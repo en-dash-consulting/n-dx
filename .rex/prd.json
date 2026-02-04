@@ -394,7 +394,7 @@
             {
               "id": "8c0107fc-f568-4649-8e6c-7c81ce45f22b",
               "title": "Add blocked status",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Distinguish blocked tasks from deferred tasks",
               "acceptanceCriteria": [
@@ -422,7 +422,7 @@
             {
               "id": "a080f709-e5aa-4672-9043-8088b512f964",
               "title": "Validate status transitions",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Prevent invalid status changes without explicit force",
               "acceptanceCriteria": [
