@@ -219,6 +219,11 @@ async function main(): Promise<void> {
         await cmdValidate(resolveDir(), flags);
         break;
       }
+      case "verify": {
+        const { cmdVerify } = await import("./commands/verify.js");
+        await cmdVerify(resolveDir(), flags);
+        break;
+      }
       case "recommend": {
         const { cmdRecommend } = await import("./commands/recommend.js");
         await cmdRecommend(resolveDir(), flags);

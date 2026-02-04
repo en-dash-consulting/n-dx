@@ -18,6 +18,7 @@ Commands:
   move <id> [dir]         Move item to new parent (reparent)
   prune [dir]             Remove completed subtrees (archive to .rex/archive.json)
   validate [dir]          Check PRD integrity (DAG, schema)
+  verify [dir]            Run tests for acceptance criteria
   recommend [dir]         Get SourceVision recommendations
   analyze [dir]           Build PRD from project analysis
   import [dir]            Alias for analyze (file import shorthand)
@@ -32,7 +33,8 @@ Options:
   --force                 Override status transition rules (for update)
   --priority=<p>          Priority (for update/add)
   --description="..."     Description (for add/update)
-  --dry-run               Preview without making changes (for prune)
+  --task=<id>             Target a specific task (for verify)
+  --dry-run               Preview without making changes (for prune, verify)
   --format=tree|json      Output format (default: tree)
   --lite                  File-name-only scan (for analyze)
   --accept                Accept LLM proposals into PRD (for smart add, analyze)

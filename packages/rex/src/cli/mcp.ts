@@ -12,6 +12,7 @@ import { computeTimestampUpdates } from "../core/timestamps.js";
 import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
 import { validateMove, moveItem } from "../core/move.js";
+import { verify } from "../core/verify.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -464,6 +465,46 @@ export async function startMcpServer(dir: string): Promise<void> {
           },
         ],
       };
+    },
+  );
+
+  server.tool(
+    "verify_criteria",
+    "Map acceptance criteria to test files and optionally run tests to verify them",
+    {
+      taskId: z.string().optional().describe("Task ID to verify (omit for all tasks)"),
+      runTests: z.boolean().optional().describe("Whether to execute tests (default: true)"),
+    },
+    async ({ taskId, runTests }) => {
+      try {
+        const doc = await store.loadDocument();
+        const config = await store.loadConfig();
+        const result = await verify({
+          projectDir: dir,
+          items: doc.items,
+          taskId,
+          testCommand: config.test,
+          runTests: runTests ?? true,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${(err as Error).message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     },
   );
 
