@@ -3,6 +3,8 @@ export { FileStore, ensureRexDir } from "./file-adapter.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
 export { LiveNotionClient } from "./notion-client.js";
+export { SyncEngine } from "../core/sync-engine.js";
+export type { SyncDirection, SyncReport, SyncOptions } from "../core/sync-engine.js";
 
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";

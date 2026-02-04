@@ -783,7 +783,7 @@
             {
               "id": "1a304d60-73c3-48cf-8ef2-559e7ca78e90",
               "title": "Add bidirectional sync support",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support changes flowing both ways between local and external stores",
               "acceptanceCriteria": [
@@ -799,7 +799,7 @@
         {
           "id": "1aca6c86-7f94-4278-befd-c8d0b125a71d",
           "title": "Notion adapter implementation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Specific implementation for Notion database integration",
           "source": "llm",
@@ -821,7 +821,7 @@
             {
               "id": "2aaae13a-0d78-4706-bacf-687296f37b85",
               "title": "Sync all PRD fields to Notion",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support status, priority, description, criteria, and tags in Notion",
               "acceptanceCriteria": [
@@ -836,7 +836,7 @@
             {
               "id": "1f98431d-0c61-471c-b9d7-fc596bb96d18",
               "title": "Use Notion native properties",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Map to Notion's built-in status and priority properties",
               "acceptanceCriteria": [
