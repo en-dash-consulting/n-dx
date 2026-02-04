@@ -250,6 +250,54 @@ describe("n-dx ci", () => {
       const valStep = report.steps.find((s) => s.name === "validate");
       expect(valStep.ok).toBe(false);
     });
+
+    it("exits non-zero on orphaned items", async () => {
+      // Subtask at root is an orphan — subtasks must be under task
+      await writeFile(
+        join(tmpDir, ".rex", "prd.json"),
+        JSON.stringify({
+          schema: "rex/v1",
+          title: "Test",
+          items: [
+            {
+              id: "sub1",
+              title: "Orphan Subtask",
+              level: "subtask",
+              status: "pending",
+            },
+          ],
+        }),
+      );
+
+      const { code } = runResult([tmpDir]);
+      expect(code).not.toBe(0);
+    });
+
+    it("JSON report shows orphaned items as failed check", async () => {
+      await writeFile(
+        join(tmpDir, ".rex", "prd.json"),
+        JSON.stringify({
+          schema: "rex/v1",
+          title: "Test",
+          items: [
+            {
+              id: "sub1",
+              title: "Orphan Subtask",
+              level: "subtask",
+              status: "pending",
+            },
+          ],
+        }),
+      );
+
+      const { stdout, code } = runResult(["--format=json", "--quiet", tmpDir]);
+      expect(code).not.toBe(0);
+      const report = JSON.parse(stdout);
+      expect(report.ok).toBe(false);
+      // The validate step should show the hierarchy placement failure
+      const valStep = report.steps.find((s) => s.name === "validate");
+      expect(valStep.ok).toBe(false);
+    });
   });
 
   // ── Help text ──────────────────────────────────────────────────────────────

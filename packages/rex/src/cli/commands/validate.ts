@@ -123,19 +123,34 @@ export async function cmdValidate(
     });
   }
 
+  // Determine pass/fail: warnings don't cause failure
+  const errorChecks = checks.filter(
+    (c) => !c.pass && c.severity !== "warn",
+  );
+  const allPass = errorChecks.length === 0;
+
   // Output results
   if (flags.format === "json") {
-    result(JSON.stringify(checks, null, 2));
+    const report = {
+      ok: allPass,
+      checks,
+      summary: {
+        total: checks.length,
+        passed: checks.filter((c) => c.pass).length,
+        failed: errorChecks.length,
+        warnings: checks.filter((c) => !c.pass && c.severity === "warn").length,
+      },
+    };
+    result(JSON.stringify(report, null, 2));
+    if (!allPass) process.exit(1);
     return;
   }
 
-  let allPass = true;
   for (const check of checks) {
     const isWarn = !check.pass && check.severity === "warn";
     const icon = check.pass ? "✓" : isWarn ? "⚠" : "✗";
     result(`${icon} ${check.name}`);
     if (!check.pass) {
-      if (!isWarn) allPass = false;
       for (const err of check.errors) {
         result(`    ${err}`);
       }

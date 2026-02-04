@@ -103,18 +103,23 @@ export async function runCI(dir, flags, { run, tools }) {
   const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir]);
 
   let validateChecks = [];
+  let validateReport = null;
   try {
-    validateChecks = JSON.parse(rexValidate.stdout);
+    const parsed = JSON.parse(rexValidate.stdout);
+    // Handle structured report format (has .ok and .checks) or bare array
+    if (parsed && typeof parsed === "object" && "checks" in parsed) {
+      validateReport = parsed;
+      validateChecks = parsed.checks;
+    } else if (Array.isArray(parsed)) {
+      validateChecks = parsed;
+    }
   } catch {
     // Could not parse — treat as opaque output
   }
 
-  // rex validate --format=json exits 0 even on failure (returns early for JSON).
-  // Determine pass/fail from the check results themselves.
-  const hasErrors = validateChecks.some(
-    (c) => !c.pass && c.severity !== "warn",
-  );
-  const rexValOk = rexValidate.code === 0 && !hasErrors;
+  // rex validate --format=json now exits non-zero on failure.
+  // Use exit code as primary signal; fall back to check analysis.
+  const rexValOk = rexValidate.code === 0;
   if (!rexValOk) allOk = false;
 
   steps.push({
@@ -132,7 +137,7 @@ export async function runCI(dir, flags, { run, tools }) {
     info(`  ✗ rex validate`);
     if (!isJSON) {
       for (const check of validateChecks) {
-        if (!check.pass) {
+        if (!check.pass && check.severity !== "warn") {
           console.log(`    ✗ ${check.name}`);
           for (const err of check.errors) {
             console.log(`      ${err}`);
