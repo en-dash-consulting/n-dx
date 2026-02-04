@@ -7,10 +7,11 @@
 
 export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs } from "./enrich-config.js";
 export type { PassConfig } from "./enrich-config.js";
-export { tryCallClaude } from "./claude-cli.js";
+export { tryCallClaude, parseStreamTokenUsage } from "./claude-cli.js";
 export type { ClaudeCallResult } from "./claude-cli.js";
 export { tryParseJSON, extractFindings, mergeZonesByName } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";
+export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ import type {
   ZoneCrossing,
   Zones,
   Finding,
+  TokenUsage,
+  AnalyzeTokenUsage,
 } from "../schema/index.js";
 
 import {
@@ -38,6 +41,7 @@ import type { PassConfig } from "./enrich-config.js";
 import { tryCallClaude } from "./claude-cli.js";
 import { tryParseJSON, extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
+import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 
 // ── Batch processing (private) ───────────────────────────────────────────────
 
@@ -47,6 +51,8 @@ interface BatchResult {
   parsed: any;
   /** Which zones were in this batch */
   batchZones: Zone[];
+  /** Token usage from Claude calls for this batch */
+  tokenUsage: AnalyzeTokenUsage;
 }
 
 /**
@@ -97,6 +103,7 @@ async function enrichBatch(
     : "";
 
   const batchLabel = totalBatches > 1 ? ` batch ${batchIndex + 1}/${totalBatches}` : "";
+  const batchTokenUsage = emptyAnalyzeTokenUsage();
 
   for (let attempt = 0; attempt < ATTEMPT_CONFIGS.length; attempt++) {
     const config = ATTEMPT_CONFIGS[attempt];
@@ -238,6 +245,7 @@ Return ONLY JSON:
     console.log(`  [enrich]${batchLabel} Calling Claude (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt, ${Math.round(IDLE_TIMEOUT_MS / 60_000)}m idle / ${Math.round(OVERALL_TIMEOUT_MS / 60_000)}m max)...`);
 
     const callResult = await tryCallClaude(prompt, config.timeout);
+    accumulateTokenUsage(batchTokenUsage, callResult.ok ? callResult.tokenUsage : undefined);
 
     if (!callResult.ok) {
       if (callResult.reason === "auth") {
@@ -267,7 +275,7 @@ Return ONLY JSON:
     if (attempt > 0) {
       console.log(`  [enrich]${batchLabel} Succeeded on attempt ${attempt + 1}`);
     }
-    return { parsed: candidate, batchZones };
+    return { parsed: candidate, batchZones, tokenUsage: batchTokenUsage };
   }
 
   console.warn(`  [enrich]${batchLabel} All attempts exhausted — keeping algorithmic names for this batch`);
@@ -323,11 +331,13 @@ export async function enrichZonesWithAI(
       zones.reduce((s, z) => s + z.files.length, 0), zones.length, passNumber
     );
     const config = ATTEMPT_CONFIGS[0];
+    const metaTokenUsage = emptyAnalyzeTokenUsage();
 
     const callResult = await tryCallClaude(metaPrompt, config.timeout);
+    accumulateTokenUsage(metaTokenUsage, callResult.ok ? callResult.tokenUsage : undefined);
     if (!callResult.ok) {
       console.warn(`  [enrich] Meta-evaluation failed (${callResult.reason})`);
-      return empty;
+      return { ...empty, tokenUsage: metaTokenUsage };
     }
 
     const parsed = tryParseJSON(callResult.response);
@@ -381,6 +391,7 @@ export async function enrichZonesWithAI(
       newFindings: newFindings,
       pass: passNumber,
       _updatedFindings: updatedFindings,
+      tokenUsage: metaTokenUsage,
     };
   }
 
@@ -447,7 +458,23 @@ export async function enrichZonesWithAI(
     return empty;
   }
 
-  // 5. Merge all batch results
+  // 5. Aggregate token usage across all batches
+  const totalTokenUsage = emptyAnalyzeTokenUsage();
+  for (const br of allBatchResults) {
+    totalTokenUsage.calls += br.tokenUsage.calls;
+    totalTokenUsage.inputTokens += br.tokenUsage.inputTokens;
+    totalTokenUsage.outputTokens += br.tokenUsage.outputTokens;
+    if (br.tokenUsage.cacheCreationInputTokens) {
+      totalTokenUsage.cacheCreationInputTokens =
+        (totalTokenUsage.cacheCreationInputTokens ?? 0) + br.tokenUsage.cacheCreationInputTokens;
+    }
+    if (br.tokenUsage.cacheReadInputTokens) {
+      totalTokenUsage.cacheReadInputTokens =
+        (totalTokenUsage.cacheReadInputTokens ?? 0) + br.tokenUsage.cacheReadInputTokens;
+    }
+  }
+
+  // 6. Merge all batch results
   // Build a combined "parsed" response from all successful batches
   const allParsedZones: any[] = [];
   const allParsedInsights: string[] = [];
@@ -542,6 +569,7 @@ export async function enrichZonesWithAI(
       newGlobalInsights: dedupedInsights,
       newFindings: newFindings,
       pass: 1,
+      tokenUsage: totalTokenUsage,
     };
   }
 
@@ -587,5 +615,6 @@ export async function enrichZonesWithAI(
     newGlobalInsights: dedupedInsights,
     newFindings: newFindings,
     pass: passNumber,
+    tokenUsage: totalTokenUsage,
   };
 }

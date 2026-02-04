@@ -156,6 +156,30 @@ export interface Zones {
   structureHash?: string;
 }
 
+// ── Token Usage ─────────────────────────────────────────────────────────────
+
+/** Token usage from a single Claude API call. */
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cacheCreationInput?: number;
+  cacheReadInput?: number;
+}
+
+/** Aggregated token usage across one or more LLM calls. */
+export interface AnalyzeTokenUsage {
+  /** Number of LLM calls made. */
+  calls: number;
+  /** Total input tokens across all calls. */
+  inputTokens: number;
+  /** Total output tokens across all calls. */
+  outputTokens: number;
+  /** Total cache creation input tokens (if any). */
+  cacheCreationInputTokens?: number;
+  /** Total cache read input tokens (if any). */
+  cacheReadInputTokens?: number;
+}
+
 // ── Components ──────────────────────────────────────────────────────────────
 
 export type ComponentKind = "function" | "arrow" | "class" | "forwardRef";

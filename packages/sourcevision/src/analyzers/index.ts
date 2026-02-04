@@ -7,6 +7,8 @@ export {
   updateManifestError,
 } from "./manifest.js";
 export { analyzeZones } from "./zones.js";
+export type { AnalyzeZonesResult } from "./zones.js";
+export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
 export {
   analyzeComponents,
   extractComponentDefinitions,

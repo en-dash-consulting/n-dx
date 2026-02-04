@@ -12,6 +12,7 @@ import type {
   ZoneCrossing,
   Zones,
   Finding,
+  AnalyzeTokenUsage,
 } from "../schema/index.js";
 import { sortZonesData } from "../util/sort.js";
 import {
@@ -23,6 +24,12 @@ import {
 } from "./louvain.js";
 import { enrichZonesWithAI } from "./enrich.js";
 import type { EnrichResult } from "./enrich.js";
+
+/** Result from analyzeZones, including the zones data and optional token usage. */
+export interface AnalyzeZonesResult {
+  zones: Zones;
+  tokenUsage?: AnalyzeTokenUsage;
+}
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
 
@@ -355,7 +362,7 @@ export async function analyzeZones(
   inventory: Inventory,
   imports: Imports,
   options?: { enrich?: boolean; previousZones?: Zones }
-): Promise<Zones> {
+): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
   const previousZones = options?.previousZones;
   const graph = buildUndirectedGraph(imports.edges);
@@ -466,6 +473,7 @@ export async function analyzeZones(
   let aiFindings: Finding[] = [];
   let enrichmentPass = 0;
   let metaUpdatedFindings: Finding[] | null = null;
+  let enrichTokenUsage: AnalyzeTokenUsage | undefined;
 
   if (enrich) {
     // Build pre-enrichment crossings for prompt context
@@ -499,6 +507,7 @@ export async function analyzeZones(
     aiGlobalInsights = result.newGlobalInsights;
     aiFindings = result.newFindings;
     enrichmentPass = result.pass;
+    enrichTokenUsage = result.tokenUsage;
     // Meta-evaluation may return updated findings with reassessed severities
     if (result._updatedFindings) {
       metaUpdatedFindings = result._updatedFindings;
@@ -685,14 +694,17 @@ export async function analyzeZones(
   // Cap enrichmentPass at 4 for UI display purposes
   const displayPass = enrichmentPass > 4 ? 4 : enrichmentPass;
 
-  return sortZonesData({
-    zones: finalZones,
-    crossings,
-    unzoned,
-    insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
-    findings: allFindings.length > 0 ? allFindings : undefined,
-    enrichmentPass: displayPass > 0 ? displayPass : undefined,
-    ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
-    structureHash,
-  });
+  return {
+    zones: sortZonesData({
+      zones: finalZones,
+      crossings,
+      unzoned,
+      insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
+      findings: allFindings.length > 0 ? allFindings : undefined,
+      enrichmentPass: displayPass > 0 ? displayPass : undefined,
+      ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
+      structureHash,
+    }),
+    tokenUsage: enrichTokenUsage,
+  };
 }

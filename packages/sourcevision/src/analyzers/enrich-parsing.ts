@@ -6,6 +6,7 @@ import type {
   Zone,
   Finding,
   FindingType,
+  AnalyzeTokenUsage,
 } from "../schema/index.js";
 
 // ── JSON parsing ─────────────────────────────────────────────────────────────
@@ -234,4 +235,6 @@ export interface EnrichResult {
   pass: number;
   /** Updated findings with reassessed severities from meta-evaluation */
   _updatedFindings?: Finding[];
+  /** Aggregated token usage across all LLM calls in this enrichment */
+  tokenUsage?: AnalyzeTokenUsage;
 }

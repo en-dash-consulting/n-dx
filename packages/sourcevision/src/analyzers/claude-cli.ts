@@ -4,11 +4,12 @@
 
 import { spawn } from "node:child_process";
 import { IDLE_TIMEOUT_MS, OVERALL_TIMEOUT_MS } from "./enrich-config.js";
+import type { TokenUsage } from "../schema/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type ClaudeCallResult =
-  | { ok: true; response: string }
+  | { ok: true; response: string; tokenUsage?: TokenUsage }
   | { ok: false; reason: "auth" | "timeout" | "rate-limit" | "unknown"; detail: string };
 
 // ── Claude CLI call ──────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ export async function tryCallClaude(prompt: string, _timeoutMs: number): Promise
 
     const stderrChunks: Buffer[] = [];
     let resultText: string | null = null;
+    let resultTokenUsage: TokenUsage | undefined;
     let settled = false;
     let lastActivity = Date.now();
 
@@ -65,6 +67,7 @@ export async function tryCallClaude(prompt: string, _timeoutMs: number): Promise
           const obj = JSON.parse(line);
           if (obj.type === "result") {
             resultText = typeof obj.result === "string" ? obj.result : null;
+            resultTokenUsage = parseStreamTokenUsage(obj);
           }
         } catch { /* skip unparseable lines */ }
       }
@@ -76,7 +79,7 @@ export async function tryCallClaude(prompt: string, _timeoutMs: number): Promise
       const stderrStr = Buffer.concat(stderrChunks).toString("utf-8").trim();
 
       if (code === 0 && resultText != null) {
-        finish({ ok: true, response: resultText.trim() });
+        finish({ ok: true, response: resultText.trim(), tokenUsage: resultTokenUsage });
         return;
       }
 
@@ -100,4 +103,46 @@ export async function tryCallClaude(prompt: string, _timeoutMs: number): Promise
     child.stdin!.write(prompt, "utf-8");
     child.stdin!.end();
   });
+}
+
+// ── Token usage parsing ──────────────────────────────────────────────────────
+
+/**
+ * Parse token usage from a stream-json result event.
+ * Claude CLI stream-json result events may include token usage at the top level
+ * or nested under a `usage` property.
+ */
+export function parseStreamTokenUsage(obj: Record<string, unknown>): TokenUsage | undefined {
+  // Try direct fields first (some CLI versions)
+  let input = obj.input_tokens ?? obj.total_input_tokens;
+  let output = obj.output_tokens ?? obj.total_output_tokens;
+  let cacheCreation = obj.cache_creation_input_tokens;
+  let cacheRead = obj.cache_read_input_tokens;
+
+  // Try nested usage object (stream-json format)
+  if (typeof input !== "number" && typeof output !== "number" && obj.usage && typeof obj.usage === "object") {
+    const usage = obj.usage as Record<string, unknown>;
+    input = usage.input_tokens ?? usage.total_input_tokens;
+    output = usage.output_tokens ?? usage.total_output_tokens;
+    cacheCreation = usage.cache_creation_input_tokens;
+    cacheRead = usage.cache_read_input_tokens;
+  }
+
+  if (typeof input !== "number" && typeof output !== "number") {
+    return undefined;
+  }
+
+  const tokenUsage: TokenUsage = {
+    input: typeof input === "number" ? input : 0,
+    output: typeof output === "number" ? output : 0,
+  };
+
+  if (typeof cacheCreation === "number" && cacheCreation > 0) {
+    tokenUsage.cacheCreationInput = cacheCreation;
+  }
+  if (typeof cacheRead === "number" && cacheRead > 0) {
+    tokenUsage.cacheReadInput = cacheRead;
+  }
+
+  return tokenUsage;
 }

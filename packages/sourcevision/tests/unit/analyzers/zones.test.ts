@@ -223,7 +223,7 @@ describe("analyzeZones", () => {
     ]);
     const imports = makeImports([]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.zones).toHaveLength(0);
     expect(result.crossings).toHaveLength(0);
@@ -251,7 +251,7 @@ describe("analyzeZones", () => {
       makeEdge("src/b/p.ts", "src/b/r.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.zones.length).toBe(2);
     expect(result.crossings).toHaveLength(0);
@@ -274,7 +274,7 @@ describe("analyzeZones", () => {
       makeEdge("src/m/a.ts", "src/m/c.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.zones).toHaveLength(1);
     expect(result.zones[0].cohesion).toBe(1);
@@ -303,7 +303,7 @@ describe("analyzeZones", () => {
       makeEdge("src/a/x.ts", "src/b/p.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.crossings.length).toBeGreaterThan(0);
     expect(result.crossings.some((c) => c.fromZone !== c.toZone)).toBe(true);
@@ -328,7 +328,7 @@ describe("analyzeZones", () => {
       makeEdge("src/m/a.ts", "src/m/c.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.unzoned).toContain("README.md");
     expect(result.unzoned).toContain(".gitignore");
@@ -353,7 +353,7 @@ describe("analyzeZones", () => {
       makeEdge("src/util/helper.ts", "src/core/a.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     // The small community (helper) should be merged into core
     // so we should have 1 zone containing all 5 files
@@ -381,7 +381,7 @@ describe("analyzeZones", () => {
       makeEdge("src/a/x.ts", "src/b/p.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     if (result.zones.length === 2) {
       // The zone containing b/p.ts should list it as an entry point
@@ -407,8 +407,8 @@ describe("analyzeZones", () => {
       makeEdge("src/a/x.ts", "src/b/p.ts"),
     ]);
 
-    const run1 = await analyzeZones(inventory, imports, { enrich: false });
-    const run2 = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: run1 } = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: run2 } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(run1).toEqual(run2);
   });
@@ -995,7 +995,7 @@ describe("analyzeZones insights", () => {
       makeEdge("src/a/x.ts", "src/a/z.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(result.zones).toHaveLength(1);
     // Should have structural insights even without AI
@@ -1019,7 +1019,7 @@ describe("analyzeZones insights", () => {
       makeEdge("src/m/a.ts", "src/m/c.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     // README.md and styles.css should be assigned to the zone by proximity
     expect(result.zones[0].files).toContain("src/m/README.md");
@@ -1203,7 +1203,7 @@ describe("analyzeZones findings", () => {
       makeEdge("src/a/x.ts", "src/a/z.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     // Should have findings array with pass 0 observations
     expect(result.findings).toBeDefined();
@@ -1224,7 +1224,7 @@ describe("analyzeZones findings", () => {
       makeEdge("src/a/x.ts", "src/a/z.ts"),
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
     // Both old insights and new findings should be populated
     expect(result.zones[0].insights).toBeDefined();
@@ -1254,7 +1254,7 @@ describe("analyzeZones findings", () => {
       // Only some internal edges → low cohesion
     ]);
 
-    const result = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
     if (result.findings) {
       for (const f of result.findings) {
         expect(["info", "warning", "critical"]).toContain(f.severity);

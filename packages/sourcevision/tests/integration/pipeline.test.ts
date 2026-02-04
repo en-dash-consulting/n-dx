@@ -35,7 +35,7 @@ describe("full analysis pipeline on small-ts-project", () => {
     expect(hasUserServiceImport).toBe(true);
 
     // Phase 3: Zones (fast mode, no AI)
-    const zones = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones } = await analyzeZones(inventory, imports, { enrich: false });
     const zonesResult = validateZones(zones);
     expect(zonesResult.ok).toBe(true);
     expect(zones.zones.length).toBeGreaterThan(0);

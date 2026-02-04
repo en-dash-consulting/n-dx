@@ -14,6 +14,8 @@ import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
+import { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
+import type { AnalyzeTokenUsage } from "../../schema/index.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -57,6 +59,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   }
 
   const filter = parsePhaseFilter(extraArgs);
+
+  const tokenUsage = emptyAnalyzeTokenUsage();
 
   info(`Analyzing: ${absDir}`);
   info("");
@@ -185,7 +189,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const importsRaw = readFileSync(importsPath, "utf-8");
         const inventory = JSON.parse(inventoryRaw);
         const importsData = JSON.parse(importsRaw);
-        let zones = await analyzeZones(inventory, importsData, { enrich, previousZones });
+        let zonesResult = await analyzeZones(inventory, importsData, { enrich, previousZones });
+        let zones = zonesResult.zones;
+        if (zonesResult.tokenUsage) {
+          accumulateFromAggregate(tokenUsage, zonesResult.tokenUsage);
+        }
         const outPath = join(svDir, DATA_FILES.zones);
         writeFileSync(outPath, toCanonicalJSON(zones));
 
@@ -199,7 +207,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
           for (let p = 0; p < passesNeeded; p++) {
             info(`\n[phase 3] Enrichment pass ${currentPass + p + 2}...`);
             const prevZones = zones;
-            zones = await analyzeZones(inventory, importsData, { enrich: true, previousZones: prevZones });
+            zonesResult = await analyzeZones(inventory, importsData, { enrich: true, previousZones: prevZones });
+            zones = zonesResult.zones;
+            if (zonesResult.tokenUsage) {
+              accumulateFromAggregate(tokenUsage, zonesResult.tokenUsage);
+            }
             writeFileSync(outPath, toCanonicalJSON(zones));
           }
         }
@@ -312,6 +324,30 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     }
   }
 
+  // ── Token usage summary ──────────────────────────────────────────────────
+  const usageLine = formatTokenUsage(tokenUsage);
+  if (usageLine) {
+    info(`Token usage: ${usageLine}`);
+  }
+
   info("");
   info("Done.");
+}
+
+/**
+ * Merge one AnalyzeTokenUsage aggregate into another.
+ * Used to combine token usage from multiple analyzeZones calls (e.g. --full mode).
+ */
+function accumulateFromAggregate(target: AnalyzeTokenUsage, source: AnalyzeTokenUsage): void {
+  target.calls += source.calls;
+  target.inputTokens += source.inputTokens;
+  target.outputTokens += source.outputTokens;
+  if (source.cacheCreationInputTokens) {
+    target.cacheCreationInputTokens =
+      (target.cacheCreationInputTokens ?? 0) + source.cacheCreationInputTokens;
+  }
+  if (source.cacheReadInputTokens) {
+    target.cacheReadInputTokens =
+      (target.cacheReadInputTokens ?? 0) + source.cacheReadInputTokens;
+  }
 }
