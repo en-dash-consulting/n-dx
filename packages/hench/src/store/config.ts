@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { validateConfig, DEFAULT_HENCH_CONFIG } from "../schema/index.js";
 import { toCanonicalJSON } from "./json.js";
+import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import type { HenchConfig } from "../schema/index.js";
 
 export async function ensureHenchDir(henchDir: string): Promise<void> {
@@ -17,7 +18,10 @@ export async function loadConfig(henchDir: string): Promise<HenchConfig> {
   if (!result.ok) {
     throw new Error(`Invalid hench config: ${result.errors.message}`);
   }
-  return result.data as HenchConfig;
+
+  // Merge project-level .n-dx.json overrides (project config takes precedence)
+  const overrides = await loadProjectOverrides(henchDir, "hench");
+  return mergeWithOverrides(result.data as HenchConfig, overrides);
 }
 
 export async function saveConfig(

@@ -371,6 +371,146 @@ describe("n-dx config", () => {
       expect(output).toContain("n-dx config hench.maxTurns 100");
       expect(output).toContain("n-dx config --json");
     });
+
+    it("documents .n-dx.json project config", () => {
+      const output = run(["--help"]);
+      expect(output).toContain(".n-dx.json");
+      expect(output).toContain("project root");
+      expect(output).toContain("precedence");
+    });
+  });
+
+  // ── Project-level .n-dx.json ─────────────────────────────────────────────
+
+  describe(".n-dx.json project config", () => {
+    it("reads .n-dx.json and merges with package configs", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ rex: { project: "overridden-name" } }, null, 2) + "\n",
+      );
+
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.rex.project).toBe("overridden-name");
+    });
+
+    it("project config takes precedence over package config", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          hench: { model: "opus", maxTurns: 200 },
+        }, null, 2) + "\n",
+      );
+
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.hench.model).toBe("opus");
+      expect(parsed.hench.maxTurns).toBe(200);
+      // Non-overridden values remain from package config
+      expect(parsed.hench.provider).toBe("cli");
+    });
+
+    it("deep merges nested objects", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          hench: { guard: { commandTimeout: 60000 } },
+        }, null, 2) + "\n",
+      );
+
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.hench.guard.commandTimeout).toBe(60000);
+      // Other guard values preserved from package config
+      expect(parsed.hench.guard.maxFileSize).toBe(1048576);
+    });
+
+    it("get returns merged value from .n-dx.json", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ hench: { model: "haiku" } }, null, 2) + "\n",
+      );
+
+      const output = run(["hench.model", tmpDir]);
+      expect(output.trim()).toBe("haiku");
+    });
+
+    it("works when no package configs exist but .n-dx.json does", async () => {
+      const freshDir = await mkdtemp(join(tmpdir(), "ndx-config-ndxonly-"));
+      try {
+        // Only create .n-dx.json — no .rex, .hench, .sourcevision dirs
+        await mkdir(join(freshDir, ".rex"), { recursive: true });
+        await writeFile(
+          join(freshDir, ".rex", "config.json"),
+          JSON.stringify({
+            schema: "rex/v1",
+            project: "base",
+            adapter: "file",
+          }, null, 2) + "\n",
+        );
+        await writeFile(
+          join(freshDir, ".n-dx.json"),
+          JSON.stringify({ rex: { project: "from-ndx" } }, null, 2) + "\n",
+        );
+
+        const output = run(["--json", freshDir]);
+        const parsed = JSON.parse(output);
+        expect(parsed.rex.project).toBe("from-ndx");
+      } finally {
+        await rm(freshDir, { recursive: true, force: true });
+      }
+    });
+
+    it("ignores .n-dx.json gracefully when it has invalid JSON", async () => {
+      await writeFile(join(tmpDir, ".n-dx.json"), "not valid json\n");
+
+      // Should still work — just skip the broken project config
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.rex.project).toBe("test-project");
+    });
+
+    it("ignores .n-dx.json when it does not exist", () => {
+      // Default behavior — no .n-dx.json
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.rex.project).toBe("test-project");
+    });
+
+    it("set writes to package config, not .n-dx.json", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ hench: { model: "opus" } }, null, 2) + "\n",
+      );
+
+      // Set a value — should write to .hench/config.json
+      run(["hench.maxTurns", "75", tmpDir]);
+
+      // .n-dx.json should be untouched
+      const ndxConfig = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      );
+      expect(ndxConfig).toEqual({ hench: { model: "opus" } });
+
+      // Package config should have the new value
+      const henchConfig = JSON.parse(
+        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+      );
+      expect(henchConfig.maxTurns).toBe(75);
+    });
+
+    it("array override replaces entire array", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          hench: { guard: { allowedCommands: ["pnpm", "git"] } },
+        }, null, 2) + "\n",
+      );
+
+      const output = run(["--json", tmpDir]);
+      const parsed = JSON.parse(output);
+      expect(parsed.hench.guard.allowedCommands).toEqual(["pnpm", "git"]);
+    });
   });
 
   // ── No config ──────────────────────────────────────────────────────────────

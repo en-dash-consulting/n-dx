@@ -4,6 +4,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/index.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
+import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import type { PRDStore, StoreCapabilities } from "./types.js";
 
 export class FileStore implements PRDStore {
@@ -75,7 +76,10 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid config.json: ${result.errors.message}`);
     }
-    return result.data as RexConfig;
+
+    // Merge project-level .n-dx.json overrides (project config takes precedence)
+    const overrides = await loadProjectOverrides(this.rexDir, "rex");
+    return mergeWithOverrides(result.data as RexConfig, overrides);
   }
 
   async saveConfig(config: RexConfig): Promise<void> {
