@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     // init creates it; analyze handles its own graceful fallback.
     // Commands whose first positional arg is an ID (not a dir) must handle
     // their own dir resolution and requireRexDir check inside the case block.
-    const SKIP_DIR_CHECK = new Set(["init", "analyze", "update", "move"]);
+    const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move"]);
     if (!SKIP_DIR_CHECK.has(command)) {
       requireRexDir(resolveDir());
     }
@@ -219,6 +219,7 @@ async function main(): Promise<void> {
         await cmdRecommend(resolveDir(), flags);
         break;
       }
+      case "import":
       case "analyze": {
         const { cmdAnalyze } = await import("./commands/analyze.js");
         await cmdAnalyze(resolveDir(), flags, multiFlags);

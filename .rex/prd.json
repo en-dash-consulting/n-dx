@@ -338,8 +338,6 @@
           "level": "feature",
           "description": "Allow more flexible organization of PRD items beyond rigid four-level structure",
           "source": "llm",
-          "startedAt": "2026-02-04T16:12:38.681Z",
-          "completedAt": "2026-02-04T16:12:38.681Z",
           "children": [
             {
               "id": "23402c98-4566-4d51-9f98-3c353988b2a9",
@@ -385,7 +383,9 @@
               "startedAt": "2026-02-04T16:12:38.671Z",
               "completedAt": "2026-02-04T16:12:38.671Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-04T16:12:38.681Z",
+          "completedAt": "2026-02-04T16:12:38.681Z"
         },
         {
           "id": "4ac64ac1-fa02-4f8a-b0b3-45faa30b69ac",
@@ -394,8 +394,6 @@
           "level": "feature",
           "description": "Improve task status management and tracking throughout lifecycle",
           "source": "llm",
-          "startedAt": "2026-02-04T15:43:05.711Z",
-          "completedAt": "2026-02-04T15:43:05.711Z",
           "children": [
             {
               "id": "8c0107fc-f568-4649-8e6c-7c81ce45f22b",
@@ -457,7 +455,9 @@
               "startedAt": "2026-02-04T15:25:09.269Z",
               "completedAt": "2026-02-04T15:25:09.269Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-04T15:43:05.711Z",
+          "completedAt": "2026-02-04T15:43:05.711Z"
         },
         {
           "id": "7f822601-2e01-4a98-adc2-3426481da3f2",
@@ -500,7 +500,7 @@
             {
               "id": "d6520294-3587-410f-965f-99370db07d26",
               "title": "Add rex import alias",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Create synonym for rex analyze --file for discoverability",
               "acceptanceCriteria": [

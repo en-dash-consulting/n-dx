@@ -19,6 +19,7 @@ Commands:
   validate [dir]          Check PRD integrity (DAG, schema)
   recommend [dir]         Get SourceVision recommendations
   analyze [dir]           Build PRD from project analysis
+  import [dir]            Alias for analyze (file import shorthand)
   adapter <sub> [name]    Manage store adapters (list|add|remove|show)
   mcp [dir]               Start MCP server
 
