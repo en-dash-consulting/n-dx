@@ -754,7 +754,7 @@
             {
               "id": "efee6790-0f15-40dd-afbe-5e66b6baf6dc",
               "title": "Define adapter interface",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create clean interface that file and external stores implement",
               "acceptanceCriteria": [
