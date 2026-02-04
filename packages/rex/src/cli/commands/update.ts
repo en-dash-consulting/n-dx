@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { createStore } from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -26,7 +26,7 @@ export async function cmdUpdate(
   }
 
   const rexDir = join(dir, REX_DIR);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
 
   const existing = await store.getItem(id);
   if (!existing) {

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { createStore } from "rex/dist/store/index.js";
+import { resolveStore } from "rex/dist/store/index.js";
 import { loadConfig } from "../../store/index.js";
 import { agentLoop } from "../../agent/loop.js";
 import { cliLoop } from "../../agent/cli-loop.js";
@@ -23,7 +23,7 @@ async function selectTask(
   dir: string,
   rexDir: string,
 ): Promise<string> {
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
   const tasks = await getActionableTasks(store);
 
   if (tasks.length === 0) {
@@ -64,7 +64,7 @@ async function runOne(
   maxTurns: number | undefined,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
 
   const result = provider === "cli"
     ? await cliLoop({

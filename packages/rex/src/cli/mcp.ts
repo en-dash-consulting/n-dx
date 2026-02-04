@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { createStore } from "../store/index.js";
+import { resolveStore } from "../store/index.js";
 import { SCHEMA_VERSION, LEVEL_HIERARCHY } from "../schema/index.js";
 import { computeStats, findItem } from "../core/tree.js";
 import { findNextTask, collectCompletedIds } from "../core/next-task.js";
@@ -15,7 +15,7 @@ const REX_DIR = ".rex";
 
 export async function startMcpServer(dir: string): Promise<void> {
   const rexDir = join(dir, REX_DIR);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
 
   const server = new McpServer({
     name: "rex",

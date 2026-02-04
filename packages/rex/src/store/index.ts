@@ -18,6 +18,8 @@ export type {
   AdapterInfo,
 } from "./adapter-registry.js";
 
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
@@ -61,4 +63,56 @@ export function createNotionStore(
 ): PRDStore {
   const client = new LiveNotionClient(config.token);
   return new NotionStore(rexDir, client, config);
+}
+
+/**
+ * Resolve the correct PRDStore for a `.rex/` directory by reading the
+ * configured adapter from `config.json`.
+ *
+ * Resolution order:
+ * 1. Read `config.json` → use the `adapter` field (e.g. `"file"`, `"notion"`).
+ * 2. For adapters that require config (e.g. Notion), load saved adapter
+ *    config from `adapters.json` via the registry.
+ * 3. Falls back to the `"file"` adapter if config is missing or unreadable.
+ *
+ * This is the preferred way to obtain a store in CLI commands and tools.
+ * It ensures the user's configured adapter is respected.
+ *
+ * @param rexDir  Path to the `.rex/` directory.
+ * @returns A PRDStore instance for the configured adapter.
+ *
+ * @example
+ * ```ts
+ * const store = await resolveStore(join(dir, ".rex"));
+ * const doc = await store.loadDocument();
+ * ```
+ */
+export async function resolveStore(rexDir: string): Promise<PRDStore> {
+  const registry = getDefaultRegistry();
+
+  let adapterName = "file";
+  try {
+    const raw = await readFile(join(rexDir, "config.json"), "utf-8");
+    const config = JSON.parse(raw);
+    if (typeof config.adapter === "string" && config.adapter.length > 0) {
+      adapterName = config.adapter;
+    }
+  } catch {
+    // Config missing or unreadable — use default
+  }
+
+  // Simple adapters (no required config fields) can be created directly
+  const def = registry.get(adapterName);
+  if (!def) {
+    // Unknown adapter in config — fall back to file
+    return new FileStore(rexDir);
+  }
+
+  const hasRequiredConfig = Object.values(def.configSchema).some((f) => f.required);
+  if (!hasRequiredConfig) {
+    return registry.create(adapterName, rexDir, {});
+  }
+
+  // Adapter requires config — load from adapters.json
+  return registry.createFromConfig(rexDir, adapterName);
 }

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { createStore } from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { findNextTask, collectCompletedIds } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -9,7 +9,7 @@ export async function cmdNext(
   flags: Record<string, string>,
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
   if (doc.items.length === 0) {

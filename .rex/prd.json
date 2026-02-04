@@ -746,7 +746,7 @@
         {
           "id": "3a5378b3-1cb9-49de-9d51-f6572a92ac8d",
           "title": "Store adapter architecture",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create abstraction layer for different storage backends",
           "source": "llm",
@@ -769,7 +769,7 @@
             {
               "id": "5e85cd0f-f2b9-4260-9a67-e891ff10e8c6",
               "title": "Implement adapter registration system",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Allow registering and configuring different store adapters",
               "acceptanceCriteria": [

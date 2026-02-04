@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
-import { createStore } from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
@@ -124,7 +124,7 @@ export async function cmdRecommend(
 
   if (flags.accept) {
     const rexDir = join(dir, REX_DIR);
-    const store = createStore("file", rexDir);
+    const store = await resolveStore(rexDir);
 
     for (const rec of recommendations) {
       const item: PRDItem = {

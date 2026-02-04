@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { createStore } from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { computeStats } from "../../core/tree.js";
 import { CLIError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
@@ -87,7 +87,7 @@ export async function cmdStatus(
   }
 
   const rexDir = join(dir, REX_DIR);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
   if (format === "json") {

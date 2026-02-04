@@ -2,7 +2,7 @@ import { join, resolve } from "node:path";
 import { access, writeFile, readFile, unlink } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import { createStore } from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -93,7 +93,7 @@ async function acceptProposals(
   }
 
   const rexDir = join(dir, REX_DIR);
-  const store = createStore("file", rexDir);
+  const store = await resolveStore(rexDir);
 
   let addedCount = 0;
 
@@ -167,7 +167,7 @@ export async function cmdAnalyze(
   if (!model && await hasRexDir(dir)) {
     try {
       const rexDir = join(dir, REX_DIR);
-      const store = createStore("file", rexDir);
+      const store = await resolveStore(rexDir);
       const config = await store.loadConfig();
       if (config.model) {
         model = config.model;
@@ -193,7 +193,7 @@ export async function cmdAnalyze(
   if (await hasRexDir(dir)) {
     try {
       const rexDir = join(dir, REX_DIR);
-      const store = createStore("file", rexDir);
+      const store = await resolveStore(rexDir);
       const doc = await store.loadDocument();
       existing = doc.items;
     } catch {
