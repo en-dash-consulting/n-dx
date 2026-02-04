@@ -807,7 +807,7 @@
             {
               "id": "8489d495-c32e-43b9-971c-8ac3142f6215",
               "title": "Map PRD hierarchy to Notion structure",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create mapping between PRD items and Notion database structure",
               "acceptanceCriteria": [
@@ -850,7 +850,7 @@
             {
               "id": "9ccb5785-1bcd-4c29-a957-d56b9ff55430",
               "title": "Implement conflict resolution",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Handle conflicts when both local and Notion have changes",
               "acceptanceCriteria": [
