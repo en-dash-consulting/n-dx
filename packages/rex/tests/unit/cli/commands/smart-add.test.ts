@@ -113,6 +113,54 @@ describe("formatProposalTree", () => {
     expect(featureIndent).toBeGreaterThan(epicIndent);
     expect(taskIndent).toBeGreaterThan(featureIndent);
   });
+
+  it("hides epic label when parentLevel is 'epic'", () => {
+    const output = formatProposalTree([singleProposal], "epic");
+    expect(output).not.toContain("[epic]");
+    expect(output).toContain("[feature] OAuth Integration");
+    expect(output).toContain("[task] Implement Google OAuth");
+  });
+
+  it("shows only tasks when parentLevel is 'feature'", () => {
+    const output = formatProposalTree([singleProposal], "feature");
+    expect(output).not.toContain("[epic]");
+    expect(output).not.toContain("[feature]");
+    expect(output).toContain("[task] Implement Google OAuth");
+    expect(output).toContain("[task] Implement GitHub OAuth");
+    expect(output).toContain("[task] Implement JWT tokens");
+  });
+
+  it("shows subtasks when parentLevel is 'task'", () => {
+    const output = formatProposalTree([singleProposal], "task");
+    expect(output).not.toContain("[epic]");
+    expect(output).not.toContain("[feature]");
+    expect(output).not.toContain("[task]");
+    expect(output).toContain("[subtask] Implement Google OAuth");
+    expect(output).toContain("[subtask] Implement JWT tokens");
+  });
+
+  it("shows task descriptions when parentLevel is 'feature'", () => {
+    const proposalWithTaskDesc: Proposal = {
+      epic: { title: "Epic", source: "smart-add" },
+      features: [
+        {
+          title: "Feature",
+          source: "smart-add",
+          tasks: [
+            {
+              title: "A task",
+              source: "smart-add",
+              sourceFile: "",
+              description: "Task description here",
+              priority: "high",
+            },
+          ],
+        },
+      ],
+    };
+    const output = formatProposalTree([proposalWithTaskDesc], "feature");
+    expect(output).toContain("Task description here");
+  });
 });
 
 describe("countProposalItems", () => {
@@ -143,6 +191,29 @@ describe("countProposalItems", () => {
     };
     // 1 epic + 1 feature = 2
     expect(countProposalItems([proposal])).toBe(2);
+  });
+
+  it("excludes epic when parentLevel is 'epic'", () => {
+    // features + tasks only: 2 features + 3 tasks = 5
+    expect(countProposalItems([singleProposal], "epic")).toBe(5);
+  });
+
+  it("counts only tasks when parentLevel is 'feature'", () => {
+    // 3 tasks across 2 features
+    expect(countProposalItems([singleProposal], "feature")).toBe(3);
+  });
+
+  it("counts only tasks when parentLevel is 'task'", () => {
+    // Same flat count as feature parent
+    expect(countProposalItems([singleProposal], "task")).toBe(3);
+  });
+
+  it("counts across multiple proposals with parentLevel", () => {
+    // epic parent: skip epics, count features + tasks
+    // First: 2 features + 3 tasks = 5
+    // Second: 1 feature + 1 task = 2
+    // Total = 7
+    expect(countProposalItems(multiProposals, "epic")).toBe(7);
   });
 });
 

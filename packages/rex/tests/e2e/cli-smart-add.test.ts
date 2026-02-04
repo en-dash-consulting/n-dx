@@ -164,6 +164,69 @@ describe("rex add (smart mode routing)", () => {
     expect(output).not.toContain("LLM");
   });
 
+  it("smart mode with --parent validates parent exists", () => {
+    run(["init", tmpDir]);
+
+    const { stderr } = runExpectFail([
+      "add",
+      "Add some tasks",
+      "--parent=nonexistent-id",
+      tmpDir,
+    ]);
+
+    expect(stderr).toContain("not found");
+  });
+
+  it("smart mode with --parent rejects subtask parent", async () => {
+    run(["init", tmpDir]);
+
+    // Build a chain: epic → feature → task → subtask
+    const epicOut = run(["add", "epic", "--title=E", "--format=json", tmpDir]);
+    const epicId = JSON.parse(epicOut).id;
+    const featOut = run(["add", "feature", "--title=F", `--parent=${epicId}`, "--format=json", tmpDir]);
+    const featId = JSON.parse(featOut).id;
+    const taskOut = run(["add", "task", "--title=T", `--parent=${featId}`, "--format=json", tmpDir]);
+    const taskId = JSON.parse(taskOut).id;
+    run(["add", "subtask", "--title=S", `--parent=${taskId}`, tmpDir]);
+
+    // Read back to find the subtask id
+    const prd = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+    const subtaskId = prd.items[0].children[0].children[0].children[0].id;
+
+    const { stderr } = runExpectFail([
+      "add",
+      "Add something",
+      `--parent=${subtaskId}`,
+      tmpDir,
+    ]);
+
+    expect(stderr).toContain("subtask");
+  });
+
+  it("smart mode with valid --parent scopes to parent", async () => {
+    run(["init", tmpDir]);
+    const epicOut = run(["add", "epic", "--title=Existing Epic", "--format=json", tmpDir]);
+    const epicId = JSON.parse(epicOut).id;
+
+    // Smart mode with --parent triggers LLM analysis scoped to the parent
+    const { stderr, stdout, timedOut } = runQuick([
+      "add",
+      "Add caching for API responses",
+      `--parent=${epicId}`,
+      tmpDir,
+    ]);
+
+    const combined = stderr + stdout;
+    expect(
+      combined.includes("Analyzing description") ||
+      combined.includes("LLM analysis failed") ||
+      combined.includes("claude CLI not found") ||
+      timedOut,
+    ).toBe(true);
+  }, 10000);
+
   it("shows error without .rex/ for smart add", () => {
     const { stderr } = runExpectFail([
       "add",

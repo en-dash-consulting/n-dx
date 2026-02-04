@@ -3,6 +3,7 @@ import { access, writeFile, readFile, unlink } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
+import { findItem } from "../../core/tree.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -12,9 +13,17 @@ import {
   DEFAULT_MODEL,
 } from "../../analyze/index.js";
 import type { Proposal } from "../../analyze/index.js";
-import type { PRDItem } from "../../schema/index.js";
+import type { PRDItem, ItemLevel } from "../../schema/index.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
+
+/** Map a parent level to the level its children should have. */
+const CHILD_LEVEL: Record<ItemLevel, ItemLevel | null> = {
+  epic: "feature",
+  feature: "task",
+  task: "subtask",
+  subtask: null,
+};
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
@@ -25,14 +34,32 @@ async function hasRexDir(dir: string): Promise<boolean> {
   }
 }
 
-/** Count total items (epics + features + tasks) across proposals. */
-export function countProposalItems(proposals: Proposal[]): number {
+/**
+ * Count total items that will be added across proposals.
+ *
+ * When `parentLevel` is provided, the count reflects which items actually get
+ * created (e.g. when scoped to an epic, the epic itself is not counted; when
+ * scoped to a feature, only tasks are counted).
+ */
+export function countProposalItems(
+  proposals: Proposal[],
+  parentLevel?: ItemLevel,
+): number {
   let count = 0;
   for (const p of proposals) {
-    count++; // epic
-    for (const f of p.features) {
-      count++; // feature
-      count += f.tasks.length;
+    if (!parentLevel) {
+      count++; // epic
+    }
+    if (!parentLevel || parentLevel === "epic") {
+      for (const f of p.features) {
+        count++; // feature
+        count += f.tasks.length;
+      }
+    } else {
+      // feature or task parent — only task-level items are created
+      for (const f of p.features) {
+        count += f.tasks.length;
+      }
     }
   }
   return count;
@@ -41,27 +68,72 @@ export function countProposalItems(proposals: Proposal[]): number {
 /**
  * Format proposals as a readable tree with indentation and item metadata.
  * Shows numbered headers when there are multiple proposals.
+ *
+ * When `parentLevel` is provided, the display adapts to show items at the
+ * correct hierarchy level relative to the parent (e.g. when the parent is
+ * a feature, proposal features' tasks are shown as tasks under that feature).
  */
-export function formatProposalTree(proposals: Proposal[]): string {
+export function formatProposalTree(
+  proposals: Proposal[],
+  parentLevel?: ItemLevel,
+): string {
   const numbered = proposals.length > 1;
   const lines: string[] = [];
 
   for (let i = 0; i < proposals.length; i++) {
     const p = proposals[i];
-    const prefix = numbered ? `${i + 1}. ` : "  ";
-    lines.push(`${prefix}[epic] ${p.epic.title}`);
 
-    for (const f of p.features) {
-      lines.push(`    [feature] ${f.title}`);
-      if (f.description) {
-        lines.push(`      ${f.description}`);
+    if (!parentLevel || parentLevel === "epic") {
+      // Default: full epic → feature → task tree
+      const prefix = numbered ? `${i + 1}. ` : "  ";
+      if (!parentLevel) {
+        lines.push(`${prefix}[epic] ${p.epic.title}`);
       }
-      for (const t of f.tasks) {
-        const pri = t.priority ? ` [${t.priority}]` : "";
-        lines.push(`      [task] ${t.title}${pri}`);
-        if (t.acceptanceCriteria?.length) {
-          for (const ac of t.acceptanceCriteria) {
-            lines.push(`        - ${ac}`);
+
+      for (const f of p.features) {
+        lines.push(`    [feature] ${f.title}`);
+        if (f.description) {
+          lines.push(`      ${f.description}`);
+        }
+        for (const t of f.tasks) {
+          const pri = t.priority ? ` [${t.priority}]` : "";
+          lines.push(`      [task] ${t.title}${pri}`);
+          if (t.acceptanceCriteria?.length) {
+            for (const ac of t.acceptanceCriteria) {
+              lines.push(`        - ${ac}`);
+            }
+          }
+        }
+      }
+    } else if (parentLevel === "feature") {
+      // Parent is a feature — show tasks directly
+      for (const f of p.features) {
+        for (const t of f.tasks) {
+          const pri = t.priority ? ` [${t.priority}]` : "";
+          lines.push(`    [task] ${t.title}${pri}`);
+          if (t.description) {
+            lines.push(`      ${t.description}`);
+          }
+          if (t.acceptanceCriteria?.length) {
+            for (const ac of t.acceptanceCriteria) {
+              lines.push(`      - ${ac}`);
+            }
+          }
+        }
+      }
+    } else if (parentLevel === "task") {
+      // Parent is a task — show subtasks
+      for (const f of p.features) {
+        for (const t of f.tasks) {
+          const pri = t.priority ? ` [${t.priority}]` : "";
+          lines.push(`    [subtask] ${t.title}${pri}`);
+          if (t.description) {
+            lines.push(`      ${t.description}`);
+          }
+          if (t.acceptanceCriteria?.length) {
+            for (const ac of t.acceptanceCriteria) {
+              lines.push(`      - ${ac}`);
+            }
           }
         }
       }
@@ -156,6 +228,22 @@ async function clearPending(dir: string): Promise<void> {
   }
 }
 
+/**
+ * Resolve the level of the parent item when parentId is provided.
+ * Returns null when the parent does not exist or no parentId is given.
+ */
+async function resolveParentLevel(
+  dir: string,
+  parentId: string | undefined,
+): Promise<ItemLevel | null> {
+  if (!parentId) return null;
+  const rexDir = join(dir, REX_DIR);
+  const store = await resolveStore(rexDir);
+  const doc = await store.loadDocument();
+  const entry = findItem(doc.items, parentId);
+  return entry?.item.level ?? null;
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -163,53 +251,133 @@ async function acceptProposals(
 ): Promise<number> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+  const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
 
   for (const p of proposals) {
-    // If scoped to a parent, skip creating the epic and attach features directly
-    const epicId = parentId ?? randomUUID();
-
     if (!parentId) {
-      const epicItem: PRDItem = {
+      // No parent — create a new top-level epic with features and tasks beneath
+      const epicId = randomUUID();
+      await store.addItem({
         id: epicId,
         title: p.epic.title,
         level: "epic",
         status: "pending",
         source: "smart-add",
-      };
-      await store.addItem(epicItem);
-      addedCount++;
-    }
-
-    for (const f of p.features) {
-      const featureId = randomUUID();
-      const featureItem: PRDItem = {
-        id: featureId,
-        title: f.title,
-        level: "feature",
-        status: "pending",
-        source: "smart-add",
-        description: f.description,
-      };
-      await store.addItem(featureItem, epicId);
+      });
       addedCount++;
 
-      for (const t of f.tasks) {
-        const taskId = randomUUID();
-        const taskItem: PRDItem = {
-          id: taskId,
-          title: t.title,
-          level: "task",
-          status: "pending",
-          source: "smart-add",
-          description: t.description,
-          acceptanceCriteria: t.acceptanceCriteria,
-          priority: t.priority as PRDItem["priority"],
-          tags: t.tags,
-        };
-        await store.addItem(taskItem, featureId);
+      for (const f of p.features) {
+        const featureId = randomUUID();
+        await store.addItem(
+          {
+            id: featureId,
+            title: f.title,
+            level: "feature",
+            status: "pending",
+            source: "smart-add",
+            description: f.description,
+          },
+          epicId,
+        );
         addedCount++;
+
+        for (const t of f.tasks) {
+          await store.addItem(
+            {
+              id: randomUUID(),
+              title: t.title,
+              level: "task",
+              status: "pending",
+              source: "smart-add",
+              description: t.description,
+              acceptanceCriteria: t.acceptanceCriteria,
+              priority: t.priority as PRDItem["priority"],
+              tags: t.tags,
+            },
+            featureId,
+          );
+          addedCount++;
+        }
+      }
+    } else if (parentLevel === "epic") {
+      // Parent is an epic — attach features (and their tasks) directly
+      for (const f of p.features) {
+        const featureId = randomUUID();
+        await store.addItem(
+          {
+            id: featureId,
+            title: f.title,
+            level: "feature",
+            status: "pending",
+            source: "smart-add",
+            description: f.description,
+          },
+          parentId,
+        );
+        addedCount++;
+
+        for (const t of f.tasks) {
+          await store.addItem(
+            {
+              id: randomUUID(),
+              title: t.title,
+              level: "task",
+              status: "pending",
+              source: "smart-add",
+              description: t.description,
+              acceptanceCriteria: t.acceptanceCriteria,
+              priority: t.priority as PRDItem["priority"],
+              tags: t.tags,
+            },
+            featureId,
+          );
+          addedCount++;
+        }
+      }
+    } else if (parentLevel === "feature") {
+      // Parent is a feature — flatten proposal features' tasks as direct
+      // children of the feature (level: task)
+      for (const f of p.features) {
+        for (const t of f.tasks) {
+          await store.addItem(
+            {
+              id: randomUUID(),
+              title: t.title,
+              level: "task",
+              status: "pending",
+              source: "smart-add",
+              description: t.description,
+              acceptanceCriteria: t.acceptanceCriteria,
+              priority: t.priority as PRDItem["priority"],
+              tags: t.tags,
+            },
+            parentId,
+          );
+          addedCount++;
+        }
+      }
+    } else if (parentLevel === "task") {
+      // Parent is a task — flatten everything as subtasks
+      for (const f of p.features) {
+        for (const t of f.tasks) {
+          await store.addItem(
+            {
+              id: randomUUID(),
+              title: t.title,
+              level: "subtask",
+              status: "pending",
+              source: "smart-add",
+              description: t.description,
+              acceptanceCriteria: t.acceptanceCriteria,
+              priority: t.priority as PRDItem["priority"],
+              tags: t.tags,
+            },
+            parentId,
+          );
+          addedCount++;
+        }
       }
     }
   }
@@ -217,7 +385,7 @@ async function acceptProposals(
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "smart_add_accept",
-    detail: `Added ${addedCount} items from smart add`,
+    detail: `Added ${addedCount} items from smart add${parentId ? ` under parent ${parentId}` : ""}`,
   });
 
   await clearPending(dir);
@@ -279,14 +447,21 @@ export async function cmdSmartAdd(
   const doc = await store.loadDocument();
   const existing = doc.items;
 
-  // Validate parent if provided
+  // Validate parent if provided and resolve its level
+  let parentLevel: ItemLevel | undefined;
   if (parentId) {
-    const { findItem } = await import("../../core/tree.js");
     const parentEntry = findItem(existing, parentId);
     if (!parentEntry) {
       throw new CLIError(
         `Parent "${parentId}" not found.`,
         "Check the ID with 'rex status' and try again.",
+      );
+    }
+    parentLevel = parentEntry.item.level;
+    if (parentLevel === "subtask") {
+      throw new CLIError(
+        "Cannot add children under a subtask.",
+        "Subtasks are leaf nodes. Specify a task, feature, or epic as the parent.",
       );
     }
   }
@@ -355,10 +530,14 @@ export async function cmdSmartAdd(
   }
 
   // Display proposed structure
-  const itemCount = countProposalItems(proposals);
+  const itemCount = countProposalItems(proposals, parentLevel);
   if (flags.format !== "json") {
-    info(`\nProposed structure (${itemCount} items):`);
-    info(formatProposalTree(proposals));
+    if (parentId && parentLevel) {
+      info(`\nProposed additions under parent ${parentId} (${itemCount} items):`);
+    } else {
+      info(`\nProposed structure (${itemCount} items):`);
+    }
+    info(formatProposalTree(proposals, parentLevel));
     info("");
   }
 
