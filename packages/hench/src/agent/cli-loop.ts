@@ -16,6 +16,8 @@ export interface CliLoopOptions {
   taskId?: string;
   dryRun?: boolean;
   model?: string;
+  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
+  excludeTaskIds?: Set<string>;
 }
 
 export interface CliLoopResult {
@@ -244,7 +246,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
   const model = opts.model ?? config.model;
 
-  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId);
+  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {
+    excludeTaskIds: opts.excludeTaskIds,
+  });
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
 

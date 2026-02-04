@@ -12,6 +12,11 @@ import type {
   TaskBriefLogEntry,
 } from "../schema/index.js";
 
+export interface AssembleBriefOptions {
+  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
+  excludeTaskIds?: Set<string>;
+}
+
 function itemToTaskBrief(item: PRDItem): TaskBriefTask {
   return {
     id: item.id,
@@ -51,9 +56,11 @@ function getSiblings(entry: TreeEntry, doc: { items: PRDItem[] }): TaskBriefSibl
 export async function assembleTaskBrief(
   store: PRDStore,
   taskId?: string,
+  options?: AssembleBriefOptions,
 ): Promise<{ brief: TaskBrief; taskId: string }> {
   const doc = await store.loadDocument();
   const config = await store.loadConfig();
+  const excludeIds = options?.excludeTaskIds;
 
   let entry: TreeEntry | null;
 
@@ -64,7 +71,11 @@ export async function assembleTaskBrief(
     }
   } else {
     const completedIds = collectCompletedIds(doc.items);
-    entry = findNextTask(doc.items, completedIds);
+    // When excluding stuck tasks, treat them as completed so findNextTask skips them
+    const skipIds = excludeIds
+      ? new Set([...completedIds, ...excludeIds])
+      : completedIds;
+    entry = findNextTask(doc.items, skipIds);
     if (!entry) {
       throw new Error("No actionable tasks found in PRD");
     }

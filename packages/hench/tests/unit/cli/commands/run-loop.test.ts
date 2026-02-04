@@ -83,6 +83,50 @@ describe("loop mode helpers", () => {
   });
 });
 
+describe("stuck task config defaults", () => {
+  it("maxFailedAttempts is optional in schema and defaults to 3", async () => {
+    const { validateConfig } = await import("../../../../src/schema/validate.js");
+    const { DEFAULT_HENCH_CONFIG } = await import("../../../../src/schema/v1.js");
+
+    const config = DEFAULT_HENCH_CONFIG();
+    const result = validateConfig(config);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.maxFailedAttempts).toBe(3);
+    }
+  });
+
+  it("maxFailedAttempts can be customised in config", async () => {
+    const { validateConfig } = await import("../../../../src/schema/validate.js");
+    const { DEFAULT_HENCH_CONFIG } = await import("../../../../src/schema/v1.js");
+
+    const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: 5 };
+    const result = validateConfig(config);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.maxFailedAttempts).toBe(5);
+    }
+  });
+
+  it("rejects maxFailedAttempts of 0", async () => {
+    const { validateConfig } = await import("../../../../src/schema/validate.js");
+    const { DEFAULT_HENCH_CONFIG } = await import("../../../../src/schema/v1.js");
+
+    const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: 0 };
+    const result = validateConfig(config);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects negative maxFailedAttempts", async () => {
+    const { validateConfig } = await import("../../../../src/schema/validate.js");
+    const { DEFAULT_HENCH_CONFIG } = await import("../../../../src/schema/v1.js");
+
+    const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: -1 };
+    const result = validateConfig(config);
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe("loop config defaults", () => {
   it("loopPauseMs is optional in schema and defaults to 2000", async () => {
     const { validateConfig } = await import("../../../../src/schema/validate.js");

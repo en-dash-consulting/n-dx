@@ -1,10 +1,11 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { resolveStore } from "rex/dist/store/index.js";
-import { loadConfig } from "../../store/index.js";
+import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/loop.js";
 import { cliLoop } from "../../agent/cli-loop.js";
 import { getActionableTasks } from "../../agent/brief.js";
+import { getStuckTaskIds } from "../../agent/stuck.js";
 import { HENCH_DIR, safeParseInt } from "./constants.js";
 import { CLIError, requireClaudeCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
@@ -15,7 +16,11 @@ import { info, result as output } from "../output.js";
 
 /**
  * Determine whether the loop should continue after a task run.
- * Continues on success and transient errors; stops on hard failures.
+ * Continues on success and transient errors; stops on hard failures
+ * only when stuck detection is disabled (threshold 0).
+ *
+ * With stuck detection enabled, the loop always continues — stuck tasks
+ * are simply skipped on the next iteration.
  */
 export function shouldContinueLoop(status: string): boolean {
   return status !== "failed" && status !== "timeout";
@@ -42,6 +47,28 @@ export function loopPause(ms: number, signal?: AbortSignal): Promise<void> {
       signal.addEventListener("abort", onAbort, { once: true });
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stuck task helpers (exported for testing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Load recent runs and compute which tasks are stuck (≥ threshold
+ * consecutive hard failures).  Returns an empty set when threshold
+ * is 0 (disabled).
+ */
+export async function loadStuckTaskIds(
+  henchDir: string,
+  threshold: number,
+): Promise<Set<string>> {
+  if (threshold <= 0) return new Set();
+  const runs = await listRuns(henchDir);
+  const stuck = getStuckTaskIds(runs, threshold);
+  if (stuck.size > 0) {
+    info(`Stuck tasks detected (${stuck.size}): ${[...stuck].join(", ")}`);
+  }
+  return stuck;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +132,7 @@ async function runOne(
   dryRun: boolean,
   model: string | undefined,
   maxTurns: number | undefined,
+  excludeTaskIds?: Set<string>,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -118,6 +146,7 @@ async function runOne(
         taskId,
         dryRun,
         model,
+        excludeTaskIds,
       })
     : await agentLoop({
         config: { ...config, provider },
@@ -128,6 +157,7 @@ async function runOne(
         dryRun,
         maxTurns,
         model,
+        excludeTaskIds,
       });
 
   const { run } = result;
@@ -199,9 +229,9 @@ export async function cmdRun(
   // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
   if (loop) {
-    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, pauseMs);
+    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, pauseMs, config.maxFailedAttempts);
   } else {
-    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, iterations);
+    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, iterations, config.maxFailedAttempts);
   }
 }
 
@@ -219,11 +249,18 @@ async function runIterations(
   model: string | undefined,
   maxTurns: number | undefined,
   iterations: number,
+  maxFailedAttempts: number,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
       info(`\n=== Iteration ${i + 1}/${iterations} ===`);
     }
+
+    // For autoselected iterations, skip stuck tasks
+    const isAutoselect = i > 0 || !taskId;
+    const stuckIds = isAutoselect
+      ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
+      : undefined;
 
     const { status } = await runOne(
       dir, henchDir, rexDir, provider,
@@ -231,6 +268,7 @@ async function runIterations(
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
       dryRun, model, maxTurns,
+      stuckIds,
     );
 
     if (status === "error_transient") {
@@ -261,6 +299,7 @@ async function runLoop(
   model: string | undefined,
   maxTurns: number | undefined,
   pauseMs: number,
+  maxFailedAttempts: number,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -293,6 +332,13 @@ async function runLoop(
       completed++;
       info(`\n=== Loop iteration ${completed} ===`);
 
+      // Compute stuck tasks before each iteration so that
+      // recently-stuck tasks are automatically skipped
+      const isAutoselect = completed > 1 || !taskId;
+      const stuckIds = isAutoselect
+        ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
+        : undefined;
+
       let status: string;
       try {
         const result = await runOne(
@@ -300,6 +346,7 @@ async function runLoop(
           // Only use explicit taskId on the very first iteration
           completed === 1 ? taskId : undefined,
           dryRun, model, maxTurns,
+          stuckIds,
         );
         status = result.status;
       } catch (err) {
@@ -311,8 +358,9 @@ async function runLoop(
       }
 
       if (!shouldContinueLoop(status)) {
-        info(`\nLoop stopped after ${completed} task(s) due to ${status} status.`);
-        break;
+        // In loop mode, hard failures don't stop the loop — the stuck
+        // task will be detected and skipped on the next iteration.
+        info(`\nTask failed (${status}), will skip if stuck on next iteration...`);
       }
 
       if (dryRun) {

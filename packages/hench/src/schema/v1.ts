@@ -26,6 +26,7 @@ export interface HenchConfig {
   guard: GuardConfig;
   retry: RetryConfig;
   loopPauseMs: number;
+  maxFailedAttempts: number;
 }
 
 export function DEFAULT_HENCH_CONFIG(): HenchConfig {
@@ -49,6 +50,7 @@ export function DEFAULT_HENCH_CONFIG(): HenchConfig {
       maxDelayMs: 30000,
     },
     loopPauseMs: 2000,
+    maxFailedAttempts: 3,
   };
 }
 

@@ -32,6 +32,7 @@ export const HenchConfigSchema = z.object({
     maxDelayMs: 30000,
   }),
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
+  maxFailedAttempts: z.number().int().positive().optional().default(3),
 });
 
 const RunStatusSchema = z.enum(["running", "completed", "failed", "timeout", "error_transient"]);

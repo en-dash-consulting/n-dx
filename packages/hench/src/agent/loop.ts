@@ -19,6 +19,8 @@ export interface AgentLoopOptions {
   dryRun?: boolean;
   maxTurns?: number;
   model?: string;
+  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
+  excludeTaskIds?: Set<string>;
 }
 
 export interface AgentLoopResult {
@@ -77,7 +79,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const model = opts.model ?? config.model;
 
   // Assemble brief
-  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId);
+  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {
+    excludeTaskIds: opts.excludeTaskIds,
+  });
   const briefText = formatTaskBrief(brief);
 
   if (dryRun) {
