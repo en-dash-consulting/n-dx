@@ -911,7 +911,7 @@
             {
               "id": "4345197b-c78f-4334-9748-b4a486c0a027",
               "title": "Handle missing claude CLI gracefully",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Provide install instructions and fallback when claude CLI not found",
               "acceptanceCriteria": [
