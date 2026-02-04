@@ -1095,7 +1095,7 @@
     {
       "id": "697ba099-9654-4e8e-8656-fb9302e46f2f",
       "title": "Testing and verification",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
       "children": [
@@ -1162,10 +1162,12 @@
         {
           "id": "a2b48f7b-e6b9-4e72-a300-d9631a1a1db6",
           "title": "CI integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Support for continuous integration and automated PRD health checks",
           "source": "llm",
+          "startedAt": "2026-02-04T19:25:58.590Z",
+          "completedAt": "2026-02-04T19:25:58.590Z",
           "children": [
             {
               "id": "9808a298-ed86-425e-a9e6-b2e499e405df",
@@ -1186,7 +1188,7 @@
             {
               "id": "dff06e9b-3406-4d8d-b0d4-b73f60d024bf",
               "title": "Output machine-readable reports",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Generate JSON reports of PRD health for CI dashboards",
               "acceptanceCriteria": [
@@ -1195,7 +1197,9 @@
                 "Dashboard-friendly format"
               ],
               "priority": "low",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T19:15:31.300Z",
+              "completedAt": "2026-02-04T19:25:58.578Z"
             },
             {
               "id": "ddde7747-c541-42c6-a800-a2535cff81bb",
@@ -1215,7 +1219,9 @@
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-04T19:25:58.596Z",
+      "completedAt": "2026-02-04T19:25:58.596Z"
     },
     {
       "id": "05338f33-e638-49b8-815f-ed12949f0c63",
