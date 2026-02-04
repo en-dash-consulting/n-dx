@@ -1,4 +1,5 @@
 import type { ScanResult } from "./scanners.js";
+import { deduplicateScanResults } from "./dedupe.js";
 
 export interface ProposalTask {
   title: string;
@@ -47,16 +48,8 @@ function inferEpic(result: ScanResult): string {
 }
 
 export function buildProposals(results: ScanResult[]): Proposal[] {
-  // Deduplicate within proposal set by normalized name + kind
-  const seen = new Set<string>();
-  const deduped: ScanResult[] = [];
-  for (const r of results) {
-    const key = `${normalize(r.name)}::${r.kind}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push(r);
-    }
-  }
+  // Deduplicate within proposal set: merge near-duplicates by kind
+  const deduped = deduplicateScanResults(results);
 
   // Separate by kind
   const epics = deduped.filter((r) => r.kind === "epic");

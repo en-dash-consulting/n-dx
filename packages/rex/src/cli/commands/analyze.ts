@@ -10,6 +10,7 @@ import {
   scanSourceVision,
   reconcile,
   buildProposals,
+  deduplicateScanResults,
   reasonFromFiles,
   reasonFromScanResults,
   formatDiff,
@@ -215,7 +216,10 @@ export async function cmdAnalyze(
       scanSourceVision(dir),
     ]);
 
-    const allResults: ScanResult[] = [...testResults, ...docResults, ...svResults];
+    const rawResults: ScanResult[] = [...testResults, ...docResults, ...svResults];
+
+    // Merge near-duplicate scan results before reconciliation
+    const allResults = deduplicateScanResults(rawResults);
 
     const testFiles = new Set(testResults.map((r) => r.sourceFile)).size;
     const docFiles = new Set(docResults.map((r) => r.sourceFile)).size;

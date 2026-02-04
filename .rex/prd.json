@@ -602,7 +602,7 @@
             {
               "id": "0d818bc8-36f7-4c4f-a94f-a8572d3a429d",
               "title": "Implement duplicate merging",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "LLM should merge near-duplicate scan results",
               "acceptanceCriteria": [

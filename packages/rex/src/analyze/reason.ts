@@ -458,7 +458,8 @@ Each element must be an object with:
 - "features": array of { "title": string, "description"?: string, "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[] } }
 
 Guidelines:
-- Merge duplicate or near-duplicate items
+- Near-duplicate items have already been merged. Focus on semantic grouping and structure.
+- If any remaining items are clearly about the same thing, merge them into a single item.
 - Create meaningful epic groupings (not just "Tests" or "Documentation")
 - Rewrite vague titles to be clear and actionable
 - Preserve priority levels from the scan results
