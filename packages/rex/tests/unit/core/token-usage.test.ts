@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   extractRexTokenUsage,
   extractHenchTokenUsage,
+  extractSvTokenUsage,
   aggregateTokenUsage,
   formatAggregateTokenUsage,
 } from "../../../src/core/token-usage.js";
@@ -325,6 +326,135 @@ describe("extractHenchTokenUsage", () => {
 });
 
 // ---------------------------------------------------------------------------
+// extractSvTokenUsage
+// ---------------------------------------------------------------------------
+
+describe("extractSvTokenUsage", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-token-sv-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  function writeManifest(manifest: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "manifest.json"),
+      JSON.stringify(manifest),
+    );
+  }
+
+  it("reads token usage from sourcevision manifest", async () => {
+    writeManifest({
+      schemaVersion: "1.0.0",
+      analyzedAt: "2026-01-15T10:00:00.000Z",
+      tokenUsage: { calls: 3, inputTokens: 2000, outputTokens: 600 },
+    });
+
+    const usage = await extractSvTokenUsage(tmp);
+
+    expect(usage.calls).toBe(3);
+    expect(usage.inputTokens).toBe(2000);
+    expect(usage.outputTokens).toBe(600);
+  });
+
+  it("returns zero when .sourcevision does not exist", async () => {
+    const usage = await extractSvTokenUsage(tmp);
+
+    expect(usage.calls).toBe(0);
+    expect(usage.inputTokens).toBe(0);
+    expect(usage.outputTokens).toBe(0);
+  });
+
+  it("returns zero when manifest has no tokenUsage field", async () => {
+    writeManifest({
+      schemaVersion: "1.0.0",
+      analyzedAt: "2026-01-15T10:00:00.000Z",
+    });
+
+    const usage = await extractSvTokenUsage(tmp);
+
+    expect(usage.calls).toBe(0);
+  });
+
+  it("returns zero for invalid manifest JSON", async () => {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "manifest.json"),
+      "not valid json",
+    );
+
+    const usage = await extractSvTokenUsage(tmp);
+
+    expect(usage.calls).toBe(0);
+  });
+
+  describe("time filtering", () => {
+    it("filters by --since using analyzedAt", async () => {
+      writeManifest({
+        schemaVersion: "1.0.0",
+        analyzedAt: "2026-01-10T10:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 1000, outputTokens: 300 },
+      });
+
+      const usage = await extractSvTokenUsage(tmp, {
+        since: "2026-01-15T00:00:00.000Z",
+      });
+
+      expect(usage.calls).toBe(0);
+      expect(usage.inputTokens).toBe(0);
+    });
+
+    it("includes data when analyzedAt is within range", async () => {
+      writeManifest({
+        schemaVersion: "1.0.0",
+        analyzedAt: "2026-01-20T10:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 1000, outputTokens: 300 },
+      });
+
+      const usage = await extractSvTokenUsage(tmp, {
+        since: "2026-01-15T00:00:00.000Z",
+      });
+
+      expect(usage.calls).toBe(2);
+      expect(usage.inputTokens).toBe(1000);
+    });
+
+    it("filters by --until using analyzedAt", async () => {
+      writeManifest({
+        schemaVersion: "1.0.0",
+        analyzedAt: "2026-01-20T10:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 1000, outputTokens: 300 },
+      });
+
+      const usage = await extractSvTokenUsage(tmp, {
+        until: "2026-01-15T00:00:00.000Z",
+      });
+
+      expect(usage.calls).toBe(0);
+    });
+
+    it("includes data when no analyzedAt is present", async () => {
+      writeManifest({
+        schemaVersion: "1.0.0",
+        tokenUsage: { calls: 2, inputTokens: 1000, outputTokens: 300 },
+      });
+
+      const usage = await extractSvTokenUsage(tmp, {
+        since: "2026-01-15T00:00:00.000Z",
+      });
+
+      // No analyzedAt means we can't filter — include the data
+      expect(usage.calls).toBe(2);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // aggregateTokenUsage
 // ---------------------------------------------------------------------------
 
@@ -347,7 +477,15 @@ describe("aggregateTokenUsage", () => {
     );
   }
 
-  it("combines rex and hench token usage", async () => {
+  function writeSvManifest(manifest: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "manifest.json"),
+      JSON.stringify(manifest),
+    );
+  }
+
+  it("combines rex, hench, and sv token usage", async () => {
     const logEntries: LogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
@@ -360,6 +498,11 @@ describe("aggregateTokenUsage", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       tokenUsage: { input: 5000, output: 1500 },
     });
+    writeSvManifest({
+      schemaVersion: "1.0.0",
+      analyzedAt: "2026-01-15T10:00:00.000Z",
+      tokenUsage: { calls: 3, inputTokens: 2000, outputTokens: 600 },
+    });
 
     const result = await aggregateTokenUsage(logEntries, tmp);
 
@@ -367,9 +510,12 @@ describe("aggregateTokenUsage", () => {
     expect(result.packages.rex.inputTokens).toBe(3000);
     expect(result.packages.hench.calls).toBe(1);
     expect(result.packages.hench.inputTokens).toBe(5000);
-    expect(result.totalInputTokens).toBe(8000);
-    expect(result.totalOutputTokens).toBe(2000);
-    expect(result.totalCalls).toBe(3);
+    expect(result.packages.sv.calls).toBe(3);
+    expect(result.packages.sv.inputTokens).toBe(2000);
+    expect(result.packages.sv.outputTokens).toBe(600);
+    expect(result.totalInputTokens).toBe(10000);
+    expect(result.totalOutputTokens).toBe(2600);
+    expect(result.totalCalls).toBe(6);
   });
 
   it("returns zero when no data exists", async () => {
@@ -380,7 +526,7 @@ describe("aggregateTokenUsage", () => {
     expect(result.totalCalls).toBe(0);
   });
 
-  it("passes filter to both extractors", async () => {
+  it("passes filter to all extractors", async () => {
     const logEntries: LogEntry[] = [
       {
         timestamp: "2026-01-10T10:00:00.000Z",
@@ -403,6 +549,12 @@ describe("aggregateTokenUsage", () => {
       startedAt: "2026-01-20T10:00:00.000Z",
       tokenUsage: { input: 4000, output: 600 },
     });
+    // SV manifest from Jan 10 — should be excluded by --since filter
+    writeSvManifest({
+      schemaVersion: "1.0.0",
+      analyzedAt: "2026-01-10T10:00:00.000Z",
+      tokenUsage: { calls: 1, inputTokens: 500, outputTokens: 100 },
+    });
 
     const result = await aggregateTokenUsage(logEntries, tmp, {
       since: "2026-01-15T00:00:00.000Z",
@@ -411,6 +563,7 @@ describe("aggregateTokenUsage", () => {
     // Only the Jan 20 entries should be included
     expect(result.packages.rex.inputTokens).toBe(2000);
     expect(result.packages.hench.inputTokens).toBe(4000);
+    expect(result.packages.sv.inputTokens).toBe(0);
     expect(result.totalInputTokens).toBe(6000);
   });
 });
@@ -420,11 +573,14 @@ describe("aggregateTokenUsage", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatAggregateTokenUsage", () => {
+  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, calls: 0 };
+
   it("formats zero usage as 'none recorded'", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 0, outputTokens: 0, calls: 0 },
-        hench: { inputTokens: 0, outputTokens: 0, calls: 0 },
+        rex: { ...EMPTY_PKG },
+        hench: { ...EMPTY_PKG },
+        sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 0,
       totalOutputTokens: 0,
@@ -442,6 +598,7 @@ describe("formatAggregateTokenUsage", () => {
       packages: {
         rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
         hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
+        sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 8000,
       totalOutputTokens: 2000,
@@ -460,6 +617,7 @@ describe("formatAggregateTokenUsage", () => {
       packages: {
         rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
         hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
+        sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 8000,
       totalOutputTokens: 2000,
@@ -477,11 +635,35 @@ describe("formatAggregateTokenUsage", () => {
     expect(lines[1]).toContain("1 runs");
   });
 
+  it("shows all three packages when all have usage", () => {
+    const usage: AggregateTokenUsage = {
+      packages: {
+        rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
+        hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
+        sv: { inputTokens: 2000, outputTokens: 600, calls: 3 },
+      },
+      totalInputTokens: 10000,
+      totalOutputTokens: 2600,
+      totalCalls: 6,
+    };
+
+    const lines = formatAggregateTokenUsage(usage);
+
+    expect(lines[0]).toContain("12,600 tokens");
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    expect(lines[1]).toContain("sv:");
+    expect(lines[1]).toContain("2,600");
+    expect(lines[1]).toContain("3 calls");
+    expect(lines[1]).toContain("rex:");
+    expect(lines[1]).toContain("hench:");
+  });
+
   it("omits packages with zero usage from breakdown", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
-        hench: { inputTokens: 0, outputTokens: 0, calls: 0 },
+        hench: { ...EMPTY_PKG },
+        sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 3000,
       totalOutputTokens: 500,
@@ -493,13 +675,15 @@ describe("formatAggregateTokenUsage", () => {
     expect(lines.length).toBeGreaterThanOrEqual(2);
     expect(lines[1]).toContain("rex:");
     expect(lines[1]).not.toContain("hench:");
+    expect(lines[1]).not.toContain("sv:");
   });
 
-  it("shows only hench when rex has no usage", () => {
+  it("shows only hench when rex and sv have no usage", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 0, outputTokens: 0, calls: 0 },
+        rex: { ...EMPTY_PKG },
         hench: { inputTokens: 10000, outputTokens: 3000, calls: 5 },
+        sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 10000,
       totalOutputTokens: 3000,
@@ -510,5 +694,25 @@ describe("formatAggregateTokenUsage", () => {
 
     expect(lines[1]).toContain("hench:");
     expect(lines[1]).not.toContain("rex:");
+    expect(lines[1]).not.toContain("sv:");
+  });
+
+  it("shows only sv when rex and hench have no usage", () => {
+    const usage: AggregateTokenUsage = {
+      packages: {
+        rex: { ...EMPTY_PKG },
+        hench: { ...EMPTY_PKG },
+        sv: { inputTokens: 4000, outputTokens: 1000, calls: 2 },
+      },
+      totalInputTokens: 4000,
+      totalOutputTokens: 1000,
+      totalCalls: 2,
+    };
+
+    const lines = formatAggregateTokenUsage(usage);
+
+    expect(lines[1]).toContain("sv:");
+    expect(lines[1]).not.toContain("rex:");
+    expect(lines[1]).not.toContain("hench:");
   });
 });

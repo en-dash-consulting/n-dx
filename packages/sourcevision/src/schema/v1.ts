@@ -23,6 +23,8 @@ export interface Manifest {
   gitBranch?: string;
   targetPath: string;
   modules: Record<string, ModuleInfo>;
+  /** Aggregate token usage from the most recent analyze run. */
+  tokenUsage?: AnalyzeTokenUsage;
 }
 
 // ── Inventory ───────────────────────────────────────────────────────────────

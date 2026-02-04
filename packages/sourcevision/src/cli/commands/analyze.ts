@@ -9,7 +9,7 @@ import type { InventoryResult } from "../../analyzers/inventory.js";
 import { analyzeImports } from "../../analyzers/imports.js";
 import { analyzeZones } from "../../analyzers/zones.js";
 import { analyzeComponents } from "../../analyzers/components.js";
-import { updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
+import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
 import { cmdInit } from "./init.js";
@@ -328,6 +328,13 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   const usageLine = formatTokenUsage(tokenUsage);
   if (usageLine) {
     info(`Token usage: ${usageLine}`);
+  }
+
+  // Persist token usage to manifest for cross-package aggregation
+  if (tokenUsage.calls > 0) {
+    const manifest = readManifest(absDir);
+    manifest.tokenUsage = tokenUsage;
+    writeManifest(absDir, manifest);
   }
 
   info("");

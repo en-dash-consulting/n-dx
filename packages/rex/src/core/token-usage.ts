@@ -4,9 +4,7 @@
  * Reads token data from:
  * - Rex execution log (`analyze_token_usage` events in .rex/execution-log.jsonl)
  * - Hench run records (.hench/runs/*.json)
- *
- * Sourcevision token usage is not currently persisted to a log file,
- * so it is not included in aggregate reporting.
+ * - Sourcevision manifest (.sourcevision/manifest.json `tokenUsage` field)
  */
 
 import { readFile, readdir } from "node:fs/promises";
@@ -33,6 +31,7 @@ export interface AggregateTokenUsage {
   packages: {
     rex: PackageTokenUsage;
     hench: PackageTokenUsage;
+    sv: PackageTokenUsage;
   };
   /** Total tokens across all packages. */
   totalInputTokens: number;
@@ -152,6 +151,50 @@ export async function extractHenchTokenUsage(
 }
 
 // ---------------------------------------------------------------------------
+// Sourcevision token usage from manifest
+// ---------------------------------------------------------------------------
+
+/** Minimal shape of a sourcevision manifest for token extraction. */
+interface SvManifest {
+  analyzedAt?: string;
+  tokenUsage?: {
+    calls?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+  };
+}
+
+/**
+ * Read sourcevision manifest and extract token usage.
+ *
+ * Reads `.sourcevision/manifest.json` and extracts the `tokenUsage` field
+ * that is persisted after each analyze run.
+ */
+export async function extractSvTokenUsage(
+  projectDir: string,
+  filter: TokenUsageFilter = {},
+): Promise<PackageTokenUsage> {
+  const usage = emptyPackageUsage();
+  const manifestPath = join(projectDir, ".sourcevision", "manifest.json");
+
+  try {
+    const raw = await readFile(manifestPath, "utf-8");
+    const manifest = JSON.parse(raw) as SvManifest;
+
+    if (!manifest.tokenUsage) return usage;
+    if (manifest.analyzedAt && !isInRange(manifest.analyzedAt, filter)) return usage;
+
+    usage.calls += manifest.tokenUsage.calls ?? 0;
+    usage.inputTokens += manifest.tokenUsage.inputTokens ?? 0;
+    usage.outputTokens += manifest.tokenUsage.outputTokens ?? 0;
+  } catch {
+    // Missing or invalid manifest — skip
+  }
+
+  return usage;
+}
+
+// ---------------------------------------------------------------------------
 // Aggregate
 // ---------------------------------------------------------------------------
 
@@ -159,7 +202,7 @@ export async function extractHenchTokenUsage(
  * Aggregate token usage across all packages.
  *
  * @param logEntries Rex execution log entries (from store.readLog())
- * @param projectDir Project root directory (for reading hench runs)
+ * @param projectDir Project root directory (for reading hench runs and sv manifest)
  * @param filter Optional time-based filter
  */
 export async function aggregateTokenUsage(
@@ -168,13 +211,16 @@ export async function aggregateTokenUsage(
   filter: TokenUsageFilter = {},
 ): Promise<AggregateTokenUsage> {
   const rex = extractRexTokenUsage(logEntries, filter);
-  const hench = await extractHenchTokenUsage(projectDir, filter);
+  const [hench, sv] = await Promise.all([
+    extractHenchTokenUsage(projectDir, filter),
+    extractSvTokenUsage(projectDir, filter),
+  ]);
 
   return {
-    packages: { rex, hench },
-    totalInputTokens: rex.inputTokens + hench.inputTokens,
-    totalOutputTokens: rex.outputTokens + hench.outputTokens,
-    totalCalls: rex.calls + hench.calls,
+    packages: { rex, hench, sv },
+    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
+    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCalls: rex.calls + hench.calls + sv.calls,
   };
 }
 
@@ -205,8 +251,13 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
   );
 
   // Per-package breakdown — only show packages with usage
-  const { rex, hench } = usage.packages;
+  const { rex, hench, sv } = usage.packages;
   const parts: string[] = [];
+
+  if (sv.inputTokens + sv.outputTokens > 0) {
+    const svTotal = sv.inputTokens + sv.outputTokens;
+    parts.push(`sv: ${fmt(svTotal)} (${sv.calls} calls)`);
+  }
 
   if (rex.inputTokens + rex.outputTokens > 0) {
     const rexTotal = rex.inputTokens + rex.outputTokens;
