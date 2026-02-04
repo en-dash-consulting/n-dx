@@ -1102,7 +1102,7 @@
         {
           "id": "2b12a3aa-b3ba-4255-b581-064dc3ceb590",
           "title": "Acceptance criteria as tests",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Link PRD acceptance criteria to actual test execution",
           "source": "llm",
@@ -1110,7 +1110,7 @@
             {
               "id": "8f740afc-9757-42bf-88e8-b6b9b73b4da2",
               "title": "Implement rex verify command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add command to run tests associated with acceptance criteria",
               "acceptanceCriteria": [
@@ -1119,7 +1119,9 @@
                 "Reports test results clearly"
               ],
               "priority": "medium",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:41:42.430Z",
+              "completedAt": "2026-02-04T18:51:15.567Z"
             },
             {
               "id": "7c545f27-6c88-4044-9e1e-abb08ffc8a49",
@@ -1140,7 +1142,7 @@
             {
               "id": "3dd0ce48-04ea-44e0-896c-44b6e2cd9fe3",
               "title": "Show test coverage in status",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Display test coverage per task when acceptance criteria map to tests",
               "acceptanceCriteria": [
@@ -1149,9 +1151,13 @@
                 "Clear visual indicators"
               ],
               "priority": "low",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:51:15.586Z",
+              "completedAt": "2026-02-04T18:57:35.775Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-04T18:57:35.785Z",
+          "completedAt": "2026-02-04T18:57:35.785Z"
         },
         {
           "id": "a2b48f7b-e6b9-4e72-a300-d9631a1a1db6",
