@@ -118,13 +118,20 @@ describe("mapItemToNotion", () => {
     expect(result.properties.Tags).toBeUndefined();
   });
 
-  it("maps description to body content blocks", () => {
+  it("maps description to both property and body content blocks", () => {
     const item = makeItem({
       id: "t1",
       title: "Task",
       description: "This is the description",
     });
     const result = mapItemToNotion(item);
+
+    // Description property
+    expect(result.properties.Description).toEqual({
+      rich_text: [{ text: { content: "This is the description" } }],
+    });
+
+    // Body block
     expect(result.children).toHaveLength(1);
     expect(result.children![0]).toEqual({
       object: "block",
@@ -133,6 +140,87 @@ describe("mapItemToNotion", () => {
         rich_text: [{ text: { content: "This is the description" } }],
       },
     });
+  });
+
+  it("omits description property when not set", () => {
+    const item = makeItem({ id: "t1", title: "Task" });
+    const result = mapItemToNotion(item);
+    expect(result.properties.Description).toBeUndefined();
+  });
+
+  it("maps source to rich_text property", () => {
+    const item = makeItem({
+      id: "t1",
+      title: "Task",
+      source: "rex-analyze",
+    });
+    const result = mapItemToNotion(item);
+    expect(result.properties.Source).toEqual({
+      rich_text: [{ text: { content: "rex-analyze" } }],
+    });
+  });
+
+  it("omits source when not set", () => {
+    const item = makeItem({ id: "t1", title: "Task" });
+    const result = mapItemToNotion(item);
+    expect(result.properties.Source).toBeUndefined();
+  });
+
+  it("maps blockedBy to comma-separated rich_text property", () => {
+    const item = makeItem({
+      id: "t1",
+      title: "Task",
+      blockedBy: ["t2", "t3"],
+    });
+    const result = mapItemToNotion(item);
+    expect(result.properties["Blocked By"]).toEqual({
+      rich_text: [{ text: { content: "t2, t3" } }],
+    });
+  });
+
+  it("omits blockedBy when not set", () => {
+    const item = makeItem({ id: "t1", title: "Task" });
+    const result = mapItemToNotion(item);
+    expect(result.properties["Blocked By"]).toBeUndefined();
+  });
+
+  it("omits blockedBy when empty array", () => {
+    const item = makeItem({ id: "t1", title: "Task", blockedBy: [] });
+    const result = mapItemToNotion(item);
+    expect(result.properties["Blocked By"]).toBeUndefined();
+  });
+
+  it("maps all PRD fields to Notion properties", () => {
+    const item = makeItem({
+      id: "t1",
+      title: "Full Task",
+      status: "in_progress",
+      level: "task",
+      description: "A complete task",
+      priority: "critical",
+      tags: ["backend", "urgent"],
+      source: "manual",
+      blockedBy: ["t0"],
+      acceptanceCriteria: ["Tests pass", "Code reviewed"],
+    });
+    const result = mapItemToNotion(item);
+
+    // All properties present
+    expect(result.properties.Name.title[0].text.content).toBe("Full Task");
+    expect(result.properties.Status.status.name).toBe("In progress");
+    expect(result.properties.Level.select.name).toBe("task");
+    expect(result.properties["PRD ID"].rich_text[0].text.content).toBe("t1");
+    expect(result.properties.Description!.rich_text[0].text.content).toBe("A complete task");
+    expect(result.properties.Priority!.select.name).toBe("Critical");
+    expect(result.properties.Tags!.multi_select).toEqual([
+      { name: "backend" },
+      { name: "urgent" },
+    ]);
+    expect(result.properties.Source!.rich_text[0].text.content).toBe("manual");
+    expect(result.properties["Blocked By"]!.rich_text[0].text.content).toBe("t0");
+
+    // Body blocks: description paragraph + heading + 2 to_do
+    expect(result.children).toHaveLength(4);
   });
 
   it("maps acceptance criteria to a checklist in body", () => {
@@ -285,6 +373,337 @@ describe("mapNotionToItem", () => {
     const item = mapNotionToItem(notionPage);
     expect(item.priority).toBeUndefined();
     expect(item.tags).toBeUndefined();
+  });
+
+  it("extracts description from Description property", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+        Description: { rich_text: [{ plain_text: "Task description" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.description).toBe("Task description");
+  });
+
+  it("extracts description from body blocks when no Description property", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+      children: [
+        {
+          type: "paragraph",
+          paragraph: { rich_text: [{ plain_text: "From body blocks" }] },
+        },
+      ],
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.description).toBe("From body blocks");
+  });
+
+  it("prefers Description property over body blocks", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+        Description: { rich_text: [{ plain_text: "From property" }] },
+      },
+      children: [
+        {
+          type: "paragraph",
+          paragraph: { rich_text: [{ plain_text: "From body" }] },
+        },
+      ],
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.description).toBe("From property");
+  });
+
+  it("extracts description from multiple paragraphs before heading", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+      children: [
+        {
+          type: "paragraph",
+          paragraph: { rich_text: [{ plain_text: "Line one" }] },
+        },
+        {
+          type: "paragraph",
+          paragraph: { rich_text: [{ plain_text: "Line two" }] },
+        },
+        {
+          type: "heading_2",
+          heading_2: { rich_text: [{ plain_text: "Some Section" }] },
+        },
+        {
+          type: "paragraph",
+          paragraph: { rich_text: [{ plain_text: "After heading" }] },
+        },
+      ],
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.description).toBe("Line one\n\nLine two");
+  });
+
+  it("extracts acceptance criteria from body blocks", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+      children: [
+        {
+          type: "heading_2",
+          heading_2: { rich_text: [{ plain_text: "Acceptance Criteria" }] },
+        },
+        {
+          type: "to_do",
+          to_do: { rich_text: [{ plain_text: "Tests pass" }], checked: false },
+        },
+        {
+          type: "to_do",
+          to_do: { rich_text: [{ plain_text: "Code reviewed" }], checked: true },
+        },
+      ],
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.acceptanceCriteria).toEqual(["Tests pass", "Code reviewed"]);
+  });
+
+  it("ignores to_do blocks outside of Acceptance Criteria section", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+      children: [
+        {
+          type: "heading_2",
+          heading_2: { rich_text: [{ plain_text: "Notes" }] },
+        },
+        {
+          type: "to_do",
+          to_do: { rich_text: [{ plain_text: "Not criteria" }], checked: false },
+        },
+        {
+          type: "heading_2",
+          heading_2: { rich_text: [{ plain_text: "Acceptance Criteria" }] },
+        },
+        {
+          type: "to_do",
+          to_do: { rich_text: [{ plain_text: "Real criteria" }], checked: false },
+        },
+      ],
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.acceptanceCriteria).toEqual(["Real criteria"]);
+  });
+
+  it("omits acceptanceCriteria when no body blocks", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.acceptanceCriteria).toBeUndefined();
+  });
+
+  it("extracts source from Source property", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+        Source: { rich_text: [{ plain_text: "rex-analyze" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.source).toBe("rex-analyze");
+  });
+
+  it("omits source when not present in Notion", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.source).toBeUndefined();
+  });
+
+  it("extracts blockedBy from Blocked By property", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+        "Blocked By": { rich_text: [{ plain_text: "t2, t3" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.blockedBy).toEqual(["t2", "t3"]);
+  });
+
+  it("handles single blockedBy value", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+        "Blocked By": { rich_text: [{ plain_text: "t2" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.blockedBy).toEqual(["t2"]);
+  });
+
+  it("omits blockedBy when not present in Notion", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ plain_text: "Task" }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ plain_text: "t1" }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.blockedBy).toBeUndefined();
+  });
+
+  it("handles text.content format for Description property", () => {
+    const notionPage = {
+      id: "p1",
+      properties: {
+        Name: { title: [{ text: { content: "Task" } }] },
+        Status: { status: { name: "Not started" } },
+        Level: { select: { name: "task" } },
+        "PRD ID": { rich_text: [{ text: { content: "t1" } }] },
+        Description: { rich_text: [{ text: { content: "Desc via text.content" } }] },
+        Source: { rich_text: [{ text: { content: "manual" } }] },
+        "Blocked By": { rich_text: [{ text: { content: "t9" } }] },
+      },
+    };
+    const item = mapNotionToItem(notionPage);
+    expect(item.description).toBe("Desc via text.content");
+    expect(item.source).toBe("manual");
+    expect(item.blockedBy).toEqual(["t9"]);
+  });
+
+  it("round-trips all fields through mapItemToNotion and mapNotionToItem", () => {
+    const original = makeItem({
+      id: "t1",
+      title: "Full Round Trip",
+      status: "in_progress",
+      level: "task",
+      description: "Round trip description",
+      priority: "high",
+      tags: ["api", "core"],
+      source: "analyze",
+      blockedBy: ["t0", "t2"],
+      acceptanceCriteria: ["AC1", "AC2"],
+    });
+
+    const { properties, children } = mapItemToNotion(original);
+
+    // Build a Notion page object from the mapped properties
+    const notionPage = {
+      id: "notion-abc",
+      properties: {
+        Name: { title: properties.Name.title.map((rt) => ({ plain_text: rt.text.content })) },
+        Status: properties.Status,
+        Level: properties.Level,
+        "PRD ID": { rich_text: properties["PRD ID"].rich_text.map((rt) => ({ plain_text: rt.text.content })) },
+        Description: properties.Description
+          ? { rich_text: properties.Description.rich_text.map((rt) => ({ plain_text: rt.text.content })) }
+          : undefined,
+        Priority: properties.Priority,
+        Tags: properties.Tags,
+        Source: properties.Source
+          ? { rich_text: properties.Source.rich_text.map((rt) => ({ plain_text: rt.text.content })) }
+          : undefined,
+        "Blocked By": properties["Blocked By"]
+          ? { rich_text: properties["Blocked By"].rich_text.map((rt) => ({ plain_text: rt.text.content })) }
+          : undefined,
+      },
+      children: children?.map((block) => {
+        const b = block as any;
+        if (b.type === "paragraph") {
+          return {
+            type: "paragraph",
+            paragraph: { rich_text: b.paragraph.rich_text.map((rt: any) => ({ plain_text: rt.text.content })) },
+          };
+        }
+        if (b.type === "heading_2") {
+          return {
+            type: "heading_2",
+            heading_2: { rich_text: b.heading_2.rich_text.map((rt: any) => ({ plain_text: rt.text.content })) },
+          };
+        }
+        if (b.type === "to_do") {
+          return {
+            type: "to_do",
+            to_do: {
+              rich_text: b.to_do.rich_text.map((rt: any) => ({ plain_text: rt.text.content })),
+              checked: b.to_do.checked,
+            },
+          };
+        }
+        return b;
+      }),
+    };
+
+    const roundTripped = mapNotionToItem(notionPage);
+
+    expect(roundTripped.id).toBe(original.id);
+    expect(roundTripped.title).toBe(original.title);
+    expect(roundTripped.status).toBe(original.status);
+    expect(roundTripped.level).toBe(original.level);
+    expect(roundTripped.description).toBe(original.description);
+    expect(roundTripped.priority).toBe(original.priority);
+    expect(roundTripped.tags).toEqual(original.tags);
+    expect(roundTripped.source).toBe(original.source);
+    expect(roundTripped.blockedBy).toEqual(original.blockedBy);
+    expect(roundTripped.acceptanceCriteria).toEqual(original.acceptanceCriteria);
   });
 });
 

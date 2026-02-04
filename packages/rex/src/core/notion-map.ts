@@ -33,8 +33,11 @@ export interface NotionPageProperties {
   Status: { status: { name: string } };
   Level: { select: { name: string } };
   "PRD ID": { rich_text: NotionRichText[] };
+  Description?: { rich_text: NotionRichText[] };
   Priority?: { select: { name: string } };
   Tags?: { multi_select: Array<{ name: string }> };
+  Source?: { rich_text: NotionRichText[] };
+  "Blocked By"?: { rich_text: NotionRichText[] };
 }
 
 export interface NotionBlock {
@@ -118,6 +121,12 @@ export function mapItemToNotion(
     "PRD ID": { rich_text: [{ text: { content: item.id } }] },
   };
 
+  if (item.description) {
+    properties.Description = {
+      rich_text: [{ text: { content: item.description } }],
+    };
+  }
+
   if (item.priority) {
     properties.Priority = {
       select: { name: PRIORITY_TO_NOTION[item.priority] },
@@ -127,6 +136,18 @@ export function mapItemToNotion(
   if (item.tags && item.tags.length > 0) {
     properties.Tags = {
       multi_select: item.tags.map((t) => ({ name: t })),
+    };
+  }
+
+  if (item.source) {
+    properties.Source = {
+      rich_text: [{ text: { content: item.source } }],
+    };
+  }
+
+  if (item.blockedBy && item.blockedBy.length > 0) {
+    properties["Blocked By"] = {
+      rich_text: [{ text: { content: item.blockedBy.join(", ") } }],
     };
   }
 
@@ -197,6 +218,27 @@ export function mapNotionToItem(notionPage: any): PRDItem {
     remoteId: notionPage.id,
   };
 
+  // Description — from property (preferred) or body blocks
+  const descriptionProp =
+    props.Description?.rich_text?.[0]?.plain_text ??
+    props.Description?.rich_text?.[0]?.text?.content;
+  if (descriptionProp) {
+    item.description = descriptionProp;
+  } else if (notionPage.children) {
+    const desc = extractDescriptionFromBlocks(notionPage.children);
+    if (desc) {
+      item.description = desc;
+    }
+  }
+
+  // Acceptance criteria — from body blocks (to_do items after an "Acceptance Criteria" heading)
+  if (notionPage.children) {
+    const criteria = extractCriteriaFromBlocks(notionPage.children);
+    if (criteria.length > 0) {
+      item.acceptanceCriteria = criteria;
+    }
+  }
+
   // Priority
   const notionPriority = props.Priority?.select?.name;
   if (notionPriority && NOTION_TO_PRIORITY[notionPriority]) {
@@ -209,9 +251,88 @@ export function mapNotionToItem(notionPage: any): PRDItem {
     item.tags = tags.map((t: any) => t.name);
   }
 
+  // Source
+  const sourceProp =
+    props.Source?.rich_text?.[0]?.plain_text ??
+    props.Source?.rich_text?.[0]?.text?.content;
+  if (sourceProp) {
+    item.source = sourceProp;
+  }
+
+  // Blocked By
+  const blockedByProp =
+    props["Blocked By"]?.rich_text?.[0]?.plain_text ??
+    props["Blocked By"]?.rich_text?.[0]?.text?.content;
+  if (blockedByProp) {
+    item.blockedBy = blockedByProp
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0);
+  }
+
   return item;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+// ---------------------------------------------------------------------------
+// Body block extraction helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract description text from Notion page body blocks.
+ * Collects paragraph blocks that appear before any heading block
+ * (headings typically start structured sections like "Acceptance Criteria").
+ */
+function extractDescriptionFromBlocks(blocks: any[]): string | undefined {
+  const paragraphs: string[] = [];
+
+  for (const block of blocks) {
+    if (block.type?.startsWith("heading")) break;
+    if (block.type === "paragraph") {
+      const text = extractRichTextContent(block.paragraph?.rich_text);
+      if (text) paragraphs.push(text);
+    }
+  }
+
+  return paragraphs.length > 0 ? paragraphs.join("\n\n") : undefined;
+}
+
+/**
+ * Extract acceptance criteria from Notion page body blocks.
+ * Looks for to_do blocks that follow an "Acceptance Criteria" heading.
+ */
+function extractCriteriaFromBlocks(blocks: any[]): string[] {
+  const criteria: string[] = [];
+  let inCriteriaSection = false;
+
+  for (const block of blocks) {
+    if (block.type?.startsWith("heading")) {
+      const headingText = extractRichTextContent(
+        block[block.type]?.rich_text,
+      );
+      inCriteriaSection =
+        headingText?.toLowerCase() === "acceptance criteria";
+      continue;
+    }
+
+    if (inCriteriaSection && block.type === "to_do") {
+      const text = extractRichTextContent(block.to_do?.rich_text);
+      if (text) criteria.push(text);
+    }
+  }
+
+  return criteria;
+}
+
+/**
+ * Extract plain text from a Notion rich_text array.
+ */
+function extractRichTextContent(richText: any[] | undefined): string | undefined {
+  if (!richText || richText.length === 0) return undefined;
+  return richText
+    .map((rt: any) => rt.plain_text ?? rt.text?.content ?? "")
+    .join("");
+}
 
 // ---------------------------------------------------------------------------
 // Parent resolution
