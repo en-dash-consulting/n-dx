@@ -15,6 +15,7 @@ Commands:
   add --file=<path>       Import ideas from a freeform text file (repeatable)
   echo "desc" | add       Pipe text as description (combinable with other sources)
   update <id> [dir]       Update item status/priority
+  move <id> [dir]         Move item to new parent (reparent)
   validate [dir]          Check PRD integrity (DAG, schema)
   recommend [dir]         Get SourceVision recommendations
   analyze [dir]           Build PRD from project analysis
@@ -24,7 +25,7 @@ Commands:
 Options:
   --help, -h              Show this help
   --title="..."           Item title (for add)
-  --parent=<id>           Parent item ID (for add)
+  --parent=<id>           Parent item ID (for add, move)
   --status=<s>            Status (for update)
   --force                 Override status transition rules (for update)
   --priority=<p>          Priority (for update/add)

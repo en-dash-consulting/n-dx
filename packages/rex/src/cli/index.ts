@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     // init creates it; analyze handles its own graceful fallback.
     // Commands whose first positional arg is an ID (not a dir) must handle
     // their own dir resolution and requireRexDir check inside the case block.
-    const SKIP_DIR_CHECK = new Set(["init", "analyze", "update"]);
+    const SKIP_DIR_CHECK = new Set(["init", "analyze", "update", "move"]);
     if (!SKIP_DIR_CHECK.has(command)) {
       requireRexDir(resolveDir());
     }
@@ -193,6 +193,20 @@ async function main(): Promise<void> {
           positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
         const { cmdUpdate } = await import("./commands/update.js");
         await cmdUpdate(dir, id, flags);
+        break;
+      }
+      case "move": {
+        const id = positional[0];
+        if (!id) {
+          throw new CLIError(
+            "Missing item ID.",
+            "Usage: rex move <id> --parent=<new-parent-id>",
+          );
+        }
+        const dir =
+          positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+        const { cmdMove } = await import("./commands/move.js");
+        await cmdMove(dir, id, flags);
         break;
       }
       case "validate": {

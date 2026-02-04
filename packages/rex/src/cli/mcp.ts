@@ -11,6 +11,7 @@ import { validateTransition } from "../core/transitions.js";
 import { computeTimestampUpdates } from "../core/timestamps.js";
 import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
+import { validateMove, moveItem } from "../core/move.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -274,6 +275,70 @@ export async function startMcpServer(dir: string): Promise<void> {
             {
               type: "text" as const,
               text: JSON.stringify({ id, level: args.level, title: args.title }),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${(err as Error).message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
+    "move_item",
+    "Move an item to a different parent in the PRD tree (reparent)",
+    {
+      id: z.string().describe("Item ID to move"),
+      parentId: z.string().optional().describe("New parent ID (omit to move to root)"),
+    },
+    async ({ id, parentId }) => {
+      try {
+        const doc = await store.loadDocument();
+
+        const validation = validateMove(doc.items, id, parentId);
+        if (!validation.valid) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `${validation.error}${validation.suggestion ? ` ${validation.suggestion}` : ""}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const result = moveItem(doc.items, id, parentId);
+        await store.saveDocument(doc);
+
+        const fromLabel = result.previousParentId ?? "root";
+        const toLabel = result.newParentId ?? "root";
+        await store.appendLog({
+          timestamp: new Date().toISOString(),
+          event: "item_moved",
+          itemId: id,
+          detail: `Moved ${result.item.level} "${result.item.title}" from ${fromLabel} to ${toLabel}`,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                id,
+                title: result.item.title,
+                level: result.item.level,
+                previousParentId: result.previousParentId,
+                newParentId: result.newParentId,
+              }),
             },
           ],
         };
