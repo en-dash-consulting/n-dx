@@ -16,13 +16,34 @@ import {
   deduplicateScanResults,
   reasonFromFiles,
   reasonFromScanResults,
+  emptyAnalyzeTokenUsage,
   formatDiff,
   DEFAULT_MODEL,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
-import type { PRDItem, PRDDocument } from "../../schema/index.js";
+import type { PRDItem, PRDDocument, AnalyzeTokenUsage } from "../../schema/index.js";
 
 const PENDING_FILE = "pending-proposals.json";
+
+/** Format token usage for display. Returns empty string when no tokens were used. */
+export function formatTokenUsage(usage: AnalyzeTokenUsage): string {
+  if (usage.calls === 0 || (usage.inputTokens === 0 && usage.outputTokens === 0)) {
+    return "";
+  }
+
+  const total = usage.inputTokens + usage.outputTokens;
+  const parts = [
+    `${total.toLocaleString()} tokens`,
+    `(${usage.inputTokens.toLocaleString()} in`,
+    `/ ${usage.outputTokens.toLocaleString()} out)`,
+  ];
+
+  if (usage.calls > 1) {
+    parts.push(`across ${usage.calls} LLM calls`);
+  }
+
+  return parts.join(" ");
+}
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
@@ -202,6 +223,7 @@ export async function cmdAnalyze(
   }
 
   let proposals: Proposal[];
+  let tokenUsage = emptyAnalyzeTokenUsage();
 
   if (filePaths.length > 0) {
     // --file mode: import from document(s) via structured parsing or LLM
@@ -213,7 +235,9 @@ export async function cmdAnalyze(
     }
 
     try {
-      proposals = await reasonFromFiles(resolved, existing, model);
+      const reasonResult = await reasonFromFiles(resolved, existing, model);
+      proposals = reasonResult.proposals;
+      tokenUsage = reasonResult.tokenUsage;
     } catch (err) {
       throw new CLIError(
         `Failed to analyze file: ${(err as Error).message}`,
@@ -222,7 +246,7 @@ export async function cmdAnalyze(
     }
 
     if (flags.format === "json") {
-      result(JSON.stringify({ proposals }, null, 2));
+      result(JSON.stringify({ proposals, tokenUsage }, null, 2));
       return;
     }
 
@@ -252,7 +276,9 @@ export async function cmdAnalyze(
 
     if (!noLlm) {
       try {
-        proposals = await reasonFromScanResults(newResults, existing, { dir, model });
+        const reasonResult = await reasonFromScanResults(newResults, existing, { dir, model });
+        proposals = reasonResult.proposals;
+        tokenUsage = reasonResult.tokenUsage;
         if (flags.format !== "json") {
           info("Proposals refined by LLM.");
         }
@@ -266,7 +292,7 @@ export async function cmdAnalyze(
     if (flags.format === "json") {
       result(
         JSON.stringify(
-          { scanned: { testFiles, docFiles, svZones, pkgFiles }, stats, proposals },
+          { scanned: { testFiles, docFiles, svZones, pkgFiles }, stats, proposals, tokenUsage },
           null,
           2,
         ),
@@ -288,7 +314,9 @@ export async function cmdAnalyze(
     if ((existing.length === 0 || guided) && !noLlm) {
       if (process.stdin.isTTY) {
         const { runGuidedSpec } = await import("../../analyze/guided.js");
-        proposals = await runGuidedSpec(dir, model);
+        const guidedResult = await runGuidedSpec(dir, model);
+        proposals = guidedResult.proposals;
+        tokenUsage = guidedResult.tokenUsage;
       } else if (!guided) {
         result("No new proposals found.");
         info("Hint: Run 'n-dx plan --guided' interactively to build your initial spec.");
@@ -314,8 +342,26 @@ export async function cmdAnalyze(
   }
   info("");
 
-  // Cache proposals so they can be accepted later without re-running
+  // Display token usage summary
+  const usageLine = formatTokenUsage(tokenUsage);
+  if (usageLine) {
+    info(`Token usage: ${usageLine}`);
+  }
+
+  // Log token usage to execution log
   if (await hasRexDir(dir)) {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+
+    if (tokenUsage.calls > 0) {
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "analyze_token_usage",
+        detail: JSON.stringify(tokenUsage),
+      });
+    }
+
+    // Cache proposals so they can be accepted later without re-running
     await savePending(dir, proposals);
   }
 

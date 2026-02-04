@@ -137,25 +137,26 @@ describe("reasonFromIdeasFile", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty array for zero files", async () => {
+  it("returns empty proposals for zero files", async () => {
     const result = await reasonFromIdeasFile([], []);
-    expect(result).toEqual([]);
+    expect(result.proposals).toEqual([]);
+    expect(result.tokenUsage.calls).toBe(0);
   });
 
-  it("returns empty array when file is empty", async () => {
+  it("returns empty proposals when file is empty", async () => {
     const fp = join(tmpDir, "empty.txt");
     await writeFile(fp, "");
 
     const result = await reasonFromIdeasFile([fp], []);
-    expect(result).toEqual([]);
+    expect(result.proposals).toEqual([]);
   });
 
-  it("returns empty array when file has only whitespace", async () => {
+  it("returns empty proposals when file has only whitespace", async () => {
     const fp = join(tmpDir, "blank.txt");
     await writeFile(fp, "   \n  \n   ");
 
     const result = await reasonFromIdeasFile([fp], []);
-    expect(result).toEqual([]);
+    expect(result.proposals).toEqual([]);
   });
 
   it("throws on non-existent file", async () => {

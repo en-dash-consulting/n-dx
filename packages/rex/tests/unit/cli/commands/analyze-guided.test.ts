@@ -39,7 +39,10 @@ vi.mock("../../../../src/analyze/reason.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../../src/analyze/reason.js")>();
   return {
     ...actual,
-    reasonFromScanResults: vi.fn().mockResolvedValue([]),
+    reasonFromScanResults: vi.fn().mockResolvedValue({
+      proposals: [],
+      tokenUsage: { calls: 0, inputTokens: 0, outputTokens: 0 },
+    }),
   };
 });
 
@@ -78,6 +81,11 @@ describe("analyze --guided integration", () => {
       join(tmpDir, ".rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "Test", items: [] }),
     );
+    // Create config so store operations work
+    await writeFile(
+      join(tmpDir, ".rex", "config.json"),
+      JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
+    );
     origIsTTY = process.stdin.isTTY;
     captureConsole();
   });
@@ -90,7 +98,10 @@ describe("analyze --guided integration", () => {
 
   it("invokes guided flow when empty PRD + no scan results + isTTY", async () => {
     process.stdin.isTTY = true;
-    mockRunGuidedSpec.mockResolvedValue([]);
+    mockRunGuidedSpec.mockResolvedValue({
+      proposals: [],
+      tokenUsage: { calls: 0, inputTokens: 0, outputTokens: 0 },
+    });
 
     await cmdAnalyze(tmpDir, {});
 
@@ -99,7 +110,10 @@ describe("analyze --guided integration", () => {
 
   it("invokes guided flow when --guided flag is set", async () => {
     process.stdin.isTTY = true;
-    mockRunGuidedSpec.mockResolvedValue([]);
+    mockRunGuidedSpec.mockResolvedValue({
+      proposals: [],
+      tokenUsage: { calls: 0, inputTokens: 0, outputTokens: 0 },
+    });
 
     await cmdAnalyze(tmpDir, { guided: "true" });
 
@@ -156,7 +170,10 @@ describe("analyze --guided integration", () => {
         ],
       },
     ];
-    mockRunGuidedSpec.mockResolvedValue(mockProposals);
+    mockRunGuidedSpec.mockResolvedValue({
+      proposals: mockProposals,
+      tokenUsage: { calls: 1, inputTokens: 1000, outputTokens: 500 },
+    });
 
     await cmdAnalyze(tmpDir, { guided: "true", accept: "true" });
 

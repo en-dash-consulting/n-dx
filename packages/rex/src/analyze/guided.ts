@@ -6,7 +6,10 @@ import {
   parseProposalResponse,
   FEW_SHOT_EXAMPLE,
   DEFAULT_MODEL,
+  emptyAnalyzeTokenUsage,
+  accumulateTokenUsage,
 } from "./reason.js";
+import type { ReasonResult } from "./reason.js";
 import type { Proposal } from "./propose.js";
 import { info } from "../cli/output.js";
 
@@ -90,10 +93,10 @@ export async function clarify(
   model: string,
 ): Promise<ClarifyResponse> {
   const prompt = buildClarifyPrompt(context, projectContext);
-  const raw = await spawnClaude(prompt, model);
+  const claudeResult = await spawnClaude(prompt, model);
 
   // Strip markdown fences if present
-  let text = raw.trim();
+  let text = claudeResult.text.trim();
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (fenceMatch) {
     text = fenceMatch[1].trim();
@@ -159,10 +162,12 @@ export async function generateSpecFromContext(
   context: GuidedContext,
   projectContext: string,
   model: string,
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
   const prompt = buildSpecPrompt(context, projectContext);
-  const raw = await spawnClaude(prompt, model);
-  return parseProposalResponse(raw);
+  const tokenUsage = emptyAnalyzeTokenUsage();
+  const claudeResult = await spawnClaude(prompt, model);
+  accumulateTokenUsage(tokenUsage, claudeResult.tokenUsage);
+  return { proposals: parseProposalResponse(claudeResult.text), tokenUsage };
 }
 
 // ── Main flow ──
@@ -172,8 +177,9 @@ const MAX_CLARIFY_ROUNDS = 5;
 export async function runGuidedSpec(
   dir: string,
   model?: string,
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
   const effectiveModel = model ?? DEFAULT_MODEL;
+  const tokenUsage = emptyAnalyzeTokenUsage();
 
   info("Guided spec builder — let's define your project.\n");
 
@@ -183,7 +189,7 @@ export async function runGuidedSpec(
 
   if (!description) {
     info("No description provided. Exiting guided mode.");
-    return [];
+    return { proposals: [], tokenUsage };
   }
 
   const context: GuidedContext = { description, exchanges: [] };

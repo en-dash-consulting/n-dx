@@ -12,6 +12,8 @@ export type {
   PRDDocument,
   RexConfig,
   LogEntry,
+  TokenUsage,
+  AnalyzeTokenUsage,
 } from "./v1.js";
 
 export {

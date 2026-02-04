@@ -497,11 +497,12 @@ export async function cmdSmartAdd(
     }
 
     try {
-      proposals = await reasonFromIdeasFile(resolved, existing, {
+      const reasonResult = await reasonFromIdeasFile(resolved, existing, {
         model,
         dir,
         parentId,
       });
+      proposals = reasonResult.proposals;
     } catch (err) {
       throw new CLIError(
         `Failed to process ideas file: ${(err as Error).message}`,
@@ -518,11 +519,12 @@ export async function cmdSmartAdd(
     }
 
     try {
-      proposals = await reasonFromDescriptions(descList, existing, {
+      const reasonResult = await reasonFromDescriptions(descList, existing, {
         model,
         dir,
         parentId,
       });
+      proposals = reasonResult.proposals;
     } catch (err) {
       throw new CLIError(
         `LLM analysis failed: ${(err as Error).message}`,

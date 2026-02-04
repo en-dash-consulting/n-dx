@@ -176,8 +176,9 @@ describe("buildMultiAddPrompt", () => {
 });
 
 describe("reasonFromDescriptions", () => {
-  it("returns empty array for zero descriptions", async () => {
+  it("returns empty proposals for zero descriptions", async () => {
     const result = await reasonFromDescriptions([], []);
-    expect(result).toEqual([]);
+    expect(result.proposals).toEqual([]);
+    expect(result.tokenUsage.calls).toBe(0);
   });
 });

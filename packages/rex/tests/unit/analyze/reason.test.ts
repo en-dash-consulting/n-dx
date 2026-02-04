@@ -595,9 +595,10 @@ describe("reasonFromFiles", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty array for zero files", async () => {
+  it("returns empty proposals for zero files", async () => {
     const result = await reasonFromFiles([], []);
-    expect(result).toEqual([]);
+    expect(result.proposals).toEqual([]);
+    expect(result.tokenUsage.calls).toBe(0);
   });
 
   it("processes a single JSON file", async () => {
@@ -614,8 +615,10 @@ describe("reasonFromFiles", () => {
 
     const result = await reasonFromFiles([filePath], []);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].epic.title).toBe("Auth");
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].epic.title).toBe("Auth");
+    // Structured JSON parse: no LLM call
+    expect(result.tokenUsage.calls).toBe(0);
   });
 
   it("combines multiple JSON files and merges same-epic proposals", async () => {
@@ -647,9 +650,9 @@ describe("reasonFromFiles", () => {
 
     const result = await reasonFromFiles([file1, file2], []);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].epic.title).toBe("Auth");
-    const featureTitles = result[0].features.map((f) => f.title);
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].epic.title).toBe("Auth");
+    const featureTitles = result.proposals[0].features.map((f) => f.title);
     expect(featureTitles).toContain("Login");
     expect(featureTitles).toContain("Signup");
   });
@@ -679,8 +682,8 @@ describe("reasonFromFiles", () => {
 
     const result = await reasonFromFiles([file1, file2], []);
 
-    expect(result).toHaveLength(2);
-    const epicTitles = result.map((p) => p.epic.title);
+    expect(result.proposals).toHaveLength(2);
+    const epicTitles = result.proposals.map((p) => p.epic.title);
     expect(epicTitles).toContain("Auth");
     expect(epicTitles).toContain("Dashboard");
   });
@@ -702,8 +705,8 @@ describe("reasonFromFiles", () => {
 
     const result = await reasonFromFiles([jsonFile, yamlFile], []);
 
-    expect(result.length).toBeGreaterThanOrEqual(1);
-    const allFeatures = result.flatMap((p) => p.features.map((f) => f.title));
+    expect(result.proposals.length).toBeGreaterThanOrEqual(1);
+    const allFeatures = result.proposals.flatMap((p) => p.features.map((f) => f.title));
     expect(allFeatures).toContain("User Management");
     expect(allFeatures).toContain("API Gateway");
   });
@@ -729,7 +732,7 @@ describe("reasonFromFiles", () => {
 
     const result = await reasonFromFiles([file1], existing);
 
-    const allFeatures = result.flatMap((p) => p.features.map((f) => f.title));
+    const allFeatures = result.proposals.flatMap((p) => p.features.map((f) => f.title));
     expect(allFeatures).not.toContain("Already Tracked");
     expect(allFeatures).toContain("New Feature");
   });

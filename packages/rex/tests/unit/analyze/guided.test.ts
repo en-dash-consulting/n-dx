@@ -24,12 +24,12 @@ describe("clarify", () => {
   });
 
   it("parses a 'clarifying' response with questions", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify({
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify({
         status: "clarifying",
         questions: ["Who are the target users?", "What tech stack?"],
       }),
-    );
+    });
 
     const context: GuidedContext = {
       description: "A task management app",
@@ -46,12 +46,12 @@ describe("clarify", () => {
   });
 
   it("parses a 'ready' response with summary", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify({
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify({
         status: "ready",
         summary: "A React-based task manager for small teams",
       }),
-    );
+    });
 
     const context: GuidedContext = {
       description: "A task management app",
@@ -65,7 +65,7 @@ describe("clarify", () => {
   });
 
   it("handles malformed LLM response gracefully by returning ready", async () => {
-    mockSpawnClaude.mockResolvedValue("This is not valid JSON at all");
+    mockSpawnClaude.mockResolvedValue({ text: "This is not valid JSON at all" });
 
     const context: GuidedContext = {
       description: "An app",
@@ -78,9 +78,9 @@ describe("clarify", () => {
   });
 
   it("handles markdown-fenced JSON response", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      '```json\n{ "status": "clarifying", "questions": ["What framework?"] }\n```',
-    );
+    mockSpawnClaude.mockResolvedValue({
+      text: '```json\n{ "status": "clarifying", "questions": ["What framework?"] }\n```',
+    });
 
     const context: GuidedContext = {
       description: "A web app",
@@ -94,9 +94,9 @@ describe("clarify", () => {
   });
 
   it("includes previous exchanges in the prompt", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify({ status: "ready", summary: "Got it" }),
-    );
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify({ status: "ready", summary: "Got it" }),
+    });
 
     const context: GuidedContext = {
       description: "An e-commerce site",
@@ -116,9 +116,9 @@ describe("clarify", () => {
   });
 
   it("includes project context in the prompt when provided", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify({ status: "ready", summary: "Got it" }),
-    );
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify({ status: "ready", summary: "Got it" }),
+    });
 
     const context: GuidedContext = {
       description: "An API service",
@@ -145,8 +145,8 @@ describe("generateSpecFromContext", () => {
   });
 
   it("includes description and all Q&A in the prompt", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify([
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify([
         {
           epic: { title: "Core" },
           features: [
@@ -157,7 +157,7 @@ describe("generateSpecFromContext", () => {
           ],
         },
       ]),
-    );
+    });
 
     const context: GuidedContext = {
       description: "A blog platform",
@@ -177,9 +177,9 @@ describe("generateSpecFromContext", () => {
     expect(prompt).toContain("Yes, OAuth");
   });
 
-  it("returns valid Proposal[] from LLM response", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify([
+  it("returns valid ReasonResult from LLM response", async () => {
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify([
         {
           epic: { title: "User Management" },
           features: [
@@ -203,27 +203,31 @@ describe("generateSpecFromContext", () => {
           ],
         },
       ]),
-    );
+      tokenUsage: { input: 500, output: 200 },
+    });
 
     const context: GuidedContext = {
       description: "A SaaS platform",
       exchanges: [],
     };
 
-    const proposals = await generateSpecFromContext(context, "", "test-model");
+    const result = await generateSpecFromContext(context, "", "test-model");
 
-    expect(proposals).toHaveLength(1);
-    expect(proposals[0].epic.title).toBe("User Management");
-    expect(proposals[0].features).toHaveLength(1);
-    expect(proposals[0].features[0].title).toBe("Registration");
-    expect(proposals[0].features[0].tasks).toHaveLength(2);
-    expect(proposals[0].features[0].tasks[0].title).toBe("Implement signup form");
-    expect(proposals[0].features[0].tasks[0].priority).toBe("high");
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].epic.title).toBe("User Management");
+    expect(result.proposals[0].features).toHaveLength(1);
+    expect(result.proposals[0].features[0].title).toBe("Registration");
+    expect(result.proposals[0].features[0].tasks).toHaveLength(2);
+    expect(result.proposals[0].features[0].tasks[0].title).toBe("Implement signup form");
+    expect(result.proposals[0].features[0].tasks[0].priority).toBe("high");
+    expect(result.tokenUsage.calls).toBe(1);
+    expect(result.tokenUsage.inputTokens).toBe(500);
+    expect(result.tokenUsage.outputTokens).toBe(200);
   });
 
   it("includes project context when provided", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify([
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify([
         {
           epic: { title: "API" },
           features: [
@@ -231,7 +235,7 @@ describe("generateSpecFromContext", () => {
           ],
         },
       ]),
-    );
+    });
 
     const context: GuidedContext = {
       description: "An API",
@@ -249,14 +253,14 @@ describe("generateSpecFromContext", () => {
   });
 
   it("includes few-shot example in the prompt", async () => {
-    mockSpawnClaude.mockResolvedValue(
-      JSON.stringify([
+    mockSpawnClaude.mockResolvedValue({
+      text: JSON.stringify([
         {
           epic: { title: "Test" },
           features: [{ title: "F", tasks: [{ title: "T" }] }],
         },
       ]),
-    );
+    });
 
     const context: GuidedContext = {
       description: "Anything",

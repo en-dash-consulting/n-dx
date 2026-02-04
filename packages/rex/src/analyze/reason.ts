@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { z } from "zod";
-import type { PRDItem } from "../schema/index.js";
+import type { PRDItem, TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import { walkTree } from "../core/tree.js";
@@ -11,6 +11,65 @@ export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
 /** Maximum number of LLM retry attempts for transient/parse failures. */
 export const MAX_RETRIES = 2;
+
+// ── Token usage helpers ──
+
+/** Result from a Claude CLI call, including text and optional token usage. */
+export interface ClaudeResult {
+  text: string;
+  tokenUsage?: TokenUsage;
+}
+
+/** Parse token usage from a claude CLI JSON envelope. */
+export function parseTokenUsage(envelope: Record<string, unknown>): TokenUsage | undefined {
+  // Claude CLI --output-format json includes usage fields at the top level
+  const input = envelope.input_tokens ?? envelope.total_input_tokens;
+  const output = envelope.output_tokens ?? envelope.total_output_tokens;
+
+  if (typeof input !== "number" && typeof output !== "number") {
+    return undefined;
+  }
+
+  const usage: TokenUsage = {
+    input: typeof input === "number" ? input : 0,
+    output: typeof output === "number" ? output : 0,
+  };
+
+  const cacheCreation = envelope.cache_creation_input_tokens;
+  const cacheRead = envelope.cache_read_input_tokens;
+  if (typeof cacheCreation === "number" && cacheCreation > 0) {
+    usage.cacheCreationInput = cacheCreation;
+  }
+  if (typeof cacheRead === "number" && cacheRead > 0) {
+    usage.cacheReadInput = cacheRead;
+  }
+
+  return usage;
+}
+
+/** Create an empty AnalyzeTokenUsage accumulator. */
+export function emptyAnalyzeTokenUsage(): AnalyzeTokenUsage {
+  return { calls: 0, inputTokens: 0, outputTokens: 0 };
+}
+
+/** Accumulate a single call's token usage into the aggregate. */
+export function accumulateTokenUsage(
+  aggregate: AnalyzeTokenUsage,
+  usage?: TokenUsage,
+): void {
+  aggregate.calls++;
+  if (!usage) return;
+  aggregate.inputTokens += usage.input;
+  aggregate.outputTokens += usage.output;
+  if (usage.cacheCreationInput) {
+    aggregate.cacheCreationInputTokens =
+      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
+  }
+  if (usage.cacheReadInput) {
+    aggregate.cacheReadInputTokens =
+      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
+  }
+}
 
 // ── Zod schemas for LLM response validation ──
 
@@ -355,7 +414,7 @@ export function validateProposalQuality(proposals: Proposal[]): QualityIssue[] {
 
 // ── LLM interaction ──
 
-function spawnClaudeOnce(prompt: string, model: string): Promise<string> {
+function spawnClaudeOnce(prompt: string, model: string): Promise<ClaudeResult> {
   return new Promise((resolve, reject) => {
     const args = [
       "-p", prompt,
@@ -395,10 +454,12 @@ function spawnClaudeOnce(prompt: string, model: string): Promise<string> {
 
       // --output-format json wraps result in { "result": "...", ... }
       try {
-        const envelope = JSON.parse(stdout);
-        resolve(typeof envelope.result === "string" ? envelope.result : stdout);
+        const envelope = JSON.parse(stdout) as Record<string, unknown>;
+        const text = typeof envelope.result === "string" ? envelope.result : stdout;
+        const tokenUsage = parseTokenUsage(envelope);
+        resolve({ text, tokenUsage });
       } catch {
-        resolve(stdout);
+        resolve({ text: stdout });
       }
     });
   });
@@ -408,8 +469,10 @@ function spawnClaudeOnce(prompt: string, model: string): Promise<string> {
  * Spawn claude CLI with automatic retry on transient failures.
  * Retries up to MAX_RETRIES times with exponential backoff.
  * Non-retryable errors (ENOENT for missing CLI) are thrown immediately.
+ *
+ * Returns the result text and token usage from the CLI envelope.
  */
-export async function spawnClaude(prompt: string, model: string): Promise<string> {
+export async function spawnClaude(prompt: string, model: string): Promise<ClaudeResult> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -717,19 +780,26 @@ export function chunkScanResults(results: ScanResult[]): ScanResult[][] {
 
 // ── Public API ──
 
+/** Result of a reason* function: proposals plus aggregated token usage. */
+export interface ReasonResult {
+  proposals: Proposal[];
+  tokenUsage: AnalyzeTokenUsage;
+}
+
 export async function reasonFromFile(
   filePath: string,
   existingItems: PRDItem[],
   model?: string,
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
   const content = await readFile(filePath, "utf-8");
   const format = detectFileFormat(filePath);
+  const tokenUsage = emptyAnalyzeTokenUsage();
 
   // For JSON/YAML, try direct structured parsing first
   if (format !== "markdown") {
     const structured = parseStructuredFile(content, format, existingItems);
     if (structured !== null) {
-      return structured;
+      return { proposals: structured, tokenUsage };
     }
   }
 
@@ -763,8 +833,9 @@ ${content}
 
 Respond with ONLY a valid JSON array, no explanation or markdown fences.`;
 
-  const raw = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
-  return parseProposalResponse(raw);
+  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  accumulateTokenUsage(tokenUsage, result.tokenUsage);
+  return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
 
 // ── Multi-file support ──
@@ -829,9 +900,11 @@ export async function reasonFromFiles(
   filePaths: string[],
   existingItems: PRDItem[],
   model?: string,
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
   if (filePaths.length === 0) {
-    return [];
+    return { proposals: [], tokenUsage };
   }
   if (filePaths.length === 1) {
     return reasonFromFile(filePaths[0], existingItems, model);
@@ -840,19 +913,32 @@ export async function reasonFromFiles(
   const allProposals: Proposal[] = [];
 
   for (const fp of filePaths) {
-    const proposals = await reasonFromFile(fp, existingItems, model);
-    allProposals.push(...proposals);
+    const result = await reasonFromFile(fp, existingItems, model);
+    allProposals.push(...result.proposals);
+    // Accumulate per-file token usage (calls already counted in reasonFromFile)
+    tokenUsage.calls += result.tokenUsage.calls;
+    tokenUsage.inputTokens += result.tokenUsage.inputTokens;
+    tokenUsage.outputTokens += result.tokenUsage.outputTokens;
+    if (result.tokenUsage.cacheCreationInputTokens) {
+      tokenUsage.cacheCreationInputTokens =
+        (tokenUsage.cacheCreationInputTokens ?? 0) + result.tokenUsage.cacheCreationInputTokens;
+    }
+    if (result.tokenUsage.cacheReadInputTokens) {
+      tokenUsage.cacheReadInputTokens =
+        (tokenUsage.cacheReadInputTokens ?? 0) + result.tokenUsage.cacheReadInputTokens;
+    }
   }
 
-  return mergeProposals(allProposals);
+  return { proposals: mergeProposals(allProposals), tokenUsage };
 }
 
 export async function reasonFromScanResults(
   results: ScanResult[],
   existingItems: PRDItem[],
   options?: { model?: string; dir?: string },
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
   const existingSummary = summarizeExisting(existingItems);
+  const tokenUsage = emptyAnalyzeTokenUsage();
 
   // Read project documentation for additional context
   const projectContext = options?.dir
@@ -867,7 +953,7 @@ export async function reasonFromScanResults(
   const chunks = chunkScanResults(results);
 
   if (chunks.length === 0) {
-    return [];
+    return { proposals: [], tokenUsage };
   }
 
   const model = options?.model ?? DEFAULT_MODEL;
@@ -916,16 +1002,14 @@ ${scanSummary}
 
 Respond with ONLY a valid JSON array, no explanation or markdown fences.`;
 
-    const raw = await spawnClaude(prompt, model);
-    allProposals.push(...parseProposalResponse(raw));
+    const claudeResult = await spawnClaude(prompt, model);
+    accumulateTokenUsage(tokenUsage, claudeResult.tokenUsage);
+    allProposals.push(...parseProposalResponse(claudeResult.text));
   }
 
   // When we made multiple LLM calls, merge overlapping epics/features
-  if (chunks.length > 1) {
-    return mergeProposals(allProposals);
-  }
-
-  return allProposals;
+  const proposals = chunks.length > 1 ? mergeProposals(allProposals) : allProposals;
+  return { proposals, tokenUsage };
 }
 
 // ── Natural-language add ──
@@ -1017,14 +1101,16 @@ export async function reasonFromDescription(
   description: string,
   existingItems: PRDItem[],
   options?: { model?: string; dir?: string; parentId?: string },
-): Promise<Proposal[]> {
+): Promise<ReasonResult> {
   const dir = options?.dir ?? process.cwd();
   const prompt = await buildAddPrompt(description, existingItems, dir, {
     parentId: options?.parentId,
   });
 
-  const raw = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  return parseProposalResponse(raw);
+  const tokenUsage = emptyAnalyzeTokenUsage();
+  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+  accumulateTokenUsage(tokenUsage, result.tokenUsage);
+  return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
 
 // ── Multiple descriptions ──
@@ -1106,8 +1192,10 @@ export async function reasonFromDescriptions(
   descriptions: string[],
   existingItems: PRDItem[],
   options?: { model?: string; dir?: string; parentId?: string },
-): Promise<Proposal[]> {
-  if (descriptions.length === 0) return [];
+): Promise<ReasonResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
+  if (descriptions.length === 0) return { proposals: [], tokenUsage };
   // Single description — delegate to the original function
   if (descriptions.length === 1) {
     return reasonFromDescription(descriptions[0], existingItems, options);
@@ -1118,8 +1206,9 @@ export async function reasonFromDescriptions(
     parentId: options?.parentId,
   });
 
-  const raw = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  return parseProposalResponse(raw);
+  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+  accumulateTokenUsage(tokenUsage, result.tokenUsage);
+  return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
 
 // ── Ideas file import ──
@@ -1198,8 +1287,10 @@ export async function reasonFromIdeasFile(
   filePaths: string[],
   existingItems: PRDItem[],
   options?: { model?: string; dir?: string; parentId?: string },
-): Promise<Proposal[]> {
-  if (filePaths.length === 0) return [];
+): Promise<ReasonResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
+  if (filePaths.length === 0) return { proposals: [], tokenUsage };
 
   const dir = options?.dir ?? process.cwd();
 
@@ -1215,13 +1306,14 @@ export async function reasonFromIdeasFile(
     }
   }
 
-  if (sections.length === 0) return [];
+  if (sections.length === 0) return { proposals: [], tokenUsage };
 
   const combined = sections.join("\n\n");
   const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
     parentId: options?.parentId,
   });
 
-  const raw = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  return parseProposalResponse(raw);
+  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+  accumulateTokenUsage(tokenUsage, result.tokenUsage);
+  return { proposals: parseProposalResponse(result.text), tokenUsage };
 }

@@ -11,7 +11,7 @@ export { similarity, deduplicateScanResults } from "./dedupe.js";
 
 export { formatDiff } from "./diff.js";
 
-export type { FileFormat, AddPromptOptions, QualityIssue } from "./reason.js";
+export type { FileFormat, AddPromptOptions, QualityIssue, ClaudeResult, ReasonResult } from "./reason.js";
 export {
   DEFAULT_MODEL,
   MAX_RETRIES,
@@ -27,6 +27,9 @@ export {
   buildIdeasPrompt,
   readProjectContext,
   parseProposalResponse,
+  parseTokenUsage,
+  emptyAnalyzeTokenUsage,
+  accumulateTokenUsage,
   extractJson,
   repairTruncatedJson,
   validateProposalQuality,
