@@ -25,7 +25,7 @@ Options:
   --status=<s>            Status (for update)
   --priority=<p>          Priority (for update/add)
   --description="..."     Description (for add/update)
-  --format=json           Output as JSON
+  --format=tree|json      Output format (default: tree)
   --lite                  File-name-only scan (for analyze)
   --accept                Accept LLM proposals into PRD (for smart add, analyze)
   --file=<path>           Import PRD from a document (repeatable, for analyze)

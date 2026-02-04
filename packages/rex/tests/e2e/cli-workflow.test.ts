@@ -125,6 +125,34 @@ describe("rex CLI workflow", () => {
     expect(parsed.items.length).toBe(1);
   });
 
+  it("status --format=tree shows hierarchy with icons", () => {
+    const epicOut = run(["add", "epic", tmpDir, '--title=Auth System', "--priority=high"]);
+    const epicId = epicOut.match(/ID: (.+)/)?.[1]?.trim();
+    const featOut = run(["add", "feature", tmpDir, '--title=Login', `--parent=${epicId}`]);
+    const featId = featOut.match(/ID: (.+)/)?.[1]?.trim();
+    run(["add", "task", tmpDir, '--title=Build form', `--parent=${featId}`]);
+
+    const output = run(["status", tmpDir, "--format=tree"]);
+    // Title, hierarchy, icons, indentation, completion counts
+    expect(output).toContain("PRD:");
+    expect(output).toContain("Auth System");
+    expect(output).toContain("Login");
+    expect(output).toContain("Build form");
+    expect(output).toContain("○"); // pending icon
+    expect(output).toContain("[high]"); // priority
+    expect(output).toContain("[0/"); // completion count
+  });
+
+  it("status --format=unknown errors", () => {
+    try {
+      run(["status", tmpDir, "--format=csv"]);
+      expect.fail("Should have thrown");
+    } catch (err: unknown) {
+      const e = err as { stderr?: string; status?: number };
+      expect(e.status).not.toBe(0);
+    }
+  });
+
   it("execution log records actions", async () => {
     run(["add", "epic", tmpDir, '--title=Logged Epic']);
     const log = await readFile(
