@@ -9,7 +9,7 @@ export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs } f
 export type { PassConfig } from "./enrich-config.js";
 export { tryCallClaude } from "./claude-cli.js";
 export type { ClaudeCallResult } from "./claude-cli.js";
-export { tryParseJSON, extractFindings } from "./enrich-parsing.js";
+export { tryParseJSON, extractFindings, mergeZonesByName } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";
 
 // ── Imports ──────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ import {
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { tryCallClaude } from "./claude-cli.js";
-import { tryParseJSON, extractFindings, deduplicateZoneIds } from "./enrich-parsing.js";
+import { tryParseJSON, extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 
 // ── Batch processing (private) ───────────────────────────────────────────────
@@ -63,16 +63,24 @@ async function enrichBatch(
   previousZones: Zones | undefined,
   batchIndex: number,
   totalBatches: number,
+  enrichedNames?: Map<string, string>,
 ): Promise<BatchResult | null | { authError: true }> {
   const isFirstPass = passNumber === 1;
   const batchFiles = batchZones.reduce((sum, z) => sum + z.files.length, 0);
   const ATTEMPT_CONFIGS = computeAttemptConfigs(batchFiles, batchZones.length, passNumber);
 
   // Build 1-line summaries for zones NOT in this batch (context)
+  // Use enriched names from previous batches when available
   const batchIds = new Set(batchZones.map((z) => z.id));
   const otherSummaries = allZones
     .filter((z) => !batchIds.has(z.id))
-    .map((z) => `"${z.id}" (${z.files.length} files, cohesion: ${z.cohesion})`)
+    .map((z) => {
+      const enrichedName = enrichedNames?.get(z.id);
+      if (enrichedName) {
+        return `"${enrichedName}" (${z.files.length} files, cohesion: ${z.cohesion})`;
+      }
+      return `"${z.id}" (${z.files.length} files, cohesion: ${z.cohesion})`;
+    })
     .join("; ");
   const otherContext = otherSummaries
     ? `\nOther zones in this codebase (for context, not in this batch): ${otherSummaries}`
@@ -81,6 +89,11 @@ async function enrichBatch(
   const isLastBatch = batchIndex === totalBatches - 1;
   const globalPromptNote = isLastBatch && totalBatches > 1
     ? "\nYou have now seen all zones. Provide any cross-zone architectural observations."
+    : "";
+
+  // Tell the LLM about names already assigned by previous batches
+  const priorNames = enrichedNames && enrichedNames.size > 0
+    ? `\nThe following zone names have already been assigned in previous batches:\n${[...enrichedNames.entries()].map(([algId, n]) => `  - "${n}" (algorithmicId: ${algId})`).join("\n")}\nIf a zone in this batch is semantically the SAME architectural concept as one above, reuse the EXACT same name and id to signal they should be merged. Otherwise, choose a distinct name.\n`
     : "";
 
   const batchLabel = totalBatches > 1 ? ` batch ${batchIndex + 1}/${totalBatches}` : "";
@@ -117,7 +130,7 @@ ${passConfig.focus}
 Zones:
 ${zoneList}
 ${otherContext}
-
+${priorNames}
 Cross-zone imports:
 ${crossingLines || "  (none)"}
 ${globalPromptNote}
@@ -150,7 +163,7 @@ Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfi
 Zones:
 ${zoneList}
 ${otherContext}
-
+${priorNames}
 Return ONLY JSON:
 {"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":[]}],"insights":[]}
 
@@ -390,39 +403,38 @@ export async function enrichZonesWithAI(
     console.log(`  [enrich] Processing ${zones.length} zones in ${batches.length} batches of up to ${ZONES_PER_BATCH}`);
   }
 
-  // 4. Process batches with concurrency limit to avoid API rate-limiting
+  // 4. Process batches sequentially, feeding enriched names forward
   const allBatchResults: BatchResult[] = [];
+  const enrichedNames = new Map<string, string>();
   let authFailed = false;
 
-  const runBatch = async (bi: number) => {
+  for (let bi = 0; bi < batches.length; bi++) {
+    if (authFailed) break;
+
     try {
       const result = await enrichBatch(
         batches[bi], zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
+        enrichedNames,
       );
       if (result && "authError" in result) {
         authFailed = true;
       } else if (result) {
         allBatchResults.push(result);
+
+        // Track enriched names so subsequent batches can avoid duplicates
+        if (isFirstPass && Array.isArray(result.parsed.zones)) {
+          for (const z of result.parsed.zones) {
+            if (z?.algorithmicId && typeof z.name === "string") {
+              enrichedNames.set(z.algorithmicId, z.name);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error(`  [enrich] batch ${bi + 1} rejected:`, err instanceof Error ? err.message : err);
     }
-  };
-
-  // Worker pool: at most MAX_CONCURRENT_BATCHES run at once
-  const queue = batches.map((_, i) => i);
-  const workers: Promise<void>[] = [];
-  for (let w = 0; w < Math.min(MAX_CONCURRENT_BATCHES, batches.length); w++) {
-    workers.push((async () => {
-      while (queue.length > 0) {
-        const bi = queue.shift()!;
-        await runBatch(bi);
-        if (authFailed) return; // stop early on auth error
-      }
-    })());
   }
-  await Promise.all(workers);
 
   // If auth failed and no batches succeeded, return empty
   if (authFailed && allBatchResults.length === 0) {
@@ -473,7 +485,7 @@ export async function enrichZonesWithAI(
 
   // 6. Apply results
   if (isFirstPass) {
-    const enriched: Zone[] = zones.map((zone, i) => {
+    const enrichedRaw: Zone[] = zones.map((zone, i) => {
       // If this zone's batch failed, keep it unchanged
       if (!successfulBatchIds.has(zone.id)) {
         return zone;
@@ -496,6 +508,12 @@ export async function enrichZonesWithAI(
         description: e.description,
       };
     });
+
+    // Merge zones the LLM identified as semantically identical across batches
+    const enriched = mergeZonesByName(enrichedRaw);
+    if (enriched.length < enrichedRaw.length) {
+      console.log(`  [enrich] Merged ${enrichedRaw.length - enriched.length} duplicate zones (${enrichedRaw.length} → ${enriched.length})`);
+    }
 
     deduplicateZoneIds(enriched);
 

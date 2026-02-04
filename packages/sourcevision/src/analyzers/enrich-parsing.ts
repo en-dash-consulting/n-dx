@@ -133,6 +133,77 @@ export function extractFindings(
   return findings;
 }
 
+// ── Zone merging ─────────────────────────────────────────────────────────────
+
+/**
+ * Merge zones that share the same LLM-assigned name.
+ * When the LLM recognizes zones across batches as semantically identical,
+ * it assigns the same name — this function combines their file lists,
+ * entry points, and insights into a single zone.
+ *
+ * Returns the deduplicated zone array (mutates nothing).
+ */
+export function mergeZonesByName(zones: Zone[]): Zone[] {
+  const byName = new Map<string, Zone[]>();
+
+  for (const zone of zones) {
+    const key = zone.name.toLowerCase().trim();
+    const group = byName.get(key);
+    if (group) {
+      group.push(zone);
+    } else {
+      byName.set(key, [zone]);
+    }
+  }
+
+  const merged: Zone[] = [];
+  for (const group of byName.values()) {
+    if (group.length === 1) {
+      merged.push(group[0]);
+      continue;
+    }
+
+    // Merge all zones in this group into one
+    const primary = group[0];
+    const allFiles = new Set(primary.files);
+    const allEntryPoints = new Set(primary.entryPoints);
+    const allInsights: string[] = [...(primary.insights ?? [])];
+    const seenInsights = new Set(allInsights);
+
+    for (let i = 1; i < group.length; i++) {
+      for (const f of group[i].files) allFiles.add(f);
+      for (const ep of group[i].entryPoints) allEntryPoints.add(ep);
+      for (const ins of group[i].insights ?? []) {
+        if (!seenInsights.has(ins)) {
+          allInsights.push(ins);
+          seenInsights.add(ins);
+        }
+      }
+    }
+
+    // Average cohesion/coupling weighted by file count
+    let totalFiles = 0;
+    let weightedCohesion = 0;
+    let weightedCoupling = 0;
+    for (const z of group) {
+      totalFiles += z.files.length;
+      weightedCohesion += z.cohesion * z.files.length;
+      weightedCoupling += z.coupling * z.files.length;
+    }
+
+    merged.push({
+      ...primary,
+      files: [...allFiles],
+      entryPoints: [...allEntryPoints],
+      cohesion: totalFiles > 0 ? Math.round((weightedCohesion / totalFiles) * 100) / 100 : primary.cohesion,
+      coupling: totalFiles > 0 ? Math.round((weightedCoupling / totalFiles) * 100) / 100 : primary.coupling,
+      insights: allInsights.length > 0 ? allInsights : undefined,
+    });
+  }
+
+  return merged;
+}
+
 // ── Zone ID deduplication ────────────────────────────────────────────────────
 
 /** Ensure no two zones share the same ID (appends -2, -3, etc.) */
