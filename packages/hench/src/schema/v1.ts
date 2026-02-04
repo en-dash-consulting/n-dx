@@ -70,6 +70,17 @@ export interface ToolCallRecord {
 export interface TokenUsage {
   input: number;
   output: number;
+  cacheCreationInput?: number;
+  cacheReadInput?: number;
+}
+
+/** Token usage for a single API turn. */
+export interface TurnTokenUsage {
+  turn: number;
+  input: number;
+  output: number;
+  cacheCreationInput?: number;
+  cacheReadInput?: number;
 }
 
 export interface CommandRecord {
@@ -130,6 +141,8 @@ export interface RunRecord {
   summary?: string;
   error?: string;
   tokenUsage: TokenUsage;
+  /** Per-turn token breakdown. One entry per API call. */
+  turnTokenUsage?: TurnTokenUsage[];
   toolCalls: ToolCallRecord[];
   model: string;
   retryAttempts?: number;

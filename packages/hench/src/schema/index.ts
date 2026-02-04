@@ -11,6 +11,7 @@ export type {
   RunStatus,
   ToolCallRecord,
   TokenUsage,
+  TurnTokenUsage,
   CommandRecord,
   TestRecord,
   PostRunTestRecord,

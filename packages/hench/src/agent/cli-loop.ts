@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex/dist/store/types.js";
-import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord } from "../schema/index.js";
+import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../schema/index.js";
 import { assembleTaskBrief, formatTaskBrief } from "./brief.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { saveRun } from "../store/index.js";
@@ -77,16 +77,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-interface CliRunResult {
+/** @internal Exported for testing. */
+export interface CliRunResult {
   turns: number;
   toolCalls: ToolCallRecord[];
-  tokenUsage: { input: number; output: number };
+  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+  turnTokenUsage: TurnTokenUsage[];
   summary?: string;
   error?: string;
   costUsd?: number;
 }
 
-function processStreamLine(
+/** @internal Exported for testing. */
+export function processStreamLine(
   line: string,
   result: CliRunResult,
   turnCounter: { value: number },
@@ -123,6 +126,35 @@ function processStreamLine(
               result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
             }
           }
+        }
+
+        // Extract per-turn token usage from message.usage
+        const usage = msg.usage as Record<string, number> | undefined;
+        if (usage) {
+          const inputTokens = usage.input_tokens ?? 0;
+          const outputTokens = usage.output_tokens ?? 0;
+
+          result.tokenUsage.input += inputTokens;
+          result.tokenUsage.output += outputTokens;
+
+          const turnUsage: TurnTokenUsage = {
+            turn: turnCounter.value,
+            input: inputTokens,
+            output: outputTokens,
+          };
+
+          const cacheCreation = usage.cache_creation_input_tokens;
+          const cacheRead = usage.cache_read_input_tokens;
+          if (cacheCreation) {
+            result.tokenUsage.cacheCreationInput = (result.tokenUsage.cacheCreationInput ?? 0) + cacheCreation;
+            turnUsage.cacheCreationInput = cacheCreation;
+          }
+          if (cacheRead) {
+            result.tokenUsage.cacheReadInput = (result.tokenUsage.cacheReadInput ?? 0) + cacheRead;
+            turnUsage.cacheReadInput = cacheRead;
+          }
+
+          result.turnTokenUsage.push(turnUsage);
         }
       }
 
@@ -176,6 +208,13 @@ function processStreamLine(
       if (typeof event.cost_usd === "number") {
         result.costUsd = event.cost_usd;
       }
+      // Extract total token usage from result event (fallback if per-turn not available)
+      if (typeof event.total_input_tokens === "number" && result.tokenUsage.input === 0) {
+        result.tokenUsage.input = event.total_input_tokens as number;
+      }
+      if (typeof event.total_output_tokens === "number" && result.tokenUsage.output === 0) {
+        result.tokenUsage.output = event.total_output_tokens as number;
+      }
       break;
     }
 
@@ -199,6 +238,7 @@ function spawnClaude(
       turns: 0,
       toolCalls: [],
       tokenUsage: { input: 0, output: 0 },
+      turnTokenUsage: [],
     };
 
     const turnCounter = { value: 0 };
@@ -299,6 +339,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     status: "running",
     turns: 0,
     tokenUsage: { input: 0, output: 0 },
+    turnTokenUsage: [],
     toolCalls: [],
     model,
   };
@@ -313,6 +354,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   let accumulatedTurns = 0;
   let accumulatedToolCalls: ToolCallRecord[] = [];
+  let accumulatedTurnTokenUsage: TurnTokenUsage[] = [];
   let lastError: string | undefined;
 
   try {
@@ -341,6 +383,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
       accumulatedTurns += result.turns;
       accumulatedToolCalls = accumulatedToolCalls.concat(result.toolCalls);
+      accumulatedTurnTokenUsage = accumulatedTurnTokenUsage.concat(result.turnTokenUsage);
 
       if (!result.error) {
         // Validate completion: require meaningful changes
@@ -351,6 +394,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.turns = accumulatedTurns;
         run.toolCalls = accumulatedToolCalls;
         run.tokenUsage = result.tokenUsage;
+        run.turnTokenUsage = accumulatedTurnTokenUsage;
         run.retryAttempts = attempt > 0 ? attempt : undefined;
 
         // Post-run token budget check (CLI provider can only check after run)
@@ -428,6 +472,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.turns = accumulatedTurns;
         run.toolCalls = accumulatedToolCalls;
         run.tokenUsage = result.tokenUsage;
+        run.turnTokenUsage = accumulatedTurnTokenUsage;
         run.status = "failed";
         run.summary = result.summary;
         run.error = result.error;
@@ -456,6 +501,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.turns = accumulatedTurns;
         run.toolCalls = accumulatedToolCalls;
         run.tokenUsage = result.tokenUsage;
+        run.turnTokenUsage = accumulatedTurnTokenUsage;
         run.status = "error_transient";
         run.summary = result.summary;
         run.error = result.error;

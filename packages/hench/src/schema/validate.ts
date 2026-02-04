@@ -49,6 +49,16 @@ const ToolCallRecordSchema = z.object({
 const TokenUsageSchema = z.object({
   input: z.number(),
   output: z.number(),
+  cacheCreationInput: z.number().optional(),
+  cacheReadInput: z.number().optional(),
+});
+
+const TurnTokenUsageSchema = z.object({
+  turn: z.number(),
+  input: z.number(),
+  output: z.number(),
+  cacheCreationInput: z.number().optional(),
+  cacheReadInput: z.number().optional(),
 });
 
 const CommandRecordSchema = z.object({
@@ -101,6 +111,7 @@ export const RunRecordSchema = z.object({
   summary: z.string().optional(),
   error: z.string().optional(),
   tokenUsage: TokenUsageSchema,
+  turnTokenUsage: z.array(TurnTokenUsageSchema).optional(),
   toolCalls: z.array(ToolCallRecordSchema),
   model: z.string(),
   retryAttempts: z.number().int().nonnegative().optional(),

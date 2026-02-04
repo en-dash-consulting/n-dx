@@ -33,7 +33,8 @@ export async function cmdStatus(
 
     result(`${icon} ${run.id.slice(0, 8)}  ${run.taskTitle}`);
     info(`  ${run.status} | ${run.turns} turns | ${duration} | ${run.model}`);
-    info(`  tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out`);
+    const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
+    info(`  tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
     if (run.error) {
       result(`  error: ${run.error}`);
     }

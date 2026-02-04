@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex/dist/store/types.js";
-import type { HenchConfig, RunRecord } from "../schema/index.js";
+import type { HenchConfig, RunRecord, TurnTokenUsage } from "../schema/index.js";
 import { GuardRails } from "../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "./tools.js";
 import type { ToolContext } from "./tools.js";
@@ -153,6 +153,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     status: "running",
     turns: 0,
     tokenUsage: { input: 0, output: 0 },
+    turnTokenUsage: [],
     toolCalls: [],
     model,
   };
@@ -186,6 +187,26 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       // Track token usage
       run.tokenUsage.input += response.usage.input_tokens;
       run.tokenUsage.output += response.usage.output_tokens;
+
+      const usageRaw = response.usage as unknown as Record<string, number>;
+      const cacheCreation = usageRaw.cache_creation_input_tokens as number | undefined;
+      const cacheRead = usageRaw.cache_read_input_tokens as number | undefined;
+      if (cacheCreation) {
+        run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + cacheCreation;
+      }
+      if (cacheRead) {
+        run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + cacheRead;
+      }
+
+      // Per-turn breakdown
+      const turnUsage: TurnTokenUsage = {
+        turn: turn + 1,
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens,
+      };
+      if (cacheCreation) turnUsage.cacheCreationInput = cacheCreation;
+      if (cacheRead) turnUsage.cacheReadInput = cacheRead;
+      run.turnTokenUsage!.push(turnUsage);
 
       // Check token budget
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);

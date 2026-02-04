@@ -23,7 +23,11 @@ export async function cmdShow(
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);
-  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out`);
+  const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
+  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
+  if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
+    info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
+  }
 
   if (run.summary) {
     info(`\nSummary:\n${run.summary}`);
@@ -87,6 +91,19 @@ export async function cmdShow(
       if (call.output.startsWith("[GUARD]") || call.output.startsWith("[ERROR]")) {
         info(`       ${call.output.slice(0, 120)}`);
       }
+    }
+  }
+
+  // Per-turn token breakdown
+  if (run.turnTokenUsage && run.turnTokenUsage.length > 0) {
+    info(`\nToken Usage Per Turn (${run.turnTokenUsage.length}):`);
+    for (const t of run.turnTokenUsage) {
+      const turnTotal = t.input + t.output;
+      let line = `  [${t.turn}] ${t.input} in / ${t.output} out (${turnTotal})`;
+      if (t.cacheCreationInput || t.cacheReadInput) {
+        line += ` cache: ${t.cacheCreationInput ?? 0}c/${t.cacheReadInput ?? 0}r`;
+      }
+      info(line);
     }
   }
 }

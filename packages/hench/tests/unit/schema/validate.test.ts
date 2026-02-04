@@ -209,4 +209,61 @@ describe("validateRunRecord", () => {
     const result = validateRunRecord(run);
     expect(result.ok).toBe(false);
   });
+
+  it("accepts run with turnTokenUsage", () => {
+    const run = {
+      ...validRun,
+      turnTokenUsage: [
+        { turn: 1, input: 500, output: 200 },
+        { turn: 2, input: 600, output: 300, cacheCreationInput: 100, cacheReadInput: 400 },
+      ],
+    };
+    const result = validateRunRecord(run);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.turnTokenUsage).toHaveLength(2);
+      expect(result.data.turnTokenUsage![0]).toEqual({ turn: 1, input: 500, output: 200 });
+      expect(result.data.turnTokenUsage![1].cacheCreationInput).toBe(100);
+      expect(result.data.turnTokenUsage![1].cacheReadInput).toBe(400);
+    }
+  });
+
+  it("accepts run without turnTokenUsage (backward compat)", () => {
+    const result = validateRunRecord(validRun);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.turnTokenUsage).toBeUndefined();
+    }
+  });
+
+  it("accepts tokenUsage with cache fields", () => {
+    const run = {
+      ...validRun,
+      tokenUsage: { input: 1000, output: 500, cacheCreationInput: 200, cacheReadInput: 800 },
+    };
+    const result = validateRunRecord(run);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.tokenUsage.cacheCreationInput).toBe(200);
+      expect(result.data.tokenUsage.cacheReadInput).toBe(800);
+    }
+  });
+
+  it("accepts tokenUsage without cache fields (backward compat)", () => {
+    const result = validateRunRecord(validRun);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.tokenUsage.cacheCreationInput).toBeUndefined();
+      expect(result.data.tokenUsage.cacheReadInput).toBeUndefined();
+    }
+  });
+
+  it("rejects run with invalid turnTokenUsage entries", () => {
+    const run = {
+      ...validRun,
+      turnTokenUsage: [{ turn: "not-a-number", input: 500 }],
+    };
+    const result = validateRunRecord(run);
+    expect(result.ok).toBe(false);
+  });
 });
