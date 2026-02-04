@@ -16,6 +16,7 @@ Commands:
   validate [dir]          Check PRD integrity (DAG, schema)
   recommend [dir]         Get SourceVision recommendations
   analyze [dir]           Build PRD from project analysis
+  adapter <sub> [name]    Manage store adapters (list|add|remove|show)
   mcp [dir]               Start MCP server
 
 Options:

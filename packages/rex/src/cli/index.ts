@@ -50,7 +50,10 @@ function parseArgs(argv: string[]): {
 async function main(): Promise<void> {
   const { command, positional, flags, multiFlags } = parseArgs(process.argv.slice(2));
 
-  if (flags.help || !command) {
+  // Show top-level help if no command, or --help without a command that
+  // handles its own help (e.g. adapter has subcommand-level help).
+  const SELF_HELP_COMMANDS = new Set(["adapter"]);
+  if (!command || (flags.help && !SELF_HELP_COMMANDS.has(command))) {
     usage();
     process.exit(0);
   }
@@ -163,6 +166,25 @@ async function main(): Promise<void> {
       case "analyze": {
         const { cmdAnalyze } = await import("./commands/analyze.js");
         await cmdAnalyze(resolveDir(), flags, multiFlags);
+        break;
+      }
+      case "adapter": {
+        // Adapter uses subcommands — strip the trailing dir from positional args
+        // so cmdAdapter only sees [subcommand, name?, ...].
+        const dir = resolveDir();
+        const adapterPositional = [...positional];
+        if (adapterPositional.length > 0) {
+          const last = adapterPositional[adapterPositional.length - 1];
+          try {
+            if (existsSync(last) && statSync(last).isDirectory()) {
+              adapterPositional.pop();
+            }
+          } catch {
+            // Not a directory — keep it
+          }
+        }
+        const { cmdAdapter } = await import("./commands/adapter.js");
+        await cmdAdapter(dir, adapterPositional, flags);
         break;
       }
       case "mcp": {

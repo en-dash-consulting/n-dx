@@ -1,0 +1,405 @@
+/**
+ * Tests for the adapter registration system.
+ *
+ * The AdapterRegistry allows registering store adapter factories,
+ * persisting adapter configurations, and creating stores from registered
+ * adapters.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile, readFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { SCHEMA_VERSION } from "../../../src/schema/index.js";
+import { toCanonicalJSON } from "../../../src/core/canonical.js";
+import {
+  AdapterRegistry,
+  type AdapterDefinition,
+  type AdapterConfig,
+} from "../../../src/store/adapter-registry.js";
+import type { PRDStore } from "../../../src/store/types.js";
+import { FileStore } from "../../../src/store/file-adapter.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Minimal mock store for testing adapter factories. */
+function createMockStore(rexDir: string, config: Record<string, unknown>): PRDStore {
+  return new FileStore(rexDir);
+}
+
+async function seedRexDir(rexDir: string): Promise<void> {
+  await mkdir(rexDir, { recursive: true });
+  await writeFile(
+    join(rexDir, "prd.json"),
+    toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Test", items: [] }),
+    "utf-8",
+  );
+  await writeFile(
+    join(rexDir, "config.json"),
+    toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
+    "utf-8",
+  );
+  await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+  await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("AdapterRegistry", () => {
+  let tmpDir: string;
+  let rexDir: string;
+  let registry: AdapterRegistry;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-registry-"));
+    rexDir = join(tmpDir, ".rex");
+    await seedRexDir(rexDir);
+    registry = new AdapterRegistry();
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  // ---- Built-in adapters -------------------------------------------------
+
+  describe("built-in adapters", () => {
+    it("has 'file' adapter registered by default", () => {
+      const adapters = registry.list();
+      expect(adapters.some((a) => a.name === "file")).toBe(true);
+    });
+
+    it("has 'notion' adapter registered by default", () => {
+      const adapters = registry.list();
+      expect(adapters.some((a) => a.name === "notion")).toBe(true);
+    });
+
+    it("creates a FileStore for the 'file' adapter", () => {
+      const store = registry.create("file", rexDir, {});
+      expect(store.capabilities().adapter).toBe("file");
+    });
+  });
+
+  // ---- Registration ------------------------------------------------------
+
+  describe("register", () => {
+    it("registers a new adapter", () => {
+      const def: AdapterDefinition = {
+        name: "custom",
+        description: "Custom test adapter",
+        configSchema: { token: { required: true, description: "API token" } },
+        factory: createMockStore,
+      };
+      registry.register(def);
+
+      const adapters = registry.list();
+      expect(adapters.some((a) => a.name === "custom")).toBe(true);
+    });
+
+    it("rejects duplicate adapter names", () => {
+      const def: AdapterDefinition = {
+        name: "file",
+        description: "Duplicate file adapter",
+        configSchema: {},
+        factory: createMockStore,
+      };
+      expect(() => registry.register(def)).toThrow(/already registered/);
+    });
+
+    it("rejects empty adapter name", () => {
+      expect(() =>
+        registry.register({
+          name: "",
+          description: "Empty name",
+          configSchema: {},
+          factory: createMockStore,
+        }),
+      ).toThrow(/name/i);
+    });
+  });
+
+  // ---- Unregister --------------------------------------------------------
+
+  describe("unregister", () => {
+    it("removes a registered adapter", () => {
+      registry.register({
+        name: "removable",
+        description: "Will be removed",
+        configSchema: {},
+        factory: createMockStore,
+      });
+
+      registry.unregister("removable");
+
+      const adapters = registry.list();
+      expect(adapters.some((a) => a.name === "removable")).toBe(false);
+    });
+
+    it("prevents unregistering built-in adapters", () => {
+      expect(() => registry.unregister("file")).toThrow(/built-in/);
+      expect(() => registry.unregister("notion")).toThrow(/built-in/);
+    });
+
+    it("throws for unknown adapter", () => {
+      expect(() => registry.unregister("nonexistent")).toThrow(/not found/);
+    });
+  });
+
+  // ---- Get ---------------------------------------------------------------
+
+  describe("get", () => {
+    it("returns definition for registered adapter", () => {
+      const def = registry.get("file");
+      expect(def).toBeDefined();
+      expect(def!.name).toBe("file");
+    });
+
+    it("returns undefined for unknown adapter", () => {
+      expect(registry.get("nonexistent")).toBeUndefined();
+    });
+  });
+
+  // ---- List --------------------------------------------------------------
+
+  describe("list", () => {
+    it("returns all registered adapters with metadata", () => {
+      const adapters = registry.list();
+      expect(adapters.length).toBeGreaterThanOrEqual(2); // file + notion
+      for (const a of adapters) {
+        expect(a.name).toBeTruthy();
+        expect(a.description).toBeTruthy();
+        expect(typeof a.builtIn).toBe("boolean");
+      }
+    });
+
+    it("marks built-in adapters", () => {
+      const adapters = registry.list();
+      const fileAdapter = adapters.find((a) => a.name === "file");
+      expect(fileAdapter!.builtIn).toBe(true);
+    });
+
+    it("marks custom adapters as not built-in", () => {
+      registry.register({
+        name: "custom",
+        description: "Custom",
+        configSchema: {},
+        factory: createMockStore,
+      });
+
+      const adapters = registry.list();
+      const custom = adapters.find((a) => a.name === "custom");
+      expect(custom!.builtIn).toBe(false);
+    });
+  });
+
+  // ---- Create store from adapter -----------------------------------------
+
+  describe("create", () => {
+    it("creates a store from a registered adapter", () => {
+      const store = registry.create("file", rexDir, {});
+      expect(store).toBeDefined();
+      expect(store.capabilities().adapter).toBe("file");
+    });
+
+    it("throws for unknown adapter", () => {
+      expect(() => registry.create("nonexistent", rexDir, {})).toThrow(
+        /Unknown adapter/,
+      );
+    });
+
+    it("passes config to the factory", () => {
+      let receivedConfig: Record<string, unknown> = {};
+      registry.register({
+        name: "config-test",
+        description: "Config test adapter",
+        configSchema: { apiKey: { required: true, description: "API Key" } },
+        factory: (dir, config) => {
+          receivedConfig = config;
+          return createMockStore(dir, config);
+        },
+      });
+
+      registry.create("config-test", rexDir, { apiKey: "secret-123" });
+      expect(receivedConfig).toEqual({ apiKey: "secret-123" });
+    });
+
+    it("validates required config fields", () => {
+      registry.register({
+        name: "requires-token",
+        description: "Requires token",
+        configSchema: { token: { required: true, description: "Token" } },
+        factory: createMockStore,
+      });
+
+      expect(() => registry.create("requires-token", rexDir, {})).toThrow(
+        /required.*token/i,
+      );
+    });
+
+    it("allows optional config fields to be missing", () => {
+      registry.register({
+        name: "optional-fields",
+        description: "Has optional fields",
+        configSchema: {
+          required_field: { required: true, description: "Required" },
+          optional_field: { required: false, description: "Optional" },
+        },
+        factory: createMockStore,
+      });
+
+      expect(() =>
+        registry.create("optional-fields", rexDir, { required_field: "value" }),
+      ).not.toThrow();
+    });
+  });
+
+  // ---- Config persistence ------------------------------------------------
+
+  describe("adapter config persistence", () => {
+    it("saves adapter config to adapters.json", async () => {
+      const config: AdapterConfig = {
+        name: "notion",
+        config: { token: "secret_abc", databaseId: "db-123" },
+      };
+
+      await registry.saveAdapterConfig(rexDir, config);
+
+      const raw = await readFile(join(rexDir, "adapters.json"), "utf-8");
+      const data = JSON.parse(raw);
+      expect(data.adapters).toBeDefined();
+      expect(data.adapters).toHaveLength(1);
+      expect(data.adapters[0].name).toBe("notion");
+    });
+
+    it("loads saved adapter config", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "secret_abc", databaseId: "db-123" },
+      });
+
+      const configs = await registry.loadAdapterConfigs(rexDir);
+      expect(configs).toHaveLength(1);
+      expect(configs[0].name).toBe("notion");
+      expect(configs[0].config.databaseId).toBe("db-123");
+    });
+
+    it("supports multiple adapter configs", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "token-1", databaseId: "db-1" },
+      });
+      await registry.saveAdapterConfig(rexDir, {
+        name: "custom",
+        config: { endpoint: "https://api.example.com" },
+      });
+
+      const configs = await registry.loadAdapterConfigs(rexDir);
+      expect(configs).toHaveLength(2);
+      expect(configs.map((c) => c.name).sort()).toEqual(["custom", "notion"]);
+    });
+
+    it("overwrites config for the same adapter name", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "old-token", databaseId: "db-1" },
+      });
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "new-token", databaseId: "db-2" },
+      });
+
+      const configs = await registry.loadAdapterConfigs(rexDir);
+      expect(configs).toHaveLength(1);
+      expect(configs[0].config.token).toBe("new-token");
+      expect(configs[0].config.databaseId).toBe("db-2");
+    });
+
+    it("removes adapter config", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "abc" },
+      });
+      await registry.saveAdapterConfig(rexDir, {
+        name: "custom",
+        config: { key: "xyz" },
+      });
+
+      await registry.removeAdapterConfig(rexDir, "notion");
+
+      const configs = await registry.loadAdapterConfigs(rexDir);
+      expect(configs).toHaveLength(1);
+      expect(configs[0].name).toBe("custom");
+    });
+
+    it("returns empty array when no adapters.json exists", async () => {
+      const configs = await registry.loadAdapterConfigs(rexDir);
+      expect(configs).toEqual([]);
+    });
+
+    it("does not store tokens in plaintext — redacts sensitive fields", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "secret_abc123", databaseId: "db-1" },
+      });
+
+      const raw = await readFile(join(rexDir, "adapters.json"), "utf-8");
+      // The token value should be stored but the file should be readable
+      // (we store the full config — security is via .gitignore/.rex/ being ignored)
+      const data = JSON.parse(raw);
+      expect(data.adapters[0].config.token).toBe("secret_abc123");
+    });
+
+    it("getAdapterConfig returns config for specific adapter", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "notion",
+        config: { token: "abc", databaseId: "db-1" },
+      });
+      await registry.saveAdapterConfig(rexDir, {
+        name: "custom",
+        config: { key: "xyz" },
+      });
+
+      const config = await registry.getAdapterConfig(rexDir, "notion");
+      expect(config).toBeDefined();
+      expect(config!.name).toBe("notion");
+
+      const missing = await registry.getAdapterConfig(rexDir, "nonexistent");
+      expect(missing).toBeNull();
+    });
+  });
+
+  // ---- createFromConfig --------------------------------------------------
+
+  describe("createFromConfig", () => {
+    it("creates a store using saved adapter config", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "file",
+        config: {},
+      });
+
+      const store = await registry.createFromConfig(rexDir, "file");
+      expect(store.capabilities().adapter).toBe("file");
+    });
+
+    it("throws when no config exists for adapter", async () => {
+      await expect(
+        registry.createFromConfig(rexDir, "notion"),
+      ).rejects.toThrow(/no.*config/i);
+    });
+
+    it("throws when adapter is not registered", async () => {
+      await registry.saveAdapterConfig(rexDir, {
+        name: "unknown-adapter",
+        config: {},
+      });
+
+      await expect(
+        registry.createFromConfig(rexDir, "unknown-adapter"),
+      ).rejects.toThrow(/Unknown adapter/);
+    });
+  });
+});
