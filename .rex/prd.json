@@ -206,7 +206,7 @@
         {
           "id": "e99c65c7-a62f-4bc9-950c-097a98b6df83",
           "title": "Run quality and guardrails",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Validate work quality and provide safety mechanisms for autonomous execution",
           "source": "llm",
@@ -230,7 +230,7 @@
             {
               "id": "da30cf47-a66f-4c72-9843-30472b2eb384",
               "title": "Implement review mode",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Add --review flag to show proposed changes before committing",
               "acceptanceCriteria": [
@@ -240,7 +240,8 @@
               ],
               "priority": "medium",
               "source": "llm",
-              "startedAt": "2026-02-04T17:55:05.986Z"
+              "startedAt": "2026-02-04T17:55:05.986Z",
+              "completedAt": "2026-02-04T18:02:44.982Z"
             },
             {
               "id": "8817fcaf-2f8d-4f9a-8cc8-dca1a3795250",
@@ -262,7 +263,7 @@
             {
               "id": "c79338e3-1f96-40d8-af79-a2dc334f75e6",
               "title": "Implement token budget limits",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Cap total token spend per run with configurable budget",
               "acceptanceCriteria": [
@@ -271,9 +272,13 @@
                 "Budget separate from max turns limit"
               ],
               "priority": "low",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:02:44.995Z",
+              "completedAt": "2026-02-04T18:11:41.981Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-04T18:11:41.993Z",
+          "completedAt": "2026-02-04T18:11:41.993Z"
         },
         {
           "id": "2cae10b4-7d16-4b09-82b4-c0922d28a00f",
