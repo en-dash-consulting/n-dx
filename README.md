@@ -14,6 +14,11 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 pnpm install
 pnpm build
 
+# Register CLI to globally
+npm link
+# or
+pnpm link --global
+
 # Initialize all tools in a project
 n-dx init .
 
