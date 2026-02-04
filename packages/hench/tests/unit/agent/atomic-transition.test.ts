@@ -65,7 +65,7 @@ describe("atomic task state transitions", () => {
       await rm(projectDir, { recursive: true, force: true });
     });
 
-    it("transitions pending task to in_progress before API calls", async () => {
+    it("transitions pending task to in_progress before API calls, then deferred on failure", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         JSON.stringify({
@@ -96,13 +96,15 @@ describe("atomic task state transitions", () => {
       process.env.ANTHROPIC_API_KEY = "test-key-fake";
 
       try {
-        // The API call will fail, but the status should have been updated first
-        await agentLoop({ config, store, projectDir, henchDir }).catch(() => {});
+        // The API call will fail with auth error — task should be deferred (not left in_progress)
+        const result = await agentLoop({ config, store, projectDir, henchDir });
 
-        // Read the PRD back and verify the task is in_progress
+        expect(result.run.status).toBe("failed");
+
+        // Read the PRD back — task should be deferred after failure handling
         const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
         const task = prd.items.find((i: { id: string }) => i.id === "task-1");
-        expect(task.status).toBe("in_progress");
+        expect(task.status).toBe("deferred");
         expect(task.startedAt).toBeDefined();
       } finally {
         if (origKey) {
@@ -113,7 +115,7 @@ describe("atomic task state transitions", () => {
       }
     });
 
-    it("does not re-transition already in_progress task", async () => {
+    it("preserves startedAt for already in_progress task that fails", async () => {
       const existingStartedAt = "2025-06-01T00:00:00.000Z";
       await writeFile(
         join(rexDir, "prd.json"),
@@ -145,12 +147,15 @@ describe("atomic task state transitions", () => {
       process.env.ANTHROPIC_API_KEY = "test-key-fake";
 
       try {
-        await agentLoop({ config, store, projectDir, henchDir }).catch(() => {});
+        // Task starts as in_progress — no re-transition happens.
+        // On failure it moves to deferred, but startedAt is preserved.
+        const result = await agentLoop({ config, store, projectDir, henchDir });
 
-        // startedAt should be preserved (not overwritten)
+        expect(result.run.status).toBe("failed");
+
         const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
         const task = prd.items.find((i: { id: string }) => i.id === "task-1");
-        expect(task.status).toBe("in_progress");
+        expect(task.status).toBe("deferred");
         expect(task.startedAt).toBe(existingStartedAt);
       } finally {
         if (origKey) {

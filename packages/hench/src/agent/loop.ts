@@ -11,7 +11,7 @@ import { saveRun } from "../store/index.js";
 import { buildRunSummary } from "./summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
 import { checkTokenBudget } from "./token-budget.js";
-import { toolRexUpdateStatus } from "../tools/rex.js";
+import { toolRexUpdateStatus, toolRexAppendLog } from "../tools/rex.js";
 import { section, subsection, stream, detail, info } from "../cli/output.js";
 
 export interface AgentLoopOptions {
@@ -192,6 +192,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         run.status = "budget_exceeded";
         run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
         stream("Budget", run.error);
+
+        await toolRexUpdateStatus(store, taskId, { status: "pending" });
+        await toolRexAppendLog(store, taskId, {
+          event: "budget_exceeded",
+          detail: run.error,
+        });
         break;
       }
 
@@ -277,11 +283,23 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     if (run.status === "running") {
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
+
+      await toolRexUpdateStatus(store, taskId, { status: "deferred" });
+      await toolRexAppendLog(store, taskId, {
+        event: "task_failed",
+        detail: run.error,
+      });
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
+
+    await toolRexUpdateStatus(store, taskId, { status: "deferred" });
+    await toolRexAppendLog(store, taskId, {
+      event: "task_failed",
+      detail: run.error,
+    });
   }
 
   // Review gate — prompt user before finalizing a completed run
@@ -295,6 +313,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       info(`\nChanges rejected — reverting...`);
       await revertChanges(projectDir);
+
+      await toolRexUpdateStatus(store, taskId, { status: "pending" });
+      await toolRexAppendLog(store, taskId, {
+        event: "review_rejected",
+        detail: reviewResult.reason ?? "Changes rejected by reviewer",
+      });
     }
   }
 

@@ -164,7 +164,7 @@
             {
               "id": "a82f55ef-7108-4a4c-b1b0-16736b5f65ff",
               "title": "Implement atomic task state transitions",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Transition tasks to in_progress atomically before starting work",
               "acceptanceCriteria": [
@@ -174,7 +174,8 @@
               ],
               "priority": "critical",
               "source": "llm",
-              "startedAt": "2026-02-04T18:19:39.486Z"
+              "startedAt": "2026-02-04T18:19:39.486Z",
+              "completedAt": "2026-02-04T18:26:17.771Z"
             },
             {
               "id": "c8e37f18-7a10-4f27-ae6a-d62d6833584c",
@@ -193,7 +194,7 @@
             {
               "id": "0df69478-9dd8-4b64-9564-da2a9fcd72e7",
               "title": "Handle task failures properly",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Mark failed tasks as deferred with clear error summary",
               "acceptanceCriteria": [
@@ -202,7 +203,8 @@
                 "Tasks not left in in_progress state"
               ],
               "priority": "high",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:26:17.790Z"
             }
           ]
         },
