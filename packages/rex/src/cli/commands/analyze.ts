@@ -12,6 +12,7 @@ import {
   buildProposals,
   reasonFromFiles,
   reasonFromScanResults,
+  formatDiff,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type { PRDItem, PRDDocument } from "../../schema/index.js";
@@ -260,7 +261,12 @@ export async function cmdAnalyze(
     return;
   }
 
-  console.log(formatProposals(proposals));
+  // Show diff view when existing PRD items are present, otherwise plain list
+  if (existing.length > 0) {
+    console.log(formatDiff(proposals, existing));
+  } else {
+    console.log(formatProposals(proposals));
+  }
   console.log("");
 
   // Cache proposals so they can be accepted later without re-running

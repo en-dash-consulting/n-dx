@@ -408,6 +408,52 @@ describe("Cache", () => {
     expect(titles).toContain("Charts");
   });
 
+  it("shows diff view when importing into existing PRD", async () => {
+    run(["init", tmpDir]);
+
+    // First import to populate the PRD
+    await writeFile(
+      join(tmpDir, "initial.json"),
+      JSON.stringify([
+        {
+          epic: { title: "Auth" },
+          features: [
+            { title: "Login", tasks: [{ title: "Validate email" }] },
+          ],
+        },
+      ]),
+    );
+    run(["analyze", "--file=initial.json", "--accept", tmpDir]);
+
+    // Second import with overlapping + new content
+    await writeFile(
+      join(tmpDir, "update.json"),
+      JSON.stringify([
+        {
+          epic: { title: "Auth" },
+          features: [
+            { title: "Login", tasks: [{ title: "Validate email" }, { title: "Handle OAuth" }] },
+            { title: "Signup", tasks: [] },
+          ],
+        },
+        {
+          epic: { title: "Dashboard" },
+          features: [
+            { title: "Charts", tasks: [] },
+          ],
+        },
+      ]),
+    );
+    const output = run(["analyze", "--file=update.json", tmpDir]);
+
+    // Should show diff markers
+    expect(output).toContain("~ [epic] Auth");       // existing epic with new children
+    expect(output).toContain("+ [epic] Dashboard");  // new epic
+    expect(output).toContain("+   [feature] Signup"); // new feature
+    expect(output).toContain("Summary:");
+    expect(output).toContain("to add");
+  });
+
   it("multiple --file flags with mixed formats", async () => {
     await writeFile(
       join(tmpDir, "features.json"),
