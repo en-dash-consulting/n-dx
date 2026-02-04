@@ -89,6 +89,81 @@ describe("rex add (smart mode routing)", () => {
     expect(output).toContain("Created feature: My Feature");
   });
 
+  it("--level flag routes to manual mode", async () => {
+    run(["init", tmpDir]);
+
+    const output = run(["add", "--level=epic", "--title=Flag Epic", tmpDir]);
+
+    expect(output).toContain("Created epic: Flag Epic");
+    expect(output).toContain("ID:");
+
+    const prd = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+    expect(prd.items.some((i: { title: string }) => i.title === "Flag Epic")).toBe(true);
+  });
+
+  it("--level flag with --parent creates correct child", async () => {
+    run(["init", tmpDir]);
+    const epicOutput = run(["add", "--level=epic", "--title=Parent Epic", "--format=json", tmpDir]);
+    const epicId = JSON.parse(epicOutput).id;
+
+    const output = run([
+      "add",
+      `--level=feature`,
+      `--title=Child Feature`,
+      `--parent=${epicId}`,
+      tmpDir,
+    ]);
+
+    expect(output).toContain("Created feature: Child Feature");
+  });
+
+  it("--title only (no level) defaults to epic", async () => {
+    run(["init", tmpDir]);
+
+    const output = run(["add", "--title=Auto Epic", "--format=json", tmpDir]);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.level).toBe("epic");
+    expect(parsed.title).toBe("Auto Epic");
+  });
+
+  it("--title with --parent infers level from parent", async () => {
+    run(["init", tmpDir]);
+    const epicOutput = run(["add", "epic", "--title=E", "--format=json", tmpDir]);
+    const epicId = JSON.parse(epicOutput).id;
+
+    const output = run([
+      "add",
+      `--title=Inferred Feature`,
+      `--parent=${epicId}`,
+      "--format=json",
+      tmpDir,
+    ]);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.level).toBe("feature");
+    expect(parsed.title).toBe("Inferred Feature");
+  });
+
+  it("--title bypasses LLM even with description-like text", async () => {
+    run(["init", tmpDir]);
+
+    // With --title, this should NOT trigger smart mode even though the title
+    // looks like a natural language description
+    const output = run([
+      "add",
+      "--title=Add user authentication with OAuth support",
+      tmpDir,
+    ]);
+
+    expect(output).toContain("Created epic: Add user authentication with OAuth support");
+    // Should NOT show any LLM-related output
+    expect(output).not.toContain("Analyzing");
+    expect(output).not.toContain("LLM");
+  });
+
   it("shows error without .rex/ for smart add", () => {
     const { stderr } = runExpectFail([
       "add",

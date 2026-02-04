@@ -116,12 +116,25 @@ async function main(): Promise<void> {
         // Read piped stdin if available (non-blocking for TTY)
         const stdinText = await readStdin();
 
-        if (firstArg && VALID_LEVELS.has(firstArg)) {
-          // Manual mode: rex add <level> --title="..."
+        // Manual mode detection:
+        //   1. Positional level:  rex add task --title="..." --parent=<id>
+        //   2. --level flag:      rex add --level=task --title="..." --parent=<id>
+        //   3. --title flag only: rex add --title="..." (defaults to epic)
+        const positionalLevel = firstArg && VALID_LEVELS.has(firstArg);
+        const flagLevel = flags.level && VALID_LEVELS.has(flags.level);
+        const isManualMode = positionalLevel || flagLevel || flags.title;
+
+        if (isManualMode) {
+          // Manual mode: bypass LLM processing entirely
+          const level = positionalLevel
+            ? firstArg
+            : flags.level;
           const dir =
-            positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+            positional.length > (positionalLevel ? 1 : 0)
+              ? resolve(positional[positional.length - 1])
+              : process.cwd();
           const { cmdAdd } = await import("./commands/add.js");
-          await cmdAdd(dir, firstArg, flags);
+          await cmdAdd(dir, level, flags);
         } else if (firstArg || flags.description || hasFileFlag || stdinText) {
           // Smart mode: rex add "desc1" "desc2" ... [dir]
           //   or file mode: rex add --file=ideas.txt [dir]

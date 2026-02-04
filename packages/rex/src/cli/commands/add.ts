@@ -10,23 +10,23 @@ import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/inde
 
 const VALID_LEVELS = new Set(Object.keys(LEVEL_HIERARCHY));
 
+/** Map parent level → child level for inference. */
+const CHILD_LEVEL: Record<string, ItemLevel> = {
+  epic: "feature",
+  feature: "task",
+  task: "subtask",
+};
+
 export async function cmdAdd(
   dir: string,
-  level: string,
+  level: string | undefined,
   flags: Record<string, string>,
 ): Promise<void> {
-  if (!VALID_LEVELS.has(level)) {
-    throw new CLIError(
-      `Invalid level "${level}".`,
-      `Must be one of: ${[...VALID_LEVELS].join(", ")}`,
-    );
-  }
-
   const title = flags.title;
   if (!title) {
     throw new CLIError(
       "Missing required flag: --title",
-      'Usage: rex add <level> --title="..."',
+      'Usage: rex add <level> --title="..." or rex add --title="..." --level=<level>',
     );
   }
 
@@ -36,16 +36,50 @@ export async function cmdAdd(
 
   const parentId = flags.parent;
 
+  // Infer level when not explicitly provided
+  let resolvedLevel: string;
+  if (level) {
+    resolvedLevel = level;
+  } else if (parentId) {
+    // Infer from parent: epic→feature, feature→task, task→subtask
+    const parentEntry = findItem(doc.items, parentId);
+    if (!parentEntry) {
+      throw new CLIError(
+        `Parent "${parentId}" not found.`,
+        "Check the ID with 'rex status' and try again.",
+      );
+    }
+    const inferred = CHILD_LEVEL[parentEntry.item.level];
+    if (!inferred) {
+      throw new CLIError(
+        `Cannot infer child level for parent type "${parentEntry.item.level}".`,
+        'Specify the level explicitly with --level=<level> or as a positional argument.',
+      );
+    }
+    resolvedLevel = inferred;
+  } else {
+    // No parent, no level → default to epic
+    resolvedLevel = "epic";
+  }
+
+  if (!VALID_LEVELS.has(resolvedLevel)) {
+    throw new CLIError(
+      `Invalid level "${resolvedLevel}".`,
+      `Must be one of: ${[...VALID_LEVELS].join(", ")}`,
+    );
+  }
+
   // Validate parent-child level relationship
-  const requiredParentLevel = LEVEL_HIERARCHY[level as ItemLevel];
+  const requiredParentLevel = LEVEL_HIERARCHY[resolvedLevel as ItemLevel];
   if (requiredParentLevel && !parentId) {
     throw new CLIError(
-      `A ${level} requires a parent.`,
+      `A ${resolvedLevel} requires a parent.`,
       `Use --parent=<id> to specify a ${requiredParentLevel}.`,
     );
   }
 
   if (parentId) {
+    // Re-fetch parent (may already have it from inference, but need it for validation too)
     const parentEntry = findItem(doc.items, parentId);
     if (!parentEntry) {
       throw new CLIError(
@@ -55,7 +89,7 @@ export async function cmdAdd(
     }
     if (requiredParentLevel && parentEntry.item.level !== requiredParentLevel) {
       throw new CLIError(
-        `A ${level} must be a child of a ${requiredParentLevel}, but "${parentId}" is a ${parentEntry.item.level}.`,
+        `A ${resolvedLevel} must be a child of a ${requiredParentLevel}, but "${parentId}" is a ${parentEntry.item.level}.`,
         `Use --parent=<id> to specify a ${requiredParentLevel} instead.`,
       );
     }
@@ -70,7 +104,7 @@ export async function cmdAdd(
     id,
     title,
     status: (flags.status as ItemStatus) ?? "pending",
-    level: level as ItemLevel,
+    level: resolvedLevel as ItemLevel,
   };
 
   if (flags.description) item.description = flags.description;
@@ -83,13 +117,13 @@ export async function cmdAdd(
     timestamp: new Date().toISOString(),
     event: "item_added",
     itemId: id,
-    detail: `Added ${level}: ${title}`,
+    detail: `Added ${resolvedLevel}: ${title}`,
   });
 
   if (flags.format === "json") {
-    result(JSON.stringify({ id, level, title }, null, 2));
+    result(JSON.stringify({ id, level: resolvedLevel, title }, null, 2));
   } else {
-    result(`Created ${level}: ${title}`);
+    result(`Created ${resolvedLevel}: ${title}`);
     result(`  ID: ${id}`);
   }
 }
