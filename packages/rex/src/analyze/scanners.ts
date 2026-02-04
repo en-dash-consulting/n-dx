@@ -336,7 +336,35 @@ export async function scanDocs(
   return results;
 }
 
-interface Zone {
+// Canonical sourcevision schema (v1)
+interface SVFinding {
+  type: "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion";
+  pass: number;
+  scope: string;
+  text: string;
+  severity?: "info" | "warning" | "critical";
+  related?: string[];
+}
+
+interface SVZone {
+  id: string;
+  name: string;
+  description: string;
+  files: string[];
+  entryPoints: string[];
+  cohesion: number;
+  coupling: number;
+  insights?: string[];
+}
+
+interface SVZonesData {
+  zones: SVZone[];
+  findings?: SVFinding[];
+  insights?: string[];
+}
+
+// Legacy zone format (pre-v1)
+interface LegacyZone {
   name: string;
   description?: string;
   insights?: string[];
@@ -347,13 +375,47 @@ interface Zone {
   }[];
 }
 
-interface InventoryData {
+// Canonical inventory schema
+interface SVFileEntry {
+  path: string;
+  category: string;
+  role: string;
+}
+
+interface SVInventoryData {
+  files?: SVFileEntry[];
+  // Legacy format
   byCategory?: Record<string, unknown>;
 }
 
-interface ImportData {
+// Canonical imports schema
+interface SVCircularDependency {
+  cycle: string[];
+}
+
+interface SVImportsData {
+  summary?: {
+    circulars?: SVCircularDependency[];
+  };
+  // Legacy formats
   circularDependencies?: { from: string; to: string }[];
   circular?: string[][];
+}
+
+/** Map finding type to an actionable task prefix */
+function findingPrefix(type: SVFinding["type"]): string {
+  switch (type) {
+    case "anti-pattern":
+      return "Fix";
+    case "suggestion":
+      return "Implement";
+    case "pattern":
+      return "Refactor";
+    case "observation":
+    case "relationship":
+    default:
+      return "Investigate";
+  }
 }
 
 export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
@@ -366,37 +428,77 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
 
   const results: ScanResult[] = [];
 
-  // Read zones.json
+  // Read zones.json — supports both canonical (v1) and legacy formats
   try {
     const raw = await readFile(join(svDir, "zones.json"), "utf-8");
     const parsed = JSON.parse(raw);
-    const zones: Zone[] = Array.isArray(parsed) ? parsed : (parsed.zones ?? []);
 
-    for (const zone of zones) {
-      results.push({
-        name: zone.name,
-        source: "sourcevision",
-        sourceFile: ".sourcevision/zones.json",
-        kind: "feature",
-        description: zone.description,
-        acceptanceCriteria: zone.insights,
-      });
+    if (Array.isArray(parsed)) {
+      // Legacy format: flat array of zones with inline findings
+      processLegacyZones(parsed as LegacyZone[], results);
+    } else {
+      // Canonical format: { zones, findings, ... }
+      const zonesData = parsed as SVZonesData;
+      const zones = zonesData.zones ?? [];
+      const zoneMap = new Map<string, SVZone>();
 
-      if (zone.findings) {
-        for (const finding of zone.findings) {
+      for (const zone of zones) {
+        zoneMap.set(zone.id, zone);
+        const fileCount = zone.files?.length ?? 0;
+        results.push({
+          name: zone.name,
+          source: "sourcevision",
+          sourceFile: ".sourcevision/zones.json",
+          kind: "feature",
+          description: fileCount > 0
+            ? `${zone.description} (${fileCount} files)`
+            : zone.description,
+          acceptanceCriteria: zone.insights,
+        });
+      }
+
+      // Process top-level findings into actionable tasks
+      if (zonesData.findings) {
+        for (const finding of zonesData.findings) {
+          // Skip findings with no severity — not yet triaged
+          if (!finding.severity) continue;
+          // Skip info-level observations/relationships — purely informational
+          const infoOnly = finding.type === "observation" || finding.type === "relationship";
+          if (finding.severity === "info" && infoOnly) continue;
+
           const priority: Priority =
             finding.severity === "critical"
               ? "critical"
               : finding.severity === "warning"
                 ? "high"
                 : "medium";
+
+          const prefix = findingPrefix(finding.type);
+          const zone = zoneMap.get(finding.scope);
+
+          // Use first related file as sourceFile, fall back to zones.json
+          const primaryFile = finding.related?.[0];
+          const sourceFile = primaryFile ?? ".sourcevision/zones.json";
+
+          // Build acceptance criteria from related file paths
+          const criteria: string[] = [];
+          if (finding.related && finding.related.length > 0) {
+            criteria.push(
+              `Affected files: ${finding.related.join(", ")}`,
+            );
+          }
+          if (zone) {
+            criteria.push(`Zone: ${zone.name} (${zone.files.length} files)`);
+          }
+
           results.push({
-            name: finding.message,
+            name: `${prefix}: ${finding.text}`,
             source: "sourcevision",
-            sourceFile: finding.file ?? ".sourcevision/zones.json",
+            sourceFile,
             kind: "task",
             priority,
-            tags: [zone.name],
+            tags: zone ? [zone.name] : finding.scope !== "global" ? [finding.scope] : undefined,
+            acceptanceCriteria: criteria.length > 0 ? criteria : undefined,
           });
         }
       }
@@ -405,12 +507,32 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
     // zones.json not found or invalid, skip
   }
 
-  // Read inventory.json for epic groupings
+  // Read inventory.json for epic groupings — supports canonical and legacy formats
   try {
     const raw = await readFile(join(svDir, "inventory.json"), "utf-8");
-    const inventory: InventoryData = JSON.parse(raw);
+    const inventory: SVInventoryData = JSON.parse(raw);
 
-    if (inventory.byCategory) {
+    if (inventory.files && inventory.files.length > 0) {
+      // Canonical format: group files by category
+      const categoryFiles = new Map<string, string[]>();
+      for (const entry of inventory.files) {
+        if (!entry.category) continue;
+        const list = categoryFiles.get(entry.category) ?? [];
+        list.push(entry.path);
+        categoryFiles.set(entry.category, list);
+      }
+      for (const [category, files] of categoryFiles) {
+        const fileLabel = files.length === 1 ? "1 file" : `${files.length} files`;
+        results.push({
+          name: toTitleCase(category),
+          source: "sourcevision",
+          sourceFile: ".sourcevision/inventory.json",
+          kind: "epic",
+          description: `${toTitleCase(category)} (${fileLabel})`,
+        });
+      }
+    } else if (inventory.byCategory) {
+      // Legacy format: byCategory object
       for (const category of Object.keys(inventory.byCategory)) {
         results.push({
           name: toTitleCase(category),
@@ -424,11 +546,32 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
     // inventory.json not found or invalid, skip
   }
 
-  // Read imports.json for circular dependencies
+  // Read imports.json for circular dependencies — supports canonical and legacy formats
   try {
     const raw = await readFile(join(svDir, "imports.json"), "utf-8");
-    const imports: ImportData = JSON.parse(raw);
+    const imports: SVImportsData = JSON.parse(raw);
 
+    // Canonical format: summary.circulars[].cycle
+    if (imports.summary?.circulars) {
+      for (const dep of imports.summary.circulars) {
+        const uniqueFiles = [...new Set(dep.cycle)];
+        const label = uniqueFiles.join(" → ");
+        results.push({
+          name: `Resolve circular: ${label}`,
+          source: "sourcevision",
+          sourceFile: uniqueFiles[0] ?? ".sourcevision/imports.json",
+          kind: "task",
+          priority: "high",
+          tags: ["tech-debt"],
+          acceptanceCriteria: [
+            `Break circular dependency cycle: ${dep.cycle.join(" → ")}`,
+            ...uniqueFiles.map((f) => `File: ${f}`),
+          ],
+        });
+      }
+    }
+
+    // Legacy format: circularDependencies[].{from, to}
     if (imports.circularDependencies) {
       for (const dep of imports.circularDependencies) {
         results.push({
@@ -442,6 +585,7 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
       }
     }
 
+    // Legacy format: circular[][]
     if (imports.circular) {
       for (const cycle of imports.circular) {
         const label = cycle.join(" → ");
@@ -460,4 +604,40 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
   }
 
   return results;
+}
+
+/** Process legacy zone format (flat array with inline findings) */
+function processLegacyZones(
+  zones: LegacyZone[],
+  results: ScanResult[],
+): void {
+  for (const zone of zones) {
+    results.push({
+      name: zone.name,
+      source: "sourcevision",
+      sourceFile: ".sourcevision/zones.json",
+      kind: "feature",
+      description: zone.description,
+      acceptanceCriteria: zone.insights,
+    });
+
+    if (zone.findings) {
+      for (const finding of zone.findings) {
+        const priority: Priority =
+          finding.severity === "critical"
+            ? "critical"
+            : finding.severity === "warning"
+              ? "high"
+              : "medium";
+        results.push({
+          name: finding.message,
+          source: "sourcevision",
+          sourceFile: finding.file ?? ".sourcevision/zones.json",
+          kind: "task",
+          priority,
+          tags: [zone.name],
+        });
+      }
+    }
+  }
 }

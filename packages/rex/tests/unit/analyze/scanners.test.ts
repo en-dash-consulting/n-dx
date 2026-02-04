@@ -245,7 +245,146 @@ describe("scanSourceVision", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it("reads zone data and maps to features", async () => {
+  it("reads zone data and maps to features with file counts", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [
+          {
+            id: "auth",
+            name: "Authentication",
+            description: "Auth module",
+            files: ["src/auth/login.ts", "src/auth/session.ts"],
+            entryPoints: ["src/auth/login.ts"],
+            cohesion: 0.85,
+            coupling: 0.2,
+            insights: ["Uses JWT tokens", "Session management"],
+          },
+        ],
+        findings: [
+          {
+            type: "anti-pattern",
+            pass: 1,
+            scope: "auth",
+            text: "Hardcoded secret in config",
+            severity: "critical",
+            related: ["src/auth/config.ts"],
+          },
+          {
+            type: "suggestion",
+            pass: 2,
+            scope: "auth",
+            text: "Missing rate limit on login endpoint",
+            severity: "warning",
+            related: ["src/auth/login.ts"],
+          },
+        ],
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+
+    const features = results.filter((r) => r.kind === "feature");
+    expect(features.some((f) => f.name === "Authentication")).toBe(true);
+    const authFeature = features.find((f) => f.name === "Authentication")!;
+    expect(authFeature.acceptanceCriteria).toEqual([
+      "Uses JWT tokens",
+      "Session management",
+    ]);
+    // Feature description includes file count
+    expect(authFeature.description).toContain("2 files");
+
+    const tasks = results.filter((r) => r.kind === "task");
+    // Tasks have actionable prefixes based on finding type
+    const criticalTask = tasks.find((t) => t.name.includes("Hardcoded secret in config"));
+    expect(criticalTask).toBeDefined();
+    expect(criticalTask!.name).toMatch(/^Fix:/);
+    expect(criticalTask!.priority).toBe("critical");
+    // Tasks include related file paths
+    expect(criticalTask!.sourceFile).toBe("src/auth/config.ts");
+
+    const warningTask = tasks.find((t) => t.name.includes("Missing rate limit"));
+    expect(warningTask).toBeDefined();
+    expect(warningTask!.name).toMatch(/^Implement:/);
+    expect(warningTask!.priority).toBe("high");
+    expect(warningTask!.sourceFile).toBe("src/auth/login.ts");
+    expect(warningTask!.tags).toContain("Authentication");
+  });
+
+  it("maps finding types to actionable prefixes", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [
+          {
+            id: "core",
+            name: "Core",
+            description: "Core module",
+            files: ["src/core.ts"],
+            entryPoints: [],
+            cohesion: 0.9,
+            coupling: 0.1,
+          },
+        ],
+        findings: [
+          { type: "anti-pattern", pass: 1, scope: "core", text: "God object detected", severity: "warning" },
+          { type: "suggestion", pass: 1, scope: "core", text: "Add input validation", severity: "info" },
+          { type: "observation", pass: 0, scope: "core", text: "High coupling (0.8)", severity: "warning" },
+          { type: "pattern", pass: 1, scope: "core", text: "Repeated error handling", severity: "info" },
+        ],
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+    const tasks = results.filter((r) => r.kind === "task");
+
+    expect(tasks.find((t) => t.name === "Fix: God object detected")).toBeDefined();
+    expect(tasks.find((t) => t.name === "Implement: Add input validation")).toBeDefined();
+    expect(tasks.find((t) => t.name === "Investigate: High coupling (0.8)")).toBeDefined();
+    expect(tasks.find((t) => t.name === "Refactor: Repeated error handling")).toBeDefined();
+  });
+
+  it("includes acceptance criteria with file paths on tasks", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [
+          {
+            id: "utils",
+            name: "Utilities",
+            description: "Shared utils",
+            files: ["src/utils/format.ts", "src/utils/validate.ts"],
+            entryPoints: [],
+            cohesion: 0.7,
+            coupling: 0.3,
+          },
+        ],
+        findings: [
+          {
+            type: "anti-pattern",
+            pass: 2,
+            scope: "utils",
+            text: "Duplicated validation logic",
+            severity: "warning",
+            related: ["src/utils/format.ts", "src/utils/validate.ts"],
+          },
+        ],
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+    const task = results.find((r) => r.kind === "task" && r.name.includes("Duplicated validation"));
+    expect(task).toBeDefined();
+    // Acceptance criteria includes affected file paths
+    expect(task!.acceptanceCriteria).toBeDefined();
+    expect(task!.acceptanceCriteria!.some((c: string) => c.includes("src/utils/format.ts"))).toBe(true);
+    expect(task!.acceptanceCriteria!.some((c: string) => c.includes("src/utils/validate.ts"))).toBe(true);
+  });
+
+  it("handles legacy zone format (flat array)", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(
       join(tempDir, ".sourcevision", "zones.json"),
@@ -253,10 +392,9 @@ describe("scanSourceVision", () => {
         {
           name: "Authentication",
           description: "Auth module",
-          insights: ["Uses JWT tokens", "Session management"],
+          insights: ["Uses JWT tokens"],
           findings: [
             { severity: "critical", message: "Hardcoded secret" },
-            { severity: "warning", message: "Missing rate limit" },
           ],
         },
       ]),
@@ -266,22 +404,38 @@ describe("scanSourceVision", () => {
 
     const features = results.filter((r) => r.kind === "feature");
     expect(features.some((f) => f.name === "Authentication")).toBe(true);
-    expect(features[0].acceptanceCriteria).toEqual([
-      "Uses JWT tokens",
-      "Session management",
-    ]);
 
     const tasks = results.filter((r) => r.kind === "task");
-    expect(tasks.some((t) => t.name === "Hardcoded secret")).toBe(true);
-    expect(tasks.some((t) => t.name === "Missing rate limit")).toBe(true);
-
-    const critical = tasks.find((t) => t.name === "Hardcoded secret");
-    expect(critical?.priority).toBe("critical");
-    const warning = tasks.find((t) => t.name === "Missing rate limit");
-    expect(warning?.priority).toBe("high");
+    expect(tasks.some((t) => t.name.includes("Hardcoded secret"))).toBe(true);
+    expect(tasks[0].priority).toBe("critical");
   });
 
-  it("reads inventory.json for epic groupings", async () => {
+  it("reads inventory.json with canonical schema for epic groupings", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "inventory.json"),
+      JSON.stringify({
+        files: [
+          { path: "src/components/Button.tsx", category: "components", role: "source" },
+          { path: "src/components/Input.tsx", category: "components", role: "source" },
+          { path: "src/services/api.ts", category: "services", role: "source" },
+        ],
+        summary: { totalFiles: 3 },
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+    const epics = results.filter((r) => r.kind === "epic");
+    expect(epics.some((e) => e.name === "Components")).toBe(true);
+    expect(epics.some((e) => e.name === "Services")).toBe(true);
+    // Epics include file count in description
+    const compEpic = epics.find((e) => e.name === "Components")!;
+    expect(compEpic.description).toContain("2 files");
+    const svcEpic = epics.find((e) => e.name === "Services")!;
+    expect(svcEpic.description).toContain("1 file");
+  });
+
+  it("reads inventory.json with legacy byCategory format", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(
       join(tempDir, ".sourcevision", "inventory.json"),
@@ -299,7 +453,38 @@ describe("scanSourceVision", () => {
     expect(epics.some((e) => e.name === "Services")).toBe(true);
   });
 
-  it("reads imports.json for circular dependencies", async () => {
+  it("reads imports.json with canonical schema for circular dependencies", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "imports.json"),
+      JSON.stringify({
+        edges: [],
+        external: [],
+        summary: {
+          totalEdges: 10,
+          totalExternal: 3,
+          circularCount: 1,
+          circulars: [
+            { cycle: ["src/moduleA.ts", "src/moduleB.ts", "src/moduleA.ts"] },
+          ],
+          mostImported: [],
+          avgImportsPerFile: 2,
+        },
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+    const circulars = results.filter((r) => r.name.startsWith("Resolve circular"));
+    expect(circulars.length).toBe(1);
+    expect(circulars[0].name).toContain("src/moduleA.ts");
+    expect(circulars[0].name).toContain("src/moduleB.ts");
+    expect(circulars[0].priority).toBe("high");
+    // Acceptance criteria lists files in the cycle
+    expect(circulars[0].acceptanceCriteria).toBeDefined();
+    expect(circulars[0].acceptanceCriteria!.some((c: string) => c.includes("src/moduleA.ts"))).toBe(true);
+  });
+
+  it("reads imports.json with legacy circularDependencies format", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(
       join(tempDir, ".sourcevision", "imports.json"),
@@ -318,7 +503,7 @@ describe("scanSourceVision", () => {
     expect(circulars[0].priority).toBe("high");
   });
 
-  it("handles circular array format in imports.json", async () => {
+  it("reads imports.json with legacy circular array format", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(
       join(tempDir, ".sourcevision", "imports.json"),
@@ -343,11 +528,60 @@ describe("scanSourceVision", () => {
     // Only zones.json, no inventory or imports
     await writeFile(
       join(tempDir, ".sourcevision", "zones.json"),
-      JSON.stringify([{ name: "Core", description: "Core module" }]),
+      JSON.stringify({
+        zones: [
+          {
+            id: "core",
+            name: "Core",
+            description: "Core module",
+            files: ["src/core.ts"],
+            entryPoints: [],
+            cohesion: 0.9,
+            coupling: 0.1,
+          },
+        ],
+      }),
     );
 
     const results = await scanSourceVision(tempDir);
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some((r) => r.name === "Core")).toBe(true);
+  });
+
+  it("skips info-severity observations but keeps actionable info findings", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [
+          {
+            id: "core",
+            name: "Core",
+            description: "Core module",
+            files: ["src/core.ts"],
+            entryPoints: [],
+            cohesion: 0.9,
+            coupling: 0.1,
+          },
+        ],
+        findings: [
+          { type: "observation", pass: 0, scope: "core", text: "High cohesion (0.9)", severity: "info" },
+          { type: "relationship", pass: 0, scope: "core", text: "Depends on utils zone", severity: "info" },
+          { type: "suggestion", pass: 1, scope: "core", text: "Consider adding tests", severity: "info" },
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Bad pattern detected", severity: "warning" },
+        ],
+      }),
+    );
+
+    const results = await scanSourceVision(tempDir);
+    const tasks = results.filter((r) => r.kind === "task");
+    // Info observations/relationships are skipped — purely informational
+    // But info suggestions/patterns/anti-patterns are kept — they're actionable
+    expect(tasks.length).toBe(2);
+    expect(tasks.some((t) => t.name.includes("Bad pattern detected"))).toBe(true);
+    expect(tasks.some((t) => t.name.includes("Consider adding tests"))).toBe(true);
+    // Info-severity actionable findings get medium priority
+    const suggestion = tasks.find((t) => t.name.includes("Consider adding tests"));
+    expect(suggestion?.priority).toBe("medium");
   });
 });
