@@ -281,7 +281,7 @@
             {
               "id": "54b42890-14ca-40eb-9f45-e4e9a2e1ec83",
               "title": "Add continuous loop mode",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement --loop flag to automatically continue to next task",
               "acceptanceCriteria": [
@@ -290,12 +290,14 @@
                 "Continues until no more tasks or manual stop"
               ],
               "priority": "medium",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T17:21:53.842Z",
+              "completedAt": "2026-02-04T17:27:48.360Z"
             },
             {
               "id": "aff62817-8f65-4825-a380-5e1efbc411d8",
               "title": "Implement stuck task detection",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Skip tasks after multiple failed attempts",
               "acceptanceCriteria": [
@@ -304,7 +306,9 @@
                 "Moves to next available task"
               ],
               "priority": "medium",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T17:27:48.377Z",
+              "completedAt": "2026-02-04T17:34:55.481Z"
             },
             {
               "id": "87fe384b-0e3e-49d8-8d36-3f25b8c8942b",
@@ -330,6 +334,8 @@
       "status": "completed",
       "level": "epic",
       "source": "llm",
+      "startedAt": "2026-02-04T17:19:07.559Z",
+      "completedAt": "2026-02-04T17:19:07.559Z",
       "children": [
         {
           "id": "d0937fc9-9d94-408f-b5d2-3b5666b55e17",
@@ -519,9 +525,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-04T17:19:07.559Z",
-      "completedAt": "2026-02-04T17:19:07.559Z"
+      ]
     },
     {
       "id": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
