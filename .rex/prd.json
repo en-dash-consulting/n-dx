@@ -883,7 +883,7 @@
             {
               "id": "3a98fcc1-2af5-4564-baf4-9106a064b331",
               "title": "Replace stack traces with user-friendly errors",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Show actionable error messages instead of raw stack traces",
               "acceptanceCriteria": [
@@ -897,7 +897,7 @@
             {
               "id": "35e73e67-aa4b-471d-aea1-ac3826ece7f3",
               "title": "Add helpful suggestions for missing directories",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Suggest n-dx init when .rex/ doesn't exist",
               "acceptanceCriteria": [
@@ -993,7 +993,7 @@
         {
           "id": "72c651f2-974f-48c1-85c6-462b6a1d2204",
           "title": "Configuration management",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Unified configuration system across all packages",
           "source": "llm",
@@ -1015,7 +1015,7 @@
             {
               "id": "20fee51e-b879-49ef-ab3c-6a28b7f39b4a",
               "title": "Support project-level config file",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Use .n-dx.json at project root for unified configuration",
               "acceptanceCriteria": [
@@ -1029,7 +1029,7 @@
             {
               "id": "a8a20d83-c58c-43c1-a3c7-9a2fecfb4988",
               "title": "Document all config options in help",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Include comprehensive config documentation in --help output",
               "acceptanceCriteria": [
