@@ -1170,7 +1170,7 @@
             {
               "id": "9808a298-ed86-425e-a9e6-b2e499e405df",
               "title": "Add n-dx ci command",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Run sourcevision analyze, rex validate, and generate reports",
               "acceptanceCriteria": [
@@ -1180,7 +1180,8 @@
               ],
               "priority": "low",
               "source": "llm",
-              "startedAt": "2026-02-04T18:58:01.612Z"
+              "startedAt": "2026-02-04T18:58:01.612Z",
+              "completedAt": "2026-02-04T19:04:00.316Z"
             },
             {
               "id": "dff06e9b-3406-4d8d-b0d4-b73f60d024bf",
