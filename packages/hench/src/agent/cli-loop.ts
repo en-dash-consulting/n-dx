@@ -53,14 +53,28 @@ function processStreamLine(
   switch (type) {
     case "assistant": {
       turnCounter.value++;
-      const message = event.message as string | undefined;
-      if (message) {
+
+      // Extract text from message — may be a string, object with content blocks, or absent
+      const message = event.message;
+      if (typeof message === "string") {
         console.log(`[Agent] ${message}`);
         result.summary = message.slice(0, MAX_SUMMARY_LENGTH);
+      } else if (message && typeof message === "object") {
+        const msg = message as Record<string, unknown>;
+        const blocks = msg.content as Array<{ type: string; text?: string }> | undefined;
+        if (Array.isArray(blocks)) {
+          for (const block of blocks) {
+            if (block.type === "text" && block.text) {
+              console.log(`[Agent] ${block.text}`);
+              result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
+            }
+          }
+        }
       }
-      // Handle structured message content (array of blocks)
+
+      // Also check top-level content (some event shapes put it here)
       const content = event.content as Array<{ type: string; text?: string }> | undefined;
-      if (content) {
+      if (Array.isArray(content) && !event.message) {
         for (const block of content) {
           if (block.type === "text" && block.text) {
             console.log(`[Agent] ${block.text}`);
@@ -235,12 +249,17 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     const args = [
       "-p", briefText,
       "--output-format", "stream-json",
-      "--model", model,
+      "--verbose",
       "--system-prompt", systemPrompt,
       "--dangerously-skip-permissions",
     ];
 
-    console.log(`[CLI] Spawning claude (model: ${model})...`);
+    // Only pass --model if explicitly overridden; otherwise let claude CLI use its default
+    if (opts.model) {
+      args.push("--model", opts.model);
+    }
+
+    console.log(`[CLI] Spawning claude${opts.model ? ` (model: ${opts.model})` : ""}...`);
 
     const result = await spawnClaude(args, projectDir);
 

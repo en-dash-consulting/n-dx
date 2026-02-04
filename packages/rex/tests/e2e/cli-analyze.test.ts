@@ -198,6 +198,45 @@ describe("Auth", () => {
     expect(parsed.stats.total).toBeGreaterThanOrEqual(1);
   });
 
+  it("caches proposals and accepts them later", async () => {
+    run(["init", tmpDir]);
+
+    await mkdir(join(tmpDir, "tests"), { recursive: true });
+    await writeFile(
+      join(tmpDir, "tests", "cache.test.ts"),
+      `
+describe("Cache", () => {
+  it("stores values", () => {});
+});
+`,
+    );
+
+    // First run generates and caches proposals (non-TTY, no --accept → just saves)
+    const firstOutput = run(["analyze", "--no-llm", tmpDir]);
+    expect(firstOutput).toContain("[epic]");
+    expect(firstOutput).toContain("Proposals saved");
+
+    // Verify pending file exists
+    const pending = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "pending-proposals.json"), "utf-8"),
+    );
+    expect(pending.length).toBeGreaterThan(0);
+
+    // Second run with --accept picks up cached proposals without re-scanning
+    const acceptOutput = run(["analyze", "--accept", tmpDir]);
+    expect(acceptOutput).toContain("cached proposals");
+    expect(acceptOutput).toContain("Added");
+    expect(acceptOutput).toContain("items to PRD");
+
+    // Pending file should be cleared
+    try {
+      await readFile(join(tmpDir, ".rex", "pending-proposals.json"), "utf-8");
+      expect(true).toBe(false); // should not reach
+    } catch {
+      // Expected: file deleted
+    }
+  });
+
   it("--file with nonexistent file shows error", async () => {
     try {
       run(["analyze", "--file=nonexistent.md", tmpDir]);

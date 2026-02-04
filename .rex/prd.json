@@ -1,5 +1,1123 @@
 {
   "schema": "rex/v1",
   "title": "n-dx",
-  "items": []
+  "items": [
+    {
+      "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
+      "title": "Natural language PRD authoring",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "5b558cbb-b329-45e8-af46-b102eada7929",
+          "title": "Smart add functionality",
+          "status": "pending",
+          "level": "feature",
+          "description": "Allow natural language input that gets structured by LLM into proper PRD hierarchy",
+          "source": "llm",
+          "children": [
+            {
+              "id": "75e2da1b-51c2-4dab-a9fe-c0f8591ea24e",
+              "title": "Implement LLM-powered add command",
+              "status": "pending",
+              "level": "task",
+              "description": "Send description to Claude to determine hierarchy and create full breakdown",
+              "acceptanceCriteria": [
+                "Command accepts natural language input",
+                "LLM creates appropriate epic/feature/task structure",
+                "Existing PRD provided as context to avoid duplicates"
+              ],
+              "priority": "critical",
+              "source": "llm"
+            },
+            {
+              "id": "5c160a8b-ad78-44f6-9335-444e7727ccfd",
+              "title": "Add approval flow for LLM proposals",
+              "status": "pending",
+              "level": "task",
+              "description": "Present proposed tree structure for user approval before inserting",
+              "acceptanceCriteria": [
+                "Shows proposed structure before adding",
+                "User can approve or reject proposals",
+                "Only approved items are added to PRD"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "9e5d1d9c-6306-4255-9906-47329993307e",
+              "title": "Support scoped additions with parent constraint",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow constraining new items under existing parent with --parent flag",
+              "acceptanceCriteria": [
+                "Accepts --parent=<epic-id> parameter",
+                "LLM expansion stays within specified parent",
+                "Auto-determines placement when no parent specified"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "1d92f102-9a80-4234-a3e9-f713ed42ab61",
+              "title": "Maintain explicit manual mode",
+              "status": "pending",
+              "level": "task",
+              "description": "Support direct task creation bypassing LLM with explicit parameters",
+              "acceptanceCriteria": [
+                "Commands with --title and --parent work as before",
+                "Manual mode bypasses LLM processing",
+                "Explicit level specification supported"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "4c522dcd-db15-4f2e-a108-d98619be078a",
+          "title": "Bulk natural language input",
+          "status": "pending",
+          "level": "feature",
+          "description": "Support multiple descriptions and file-based input for batch PRD creation",
+          "source": "llm",
+          "children": [
+            {
+              "id": "0a24b5bd-fa59-41c0-b9ac-9bfd85eca54e",
+              "title": "Support multiple descriptions in single command",
+              "status": "pending",
+              "level": "task",
+              "description": "Accept multiple natural language descriptions in one rex add call",
+              "acceptanceCriteria": [
+                "Multiple descriptions can be passed as arguments",
+                "Each description processed by LLM",
+                "Results combined into coherent structure"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "ed902797-9b9f-4181-9d88-cac559014a91",
+              "title": "Add piped input support",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow piping text into rex add command",
+              "acceptanceCriteria": [
+                "Accepts stdin input",
+                "Processes piped text as description",
+                "Works with echo and other pipe sources"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "6b968585-1368-40e3-aa65-b966148e5c91",
+              "title": "Implement file-based idea import",
+              "status": "pending",
+              "level": "task",
+              "description": "Support --file flag to read freeform brainstorming notes",
+              "acceptanceCriteria": [
+                "Accepts --file parameter",
+                "Reads freeform text files",
+                "Structures all ideas at once via LLM",
+                "Distinct from formal spec import"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6b0c3873-5607-4adc-9027-abd8d70ab0e3",
+      "title": "Reliable work loop",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "262601f3-b1d3-4c76-abc7-cd3310a2a2b3",
+          "title": "Task selection and state transitions",
+          "status": "pending",
+          "level": "feature",
+          "description": "Ensure proper task ordering and atomic state management during execution",
+          "source": "llm",
+          "children": [
+            {
+              "id": "1ba9b8ba-078b-4a20-91bc-221462c1364e",
+              "title": "Fix findNextTask priority and dependency logic",
+              "status": "pending",
+              "level": "task",
+              "description": "Ensure priority ordering and blocked-by dependencies work correctly",
+              "acceptanceCriteria": [
+                "Tasks selected in priority order",
+                "Blocked tasks properly skipped",
+                "Dependencies respected in selection"
+              ],
+              "priority": "critical",
+              "source": "llm"
+            },
+            {
+              "id": "a82f55ef-7108-4a4c-b1b0-16736b5f65ff",
+              "title": "Implement atomic task state transitions",
+              "status": "pending",
+              "level": "task",
+              "description": "Transition tasks to in_progress atomically before starting work",
+              "acceptanceCriteria": [
+                "State change happens before work begins",
+                "Works for both CLI and API providers",
+                "Prevents race conditions"
+              ],
+              "priority": "critical",
+              "source": "llm"
+            },
+            {
+              "id": "c8e37f18-7a10-4f27-ae6a-d62d6833584c",
+              "title": "Add automatic parent completion logic",
+              "status": "pending",
+              "level": "task",
+              "description": "Auto-complete parent items when all children are completed",
+              "acceptanceCriteria": [
+                "Features complete when all tasks complete",
+                "Epics complete when all features complete",
+                "State propagation works correctly"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "0df69478-9dd8-4b64-9564-da2a9fcd72e7",
+              "title": "Handle task failures properly",
+              "status": "pending",
+              "level": "task",
+              "description": "Mark failed tasks as deferred with clear error summary",
+              "acceptanceCriteria": [
+                "Failed tasks marked as deferred",
+                "Error summary logged clearly",
+                "Tasks not left in in_progress state"
+              ],
+              "priority": "high",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "e99c65c7-a62f-4bc9-950c-097a98b6df83",
+          "title": "Run quality and guardrails",
+          "status": "pending",
+          "level": "feature",
+          "description": "Validate work quality and provide safety mechanisms for autonomous execution",
+          "source": "llm",
+          "children": [
+            {
+              "id": "c953070b-ef5a-4793-aaca-27144bed45c0",
+              "title": "Add completion validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Validate meaningful changes were made before marking tasks complete",
+              "acceptanceCriteria": [
+                "Checks git diff is non-empty",
+                "Optionally runs tests for verification",
+                "Prevents false completion claims"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "da30cf47-a66f-4c72-9843-30472b2eb384",
+              "title": "Implement review mode",
+              "status": "pending",
+              "level": "task",
+              "description": "Add --review flag to show proposed changes before committing",
+              "acceptanceCriteria": [
+                "Shows agent's proposed changes",
+                "User can approve or reject",
+                "Changes only applied after approval"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "8817fcaf-2f8d-4f9a-8cc8-dca1a3795250",
+              "title": "Add structured run summaries",
+              "status": "pending",
+              "level": "task",
+              "description": "Include structured metadata in run records",
+              "acceptanceCriteria": [
+                "Records files changed",
+                "Tracks tests run",
+                "Lists commands executed",
+                "Summary easily parseable"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "c79338e3-1f96-40d8-af79-a2dc334f75e6",
+              "title": "Implement token budget limits",
+              "status": "pending",
+              "level": "task",
+              "description": "Cap total token spend per run with configurable budget",
+              "acceptanceCriteria": [
+                "Configurable token budget per run",
+                "Run stops when budget exceeded",
+                "Budget separate from max turns limit"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "2cae10b4-7d16-4b09-82b4-c0922d28a00f",
+          "title": "Loop continuity",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enable continuous autonomous execution with proper error handling",
+          "source": "llm",
+          "children": [
+            {
+              "id": "54b42890-14ca-40eb-9f45-e4e9a2e1ec83",
+              "title": "Add continuous loop mode",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement --loop flag to automatically continue to next task",
+              "acceptanceCriteria": [
+                "Automatically picks next task after completion",
+                "Configurable pause between tasks",
+                "Continues until no more tasks or manual stop"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "aff62817-8f65-4825-a380-5e1efbc411d8",
+              "title": "Implement stuck task detection",
+              "status": "pending",
+              "level": "task",
+              "description": "Skip tasks after multiple failed attempts",
+              "acceptanceCriteria": [
+                "Detects 3+ failed attempts on same task",
+                "Automatically skips stuck tasks",
+                "Moves to next available task"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "87fe384b-0e3e-49d8-8d36-3f25b8c8942b",
+              "title": "Add clear error handling for invalid task selection",
+              "status": "pending",
+              "level": "task",
+              "description": "Error clearly when trying to work on completed or deferred tasks",
+              "acceptanceCriteria": [
+                "Clear error for completed tasks",
+                "Clear error for deferred tasks",
+                "Suggests alternative actions"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d6d0cbed-f63a-4434-a004-166c39cc8d2c",
+      "title": "PRD structure and lifecycle",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "d0937fc9-9d94-408f-b5d2-3b5666b55e17",
+          "title": "Flexible hierarchy",
+          "status": "pending",
+          "level": "feature",
+          "description": "Allow more flexible organization of PRD items beyond rigid four-level structure",
+          "source": "llm",
+          "children": [
+            {
+              "id": "23402c98-4566-4d51-9f98-3c353988b2a9",
+              "title": "Allow tasks directly under epics",
+              "status": "pending",
+              "level": "task",
+              "description": "Support skipping feature level when not needed",
+              "acceptanceCriteria": [
+                "Tasks can have epics as direct parents",
+                "Feature level becomes optional",
+                "Existing hierarchy still supported"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "2938285a-01bf-4eb2-8ff9-6ef1ef6315da",
+              "title": "Implement task-to-task dependencies",
+              "status": "pending",
+              "level": "task",
+              "description": "Ensure blockedBy field is fully respected in work selection",
+              "acceptanceCriteria": [
+                "blockedBy prevents task selection",
+                "Dependency resolution works correctly",
+                "Circular dependencies detected"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "a143409d-3428-4e11-8332-31c0c8c284a7",
+              "title": "Add move command for reparenting",
+              "status": "pending",
+              "level": "task",
+              "description": "Support moving items to different parents in the tree",
+              "acceptanceCriteria": [
+                "Can change parent of any item",
+                "Validates move is structurally valid",
+                "Updates references correctly"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "4ac64ac1-fa02-4f8a-b0b3-45faa30b69ac",
+          "title": "Better task lifecycle",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve task status management and tracking throughout lifecycle",
+          "source": "llm",
+          "children": [
+            {
+              "id": "8c0107fc-f568-4649-8e6c-7c81ce45f22b",
+              "title": "Add blocked status",
+              "status": "pending",
+              "level": "task",
+              "description": "Distinguish blocked tasks from deferred tasks",
+              "acceptanceCriteria": [
+                "blocked status added to schema",
+                "Distinct from deferred status",
+                "Used for dependency-blocked tasks"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "a42cfc8a-51c6-4183-b133-19f635c48dad",
+              "title": "Add explanation to rex next",
+              "status": "pending",
+              "level": "task",
+              "description": "Explain why a particular task was selected",
+              "acceptanceCriteria": [
+                "Shows selection reasoning",
+                "Explains priority considerations",
+                "Notes dependency status"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "a080f709-e5aa-4672-9043-8088b512f964",
+              "title": "Validate status transitions",
+              "status": "pending",
+              "level": "task",
+              "description": "Prevent invalid status changes without explicit force",
+              "acceptanceCriteria": [
+                "Prevents completed -> pending without --force",
+                "Validates all transition rules",
+                "Clear error messages for invalid transitions"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "98ee2a19-494b-4717-810f-8d484c58a7ee",
+              "title": "Add automatic timestamping",
+              "status": "pending",
+              "level": "task",
+              "description": "Track startedAt and completedAt timestamps on status changes",
+              "acceptanceCriteria": [
+                "startedAt set when task becomes in_progress",
+                "completedAt set when task completes",
+                "Timestamps included in status output"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "7f822601-2e01-4a98-adc2-3426481da3f2",
+          "title": "PRD quality",
+          "status": "pending",
+          "level": "feature",
+          "description": "Tools to maintain and clean up PRD structure and content",
+          "source": "llm",
+          "children": [
+            {
+              "id": "6834c45c-3f27-4ffb-9042-34d79edba35b",
+              "title": "Enhance rex validate with structural checks",
+              "status": "pending",
+              "level": "task",
+              "description": "Check for orphaned items, circular dependencies, and stuck tasks",
+              "acceptanceCriteria": [
+                "Detects orphaned items",
+                "Finds circular blockedBy references",
+                "Identifies tasks stuck in_progress too long"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "a3508f63-7ca4-4f9a-ba05-afb73a67442c",
+              "title": "Add rex prune command",
+              "status": "pending",
+              "level": "task",
+              "description": "Remove completed subtrees and archive them",
+              "acceptanceCriteria": [
+                "Removes completed items",
+                "Archives to separate file",
+                "Preserves history"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "d6520294-3587-410f-965f-99370db07d26",
+              "title": "Add rex import alias",
+              "status": "pending",
+              "level": "task",
+              "description": "Create synonym for rex analyze --file for discoverability",
+              "acceptanceCriteria": [
+                "rex import works as alias",
+                "Maintains same functionality",
+                "Documented in help"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
+      "title": "Analyze pipeline improvements",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "6f927f1f-811b-4eb3-a269-0bae5edd8017",
+          "title": "Scanner improvements",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enhance individual scanners to produce better quality analysis results",
+          "source": "llm",
+          "children": [
+            {
+              "id": "301abd47-1652-4409-ba0f-9121c3d0728a",
+              "title": "Improve scanTests grouping logic",
+              "status": "pending",
+              "level": "task",
+              "description": "Group test results by describe-block nesting instead of just file name",
+              "acceptanceCriteria": [
+                "Parses describe block structure",
+                "Groups tests by logical hierarchy",
+                "More meaningful test organization"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "9a7d6848-2054-47d4-9d10-e5bd144939e9",
+              "title": "Filter auto-generated files from scanDocs",
+              "status": "pending",
+              "level": "task",
+              "description": "Ignore files in dist/, .sourcevision/ and other generated directories",
+              "acceptanceCriteria": [
+                "Skips known generated directories",
+                "Configurable ignore patterns",
+                "Focuses on human-written docs"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "dbcbbb03-7c1d-4d45-8764-abf7711fb87e",
+              "title": "Enhance scanSourceVision output",
+              "status": "pending",
+              "level": "task",
+              "description": "Produce more actionable tasks from zone findings with file paths",
+              "acceptanceCriteria": [
+                "Includes specific file paths",
+                "Suggests concrete fixes",
+                "More actionable task descriptions"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "0cf5900a-dbac-4146-b0ac-880f19523d52",
+              "title": "Add scanPackageJson scanner",
+              "status": "pending",
+              "level": "task",
+              "description": "Extract scripts, dependencies, and engine requirements as tasks",
+              "acceptanceCriteria": [
+                "Parses package.json files",
+                "Identifies scripts as potential tasks",
+                "Checks dependency updates",
+                "Notes engine requirements"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "d23b926d-00b5-4b9e-b99c-6adb30fd69c1",
+          "title": "LLM refinement",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve the LLM reasoning layer for better analysis quality",
+          "source": "llm",
+          "children": [
+            {
+              "id": "ce0f3736-1f0a-43dc-a0a0-34fee6fb407e",
+              "title": "Include project context in LLM prompt",
+              "status": "pending",
+              "level": "task",
+              "description": "Add CLAUDE.md or README content to reasonFromScanResults prompt",
+              "acceptanceCriteria": [
+                "Reads project documentation",
+                "Includes context in LLM prompt",
+                "More relevant task generation"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "0d818bc8-36f7-4c4f-a94f-a8572d3a429d",
+              "title": "Implement duplicate merging",
+              "status": "pending",
+              "level": "task",
+              "description": "LLM should merge near-duplicate scan results",
+              "acceptanceCriteria": [
+                "Identifies similar results",
+                "Merges duplicates intelligently",
+                "Reduces noise in final output"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "53558943-22ff-4e1a-b1e8-787b51bb7639",
+              "title": "Add model selection for analyze",
+              "status": "pending",
+              "level": "task",
+              "description": "Support --model flag to override default model",
+              "acceptanceCriteria": [
+                "Accepts --model parameter",
+                "Uses specified model for LLM reasoning",
+                "Falls back to default if model unavailable"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "46f6c6a0-f5c0-4e3c-bfe2-74b25ce959ec",
+              "title": "Handle large result sets with chunking",
+              "status": "pending",
+              "level": "task",
+              "description": "Batch large scan results into multiple LLM calls",
+              "acceptanceCriteria": [
+                "Detects when results exceed threshold",
+                "Splits into manageable chunks",
+                "Combines results coherently"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "dc8fd7bb-c902-4a61-931b-0a91a1d7fe0a",
+          "title": "File import enhancements",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve file-based import functionality for better flexibility",
+          "source": "llm",
+          "children": [
+            {
+              "id": "45a448f5-95b5-46bf-a32e-490181ccd56e",
+              "title": "Support multiple input files",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow multiple --file flags in rex analyze command",
+              "acceptanceCriteria": [
+                "Accepts multiple --file parameters",
+                "Processes all files together",
+                "Combines results coherently"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "22f4144a-0ec1-4c19-8ce4-fa3a8fa294dc",
+              "title": "Add JSON and YAML import support",
+              "status": "completed",
+              "level": "task",
+              "description": "Support additional file formats beyond markdown",
+              "acceptanceCriteria": [
+                "Detects format by extension",
+                "Parses JSON input files",
+                "Parses YAML input files",
+                "Maintains markdown support"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "f5f4259c-8a98-4295-89e6-5f3870464d7a",
+              "title": "Show import diff before accepting",
+              "status": "deferred",
+              "level": "task",
+              "description": "Display changes against existing PRD before importing",
+              "acceptanceCriteria": [
+                "Shows what will be added",
+                "Shows what will be changed",
+                "User approval before applying"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "9679e55e-a3c0-43e3-b240-1e749613e9cc",
+      "title": "External sync and Notion integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "3a5378b3-1cb9-49de-9d51-f6572a92ac8d",
+          "title": "Store adapter architecture",
+          "status": "pending",
+          "level": "feature",
+          "description": "Create abstraction layer for different storage backends",
+          "source": "llm",
+          "children": [
+            {
+              "id": "efee6790-0f15-40dd-afbe-5e66b6baf6dc",
+              "title": "Define adapter interface",
+              "status": "pending",
+              "level": "task",
+              "description": "Create clean interface that file and external stores implement",
+              "acceptanceCriteria": [
+                "CRUD operations defined",
+                "Log append operations supported",
+                "Config load/save methods included",
+                "Interface well-documented"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "5e85cd0f-f2b9-4260-9a67-e891ff10e8c6",
+              "title": "Implement adapter registration system",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow registering and configuring different store adapters",
+              "acceptanceCriteria": [
+                "Adapter registration command works",
+                "Configuration stored securely",
+                "Multiple adapters supported"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "1a304d60-73c3-48cf-8ef2-559e7ca78e90",
+              "title": "Add bidirectional sync support",
+              "status": "pending",
+              "level": "task",
+              "description": "Support changes flowing both ways between local and external stores",
+              "acceptanceCriteria": [
+                "Local changes sync to external",
+                "External changes sync to local",
+                "Conflict detection included"
+              ],
+              "priority": "high",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "1aca6c86-7f94-4278-befd-c8d0b125a71d",
+          "title": "Notion adapter implementation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Specific implementation for Notion database integration",
+          "source": "llm",
+          "children": [
+            {
+              "id": "8489d495-c32e-43b9-971c-8ac3142f6215",
+              "title": "Map PRD hierarchy to Notion structure",
+              "status": "pending",
+              "level": "task",
+              "description": "Create mapping between PRD items and Notion database structure",
+              "acceptanceCriteria": [
+                "Epics as top-level pages",
+                "Features and tasks as sub-items",
+                "Hierarchy preserved correctly"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "2aaae13a-0d78-4706-bacf-687296f37b85",
+              "title": "Sync all PRD fields to Notion",
+              "status": "pending",
+              "level": "task",
+              "description": "Support status, priority, description, criteria, and tags in Notion",
+              "acceptanceCriteria": [
+                "All PRD fields mapped",
+                "Status values synchronized",
+                "Priority levels matched",
+                "Rich text fields supported"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "1f98431d-0c61-471c-b9d7-fc596bb96d18",
+              "title": "Use Notion native properties",
+              "status": "pending",
+              "level": "task",
+              "description": "Map to Notion's built-in status and priority properties",
+              "acceptanceCriteria": [
+                "Uses Notion status property type",
+                "Uses Notion priority property type",
+                "Maintains compatibility with rex values"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "9ccb5785-1bcd-4c29-a957-d56b9ff55430",
+              "title": "Implement conflict resolution",
+              "status": "pending",
+              "level": "task",
+              "description": "Handle conflicts when both local and Notion have changes",
+              "acceptanceCriteria": [
+                "Last-write-wins strategy",
+                "Conflict warnings logged",
+                "Data integrity maintained"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
+      "title": "CLI and developer experience",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "04ca00fe-ef44-4d81-890a-5d8772df540b",
+          "title": "Error handling improvements",
+          "status": "pending",
+          "level": "feature",
+          "description": "Provide clear, actionable error messages instead of technical failures",
+          "source": "llm",
+          "children": [
+            {
+              "id": "3a98fcc1-2af5-4564-baf4-9106a064b331",
+              "title": "Replace stack traces with user-friendly errors",
+              "status": "pending",
+              "level": "task",
+              "description": "Show actionable error messages instead of raw stack traces",
+              "acceptanceCriteria": [
+                "No stack traces in normal output",
+                "Clear problem descriptions",
+                "Suggested solutions included"
+              ],
+              "priority": "high",
+              "source": "llm"
+            },
+            {
+              "id": "35e73e67-aa4b-471d-aea1-ac3826ece7f3",
+              "title": "Add helpful suggestions for missing directories",
+              "status": "pending",
+              "level": "task",
+              "description": "Suggest n-dx init when .rex/ doesn't exist",
+              "acceptanceCriteria": [
+                "Detects missing directories",
+                "Suggests initialization command",
+                "Avoids crashes"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "4345197b-c78f-4334-9748-b4a486c0a027",
+              "title": "Handle missing claude CLI gracefully",
+              "status": "pending",
+              "level": "task",
+              "description": "Provide install instructions and fallback when claude CLI not found",
+              "acceptanceCriteria": [
+                "Detects missing claude CLI",
+                "Provides installation instructions",
+                "Graceful fallback behavior"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "c679bde8-9a4b-46bb-a0f8-750bf34fbf95",
+          "title": "Output and formatting",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve visual presentation and information density of command output",
+          "source": "llm",
+          "children": [
+            {
+              "id": "ef35bbdc-1a62-4e01-9a46-98950bc12b4d",
+              "title": "Add progress bars to status command",
+              "status": "pending",
+              "level": "task",
+              "description": "Show visual progress indicators per epic in status output",
+              "acceptanceCriteria": [
+                "Progress bar for each epic",
+                "Accurate completion percentage",
+                "Visually clear presentation"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "2a5c0077-de89-42b2-a783-45fb675f275a",
+              "title": "Add tree format option to status",
+              "status": "pending",
+              "level": "task",
+              "description": "Support --format=tree to show full hierarchy with status icons",
+              "acceptanceCriteria": [
+                "Tree view shows full hierarchy",
+                "Status icons clearly visible",
+                "Indentation shows structure"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "5e68b89e-8f81-4c6b-b2a6-52b361eee707",
+              "title": "Stream hench output with section headers",
+              "status": "pending",
+              "level": "task",
+              "description": "Provide real-time output from hench with clear organization",
+              "acceptanceCriteria": [
+                "Real-time output streaming",
+                "Clear section headers",
+                "Easy to follow progress"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "da4fecd8-f501-4499-9af2-655eeafedb0c",
+              "title": "Add quiet mode for scripting",
+              "status": "pending",
+              "level": "task",
+              "description": "Support --quiet flag across all commands for automation",
+              "acceptanceCriteria": [
+                "Minimal output in quiet mode",
+                "Essential information still shown",
+                "Consistent across all commands"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "72c651f2-974f-48c1-85c6-462b6a1d2204",
+          "title": "Configuration management",
+          "status": "pending",
+          "level": "feature",
+          "description": "Unified configuration system across all packages",
+          "source": "llm",
+          "children": [
+            {
+              "id": "cf194705-5786-44f9-8d8b-ddb8aa7bd924",
+              "title": "Add unified config command",
+              "status": "pending",
+              "level": "task",
+              "description": "Single command to view and edit settings across all packages",
+              "acceptanceCriteria": [
+                "Shows all package configurations",
+                "Allows editing any setting",
+                "Validates configuration values"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "20fee51e-b879-49ef-ab3c-6a28b7f39b4a",
+              "title": "Support project-level config file",
+              "status": "pending",
+              "level": "task",
+              "description": "Use .n-dx.json at project root for unified configuration",
+              "acceptanceCriteria": [
+                "Reads .n-dx.json from project root",
+                "Merges with individual package configs",
+                "Project config takes precedence"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "a8a20d83-c58c-43c1-a3c7-9a2fecfb4988",
+              "title": "Document all config options in help",
+              "status": "pending",
+              "level": "task",
+              "description": "Include comprehensive config documentation in --help output",
+              "acceptanceCriteria": [
+                "All options documented",
+                "Clear descriptions provided",
+                "Examples included where helpful"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "697ba099-9654-4e8e-8656-fb9302e46f2f",
+      "title": "Testing and verification",
+      "status": "pending",
+      "level": "epic",
+      "source": "llm",
+      "children": [
+        {
+          "id": "2b12a3aa-b3ba-4255-b581-064dc3ceb590",
+          "title": "Acceptance criteria as tests",
+          "status": "pending",
+          "level": "feature",
+          "description": "Link PRD acceptance criteria to actual test execution",
+          "source": "llm",
+          "children": [
+            {
+              "id": "8f740afc-9757-42bf-88e8-b6b9b73b4da2",
+              "title": "Implement rex verify command",
+              "status": "pending",
+              "level": "task",
+              "description": "Add command to run tests associated with acceptance criteria",
+              "acceptanceCriteria": [
+                "Maps criteria to test files",
+                "Runs relevant tests for a task",
+                "Reports test results clearly"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "7c545f27-6c88-4044-9e1e-abb08ffc8a49",
+              "title": "Add automatic test running to hench",
+              "status": "pending",
+              "level": "task",
+              "description": "Attempt to run relevant tests when hench completes a task",
+              "acceptanceCriteria": [
+                "Identifies relevant tests automatically",
+                "Runs tests after task completion",
+                "Reports test results in run summary"
+              ],
+              "priority": "medium",
+              "source": "llm"
+            },
+            {
+              "id": "3dd0ce48-04ea-44e0-896c-44b6e2cd9fe3",
+              "title": "Show test coverage in status",
+              "status": "pending",
+              "level": "task",
+              "description": "Display test coverage per task when acceptance criteria map to tests",
+              "acceptanceCriteria": [
+                "Shows which tasks have test coverage",
+                "Indicates test status",
+                "Clear visual indicators"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        },
+        {
+          "id": "a2b48f7b-e6b9-4e72-a300-d9631a1a1db6",
+          "title": "CI integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Support for continuous integration and automated PRD health checks",
+          "source": "llm",
+          "children": [
+            {
+              "id": "9808a298-ed86-425e-a9e6-b2e499e405df",
+              "title": "Add n-dx ci command",
+              "status": "pending",
+              "level": "task",
+              "description": "Run sourcevision analyze, rex validate, and generate reports",
+              "acceptanceCriteria": [
+                "Runs full analysis pipeline",
+                "Validates PRD health",
+                "Generates comprehensive report"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "dff06e9b-3406-4d8d-b0d4-b73f60d024bf",
+              "title": "Output machine-readable reports",
+              "status": "pending",
+              "level": "task",
+              "description": "Generate JSON reports of PRD health for CI dashboards",
+              "acceptanceCriteria": [
+                "JSON format output",
+                "Structured health metrics",
+                "Dashboard-friendly format"
+              ],
+              "priority": "low",
+              "source": "llm"
+            },
+            {
+              "id": "ddde7747-c541-42c6-a800-a2535cff81bb",
+              "title": "Fail CI on validation errors",
+              "status": "pending",
+              "level": "task",
+              "description": "Return appropriate exit codes for CI failure conditions",
+              "acceptanceCriteria": [
+                "Non-zero exit on validation errors",
+                "Non-zero exit on orphaned items",
+                "Clear error reporting"
+              ],
+              "priority": "low",
+              "source": "llm"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

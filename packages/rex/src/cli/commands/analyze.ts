@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path";
-import { access } from "node:fs/promises";
+import { access, writeFile, readFile, unlink } from "node:fs/promises";
+import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { createStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
@@ -14,6 +15,8 @@ import {
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type { PRDItem, PRDDocument } from "../../schema/index.js";
+
+const PENDING_FILE = "pending-proposals.json";
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
@@ -39,6 +42,109 @@ function formatProposals(proposals: Proposal[]): string {
   return lines.join("\n");
 }
 
+function promptUser(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase());
+    });
+  });
+}
+
+async function savePending(dir: string, proposals: Proposal[]): Promise<void> {
+  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  await writeFile(filePath, JSON.stringify(proposals, null, 2));
+}
+
+async function loadPending(dir: string): Promise<Proposal[] | null> {
+  const filePath = join(dir, REX_DIR, PENDING_FILE);
+  try {
+    const raw = await readFile(filePath, "utf-8");
+    return JSON.parse(raw) as Proposal[];
+  } catch {
+    return null;
+  }
+}
+
+async function clearPending(dir: string): Promise<void> {
+  try {
+    await unlink(join(dir, REX_DIR, PENDING_FILE));
+  } catch {
+    // Already gone
+  }
+}
+
+async function acceptProposals(
+  dir: string,
+  proposals: Proposal[],
+): Promise<void> {
+  if (!(await hasRexDir(dir))) {
+    console.error(
+      `No .rex/ found in ${dir}. Run "rex init" first.`,
+    );
+    process.exit(1);
+  }
+
+  const rexDir = join(dir, REX_DIR);
+  const store = createStore("file", rexDir);
+
+  let addedCount = 0;
+
+  for (const p of proposals) {
+    const epicId = randomUUID();
+    const epicItem: PRDItem = {
+      id: epicId,
+      title: p.epic.title,
+      level: "epic",
+      status: "pending",
+      source: p.epic.source,
+    };
+    await store.addItem(epicItem);
+    addedCount++;
+
+    for (const f of p.features) {
+      const featureId = randomUUID();
+      const featureItem: PRDItem = {
+        id: featureId,
+        title: f.title,
+        level: "feature",
+        status: "pending",
+        source: f.source,
+        description: f.description,
+      };
+      await store.addItem(featureItem, epicId);
+      addedCount++;
+
+      for (const t of f.tasks) {
+        const taskId = randomUUID();
+        const taskItem: PRDItem = {
+          id: taskId,
+          title: t.title,
+          level: "task",
+          status: "pending",
+          source: t.source,
+          description: t.description,
+          acceptanceCriteria: t.acceptanceCriteria,
+          priority: t.priority as PRDItem["priority"],
+          tags: t.tags,
+        };
+        await store.addItem(taskItem, featureId);
+        addedCount++;
+      }
+    }
+  }
+
+  await store.appendLog({
+    timestamp: new Date().toISOString(),
+    event: "analyze_accept",
+    detail: `Added ${addedCount} items from analysis`,
+  });
+
+  await clearPending(dir);
+  console.log(`Added ${addedCount} items to PRD.`);
+}
+
 export async function cmdAnalyze(
   dir: string,
   flags: Record<string, string>,
@@ -47,6 +153,17 @@ export async function cmdAnalyze(
   const accept = flags.accept === "true";
   const noLlm = flags["no-llm"] === "true";
   const filePath = flags.file;
+
+  // --accept with no other flags: replay cached proposals
+  if (accept && !filePath && !flags.format) {
+    const cached = await loadPending(dir);
+    if (cached && cached.length > 0) {
+      console.log(`Accepting ${cached.length} cached proposals...`);
+      await acceptProposals(dir, cached);
+      return;
+    }
+    // No cache — fall through to generate fresh proposals
+  }
 
   // Load existing PRD items for deduplication
   let existing: PRDItem[] = [];
@@ -102,14 +219,12 @@ export async function cmdAnalyze(
     const { results: newResults, stats } = reconcile(allResults, existing);
 
     if (!noLlm) {
-      // Try LLM refinement
       try {
         proposals = await reasonFromScanResults(newResults, existing);
         if (flags.format !== "json") {
           console.log("Proposals refined by LLM.");
         }
       } catch {
-        // Fall back to algorithmic
         proposals = buildProposals(newResults);
       }
     } else {
@@ -142,77 +257,26 @@ export async function cmdAnalyze(
   }
 
   console.log(formatProposals(proposals));
+  console.log("");
+
+  // Cache proposals so they can be accepted later without re-running
+  if (await hasRexDir(dir)) {
+    await savePending(dir, proposals);
+  }
 
   if (accept) {
-    if (!(await hasRexDir(dir))) {
-      console.error(
-        `No .rex/ found in ${dir}. Run "rex init" first before using --accept.`,
-      );
-      process.exit(1);
+    // Non-interactive: accept immediately
+    await acceptProposals(dir, proposals);
+  } else if (process.stdin.isTTY) {
+    // Interactive: prompt the user
+    const answer = await promptUser("Accept these proposals into the PRD? (y/n) ");
+    if (answer === "y" || answer === "yes") {
+      await acceptProposals(dir, proposals);
+    } else {
+      console.log("Proposals saved. Run `rex analyze --accept` to accept later.");
     }
-
-    const rexDir = join(dir, REX_DIR);
-    const store = createStore("file", rexDir);
-
-    console.log("");
-    let addedCount = 0;
-
-    for (const p of proposals) {
-      // Create epic
-      const epicId = randomUUID();
-      const epicItem: PRDItem = {
-        id: epicId,
-        title: p.epic.title,
-        level: "epic",
-        status: "pending",
-        source: p.epic.source,
-      };
-      await store.addItem(epicItem);
-      addedCount++;
-
-      for (const f of p.features) {
-        // Create feature under epic
-        const featureId = randomUUID();
-        const featureItem: PRDItem = {
-          id: featureId,
-          title: f.title,
-          level: "feature",
-          status: "pending",
-          source: f.source,
-          description: f.description,
-        };
-        await store.addItem(featureItem, epicId);
-        addedCount++;
-
-        for (const t of f.tasks) {
-          // Create task under feature
-          const taskId = randomUUID();
-          const taskItem: PRDItem = {
-            id: taskId,
-            title: t.title,
-            level: "task",
-            status: "pending",
-            source: t.source,
-            description: t.description,
-            acceptanceCriteria: t.acceptanceCriteria,
-            priority: t.priority as PRDItem["priority"],
-            tags: t.tags,
-          };
-          await store.addItem(taskItem, featureId);
-          addedCount++;
-        }
-      }
-    }
-
-    await store.appendLog({
-      timestamp: new Date().toISOString(),
-      event: "analyze_accept",
-      detail: `Added ${addedCount} items from analysis`,
-    });
-
-    console.log(`Added ${addedCount} items to PRD.`);
   } else {
-    console.log("");
-    console.log("Run with --accept to add all proposals to the PRD.");
+    // Non-interactive without --accept: just show
+    console.log("Proposals saved. Run `rex analyze --accept` to accept later.");
   }
 }
