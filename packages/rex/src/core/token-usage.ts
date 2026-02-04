@@ -47,6 +47,27 @@ export interface TokenUsageFilter {
   until?: string;
 }
 
+/** Token usage for a single command. */
+export interface CommandTokenUsage extends PackageTokenUsage {
+  /** Command name (e.g. "analyze", "run", "smart-add"). */
+  command: string;
+  /** Package this command belongs to. */
+  package: "rex" | "hench" | "sv";
+}
+
+/** Valid time period groupings. */
+export type TimePeriod = "day" | "week" | "month";
+
+/** Token usage for a single time bucket. */
+export interface PeriodBucket {
+  /** Period label (e.g. "2026-01-15", "2026-W03", "2026-01"). */
+  period: string;
+  /** Aggregate usage for this period. */
+  usage: AggregateTokenUsage;
+  /** Estimated cost for this period. */
+  estimatedCost: CostEstimate;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -102,6 +123,16 @@ export function extractRexTokenUsage(
 // ---------------------------------------------------------------------------
 // Hench token usage from run records
 // ---------------------------------------------------------------------------
+
+/** Timestamped token event used internally for grouping and command breakdown. */
+export interface TokenEvent {
+  timestamp: string;
+  command: string;
+  package: "rex" | "hench" | "sv";
+  inputTokens: number;
+  outputTokens: number;
+  calls: number;
+}
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
@@ -192,6 +223,277 @@ export async function extractSvTokenUsage(
   }
 
   return usage;
+}
+
+// ---------------------------------------------------------------------------
+// Token event extraction (for command and time-period breakdown)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract individual token events from the rex execution log.
+ * Maps event types to their originating commands.
+ */
+export function extractRexTokenEvents(
+  logEntries: LogEntry[],
+  filter: TokenUsageFilter = {},
+): TokenEvent[] {
+  const events: TokenEvent[] = [];
+
+  /** Map log event types to human-readable command names. */
+  const EVENT_COMMAND_MAP: Record<string, string> = {
+    analyze_token_usage: "analyze",
+    smart_add_token_usage: "smart-add",
+  };
+
+  for (const entry of logEntries) {
+    const command = EVENT_COMMAND_MAP[entry.event];
+    if (!command) continue;
+    if (!entry.detail) continue;
+    if (!isInRange(entry.timestamp, filter)) continue;
+
+    try {
+      const data = JSON.parse(entry.detail) as {
+        calls?: number;
+        inputTokens?: number;
+        outputTokens?: number;
+      };
+      events.push({
+        timestamp: entry.timestamp,
+        command,
+        package: "rex",
+        inputTokens: data.inputTokens ?? 0,
+        outputTokens: data.outputTokens ?? 0,
+        calls: data.calls ?? 0,
+      });
+    } catch {
+      // Malformed detail — skip
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Extract individual token events from hench run records.
+ * Each run becomes a single event attributed to the "run" command.
+ */
+export async function extractHenchTokenEvents(
+  projectDir: string,
+  filter: TokenUsageFilter = {},
+): Promise<TokenEvent[]> {
+  const events: TokenEvent[] = [];
+  const runsDir = join(projectDir, ".hench", "runs");
+
+  let files: string[];
+  try {
+    files = await readdir(runsDir);
+  } catch {
+    return events;
+  }
+
+  const jsonFiles = files.filter((f) => f.endsWith(".json"));
+
+  for (const file of jsonFiles) {
+    try {
+      const raw = await readFile(join(runsDir, file), "utf-8");
+      const run = JSON.parse(raw) as HenchRunSummary;
+
+      if (!run.startedAt || !run.tokenUsage) continue;
+      if (!isInRange(run.startedAt, filter)) continue;
+
+      events.push({
+        timestamp: run.startedAt,
+        command: "run",
+        package: "hench",
+        inputTokens: run.tokenUsage.input ?? 0,
+        outputTokens: run.tokenUsage.output ?? 0,
+        calls: 1,
+      });
+    } catch {
+      // Invalid run file — skip
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Extract token events from sourcevision manifest.
+ * The manifest represents a single "analyze" event.
+ */
+export async function extractSvTokenEvents(
+  projectDir: string,
+  filter: TokenUsageFilter = {},
+): Promise<TokenEvent[]> {
+  const events: TokenEvent[] = [];
+  const manifestPath = join(projectDir, ".sourcevision", "manifest.json");
+
+  try {
+    const raw = await readFile(manifestPath, "utf-8");
+    const manifest = JSON.parse(raw) as SvManifest;
+
+    if (!manifest.tokenUsage) return events;
+    if (manifest.analyzedAt && !isInRange(manifest.analyzedAt, filter)) return events;
+
+    events.push({
+      timestamp: manifest.analyzedAt ?? new Date().toISOString(),
+      command: "analyze",
+      package: "sv",
+      inputTokens: manifest.tokenUsage.inputTokens ?? 0,
+      outputTokens: manifest.tokenUsage.outputTokens ?? 0,
+      calls: manifest.tokenUsage.calls ?? 0,
+    });
+  } catch {
+    // Missing or invalid manifest — skip
+  }
+
+  return events;
+}
+
+/**
+ * Collect all token events across all packages.
+ */
+export async function collectTokenEvents(
+  logEntries: LogEntry[],
+  projectDir: string,
+  filter: TokenUsageFilter = {},
+): Promise<TokenEvent[]> {
+  const rexEvents = extractRexTokenEvents(logEntries, filter);
+  const [henchEvents, svEvents] = await Promise.all([
+    extractHenchTokenEvents(projectDir, filter),
+    extractSvTokenEvents(projectDir, filter),
+  ]);
+
+  return [...rexEvents, ...henchEvents, ...svEvents].sort(
+    (a, b) => a.timestamp.localeCompare(b.timestamp),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Command breakdown
+// ---------------------------------------------------------------------------
+
+/**
+ * Group token events by command, producing per-command usage summaries.
+ */
+export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
+  const map = new Map<string, CommandTokenUsage>();
+
+  for (const ev of events) {
+    const key = `${ev.package}:${ev.command}`;
+    let entry = map.get(key);
+    if (!entry) {
+      entry = {
+        command: ev.command,
+        package: ev.package,
+        inputTokens: 0,
+        outputTokens: 0,
+        calls: 0,
+      };
+      map.set(key, entry);
+    }
+    entry.inputTokens += ev.inputTokens;
+    entry.outputTokens += ev.outputTokens;
+    entry.calls += ev.calls;
+  }
+
+  // Sort by total tokens descending
+  return Array.from(map.values()).sort(
+    (a, b) =>
+      b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Time period grouping
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the period key for a timestamp.
+ * - day:   "2026-01-15"
+ * - week:  "2026-W03"
+ * - month: "2026-01"
+ */
+export function periodKey(timestamp: string, period: TimePeriod): string {
+  const date = new Date(timestamp);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  switch (period) {
+    case "day":
+      return `${year}-${month}-${day}`;
+    case "month":
+      return `${year}-${month}`;
+    case "week": {
+      // ISO week number
+      const d = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil(
+        ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+      );
+      return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+    }
+  }
+}
+
+/**
+ * Group token events into time-period buckets.
+ */
+export function groupByTimePeriod(
+  events: TokenEvent[],
+  period: TimePeriod,
+): PeriodBucket[] {
+  const buckets = new Map<string, TokenEvent[]>();
+
+  for (const ev of events) {
+    const key = periodKey(ev.timestamp, period);
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(key, bucket);
+    }
+    bucket.push(ev);
+  }
+
+  // Build AggregateTokenUsage per bucket
+  const result: PeriodBucket[] = [];
+  for (const [key, evts] of buckets) {
+    const usage = eventsToAggregate(evts);
+    result.push({
+      period: key,
+      usage,
+      estimatedCost: estimateCost(usage),
+    });
+  }
+
+  // Sort by period ascending
+  result.sort((a, b) => a.period.localeCompare(b.period));
+  return result;
+}
+
+/**
+ * Convert a list of token events into an AggregateTokenUsage.
+ */
+function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
+  const rex = emptyPackageUsage();
+  const hench = emptyPackageUsage();
+  const sv = emptyPackageUsage();
+
+  for (const ev of events) {
+    const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
+    pkg.inputTokens += ev.inputTokens;
+    pkg.outputTokens += ev.outputTokens;
+    pkg.calls += ev.calls;
+  }
+
+  return {
+    packages: { rex, hench, sv },
+    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
+    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCalls: rex.calls + hench.calls + sv.calls,
+  };
 }
 
 // ---------------------------------------------------------------------------

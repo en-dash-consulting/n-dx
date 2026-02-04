@@ -42,6 +42,7 @@ Options:
   --tokens=false          Hide token usage summary (shown by default, for status)
   --since=<ISO>           Filter token usage after timestamp (for status, usage)
   --until=<ISO>           Filter token usage before timestamp (for status, usage)
+  --group=day|week|month  Group usage by time period (for usage)
   --format=tree|json      Output format (default: tree)
   --lite                  File-name-only scan (for analyze)
   --accept                Accept LLM proposals into PRD (for smart add, analyze)

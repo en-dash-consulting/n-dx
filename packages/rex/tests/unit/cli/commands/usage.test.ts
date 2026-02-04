@@ -335,10 +335,195 @@ describe("cmdUsage", () => {
     });
   });
 
+  describe("command breakdown", () => {
+    it("shows per-command breakdown in tree output", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+        },
+      ]);
+      writeHenchRun(tmp, "run-1", {
+        startedAt: "2026-01-16T10:00:00.000Z",
+        status: "completed",
+        model: "sonnet",
+        tokenUsage: { input: 5000, output: 1500 },
+      });
+
+      await cmdUsage(tmp, {});
+      const out = output();
+
+      expect(out).toContain("By command:");
+      expect(out).toContain("rex analyze:");
+      expect(out).toContain("hench run:");
+    });
+
+    it("includes commands array in JSON output", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+        },
+      ]);
+      writeHenchRun(tmp, "run-1", {
+        startedAt: "2026-01-16T10:00:00.000Z",
+        status: "completed",
+        model: "sonnet",
+        tokenUsage: { input: 5000, output: 1500 },
+      });
+
+      await cmdUsage(tmp, { format: "json" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.commands).toBeDefined();
+      expect(parsed.commands).toHaveLength(2);
+
+      const rexCmd = parsed.commands.find((c: Record<string, unknown>) => c.package === "rex");
+      expect(rexCmd.command).toBe("analyze");
+      expect(rexCmd.inputTokens).toBe(3000);
+      expect(rexCmd.calls).toBe(2);
+
+      const henchCmd = parsed.commands.find((c: Record<string, unknown>) => c.package === "hench");
+      expect(henchCmd.command).toBe("run");
+      expect(henchCmd.inputTokens).toBe(5000);
+    });
+
+    it("includes empty commands array when no data", async () => {
+      await cmdUsage(tmp, { format: "json" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.commands).toBeDefined();
+      expect(parsed.commands).toHaveLength(0);
+    });
+  });
+
+  describe("time period grouping", () => {
+    it("groups by day in tree output", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+        {
+          timestamp: "2026-01-16T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 2000, outputTokens: 400 }),
+        },
+      ]);
+
+      await cmdUsage(tmp, { group: "day" });
+      const out = output();
+
+      expect(out).toContain("By day:");
+      expect(out).toContain("2026-01-15:");
+      expect(out).toContain("2026-01-16:");
+    });
+
+    it("groups by month in tree output", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+        {
+          timestamp: "2026-02-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 2000, outputTokens: 400 }),
+        },
+      ]);
+
+      await cmdUsage(tmp, { group: "month" });
+      const out = output();
+
+      expect(out).toContain("By month:");
+      expect(out).toContain("2026-01:");
+      expect(out).toContain("2026-02:");
+    });
+
+    it("includes periods in JSON output with --group", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+        {
+          timestamp: "2026-01-16T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 2000, outputTokens: 400 }),
+        },
+      ]);
+
+      await cmdUsage(tmp, { format: "json", group: "day" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.periods).toBeDefined();
+      expect(parsed.periods).toHaveLength(2);
+      expect(parsed.periods[0].period).toBe("2026-01-15");
+      expect(parsed.periods[0].totalInputTokens).toBe(1000);
+      expect(parsed.periods[1].period).toBe("2026-01-16");
+      expect(parsed.periods[1].totalInputTokens).toBe(2000);
+      expect(parsed.group).toBe("day");
+    });
+
+    it("includes cost estimation per period in JSON output", async () => {
+      writeHenchRun(tmp, "run-1", {
+        startedAt: "2026-01-15T10:00:00.000Z",
+        status: "completed",
+        model: "sonnet",
+        tokenUsage: { input: 1000000, output: 1000000 },
+      });
+
+      await cmdUsage(tmp, { format: "json", group: "day" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.periods[0].estimatedCost).toBeDefined();
+      expect(parsed.periods[0].estimatedCost.total).toBe("$18.00");
+    });
+
+    it("omits periods from JSON when no --group specified", async () => {
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+      ]);
+
+      await cmdUsage(tmp, { format: "json" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.periods).toBeUndefined();
+      expect(parsed.group).toBeUndefined();
+    });
+
+    it("does not show period section when no data", async () => {
+      await cmdUsage(tmp, { group: "day" });
+      const out = output();
+
+      expect(out).not.toContain("By day:");
+    });
+  });
+
   describe("error handling", () => {
     it("rejects invalid format", async () => {
       await expect(cmdUsage(tmp, { format: "csv" })).rejects.toThrow(
         /Unknown format/,
+      );
+    });
+
+    it("rejects invalid group period", async () => {
+      await expect(cmdUsage(tmp, { group: "hour" })).rejects.toThrow(
+        /Unknown group period/,
       );
     });
   });

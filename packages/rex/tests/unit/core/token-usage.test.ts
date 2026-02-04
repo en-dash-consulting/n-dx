@@ -9,9 +9,16 @@ import {
   aggregateTokenUsage,
   formatAggregateTokenUsage,
   estimateCost,
+  extractRexTokenEvents,
+  extractHenchTokenEvents,
+  extractSvTokenEvents,
+  collectTokenEvents,
+  groupByCommand,
+  groupByTimePeriod,
+  periodKey,
 } from "../../../src/core/token-usage.js";
 import type { LogEntry } from "../../../src/schema/index.js";
-import type { AggregateTokenUsage } from "../../../src/core/token-usage.js";
+import type { AggregateTokenUsage, TokenEvent } from "../../../src/core/token-usage.js";
 
 // ---------------------------------------------------------------------------
 // extractRexTokenUsage
@@ -804,5 +811,437 @@ describe("estimateCost", () => {
     // $3 * 500/1M = $0.0015, $15 * 100/1M = $0.0015
     expect(cost.total).toBe("$0.00");
     expect(cost.totalRaw).toBeCloseTo(0.003, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractRexTokenEvents
+// ---------------------------------------------------------------------------
+
+describe("extractRexTokenEvents", () => {
+  it("returns token events from analyze_token_usage entries", () => {
+    const entries: LogEntry[] = [
+      {
+        timestamp: "2026-01-15T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+      },
+    ];
+
+    const events = extractRexTokenEvents(entries);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].command).toBe("analyze");
+    expect(events[0].package).toBe("rex");
+    expect(events[0].inputTokens).toBe(3000);
+    expect(events[0].outputTokens).toBe(500);
+    expect(events[0].calls).toBe(2);
+  });
+
+  it("maps smart_add_token_usage events to smart-add command", () => {
+    const entries: LogEntry[] = [
+      {
+        timestamp: "2026-01-15T10:00:00.000Z",
+        event: "smart_add_token_usage",
+        detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+      },
+    ];
+
+    const events = extractRexTokenEvents(entries);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].command).toBe("smart-add");
+    expect(events[0].package).toBe("rex");
+  });
+
+  it("ignores non-token events", () => {
+    const entries: LogEntry[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", event: "task_completed", detail: "done" },
+      {
+        timestamp: "2026-01-15T11:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 1, inputTokens: 500, outputTokens: 100 }),
+      },
+    ];
+
+    const events = extractRexTokenEvents(entries);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].command).toBe("analyze");
+  });
+
+  it("applies time filter", () => {
+    const entries: LogEntry[] = [
+      {
+        timestamp: "2026-01-10T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+      },
+      {
+        timestamp: "2026-01-20T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 1, inputTokens: 2000, outputTokens: 400 }),
+      },
+    ];
+
+    const events = extractRexTokenEvents(entries, { since: "2026-01-15T00:00:00.000Z" });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].inputTokens).toBe(2000);
+  });
+
+  it("returns empty array for empty log", () => {
+    expect(extractRexTokenEvents([])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractHenchTokenEvents
+// ---------------------------------------------------------------------------
+
+describe("extractHenchTokenEvents", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-hench-events-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  function writeRun(id: string, run: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    writeFileSync(join(tmp, ".hench", "runs", `${id}.json`), JSON.stringify(run));
+  }
+
+  it("returns token events from hench run files", async () => {
+    writeRun("run-001", {
+      id: "run-001",
+      startedAt: "2026-01-15T10:00:00.000Z",
+      tokenUsage: { input: 5000, output: 1500 },
+    });
+
+    const events = await extractHenchTokenEvents(tmp);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].command).toBe("run");
+    expect(events[0].package).toBe("hench");
+    expect(events[0].inputTokens).toBe(5000);
+    expect(events[0].outputTokens).toBe(1500);
+    expect(events[0].calls).toBe(1);
+  });
+
+  it("returns multiple events from multiple run files", async () => {
+    writeRun("run-001", {
+      startedAt: "2026-01-15T10:00:00.000Z",
+      tokenUsage: { input: 3000, output: 1000 },
+    });
+    writeRun("run-002", {
+      startedAt: "2026-01-16T10:00:00.000Z",
+      tokenUsage: { input: 4000, output: 1200 },
+    });
+
+    const events = await extractHenchTokenEvents(tmp);
+
+    expect(events).toHaveLength(2);
+  });
+
+  it("returns empty array when no .hench/runs exists", async () => {
+    const events = await extractHenchTokenEvents(tmp);
+    expect(events).toEqual([]);
+  });
+
+  it("applies time filter", async () => {
+    writeRun("run-001", {
+      startedAt: "2026-01-10T10:00:00.000Z",
+      tokenUsage: { input: 1000, output: 200 },
+    });
+    writeRun("run-002", {
+      startedAt: "2026-01-20T10:00:00.000Z",
+      tokenUsage: { input: 2000, output: 400 },
+    });
+
+    const events = await extractHenchTokenEvents(tmp, { since: "2026-01-15T00:00:00.000Z" });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].inputTokens).toBe(2000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractSvTokenEvents
+// ---------------------------------------------------------------------------
+
+describe("extractSvTokenEvents", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-sv-events-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  function writeManifest(manifest: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(join(tmp, ".sourcevision", "manifest.json"), JSON.stringify(manifest));
+  }
+
+  it("returns token event from sourcevision manifest", async () => {
+    writeManifest({
+      analyzedAt: "2026-01-15T10:00:00.000Z",
+      tokenUsage: { calls: 3, inputTokens: 2000, outputTokens: 600 },
+    });
+
+    const events = await extractSvTokenEvents(tmp);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].command).toBe("analyze");
+    expect(events[0].package).toBe("sv");
+    expect(events[0].inputTokens).toBe(2000);
+    expect(events[0].calls).toBe(3);
+  });
+
+  it("returns empty array when no manifest exists", async () => {
+    const events = await extractSvTokenEvents(tmp);
+    expect(events).toEqual([]);
+  });
+
+  it("applies time filter", async () => {
+    writeManifest({
+      analyzedAt: "2026-01-10T10:00:00.000Z",
+      tokenUsage: { calls: 2, inputTokens: 1000, outputTokens: 300 },
+    });
+
+    const events = await extractSvTokenEvents(tmp, { since: "2026-01-15T00:00:00.000Z" });
+    expect(events).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// collectTokenEvents
+// ---------------------------------------------------------------------------
+
+describe("collectTokenEvents", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-collect-events-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  function writeRun(id: string, run: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    writeFileSync(join(tmp, ".hench", "runs", `${id}.json`), JSON.stringify(run));
+  }
+
+  function writeSvManifest(manifest: Record<string, unknown>): void {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(join(tmp, ".sourcevision", "manifest.json"), JSON.stringify(manifest));
+  }
+
+  it("collects events from all packages sorted by timestamp", async () => {
+    const logEntries: LogEntry[] = [
+      {
+        timestamp: "2026-01-15T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+      },
+    ];
+    writeRun("run-001", {
+      startedAt: "2026-01-14T10:00:00.000Z",
+      tokenUsage: { input: 5000, output: 1500 },
+    });
+    writeSvManifest({
+      analyzedAt: "2026-01-16T10:00:00.000Z",
+      tokenUsage: { calls: 1, inputTokens: 2000, outputTokens: 600 },
+    });
+
+    const events = await collectTokenEvents(logEntries, tmp);
+
+    expect(events).toHaveLength(3);
+    // Should be sorted by timestamp
+    expect(events[0].package).toBe("hench");
+    expect(events[1].package).toBe("rex");
+    expect(events[2].package).toBe("sv");
+  });
+
+  it("returns empty array when no data exists", async () => {
+    const events = await collectTokenEvents([], tmp);
+    expect(events).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupByCommand
+// ---------------------------------------------------------------------------
+
+describe("groupByCommand", () => {
+  it("groups events by package:command", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 3000, outputTokens: 500, calls: 2 },
+      { timestamp: "2026-01-16T10:00:00.000Z", command: "run", package: "hench", inputTokens: 5000, outputTokens: 1500, calls: 1 },
+      { timestamp: "2026-01-17T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 2000, outputTokens: 300, calls: 1 },
+    ];
+
+    const commands = groupByCommand(events);
+
+    expect(commands).toHaveLength(2);
+    // Sorted by total tokens descending
+    const hench = commands.find((c) => c.package === "hench");
+    const rex = commands.find((c) => c.package === "rex");
+    expect(hench?.inputTokens).toBe(5000);
+    expect(hench?.outputTokens).toBe(1500);
+    expect(hench?.calls).toBe(1);
+    expect(rex?.inputTokens).toBe(5000);
+    expect(rex?.outputTokens).toBe(800);
+    expect(rex?.calls).toBe(3);
+  });
+
+  it("returns empty array for no events", () => {
+    expect(groupByCommand([])).toEqual([]);
+  });
+
+  it("sorts by total tokens descending", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", command: "analyze", package: "sv", inputTokens: 100, outputTokens: 50, calls: 1 },
+      { timestamp: "2026-01-16T10:00:00.000Z", command: "run", package: "hench", inputTokens: 50000, outputTokens: 10000, calls: 5 },
+      { timestamp: "2026-01-17T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 500, outputTokens: 200, calls: 2 },
+    ];
+
+    const commands = groupByCommand(events);
+
+    expect(commands[0].package).toBe("hench");
+    expect(commands[1].package).toBe("rex");
+    expect(commands[2].package).toBe("sv");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// periodKey
+// ---------------------------------------------------------------------------
+
+describe("periodKey", () => {
+  it("returns date for day period", () => {
+    expect(periodKey("2026-01-15T10:00:00.000Z", "day")).toBe("2026-01-15");
+  });
+
+  it("returns year-month for month period", () => {
+    expect(periodKey("2026-01-15T10:00:00.000Z", "month")).toBe("2026-01");
+  });
+
+  it("returns ISO week for week period", () => {
+    // 2026-01-15 is a Thursday in ISO week 3
+    expect(periodKey("2026-01-15T10:00:00.000Z", "week")).toBe("2026-W03");
+  });
+
+  it("handles year boundaries for week period", () => {
+    // 2026-01-01 is a Thursday in ISO week 1
+    expect(periodKey("2026-01-01T10:00:00.000Z", "week")).toBe("2026-W01");
+  });
+
+  it("handles different months for day period", () => {
+    expect(periodKey("2026-12-31T23:59:59.000Z", "day")).toBe("2026-12-31");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupByTimePeriod
+// ---------------------------------------------------------------------------
+
+describe("groupByTimePeriod", () => {
+  it("groups events by day", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T08:00:00.000Z", command: "analyze", package: "rex", inputTokens: 1000, outputTokens: 200, calls: 1 },
+      { timestamp: "2026-01-15T14:00:00.000Z", command: "run", package: "hench", inputTokens: 3000, outputTokens: 500, calls: 1 },
+      { timestamp: "2026-01-16T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 2000, outputTokens: 400, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "day");
+
+    expect(buckets).toHaveLength(2);
+    expect(buckets[0].period).toBe("2026-01-15");
+    expect(buckets[0].usage.totalInputTokens).toBe(4000);
+    expect(buckets[0].usage.totalOutputTokens).toBe(700);
+    expect(buckets[1].period).toBe("2026-01-16");
+    expect(buckets[1].usage.totalInputTokens).toBe(2000);
+  });
+
+  it("groups events by month", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 1000, outputTokens: 200, calls: 1 },
+      { timestamp: "2026-02-10T10:00:00.000Z", command: "run", package: "hench", inputTokens: 5000, outputTokens: 1000, calls: 1 },
+      { timestamp: "2026-02-20T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 2000, outputTokens: 400, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "month");
+
+    expect(buckets).toHaveLength(2);
+    expect(buckets[0].period).toBe("2026-01");
+    expect(buckets[0].usage.totalInputTokens).toBe(1000);
+    expect(buckets[1].period).toBe("2026-02");
+    expect(buckets[1].usage.totalInputTokens).toBe(7000);
+  });
+
+  it("groups events by week", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-12T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 1000, outputTokens: 200, calls: 1 },
+      { timestamp: "2026-01-14T10:00:00.000Z", command: "run", package: "hench", inputTokens: 3000, outputTokens: 500, calls: 1 },
+      { timestamp: "2026-01-20T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 2000, outputTokens: 400, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "week");
+
+    expect(buckets).toHaveLength(2);
+    // Jan 12 and Jan 14 should be in the same week
+    expect(buckets[0].usage.totalInputTokens).toBe(4000);
+    // Jan 20 is a different week
+    expect(buckets[1].usage.totalInputTokens).toBe(2000);
+  });
+
+  it("sorts buckets by period ascending", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-03-01T10:00:00.000Z", command: "run", package: "hench", inputTokens: 3000, outputTokens: 500, calls: 1 },
+      { timestamp: "2026-01-01T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 1000, outputTokens: 200, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "month");
+
+    expect(buckets[0].period).toBe("2026-01");
+    expect(buckets[1].period).toBe("2026-03");
+  });
+
+  it("includes cost estimation per bucket", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", command: "run", package: "hench", inputTokens: 1000000, outputTokens: 1000000, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "day");
+
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].estimatedCost.total).toBe("$18.00");
+  });
+
+  it("preserves per-package breakdown in buckets", () => {
+    const events: TokenEvent[] = [
+      { timestamp: "2026-01-15T10:00:00.000Z", command: "analyze", package: "rex", inputTokens: 1000, outputTokens: 200, calls: 1 },
+      { timestamp: "2026-01-15T14:00:00.000Z", command: "run", package: "hench", inputTokens: 3000, outputTokens: 500, calls: 1 },
+    ];
+
+    const buckets = groupByTimePeriod(events, "day");
+
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].usage.packages.rex.inputTokens).toBe(1000);
+    expect(buckets[0].usage.packages.hench.inputTokens).toBe(3000);
+    expect(buckets[0].usage.packages.sv.inputTokens).toBe(0);
+  });
+
+  it("returns empty array for no events", () => {
+    expect(groupByTimePeriod([], "day")).toEqual([]);
   });
 });
