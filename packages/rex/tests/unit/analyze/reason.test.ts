@@ -8,6 +8,7 @@ import {
   parseStructuredFile,
   mergeProposals,
   reasonFromFiles,
+  readProjectContext,
 } from "../../../src/analyze/reason.js";
 import type { Proposal } from "../../../src/analyze/propose.js";
 
@@ -722,5 +723,95 @@ describe("reasonFromFiles", () => {
     const allFeatures = result.flatMap((p) => p.features.map((f) => f.title));
     expect(allFeatures).not.toContain("Already Tracked");
     expect(allFeatures).toContain("New Feature");
+  });
+});
+
+describe("readProjectContext", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-context-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns empty string when no docs exist", async () => {
+    const result = await readProjectContext(tmpDir);
+    expect(result).toBe("");
+  });
+
+  it("reads CLAUDE.md when present", async () => {
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# My Project\nDoes cool stuff");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("CLAUDE.md");
+    expect(result).toContain("# My Project");
+    expect(result).toContain("Does cool stuff");
+  });
+
+  it("reads README.md when present", async () => {
+    await writeFile(join(tmpDir, "README.md"), "# README\nProject description");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("README.md");
+    expect(result).toContain("Project description");
+  });
+
+  it("reads both CLAUDE.md and README.md", async () => {
+    await writeFile(join(tmpDir, "CLAUDE.md"), "Claude instructions");
+    await writeFile(join(tmpDir, "README.md"), "Readme content");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("CLAUDE.md");
+    expect(result).toContain("Claude instructions");
+    expect(result).toContain("README.md");
+    expect(result).toContain("Readme content");
+  });
+
+  it("skips empty files", async () => {
+    await writeFile(join(tmpDir, "CLAUDE.md"), "");
+    await writeFile(join(tmpDir, "README.md"), "Actual content");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).not.toContain("CLAUDE.md");
+    expect(result).toContain("README.md");
+    expect(result).toContain("Actual content");
+  });
+
+  it("truncates content exceeding max length", async () => {
+    const longContent = "x".repeat(5000);
+    await writeFile(join(tmpDir, "CLAUDE.md"), longContent);
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("...(truncated)");
+    // Should be under the max limit plus header overhead
+    expect(result.length).toBeLessThan(4200);
+  });
+
+  it("stops reading files once budget is exhausted", async () => {
+    const longContent = "y".repeat(4000);
+    await writeFile(join(tmpDir, "CLAUDE.md"), longContent);
+    await writeFile(join(tmpDir, "README.md"), "Should not appear");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("CLAUDE.md");
+    expect(result).not.toContain("README.md");
+  });
+
+  it("reads plain README file", async () => {
+    await writeFile(join(tmpDir, "README"), "Plain readme");
+
+    const result = await readProjectContext(tmpDir);
+
+    expect(result).toContain("README");
+    expect(result).toContain("Plain readme");
   });
 });

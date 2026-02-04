@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { extname, join } from "node:path";
 import { z } from "zod";
 import type { PRDItem } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
@@ -41,6 +41,51 @@ function summarizeExisting(items: PRDItem[]): string {
     lines.push(`${indent}- [${item.level}] ${item.title} (${item.status})`);
   }
   return lines.length > 0 ? lines.join("\n") : "(empty PRD)";
+}
+
+// ── Project context loading ──
+
+/** Doc files to search for, in priority order. First found wins per slot. */
+const PROJECT_DOC_FILES = [
+  "CLAUDE.md",
+  "README.md",
+  "README",
+  "README.txt",
+];
+
+/** Max characters of project context to include in the LLM prompt. */
+const MAX_CONTEXT_LENGTH = 4000;
+
+/**
+ * Read project documentation files from `dir`. Returns a trimmed string
+ * suitable for inclusion in an LLM prompt, or an empty string if nothing
+ * useful is found.
+ */
+export async function readProjectContext(dir: string): Promise<string> {
+  const sections: string[] = [];
+  let totalLength = 0;
+
+  for (const name of PROJECT_DOC_FILES) {
+    if (totalLength >= MAX_CONTEXT_LENGTH) break;
+    try {
+      const content = await readFile(join(dir, name), "utf-8");
+      const trimmed = content.trim();
+      if (trimmed.length === 0) continue;
+
+      const remaining = MAX_CONTEXT_LENGTH - totalLength;
+      const snippet =
+        trimmed.length > remaining
+          ? trimmed.slice(0, remaining) + "\n...(truncated)"
+          : trimmed;
+
+      sections.push(`--- ${name} ---\n${snippet}`);
+      totalLength += snippet.length;
+    } catch {
+      // File not found — skip
+    }
+  }
+
+  return sections.join("\n\n");
 }
 
 export function parseProposalResponse(raw: string): Proposal[] {
@@ -437,7 +482,7 @@ export async function reasonFromFiles(
 export async function reasonFromScanResults(
   results: ScanResult[],
   existingItems: PRDItem[],
-  model?: string,
+  options?: { model?: string; dir?: string },
 ): Promise<Proposal[]> {
   const existingSummary = summarizeExisting(existingItems);
 
@@ -450,6 +495,15 @@ export async function reasonFromScanResults(
     if (r.tags?.length) parts.push(`  tags: ${r.tags.join(", ")}`);
     return parts.join("\n");
   }).join("\n\n");
+
+  // Read project documentation for additional context
+  const projectContext = options?.dir
+    ? await readProjectContext(options.dir)
+    : "";
+
+  const contextBlock = projectContext
+    ? `\nProject context (from documentation):\n${projectContext}\n`
+    : "";
 
   const prompt = `You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
 
@@ -464,7 +518,8 @@ Guidelines:
 - Rewrite vague titles to be clear and actionable
 - Preserve priority levels from the scan results
 - Do NOT include items that duplicate anything in the existing PRD
-
+- Use the project context below to understand the project's purpose, architecture, and terminology; align epic/feature names with the project's domain
+${contextBlock}
 Existing PRD:
 ${existingSummary}
 
@@ -473,6 +528,6 @@ ${scanSummary}
 
 Respond with ONLY a valid JSON array, no explanation or markdown fences.`;
 
-  const raw = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  const raw = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
   return parseProposalResponse(raw);
 }

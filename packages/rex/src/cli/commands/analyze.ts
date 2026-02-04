@@ -229,7 +229,7 @@ export async function cmdAnalyze(
 
     if (!noLlm) {
       try {
-        proposals = await reasonFromScanResults(newResults, existing);
+        proposals = await reasonFromScanResults(newResults, existing, { dir });
         if (flags.format !== "json") {
           console.log("Proposals refined by LLM.");
         }

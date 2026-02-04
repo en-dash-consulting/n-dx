@@ -16,6 +16,7 @@ export {
   reasonFromFile,
   reasonFromFiles,
   reasonFromScanResults,
+  readProjectContext,
   parseProposalResponse,
   detectFileFormat,
   parseStructuredFile,
