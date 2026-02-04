@@ -8,6 +8,7 @@ import { saveRun } from "../store/index.js";
 import { buildRunSummary } from "./summary.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../tools/rex.js";
 import { validateCompletion, formatValidationResult } from "./completion.js";
+import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
 import { section, subsection, stream, info } from "../cli/output.js";
 
 export interface CliLoopOptions {
@@ -18,6 +19,8 @@ export interface CliLoopOptions {
   taskId?: string;
   dryRun?: boolean;
   model?: string;
+  /** Show diff and prompt for approval before finalizing. */
+  review?: boolean;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
 }
@@ -346,6 +349,28 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.retryAttempts = attempt > 0 ? attempt : undefined;
 
         if (validation.valid) {
+          // Review gate — prompt user before finalizing
+          if (opts.review) {
+            const reviewDiff = await collectReviewDiff(projectDir);
+            const reviewResult = await promptReview(reviewDiff);
+
+            if (!reviewResult.approved) {
+              run.status = "failed";
+              run.summary = result.summary;
+              run.error = reviewResult.reason;
+
+              info(`\nChanges rejected — reverting...`);
+              await revertChanges(projectDir);
+
+              await toolRexUpdateStatus(store, taskId, { status: "pending" });
+              await toolRexAppendLog(store, taskId, {
+                event: "review_rejected",
+                detail: reviewResult.reason ?? "Changes rejected by reviewer",
+              });
+              break;
+            }
+          }
+
           // Success
           run.status = "completed";
           run.summary = result.summary;

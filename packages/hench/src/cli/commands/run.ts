@@ -132,6 +132,7 @@ async function runOne(
   dryRun: boolean,
   model: string | undefined,
   maxTurns: number | undefined,
+  review: boolean,
   excludeTaskIds?: Set<string>,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
@@ -146,6 +147,7 @@ async function runOne(
         taskId,
         dryRun,
         model,
+        review,
         excludeTaskIds,
       })
     : await agentLoop({
@@ -157,6 +159,7 @@ async function runOne(
         dryRun,
         maxTurns,
         model,
+        review,
         excludeTaskIds,
       });
 
@@ -204,6 +207,7 @@ export async function cmdRun(
 
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
+  const review = flags.review === "true";
   const model = flags.model;
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
@@ -229,9 +233,9 @@ export async function cmdRun(
   // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
   if (loop) {
-    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, pauseMs, config.maxFailedAttempts);
+    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, pauseMs, config.maxFailedAttempts, review);
   } else {
-    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, iterations, config.maxFailedAttempts);
+    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, iterations, config.maxFailedAttempts, review);
   }
 }
 
@@ -250,6 +254,7 @@ async function runIterations(
   maxTurns: number | undefined,
   iterations: number,
   maxFailedAttempts: number,
+  review: boolean,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
@@ -268,6 +273,7 @@ async function runIterations(
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
       dryRun, model, maxTurns,
+      review,
       stuckIds,
     );
 
@@ -300,6 +306,7 @@ async function runLoop(
   maxTurns: number | undefined,
   pauseMs: number,
   maxFailedAttempts: number,
+  review: boolean,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -346,6 +353,7 @@ async function runLoop(
           // Only use explicit taskId on the very first iteration
           completed === 1 ? taskId : undefined,
           dryRun, model, maxTurns,
+          review,
           stuckIds,
         );
         status = result.status;

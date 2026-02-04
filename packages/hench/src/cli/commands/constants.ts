@@ -33,6 +33,7 @@ Options:
   --loop                  Run continuously until all tasks complete or Ctrl+C (for run)
   --loop-pause=<ms>       Pause between loop iterations in ms (default: config loopPauseMs)
   --dry-run               Print brief without calling Claude API (for run)
+  --review                Show proposed changes and prompt for approval (for run)
   --max-turns=<n>         Override max turns (for run)
   --model=<m>             Override model (for run)
   --format=json           Output as JSON (for status/show)

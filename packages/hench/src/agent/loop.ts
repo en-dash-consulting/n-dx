@@ -9,6 +9,7 @@ import { assembleTaskBrief, formatTaskBrief } from "./brief.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { saveRun } from "../store/index.js";
 import { buildRunSummary } from "./summary.js";
+import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
 import { section, subsection, stream, detail, info } from "../cli/output.js";
 
 export interface AgentLoopOptions {
@@ -20,6 +21,8 @@ export interface AgentLoopOptions {
   dryRun?: boolean;
   maxTurns?: number;
   model?: string;
+  /** Show diff and prompt for approval before finalizing. */
+  review?: boolean;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
 }
@@ -259,6 +262,20 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
+  }
+
+  // Review gate — prompt user before finalizing a completed run
+  if (opts.review && run.status === "completed") {
+    const reviewDiff = await collectReviewDiff(projectDir);
+    const reviewResult = await promptReview(reviewDiff);
+
+    if (!reviewResult.approved) {
+      run.status = "failed";
+      run.error = reviewResult.reason;
+
+      info(`\nChanges rejected — reverting...`);
+      await revertChanges(projectDir);
+    }
   }
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
