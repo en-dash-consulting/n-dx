@@ -244,7 +244,7 @@
             {
               "id": "8817fcaf-2f8d-4f9a-8cc8-dca1a3795250",
               "title": "Add structured run summaries",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Include structured metadata in run records",
               "acceptanceCriteria": [
@@ -254,7 +254,9 @@
                 "Summary easily parseable"
               ],
               "priority": "medium",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T17:47:35.478Z",
+              "completedAt": "2026-02-04T17:54:40.894Z"
             },
             {
               "id": "c79338e3-1f96-40d8-af79-a2dc334f75e6",
