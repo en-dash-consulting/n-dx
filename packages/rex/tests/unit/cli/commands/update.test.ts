@@ -110,6 +110,20 @@ describe("cmdUpdate", () => {
     }
   });
 
+  it("throws CLIError when .rex directory does not exist", async () => {
+    const noRexDir = mkdtempSync(join(tmpdir(), "rex-update-norex-"));
+    try {
+      await expect(
+        cmdUpdate(noRexDir, itemId, { status: "completed" }),
+      ).rejects.toThrow(CLIError);
+      await expect(
+        cmdUpdate(noRexDir, itemId, { status: "completed" }),
+      ).rejects.toThrow(/Rex directory not found/);
+    } finally {
+      rmSync(noRexDir, { recursive: true });
+    }
+  });
+
   it("succeeds for valid update", async () => {
     await expect(
       cmdUpdate(tmp, itemId, { status: "completed" }),

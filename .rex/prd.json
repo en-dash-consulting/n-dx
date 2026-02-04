@@ -5,7 +5,7 @@
     {
       "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
       "title": "Natural language PRD authoring",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
       "children": [

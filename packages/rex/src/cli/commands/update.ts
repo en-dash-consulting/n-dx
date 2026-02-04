@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
-import { CLIError } from "../errors.js";
+import { CLIError, requireRexDir } from "../errors.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemStatus, Priority } from "../../schema/index.js";
 
@@ -25,6 +25,7 @@ export async function cmdUpdate(
     );
   }
 
+  requireRexDir(dir);
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
 

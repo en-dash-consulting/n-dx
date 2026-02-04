@@ -87,7 +87,9 @@ async function main(): Promise<void> {
   try {
     // Ensure .rex/ exists for commands that need it.
     // init creates it; analyze handles its own graceful fallback.
-    const SKIP_DIR_CHECK = new Set(["init", "analyze"]);
+    // Commands whose first positional arg is an ID (not a dir) must handle
+    // their own dir resolution and requireRexDir check inside the case block.
+    const SKIP_DIR_CHECK = new Set(["init", "analyze", "update"]);
     if (!SKIP_DIR_CHECK.has(command)) {
       requireRexDir(resolveDir());
     }
