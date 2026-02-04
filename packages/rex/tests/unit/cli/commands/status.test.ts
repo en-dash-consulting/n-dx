@@ -646,6 +646,159 @@ describe("cmdStatus", () => {
       expect(parsed.coverage).toBeUndefined();
     });
   });
+
+  describe("--tokens flag", () => {
+    function writeLog(dir: string, entries: Array<Record<string, unknown>>): void {
+      const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+      writeFileSync(join(dir, ".rex", "execution-log.jsonl"), lines);
+    }
+
+    it("shows token usage summary in tree output", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { tokens: "true" });
+      const out = output();
+
+      expect(out).toContain("Token usage:");
+      expect(out).toContain("3,500 tokens");
+      expect(out).toContain("3,000 in");
+      expect(out).toContain("500 out");
+    });
+
+    it("shows 'none recorded' when no token data exists", async () => {
+      writePRD(tmp, POPULATED_PRD);
+
+      await cmdStatus(tmp, { tokens: "true" });
+      const out = output();
+
+      expect(out).toContain("Token usage: none recorded");
+    });
+
+    it("does not show token usage when flag is absent", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, {});
+      const out = output();
+
+      expect(out).not.toContain("Token usage:");
+    });
+
+    it("includes token usage in JSON output", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { format: "json", tokens: "true" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.tokenUsage).toBeDefined();
+      expect(parsed.tokenUsage.totalInputTokens).toBe(3000);
+      expect(parsed.tokenUsage.totalOutputTokens).toBe(500);
+      expect(parsed.tokenUsage.totalCalls).toBe(2);
+      expect(parsed.tokenUsage.packages.rex).toBeDefined();
+    });
+
+    it("does not include tokenUsage in JSON output when flag is absent", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { format: "json" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.tokenUsage).toBeUndefined();
+    });
+
+    it("applies --since filter", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-10T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+        {
+          timestamp: "2026-01-20T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 5000, outputTokens: 800 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { tokens: "true", since: "2026-01-15T00:00:00.000Z" });
+      const out = output();
+
+      // Should only include the Jan 20 entry
+      expect(out).toContain("5,800 tokens");
+      expect(out).toContain("filtered:");
+      expect(out).toContain("since");
+    });
+
+    it("applies --until filter", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-10T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 1000, outputTokens: 200 }),
+        },
+        {
+          timestamp: "2026-01-20T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 5000, outputTokens: 800 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { tokens: "true", until: "2026-01-15T00:00:00.000Z" });
+      const out = output();
+
+      // Should only include the Jan 10 entry
+      expect(out).toContain("1,200 tokens");
+      expect(out).toContain("filtered:");
+      expect(out).toContain("until");
+    });
+
+    it("shows per-package breakdown with rex label", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      writeLog(tmp, [
+        {
+          timestamp: "2026-01-15T10:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 3, inputTokens: 8000, outputTokens: 2000 }),
+        },
+      ]);
+
+      await cmdStatus(tmp, { tokens: "true" });
+      const out = output();
+
+      expect(out).toContain("rex:");
+    });
+  });
 });
 
 describe("renderTree with coverage", () => {

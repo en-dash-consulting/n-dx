@@ -2,12 +2,17 @@ import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
 import { computeStats } from "../../core/tree.js";
 import { verify } from "../../core/verify.js";
+import {
+  aggregateTokenUsage,
+  formatAggregateTokenUsage,
+} from "../../core/token-usage.js";
 import { CLIError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, result, isQuiet } from "../output.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { TreeStats } from "../../core/tree.js";
 import type { VerifyResult } from "../../core/verify.js";
+import type { TokenUsageFilter } from "../../core/token-usage.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
 
@@ -150,6 +155,7 @@ export async function cmdStatus(
 ): Promise<void> {
   const format = flags.format;
   const showCoverage = flags.coverage === "true";
+  const showTokens = flags.tokens === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -172,6 +178,11 @@ export async function cmdStatus(
     });
   }
 
+  // Build time filter for token usage
+  const tokenFilter: TokenUsageFilter = {};
+  if (flags.since) tokenFilter.since = flags.since;
+  if (flags.until) tokenFilter.until = flags.until;
+
   if (format === "json") {
     const output: Record<string, unknown> = { ...doc };
     if (verifyResult) {
@@ -179,6 +190,11 @@ export async function cmdStatus(
         tasks: verifyResult.tasks,
         summary: verifyResult.summary,
       };
+    }
+    if (showTokens) {
+      const logEntries = await store.readLog();
+      const tokenUsage = await aggregateTokenUsage(logEntries, dir, tokenFilter);
+      output.tokenUsage = tokenUsage;
     }
     result(JSON.stringify(output, null, 2));
     return;
@@ -215,5 +231,21 @@ export async function cmdStatus(
   if (verifyResult && verifyResult.summary.totalCriteria > 0) {
     info("");
     info(`Test coverage: ${formatCoverageSummary(verifyResult)}`);
+  }
+
+  // Token usage summary
+  if (showTokens) {
+    const logEntries = await store.readLog();
+    const tokenUsage = await aggregateTokenUsage(logEntries, dir, tokenFilter);
+    info("");
+    for (const line of formatAggregateTokenUsage(tokenUsage)) {
+      info(line);
+    }
+    if (tokenFilter.since || tokenFilter.until) {
+      const parts: string[] = [];
+      if (tokenFilter.since) parts.push(`since ${tokenFilter.since}`);
+      if (tokenFilter.until) parts.push(`until ${tokenFilter.until}`);
+      info(`  (filtered: ${parts.join(", ")})`);
+    }
   }
 }
