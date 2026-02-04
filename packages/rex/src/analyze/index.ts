@@ -14,6 +14,7 @@ export { formatDiff } from "./diff.js";
 export type { FileFormat, AddPromptOptions } from "./reason.js";
 export {
   DEFAULT_MODEL,
+  CHUNK_CHAR_LIMIT,
   reasonFromFile,
   reasonFromFiles,
   reasonFromScanResults,
@@ -24,4 +25,6 @@ export {
   detectFileFormat,
   parseStructuredFile,
   mergeProposals,
+  chunkScanResults,
+  summarizeScanResults,
 } from "./reason.js";

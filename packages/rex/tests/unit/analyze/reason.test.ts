@@ -10,6 +10,9 @@ import {
   mergeProposals,
   reasonFromFiles,
   readProjectContext,
+  chunkScanResults,
+  summarizeScanResults,
+  CHUNK_CHAR_LIMIT,
 } from "../../../src/analyze/reason.js";
 import type { Proposal } from "../../../src/analyze/propose.js";
 
@@ -825,5 +828,136 @@ describe("DEFAULT_MODEL", () => {
 
   it("contains a claude model identifier", () => {
     expect(DEFAULT_MODEL).toMatch(/^claude-/);
+  });
+});
+
+describe("summarizeScanResults", () => {
+  it("formats a single result with all fields", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      {
+        name: "Login flow",
+        source: "test",
+        sourceFile: "tests/auth.test.ts",
+        kind: "task",
+        description: "Handles login",
+        acceptanceCriteria: ["Email valid", "Token issued"],
+        priority: "high",
+        tags: ["auth"],
+      },
+    ];
+
+    const summary = summarizeScanResults(results);
+
+    expect(summary).toContain("[task] Login flow");
+    expect(summary).toContain("source: test");
+    expect(summary).toContain("description: Handles login");
+    expect(summary).toContain("criteria: Email valid; Token issued");
+    expect(summary).toContain("priority: high");
+    expect(summary).toContain("tags: auth");
+  });
+
+  it("handles results with no optional fields", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      {
+        name: "Basic feature",
+        source: "doc",
+        sourceFile: "docs/readme.md",
+        kind: "feature",
+      },
+    ];
+
+    const summary = summarizeScanResults(results);
+
+    expect(summary).toContain("[feature] Basic feature");
+    expect(summary).not.toContain("description:");
+    expect(summary).not.toContain("criteria:");
+    expect(summary).not.toContain("priority:");
+    expect(summary).not.toContain("tags:");
+  });
+
+  it("returns empty string for empty array", () => {
+    expect(summarizeScanResults([])).toBe("");
+  });
+});
+
+describe("chunkScanResults", () => {
+  function makeScanResult(name: string): import("../../../src/analyze/scanners.js").ScanResult {
+    return {
+      name,
+      source: "test",
+      sourceFile: `tests/${name}.test.ts`,
+      kind: "task",
+      description: `Description for ${name}`,
+      priority: "medium",
+    };
+  }
+
+  it("returns a single chunk when results fit within limit", () => {
+    const results = [makeScanResult("small-task")];
+    const chunks = chunkScanResults(results);
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toEqual(results);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(chunkScanResults([])).toEqual([]);
+  });
+
+  it("splits results into multiple chunks when they exceed the limit", () => {
+    // Create enough results to exceed the character limit
+    // Each result summarizes to ~80-100 chars, so at 40K limit we need ~500+ results
+    const longDesc = "x".repeat(200);
+    const results = Array.from({ length: 300 }, (_, i) => ({
+      name: `Task number ${i} with a reasonably long title`,
+      source: "test" as const,
+      sourceFile: `tests/feature-area-${i}/component-${i}.test.ts`,
+      kind: "task" as const,
+      description: longDesc,
+      acceptanceCriteria: ["Criterion A", "Criterion B"],
+      priority: "medium" as const,
+      tags: ["tag-a", "tag-b"],
+    }));
+
+    const chunks = chunkScanResults(results);
+
+    expect(chunks.length).toBeGreaterThan(1);
+
+    // All original results should be present across all chunks
+    const totalResults = chunks.reduce((sum, c) => sum + c.length, 0);
+    expect(totalResults).toBe(results.length);
+
+    // Each chunk's summary should be within the character limit
+    for (const chunk of chunks) {
+      const summary = summarizeScanResults(chunk);
+      expect(summary.length).toBeLessThanOrEqual(CHUNK_CHAR_LIMIT);
+    }
+  });
+
+  it("preserves result order within chunks", () => {
+    const results = Array.from({ length: 5 }, (_, i) => makeScanResult(`task-${i}`));
+    const chunks = chunkScanResults(results);
+
+    const flattened = chunks.flat();
+    for (let i = 0; i < results.length; i++) {
+      expect(flattened[i].name).toBe(results[i].name);
+    }
+  });
+
+  it("puts a single oversized result in its own chunk", () => {
+    const hugeResult: import("../../../src/analyze/scanners.js").ScanResult = {
+      name: "Huge task",
+      source: "test",
+      sourceFile: "tests/huge.test.ts",
+      kind: "task",
+      description: "x".repeat(CHUNK_CHAR_LIMIT + 1000),
+    };
+    const smallResult = makeScanResult("small");
+
+    const chunks = chunkScanResults([hugeResult, smallResult]);
+
+    expect(chunks.length).toBe(2);
+    expect(chunks[0]).toEqual([hugeResult]);
+    expect(chunks[1]).toEqual([smallResult]);
   });
 });

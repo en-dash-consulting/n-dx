@@ -354,6 +354,69 @@ const FORMAT_HINTS: Record<FileFormat, string> = {
     "The document is in YAML format. Extract meaningful requirements from the structured data fields.",
 };
 
+// ── Scan result summarization + chunking ──
+
+/**
+ * Character budget per LLM chunk. Keeps each prompt well within token limits
+ * while leaving room for the system instructions, existing PRD summary, and
+ * project context that surround the scan data.
+ */
+export const CHUNK_CHAR_LIMIT = 40_000;
+
+/**
+ * Render an array of ScanResults into the text block used inside LLM prompts.
+ */
+export function summarizeScanResults(results: ScanResult[]): string {
+  return results
+    .map((r) => {
+      const parts = [
+        `[${r.kind}] ${r.name} (source: ${r.source}, file: ${r.sourceFile})`,
+      ];
+      if (r.description) parts.push(`  description: ${r.description}`);
+      if (r.acceptanceCriteria?.length)
+        parts.push(`  criteria: ${r.acceptanceCriteria.join("; ")}`);
+      if (r.priority) parts.push(`  priority: ${r.priority}`);
+      if (r.tags?.length) parts.push(`  tags: ${r.tags.join(", ")}`);
+      return parts.join("\n");
+    })
+    .join("\n\n");
+}
+
+/**
+ * Split scan results into chunks whose serialised summary stays within
+ * `CHUNK_CHAR_LIMIT`. When all results fit in a single chunk, this returns
+ * a one-element array — no overhead.
+ */
+export function chunkScanResults(results: ScanResult[]): ScanResult[][] {
+  if (results.length === 0) return [];
+
+  const chunks: ScanResult[][] = [];
+  let current: ScanResult[] = [];
+  let currentLen = 0;
+
+  for (const r of results) {
+    const itemText = summarizeScanResults([r]);
+    const itemLen = itemText.length;
+
+    // If adding this item would exceed the limit, flush the current chunk
+    // (unless it's empty — an oversized single item gets its own chunk).
+    if (current.length > 0 && currentLen + itemLen + 2 > CHUNK_CHAR_LIMIT) {
+      chunks.push(current);
+      current = [];
+      currentLen = 0;
+    }
+
+    current.push(r);
+    currentLen += itemLen + 2; // account for the "\n\n" separator
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
 // ── Public API ──
 
 export async function reasonFromFile(
@@ -486,16 +549,6 @@ export async function reasonFromScanResults(
 ): Promise<Proposal[]> {
   const existingSummary = summarizeExisting(existingItems);
 
-  // Summarize scan results for the LLM
-  const scanSummary = results.map((r) => {
-    const parts = [`[${r.kind}] ${r.name} (source: ${r.source}, file: ${r.sourceFile})`];
-    if (r.description) parts.push(`  description: ${r.description}`);
-    if (r.acceptanceCriteria?.length) parts.push(`  criteria: ${r.acceptanceCriteria.join("; ")}`);
-    if (r.priority) parts.push(`  priority: ${r.priority}`);
-    if (r.tags?.length) parts.push(`  tags: ${r.tags.join(", ")}`);
-    return parts.join("\n");
-  }).join("\n\n");
-
   // Read project documentation for additional context
   const projectContext = options?.dir
     ? await readProjectContext(options.dir)
@@ -505,7 +558,25 @@ export async function reasonFromScanResults(
     ? `\nProject context (from documentation):\n${projectContext}\n`
     : "";
 
-  const prompt = `You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
+  // Split large result sets into chunks to stay within token limits
+  const chunks = chunkScanResults(results);
+
+  if (chunks.length === 0) {
+    return [];
+  }
+
+  const model = options?.model ?? DEFAULT_MODEL;
+  const allProposals: Proposal[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const scanSummary = summarizeScanResults(chunks[i]);
+
+    const chunkNote =
+      chunks.length > 1
+        ? `\nNote: This is chunk ${i + 1} of ${chunks.length}. Focus only on the scan results shown here.\n`
+        : "";
+
+    const prompt = `You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
 
 Each element must be an object with:
 - "epic": { "title": string }
@@ -519,7 +590,7 @@ Guidelines:
 - Preserve priority levels from the scan results
 - Do NOT include items that duplicate anything in the existing PRD
 - Use the project context below to understand the project's purpose, architecture, and terminology; align epic/feature names with the project's domain
-${contextBlock}
+${chunkNote}${contextBlock}
 Existing PRD:
 ${existingSummary}
 
@@ -528,8 +599,16 @@ ${scanSummary}
 
 Respond with ONLY a valid JSON array, no explanation or markdown fences.`;
 
-  const raw = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  return parseProposalResponse(raw);
+    const raw = await spawnClaude(prompt, model);
+    allProposals.push(...parseProposalResponse(raw));
+  }
+
+  // When we made multiple LLM calls, merge overlapping epics/features
+  if (chunks.length > 1) {
+    return mergeProposals(allProposals);
+  }
+
+  return allProposals;
 }
 
 // ── Natural-language add ──
