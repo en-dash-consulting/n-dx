@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION, validateDocument, validateConfig } from "../../schema/index.js";
 import { validateDAG } from "../../core/dag.js";
+import { validateStructure } from "../../core/structural.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import type { PRDDocument } from "../../schema/index.js";
@@ -9,6 +10,8 @@ import type { PRDDocument } from "../../schema/index.js";
 interface CheckResult {
   name: string;
   pass: boolean;
+  /** "warn" checks are displayed but do not cause exit(1). */
+  severity?: "error" | "warn";
   errors: string[];
 }
 
@@ -92,6 +95,34 @@ export async function cmdValidate(
     }
   }
 
+  // Structural validation: orphans, cycles, stuck tasks
+  if (doc) {
+    const structural = validateStructure(doc.items);
+
+    checks.push({
+      name: "hierarchy placement",
+      pass: structural.orphanedItems.length === 0,
+      errors: structural.orphanedItems.map(
+        (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
+      ),
+    });
+
+    checks.push({
+      name: "blockedBy cycles",
+      pass: structural.cycles.length === 0,
+      errors: structural.cycles.map((c) => c.join(" → ")),
+    });
+
+    checks.push({
+      name: "stuck tasks",
+      pass: structural.stuckItems.length === 0,
+      severity: "warn",
+      errors: structural.stuckItems.map(
+        (s) => `"${s.itemId}": ${s.reason}`,
+      ),
+    });
+  }
+
   // Output results
   if (flags.format === "json") {
     result(JSON.stringify(checks, null, 2));
@@ -100,10 +131,11 @@ export async function cmdValidate(
 
   let allPass = true;
   for (const check of checks) {
-    const icon = check.pass ? "✓" : "✗";
+    const isWarn = !check.pass && check.severity === "warn";
+    const icon = check.pass ? "✓" : isWarn ? "⚠" : "✗";
     result(`${icon} ${check.name}`);
     if (!check.pass) {
-      allPass = false;
+      if (!isWarn) allPass = false;
       for (const err of check.errors) {
         result(`    ${err}`);
       }
