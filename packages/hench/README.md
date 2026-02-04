@@ -19,19 +19,23 @@ Create `.hench/` with default config and runs directory.
 
 ### `hench run [dir]`
 
-Execute one task from the Rex PRD.
+Execute tasks from the Rex PRD. By default, presents an interactive task picker sorted by priority. Use `--auto` to skip selection and autoselect the highest-priority task.
 
 ```sh
-hench run .                    # run next task
+hench run .                    # interactive task selection (TTY)
 hench run --task=<id> .        # run specific task
+hench run --auto .             # autoselect highest-priority task
+hench run --iterations=5 .     # run 5 tasks sequentially
 hench run --dry-run .          # print brief, no API calls
 hench run --max-turns=20 .     # limit turns
 hench run --model=<model> .    # override model
 hench run --provider=cli .     # use Claude CLI instead of API
 ```
 
+Task selection precedence: `--task=<id>` > interactive picker (TTY) > autoselect. When using `--iterations`, the first iteration uses the selected task; subsequent iterations autoselect the next task by priority. Iteration stops early on failure or timeout.
+
 The agent loop:
-1. Reads the Rex PRD and picks the next actionable task (or uses `--task`)
+1. Reads the Rex PRD and picks the next actionable task
 2. Assembles a task brief with parent chain, siblings, and project context
 3. Runs a tool-use loop until the task is complete or turns are exhausted
 4. Records the run with full metadata to `.hench/runs/`

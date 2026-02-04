@@ -24,6 +24,8 @@ Commands:
 Options:
   --help, -h              Show this help
   --task=<id>             Target a specific Rex task ID (for run)
+  --auto                  Skip interactive selection, autoselect by priority (for run)
+  --iterations=<n>        Run multiple tasks sequentially (for run)
   --dry-run               Print brief without calling Claude API (for run)
   --max-turns=<n>         Override max turns (for run)
   --model=<m>             Override model (for run)

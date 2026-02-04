@@ -45,7 +45,9 @@ n-dx init [dir]            sourcevision init + rex init + hench init
 n-dx plan [dir]            sourcevision analyze + rex analyze (show proposals)
 n-dx plan --accept [dir]   ...then accept proposals into PRD
 n-dx plan --file=<path>    import PRD from a document (skips sourcevision)
-n-dx work [dir]            hench run (pass --task=ID, --dry-run, etc.)
+n-dx work [dir]            hench run (interactive task selection by default)
+n-dx work --auto [dir]     autoselect highest-priority task
+n-dx work --iterations=N   run N tasks sequentially (stops on failure)
 n-dx status [dir]          rex status (pass --format=json)
 ```
 

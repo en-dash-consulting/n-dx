@@ -630,7 +630,7 @@
             {
               "id": "46f6c6a0-f5c0-4e3c-bfe2-74b25ce959ec",
               "title": "Handle large result sets with chunking",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Batch large scan results into multiple LLM calls",
               "acceptanceCriteria": [
@@ -1242,9 +1242,8 @@
             {
               "id": "6a759ce3-8c81-4853-a052-0de115440c9d",
               "title": "Add usage budget warnings",
-              "level": "task",
               "status": "pending",
-              "source": "smart-add",
+              "level": "task",
               "description": "Warn users when approaching token usage limits",
               "acceptanceCriteria": [
                 "Configurable budget thresholds",
@@ -1256,7 +1255,8 @@
                 "cli",
                 "tokens",
                 "budget"
-              ]
+              ],
+              "source": "smart-add"
             }
           ]
         }

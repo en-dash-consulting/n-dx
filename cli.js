@@ -93,7 +93,7 @@ Orchestration:
   init [dir]            Initialize all tools (sourcevision + rex + hench)
   plan [dir]            Analyze codebase and show PRD proposals
   plan --accept [dir]   Analyze and accept proposals into PRD
-  work [dir]            Run next task (--task=ID, --dry-run)
+  work [dir]            Run next task (--task=ID, --auto, --iterations=N)
   status [dir]          Show PRD status (--format=json)
 
 Tools:
