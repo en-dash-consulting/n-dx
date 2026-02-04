@@ -6,12 +6,18 @@ import {
   cmdStatus,
   renderProgressBar,
   formatTimestamp,
+  renderTree,
 } from "../../../../src/cli/commands/status.js";
 import { CLIError } from "../../../../src/cli/errors.js";
-import type { PRDDocument } from "../../../../src/schema/index.js";
+import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
+import type { CoverageMap } from "../../../../src/cli/commands/status.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
   writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+}
+
+function writeConfig(dir: string, config: Record<string, unknown>): void {
+  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
 }
 
 const EMPTY_PRD: PRDDocument = {
@@ -511,5 +517,220 @@ describe("cmdStatus", () => {
         expect((err as CLIError).suggestion).toContain("json");
       }
     });
+  });
+
+  describe("--coverage flag", () => {
+    const PRD_WITH_CRITERIA: PRDDocument = {
+      schema: "rex/v1",
+      title: "Test Project",
+      items: [
+        {
+          id: "e1",
+          title: "Auth System",
+          level: "epic",
+          status: "in_progress",
+          children: [
+            {
+              id: "t1",
+              title: "Login feature",
+              level: "task",
+              status: "pending",
+              acceptanceCriteria: [
+                "User can login successfully",
+                "Shows error on invalid credentials",
+              ],
+            },
+            {
+              id: "t2",
+              title: "Session store",
+              level: "task",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    };
+
+    it("shows coverage indicators on tasks with acceptance criteria", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+      // Create a test file matching "login"
+      mkdirSync(join(tmp, "tests"), { recursive: true });
+      writeFileSync(join(tmp, "tests", "login.test.ts"), "");
+
+      await cmdStatus(tmp, { coverage: "true" });
+      const out = output();
+
+      // Login feature should show a coverage indicator
+      const loginLine = out.split("\n").find((l: string) => l.includes("Login feature"));
+      expect(loginLine).toBeDefined();
+      expect(loginLine).toMatch(/\[.*\d+\/\d+.*\]/); // coverage ratio like [1/2 covered]
+    });
+
+    it("does not show coverage indicators when flag is absent", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+      mkdirSync(join(tmp, "tests"), { recursive: true });
+      writeFileSync(join(tmp, "tests", "login.test.ts"), "");
+
+      await cmdStatus(tmp, {});
+      const out = output();
+
+      // No coverage indicators
+      expect(out).not.toContain("covered");
+    });
+
+    it("shows uncovered indicator when no tests match", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+      // No test files created
+
+      await cmdStatus(tmp, { coverage: "true" });
+      const out = output();
+
+      const loginLine = out.split("\n").find((l: string) => l.includes("Login feature"));
+      expect(loginLine).toBeDefined();
+      expect(loginLine).toContain("0/2 covered");
+    });
+
+    it("shows coverage summary at the bottom", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+      mkdirSync(join(tmp, "tests"), { recursive: true });
+      writeFileSync(join(tmp, "tests", "login.test.ts"), "");
+
+      await cmdStatus(tmp, { coverage: "true" });
+      const out = output();
+
+      // Summary line
+      expect(out).toMatch(/\d+\/\d+ criteria covered/);
+    });
+
+    it("skips tasks without acceptance criteria in coverage", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+
+      await cmdStatus(tmp, { coverage: "true" });
+      const out = output();
+
+      // Session store (no acceptance criteria) should not have coverage indicator
+      const sessionLine = out.split("\n").find((l: string) => l.includes("Session store"));
+      expect(sessionLine).toBeDefined();
+      expect(sessionLine).not.toContain("covered");
+    });
+
+    it("includes coverage data in JSON output when --coverage is used", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+      mkdirSync(join(tmp, "tests"), { recursive: true });
+      writeFileSync(join(tmp, "tests", "login.test.ts"), "");
+
+      await cmdStatus(tmp, { format: "json", coverage: "true" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.coverage).toBeDefined();
+      expect(parsed.coverage.tasks).toBeInstanceOf(Array);
+      expect(parsed.coverage.summary).toBeDefined();
+      expect(parsed.coverage.summary.totalCriteria).toBe(2);
+    });
+
+    it("does not include coverage in JSON output when flag is absent", async () => {
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
+
+      await cmdStatus(tmp, { format: "json" });
+      const out = output();
+      const parsed = JSON.parse(out);
+
+      expect(parsed.coverage).toBeUndefined();
+    });
+  });
+});
+
+describe("renderTree with coverage", () => {
+  it("annotates tasks that have coverage data", () => {
+    const items: PRDItem[] = [
+      {
+        id: "t1",
+        title: "Login feature",
+        level: "task",
+        status: "pending",
+        acceptanceCriteria: ["User can login", "Shows errors"],
+      },
+    ];
+    const coverage: CoverageMap = new Map([
+      ["t1", { covered: 1, total: 2 }],
+    ]);
+
+    const lines = renderTree(items, 0, coverage);
+    expect(lines[0]).toContain("[1/2 covered]");
+  });
+
+  it("shows full coverage with checkmark", () => {
+    const items: PRDItem[] = [
+      {
+        id: "t1",
+        title: "Login feature",
+        level: "task",
+        status: "completed",
+        acceptanceCriteria: ["User can login"],
+      },
+    ];
+    const coverage: CoverageMap = new Map([
+      ["t1", { covered: 1, total: 1 }],
+    ]);
+
+    const lines = renderTree(items, 0, coverage);
+    expect(lines[0]).toContain("✓");
+  });
+
+  it("shows zero coverage with warning", () => {
+    const items: PRDItem[] = [
+      {
+        id: "t1",
+        title: "Login feature",
+        level: "task",
+        status: "pending",
+        acceptanceCriteria: ["User can login"],
+      },
+    ];
+    const coverage: CoverageMap = new Map([
+      ["t1", { covered: 0, total: 1 }],
+    ]);
+
+    const lines = renderTree(items, 0, coverage);
+    expect(lines[0]).toContain("✗");
+    expect(lines[0]).toContain("0/1 covered");
+  });
+
+  it("does not annotate tasks without coverage data", () => {
+    const items: PRDItem[] = [
+      {
+        id: "t1",
+        title: "Simple task",
+        level: "task",
+        status: "pending",
+      },
+    ];
+
+    const coverage: CoverageMap = new Map();
+    const lines = renderTree(items, 0, coverage);
+    expect(lines[0]).not.toContain("covered");
+  });
+
+  it("renders normally when no coverage map is provided", () => {
+    const items: PRDItem[] = [
+      {
+        id: "t1",
+        title: "Simple task",
+        level: "task",
+        status: "pending",
+      },
+    ];
+
+    const lines = renderTree(items);
+    expect(lines[0]).toContain("Simple task");
+    expect(lines[0]).not.toContain("covered");
   });
 });

@@ -1,11 +1,13 @@
 import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
 import { computeStats } from "../../core/tree.js";
+import { verify } from "../../core/verify.js";
 import { CLIError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, result, isQuiet } from "../output.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { TreeStats } from "../../core/tree.js";
+import type { VerifyResult } from "../../core/verify.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
 
@@ -20,6 +22,9 @@ const STATUS_ICONS: Record<string, string> = {
 const FILLED = "█";
 const EMPTY = "░";
 const DEFAULT_BAR_WIDTH = 20;
+
+/** Per-task coverage stats, keyed by item ID. */
+export type CoverageMap = Map<string, { covered: number; total: number }>;
 
 /** Render a progress bar string from a completion ratio. */
 export function renderProgressBar(
@@ -55,14 +60,35 @@ function timestampSuffix(item: PRDItem): string {
   return "";
 }
 
+/** Format a coverage suffix for a task with acceptance criteria. */
+function coverageSuffix(itemId: string, coverage?: CoverageMap): string {
+  if (!coverage) return "";
+  const entry = coverage.get(itemId);
+  if (!entry) return "";
+
+  const { covered, total } = entry;
+  if (covered === total) {
+    return ` [✓ ${covered}/${total} covered]`;
+  }
+  if (covered === 0) {
+    return ` [✗ ${covered}/${total} covered]`;
+  }
+  return ` [${covered}/${total} covered]`;
+}
+
 /** Render a PRD tree to lines with status icons and indentation. */
-export function renderTree(items: PRDItem[], indent: number = 0): string[] {
+export function renderTree(
+  items: PRDItem[],
+  indent: number = 0,
+  coverage?: CoverageMap,
+): string[] {
   const lines: string[] = [];
   for (const item of items) {
     const icon = STATUS_ICONS[item.status] ?? "?";
     const prefix = "  ".repeat(indent);
     const priority = item.priority ? ` [${item.priority}]` : "";
     const ts = timestampSuffix(item);
+    const cov = coverageSuffix(item.id, coverage);
 
     if (item.children && item.children.length > 0) {
       const stats = computeStats(item.children);
@@ -80,9 +106,9 @@ export function renderTree(items: PRDItem[], indent: number = 0): string[] {
           `${prefix}${icon} ${item.title}${priority} ${count}${ts}`,
         );
       }
-      lines.push(...renderTree(item.children, indent + 1));
+      lines.push(...renderTree(item.children, indent + 1, coverage));
     } else {
-      lines.push(`${prefix}${icon} ${item.title}${priority}${ts}`);
+      lines.push(`${prefix}${icon} ${item.title}${priority}${cov}${ts}`);
     }
   }
   return lines;
@@ -100,11 +126,30 @@ export function formatStats(stats: TreeStats): string {
   return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})`;
 }
 
+/** Build a CoverageMap from verify results. */
+function buildCoverageMap(verifyResult: VerifyResult): CoverageMap {
+  const map: CoverageMap = new Map();
+  for (const task of verifyResult.tasks) {
+    map.set(task.id, {
+      covered: task.coveredCriteria,
+      total: task.totalCriteria,
+    });
+  }
+  return map;
+}
+
+/** Format a coverage summary line. */
+function formatCoverageSummary(verifyResult: VerifyResult): string {
+  const { coveredCriteria, totalCriteria, totalTasks } = verifyResult.summary;
+  return `${coveredCriteria}/${totalCriteria} criteria covered across ${totalTasks} task(s)`;
+}
+
 export async function cmdStatus(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
   const format = flags.format;
+  const showCoverage = flags.coverage === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -117,8 +162,25 @@ export async function cmdStatus(
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
+  // Compute coverage if requested
+  let verifyResult: VerifyResult | undefined;
+  if (showCoverage) {
+    verifyResult = await verify({
+      projectDir: dir,
+      items: doc.items,
+      runTests: false,
+    });
+  }
+
   if (format === "json") {
-    result(JSON.stringify(doc, null, 2));
+    const output: Record<string, unknown> = { ...doc };
+    if (verifyResult) {
+      output.coverage = {
+        tasks: verifyResult.tasks,
+        summary: verifyResult.summary,
+      };
+    }
+    result(JSON.stringify(output, null, 2));
     return;
   }
 
@@ -140,11 +202,18 @@ export async function cmdStatus(
     return;
   }
 
-  for (const line of renderTree(doc.items)) {
+  const coverageMap = verifyResult ? buildCoverageMap(verifyResult) : undefined;
+  for (const line of renderTree(doc.items, 0, coverageMap)) {
     result(line);
   }
 
   const stats = computeStats(doc.items);
   info("");
   info(formatStats(stats));
+
+  // Coverage summary
+  if (verifyResult && verifyResult.summary.totalCriteria > 0) {
+    info("");
+    info(`Test coverage: ${formatCoverageSummary(verifyResult)}`);
+  }
 }

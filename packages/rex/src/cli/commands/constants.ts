@@ -35,6 +35,7 @@ Options:
   --description="..."     Description (for add/update)
   --task=<id>             Target a specific task (for verify)
   --dry-run               Preview without making changes (for prune, verify)
+  --coverage              Show test coverage per task (for status)
   --format=tree|json      Output format (default: tree)
   --lite                  File-name-only scan (for analyze)
   --accept                Accept LLM proposals into PRD (for smart add, analyze)
