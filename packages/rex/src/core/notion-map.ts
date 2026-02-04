@@ -72,6 +72,7 @@ export const STATUS_OPTIONS: Record<ItemStatus, NotionStatusOption> = {
   in_progress: { name: "In progress",  color: "blue",    group: "In progress" },
   completed:   { name: "Done",         color: "green",   group: "Complete" },
   deferred:    { name: "Deferred",     color: "yellow",  group: "To-do" },
+  blocked:     { name: "Blocked",      color: "red",     group: "In progress" },
 };
 
 /**
@@ -128,7 +129,7 @@ export const DATABASE_SCHEMA: Record<string, NotionPropertySchema> = {
       {
         name: "In progress",
         color: "blue",
-        option_names: [STATUS_OPTIONS.in_progress.name],
+        option_names: [STATUS_OPTIONS.in_progress.name, STATUS_OPTIONS.blocked.name],
       },
       {
         name: "Complete",

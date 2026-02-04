@@ -2,7 +2,7 @@ export const SCHEMA_VERSION = "rex/v1";
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";
 
-export type ItemStatus = "pending" | "in_progress" | "completed" | "deferred";
+export type ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked";
 
 export type Priority = "critical" | "high" | "medium" | "low";
 

@@ -129,4 +129,10 @@ describe("cmdUpdate", () => {
       cmdUpdate(tmp, itemId, { status: "completed" }),
     ).resolves.toBeUndefined();
   });
+
+  it("accepts blocked as a valid status", async () => {
+    await expect(
+      cmdUpdate(tmp, itemId, { status: "blocked" }),
+    ).resolves.toBeUndefined();
+  });
 });

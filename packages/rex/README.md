@@ -48,7 +48,7 @@ rex add task --title="Validate card" --parent=<feature-id> --description="Luhn c
 
 Features require an epic parent, tasks require a feature parent, subtasks require a task parent.
 
-**Flags:** `--title` (required), `--parent=<id>`, `--description`, `--priority=<critical|high|medium|low>`, `--status=<pending|in_progress|completed|deferred>`, `--format=json`
+**Flags:** `--title` (required), `--parent=<id>`, `--description`, `--priority=<critical|high|medium|low>`, `--status=<pending|in_progress|completed|deferred|blocked>`, `--format=json`
 
 ### `rex update <id> [dir]`
 
@@ -80,13 +80,13 @@ PRD: My Project
 2 completed, 1 in progress, 4 pending — 28% complete (2/7)
 ```
 
-Icons: `○` pending, `◐` in progress, `●` completed, `◌` deferred.
+Icons: `○` pending, `◐` in progress, `●` completed, `◌` deferred, `⊘` blocked.
 
 **Flags:** `--format=json` outputs the full PRDDocument.
 
 ### `rex next [dir]`
 
-Print the next actionable task. Searches depth-first by priority, skipping completed/deferred items and items with unresolved `blockedBy` dependencies.
+Print the next actionable task. Searches depth-first by priority, skipping completed/deferred/blocked items and items with unresolved `blockedBy` dependencies.
 
 ```
 Authentication → Login UI →
@@ -174,7 +174,7 @@ Items form a tree: **epic > feature > task > subtask**. Each item has:
 |-------|------|----------|
 | `id` | string (UUID) | yes |
 | `title` | string | yes |
-| `status` | `pending` \| `in_progress` \| `completed` \| `deferred` | yes |
+| `status` | `pending` \| `in_progress` \| `completed` \| `deferred` \| `blocked` | yes |
 | `level` | `epic` \| `feature` \| `task` \| `subtask` | yes |
 | `description` | string | no |
 | `acceptanceCriteria` | string[] | no |

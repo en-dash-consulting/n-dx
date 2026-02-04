@@ -59,6 +59,15 @@ describe("findNextTask", () => {
     expect(result!.item.id).toBe("t2");
   });
 
+  it("skips blocked items", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Task 1", status: "blocked" }),
+      makeItem({ id: "t2", title: "Task 2" }),
+    ];
+    const result = findNextTask(items, new Set());
+    expect(result!.item.id).toBe("t2");
+  });
+
   it("skips items with unresolved blockers", () => {
     const items: PRDItem[] = [
       makeItem({ id: "t1", title: "Task 1", blockedBy: ["t3"] }),

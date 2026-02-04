@@ -107,7 +107,7 @@ export async function startMcpServer(dir: string): Promise<void> {
     "Update the status of a PRD item",
     {
       id: z.string().describe("Item ID"),
-      status: z.enum(["pending", "in_progress", "completed", "deferred"]).describe("New status"),
+      status: z.enum(["pending", "in_progress", "completed", "deferred", "blocked"]).describe("New status"),
     },
     async ({ id, status }) => {
       try {

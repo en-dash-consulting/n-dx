@@ -179,14 +179,16 @@ describe("computeStats", () => {
       makeItem({ id: "2", title: "B", status: "in_progress" }),
       makeItem({ id: "3", title: "C", status: "completed" }),
       makeItem({ id: "4", title: "D", status: "deferred" }),
+      makeItem({ id: "5", title: "E", status: "blocked" }),
     ];
     const stats = computeStats(items);
     expect(stats).toEqual({
-      total: 4,
+      total: 5,
       pending: 1,
       inProgress: 1,
       completed: 1,
       deferred: 1,
+      blocked: 1,
     });
   });
 

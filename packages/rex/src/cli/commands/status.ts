@@ -14,6 +14,7 @@ const STATUS_ICONS: Record<string, string> = {
   in_progress: "◐",
   completed: "●",
   deferred: "◌",
+  blocked: "⊘",
 };
 
 const FILLED = "█";
@@ -68,6 +69,7 @@ export function formatStats(stats: TreeStats): string {
   if (stats.inProgress > 0) parts.push(`${stats.inProgress} in progress`);
   if (stats.pending > 0) parts.push(`${stats.pending} pending`);
   if (stats.deferred > 0) parts.push(`${stats.deferred} deferred`);
+  if (stats.blocked > 0) parts.push(`${stats.blocked} blocked`);
   const pct =
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
   return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})`;

@@ -82,6 +82,22 @@ describe("validateDocument", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("accepts a document with blocked status", () => {
+    const result = validateDocument({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        {
+          id: "t1",
+          title: "Blocked Task",
+          status: "blocked",
+          level: "task",
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects document with invalid item status", () => {
     const result = validateDocument({
       schema: "rex/v1",

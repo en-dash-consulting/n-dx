@@ -157,6 +157,27 @@ describe("cmdStatus", () => {
       expect(out).toContain("◌");
     });
 
+    it("shows blocked icon for blocked items", async () => {
+      const blockedPrd: PRDDocument = {
+        schema: "rex/v1",
+        title: "Test Project",
+        items: [
+          {
+            id: "t1",
+            title: "Blocked Task",
+            level: "task",
+            status: "blocked",
+          },
+        ],
+      };
+      writePRD(tmp, blockedPrd);
+      await cmdStatus(tmp, { format: "tree" });
+      const out = output();
+
+      // blocked icon
+      expect(out).toContain("⊘");
+    });
+
     it("indents children under parents", async () => {
       writePRD(tmp, POPULATED_PRD);
       await cmdStatus(tmp, { format: "tree" });

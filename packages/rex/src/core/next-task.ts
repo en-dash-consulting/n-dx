@@ -47,7 +47,7 @@ export function findActionableTasks(
 
   function collect(list: PRDItem[], parentChain: PRDItem[]): void {
     for (const item of list) {
-      if (item.status === "completed" || item.status === "deferred") continue;
+      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked") continue;
 
       if (item.blockedBy && item.blockedBy.length > 0) {
         if (!item.blockedBy.every((dep) => completedIds.has(dep))) continue;
@@ -95,7 +95,7 @@ export function findNextTask(
   ): TreeEntry | null {
     const sorted = sortByPriority(list);
     for (const item of sorted) {
-      if (item.status === "completed" || item.status === "deferred") {
+      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked") {
         continue;
       }
 

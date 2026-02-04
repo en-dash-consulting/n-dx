@@ -10,6 +10,7 @@ const VALID_STATUSES = new Set([
   "in_progress",
   "completed",
   "deferred",
+  "blocked",
 ]);
 const VALID_PRIORITIES = new Set(["critical", "high", "medium", "low"]);
 

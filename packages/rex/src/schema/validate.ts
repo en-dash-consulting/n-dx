@@ -9,6 +9,7 @@ const ItemStatusSchema = z.enum([
   "in_progress",
   "completed",
   "deferred",
+  "blocked",
 ]);
 
 const ItemLevelSchema = z.enum(["epic", "feature", "task", "subtask"]);

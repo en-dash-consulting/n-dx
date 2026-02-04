@@ -984,11 +984,12 @@ describe("mapNotionToDocument", () => {
 // ---------------------------------------------------------------------------
 
 describe("STATUS_OPTIONS", () => {
-  it("defines options for all four PRD statuses", () => {
+  it("defines options for all five PRD statuses", () => {
     expect(STATUS_OPTIONS.pending).toBeDefined();
     expect(STATUS_OPTIONS.in_progress).toBeDefined();
     expect(STATUS_OPTIONS.completed).toBeDefined();
     expect(STATUS_OPTIONS.deferred).toBeDefined();
+    expect(STATUS_OPTIONS.blocked).toBeDefined();
   });
 
   it("assigns each status to a Notion status group", () => {
@@ -996,6 +997,7 @@ describe("STATUS_OPTIONS", () => {
     expect(STATUS_OPTIONS.in_progress.group).toBe("In progress");
     expect(STATUS_OPTIONS.completed.group).toBe("Complete");
     expect(STATUS_OPTIONS.deferred.group).toBe("To-do");
+    expect(STATUS_OPTIONS.blocked.group).toBe("In progress");
   });
 
   it("provides color for each option", () => {
@@ -1010,6 +1012,7 @@ describe("STATUS_OPTIONS", () => {
     expect(STATUS_OPTIONS.in_progress.name).toBe("In progress");
     expect(STATUS_OPTIONS.completed.name).toBe("Done");
     expect(STATUS_OPTIONS.deferred.name).toBe("Deferred");
+    expect(STATUS_OPTIONS.blocked.name).toBe("Blocked");
   });
 });
 
@@ -1064,17 +1067,19 @@ describe("DATABASE_SCHEMA", () => {
     expect(todoGroup!.option_names).toContain("Not started");
     expect(todoGroup!.option_names).toContain("Deferred");
     expect(inProgressGroup!.option_names).toContain("In progress");
+    expect(inProgressGroup!.option_names).toContain("Blocked");
     expect(completeGroup!.option_names).toContain("Done");
   });
 
   it("includes all status options", () => {
     const options = DATABASE_SCHEMA.Status.options!;
-    expect(options).toHaveLength(4);
+    expect(options).toHaveLength(5);
     const names = options.map((o) => o.name);
     expect(names).toContain("Not started");
     expect(names).toContain("In progress");
     expect(names).toContain("Done");
     expect(names).toContain("Deferred");
+    expect(names).toContain("Blocked");
   });
 
   it("includes all priority options", () => {
@@ -1094,10 +1099,12 @@ describe("resolveStatusFromNotion", () => {
     expect(resolveStatusFromNotion("In progress")).toBe("in_progress");
     expect(resolveStatusFromNotion("Done")).toBe("completed");
     expect(resolveStatusFromNotion("Deferred")).toBe("deferred");
+    expect(resolveStatusFromNotion("Blocked")).toBe("blocked");
   });
 
   it("resolves unknown status name via group fallback", () => {
-    expect(resolveStatusFromNotion("Blocked", "In progress")).toBe("in_progress");
+    // "Blocked" is now a known exact-match status, so use a different example
+    expect(resolveStatusFromNotion("On Hold", "In progress")).toBe("in_progress");
     expect(resolveStatusFromNotion("Backlog", "To-do")).toBe("pending");
     expect(resolveStatusFromNotion("Archived", "Complete")).toBe("completed");
   });
@@ -1128,7 +1135,7 @@ describe("mapNotionToItem with statusGroupMap", () => {
         "PRD ID": { rich_text: [{ plain_text: "t1" }] },
       },
     };
-    expect(mapNotionToItem(blocked, statusGroupMap).status).toBe("in_progress");
+    expect(mapNotionToItem(blocked, statusGroupMap).status).toBe("blocked");
 
     const backlog = {
       id: "p2",

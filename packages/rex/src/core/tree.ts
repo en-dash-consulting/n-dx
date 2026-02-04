@@ -79,6 +79,7 @@ export interface TreeStats {
   inProgress: number;
   pending: number;
   deferred: number;
+  blocked: number;
 }
 
 export function computeStats(items: PRDItem[]): TreeStats {
@@ -88,6 +89,7 @@ export function computeStats(items: PRDItem[]): TreeStats {
     inProgress: 0,
     pending: 0,
     deferred: 0,
+    blocked: 0,
   };
   for (const { item } of walkTree(items)) {
     stats.total++;
@@ -103,6 +105,9 @@ export function computeStats(items: PRDItem[]): TreeStats {
         break;
       case "deferred":
         stats.deferred++;
+        break;
+      case "blocked":
+        stats.blocked++;
         break;
     }
   }
