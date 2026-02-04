@@ -506,14 +506,14 @@
     {
       "id": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
       "title": "Analyze pipeline improvements",
-      "status": "pending",
+      "status": "in_progress",
       "level": "epic",
       "source": "llm",
       "children": [
         {
           "id": "6f927f1f-811b-4eb3-a269-0bae5edd8017",
           "title": "Scanner improvements",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "description": "Enhance individual scanners to produce better quality analysis results",
           "source": "llm",
@@ -585,7 +585,7 @@
             {
               "id": "321c5342-b0a3-4d59-91db-65e1d6f8fcb3",
               "title": "Improve scanTests: handle skip/each variants and exclude comment braces",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "priority": "medium"
             }

@@ -68,3 +68,8 @@
 {"timestamp":"2026-02-04T06:51:52.544Z","event":"item_added","itemId":"321c5342-b0a3-4d59-91db-65e1d6f8fcb3","detail":"Added task: Improve scanTests: handle skip/each variants and exclude comment braces"}
 {"timestamp":"2026-02-04T06:51:56.581Z","event":"item_updated","itemId":"05e9ee30-c4ab-43cb-8718-cccd4f648b6d","detail":"Updated: status"}
 {"timestamp":"2026-02-04T06:53:32.603Z","event":"item_updated","itemId":"05e9ee30-c4ab-43cb-8718-cccd4f648b6d","detail":"Updated: status"}
+{"timestamp":"2026-02-04T06:54:22.383Z","event":"status_updated","itemId":"6f927f1f-811b-4eb3-a269-0bae5edd8017","detail":"Status changed to completed by hench agent"}
+{"timestamp":"2026-02-04T06:54:22.383Z","event":"task_completed","itemId":"6f927f1f-811b-4eb3-a269-0bae5edd8017","detail":"## Summary\n\n**Task completed: Improve scanDocs — numbered lists, clean headings, skip code blocks**\n\n### What was done\n\nI analyzed the \"Scanner improvements\" feature which had 4/4 original subtasks completed, identified remaining quality gaps across all scanners, and created 2 new tasks. I then implemented the first one:\n\n### Changes (2 source files, +138/-4 lines)\n\n**`packages/rex/src/analyze/scanners.ts`**\n- **`cleanHeading()`** — new helper that strips inline markdown formatting from headings"}
+{"timestamp":"2026-02-04T06:54:22.392Z","event":"status_updated","itemId":"e4868f49-5256-4fb7-a775-ac5bf06dbb47","detail":"Status changed to in_progress by hench agent"}
+{"timestamp":"2026-02-04T06:57:50.545Z","event":"item_updated","itemId":"321c5342-b0a3-4d59-91db-65e1d6f8fcb3","detail":"Updated: status"}
+{"timestamp":"2026-02-04T06:57:53.450Z","event":"item_updated","itemId":"6f927f1f-811b-4eb3-a269-0bae5edd8017","detail":"Updated: status"}
