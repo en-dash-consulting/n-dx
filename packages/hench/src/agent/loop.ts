@@ -11,6 +11,7 @@ import { saveRun } from "../store/index.js";
 import { buildRunSummary } from "./summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
 import { checkTokenBudget } from "./token-budget.js";
+import { toolRexUpdateStatus } from "../tools/rex.js";
 import { section, subsection, stream, detail, info } from "../cli/output.js";
 
 export interface AgentLoopOptions {
@@ -116,6 +117,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     };
 
     return { run };
+  }
+
+  // Atomically transition task to in_progress before any work begins.
+  // Idempotent: skip if already in_progress (e.g. resumed task).
+  if (brief.task.status !== "in_progress") {
+    await toolRexUpdateStatus(store, taskId, { status: "in_progress" });
   }
 
   // Get API key

@@ -284,8 +284,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     return { run };
   }
 
-  // Mark task in_progress before handing off to CLI
-  await toolRexUpdateStatus(store, taskId, { status: "in_progress" });
+  // Atomically transition task to in_progress before any work begins.
+  // Idempotent: skip if already in_progress (e.g. resumed task).
+  if (brief.task.status !== "in_progress") {
+    await toolRexUpdateStatus(store, taskId, { status: "in_progress" });
+  }
 
   const run: RunRecord = {
     id: randomUUID(),

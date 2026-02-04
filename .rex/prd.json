@@ -148,7 +148,7 @@
             {
               "id": "1ba9b8ba-078b-4a20-91bc-221462c1364e",
               "title": "Fix findNextTask priority and dependency logic",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure priority ordering and blocked-by dependencies work correctly",
               "acceptanceCriteria": [
@@ -157,12 +157,14 @@
                 "Dependencies respected in selection"
               ],
               "priority": "critical",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:12:15.408Z",
+              "completedAt": "2026-02-04T18:19:39.462Z"
             },
             {
               "id": "a82f55ef-7108-4a4c-b1b0-16736b5f65ff",
               "title": "Implement atomic task state transitions",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Transition tasks to in_progress atomically before starting work",
               "acceptanceCriteria": [
@@ -171,7 +173,8 @@
                 "Prevents race conditions"
               ],
               "priority": "critical",
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-04T18:19:39.486Z"
             },
             {
               "id": "c8e37f18-7a10-4f27-ae6a-d62d6833584c",
@@ -210,6 +213,8 @@
           "level": "feature",
           "description": "Validate work quality and provide safety mechanisms for autonomous execution",
           "source": "llm",
+          "startedAt": "2026-02-04T18:11:41.993Z",
+          "completedAt": "2026-02-04T18:11:41.993Z",
           "children": [
             {
               "id": "c953070b-ef5a-4793-aaca-27144bed45c0",
@@ -276,9 +281,7 @@
               "startedAt": "2026-02-04T18:02:44.995Z",
               "completedAt": "2026-02-04T18:11:41.981Z"
             }
-          ],
-          "startedAt": "2026-02-04T18:11:41.993Z",
-          "completedAt": "2026-02-04T18:11:41.993Z"
+          ]
         },
         {
           "id": "2cae10b4-7d16-4b09-82b4-c0922d28a00f",
