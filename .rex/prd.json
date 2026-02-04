@@ -12,7 +12,7 @@
         {
           "id": "5b558cbb-b329-45e8-af46-b102eada7929",
           "title": "Smart add functionality",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Allow natural language input that gets structured by LLM into proper PRD hierarchy",
           "source": "llm",
@@ -48,7 +48,7 @@
             {
               "id": "9e5d1d9c-6306-4255-9906-47329993307e",
               "title": "Support scoped additions with parent constraint",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Allow constraining new items under existing parent with --parent flag",
               "acceptanceCriteria": [

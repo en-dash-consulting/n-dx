@@ -4,8 +4,9 @@ import {
   countProposalItems,
   filterProposalsByIndex,
   parseApprovalInput,
+  formatQualityWarnings,
 } from "../../../../src/cli/commands/smart-add.js";
-import type { Proposal } from "../../../../src/analyze/index.js";
+import type { Proposal, QualityIssue } from "../../../../src/analyze/index.js";
 
 const singleProposal: Proposal = {
   epic: { title: "User Authentication", source: "smart-add" },
@@ -319,5 +320,86 @@ describe("parseApprovalInput", () => {
     expect(parseApprovalInput("YES", 3)).toBe("all");
     expect(parseApprovalInput("N", 3)).toBe("none");
     expect(parseApprovalInput("All", 3)).toBe("all");
+  });
+});
+
+describe("formatQualityWarnings", () => {
+  it("returns empty string when no issues", () => {
+    expect(formatQualityWarnings([])).toBe("");
+  });
+
+  it("formats a single warning", () => {
+    const issues: QualityIssue[] = [
+      {
+        level: "warning",
+        path: 'epic:"Auth" > feature:"Login" > task:"Do"',
+        message: "Task title is too short to be actionable",
+      },
+    ];
+    const output = formatQualityWarnings(issues);
+    expect(output).toContain("Quality warnings:");
+    expect(output).toContain("⚠ Task title is too short to be actionable");
+    expect(output).toContain('at epic:"Auth" > feature:"Login" > task:"Do"');
+  });
+
+  it("formats multiple warnings", () => {
+    const issues: QualityIssue[] = [
+      {
+        level: "warning",
+        path: 'epic:"UI"',
+        message: "Epic title is too short to be descriptive",
+      },
+      {
+        level: "warning",
+        path: 'epic:"UI" > feature:"Forms"',
+        message: "Feature has no tasks",
+      },
+    ];
+    const output = formatQualityWarnings(issues);
+    const lines = output.split("\n");
+    expect(lines[0]).toBe("Quality warnings:");
+    expect(lines.length).toBe(5); // header + 2 * (message + path)
+  });
+
+  it("uses ✗ icon for errors", () => {
+    const issues: QualityIssue[] = [
+      {
+        level: "error",
+        path: 'epic:"Broken"',
+        message: "Critical structural issue",
+      },
+    ];
+    const output = formatQualityWarnings(issues);
+    expect(output).toContain("✗ Critical structural issue");
+    expect(output).not.toContain("⚠");
+  });
+
+  it("uses ⚠ icon for warnings", () => {
+    const issues: QualityIssue[] = [
+      {
+        level: "warning",
+        path: 'epic:"Auth"',
+        message: "Epic has no features",
+      },
+    ];
+    const output = formatQualityWarnings(issues);
+    expect(output).toContain("⚠ Epic has no features");
+    expect(output).not.toContain("✗");
+  });
+
+  it("includes path on indented line below message", () => {
+    const issues: QualityIssue[] = [
+      {
+        level: "warning",
+        path: 'epic:"Backend" > feature:"API" > task:"Fix"',
+        message: "Task title is too short to be actionable",
+      },
+    ];
+    const output = formatQualityWarnings(issues);
+    const lines = output.split("\n");
+    // Path should be on the line after the message, indented
+    const pathLine = lines.find((l) => l.includes("at epic:"));
+    expect(pathLine).toBeDefined();
+    expect(pathLine!.startsWith("    at ")).toBe(true);
   });
 });

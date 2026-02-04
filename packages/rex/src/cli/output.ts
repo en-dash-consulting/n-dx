@@ -30,6 +30,14 @@ export function info(...args: unknown[]): void {
 }
 
 /**
+ * Print warning output. Suppressed in quiet mode.
+ * Use for quality issues, deprecation notices, non-fatal problems.
+ */
+export function warn(...args: unknown[]): void {
+  if (!_quiet) console.error(...args);
+}
+
+/**
  * Print result output. Always shown, even in quiet mode.
  * Use for the primary data the user asked for: JSON, IDs, structured results.
  */

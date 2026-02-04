@@ -6,13 +6,14 @@ import { resolveStore } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { info, result } from "../output.js";
+import { info, warn, result } from "../output.js";
 import {
   reasonFromDescriptions,
   reasonFromIdeasFile,
+  validateProposalQuality,
   DEFAULT_MODEL,
 } from "../../analyze/index.js";
-import type { Proposal } from "../../analyze/index.js";
+import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
@@ -242,6 +243,22 @@ async function resolveParentLevel(
   const doc = await store.loadDocument();
   const entry = findItem(doc.items, parentId);
   return entry?.item.level ?? null;
+}
+
+/**
+ * Format quality issues as a human-readable warning block.
+ * Returns empty string when there are no issues.
+ */
+export function formatQualityWarnings(issues: QualityIssue[]): string {
+  if (issues.length === 0) return "";
+
+  const lines: string[] = ["Quality warnings:"];
+  for (const issue of issues) {
+    const icon = issue.level === "error" ? "✗" : "⚠";
+    lines.push(`  ${icon} ${issue.message}`);
+    lines.push(`    at ${issue.path}`);
+  }
+  return lines.join("\n");
 }
 
 async function acceptProposals(
@@ -523,9 +540,12 @@ export async function cmdSmartAdd(
     return;
   }
 
+  // Validate proposal quality
+  const qualityIssues = validateProposalQuality(proposals);
+
   // JSON mode without --accept: return proposals for external tools
   if (flags.format === "json" && !accept) {
-    result(JSON.stringify({ proposals }, null, 2));
+    result(JSON.stringify({ proposals, qualityIssues }, null, 2));
     return;
   }
 
@@ -538,6 +558,13 @@ export async function cmdSmartAdd(
       info(`\nProposed structure (${itemCount} items):`);
     }
     info(formatProposalTree(proposals, parentLevel));
+
+    // Show quality warnings if any
+    if (qualityIssues.length > 0) {
+      warn("");
+      warn(formatQualityWarnings(qualityIssues));
+    }
+
     info("");
   }
 
@@ -550,8 +577,11 @@ export async function cmdSmartAdd(
     // Non-interactive: accept immediately
     const added = await acceptProposals(dir, proposals, parentId);
     if (flags.format === "json") {
-      result(JSON.stringify({ proposals, added }, null, 2));
+      result(JSON.stringify({ proposals, added, qualityIssues }, null, 2));
     } else {
+      if (qualityIssues.length > 0) {
+        warn(`Accepted with ${qualityIssues.length} quality warning(s).`);
+      }
       result(`Added ${added} items to PRD.`);
     }
   } else if (process.stdin.isTTY) {
