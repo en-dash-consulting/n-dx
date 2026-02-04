@@ -78,7 +78,7 @@
         {
           "id": "4c522dcd-db15-4f2e-a108-d98619be078a",
           "title": "Bulk natural language input",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Support multiple descriptions and file-based input for batch PRD creation",
           "source": "llm",
@@ -86,7 +86,7 @@
             {
               "id": "0a24b5bd-fa59-41c0-b9ac-9bfd85eca54e",
               "title": "Support multiple descriptions in single command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Accept multiple natural language descriptions in one rex add call",
               "acceptanceCriteria": [
@@ -100,7 +100,7 @@
             {
               "id": "ed902797-9b9f-4181-9d88-cac559014a91",
               "title": "Add piped input support",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Allow piping text into rex add command",
               "acceptanceCriteria": [
@@ -114,7 +114,7 @@
             {
               "id": "6b968585-1368-40e3-aa65-b966148e5c91",
               "title": "Implement file-based idea import",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support --file flag to read freeform brainstorming notes",
               "acceptanceCriteria": [
