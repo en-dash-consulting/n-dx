@@ -40,6 +40,34 @@ describe("simpleGlobMatch", () => {
     expect(simpleGlobMatch(".rex/**", ".rex/prd.json")).toBe(true);
     expect(simpleGlobMatch(".rex/**", ".rex/config.json")).toBe(true);
   });
+
+  it("matches blocked directory itself, not just children", () => {
+    // dir/** must also block "dir" — accessing the directory root is just as dangerous
+    expect(simpleGlobMatch(".git/**", ".git")).toBe(true);
+    expect(simpleGlobMatch(".hench/**", ".hench")).toBe(true);
+    expect(simpleGlobMatch(".rex/**", ".rex")).toBe(true);
+    expect(simpleGlobMatch("node_modules/**", "node_modules")).toBe(true);
+  });
+
+  it("matches ? wildcard correctly", () => {
+    expect(simpleGlobMatch("?.ts", "a.ts")).toBe(true);
+    expect(simpleGlobMatch("?.ts", "ab.ts")).toBe(false);
+    expect(simpleGlobMatch("?.ts", ".ts")).toBe(false); // ? requires exactly one char
+    expect(simpleGlobMatch("src/?/file.ts", "src/a/file.ts")).toBe(true);
+    expect(simpleGlobMatch("src/?/file.ts", "src//file.ts")).toBe(false); // ? must not match /
+  });
+
+  it("handles backslash-separated paths (Windows compatibility)", () => {
+    expect(simpleGlobMatch(".git/**", ".git\\config")).toBe(true);
+    expect(simpleGlobMatch("src\\**\\*.ts", "src/deep/file.ts")).toBe(true);
+  });
+
+  it("does not match unrelated prefixes", () => {
+    // ".gitignore" should not be caught by ".git/**"
+    expect(simpleGlobMatch(".git/**", ".gitignore")).toBe(false);
+    // ".henchman" should not be caught by ".hench/**"
+    expect(simpleGlobMatch(".hench/**", ".henchman")).toBe(false);
+  });
 });
 
 describe("validatePath", () => {
@@ -59,6 +87,45 @@ describe("validatePath", () => {
   it("rejects paths that escape project directory", () => {
     expect(() =>
       validatePath("../../etc/passwd", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+  });
+
+  it("rejects absolute paths outside the project", () => {
+    expect(() =>
+      validatePath("/etc/passwd", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+  });
+
+  it("rejects internal traversal that escapes the project", () => {
+    expect(() =>
+      validatePath("src/../../etc/passwd", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+    expect(() =>
+      validatePath("a/b/c/../../../../etc", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+  });
+
+  it("rejects paths containing null bytes", () => {
+    expect(() =>
+      validatePath("src/\0malicious", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+    expect(() =>
+      validatePath("foo\0/../../../etc/passwd", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+  });
+
+  it("rejects blocked directory roots, not just children", () => {
+    expect(() =>
+      validatePath(".git", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+    expect(() =>
+      validatePath(".hench", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+    expect(() =>
+      validatePath(".rex", projectDir, blockedPaths),
+    ).toThrow(GuardError);
+    expect(() =>
+      validatePath("node_modules", projectDir, blockedPaths),
     ).toThrow(GuardError);
   });
 
@@ -84,5 +151,16 @@ describe("validatePath", () => {
     expect(() =>
       validatePath("node_modules/foo/bar.js", projectDir, blockedPaths),
     ).toThrow(GuardError);
+  });
+
+  it("allows internal traversal that stays within project", () => {
+    // src/../lib/file.ts resolves to /project/lib/file.ts — valid
+    const resolved = validatePath("src/../lib/file.ts", projectDir, blockedPaths);
+    expect(resolved).toBe("/project/lib/file.ts");
+  });
+
+  it("allows absolute paths within the project directory", () => {
+    const resolved = validatePath("/project/src/file.ts", projectDir, blockedPaths);
+    expect(resolved).toBe("/project/src/file.ts");
   });
 });
