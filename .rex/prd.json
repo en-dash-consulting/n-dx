@@ -5896,7 +5896,7 @@
             {
               "id": "a0cb59d5-5c5f-4968-ae2b-971ffdcff464",
               "title": "Update package.json bin configuration",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add all command aliases to package.json bin section for proper installation",
               "acceptanceCriteria": [
@@ -5910,7 +5910,9 @@
                 "installation",
                 "npm"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-05T16:35:40.371Z",
+              "completedAt": "2026-02-05T16:39:07.284Z"
             },
             {
               "id": "e1464393-196b-4c34-ac03-114fca5bee4d",
@@ -5940,6 +5942,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-05T16:26:43.141Z",
+      "completedAt": "2026-02-05T16:26:43.141Z",
       "children": [
         {
           "id": "8659f10b-6326-4db8-93bf-e84fe5168cd2",
@@ -6033,9 +6037,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-05T16:26:43.141Z",
-      "completedAt": "2026-02-05T16:26:43.141Z"
+      ]
     }
   ]
 }
