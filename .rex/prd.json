@@ -3015,7 +3015,7 @@
             {
               "id": "f45f3139-ef04-4f67-a3ac-960f58eabce4",
               "title": "Enhance JSX usage analysis",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Improve JSX component usage detection and counting",
               "acceptanceCriteria": [
@@ -3029,7 +3029,9 @@
               "tags": [
                 "extractJsxUsages"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T19:30:34.894Z",
+              "completedAt": "2026-02-05T19:33:10.015Z"
             },
             {
               "id": "628e5810-2917-4dfb-bf10-6187f2c8abab",
