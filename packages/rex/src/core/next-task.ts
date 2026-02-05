@@ -9,6 +9,32 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   low: 3,
 };
 
+/** Safe ancestor priority: returns medium (2) when no parents exist. */
+function bestAncestorPriority(parents: PRDItem[]): number {
+  if (parents.length === 0) return PRIORITY_ORDER.medium;
+  return Math.min(...parents.map((p) => PRIORITY_ORDER[p.priority ?? "medium"]));
+}
+
+/** Shared comparator for sorting actionable tasks. */
+function compareEntries(a: TreeEntry, b: TreeEntry): number {
+  // in_progress always wins — finish what you started
+  const aInProgress = a.item.status === "in_progress" ? 0 : 1;
+  const bInProgress = b.item.status === "in_progress" ? 0 : 1;
+  if (aInProgress !== bInProgress) return aInProgress - bInProgress;
+
+  // Then by own priority
+  const pa = PRIORITY_ORDER[a.item.priority ?? "medium"];
+  const pb = PRIORITY_ORDER[b.item.priority ?? "medium"];
+  if (pa !== pb) return pa - pb;
+
+  // Tiebreak: highest-priority ancestor
+  const ancestorA = bestAncestorPriority(a.parents);
+  const ancestorB = bestAncestorPriority(b.parents);
+  if (ancestorA !== ancestorB) return ancestorA - ancestorB;
+
+  return a.item.title.localeCompare(b.item.title);
+}
+
 export interface SelectionExplanation {
   /** Human-readable summary of why this task was selected. */
   summary: string;
@@ -31,6 +57,10 @@ export interface SelectionExplanation {
     deferred: number;
     blocked: number;
     unresolvedDeps: number;
+    /** In-progress items that weren't selected (lost tiebreak). */
+    inProgress: number;
+    /** Actionable items skipped because a higher-priority item was chosen. */
+    actionable: number;
     total: number;
   };
 }
@@ -52,15 +82,13 @@ export function collectCompletedIds(items: PRDItem[]): Set<string> {
 }
 
 /**
- * Collect ALL actionable tasks flattened and sorted globally by priority.
- * Returns every leaf task that is pending/in_progress with resolved
- * dependencies, sorted: in_progress first, then by priority, then by
- * ancestor priority, then alphabetically.
+ * Collect actionable candidates from the tree.
+ * Returns every leaf task (or parent with all children done) that is
+ * pending/in_progress with all dependencies resolved.
  */
-export function findActionableTasks(
+function collectActionable(
   items: PRDItem[],
   completedIds: Set<string>,
-  limit = 20,
 ): TreeEntry[] {
   const results: TreeEntry[] = [];
 
@@ -88,24 +116,22 @@ export function findActionableTasks(
   }
 
   collect(items, []);
+  return results;
+}
 
-  // Sort: in_progress first, then by own priority, then ancestor priority, then title
-  results.sort((a, b) => {
-    // in_progress always wins — finish what you started
-    const aInProgress = a.item.status === "in_progress" ? 0 : 1;
-    const bInProgress = b.item.status === "in_progress" ? 0 : 1;
-    if (aInProgress !== bInProgress) return aInProgress - bInProgress;
-
-    const pa = PRIORITY_ORDER[a.item.priority ?? "medium"];
-    const pb = PRIORITY_ORDER[b.item.priority ?? "medium"];
-    if (pa !== pb) return pa - pb;
-    // Tiebreak: highest-priority ancestor
-    const ancestorA = Math.min(...a.parents.map((p) => PRIORITY_ORDER[p.priority ?? "medium"]));
-    const ancestorB = Math.min(...b.parents.map((p) => PRIORITY_ORDER[p.priority ?? "medium"]));
-    if (ancestorA !== ancestorB) return ancestorA - ancestorB;
-    return a.item.title.localeCompare(b.item.title);
-  });
-
+/**
+ * Collect ALL actionable tasks flattened and sorted globally by priority.
+ * Returns every leaf task that is pending/in_progress with resolved
+ * dependencies, sorted: in_progress first, then by priority, then by
+ * ancestor priority, then alphabetically.
+ */
+export function findActionableTasks(
+  items: PRDItem[],
+  completedIds: Set<string>,
+  limit = 20,
+): TreeEntry[] {
+  const results = collectActionable(items, completedIds);
+  results.sort(compareEntries);
   return results.slice(0, limit);
 }
 
@@ -113,78 +139,56 @@ export function findNextTask(
   items: PRDItem[],
   completedIds: Set<string>,
 ): TreeEntry | null {
-  const candidates: TreeEntry[] = [];
+  const results = collectActionable(items, completedIds);
+  if (results.length === 0) return null;
+  results.sort(compareEntries);
+  return results[0];
+}
 
-  function collect(list: PRDItem[], parentChain: PRDItem[]): void {
-    for (const item of list) {
-      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked") {
-        continue;
-      }
-
-      if (item.blockedBy && item.blockedBy.length > 0) {
-        if (!item.blockedBy.every((dep) => completedIds.has(dep))) {
-          continue;
-        }
-      }
-
-      if (item.children && item.children.length > 0) {
-        collect(item.children, [...parentChain, item]);
-
-        const allChildrenDone = item.children.every(
-          (c) => c.status === "completed" || c.status === "deferred",
-        );
-        if (allChildrenDone) {
-          candidates.push({ item, parents: parentChain });
-        }
-      } else {
-        candidates.push({ item, parents: parentChain });
-      }
-    }
-  }
-
-  collect(items, []);
-
-  if (candidates.length === 0) return null;
-
-  // Sort: in_progress first, then by own priority, then ancestor priority, then title
-  candidates.sort((a, b) => {
-    // in_progress always wins — finish what you started
-    const aInProgress = a.item.status === "in_progress" ? 0 : 1;
-    const bInProgress = b.item.status === "in_progress" ? 0 : 1;
-    if (aInProgress !== bInProgress) return aInProgress - bInProgress;
-
-    // Then by own priority
-    const pa = PRIORITY_ORDER[a.item.priority ?? "medium"];
-    const pb = PRIORITY_ORDER[b.item.priority ?? "medium"];
-    if (pa !== pb) return pa - pb;
-
-    // Tiebreak: highest-priority ancestor
-    const ancestorA = Math.min(...a.parents.map((p) => PRIORITY_ORDER[p.priority ?? "medium"]));
-    const ancestorB = Math.min(...b.parents.map((p) => PRIORITY_ORDER[p.priority ?? "medium"]));
-    if (ancestorA !== ancestorB) return ancestorA - ancestorB;
-
-    return a.item.title.localeCompare(b.item.title);
-  });
-
-  return candidates[0];
+/** Check if an item is a leaf (no children or empty children array). */
+function isLeaf(item: PRDItem): boolean {
+  return !item.children || item.children.length === 0;
 }
 
 /**
  * Explain why a particular task was selected by findNextTask.
  * Walks the full tree to gather skip counts, dependency info, and priority context.
+ * Only counts leaf-level items (and parents whose children are all done) to avoid
+ * inflating skip counts with intermediate branch nodes.
  */
 export function explainSelection(
   items: PRDItem[],
   selected: TreeEntry,
   completedIds: Set<string>,
 ): SelectionExplanation {
-  const skipped = { completed: 0, deferred: 0, blocked: 0, unresolvedDeps: 0, total: 0 };
+  const skipped = {
+    completed: 0,
+    deferred: 0,
+    blocked: 0,
+    unresolvedDeps: 0,
+    inProgress: 0,
+    actionable: 0,
+    total: 0,
+  };
   const selectedPriority = PRIORITY_ORDER[selected.item.priority ?? "medium"];
   let higherPriorityBlocked = 0;
 
-  // Walk every leaf to count skipped items and detect higher-priority blocked items
+  // Build the set of actionable candidates for accurate actionable/inProgress counts
+  const actionableSet = new Set(
+    collectActionable(items, completedIds).map((e) => e.item.id),
+  );
+
+  // Walk the tree, but only count leaves and parents-with-all-children-done
   for (const { item } of walkTree(items)) {
     if (item.id === selected.item.id) continue;
+
+    // Skip intermediate branch nodes — only count leaves and finalize-ready parents
+    if (!isLeaf(item)) {
+      const allChildrenDone = item.children!.every(
+        (c) => c.status === "completed" || c.status === "deferred",
+      );
+      if (!allChildrenDone) continue; // branch with active children — don't count
+    }
 
     if (item.status === "completed") {
       skipped.completed++;
@@ -208,6 +212,14 @@ export function explainSelection(
       if (PRIORITY_ORDER[item.priority ?? "medium"] < selectedPriority) {
         higherPriorityBlocked++;
       }
+    } else if (actionableSet.has(item.id)) {
+      // Item is actionable but wasn't selected
+      if (item.status === "in_progress") {
+        skipped.inProgress++;
+      } else {
+        skipped.actionable++;
+      }
+      skipped.total++;
     }
   }
 

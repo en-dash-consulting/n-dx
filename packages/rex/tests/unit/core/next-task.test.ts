@@ -479,4 +479,157 @@ describe("findActionableTasks", () => {
     const results = findActionableTasks(items, new Set(), 2);
     expect(results).toHaveLength(2);
   });
+
+  it("handles root-level tasks with no parents in ancestor tiebreaker", () => {
+    // Root-level tasks (no parents) should sort stably without NaN/Infinity issues
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "B Root", priority: "medium" }),
+      makeItem({ id: "t2", title: "A Root", priority: "medium" }),
+    ];
+    const results = findActionableTasks(items, new Set());
+    // Same priority, no parents → alphabetical tiebreak
+    expect(results.map((r) => r.item.id)).toEqual(["t2", "t1"]);
+  });
+
+  it("findNextTask returns same result as findActionableTasks[0]", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Low", priority: "low" }),
+      makeItem({ id: "t2", title: "Critical", priority: "critical" }),
+      makeItem({ id: "t3", title: "High", priority: "high", status: "in_progress" }),
+    ];
+    const completedIds = new Set<string>();
+    const next = findNextTask(items, completedIds);
+    const all = findActionableTasks(items, completedIds);
+    expect(next).not.toBeNull();
+    expect(all.length).toBeGreaterThan(0);
+    expect(next!.item.id).toBe(all[0].item.id);
+  });
+
+  it("skips items with partially resolved blockers", () => {
+    // t1 depends on both t0a and t0b, only t0a is completed
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Partially blocked", blockedBy: ["t0a", "t0b"] }),
+      makeItem({ id: "t2", title: "Free" }),
+    ];
+    const results = findActionableTasks(items, new Set(["t0a"]));
+    expect(results.map((r) => r.item.id)).toEqual(["t2"]);
+  });
+
+  it("includes item when all multiple blockers resolved", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Was blocked", priority: "critical", blockedBy: ["t0a", "t0b"] }),
+      makeItem({ id: "t2", title: "Free", priority: "low" }),
+    ];
+    const results = findActionableTasks(items, new Set(["t0a", "t0b"]));
+    expect(results[0].item.id).toBe("t1");
+  });
+
+  it("returns empty array when all items blocked", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Blocked 1", blockedBy: ["ext1"] }),
+      makeItem({ id: "t2", title: "Blocked 2", status: "blocked" }),
+      makeItem({ id: "t3", title: "Done", status: "completed" }),
+    ];
+    const results = findActionableTasks(items, new Set(["t3"]));
+    expect(results).toHaveLength(0);
+  });
+});
+
+describe("explainSelection — enhanced", () => {
+  it("counts only leaf-level skipped items, not branch parents", () => {
+    // Epic with a completed child and a pending child — the epic itself
+    // should not be counted as skipped
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        children: [
+          makeItem({ id: "t1", title: "Done", status: "completed" }),
+          makeItem({ id: "t2", title: "Selected" }),
+        ],
+      }),
+    ];
+    const completedIds = new Set(["t1"]);
+    const result = findNextTask(items, completedIds)!;
+    expect(result.item.id).toBe("t2");
+
+    const explanation = explainSelection(items, result, completedIds);
+    // Only t1 is a skip — e1 is not because it has actionable children
+    expect(explanation.skipped.completed).toBe(1);
+    expect(explanation.skipped.total).toBe(1);
+  });
+
+  it("counts higher-priority items with unresolved deps in blocked count", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Critical with deps", priority: "critical", blockedBy: ["ext"] }),
+      makeItem({ id: "t2", title: "Critical blocked", priority: "critical", status: "blocked" }),
+      makeItem({ id: "t3", title: "Selected", priority: "low" }),
+    ];
+    const completedIds = new Set<string>();
+    const result = findNextTask(items, completedIds)!;
+    expect(result.item.id).toBe("t3");
+
+    const explanation = explainSelection(items, result, completedIds);
+    expect(explanation.priority.higherPriorityBlocked).toBe(2);
+  });
+
+  it("includes blocker titles in dependency resolution summary when available", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Setup DB", status: "completed" }),
+      makeItem({ id: "t2", title: "Run Migrations", blockedBy: ["t1"] }),
+    ];
+    const completedIds = new Set(["t1"]);
+    const result = findNextTask(items, completedIds)!;
+    const explanation = explainSelection(items, result, completedIds);
+
+    expect(explanation.dependencies.status).toBe("resolved");
+    expect(explanation.summary).toContain("blocker");
+  });
+
+  it("provides summary for items with no dependencies and no special status", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Simple task", priority: "high" }),
+    ];
+    const completedIds = new Set<string>();
+    const result = findNextTask(items, completedIds)!;
+    const explanation = explainSelection(items, result, completedIds);
+
+    expect(explanation.summary).toContain("Simple task");
+    expect(explanation.summary).toContain("high");
+    expect(explanation.dependencies.status).toBe("none");
+    expect(explanation.skipped.total).toBe(0);
+  });
+
+  it("includes in_progress count in skipped breakdown", () => {
+    // Two in_progress tasks — one wins, the other is skipped
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "AAA in progress", priority: "high", status: "in_progress" }),
+      makeItem({ id: "t2", title: "ZZZ in progress", priority: "high", status: "in_progress" }),
+      makeItem({ id: "t3", title: "Pending low", priority: "low" }),
+    ];
+    const completedIds = new Set<string>();
+    const result = findNextTask(items, completedIds)!;
+    expect(result.item.id).toBe("t1");
+
+    const explanation = explainSelection(items, result, completedIds);
+    expect(explanation.skipped.inProgress).toBe(1);
+    expect(explanation.skipped.total).toBe(2); // t2 (in_progress) + t3 (actionable)
+  });
+
+  it("counts actionable but lower-priority items as skipped", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Critical", priority: "critical" }),
+      makeItem({ id: "t2", title: "Medium", priority: "medium" }),
+      makeItem({ id: "t3", title: "Low", priority: "low" }),
+    ];
+    const completedIds = new Set<string>();
+    const result = findNextTask(items, completedIds)!;
+    expect(result.item.id).toBe("t1");
+
+    const explanation = explainSelection(items, result, completedIds);
+    // t2 and t3 are actionable but skipped
+    expect(explanation.skipped.actionable).toBe(2);
+    expect(explanation.skipped.total).toBe(2);
+  });
 });
