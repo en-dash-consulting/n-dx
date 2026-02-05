@@ -2532,7 +2532,7 @@
             {
               "id": "2d88295f-93ac-44ac-aab4-1e94ada32bcb",
               "title": "Handle escaped characters in JSON strings",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Process escaped characters correctly in JSON parsing",
               "acceptanceCriteria": [
@@ -2545,7 +2545,9 @@
                 "parsing",
                 "robustness"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T20:49:13.215Z",
+              "completedAt": "2026-02-05T20:57:56.780Z"
             },
             {
               "id": "9a6d5e8e-c1c7-46ff-9d6f-976b8dbee8b9",

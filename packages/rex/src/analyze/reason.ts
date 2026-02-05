@@ -245,6 +245,29 @@ export function extractJson(raw: string): string {
  * truncation, and unclosed brackets/braces.
  * Returns repaired JSON string or null if not repairable.
  */
+/**
+ * Strip incomplete escape sequences from the end of a truncated JSON string.
+ * Handles:
+ *  - trailing lone backslash (`"path\` → `"path`)
+ *  - partial unicode escapes (`"emoji \u00` → `"emoji `)
+ */
+function stripTrailingEscape(s: string): string {
+  // Strip partial \uXXXX (1-4 hex digits after \u)
+  const partialUnicode = s.match(/\\u[\da-fA-F]{0,3}$/);
+  if (partialUnicode) return s.slice(0, partialUnicode.index);
+
+  // Strip lone trailing backslash (incomplete escape)
+  if (s.endsWith("\\")) {
+    // But not an escaped backslash (\\) — count consecutive trailing backslashes
+    let count = 0;
+    for (let i = s.length - 1; i >= 0 && s[i] === "\\"; i--) count++;
+    // Odd number means the last backslash is a lone escape starter
+    if (count % 2 === 1) return s.slice(0, -1);
+  }
+
+  return s;
+}
+
 export function repairTruncatedJson(text: string): string | null {
   // Only attempt repair on text that starts as a JSON array or object
   const trimmed = text.trim();
@@ -287,9 +310,9 @@ export function repairTruncatedJson(text: string): string | null {
 
   if (stack.length === 0) return null;
 
-  // Close any unclosed string
+  // Close any unclosed string, stripping incomplete escape sequences first
   let repaired = trimmed;
-  if (inString) repaired += '"';
+  if (inString) repaired = stripTrailingEscape(repaired) + '"';
 
   // Close structures in reverse order
   while (stack.length > 0) {
@@ -327,7 +350,7 @@ export function repairTruncatedJson(text: string): string | null {
   ];
 
   let content = trimmed;
-  if (inString) content += '"';
+  if (inString) content = stripTrailingEscape(content) + '"';
 
   for (let attempts = 0; attempts < 20; attempts++) {
     // Recompute the structure stack for the current content
@@ -345,7 +368,7 @@ export function repairTruncatedJson(text: string): string | null {
     }
 
     let candidate = content;
-    if (innerString) candidate += '"';
+    if (innerString) candidate = stripTrailingEscape(candidate) + '"';
 
     const closingStack = [...innerStack];
     while (closingStack.length > 0) {

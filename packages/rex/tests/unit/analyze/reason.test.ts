@@ -1112,6 +1112,24 @@ describe("extractJson", () => {
     const raw = `Result:\n${json}\nDone.`;
     expect(extractJson(raw)).toBe(json);
   });
+
+  it("handles single-character string values", () => {
+    const json = '[{"a":"b"}]';
+    const raw = `Result:\n${json}\nDone.`;
+    expect(extractJson(raw)).toBe(json);
+  });
+
+  it("handles escaped characters in strings", () => {
+    const json = '{"epic":{"title":"line1\\nline2\\ttab"},"features":[]}';
+    const raw = `Result:\n${json}\nDone.`;
+    expect(extractJson(raw)).toBe(json);
+  });
+
+  it("handles escaped backslash at end of string value", () => {
+    const json = '{"epic":{"title":"path\\\\"},"features":[]}';
+    const raw = `Result:\n${json}\nDone.`;
+    expect(extractJson(raw)).toBe(json);
+  });
 });
 
 describe("repairTruncatedJson", () => {
@@ -1159,6 +1177,69 @@ describe("repairTruncatedJson", () => {
     const repaired = repairTruncatedJson(truncated);
     expect(repaired).not.toBeNull();
     expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles single-character string values", () => {
+    const truncated = '[{"epic":{"title":"A"},"features":[{"title":"B';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("A");
+  });
+
+  it("handles single-character key names", () => {
+    const truncated = '[{"epic":{"title":"Test"},"x';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("Test");
+  });
+
+  it("handles truncation right after a backslash in a string", () => {
+    // Truncated mid-escape: the trailing backslash should be dropped
+    const truncated = '[{"epic":{"title":"path\\';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    // The trailing incomplete escape should be stripped, not turned into \"
+    expect(parsed[0].epic.title).toBe("path");
+  });
+
+  it("handles truncated unicode escape sequence", () => {
+    // Truncated mid-unicode: \u00 is incomplete (needs 4 hex digits)
+    const truncated = '[{"epic":{"title":"emoji \\u00';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("emoji ");
+  });
+
+  it("handles escaped newline and tab in truncated strings", () => {
+    const truncated = '[{"epic":{"title":"line1\\nline2\\t';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("line1\nline2\t");
+  });
+
+  it("handles string that is only an escaped character", () => {
+    const truncated = '[{"epic":{"title":"\\n';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("\n");
   });
 
   it("handles trailing comma after last array element", () => {
