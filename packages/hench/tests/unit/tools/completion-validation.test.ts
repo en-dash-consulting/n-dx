@@ -182,4 +182,124 @@ describe("toolRexUpdateStatus with completion validation", () => {
     expect(result).toContain("Tests failed");
     expect(store.updateItem).not.toHaveBeenCalled();
   });
+
+  it("passes startingHead to validation", async () => {
+    const store = mockStore();
+
+    mockValidate.mockResolvedValue({
+      valid: true,
+      hasChanges: true,
+    });
+
+    await toolRexUpdateStatus(
+      store,
+      "task-1",
+      { status: "completed" },
+      { projectDir: "/project", startingHead: "abc123" },
+    );
+
+    expect(mockValidate).toHaveBeenCalledWith("/project", {
+      startingHead: "abc123",
+    });
+  });
+
+  it("passes both startingHead and testCommand to validation", async () => {
+    const store = mockStore();
+
+    mockValidate.mockResolvedValue({
+      valid: true,
+      hasChanges: true,
+      testsRan: true,
+      testsPassed: true,
+    });
+
+    await toolRexUpdateStatus(
+      store,
+      "task-1",
+      { status: "completed" },
+      { projectDir: "/project", startingHead: "abc123", testCommand: "pnpm test" },
+    );
+
+    expect(mockValidate).toHaveBeenCalledWith("/project", {
+      testCommand: "pnpm test",
+      startingHead: "abc123",
+    });
+  });
+
+  it("rejection message includes guidance about staging changes", async () => {
+    const store = mockStore();
+
+    mockValidate.mockResolvedValue({
+      valid: false,
+      hasChanges: false,
+      reason: "No changes detected in git diff. Task must produce meaningful changes to be marked complete.",
+    });
+    mockFormat.mockReturnValue("No changes detected in git diff");
+
+    const result = await toolRexUpdateStatus(
+      store,
+      "task-1",
+      { status: "completed" },
+      { projectDir: "/project" },
+    );
+
+    expect(result).toContain("COMPLETION_REJECTED");
+    expect(result).toContain("committed or staged");
+  });
+
+  it("logs formatted validation detail on rejection", async () => {
+    const store = mockStore();
+
+    mockValidate.mockResolvedValue({
+      valid: false,
+      hasChanges: true,
+      testsRan: true,
+      testsPassed: false,
+      reason: "Tests failed: FAIL src/app.test.ts",
+    });
+    mockFormat.mockReturnValue("Changes detected: yes\nTests failed: FAIL src/app.test.ts");
+
+    await toolRexUpdateStatus(
+      store,
+      "task-1",
+      { status: "completed" },
+      { projectDir: "/project", testCommand: "npm test" },
+    );
+
+    expect(store.appendLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "completion_rejected",
+        itemId: "task-1",
+        detail: "Changes detected: yes\nTests failed: FAIL src/app.test.ts",
+      }),
+    );
+  });
+
+  it("skips validation for deferred status even with projectDir", async () => {
+    const store = mockStore();
+    store.getItem.mockResolvedValue({
+      id: "task-1",
+      title: "Test task",
+      status: "in_progress",
+      level: "task",
+    });
+    store.loadDocument.mockResolvedValue({
+      schema: "rex/v1",
+      title: "Test",
+      items: [],
+    });
+
+    await toolRexUpdateStatus(
+      store,
+      "task-1",
+      { status: "deferred" },
+      { projectDir: "/project" },
+    );
+
+    expect(mockValidate).not.toHaveBeenCalled();
+    expect(store.updateItem).toHaveBeenCalledWith(
+      "task-1",
+      expect.objectContaining({ status: "deferred" }),
+    );
+  });
 });
