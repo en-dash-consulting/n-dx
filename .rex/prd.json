@@ -2193,7 +2193,7 @@
             {
               "id": "cdf959a7-803d-435b-b27b-0f2f32b66379",
               "title": "Implement chunking for large results",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Handle large scan result sets by chunking",
               "acceptanceCriteria": [
@@ -2209,7 +2209,9 @@
                 "large-datasets",
                 "optimization"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T20:58:37.607Z",
+              "completedAt": "2026-02-05T21:01:19.092Z"
             },
             {
               "id": "3dab4b0e-3429-4212-943c-a0d99b906bf7",
@@ -2947,7 +2949,7 @@
             {
               "id": "bc9b3d74-39e7-4f88-a0ad-8a72bfb8696b",
               "title": "Implement completion propagation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Automatically mark parent items as complete when all children are done",
               "acceptanceCriteria": [
@@ -2960,7 +2962,9 @@
               "tags": [
                 "findAutoCompletions"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T21:01:43.806Z",
+              "completedAt": "2026-02-05T21:04:38.560Z"
             }
           ]
         },
