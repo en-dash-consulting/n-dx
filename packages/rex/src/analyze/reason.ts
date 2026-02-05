@@ -151,8 +151,36 @@ export async function readProjectContext(dir: string): Promise<string> {
 }
 
 /**
+ * Walk a JSON structure starting at `open` (`[` or `{`), tracking nesting
+ * and string state, and return the index of the matching close character.
+ * Returns -1 if the structure is never closed (truncated).
+ */
+function findMatchingClose(text: string, startIndex: number): number {
+  const open = text[startIndex];
+  const close = open === "[" ? "]" : "}";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = startIndex; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === "\\") { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  return -1;
+}
+
+/**
  * Extract JSON text from an LLM response, handling markdown fences,
- * leading prose, and trailing text after the JSON array.
+ * leading prose, and trailing text after the JSON array or object.
  */
 export function extractJson(raw: string): string {
   let text = raw.trim();
@@ -161,12 +189,6 @@ export function extractJson(raw: string): string {
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (fenceMatch) {
     return fenceMatch[1].trim();
-  }
-
-  // If it already looks like a JSON object (not an array), return as-is —
-  // the caller (parseProposalResponse) will handle schema validation.
-  if (text.startsWith("{")) {
-    return text;
   }
 
   // Find the start of a top-level JSON array. When text already starts with
@@ -184,25 +206,34 @@ export function extractJson(raw: string): string {
 
   if (arrayStart >= 0) {
     text = text.slice(arrayStart);
-
-    // Find the matching closing bracket, accounting for nesting and strings
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (escaped) { escaped = false; continue; }
-      if (ch === "\\") { escaped = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === "[") depth++;
-      else if (ch === "]") {
-        depth--;
-        if (depth === 0) {
-          return text.slice(0, i + 1);
-        }
-      }
+    const closeIdx = findMatchingClose(text, 0);
+    if (closeIdx >= 0) {
+      return text.slice(0, closeIdx + 1);
     }
+    // Unclosed array — return the sliced text for downstream repair
+    return text;
+  }
+
+  // Handle JSON objects: find the first `{` (at start or on its own line)
+  // and match its closing `}`, stripping leading and trailing prose.
+  let objStart = -1;
+  if (text.startsWith("{")) {
+    objStart = 0;
+  } else {
+    const match = text.match(/(?:^|\n)\s*(\{)/);
+    if (match) {
+      objStart = text.indexOf(match[1], match.index!);
+    }
+  }
+
+  if (objStart >= 0) {
+    text = text.slice(objStart);
+    const closeIdx = findMatchingClose(text, 0);
+    if (closeIdx >= 0) {
+      return text.slice(0, closeIdx + 1);
+    }
+    // Unclosed object — return sliced text for downstream repair
+    return text;
   }
 
   return text;
@@ -210,12 +241,14 @@ export function extractJson(raw: string): string {
 
 /**
  * Attempt to repair truncated JSON by closing any open structures.
+ * Handles trailing commas, truncated strings, mid-key/mid-value
+ * truncation, and unclosed brackets/braces.
  * Returns repaired JSON string or null if not repairable.
  */
 export function repairTruncatedJson(text: string): string | null {
-  // Only attempt repair on text that starts as a JSON array
+  // Only attempt repair on text that starts as a JSON array or object
   const trimmed = text.trim();
-  if (!trimmed.startsWith("[")) return null;
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;
 
   // Try parsing as-is first
   try {
@@ -269,8 +302,73 @@ export function repairTruncatedJson(text: string): string | null {
     JSON.parse(repaired);
     return repaired;
   } catch {
-    return null;
+    // The naive close didn't work (trailing commas, partial values, etc.)
+    // Try progressively stripping trailing junk before closing
   }
+
+  // Strategy: progressively strip trailing incomplete tokens from the
+  // truncation point. Each pattern removes one layer of junk:
+  //   - trailing commas/whitespace
+  //   - dangling colons (key with no value)
+  //   - partial key-value pairs (e.g. `,"feat` or `,"key":"val`)
+  //   - orphaned keys without values
+  const stripPatterns = [
+    // Trailing comma, colon, or whitespace
+    /[,:\s]+$/,
+    // Dangling key with optional colon: `,"key":` or `,"key"` or `,"ke`
+    /,\s*"[^"]*"?\s*:?\s*$/,
+    // Dangling value token (partial string, number, bool, null)
+    /,\s*(?:"[^"]*"?|[\d.]+|true|false|null)\s*$/,
+    // Orphan key without comma prefix: `"key":` at end of object
+    /"\w*"?\s*:?\s*$/,
+  ];
+
+  let content = trimmed;
+  if (inString) content += '"';
+
+  for (let attempts = 0; attempts < 20; attempts++) {
+    // Recompute the structure stack for the current content
+    let innerString = false;
+    let innerEscaped = false;
+    const innerStack: string[] = [];
+
+    for (const ch of content) {
+      if (innerEscaped) { innerEscaped = false; continue; }
+      if (ch === "\\") { innerEscaped = true; continue; }
+      if (ch === '"') { innerString = !innerString; continue; }
+      if (innerString) continue;
+      if (ch === "[" || ch === "{") innerStack.push(ch);
+      else if (ch === "]" || ch === "}") innerStack.pop();
+    }
+
+    let candidate = content;
+    if (innerString) candidate += '"';
+
+    const closingStack = [...innerStack];
+    while (closingStack.length > 0) {
+      const open = closingStack.pop()!;
+      candidate += open === "[" ? "]" : "}";
+    }
+
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Try each strip pattern until one makes progress
+      let stripped = false;
+      for (const pattern of stripPatterns) {
+        const result = content.replace(pattern, "");
+        if (result.length < content.length) {
+          content = result;
+          stripped = true;
+          break;
+        }
+      }
+      if (!stripped) break;
+    }
+  }
+
+  return null;
 }
 
 export function parseProposalResponse(raw: string): Proposal[] {
@@ -286,6 +384,14 @@ export function parseProposalResponse(raw: string): Proposal[] {
       parsed = JSON.parse(repaired);
     } else {
       throw new Error(`Invalid JSON in LLM response: ${text.slice(0, 200)}`);
+    }
+  }
+
+  // If the LLM returned a single object instead of an array, wrap it
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const single = ProposalSchema.safeParse(parsed);
+    if (single.success) {
+      return normalizeProposals([single.data]);
     }
   }
 

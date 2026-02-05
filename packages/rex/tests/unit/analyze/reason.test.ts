@@ -146,11 +146,21 @@ describe("parseProposalResponse", () => {
     expect(() => parseProposalResponse(json)).toThrow();
   });
 
-  it("rejects non-array input", () => {
+  it("wraps single valid proposal object in array", () => {
     const json = JSON.stringify({
       epic: { title: "Single" },
       features: [],
     });
+
+    const proposals = parseProposalResponse(json);
+
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].epic.title).toBe("Single");
+    expect(proposals[0].epic.source).toBe("llm");
+  });
+
+  it("rejects non-proposal object input", () => {
+    const json = JSON.stringify({ bad: "data", not: "a proposal" });
 
     expect(() => parseProposalResponse(json)).toThrow();
   });
@@ -1008,6 +1018,34 @@ describe("extractJson", () => {
     const raw = 'Preamble [bad]\n```json\n[{"epic":{"title":"X"},"features":[]}]\n```\nTrailing';
     expect(extractJson(raw)).toBe('[{"epic":{"title":"X"},"features":[]}]');
   });
+
+  it("strips trailing prose after JSON object", () => {
+    const raw = '{"epic":{"title":"D"},"features":[]}\n\nLet me know if you need changes.';
+    expect(extractJson(raw)).toBe('{"epic":{"title":"D"},"features":[]}');
+  });
+
+  it("strips leading prose before JSON object", () => {
+    const raw = 'Here is the result:\n{"epic":{"title":"E"},"features":[]}';
+    expect(extractJson(raw)).toBe('{"epic":{"title":"E"},"features":[]}');
+  });
+
+  it("handles nested objects correctly when stripping trailing prose", () => {
+    const json = '{"epic":{"title":"E"},"features":[{"title":"F","tasks":[{"title":"T"}]}]}';
+    const raw = `Some preamble\n${json}\nSome epilogue`;
+    expect(extractJson(raw)).toBe(json);
+  });
+
+  it("handles strings with braces inside JSON objects", () => {
+    const json = '{"epic":{"title":"Handle {curly} braces"},"features":[]}';
+    const raw = `Result:\n${json}\nDone.`;
+    expect(extractJson(raw)).toBe(json);
+  });
+
+  it("handles strings with brackets inside JSON objects", () => {
+    const json = '{"epic":{"title":"Handle [square] brackets"},"features":[]}';
+    const raw = `Result:\n${json}\nDone.`;
+    expect(extractJson(raw)).toBe(json);
+  });
 });
 
 describe("repairTruncatedJson", () => {
@@ -1033,8 +1071,17 @@ describe("repairTruncatedJson", () => {
     expect(() => JSON.parse(repaired!)).not.toThrow();
   });
 
-  it("returns null for non-array input", () => {
-    expect(repairTruncatedJson('{"key": "value"')).toBeNull();
+  it("repairs truncated JSON objects", () => {
+    const repaired = repairTruncatedJson('{"key": "value"');
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed.key).toBe("value");
+  });
+
+  it("returns null for non-JSON input", () => {
+    expect(repairTruncatedJson("some plain text")).toBeNull();
   });
 
   it("returns null for completely mangled input", () => {
@@ -1046,6 +1093,57 @@ describe("repairTruncatedJson", () => {
     const repaired = repairTruncatedJson(truncated);
     expect(repaired).not.toBeNull();
     expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles trailing comma after last array element", () => {
+    const truncated = '[{"epic":{"title":"A"},"features":[]},';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("A");
+  });
+
+  it("handles trailing comma after last object property", () => {
+    const truncated = '[{"epic":{"title":"A"},';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles truncation mid-value with colon", () => {
+    // Truncated right after a colon — the value is missing entirely
+    const truncated = '[{"epic":{"title":';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles deeply nested truncation", () => {
+    const truncated = '[{"epic":{"title":"A"},"features":[{"title":"F","tasks":[{"title":"T","acceptanceCriteria":["crit1","crit2';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("A");
+  });
+
+  it("handles truncation in the middle of a key name", () => {
+    const truncated = '[{"epic":{"title":"A"},"feat';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles empty array at truncation point", () => {
+    const truncated = '[{"epic":{"title":"A"},"features":[]}';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    // Should end up as a valid single-element array
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("A");
   });
 });
 
@@ -1095,6 +1193,30 @@ describe("parseProposalResponse — enhanced", () => {
 
   it("provides useful error message for non-JSON", () => {
     expect(() => parseProposalResponse("I cannot generate that")).toThrow(/Invalid JSON/);
+  });
+
+  it("handles deeply truncated JSON with partial acceptance criteria", () => {
+    const truncated = '[{"epic":{"title":"Auth"},"features":[{"title":"Login","tasks":[{"title":"Validate","acceptanceCriteria":["email valid","pass';
+    const proposals = parseProposalResponse(truncated);
+
+    expect(proposals.length).toBeGreaterThanOrEqual(1);
+    expect(proposals[0].epic.title).toBe("Auth");
+  });
+
+  it("handles JSON with trailing commas from truncation", () => {
+    const truncated = '[{"epic":{"title":"Auth"},"features":[{"title":"Login","tasks":[{"title":"Validate email"}]},';
+    const proposals = parseProposalResponse(truncated);
+
+    expect(proposals.length).toBeGreaterThanOrEqual(1);
+    expect(proposals[0].epic.title).toBe("Auth");
+  });
+
+  it("extracts JSON object wrapped in prose and treats as single-item array", () => {
+    const raw = 'Here is the result:\n{"epic":{"title":"API"},"features":[{"title":"Endpoints","tasks":[]}]}\nLet me know!';
+    const proposals = parseProposalResponse(raw);
+
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].epic.title).toBe("API");
   });
 });
 
