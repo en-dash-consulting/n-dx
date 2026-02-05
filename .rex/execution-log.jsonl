@@ -703,3 +703,25 @@
 {"timestamp":"2026-02-05T17:22:11.628Z","event":"status_updated","itemId":"aef1c182-56b1-4d01-829a-50d7fbe85a07","detail":"Status changed to in_progress by hench agent"}
 {"timestamp":"2026-02-05T17:26:11.230Z","event":"item_updated","itemId":"aef1c182-56b1-4d01-829a-50d7fbe85a07","detail":"Updated: status, completedAt"}
 {"timestamp":"2026-02-05T17:26:30.000Z","event":"task_completed","itemId":"aef1c182-56b1-4d01-829a-50d7fbe85a07","detail":"## Summary\n\nTask **Implement intelligent result merging** was already fully implemented.\n\n### Verification\n- Reviewed dedupe.ts implementation\n- All 11 acceptance criteria are covered by existing tests in dedupe.test.ts\n- All 24 dedupe tests pass\n- Full test suite (1338 tests) passes\n\n### Implementation Details\nThe dedupe module provides:\n1. **similarity()** - Combines bigram Dice coefficient, word overlap Jaccard index, and substring containment scoring\n2. **deduplicateScanResults()** - Groups by kind, uses union-find clustering, and merges with richness scoring\n3. **mergeCluster()** - Picks richest result and merges acceptance criteria + tags from all cluster members\n\nAll acceptance criteria are met through existing implementation."}
+{"timestamp":"2026-02-05T17:26:40.784Z","event":"status_updated","itemId":"aef1c182-56b1-4d01-829a-50d7fbe85a07","detail":"Status changed to completed by hench agent"}
+{"timestamp":"2026-02-05T17:26:40.792Z","event":"task_completed","itemId":"aef1c182-56b1-4d01-829a-50d7fbe85a07","detail":"## Summary\n\nTask **Implement intelligent result merging** (ID: aef1c182-56b1-4d01-829a-50d7fbe85a07) was verified as **already complete**.\n\n### Verification\n- Reviewed `packages/rex/src/analyze/dedupe.ts` implementation\n- All 11 acceptance criteria are fully covered by existing tests in `packages/rex/tests/unit/analyze/dedupe.test.ts`\n- All 24 dedupe tests pass\n- Full test suite (1338 tests) passes\n\n### Implementation Details\nThe dedupe module provides complete functionality:\n1. **`similarity()`"}
+{"timestamp":"2026-02-05T17:26:40.844Z","event":"status_updated","itemId":"26b1b3bf-44eb-4b0b-b9ff-5470f8200f03","detail":"Status changed to in_progress by hench agent"}
+{"timestamp":"2026-02-05T17:29:36.210Z","event":"item_updated","itemId":"26b1b3bf-44eb-4b0b-b9ff-5470f8200f03","detail":"Updated: status, completedAt"}
+{"timestamp":"2026-02-05T17:30:07.000Z","event":"task_completed","itemId":"26b1b3bf-44eb-4b0b-b9ff-5470f8200f03","detail":"## Summary
+
+Task **Implement priority-based task selection** was verified as **already complete**.
+
+### Verification
+- Reviewed `packages/rex/src/core/next-task.ts` implementation
+- All 6 acceptance criteria are fully covered by existing tests in `packages/rex/tests/unit/core/next-task.test.ts`
+- All 43 next-task tests pass
+- Full test suite (1338 tests) passes
+
+### Implementation Details
+The `compareEntries` function in `next-task.ts` implements all priority-based selection logic:
+1. **in_progress first** - in_progress tasks always sorted before pending, regardless of priority
+2. **Own priority** - Tasks sorted by their own priority (critical > high > medium > low)
+3. **Ancestor tiebreaker** - Same-priority tasks use highest-priority ancestor as tiebreaker
+4. **Alphabetical fallback** - Final tiebreaker is title
+
+All acceptance criteria map to existing tests."}
