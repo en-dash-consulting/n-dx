@@ -27,24 +27,36 @@ pnpm test           # test all packages
 pnpm typecheck      # typecheck all packages
 ```
 
+## Command Aliases
+
+Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
+`sv` is an alias for `sourcevision`.
+
 ## n-dx Orchestration Commands
 
 ```sh
-n-dx init [dir]            # sourcevision init → rex init → hench init
-n-dx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
-n-dx plan --accept [dir]   # ...then accept proposals into PRD
-n-dx work [dir]            # hench run (pass --task=ID, --dry-run, etc.)
-n-dx status [dir]          # rex status (pass --format=json)
-n-dx config [key] [value]  # view/edit settings (--json, --help)
+ndx init [dir]            # sourcevision init → rex init → hench init
+ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
+ndx plan --accept [dir]   # ...then accept proposals into PRD
+ndx work [dir]            # hench run (pass --task=ID, --dry-run, etc.)
+ndx status [dir]          # rex status (pass --format=json)
+ndx config [key] [value]  # view/edit settings (--json, --help)
 ```
 
 ## Direct Tool Access
 
 ```sh
-n-dx rex <command> [args]
-n-dx hench <command> [args]
-n-dx sourcevision <command> [args]
-n-dx sv <command> [args]          # alias for sourcevision
+# Via orchestrator
+ndx rex <command> [args]
+ndx hench <command> [args]
+ndx sourcevision <command> [args]
+ndx sv <command> [args]           # alias for sourcevision
+
+# Standalone binaries (also available after npm link)
+rex <command> [args]
+hench <command> [args]
+sourcevision <command> [args]
+sv <command> [args]               # alias for sourcevision
 ```
 
 ### Rex commands
@@ -88,11 +100,11 @@ claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp 
 
 ## Development Workflow
 
-1. `n-dx init .` — set up all tool directories
-2. `n-dx plan .` — analyze codebase, review proposals
-3. `n-dx plan --accept .` — accept proposals into PRD
-4. `n-dx work .` — execute next task autonomously
-5. `n-dx status .` — check progress
+1. `ndx init .` — set up all tool directories
+2. `ndx plan .` — analyze codebase, review proposals
+3. `ndx plan --accept .` — accept proposals into PRD
+4. `ndx work .` — execute next task autonomously
+5. `ndx status .` — check progress
 
 ## Key Files
 

@@ -14,25 +14,25 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 pnpm install
 pnpm build
 
-# Register CLI to globally
+# Register CLI globally
 npm link
 # or
 pnpm link --global
 
 # Initialize all tools in a project
-n-dx init .
+ndx init .
 
 # Analyze codebase and generate PRD proposals
-n-dx plan .
+ndx plan .
 
 # Accept proposals into the PRD
-n-dx plan --accept .
+ndx plan --accept .
 
 # Execute the next task autonomously
-n-dx work .
+ndx work .
 
 # Check progress
-n-dx status .
+ndx status .
 ```
 
 ## Packages
@@ -43,26 +43,44 @@ n-dx status .
 
 **[hench](packages/hench)** — Autonomous agent: picks next rex task, builds a brief, calls Claude API or CLI in a tool-use loop with security guardrails, records runs in `.hench/runs/`.
 
+## Command Aliases
+
+Both `n-dx` and `ndx` work identically. Examples in this doc use `ndx` for brevity.
+
+| Full Form | Short Form |
+|-----------|------------|
+| `n-dx` | `ndx` |
+| `sourcevision` | `sv` |
+
 ## Orchestration Commands
 
 ```
-n-dx init [dir]            sourcevision init + rex init + hench init
-n-dx plan [dir]            sourcevision analyze + rex analyze (show proposals)
-n-dx plan --accept [dir]   ...then accept proposals into PRD
-n-dx plan --file=<path>    import PRD from a document (skips sourcevision)
-n-dx work [dir]            hench run (interactive task selection by default)
-n-dx work --auto [dir]     autoselect highest-priority task
-n-dx work --iterations=N   run N tasks sequentially (stops on failure)
-n-dx status [dir]          rex status (pass --format=json)
+ndx init [dir]             sourcevision init + rex init + hench init
+ndx plan [dir]             sourcevision analyze + rex analyze (show proposals)
+ndx plan --accept [dir]    ...then accept proposals into PRD
+ndx plan --file=<path>     import PRD from a document (skips sourcevision)
+ndx work [dir]             hench run (interactive task selection by default)
+ndx work --auto [dir]      autoselect highest-priority task
+ndx work --iterations=N    run N tasks sequentially (stops on failure)
+ndx status [dir]           rex status (pass --format=json)
 ```
 
 ## Direct Tool Access
 
+Access individual tools through the orchestrator or as standalone commands:
+
 ```sh
-n-dx rex <command> [args]
-n-dx hench <command> [args]
-n-dx sourcevision <command> [args]
-n-dx sv <command> [args]          # alias
+# Via orchestrator (ndx delegates to the tool)
+ndx rex <command> [args]
+ndx hench <command> [args]
+ndx sourcevision <command> [args]
+ndx sv <command> [args]           # shorthand for sourcevision
+
+# Standalone binaries (also available after npm link)
+rex <command> [args]
+hench <command> [args]
+sourcevision <command> [args]
+sv <command> [args]               # shorthand for sourcevision
 ```
 
 ## MCP Servers
@@ -70,6 +88,11 @@ n-dx sv <command> [args]          # alias
 Rex and sourcevision expose MCP servers for Claude Code tool use:
 
 ```sh
+# Using standalone binaries (recommended)
+claude mcp add rex -- rex mcp .
+claude mcp add sourcevision -- sv mcp .
+
+# Or using node directly
 claude mcp add rex -- node packages/rex/dist/cli/index.js mcp .
 claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp .
 ```

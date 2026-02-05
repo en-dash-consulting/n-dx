@@ -170,15 +170,17 @@ Orchestration:
   ci [dir]              Run analysis pipeline and validate PRD health
   config [key] [value]  View and edit settings (--json, --help)
 
-Tools:
+Tools (via orchestrator or standalone):
   rex ...               PRD management and task tracking
   hench ...             Autonomous agent for task execution
   sourcevision ...      Codebase analysis and visualization
   sv ...                Alias for sourcevision
 
 Global Options:
-  --quiet, -q             Suppress informational output (for scripting)
+  --quiet, -q           Suppress informational output (for scripting)
 
 Usage: ndx <command> [args...]
-       n-dx <command> [args...]`);
+       n-dx <command> [args...]
+
+Standalone binaries (rex, hench, sourcevision, sv) are also available after install.`);
 process.exit(command ? 1 : 0);
