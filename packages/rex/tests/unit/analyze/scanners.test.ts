@@ -15,7 +15,7 @@ describe("scanTests", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it("extracts describe and it blocks from test files", async () => {
+  it("emits summary features grouped by epic, not individual tasks", async () => {
     await mkdir(join(tempDir, "tests"), { recursive: true });
     await writeFile(
       join(tempDir, "tests", "login.test.ts"),
@@ -29,16 +29,16 @@ describe("Login Flow", () => {
 
     const results = await scanTests(tempDir);
 
+    // Should emit one summary feature, NOT individual tasks for each test case
     const features = results.filter((r) => r.kind === "feature");
     const tasks = results.filter((r) => r.kind === "task");
 
-    expect(features.length).toBeGreaterThanOrEqual(1);
-    expect(features.some((f) => f.name === "Login")).toBe(true);
-    expect(features.some((f) => f.name === "Login Flow")).toBe(true);
+    expect(features.length).toBe(1);
+    expect(features[0].name).toBe("General Tests");
+    expect(features[0].description).toContain("1 test file");
 
-    expect(tasks.length).toBe(2);
-    expect(tasks.some((t) => t.name === "validates email format")).toBe(true);
-    expect(tasks.some((t) => t.name === "handles invalid credentials")).toBe(true);
+    // No individual test tasks — tests are part of workflow, not standalone tasks
+    expect(tasks.length).toBe(0);
   });
 
   it("groups by directory to infer epic names", async () => {
@@ -55,28 +55,21 @@ describe("Login", () => {
     const results = await scanTests(tempDir);
     const feature = results.find((r) => r.kind === "feature");
     expect(feature?.tags).toContain("Auth");
+    expect(feature?.name).toBe("Auth Tests");
   });
 
-  it("lite mode uses filenames only, skips content", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "auth.test.ts"),
-      `
-describe("Auth", () => {
-  it("validates tokens", () => {});
-  it("handles expiry", () => {});
-});
-`,
-    );
+  it("groups multiple test files under the same epic", async () => {
+    await mkdir(join(tempDir, "tests", "auth"), { recursive: true });
+    await writeFile(join(tempDir, "tests", "auth", "login.test.ts"), `test("a", () => {});`);
+    await writeFile(join(tempDir, "tests", "auth", "logout.test.ts"), `test("b", () => {});`);
+    await writeFile(join(tempDir, "tests", "auth", "session.test.ts"), `test("c", () => {});`);
 
-    const results = await scanTests(tempDir, { lite: true });
+    const results = await scanTests(tempDir);
 
-    // Should only have file-level feature, no tasks from content
+    // Should have one feature summarizing all auth tests
     expect(results.length).toBe(1);
-    expect(results[0].kind).toBe("feature");
-    expect(results[0].name).toBe("Auth");
-    const tasks = results.filter((r) => r.kind === "task");
-    expect(tasks.length).toBe(0);
+    expect(results[0].name).toBe("Auth Tests");
+    expect(results[0].description).toContain("3 test files");
   });
 
   it("handles spec files", async () => {
@@ -89,7 +82,10 @@ test("adds numbers", () => {});
     );
 
     const results = await scanTests(tempDir);
-    expect(results.some((r) => r.name === "adds numbers" && r.kind === "task")).toBe(true);
+    // Should emit a feature summarizing coverage, not individual task
+    expect(results.length).toBe(1);
+    expect(results[0].kind).toBe("feature");
+    expect(results[0].name).toBe("Src Tests");
   });
 
   it("handles __tests__ directory", async () => {
@@ -104,7 +100,10 @@ describe("Helper", () => {
     );
 
     const results = await scanTests(tempDir);
-    expect(results.some((r) => r.name === "formats dates")).toBe(true);
+    // Feature summarizing coverage, not individual tasks
+    expect(results.length).toBe(1);
+    expect(results[0].kind).toBe("feature");
+    expect(results[0].name).toBe("Src Tests");
   });
 
   it("returns empty for directory with no test files", async () => {
@@ -115,214 +114,18 @@ describe("Helper", () => {
     expect(results).toEqual([]);
   });
 
-  it("groups tests under nested describe blocks", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "auth.test.ts"),
-      `
-describe("Auth", () => {
-  describe("login", () => {
-    it("validates email", () => {});
-    it("checks password", () => {});
-  });
-  describe("logout", () => {
-    it("clears session", () => {});
-  });
-});
-`,
-    );
+  it("groups test files from multiple epics", async () => {
+    await mkdir(join(tempDir, "tests", "auth"), { recursive: true });
+    await mkdir(join(tempDir, "tests", "api"), { recursive: true });
+    await writeFile(join(tempDir, "tests", "auth", "login.test.ts"), `test("a", () => {});`);
+    await writeFile(join(tempDir, "tests", "api", "routes.test.ts"), `test("b", () => {});`);
 
     const results = await scanTests(tempDir);
-    const tasks = results.filter((r) => r.kind === "task");
 
-    // Tasks should carry their describe-block hierarchy in tags
-    const emailTask = tasks.find((t) => t.name === "validates email");
-    expect(emailTask).toBeDefined();
-    expect(emailTask!.tags).toContain("Auth > login");
-
-    const sessionTask = tasks.find((t) => t.name === "clears session");
-    expect(sessionTask).toBeDefined();
-    expect(sessionTask!.tags).toContain("Auth > logout");
-  });
-
-  it("handles deeply nested describe blocks", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "api.test.ts"),
-      `
-describe("API", () => {
-  describe("v2", () => {
-    describe("users", () => {
-      it("lists all users", () => {});
-    });
-  });
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const tasks = results.filter((r) => r.kind === "task");
-
-    const task = tasks.find((t) => t.name === "lists all users");
-    expect(task).toBeDefined();
-    expect(task!.tags).toContain("API > v2 > users");
-  });
-
-  it("preserves top-level tests without describe nesting", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "utils.test.ts"),
-      `
-test("adds numbers", () => {});
-describe("Formatting", () => {
-  it("formats dates", () => {});
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const tasks = results.filter((r) => r.kind === "task");
-
-    // Top-level test has no describe path — just the epic tag
-    const addTask = tasks.find((t) => t.name === "adds numbers");
-    expect(addTask).toBeDefined();
-    expect(addTask!.tags).toEqual(["General"]);
-
-    // Nested test has describe path
-    const fmtTask = tasks.find((t) => t.name === "formats dates");
-    expect(fmtTask).toBeDefined();
-    expect(fmtTask!.tags).toContain("Formatting");
-  });
-
-  it("handles describe.skip and describe.each variants", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "variants.test.ts"),
-      `
-describe.skip("Skipped Suite", () => {
-  it("never runs", () => {});
-});
-
-describe.each([[1], [2]])("Param Suite %i", (n) => {
-  it("works with param", () => {});
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const features = results.filter((r) => r.kind === "feature");
-    const tasks = results.filter((r) => r.kind === "task");
-
-    expect(features.some((f) => f.name === "Skipped Suite")).toBe(true);
-    expect(features.some((f) => f.name === "Param Suite %i")).toBe(true);
-    expect(tasks.some((t) => t.name === "never runs")).toBe(true);
-    expect(tasks.some((t) => t.name === "works with param")).toBe(true);
-  });
-
-  it("handles it.skip, it.each, test.skip, and test.each variants", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "test-variants.test.ts"),
-      `
-describe("Variants", () => {
-  it.skip("skipped test", () => {});
-  it.each([1, 2])("param test %i", () => {});
-  test.skip("skipped test fn", () => {});
-  test.each([1, 2])("param test fn %i", () => {});
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const tasks = results.filter((r) => r.kind === "task");
-
-    expect(tasks.some((t) => t.name === "skipped test")).toBe(true);
-    expect(tasks.some((t) => t.name === "param test %i")).toBe(true);
-    expect(tasks.some((t) => t.name === "skipped test fn")).toBe(true);
-    expect(tasks.some((t) => t.name === "param test fn %i")).toBe(true);
-  });
-
-  it("excludes braces inside comments from depth tracking", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "comments.test.ts"),
-      `
-describe("WithComments", () => {
-  // This line has braces { that } should be ignored
-  it("test one", () => {});
-  /* Another comment { with braces } */
-  it("test two", () => {});
-});
-
-describe("After", () => {
-  it("still works", () => {});
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const tasks = results.filter((r) => r.kind === "task");
-
-    // Both tests should be inside "WithComments"
-    const t1 = tasks.find((t) => t.name === "test one");
-    expect(t1).toBeDefined();
-    expect(t1!.tags).toContain("WithComments");
-
-    const t2 = tasks.find((t) => t.name === "test two");
-    expect(t2).toBeDefined();
-    expect(t2!.tags).toContain("WithComments");
-
-    // "After" describe should still be parsed correctly
-    const t3 = tasks.find((t) => t.name === "still works");
-    expect(t3).toBeDefined();
-    expect(t3!.tags).toContain("After");
-  });
-
-  it("ignores commented-out describe and test lines", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "commented.test.ts"),
-      `
-describe("Real", () => {
-  // describe("Fake", () => {
-  it("real test", () => {});
-  // it("fake test", () => {});
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const features = results.filter((r) => r.kind === "feature");
-    const tasks = results.filter((r) => r.kind === "task");
-
-    expect(features.some((f) => f.name === "Fake")).toBe(false);
-    expect(tasks.some((t) => t.name === "fake test")).toBe(false);
-    expect(tasks.some((t) => t.name === "real test")).toBe(true);
-  });
-
-  it("emits feature results for each describe block with nesting path", async () => {
-    await mkdir(join(tempDir, "tests"), { recursive: true });
-    await writeFile(
-      join(tempDir, "tests", "parser.test.ts"),
-      `
-describe("Parser", () => {
-  describe("JSON", () => {
-    it("parses objects", () => {});
-  });
-  describe("YAML", () => {
-    it("parses documents", () => {});
-  });
-});
-`,
-    );
-
-    const results = await scanTests(tempDir);
-    const features = results.filter((r) => r.kind === "feature");
-
-    // Should have file-level feature + describe features
-    expect(features.some((f) => f.name === "Parser")).toBe(true);
-    expect(features.some((f) => f.name === "Parser > JSON")).toBe(true);
-    expect(features.some((f) => f.name === "Parser > YAML")).toBe(true);
+    // Should have two features, one per epic
+    expect(results.length).toBe(2);
+    const names = results.map((r) => r.name).sort();
+    expect(names).toEqual(["Api Tests", "Auth Tests"]);
   });
 });
 
@@ -700,9 +503,8 @@ describe("scanSourceVision", () => {
         ],
         findings: [
           { type: "anti-pattern", pass: 1, scope: "core", text: "God object detected", severity: "warning" },
-          { type: "suggestion", pass: 1, scope: "core", text: "Add input validation", severity: "info" },
-          { type: "observation", pass: 0, scope: "core", text: "High coupling (0.8)", severity: "warning" },
-          { type: "pattern", pass: 1, scope: "core", text: "Repeated error handling", severity: "info" },
+          { type: "suggestion", pass: 1, scope: "core", text: "Add input validation", severity: "warning" },
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Security vulnerability", severity: "critical" },
         ],
       }),
     );
@@ -710,10 +512,10 @@ describe("scanSourceVision", () => {
     const results = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
 
+    // anti-pattern → "Fix:", suggestion → "Implement:"
     expect(tasks.find((t) => t.name === "Fix: God object detected")).toBeDefined();
     expect(tasks.find((t) => t.name === "Implement: Add input validation")).toBeDefined();
-    expect(tasks.find((t) => t.name === "Investigate: High coupling (0.8)")).toBeDefined();
-    expect(tasks.find((t) => t.name === "Refactor: Repeated error handling")).toBeDefined();
+    expect(tasks.find((t) => t.name === "Fix: Security vulnerability")).toBeDefined();
   });
 
   it("includes acceptance criteria with file paths on tasks", async () => {
@@ -918,7 +720,7 @@ describe("scanSourceVision", () => {
     expect(results.some((r) => r.name === "Core")).toBe(true);
   });
 
-  it("skips info-severity observations but keeps actionable info findings", async () => {
+  it("only includes actionable warning/critical findings as tasks", async () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(
       join(tempDir, ".sourcevision", "zones.json"),
@@ -935,24 +737,35 @@ describe("scanSourceVision", () => {
           },
         ],
         findings: [
-          { type: "observation", pass: 0, scope: "core", text: "High cohesion (0.9)", severity: "info" },
-          { type: "relationship", pass: 0, scope: "core", text: "Depends on utils zone", severity: "info" },
+          // Informational types — skipped regardless of severity
+          { type: "observation", pass: 0, scope: "core", text: "High cohesion (0.9)", severity: "warning" },
+          { type: "relationship", pass: 0, scope: "core", text: "Depends on utils zone", severity: "warning" },
+          { type: "pattern", pass: 1, scope: "core", text: "Uses factory pattern", severity: "warning" },
+          // Info severity — skipped even for actionable types
           { type: "suggestion", pass: 1, scope: "core", text: "Consider adding tests", severity: "info" },
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Minor code smell", severity: "info" },
+          // Actionable types with warning/critical — these become tasks
           { type: "anti-pattern", pass: 1, scope: "core", text: "Bad pattern detected", severity: "warning" },
+          { type: "suggestion", pass: 2, scope: "core", text: "Add input validation", severity: "warning" },
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Critical security issue", severity: "critical" },
         ],
       }),
     );
 
     const results = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
-    // Info observations/relationships are skipped — purely informational
-    // But info suggestions/patterns/anti-patterns are kept — they're actionable
-    expect(tasks.length).toBe(2);
+
+    // Only anti-patterns and suggestions with warning/critical severity become tasks
+    expect(tasks.length).toBe(3);
     expect(tasks.some((t) => t.name.includes("Bad pattern detected"))).toBe(true);
-    expect(tasks.some((t) => t.name.includes("Consider adding tests"))).toBe(true);
-    // Info-severity actionable findings get medium priority
-    const suggestion = tasks.find((t) => t.name.includes("Consider adding tests"));
-    expect(suggestion?.priority).toBe("medium");
+    expect(tasks.some((t) => t.name.includes("Add input validation"))).toBe(true);
+    expect(tasks.some((t) => t.name.includes("Critical security issue"))).toBe(true);
+
+    // Verify priorities
+    const warning = tasks.find((t) => t.name.includes("Bad pattern detected"));
+    expect(warning?.priority).toBe("high");
+    const critical = tasks.find((t) => t.name.includes("Critical security issue"));
+    expect(critical?.priority).toBe("critical");
   });
 
   it("includes concrete fix suggestions based on finding patterns", async () => {
@@ -1047,7 +860,7 @@ describe("scanSourceVision", () => {
         ],
         findings: [
           {
-            type: "observation",
+            type: "suggestion",
             pass: 1,
             scope: "utils",
             text: "Low coupling indicates good isolation",
@@ -1083,7 +896,7 @@ describe("scanSourceVision", () => {
         ],
         findings: [
           {
-            type: "pattern",
+            type: "anti-pattern",
             pass: 2,
             scope: "core",
             text: "Duplicated sorting logic in multiple files",
@@ -1160,7 +973,7 @@ describe("scanSourceVision", () => {
             pass: 1,
             scope: "small",
             text: "Consider adding documentation",
-            severity: "info",
+            severity: "warning",
             // No related field
           },
         ],

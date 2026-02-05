@@ -86,14 +86,13 @@ describe("App", () => {
   });
 
   it("supports --lite mode", async () => {
-    await mkdir(join(tmpDir, "tests"), { recursive: true });
+    // Create a markdown doc that has content-level items in full mode
     await writeFile(
-      join(tmpDir, "tests", "auth.test.ts"),
-      `
-describe("Auth", () => {
-  it("validates tokens", () => {});
-  it("handles expiry", () => {});
-});
+      join(tmpDir, "features.md"),
+      `# Dashboard
+- Display charts
+- Export data
+- Filter data
 `,
     );
 
@@ -103,7 +102,8 @@ describe("Auth", () => {
     const fullParsed = JSON.parse(fullOutput);
     const liteParsed = JSON.parse(liteOutput);
 
-    // Lite should have fewer proposals (no task-level items from content parsing)
+    // Lite mode uses filenames only for docs (no bullet extraction)
+    // Full mode extracts heading features + bullet tasks
     expect(liteParsed.stats.total).toBeLessThan(fullParsed.stats.total);
   });
 

@@ -129,141 +129,18 @@ function featureNameFromFile(filePath: string): string {
   return toTitleCase(name);
 }
 
-/** A node in the describe-block tree */
-interface DescribeNode {
-  name: string;
-  children: DescribeNode[];
-  tests: string[];
-}
-
 /**
- * Parse test file content into a tree of describe blocks and their tests.
- * Uses brace-depth tracking (not regex alone) so nesting is preserved.
+ * Scan test files for coverage context.
+ *
+ * IMPORTANT: This scanner only emits file-level features for context.
+ * It does NOT create individual tasks for each test case because:
+ * 1. Tests that exist are already passing — they're not work to be done
+ * 2. Testing is part of the development workflow, not standalone tasks
+ * 3. Test requirements should be acceptance criteria on feature tasks
+ *
+ * The scanner provides awareness of test coverage without polluting the
+ * PRD with hundreds of "Test X" tasks that are already implemented.
  */
-function parseDescribeTree(content: string): { roots: DescribeNode[]; topLevelTests: string[] } {
-  const roots: DescribeNode[] = [];
-  const topLevelTests: string[] = [];
-  const lines = content.split("\n");
-
-  // Stack tracks current nesting: each entry is { node, braceDepth at open }
-  const stack: { node: DescribeNode; openDepth: number }[] = [];
-  let braceDepth = 0;
-
-  for (const line of lines) {
-    // Strip comments first so braces/patterns inside them are ignored,
-    // then strip string literals for brace counting.
-    const uncommented = stripComments(line);
-    const strippedLine = stripStrings(uncommented);
-
-    // Check for describe block opening before counting braces.
-    // Handles: describe(, describe.skip(, describe.each(...)( , etc.
-    const describeMatch = uncommented.match(
-      /describe(?:\.(?:skip|only|each)\b(?:\([^)]*\))?)?(?:\s*)\(\s*["'`]([^"'`]+)["'`]/,
-    );
-    if (describeMatch) {
-      const node: DescribeNode = { name: describeMatch[1], children: [], tests: [] };
-      if (stack.length > 0) {
-        stack[stack.length - 1].node.children.push(node);
-      } else {
-        roots.push(node);
-      }
-      // The opening brace for the describe callback is on this line (or will be)
-      const openBraces = (strippedLine.match(/\{/g) || []).length;
-      const closeBraces = (strippedLine.match(/\}/g) || []).length;
-      braceDepth += openBraces - closeBraces;
-      stack.push({ node, openDepth: braceDepth });
-      continue;
-    }
-
-    // Check for it/test blocks.
-    // Handles: it(, it.skip(, it.each(...)( , test(, test.skip(, etc.
-    const testMatch = uncommented.match(
-      /(?:it|test)(?:\.(?:skip|only|each|todo)\b(?:\([^)]*\))?)?(?:\s*)\(\s*["'`]([^"'`]+)["'`]/,
-    );
-    if (testMatch) {
-      if (stack.length > 0) {
-        stack[stack.length - 1].node.tests.push(testMatch[1]);
-      } else {
-        topLevelTests.push(testMatch[1]);
-      }
-    }
-
-    // Update brace depth
-    const openBraces = (strippedLine.match(/\{/g) || []).length;
-    const closeBraces = (strippedLine.match(/\}/g) || []).length;
-    braceDepth += openBraces - closeBraces;
-
-    // Pop stack when we close back to where a describe opened
-    while (stack.length > 0 && braceDepth < stack[stack.length - 1].openDepth) {
-      stack.pop();
-    }
-  }
-
-  return { roots, topLevelTests };
-}
-
-/** Strip string literals from a line to avoid counting braces inside strings */
-function stripStrings(line: string): string {
-  // Remove template literals, double-quoted, and single-quoted strings
-  return line
-    .replace(/`[^`]*`/g, "")
-    .replace(/"[^"]*"/g, "")
-    .replace(/'[^']*'/g, "");
-}
-
-/** Strip comments from a line so braces and patterns inside them are ignored */
-function stripComments(line: string): string {
-  // Remove inline block comments: /* ... */
-  let result = line.replace(/\/\*.*?\*\//g, "");
-  // Remove single-line comments: // ...
-  // Only strip if "//" is not inside a string literal — approximate by checking
-  // that it is preceded by whitespace or start-of-line (good enough for test files).
-  result = result.replace(/\/\/.*$/, "");
-  return result;
-}
-
-/** Walk a describe tree and emit ScanResults with hierarchical paths */
-function emitDescribeResults(
-  node: DescribeNode,
-  parentPath: string[],
-  epicName: string,
-  rel: string,
-  featureName: string,
-  results: ScanResult[],
-): void {
-  const currentPath = [...parentPath, node.name];
-  const pathLabel = currentPath.join(" > ");
-
-  // Emit a feature for this describe block (with nesting path)
-  // Skip if it duplicates the file-level feature name
-  if (pathLabel.toLowerCase() !== featureName.toLowerCase()) {
-    results.push({
-      name: pathLabel,
-      source: "test",
-      sourceFile: rel,
-      kind: "feature",
-      tags: [epicName],
-    });
-  }
-
-  // Emit tasks under this describe block — tag with the describe path
-  for (const testName of node.tests) {
-    results.push({
-      name: testName,
-      source: "test",
-      sourceFile: rel,
-      kind: "task",
-      acceptanceCriteria: [testName],
-      tags: [pathLabel],
-    });
-  }
-
-  // Recurse into children
-  for (const child of node.children) {
-    emitDescribeResults(child, currentPath, epicName, rel, featureName, results);
-  }
-}
-
 export async function scanTests(
   dir: string,
   opts: ScanOptions = {},
@@ -271,49 +148,32 @@ export async function scanTests(
   const files = await globFiles(dir, isTestFile);
   const results: ScanResult[] = [];
 
+  // Group test files by epic for a summary view
+  const epicFiles = new Map<string, string[]>();
+
   for (const filePath of files) {
     const rel = relative(dir, filePath);
     const epicName = inferEpicName(filePath, dir);
-    const featureName = featureNameFromFile(filePath);
 
-    // Always emit a feature-level result for the file itself
+    const list = epicFiles.get(epicName) ?? [];
+    list.push(rel);
+    epicFiles.set(epicName, list);
+  }
+
+  // Emit one feature per epic summarizing test coverage
+  // This provides context without creating individual tasks
+  for (const [epicName, testFiles] of epicFiles) {
+    const fileCount = testFiles.length;
+    const fileLabel = fileCount === 1 ? "1 test file" : `${fileCount} test files`;
+
     results.push({
-      name: featureName,
+      name: `${epicName} Tests`,
       source: "test",
-      sourceFile: rel,
+      sourceFile: testFiles[0], // Primary file for reference
       kind: "feature",
+      description: `Test coverage: ${fileLabel}`,
       tags: [epicName],
     });
-
-    if (opts.lite) continue;
-
-    // Full mode: parse file contents
-    let content: string;
-    try {
-      content = await readFile(filePath, "utf-8");
-    } catch {
-      continue;
-    }
-
-    // Parse describe-block tree to produce hierarchical grouping
-    const { roots, topLevelTests } = parseDescribeTree(content);
-
-    // Emit results for each describe tree
-    for (const root of roots) {
-      emitDescribeResults(root, [], epicName, rel, featureName, results);
-    }
-
-    // Top-level tests (outside any describe block)
-    for (const testName of topLevelTests) {
-      results.push({
-        name: testName,
-        source: "test",
-        sourceFile: rel,
-        kind: "task",
-        acceptanceCriteria: [testName],
-        tags: [epicName],
-      });
-    }
   }
 
   return results;
@@ -730,13 +590,21 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
       }
 
       // Process top-level findings into actionable tasks
+      // Focus on problems (anti-patterns) and actionable suggestions, skip informational items
       if (zonesData.findings) {
         for (const finding of zonesData.findings) {
           // Skip findings with no severity — not yet triaged
           if (!finding.severity) continue;
-          // Skip info-level observations/relationships — purely informational
-          const infoOnly = finding.type === "observation" || finding.type === "relationship";
-          if (finding.severity === "info" && infoOnly) continue;
+
+          // Only include actionable finding types:
+          // - anti-pattern: something wrong that needs fixing
+          // - suggestion: an improvement to implement
+          // Skip observations, relationships, patterns — these are informational context
+          const isActionable = finding.type === "anti-pattern" || finding.type === "suggestion";
+          if (!isActionable) continue;
+
+          // Only include warning/critical severity — info is too noisy for task generation
+          if (finding.severity === "info") continue;
 
           const priority: Priority =
             finding.severity === "critical"
