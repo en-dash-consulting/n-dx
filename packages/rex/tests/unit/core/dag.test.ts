@@ -67,8 +67,18 @@ describe("validateDAG", () => {
   it("detects cycles", () => {
     const items: PRDItem[] = [
       makeItem({ id: "t1", title: "A", blockedBy: ["t2"] }),
-      makeItem({ id: "t2", title: "B", blockedBy: ["t3"] }),
-      makeItem({ id: "t3", title: "C", blockedBy: ["t1"] }),
+      makeItem({ id: "t2", title: "B", blockedBy: ["t1"] }),
+    ];
+    const result = validateDAG(items);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("Cycle detected"))).toBe(true);
+  });
+
+  it("detects triangle cycle", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "A", blockedBy: ["t3"] }),
+      makeItem({ id: "t2", title: "B", blockedBy: ["t1"] }),
+      makeItem({ id: "t3", title: "C", blockedBy: ["t2"] }),
     ];
     const result = validateDAG(items);
     expect(result.valid).toBe(false);

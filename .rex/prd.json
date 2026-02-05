@@ -1980,7 +1980,7 @@
         {
           "id": "d24dbc1a-77cb-4db3-ac06-0315cfe76ddb",
           "title": "Core Validation Logic",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Fundamental validation algorithms for PRD structure",
           "source": "llm",
@@ -1988,7 +1988,7 @@
             {
               "id": "fadf770b-4806-4f6b-b8c6-0851718424a6",
               "title": "Validate DAG structure",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure PRD maintains valid directed acyclic graph structure",
               "acceptanceCriteria": [
@@ -2015,9 +2015,13 @@
                 "validateStructure",
                 "detectCirculars"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T01:43:25.500Z",
+              "completedAt": "2026-02-05T01:47:37.926Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-05T01:47:37.959Z",
+          "completedAt": "2026-02-05T01:47:37.959Z"
         },
         {
           "id": "6bcacd7d-9a06-49df-8e9b-dd77d1a814ae",
