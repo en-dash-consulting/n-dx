@@ -200,6 +200,41 @@ describe("n-dx ci", () => {
       expect(statusStep.data).toHaveProperty("completed");
     });
 
+    it("report includes sourcevision-validate step", () => {
+      const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
+      const report = JSON.parse(output);
+      const svValStep = report.steps.find((s) => s.name === "sourcevision-validate");
+      expect(svValStep).toBeDefined();
+      expect(svValStep.ok).toBe(true);
+      expect(svValStep.detail).toBe("All modules valid");
+    });
+
+    it("validate step includes checks array", () => {
+      const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
+      const report = JSON.parse(output);
+      const valStep = report.steps.find((s) => s.name === "validate");
+      expect(valStep.checks).toBeDefined();
+      expect(Array.isArray(valStep.checks)).toBe(true);
+      expect(valStep.checks.length).toBeGreaterThan(0);
+      // Each check should have name and pass properties
+      for (const check of valStep.checks) {
+        expect(check).toHaveProperty("name");
+        expect(check).toHaveProperty("pass");
+      }
+    });
+
+    it("status data includes all count fields", () => {
+      const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
+      const report = JSON.parse(output);
+      const statusStep = report.steps.find((s) => s.name === "status");
+      expect(statusStep.data).toHaveProperty("total");
+      expect(statusStep.data).toHaveProperty("completed");
+      expect(statusStep.data).toHaveProperty("inProgress");
+      expect(statusStep.data).toHaveProperty("pending");
+      expect(statusStep.data).toHaveProperty("deferred");
+      expect(statusStep.data).toHaveProperty("blocked");
+    });
+
     it("overall ok is true when all steps pass", () => {
       const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
       const report = JSON.parse(output);
@@ -297,6 +332,134 @@ describe("n-dx ci", () => {
       // The validate step should show the hierarchy placement failure
       const valStep = report.steps.find((s) => s.name === "validate");
       expect(valStep.ok).toBe(false);
+    });
+
+    it("includes check details for failed validations", async () => {
+      await writeFile(
+        join(tmpDir, ".rex", "prd.json"),
+        JSON.stringify({
+          schema: "rex/v1",
+          title: "Test",
+          items: [
+            {
+              id: "sub1",
+              title: "Orphan Subtask",
+              level: "subtask",
+              status: "pending",
+            },
+          ],
+        }),
+      );
+
+      const { stdout } = runResult(["--format=json", "--quiet", tmpDir]);
+      const report = JSON.parse(stdout);
+      const valStep = report.steps.find((s) => s.name === "validate");
+      // Should have checks with at least one failure
+      const failedCheck = valStep.checks.find((c) => !c.pass);
+      expect(failedCheck).toBeDefined();
+      expect(failedCheck.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── Sourcevision validation failure ─────────────────────────────────────────
+
+  describe("sourcevision validation failure", () => {
+    it("exits non-zero when sourcevision data is invalid", async () => {
+      // Break the inventory schema
+      await writeFile(
+        join(tmpDir, ".sourcevision", "inventory.json"),
+        JSON.stringify({ invalid: true }),
+      );
+
+      const { code } = runResult([tmpDir]);
+      expect(code).not.toBe(0);
+    });
+
+    it("JSON report shows sourcevision-validate failure", async () => {
+      await writeFile(
+        join(tmpDir, ".sourcevision", "inventory.json"),
+        JSON.stringify({ invalid: true }),
+      );
+
+      const { stdout, code } = runResult(["--format=json", "--quiet", tmpDir]);
+      expect(code).not.toBe(0);
+      const report = JSON.parse(stdout);
+      expect(report.ok).toBe(false);
+      const svValStep = report.steps.find((s) => s.name === "sourcevision-validate");
+      expect(svValStep.ok).toBe(false);
+    });
+  });
+
+  // ── Quiet mode ──────────────────────────────────────────────────────────────
+
+  describe("--quiet flag", () => {
+    it("suppresses text output in quiet mode", () => {
+      const output = run(["--quiet", tmpDir], { stdio: "pipe" });
+      // Quiet mode without --format=json should produce minimal output
+      // Should NOT contain step headers like "── sourcevision analyze ──"
+      expect(output).not.toContain("──");
+    });
+
+    it("-q is equivalent to --quiet", () => {
+      const output = run(["-q", tmpDir], { stdio: "pipe" });
+      expect(output).not.toContain("──");
+    });
+
+    it("JSON mode with quiet produces only JSON", () => {
+      const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
+      // Should be valid JSON with no extra text
+      expect(() => JSON.parse(output)).not.toThrow();
+      // First non-whitespace character should be {
+      expect(output.trim().startsWith("{")).toBe(true);
+    });
+  });
+
+  // ── Text output formatting ──────────────────────────────────────────────────
+
+  describe("text output", () => {
+    it("shows step headers", () => {
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toContain("── sourcevision analyze ──");
+      expect(stdout).toContain("── sourcevision validate ──");
+      expect(stdout).toContain("── rex validate ──");
+      expect(stdout).toContain("── rex status ──");
+    });
+
+    it("shows success checkmarks for passing steps", () => {
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toContain("✓ sourcevision analyze");
+      expect(stdout).toContain("✓ sourcevision validate");
+      expect(stdout).toContain("✓ rex validate");
+    });
+
+    it("shows completion percentage", () => {
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toMatch(/\d+% complete/);
+    });
+
+    it("shows pipeline passed message on success", () => {
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toContain("CI pipeline passed");
+    });
+
+    it("shows pipeline failed message on failure", async () => {
+      await writeFile(
+        join(tmpDir, ".rex", "prd.json"),
+        JSON.stringify({ invalid: true }),
+      );
+
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toContain("CI pipeline failed");
+    });
+
+    it("shows failure marks for failing steps", async () => {
+      await writeFile(
+        join(tmpDir, ".rex", "prd.json"),
+        JSON.stringify({ invalid: true }),
+      );
+
+      const { stdout } = runResult([tmpDir]);
+      expect(stdout).toContain("✗ rex validate");
     });
   });
 
