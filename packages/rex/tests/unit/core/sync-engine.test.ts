@@ -234,6 +234,97 @@ describe("SyncEngine", () => {
       expect(remoteDoc.items[0].title).toBe("Local change");
     });
 
+    it("writes remote-winning conflict values back to local on push", async () => {
+      const syncTime = "2024-06-15T09:00:00Z";
+      // Remote is newer → remote wins the field
+      local.doc.items = [
+        makeItem({
+          id: "t1",
+          title: "Old local",
+          lastModified: "2024-06-15T10:00:00Z",
+          lastSyncedAt: syncTime,
+        }),
+      ];
+      remote.doc.items = [
+        makeItem({
+          id: "t1",
+          title: "Newer remote",
+          lastModified: "2024-06-15T11:00:00Z",
+          lastSyncedAt: syncTime,
+        }),
+      ];
+
+      const report = await engine.push();
+
+      expect(report.conflicts).toHaveLength(1);
+      expect(report.conflicts[0].resolution).toBe("remote");
+
+      // Both stores should converge to the remote value
+      const localDoc = await local.loadDocument();
+      const remoteDoc = await remote.loadDocument();
+      expect(localDoc.items[0].title).toBe("Newer remote");
+      expect(remoteDoc.items[0].title).toBe("Newer remote");
+    });
+
+    it("pushes multiple new local items to empty remote", async () => {
+      local.doc.items = [
+        makeItem({ id: "t1", title: "First", lastModified: "2024-06-15T11:00:00Z" }),
+        makeItem({ id: "t2", title: "Second", lastModified: "2024-06-15T11:00:00Z" }),
+        makeItem({ id: "t3", title: "Third", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      const report = await engine.push();
+
+      expect(report.pushed).toEqual(["t1", "t2", "t3"]);
+      expect(report.skipped).toEqual([]);
+      const remoteDoc = await remote.loadDocument();
+      expect(remoteDoc.items).toHaveLength(3);
+    });
+
+    it("stamps both stores with lastSyncedAt after push", async () => {
+      local.doc.items = [
+        makeItem({ id: "t1", title: "Task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      await engine.push();
+
+      const localDoc = await local.loadDocument();
+      const remoteDoc = await remote.loadDocument();
+      expect(localDoc.items[0].lastSyncedAt).toBe("2024-06-15T12:00:00.000Z");
+      expect(remoteDoc.items[0].lastSyncedAt).toBe("2024-06-15T12:00:00.000Z");
+    });
+
+    it("preserves remote-only items during push", async () => {
+      local.doc.items = [
+        makeItem({ id: "t1", title: "Local task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+      remote.doc.items = [
+        makeItem({ id: "t2", title: "Remote-only task" }),
+      ];
+
+      await engine.push();
+
+      const remoteDoc = await remote.loadDocument();
+      const remoteIds = collectIds(remoteDoc.items);
+      // Remote should keep its existing item AND get the pushed one
+      expect(remoteIds).toContain("t1");
+      expect(remoteIds).toContain("t2");
+    });
+
+    it("captures errors in report when remote saveDocument throws", async () => {
+      local.doc.items = [
+        makeItem({ id: "t1", title: "Task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      const err = new Error("network failure");
+      vi.spyOn(remote, "saveDocument").mockRejectedValueOnce(err);
+
+      const report = await engine.push();
+
+      expect(report.errors).toHaveLength(1);
+      expect(report.errors[0].error).toContain("network failure");
+    });
+
     it("handles nested tree items", async () => {
       local.doc.items = [
         makeItem({
@@ -353,6 +444,38 @@ describe("SyncEngine", () => {
       expect(localDoc.items[0].title).toBe("Remote change");
     });
 
+    it("writes local-winning conflict values back to remote on pull", async () => {
+      const syncTime = "2024-06-15T09:00:00Z";
+      // Local is newer → local wins the field
+      remote.doc.items = [
+        makeItem({
+          id: "t1",
+          title: "Old remote",
+          lastModified: "2024-06-15T10:00:00Z",
+          lastSyncedAt: syncTime,
+        }),
+      ];
+      local.doc.items = [
+        makeItem({
+          id: "t1",
+          title: "Newer local",
+          lastModified: "2024-06-15T11:00:00Z",
+          lastSyncedAt: syncTime,
+        }),
+      ];
+
+      const report = await engine.pull();
+
+      expect(report.conflicts).toHaveLength(1);
+      expect(report.conflicts[0].resolution).toBe("local");
+
+      // Both stores should converge to the local value
+      const localDoc = await local.loadDocument();
+      const remoteDoc = await remote.loadDocument();
+      expect(localDoc.items[0].title).toBe("Newer local");
+      expect(remoteDoc.items[0].title).toBe("Newer local");
+    });
+
     it("pulls remote-only items that don't exist locally", async () => {
       local.doc.items = [
         makeItem({ id: "t1", title: "Existing" }),
@@ -367,6 +490,92 @@ describe("SyncEngine", () => {
       expect(report.pulled).toContain("t2");
       const localDoc = await local.loadDocument();
       expect(localDoc.items).toHaveLength(2);
+    });
+
+    it("pulls multiple new remote items to empty local", async () => {
+      remote.doc.items = [
+        makeItem({ id: "t1", title: "First", lastModified: "2024-06-15T11:00:00Z" }),
+        makeItem({ id: "t2", title: "Second", lastModified: "2024-06-15T11:00:00Z" }),
+        makeItem({ id: "t3", title: "Third", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      const report = await engine.pull();
+
+      expect(report.pulled).toEqual(["t1", "t2", "t3"]);
+      expect(report.skipped).toEqual([]);
+      const localDoc = await local.loadDocument();
+      expect(localDoc.items).toHaveLength(3);
+    });
+
+    it("stamps both stores with lastSyncedAt after pull", async () => {
+      remote.doc.items = [
+        makeItem({ id: "t1", title: "Task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      await engine.pull();
+
+      const localDoc = await local.loadDocument();
+      const remoteDoc = await remote.loadDocument();
+      expect(localDoc.items[0].lastSyncedAt).toBe("2024-06-15T12:00:00.000Z");
+      expect(remoteDoc.items[0].lastSyncedAt).toBe("2024-06-15T12:00:00.000Z");
+    });
+
+    it("preserves local-only items during pull", async () => {
+      local.doc.items = [
+        makeItem({ id: "t1", title: "Local-only task" }),
+      ];
+      remote.doc.items = [
+        makeItem({ id: "t2", title: "Remote task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      await engine.pull();
+
+      const localDoc = await local.loadDocument();
+      const localIds = collectIds(localDoc.items);
+      // Local should keep its existing item AND get the pulled one
+      expect(localIds).toContain("t1");
+      expect(localIds).toContain("t2");
+    });
+
+    it("handles nested remote tree items on pull", async () => {
+      remote.doc.items = [
+        makeItem({
+          id: "e1",
+          title: "Remote Epic",
+          level: "epic",
+          lastModified: "2024-06-15T11:00:00Z",
+          children: [
+            makeItem({
+              id: "t1",
+              title: "Nested remote task",
+              lastModified: "2024-06-15T11:00:00Z",
+            }),
+          ],
+        }),
+      ];
+
+      const report = await engine.pull();
+
+      expect(report.pulled).toContain("e1");
+      expect(report.pulled).toContain("t1");
+      const localDoc = await local.loadDocument();
+      expect(localDoc.items).toHaveLength(1);
+      expect(localDoc.items[0].children).toHaveLength(1);
+      expect(localDoc.items[0].children![0].title).toBe("Nested remote task");
+    });
+
+    it("captures errors in report when local saveDocument throws", async () => {
+      remote.doc.items = [
+        makeItem({ id: "t1", title: "Task", lastModified: "2024-06-15T11:00:00Z" }),
+      ];
+
+      const err = new Error("disk full");
+      vi.spyOn(local, "saveDocument").mockRejectedValueOnce(err);
+
+      const report = await engine.pull();
+
+      expect(report.errors).toHaveLength(1);
+      expect(report.errors[0].error).toContain("disk full");
     });
   });
 

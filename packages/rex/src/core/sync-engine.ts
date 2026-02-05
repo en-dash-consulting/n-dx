@@ -80,6 +80,9 @@ export class SyncEngine {
     const localMap = buildItemMap(localDoc.items);
     const remoteMap = buildItemMap(remoteDoc.items);
 
+    // Track items that were conflict-merged so local gets the merged values too
+    const conflictMergedIds = new Set<string>();
+
     // Process all local items
     for (const [id, localItem] of localMap) {
       const remoteItem = remoteMap.get(id);
@@ -117,6 +120,7 @@ export class SyncEngine {
         );
         report.conflicts.push(...conflicts);
         localMap.set(id, merged);
+        conflictMergedIds.add(id);
         report.pushed.push(id);
       } else {
         // Only local changed
@@ -132,11 +136,27 @@ export class SyncEngine {
       localDoc,
     );
     remoteDoc.items = stampAllSynced(mergedRemoteItems, now);
-    await this.remote.saveDocument(remoteDoc);
 
-    // Stamp local items as synced
+    // Write merged conflict values back into local so both stores converge
+    if (conflictMergedIds.size > 0) {
+      localDoc.items = mergeItemsIntoTree(
+        localDoc,
+        localMap,
+        conflictMergedIds,
+        localDoc,
+      );
+    }
     localDoc.items = stampAllSynced(localDoc.items, now);
-    await this.local.saveDocument(localDoc);
+
+    try {
+      await this.remote.saveDocument(remoteDoc);
+      await this.local.saveDocument(localDoc);
+    } catch (err) {
+      report.errors.push({
+        itemId: "*",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return report;
   }
@@ -155,6 +175,9 @@ export class SyncEngine {
 
     const localMap = buildItemMap(localDoc.items);
     const remoteMap = buildItemMap(remoteDoc.items);
+
+    // Track items that were conflict-merged so remote gets the merged values too
+    const conflictMergedIds = new Set<string>();
 
     // Process all remote items
     for (const [id, remoteItem] of remoteMap) {
@@ -193,6 +216,7 @@ export class SyncEngine {
         );
         report.conflicts.push(...conflicts);
         remoteMap.set(id, merged);
+        conflictMergedIds.add(id);
         report.pulled.push(id);
       } else {
         // Only remote changed
@@ -208,11 +232,27 @@ export class SyncEngine {
       remoteDoc,
     );
     localDoc.items = stampAllSynced(mergedLocalItems, now);
-    await this.local.saveDocument(localDoc);
 
-    // Stamp remote items as synced
+    // Write merged conflict values back into remote so both stores converge
+    if (conflictMergedIds.size > 0) {
+      remoteDoc.items = mergeItemsIntoTree(
+        remoteDoc,
+        remoteMap,
+        conflictMergedIds,
+        remoteDoc,
+      );
+    }
     remoteDoc.items = stampAllSynced(remoteDoc.items, now);
-    await this.remote.saveDocument(remoteDoc);
+
+    try {
+      await this.local.saveDocument(localDoc);
+      await this.remote.saveDocument(remoteDoc);
+    } catch (err) {
+      report.errors.push({
+        itemId: "*",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return report;
   }
