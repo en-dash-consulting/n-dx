@@ -3,7 +3,7 @@ import type { PRDStore } from "rex/dist/store/types.js";
 import type { ItemStatus } from "rex/dist/schema/v1.js";
 import { computeTimestampUpdates } from "rex/dist/core/timestamps.js";
 import { findAutoCompletions } from "rex/dist/core/parent-completion.js";
-import { validateCompletion, formatValidationResult } from "../agent/completion.js";
+import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 
 export interface UpdateStatusOptions {
   /** Project directory for git-based completion validation. */

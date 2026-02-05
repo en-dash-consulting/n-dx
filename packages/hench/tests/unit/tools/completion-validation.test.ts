@@ -6,12 +6,12 @@ import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
  * when a projectDir is provided and status is "completed".
  */
 
-vi.mock("../../../src/agent/completion.js", () => ({
+vi.mock("../../../src/validation/completion.js", () => ({
   validateCompletion: vi.fn(),
   formatValidationResult: vi.fn((r: { reason?: string }) => r.reason ?? ""),
 }));
 
-import { validateCompletion, formatValidationResult } from "../../../src/agent/completion.js";
+import { validateCompletion, formatValidationResult } from "../../../src/validation/completion.js";
 
 const mockValidate = vi.mocked(validateCompletion);
 const mockFormat = vi.mocked(formatValidationResult);

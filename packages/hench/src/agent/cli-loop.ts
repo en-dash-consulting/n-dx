@@ -6,11 +6,10 @@ import { assembleTaskBrief, formatTaskBrief } from "./brief.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { saveRun } from "../store/index.js";
 import { buildRunSummary } from "./summary.js";
-import { toolRexUpdateStatus, toolRexAppendLog } from "../tools/rex.js";
-import { validateCompletion, formatValidationResult } from "./completion.js";
+import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../tools/index.js";
+import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
 import { checkTokenBudget } from "./token-budget.js";
-import { runPostTaskTests } from "../tools/test-runner.js";
 import { section, subsection, stream, detail, info } from "../types/output.js";
 
 export interface CliLoopOptions {
