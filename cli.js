@@ -54,13 +54,13 @@ function extractFlags(args) {
 
 /**
  * Check that required directories exist before running orchestration commands.
- * Provides a clear, actionable error message suggesting `n-dx init`.
+ * Provides a clear, actionable error message suggesting `ndx init`.
  */
 function requireInit(dir, dirs) {
   const missing = dirs.filter((d) => !existsSync(join(dir, d)));
   if (missing.length > 0) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
-    console.error(`Hint: Run 'n-dx init ${dir === process.cwd() ? "" : dir}' to set up the project.`.trimEnd());
+    console.error(`Hint: Run 'ndx init ${dir === process.cwd() ? "" : dir}' to set up the project.`.trimEnd());
     process.exit(1);
   }
 }
@@ -179,5 +179,6 @@ Tools:
 Global Options:
   --quiet, -q             Suppress informational output (for scripting)
 
-Usage: n-dx <command> [args...]`);
+Usage: ndx <command> [args...]
+       n-dx <command> [args...]`);
 process.exit(command ? 1 : 0);

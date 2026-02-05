@@ -8,6 +8,7 @@
   ],
   "bin": {
     "n-dx": "./cli.js",
+    "ndx": "./cli.js",
     "rex": "./packages/rex/dist/cli/index.js",
     "hench": "./packages/hench/dist/cli/index.js",
     "sourcevision": "./packages/sourcevision/dist/cli/index.js",
