@@ -3905,9 +3905,9 @@
             {
               "id": "bb7791ec-b388-44cd-8b8f-91754bbe0b87",
               "title": "Add configuration defaults and validation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Provide sensible defaults and validate configuration values",
+              "description": "Provide sensible defaults and validate configuration values. All three config fields (tokenBudget, maxFailedAttempts, loopPauseMs) are optional in the Zod schema with sensible defaults, and validated against invalid values. Comprehensive test coverage added.",
               "acceptanceCriteria": [
                 "tokenBudget is optional in schema and defaults to 0 (unlimited)",
                 "maxFailedAttempts is optional in schema and defaults to 3",
@@ -3928,7 +3928,9 @@
                 "token budget config defaults",
                 "loop config defaults"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T02:04:22.162Z",
+              "completedAt": "2026-02-05T02:08:35.294Z"
             },
             {
               "id": "df51902d-e8f4-4b9b-9377-05802d75844d",
@@ -7067,9 +7069,9 @@
             {
               "id": "73cbf527-e71e-497f-b37c-6d4878e19630",
               "title": "Add blocked status distinct from deferred",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Implement blocked status for tasks that can't proceed due to dependencies, separate from deferred tasks",
+              "description": "Implement blocked status for tasks that can't proceed due to dependencies, separate from deferred tasks. Blocked items display their blockedBy dependencies in status/next output, are excluded from task selection, and require transitioning through pending/in_progress before completion.",
               "acceptanceCriteria": [
                 "Blocked status prevents task selection in next command",
                 "Blocked tasks show dependency information",
@@ -7080,7 +7082,9 @@
                 "prd",
                 "status"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T01:54:16.173Z",
+              "completedAt": "2026-02-05T02:03:55.707Z"
             },
             {
               "id": "df9258a6-99d7-4ea7-9510-b20384e47f76",

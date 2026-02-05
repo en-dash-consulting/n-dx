@@ -73,6 +73,108 @@ describe("validateConfig", () => {
     const result = validateConfig(config);
     expect(result.ok).toBe(false);
   });
+
+  describe("tokenBudget defaults and validation", () => {
+    it("is optional in schema and defaults to 0 (unlimited)", () => {
+      const { tokenBudget, ...configWithout } = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig(configWithout);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.tokenBudget).toBe(0);
+      }
+    });
+
+    it("can be set to a positive value", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), tokenBudget: 500000 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.tokenBudget).toBe(500000);
+      }
+    });
+
+    it("accepts tokenBudget of 0 (unlimited)", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), tokenBudget: 0 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.tokenBudget).toBe(0);
+      }
+    });
+
+    it("rejects negative tokenBudget", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), tokenBudget: -1 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+
+    it("validates existing configs without tokenBudget field (backward compat)", () => {
+      const { tokenBudget, ...legacy } = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig(legacy);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.tokenBudget).toBe(0);
+      }
+    });
+  });
+
+  describe("maxFailedAttempts defaults and validation", () => {
+    it("is optional in schema and defaults to 3", () => {
+      const { maxFailedAttempts, ...configWithout } = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig(configWithout);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.maxFailedAttempts).toBe(3);
+      }
+    });
+
+    it("can be customised in config", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: 5 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.maxFailedAttempts).toBe(5);
+      }
+    });
+
+    it("rejects maxFailedAttempts of 0", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: 0 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+
+    it("rejects negative maxFailedAttempts", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: -1 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("loopPauseMs defaults and validation", () => {
+    it("is optional in schema and defaults to 2000", () => {
+      const { loopPauseMs, ...configWithout } = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig(configWithout);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.loopPauseMs).toBe(2000);
+      }
+    });
+
+    it("can be customised in config", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), loopPauseMs: 5000 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.loopPauseMs).toBe(5000);
+      }
+    });
+
+    it("rejects negative loopPauseMs", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), loopPauseMs: -1 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+  });
 });
 
 describe("validateRunRecord", () => {
