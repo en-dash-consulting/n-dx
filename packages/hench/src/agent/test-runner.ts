@@ -183,6 +183,9 @@ export function detectRunner(testCommand: string): string | undefined {
 /**
  * Build a scoped test command targeting specific files.
  * Returns undefined if the runner doesn't support file scoping.
+ *
+ * Preserves existing flags (e.g. `jest --ci` → `jest --ci -- file.test.ts`).
+ * Deduplicates the vitest `run` subcommand when already present.
  */
 export function buildScopedCommand(
   testCommand: string,
@@ -192,17 +195,25 @@ export function buildScopedCommand(
   const scopeFn = SCOPEABLE_RUNNERS[runner];
   if (!scopeFn) return undefined;
 
-  const args = scopeFn(testFiles);
+  const scopeArgs = scopeFn(testFiles);
 
-  // If the command uses a package manager wrapper, append args
   const parts = testCommand.trim().split(/\s+/);
   const runnerIdx = parts.findIndex((p) => basename(p) === runner);
 
   if (runnerIdx >= 0) {
-    // Runner is explicitly in the command — append file args after it
+    // Runner is explicitly in the command.
+    // Keep everything before AND after the runner, then append scope args.
     const before = parts.slice(0, runnerIdx + 1);
-    // Keep any existing args that come before, but add our scoped files
-    return [...before, ...args].join(" ");
+    const after = parts.slice(runnerIdx + 1);
+
+    // Deduplicate: if scope args start with a subcommand (e.g. "run")
+    // that is already present in the trailing args, strip it.
+    let mergedScope = scopeArgs;
+    if (after.length > 0 && scopeArgs.length > 0 && after[0] === scopeArgs[0]) {
+      mergedScope = scopeArgs.slice(1);
+    }
+
+    return [...before, ...after, ...mergedScope].join(" ");
   }
 
   // Package manager wrapper (e.g. "pnpm test") — append with --

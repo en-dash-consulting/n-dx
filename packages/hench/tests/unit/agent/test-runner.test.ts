@@ -172,7 +172,7 @@ describe("buildScopedCommand", () => {
   });
 
   it("scopes jest with -- separator", () => {
-    const cmd = buildScopedCommand("jest --ci", "jest", ["tests/foo.test.ts"]);
+    const cmd = buildScopedCommand("jest", "jest", ["tests/foo.test.ts"]);
     expect(cmd).toBe("jest -- tests/foo.test.ts");
   });
 
@@ -190,6 +190,65 @@ describe("buildScopedCommand", () => {
   it("returns undefined for unknown runner", () => {
     const cmd = buildScopedCommand("npm test", "unknown", ["tests/foo.test.ts"]);
     expect(cmd).toBeUndefined();
+  });
+
+  it("preserves jest flags when scoping", () => {
+    const cmd = buildScopedCommand("jest --ci", "jest", ["tests/foo.test.ts"]);
+    expect(cmd).toBe("jest --ci -- tests/foo.test.ts");
+  });
+
+  it("preserves jest flags through npx", () => {
+    const cmd = buildScopedCommand("npx jest --ci --verbose", "jest", [
+      "tests/foo.test.ts",
+    ]);
+    expect(cmd).toBe("npx jest --ci --verbose -- tests/foo.test.ts");
+  });
+
+  it("preserves mocha flags when scoping", () => {
+    const cmd = buildScopedCommand("npx mocha --recursive", "mocha", [
+      "test/foo.test.js",
+    ]);
+    expect(cmd).toBe("npx mocha --recursive test/foo.test.js");
+  });
+
+  it("handles pnpm exec vitest", () => {
+    const cmd = buildScopedCommand("pnpm exec vitest run", "vitest", [
+      "tests/foo.test.ts",
+    ]);
+    expect(cmd).toBe("pnpm exec vitest run tests/foo.test.ts");
+  });
+
+  it("handles node_modules/.bin/ runner path", () => {
+    const cmd = buildScopedCommand("./node_modules/.bin/vitest run", "vitest", [
+      "tests/foo.test.ts",
+    ]);
+    expect(cmd).toBe("./node_modules/.bin/vitest run tests/foo.test.ts");
+  });
+
+  it("scopes multiple files for vitest", () => {
+    const cmd = buildScopedCommand("vitest run", "vitest", [
+      "tests/a.test.ts",
+      "tests/b.test.ts",
+      "tests/c.test.ts",
+    ]);
+    expect(cmd).toBe("vitest run tests/a.test.ts tests/b.test.ts tests/c.test.ts");
+  });
+
+  it("falls back to -- separator for package manager wrappers", () => {
+    const cmd = buildScopedCommand("pnpm test", "vitest", ["tests/foo.test.ts"]);
+    expect(cmd).toBe("pnpm test -- tests/foo.test.ts");
+  });
+
+  it("does not duplicate vitest run subcommand", () => {
+    const cmd = buildScopedCommand("vitest run", "vitest", ["tests/foo.test.ts"]);
+    // Should be "vitest run tests/foo.test.ts" NOT "vitest run run tests/foo.test.ts"
+    expect(cmd).toBe("vitest run tests/foo.test.ts");
+    expect(cmd).not.toContain("run run");
+  });
+
+  it("adds run subcommand for bare vitest", () => {
+    const cmd = buildScopedCommand("vitest", "vitest", ["tests/foo.test.ts"]);
+    expect(cmd).toBe("vitest run tests/foo.test.ts");
   });
 });
 
