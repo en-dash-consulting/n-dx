@@ -245,11 +245,11 @@ describe("n-dx ci", () => {
   // ── Missing directories ────────────────────────────────────────────────────
 
   describe("missing project setup", () => {
-    it("errors when .rex is missing", async () => {
+    it("exits 1 when .rex is missing", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
         const { stderr, code } = runResult([emptyDir]);
-        expect(code).not.toBe(0);
+        expect(code).toBe(1);
         expect(stderr).toContain("Missing");
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
@@ -268,7 +268,7 @@ describe("n-dx ci", () => {
       );
 
       const { code } = runResult([tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
     });
 
     it("JSON report shows failed step", async () => {
@@ -278,7 +278,7 @@ describe("n-dx ci", () => {
       );
 
       const { stdout, code } = runResult(["--format=json", "--quiet", tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
       // Should still produce valid JSON even on failure
       const report = JSON.parse(stdout);
       expect(report.ok).toBe(false);
@@ -286,7 +286,7 @@ describe("n-dx ci", () => {
       expect(valStep.ok).toBe(false);
     });
 
-    it("exits non-zero on orphaned items", async () => {
+    it("exits 1 on orphaned items", async () => {
       // Subtask at root is an orphan — subtasks must be under task
       await writeFile(
         join(tmpDir, ".rex", "prd.json"),
@@ -305,7 +305,7 @@ describe("n-dx ci", () => {
       );
 
       const { code } = runResult([tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
     });
 
     it("JSON report shows orphaned items as failed check", async () => {
@@ -326,7 +326,7 @@ describe("n-dx ci", () => {
       );
 
       const { stdout, code } = runResult(["--format=json", "--quiet", tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
       const report = JSON.parse(stdout);
       expect(report.ok).toBe(false);
       // The validate step should show the hierarchy placement failure
@@ -364,7 +364,7 @@ describe("n-dx ci", () => {
   // ── Sourcevision validation failure ─────────────────────────────────────────
 
   describe("sourcevision validation failure", () => {
-    it("exits non-zero when sourcevision data is invalid", async () => {
+    it("exits 1 when sourcevision data is invalid", async () => {
       // Break the inventory schema
       await writeFile(
         join(tmpDir, ".sourcevision", "inventory.json"),
@@ -372,7 +372,7 @@ describe("n-dx ci", () => {
       );
 
       const { code } = runResult([tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
     });
 
     it("JSON report shows sourcevision-validate failure", async () => {
@@ -382,7 +382,7 @@ describe("n-dx ci", () => {
       );
 
       const { stdout, code } = runResult(["--format=json", "--quiet", tmpDir]);
-      expect(code).not.toBe(0);
+      expect(code).toBe(1);
       const report = JSON.parse(stdout);
       expect(report.ok).toBe(false);
       const svValStep = report.steps.find((s) => s.name === "sourcevision-validate");

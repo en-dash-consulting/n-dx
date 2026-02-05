@@ -4469,7 +4469,7 @@
             {
               "id": "4097dd91-741f-48ae-bfcd-28b781a036c9",
               "title": "Fix validation failure exit codes",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure CI fails with proper exit codes when validation fails",
               "acceptanceCriteria": [
@@ -4480,7 +4480,9 @@
                 "n-dx ci",
                 "validation failure"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T14:28:42.831Z",
+              "completedAt": "2026-02-05T14:34:55.747Z"
             }
           ]
         },
@@ -5820,7 +5822,7 @@
             {
               "id": "ea49bd62-1aa3-4139-b549-90078dcc4590",
               "title": "Fix double-counting in grouping passes",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure findings aren't counted multiple times across different grouping passes",
               "acceptanceCriteria": [
@@ -5832,7 +5834,8 @@
                 "deriveNextSteps"
               ],
               "source": "llm",
-              "startedAt": "2026-02-05T14:09:00.166Z"
+              "startedAt": "2026-02-05T14:09:00.166Z",
+              "completedAt": "2026-02-05T14:19:10.686Z"
             }
           ]
         },
