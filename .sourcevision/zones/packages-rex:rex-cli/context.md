@@ -7,16 +7,16 @@
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 8422
+Lines: 8104
 
 </zone>
 
 <files>
 
-packages/rex/src/analyze/index.ts (TypeScript, 46 lines, source)
+packages/rex/src/analyze/index.ts (TypeScript, 47 lines, source)
 packages/rex/src/analyze/propose.ts (TypeScript, 194 lines, source)
 packages/rex/src/analyze/reconcile.ts (TypeScript, 54 lines, source)
-packages/rex/src/analyze/scanners.ts (TypeScript, 1065 lines, source)
+packages/rex/src/analyze/scanners.ts (TypeScript, 933 lines, source)
 packages/rex/src/cli/commands/add.ts (TypeScript, 152 lines, source)
 packages/rex/src/cli/commands/analyze.ts (TypeScript, 410 lines, source)
 packages/rex/src/cli/commands/constants.ts (TypeScript, 60 lines, source)
@@ -42,7 +42,7 @@ packages/rex/src/workflow/default.ts (TypeScript, 20 lines, source)
 packages/rex/tests/integration/store-roundtrip.test.ts (TypeScript, 153 lines, test)
 packages/rex/tests/unit/analyze/propose.test.ts (TypeScript, 119 lines, test)
 packages/rex/tests/unit/analyze/reconcile.test.ts (TypeScript, 128 lines, test)
-packages/rex/tests/unit/analyze/scanners.test.ts (TypeScript, 1386 lines, test)
+packages/rex/tests/unit/analyze/scanners.test.ts (TypeScript, 1199 lines, test)
 packages/rex/tests/unit/core/canonical.test.ts (TypeScript, 89 lines, test)
 packages/rex/tests/unit/core/dag.test.ts (TypeScript, 120 lines, test)
 packages/rex/tests/unit/core/next-task.test.ts (TypeScript, 635 lines, test)

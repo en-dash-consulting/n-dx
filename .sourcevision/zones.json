@@ -1,9 +1,31 @@
 {
   "zones": [
     {
+      "id": "hench-completion",
+      "name": "Hench Completion",
+      "description": "Completion detection and validation logic for determining when agent tasks are finished.",
+      "files": [
+        "packages/hench/src/agent/completion.ts",
+        "packages/hench/tests/unit/agent/completion.test.ts",
+        "packages/hench/tests/unit/tools/completion-validation.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/agent/completion.ts"
+      ],
+      "cohesion": 0.57,
+      "coupling": 0.43,
+      "insights": [
+        "Isolated completion logic enables focused testing of task termination conditions",
+        "High coupling ratio (0.43) reflects tight integration with core agent state",
+        "Smallest zone by file count but critical path for agent termination — appropriate isolation of high-risk logic",
+        "Completion validation tests exist in this zone but test code in tools/ directory — indicates completion logic spans multiple concerns",
+        "Zone contains 2 test files but only 1 implementation file — 2:1 test ratio indicates critical path with extensive edge case coverage"
+      ]
+    },
+    {
       "id": "hench-core",
-      "name": "Hench Agent Core",
-      "description": "Main autonomous agent implementation including the tool-use loop, prompt construction, and run management.",
+      "name": "Hench Core",
+      "description": "Main autonomous agent package containing the agent loop, briefing system, tool implementations, and run management.",
       "files": [
         "packages/hench/src/agent/brief.ts",
         "packages/hench/src/agent/cli-loop.ts",
@@ -29,6 +51,7 @@
         "packages/hench/src/store/json.ts",
         "packages/hench/src/store/project-config.ts",
         "packages/hench/src/store/runs.ts",
+        "packages/hench/src/tools/rex.ts",
         "packages/hench/src/tools/test-runner.ts",
         "packages/hench/src/types/index.ts",
         "packages/hench/src/types/output.ts",
@@ -45,59 +68,40 @@
         "packages/hench/tests/unit/agent/token-budget.test.ts",
         "packages/hench/tests/unit/agent/token-tracking.test.ts",
         "packages/hench/tests/unit/cli/commands/constants.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
         "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
         "packages/hench/tests/unit/cli/errors.test.ts",
         "packages/hench/tests/unit/cli/output.test.ts",
         "packages/hench/tests/unit/schema/validate.test.ts",
         "packages/hench/tests/unit/store/project-config.test.ts",
+        "packages/hench/tests/unit/tools/rex.test.ts",
         "packages/hench/tests/unit/tools/test-runner.test.ts"
       ],
       "entryPoints": [
         "packages/hench/src/schema/index.ts",
         "packages/hench/src/schema/v1.ts",
+        "packages/hench/src/tools/rex.ts",
         "packages/hench/src/types/index.ts"
       ],
-      "cohesion": 0.94,
-      "coupling": 0.06,
+      "cohesion": 0.95,
+      "coupling": 0.05,
       "insights": [
-        "High cohesion (0.94) — files are tightly interconnected",
-        "Contains 51% of project files (46/91) — may be too broad, consider splitting",
-        "Contains the primary agent loop and all supporting modules for autonomous task execution",
-        "High cohesion (0.94) indicates well-organized internal dependencies",
-        "Core exports types and utilities consumed by both integration and tooling zones",
-        "Agent loop modules (brief, loop, cli-loop, review, stuck, summary) form a cohesive execution pipeline that could be formalized as a state machine",
-        "Token budget module (token-budget.ts) is isolated with no inbound dependencies — may indicate dead code or premature abstraction"
+        "High cohesion (0.95) — files are tightly interconnected",
+        "Contains 53% of project files (49/93) — may be too broad, consider splitting",
+        "Contains 53% of project files (49/92) — may be too broad, consider splitting",
+        "Houses the complete agent lifecycle from task selection through execution and review",
+        "Schema and type exports serve as the package's public API for external consumers",
+        "Acts as the 'gravity well' for the hench package — all other zones depend on types and utilities defined here",
+        "Token budget management is embedded in agent loop rather than extracted as a reusable utility",
+        "Run storage (runs/) mixes concerns: transcript logging, state persistence, and completion records in single directory structure",
+        "Agent subdirectory (agent/) contains 8 files with verb-noun naming (brief, loop, prompt, review, stuck, summary) — implicit convention for agent behaviors",
+        "Token budget logic in token-budget.ts is only consumed by loop.ts — opportunity to inline or make private module"
       ]
     },
     {
-      "id": "hench-integration",
-      "name": "Hench Integration Bridge",
-      "description": "Completion validation and Rex tool integration that bridges the agent with external systems.",
-      "files": [
-        "packages/hench/src/agent/completion.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/tests/unit/agent/completion.test.ts",
-        "packages/hench/tests/unit/tools/completion-validation.test.ts",
-        "packages/hench/tests/unit/tools/rex.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/agent/completion.ts",
-        "packages/hench/src/tools/rex.ts"
-      ],
-      "cohesion": 0.67,
-      "coupling": 0.33,
-      "insights": [
-        "Handles task completion logic and Rex PRD integration",
-        "Lower cohesion (0.67) reflects its bridging nature between agent and external tools",
-        "Completion module bridges agent decisions to Rex PRD state machine",
-        "Completion module acts as anti-corruption layer between agent decisions and Rex PRD mutations",
-        "Completion validation tests are duplicated across two files (completion.test.ts and completion-validation.test.ts) — unclear separation of concerns"
-      ]
-    },
-    {
-      "id": "hench-tooling",
-      "name": "Hench Tool Infrastructure",
-      "description": "Tool definitions, shell execution, and security guard system for safe autonomous operations.",
+      "id": "hench-guard",
+      "name": "Hench Guard",
+      "description": "Security guard layer providing command validation, path restrictions, and safe tool execution for the agent.",
       "files": [
         "packages/hench/src/agent/tools.ts",
         "packages/hench/src/guard/commands.ts",
@@ -120,28 +124,12 @@
       "coupling": 0.2,
       "insights": [
         "High cohesion (0.8) — files are tightly interconnected",
-        "Provides sandboxed execution environment with command and path guards",
-        "Tools for file operations, git, and shell access with security constraints",
-        "Guard subsystem (commands, paths) enforces sandbox boundaries orthogonal to tool implementations",
-        "Guard modules use allowlist pattern for commands but denylist pattern for paths — inconsistent security model"
-      ]
-    },
-    {
-      "id": "orchestration",
-      "name": "Orchestration Layer",
-      "description": "Top-level CLI entry points and configuration that coordinate the three sub-packages.",
-      "files": [
-        "ci.js",
-        "cli.js",
-        "config.js"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Serves as the unified interface for n-dx commands",
-        "Delegates to package-specific CLIs rather than implementing logic directly"
+        "Centralizes all security policy enforcement for shell and file operations",
+        "Clean separation allows security rules to be audited independently from agent logic",
+        "Guard zone has outbound-only logical dependency (enforces policy on core operations) but implementation shows bidirectional imports",
+        "Guard index.ts re-exports create coupling point — consumers import guard utilities through single barrel file",
+        "Guard barrel file (guard/index.ts) re-exports commands.ts and paths.ts but tools.ts imports directly from guard/commands — inconsistent import patterns",
+        "paths.ts and commands.ts have parallel structure (both are policy definition files) but no shared base type or validation interface"
       ]
     },
     {
@@ -433,92 +421,107 @@
       ],
       "childId": "packages-sourcevision",
       "depth": 1
+    },
+    {
+      "id": "root-orchestration",
+      "name": "Root Orchestration",
+      "description": "Top-level CLI entry points and configuration for the n-dx monorepo, delegating to individual packages.",
+      "files": [
+        "ci.js",
+        "cli.js",
+        "config.js"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Serves as the unified interface layer that coordinates sourcevision, rex, and hench packages",
+        "Configuration is centralized here for cross-package settings management",
+        "Zero inbound coupling from package zones — clean facade pattern isolating consumers from implementation details",
+        "Entry points delegate immediately to package CLIs — minimal business logic reduces maintenance burden",
+        "All three files follow consistent naming: lowercase single-word filenames with .js extension — no .ts or hyphenated names at orchestration layer"
+      ]
     }
   ],
   "crossings": [
     {
+      "from": "packages/hench/tests/unit/tools/completion-validation.test.ts",
+      "to": "packages/hench/src/tools/rex.ts",
+      "fromZone": "hench-completion",
+      "toZone": "hench-core"
+    },
+    {
       "from": "packages/hench/src/agent/cli-loop.ts",
       "to": "packages/hench/src/agent/completion.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-integration"
+      "toZone": "hench-completion"
     },
     {
-      "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/tools/rex.ts",
+      "from": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/agent/completion.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-integration"
-    },
-    {
-      "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "hench-core",
-      "toZone": "hench-integration"
-    },
-    {
-      "from": "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "hench-core",
-      "toZone": "hench-integration"
+      "toZone": "hench-completion"
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
       "to": "packages/hench/src/agent/tools.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-tooling"
+      "toZone": "hench-guard"
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
       "to": "packages/hench/src/guard/index.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-tooling"
+      "toZone": "hench-guard"
     },
     {
       "from": "packages/hench/src/types/index.ts",
       "to": "packages/hench/src/guard/index.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-tooling"
+      "toZone": "hench-guard"
     },
     {
       "from": "packages/hench/tests/unit/agent/task-failure.test.ts",
       "to": "packages/hench/src/agent/tools.ts",
       "fromZone": "hench-core",
-      "toZone": "hench-tooling"
+      "toZone": "hench-guard"
     },
     {
       "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/types/index.ts",
-      "fromZone": "hench-tooling",
+      "to": "packages/hench/src/tools/rex.ts",
+      "fromZone": "hench-guard",
       "toZone": "hench-core"
     },
     {
       "from": "packages/hench/src/agent/tools.ts",
       "to": "packages/hench/src/types/index.ts",
-      "fromZone": "hench-tooling",
+      "fromZone": "hench-guard",
+      "toZone": "hench-core"
+    },
+    {
+      "from": "packages/hench/src/agent/tools.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "fromZone": "hench-guard",
       "toZone": "hench-core"
     },
     {
       "from": "packages/hench/src/guard/index.ts",
       "to": "packages/hench/src/schema/index.ts",
-      "fromZone": "hench-tooling",
+      "fromZone": "hench-guard",
       "toZone": "hench-core"
     },
     {
       "from": "packages/hench/tests/unit/tools/files.test.ts",
       "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "hench-tooling",
+      "fromZone": "hench-guard",
       "toZone": "hench-core"
     },
     {
       "from": "packages/hench/tests/unit/tools/shell.test.ts",
       "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "hench-tooling",
+      "fromZone": "hench-guard",
       "toZone": "hench-core"
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "hench-tooling",
-      "toZone": "hench-integration"
     },
     {
       "from": "packages/sourcevision/src/cli/commands/init.ts",
@@ -677,62 +680,73 @@
     "prd.md",
     "tests/e2e/cli-ci.test.js",
     "tests/e2e/cli-config.test.js",
+    "tests/e2e/cli-delegation.test.js",
     "tsconfig.base.json",
     "vitest.config.js"
   ],
   "insights": [
-    "Bidirectional coupling: \"hench-core\" ↔ \"hench-tooling\" (4+5 crossings) — consider extracting shared interface",
-    "Size imbalance: largest zone has 46 files vs smallest with 3 — uneven decomposition",
-    "Hench package naturally splits into core agent, integration bridge, and tooling infrastructure",
-    "Import flow is hierarchical: tooling and integration depend on core, not the reverse",
-    "Cross-zone imports (14 total) are proportionate to the 63 files analyzed",
-    "Clean layering: orchestration → hench-core → (hench-tooling, hench-integration) with minimal leakage",
-    "Test files are co-located with implementation in same zones — keeps test dependencies aligned with production code",
-    "No shared types package exists between hench and rex — both packages define overlapping types for task/status enums, creating drift risk",
-    "Naming convention drift: some files use kebab-case (cli-loop.ts) while others use single words (loop.ts, stuck.ts) — establish consistent naming",
-    "No explicit error boundary or retry logic visible at zone boundaries — failures in integration zone could cascade to core",
-    "Run history storage (.hench/runs/) has no visible pruning mechanism — potential for unbounded disk growth over time"
+    "Bidirectional coupling: \"hench-core\" ↔ \"hench-guard\" (4+6 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"hench-completion\" ↔ \"hench-core\" (1+2 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 49 files vs smallest with 3 — uneven decomposition",
+    "The hench package has naturally decomposed into core, completion, and guard zones reflecting distinct responsibilities",
+    "Cross-zone import patterns show appropriate dependency direction: guard integrates with core, completion validates core state",
+    "Root orchestration maintains clean separation from package internals",
+    "No zone depends on root-orchestration — proper layering with orchestration at the top of the dependency graph",
+    "Package-internal zones (core/completion/guard) form a triangle dependency rather than clean directed acyclic graph",
+    "Test files are co-located with implementation zones rather than in a separate test zone — good for cohesion, requires discipline to avoid test-only exports leaking into production code",
+    "No packages/rex or packages/sourcevision zones detected despite being documented packages — analysis scope may be incomplete or packages lack sufficient internal structure for zone detection",
+    "Hench package has 3 internal zones while rex and sourcevision appear as single units — inconsistent granularity across monorepo",
+    "Test file placement creates implicit zone assignment — tests/unit/agent/*.test.ts files are in hench-core but tests/unit/tools/completion-validation.test.ts ended up in hench-completion, suggesting zone detection uses import analysis rather than directory structure",
+    "No .d.ts declaration files detected in any zone — packages may rely on TypeScript project references or tsc output rather than hand-written declarations",
+    "Hench package has no explicit public API barrel (no packages/hench/src/index.ts exporting schema and types) — consumers must know internal paths"
   ],
   "findings": [
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"hench-core\" ↔ \"hench-tooling\" (4+5 crossings) — consider extracting shared interface",
+      "text": "Bidirectional coupling: \"hench-completion\" ↔ \"hench-core\" (1+2 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Size imbalance: largest zone has 46 files vs smallest with 3 — uneven decomposition",
+      "text": "Bidirectional coupling: \"hench-core\" ↔ \"hench-guard\" (4+6 crossings) — consider extracting shared interface",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "global",
+      "text": "Size imbalance: largest zone has 49 files vs smallest with 3 — uneven decomposition",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "hench-core",
-      "text": "Contains 51% of project files (46/91) — may be too broad, consider splitting",
+      "text": "Contains 53% of project files (49/93) — may be too broad, consider splitting",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "hench-core",
-      "text": "High cohesion (0.94) — files are tightly interconnected",
+      "text": "High cohesion (0.95) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "hench-tooling",
+      "scope": "hench-guard",
       "text": "High cohesion (0.8) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "orchestration",
+      "scope": "root-orchestration",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
@@ -740,269 +754,248 @@
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "All four zones maintain cohesion above 0.67, indicating healthy module boundaries",
+      "text": "All zones show healthy cohesion/coupling ratios indicating good architectural boundaries",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "Bidirectional imports between hench-core and hench-integration (4 each way via hench zones) may indicate opportunity to clarify API boundaries",
-      "severity": "warning"
+      "text": "No circular dependency concerns detected in cross-zone import patterns",
+      "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "Orchestration layer has zero coupling which validates the delegation architecture",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "hench-core",
-      "text": "46 files with 0.94 cohesion demonstrates strong modular design within the agent package",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "hench-core",
-      "text": "Entry points through types and schema indexes provide clean public API boundaries",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "hench-core",
-      "text": "Low coupling (0.06) to other zones shows good encapsulation of agent internals",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "hench-integration",
-      "text": "Both implementation files are entry points, suggesting this zone exports rather than encapsulates",
+      "text": "hench-completion's small size (3 files) and high coupling suggests it may not need to be a separate zone",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "hench-integration",
-      "text": "Higher coupling (0.33) is expected for integration code that connects agent to Rex",
+      "scope": "hench-completion",
+      "text": "Lower cohesion (0.57) and high coupling suggest this could potentially be merged back into hench-core",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-completion",
+      "text": "Two test files for one source file indicates thorough test coverage for critical completion logic",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "hench-integration",
-      "text": "Small zone (5 files) with dedicated tests indicates focused, testable integration logic",
+      "scope": "hench-core",
+      "text": "49 files is substantial; consider whether CLI, MCP, and core agent logic warrant sub-zones",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "hench-tooling",
-      "text": "5 imports flowing to hench-core suggests tools depend on agent types but not vice versa",
+      "scope": "hench-core",
+      "text": "High cohesion (0.95) indicates strong internal module relationships",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "hench-tooling",
-      "text": "Coupling ratio (0.2) reflects necessary dependencies on core types while maintaining separation",
+      "scope": "hench-core",
+      "text": "Low coupling (0.05) suggests good encapsulation from other zones",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "hench-tooling",
-      "text": "Guard subsystem (commands, paths) provides security boundaries for autonomous execution",
+      "scope": "hench-guard",
+      "text": "Bidirectional imports with hench-core (6 in, 4 out) indicate appropriate integration pattern for a guard layer",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "orchestration",
-      "text": "Only 3 files suggests appropriately thin orchestration layer without business logic leakage",
+      "scope": "hench-guard",
+      "text": "Good cohesion (0.8) shows guard modules form a coherent security boundary",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "orchestration",
-      "text": "Perfect cohesion (1.0) with zero coupling indicates clean separation from implementation packages",
+      "scope": "hench-guard",
+      "text": "Having tools/files.ts, tools/git.ts, and tools/shell.ts here correctly co-locates guarded operations with their validators",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "root-orchestration",
+      "text": "Only 3 files suggests this zone is appropriately minimal for its coordination role",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "root-orchestration",
+      "text": "Perfect cohesion (1.0) with zero coupling indicates well-isolated orchestration layer",
       "severity": "info"
     },
     {
       "type": "pattern",
       "pass": 2,
       "scope": "global",
-      "text": "No sourcevision or rex packages detected in analysis — either excluded from scan or in separate workspaces",
-      "severity": "info"
+      "text": "Hench package zones would benefit from an explicit 'contracts' or 'interfaces' zone to break bidirectional dependencies between core↔guard and core↔completion",
+      "severity": "warning"
     },
     {
       "type": "pattern",
       "pass": 2,
       "scope": "hench-core",
-      "text": "Agent loop (loop.ts, cli-loop.ts) forms the spine that other zones attach to via well-defined interfaces",
+      "text": "Agent lifecycle files (brief→loop→review→summary) form a linear pipeline but lack explicit phase boundaries in the type system",
       "severity": "info"
     },
     {
       "type": "pattern",
       "pass": 2,
-      "scope": "hench-integration",
-      "text": "Integration zone is thin (5 files) and focused — good separation of concerns for external tool coupling",
+      "scope": "hench-guard",
+      "text": "Path and command validation split across multiple files enables granular testing but requires careful coordination of allow/deny list updates",
       "severity": "info"
     },
     {
       "type": "pattern",
       "pass": 2,
-      "scope": "hench-tooling",
-      "text": "Tools (files, git, shell) share guard infrastructure but remain individually testable",
+      "scope": "root-orchestration",
+      "text": "Orchestration layer delegates entirely through CLI spawning rather than direct imports, creating a process boundary that prevents accidental tight coupling",
       "severity": "info"
     },
     {
       "type": "relationship",
       "pass": 2,
       "scope": "global",
-      "text": "Bidirectional hench-core ↔ hench-tooling coupling (4+5 imports) suggests shared types should be extracted to a dedicated types module",
+      "text": "Cross-zone import counts (6+4+2+1=13 total) are low relative to file count (67 files) indicating generally good encapsulation despite bidirectional issues",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "hench-completion",
+      "text": "Completion depends on core agent state types but core also imports completion utilities — circular dependency suggests completion checks should be injected rather than imported",
       "severity": "warning"
     },
     {
       "type": "relationship",
       "pass": 2,
       "scope": "hench-core",
-      "text": "Core zone accepts 9 inbound imports but only reaches out to tooling (4) — appropriate dependency direction",
-      "severity": "info"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "hench-integration",
-      "text": "Rex tool wrapper isolates PRD protocol details from core agent logic",
-      "severity": "info"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "hench-tooling",
-      "text": "Tooling imports from core (5) for shared types but core also imports tooling (4) — bidirectional coupling creates potential for circular dependency issues",
+      "text": "Core zone exports types consumed by both guard and completion zones but has reverse dependencies on both, suggesting missing abstraction layer for shared contracts",
       "severity": "warning"
     },
     {
       "type": "relationship",
       "pass": 2,
-      "scope": "orchestration",
-      "text": "Orchestration zone has zero inbound dependencies — acts as pure entry point with no reverse coupling",
+      "scope": "hench-guard",
+      "text": "Security policy enforcement (guard) importing from protected code (core tools) creates potential for policy bypass if tool implementations change",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "global",
+      "text": "49-file core zone vs 3-file completion zone (16:1 ratio) suggests zone detection algorithm parameters may need tuning or manual zone hints",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
       "scope": "global",
-      "text": "Hench depends on Rex at runtime but no workspace dependency declared in package.json — implicit coupling may break with package boundary changes",
-      "severity": "critical"
+      "text": "Triangle dependency (core ↔ completion ↔ guard ↔ core) prevents independent testing and deployment of zones — extract shared types into dedicated interface zone",
+      "severity": "warning"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
-      "scope": "global",
-      "text": "Test files (.test.ts) within hench-core and hench-tooling zones inflate cohesion metrics — consider whether test co-location masks actual coupling issues",
+      "scope": "hench-completion",
+      "text": "Test file completion-validation.test.ts tests tools/ code but lives in completion zone — zone boundary is incorrectly drawn or test should move",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
       "scope": "hench-core",
-      "text": "Token budget and prompt modules are tightly coupled to agent loop but have no clear interface boundary — changes to prompting strategy require touching multiple files",
-      "severity": "info"
+      "text": "Schema types exported from core create implicit dependency for all consumers — should be isolated in dedicated types/schema zone to break coupling",
+      "severity": "warning"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
       "scope": "hench-core",
-      "text": "Zone contains 46 files spanning agent logic, CLI, runs, storage, and utilities — violates single responsibility; recommend splitting into agent/, cli/, and storage/ zones",
+      "text": "Zone contains 49 files spanning agent logic, storage, schema, CLI, and utilities — violates single responsibility; extract storage and schema into separate zones",
       "severity": "warning"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
-      "scope": "hench-integration",
-      "text": "rex.ts tool directly imports Rex types without a stable contract — Rex schema changes will break hench without compile-time guarantees",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "hench-tooling",
-      "text": "Guard modules (commands.ts, paths.ts) duplicate allowlist patterns that could be consolidated into a single declarative config",
+      "scope": "hench-guard",
+      "text": "Path validation (paths.ts) and command validation (commands.ts) share no common interface despite both being validators — missing PolicyValidator abstraction",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 3,
-      "scope": "hench-tooling",
-      "text": "tools.ts re-exports individual tool modules but also contains orchestration logic — split into tools/index.ts (exports only) and tools/registry.ts (orchestration)",
+      "scope": "hench-guard",
+      "text": "tools.ts in agent/ directory imports guard but guard/commands.ts imports types from agent — circular dependency path requires interface extraction",
       "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 4,
       "scope": "global",
-      "text": "Add shared error types package or module to formalize error contracts between zones",
-      "severity": "info"
+      "text": "Hench package lacks a root barrel file (src/index.ts) — external consumers must import from internal paths like src/schema/index.ts",
+      "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 4,
       "scope": "global",
-      "text": "Document the implicit contract that hench-integration serves as the only mutation path to Rex PRD",
+      "text": "Zone detection found rex and sourcevision packages but assigned no zones — verify those packages have sufficient internal imports for community detection threshold",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 4,
-      "scope": "global",
-      "text": "Implement run history retention policy to prevent .hench/runs/ unbounded growth",
+      "scope": "hench-completion",
+      "text": "completion-validation.test.ts tests tools/ code but lives in completion zone — file may be misplaced or indicates completion logic leaked into tools layer",
       "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 4,
       "scope": "hench-core",
-      "text": "agent/prompt.ts and agent/brief.ts both construct LLM prompts — consider consolidating prompt-building logic to reduce duplication",
+      "text": "src/agent/ mixes lifecycle stages (brief→loop→review→summary) with cross-cutting concerns (stuck, token-budget) — subdirectory could benefit from further organization",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 4,
       "scope": "hench-core",
-      "text": "stuck.ts detection logic could benefit from explicit state enum rather than heuristic string matching for robustness",
+      "text": "token-budget.ts has single consumer (loop.ts) — consider inlining to reduce module count unless reuse is planned",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 4,
-      "scope": "hench-integration",
-      "text": "Merge completion.test.ts and completion-validation.test.ts or clarify distinct responsibilities in naming",
+      "scope": "hench-guard",
+      "text": "paths.ts and commands.ts define parallel security policies without a common Policy interface — opportunity to unify validation patterns",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 4,
-      "scope": "hench-tooling",
-      "text": "Standardize guard modules to use consistent allowlist or denylist pattern for both commands and paths",
+      "scope": "hench-guard",
+      "text": "tools.ts imports from guard/commands.ts directly instead of through guard/index.ts barrel — creates implicit coupling that bypasses the public API",
       "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "hench-tooling",
-      "text": "tools/test-runner.ts was recently moved from agent/ — verify all imports updated and no stale references remain",
-      "severity": "info"
     }
   ],
   "enrichmentPass": 4,
-  "structureHash": "57f7710ae8d96309"
+  "structureHash": "e7776de2c6259a82"
 }

@@ -170,13 +170,14 @@ describe("cmdReport", () => {
       const report = parseOutput() as Record<string, unknown>;
       const stats = report.stats as Record<string, unknown>;
 
+      // Only counts tasks/subtasks, not epics/features
       expect(stats).toBeDefined();
-      expect(stats.total).toBe(7);
-      expect(stats.completed).toBe(1);
-      expect(stats.inProgress).toBe(2);
-      expect(stats.pending).toBe(2);
-      expect(stats.deferred).toBe(1);
-      expect(stats.blocked).toBe(1);
+      expect(stats.total).toBe(3); // t1, t2, t3
+      expect(stats.completed).toBe(1); // t1
+      expect(stats.inProgress).toBe(0);
+      expect(stats.pending).toBe(1); // t2
+      expect(stats.deferred).toBe(0);
+      expect(stats.blocked).toBe(1); // t3
     });
 
     it("includes progress section with percentage", async () => {
@@ -187,11 +188,12 @@ describe("cmdReport", () => {
       const report = parseOutput() as Record<string, unknown>;
       const progress = report.progress as Record<string, unknown>;
 
+      // Only counts tasks/subtasks, not epics/features
       expect(progress).toBeDefined();
       expect(typeof progress.percent).toBe("number");
-      expect(progress.percent).toBe(14); // 1/7 ≈ 14.3% → rounds to 14
+      expect(progress.percent).toBe(33); // 1/3 ≈ 33.3% → rounds to 33
       expect(progress.completed).toBe(1);
-      expect(progress.total).toBe(7);
+      expect(progress.total).toBe(3);
     });
 
     it("includes breakdown by level", async () => {

@@ -295,9 +295,10 @@ describe("cmdStatus", () => {
       await cmdStatus(tmp, { format: "tree" });
       const lines = output().split("\n");
 
-      // Auth System: 1 completed out of 4 descendants = 25%
+      // Auth System: 1 completed out of 2 tasks (t1, t2) = 50%
+      // Only counts tasks/subtasks, not features
       const authLine = lines.find((l) => l.includes("Auth System"));
-      expect(authLine).toContain("25%");
+      expect(authLine).toContain("50%");
     });
 
     it("shows 100% bar for fully completed epic", async () => {

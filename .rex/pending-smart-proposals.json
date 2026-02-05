@@ -2,30 +2,128 @@
   "proposals": [
     {
       "epic": {
-        "title": "User interface improvements",
+        "title": "Interactive Task Selection",
         "source": "llm"
       },
       "features": [
         {
-          "title": "SourceVision visual assets",
+          "title": "Multi-task selection interface",
           "source": "llm",
-          "description": "Ensure proper display of branding and visual elements in the SourceVision interface",
+          "description": "Allow users to select multiple actionable tasks from a checkbox-style interface",
           "tasks": [
             {
-              "title": "Fix logo rendering in SourceVision UI",
+              "title": "Implement interactive task selection UI",
               "source": "llm",
               "sourceFile": "",
-              "description": "Debug and resolve issues preventing the SourceVision logo from displaying correctly in the user interface",
+              "description": "Create a checkbox-style interface that displays all actionable tasks and allows multi-selection",
               "acceptanceCriteria": [
-                "Logo displays correctly in all supported browsers",
-                "Logo scales appropriately on different screen sizes",
-                "Logo loads without console errors or broken image indicators"
+                "Displays all actionable tasks in a selectable list",
+                "Supports keyboard navigation (arrow keys, space to toggle)",
+                "Shows task titles and basic metadata",
+                "Allows selecting/deselecting multiple items",
+                "Provides clear visual feedback for selected items"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ui",
+                "hench"
+              ]
+            },
+            {
+              "title": "Add batch execution mode to hench run",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Extend hench run command to accept multiple task IDs and execute them sequentially",
+              "acceptanceCriteria": [
+                "Accepts multiple task IDs as input",
+                "Executes tasks in dependency order when possible",
+                "Continues execution even if individual tasks fail",
+                "Provides clear progress indication for batch execution",
+                "Logs results for each task separately"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "execution"
+              ]
+            },
+            {
+              "title": "Integrate multi-select with n-dx work command",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Modify n-dx work orchestration to show task selection UI when no specific task is provided",
+              "acceptanceCriteria": [
+                "Shows selection UI when no --task parameter is provided",
+                "Passes selected task IDs to hench run in batch mode",
+                "Maintains backward compatibility with single task execution",
+                "Provides option to cancel selection and exit"
+              ],
+              "priority": "high",
+              "tags": [
+                "orchestration",
+                "cli"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Continuous execution loop",
+          "source": "llm",
+          "description": "Run selected tasks in a loop until all are completed",
+          "tasks": [
+            {
+              "title": "Implement task queue management",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Create a queue system that tracks selected tasks and their execution state",
+              "acceptanceCriteria": [
+                "Maintains queue of selected tasks",
+                "Updates task status as execution progresses",
+                "Removes completed tasks from queue",
+                "Handles failed tasks appropriately",
+                "Supports queue persistence across interruptions"
               ],
               "priority": "medium",
               "tags": [
-                "ui",
-                "assets",
-                "sourcevision"
+                "hench",
+                "state-management"
+              ]
+            },
+            {
+              "title": "Add loop continuation logic",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Implement logic to continue execution until all selected tasks are completed",
+              "acceptanceCriteria": [
+                "Continues execution until queue is empty",
+                "Respects dependency order for task execution",
+                "Provides clear progress updates during loop",
+                "Allows graceful interruption with Ctrl+C",
+                "Reports final status when loop completes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "execution"
+              ]
+            },
+            {
+              "title": "Add progress tracking for multi-task execution",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Show progress indicators and status updates during batch execution",
+              "acceptanceCriteria": [
+                "Shows overall progress (X of Y tasks completed)",
+                "Displays current task being executed",
+                "Shows elapsed time and estimated remaining time",
+                "Provides summary of completed vs failed tasks",
+                "Updates progress in real-time during execution"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "ux"
               ]
             }
           ]

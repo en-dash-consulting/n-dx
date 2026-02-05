@@ -389,9 +389,18 @@
     {
       "from": "packages/hench/src/cli/commands/run.ts",
       "to": "packages/hench/src/agent/brief.ts",
+      "type": "reexport",
+      "symbols": [
+        "collectEpicTaskIds"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/agent/brief.ts",
       "type": "static",
       "symbols": [
-        "getActionableTasks"
+        "getActionableTasks",
+        "collectEpicTaskIds"
       ]
     },
     {
@@ -433,6 +442,7 @@
       "type": "static",
       "symbols": [
         "CLIError",
+        "EpicNotFoundError",
         "requireClaudeCLI"
       ]
     },
@@ -854,6 +864,14 @@
     },
     {
       "from": "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+      "to": "packages/hench/src/agent/cli-loop.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/atomic-transition.test.ts",
       "to": "packages/hench/src/agent/loop.ts",
       "type": "dynamic",
       "symbols": [
@@ -892,7 +910,8 @@
         "formatTaskBrief",
         "assembleTaskBrief",
         "getActionableTasks",
-        "TaskNotActionableError"
+        "TaskNotActionableError",
+        "collectEpicTaskIds"
       ]
     },
     {
@@ -1090,6 +1109,27 @@
       "type": "static",
       "symbols": [
         "CLIError"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+      "to": "packages/hench/src/cli/commands/run.ts",
+      "type": "static",
+      "symbols": [
+        "listEpics",
+        "findEpicByIdOrTitle",
+        "resolveEpicFlag",
+        "collectEpicTaskIds",
+        "getEpicScopeInfo",
+        "EpicScopeInfo"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+      "to": "packages/hench/src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "EpicNotFoundError"
       ]
     },
     {
@@ -1436,6 +1476,7 @@
         "DEFAULT_MODEL",
         "MAX_RETRIES",
         "CHUNK_CHAR_LIMIT",
+        "CHUNK_ITEM_LIMIT",
         "FEW_SHOT_EXAMPLE",
         "spawnClaude",
         "reasonFromFile",
@@ -3645,7 +3686,8 @@
         "readProjectContext",
         "chunkScanResults",
         "summarizeScanResults",
-        "CHUNK_CHAR_LIMIT"
+        "CHUNK_CHAR_LIMIT",
+        "CHUNK_ITEM_LIMIT"
       ]
     },
     {
@@ -3975,6 +4017,7 @@
       "type": "static",
       "symbols": [
         "CLIError",
+        "BudgetExceededError",
         "formatCLIError",
         "handleCLIError",
         "requireRexDir"
@@ -6984,7 +7027,8 @@
         "packages/hench/tests/unit/agent/atomic-transition.test.ts",
         "packages/hench/tests/unit/agent/brief.test.ts",
         "packages/hench/tests/unit/agent/loop.test.ts",
-        "packages/hench/tests/unit/agent/task-failure.test.ts"
+        "packages/hench/tests/unit/agent/task-failure.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts"
       ],
       "symbols": [
         "*",
@@ -6998,7 +7042,8 @@
         "findAutoCompletions",
         "findItem",
         "findNextTask",
-        "resolveStore"
+        "resolveStore",
+        "walkTree"
       ]
     },
     {
@@ -7040,6 +7085,7 @@
         "packages/hench/tests/unit/agent/token-budget.test.ts",
         "packages/hench/tests/unit/agent/token-tracking.test.ts",
         "packages/hench/tests/unit/cli/commands/constants.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
         "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
         "packages/hench/tests/unit/cli/errors.test.ts",
         "packages/hench/tests/unit/cli/output.test.ts",
@@ -7141,6 +7187,7 @@
         "packages/sourcevision/vitest.config.ts",
         "tests/e2e/cli-ci.test.js",
         "tests/e2e/cli-config.test.js",
+        "tests/e2e/cli-delegation.test.js",
         "vitest.config.js"
       ],
       "symbols": [
@@ -7171,7 +7218,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 751,
+    "totalEdges": 755,
     "totalExternal": 12,
     "circularCount": 0,
     "circulars": [],

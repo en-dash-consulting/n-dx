@@ -1,0 +1,15 @@
+{
+  "id": "root-orchestration",
+  "name": "Root Orchestration",
+  "description": "Top-level CLI entry points and configuration for the n-dx monorepo, delegating to individual packages.",
+  "files": [
+    "ci.js",
+    "cli.js",
+    "config.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 896
+}

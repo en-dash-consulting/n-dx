@@ -2292,7 +2292,7 @@
             {
               "id": "401c3c78-1fec-4402-9c07-eb0dc4af614f",
               "title": "Implement proposal diffing system",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Compare new proposals against existing PRD structure",
               "acceptanceCriteria": [
@@ -2308,7 +2308,8 @@
                 "reconciliation",
                 "analysis"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T17:52:34.584Z"
             },
             {
               "id": "2354d362-6c8f-46df-8532-196f3b6e8aca",

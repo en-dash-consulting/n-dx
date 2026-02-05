@@ -1,7 +1,7 @@
 {
   "id": "hench-core",
-  "name": "Hench Agent Core",
-  "description": "Main autonomous agent implementation including the tool-use loop, prompt construction, and run management.",
+  "name": "Hench Core",
+  "description": "Main autonomous agent package containing the agent loop, briefing system, tool implementations, and run management.",
   "files": [
     "packages/hench/src/agent/brief.ts",
     "packages/hench/src/agent/cli-loop.ts",
@@ -27,6 +27,7 @@
     "packages/hench/src/store/json.ts",
     "packages/hench/src/store/project-config.ts",
     "packages/hench/src/store/runs.ts",
+    "packages/hench/src/tools/rex.ts",
     "packages/hench/src/tools/test-runner.ts",
     "packages/hench/src/types/index.ts",
     "packages/hench/src/types/output.ts",
@@ -43,20 +44,23 @@
     "packages/hench/tests/unit/agent/token-budget.test.ts",
     "packages/hench/tests/unit/agent/token-tracking.test.ts",
     "packages/hench/tests/unit/cli/commands/constants.test.ts",
+    "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
     "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
     "packages/hench/tests/unit/cli/errors.test.ts",
     "packages/hench/tests/unit/cli/output.test.ts",
     "packages/hench/tests/unit/schema/validate.test.ts",
     "packages/hench/tests/unit/store/project-config.test.ts",
+    "packages/hench/tests/unit/tools/rex.test.ts",
     "packages/hench/tests/unit/tools/test-runner.test.ts"
   ],
   "entryPoints": [
     "packages/hench/src/schema/index.ts",
     "packages/hench/src/schema/v1.ts",
+    "packages/hench/src/tools/rex.ts",
     "packages/hench/src/types/index.ts"
   ],
-  "cohesion": 0.94,
-  "coupling": 0.06,
-  "fileCount": 46,
-  "lineCount": 8384
+  "cohesion": 0.95,
+  "coupling": 0.05,
+  "fileCount": 49,
+  "lineCount": 9977
 }

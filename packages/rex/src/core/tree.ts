@@ -92,6 +92,9 @@ export function computeStats(items: PRDItem[]): TreeStats {
     blocked: 0,
   };
   for (const { item } of walkTree(items)) {
+    // Only count tasks and subtasks (not epics/features) for accurate work metrics
+    if (item.level !== "task" && item.level !== "subtask") continue;
+
     stats.total++;
     switch (item.status) {
       case "completed":

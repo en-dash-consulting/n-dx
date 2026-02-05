@@ -1,20 +1,17 @@
 {
   "id": "hench-completion",
-  "name": "Hench Task Completion",
-  "description": "Task completion detection and rex integration for determining when autonomous work is finished.",
+  "name": "Hench Completion",
+  "description": "Completion detection and validation logic for determining when agent tasks are finished.",
   "files": [
     "packages/hench/src/agent/completion.ts",
-    "packages/hench/src/tools/rex.ts",
     "packages/hench/tests/unit/agent/completion.test.ts",
-    "packages/hench/tests/unit/tools/completion-validation.test.ts",
-    "packages/hench/tests/unit/tools/rex.test.ts"
+    "packages/hench/tests/unit/tools/completion-validation.test.ts"
   ],
   "entryPoints": [
-    "packages/hench/src/agent/completion.ts",
-    "packages/hench/src/tools/rex.ts"
+    "packages/hench/src/agent/completion.ts"
   ],
-  "cohesion": 0.67,
-  "coupling": 0.33,
-  "fileCount": 5,
-  "lineCount": 1238
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 3,
+  "lineCount": 915
 }
