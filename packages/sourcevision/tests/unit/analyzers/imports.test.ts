@@ -269,8 +269,140 @@ describe("analyzeImports (incremental)", () => {
 
     const full = await analyzeImports(tmpDir, inv2);
 
-    expect(incremental.edges.length).toBe(full.edges.length);
-    expect(incremental.external.length).toBe(full.external.length);
-    expect(incremental.summary.totalEdges).toBe(full.summary.totalEdges);
+    expect(incremental.edges).toEqual(full.edges);
+    expect(incremental.external).toEqual(full.external);
+    expect(incremental.summary).toEqual(full.summary);
+  });
+
+  it("rebuilds edges when changed file modifies its imports", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-inc-mod-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+
+    await writeFile(
+      join(tmpDir, "src", "a.ts"),
+      `import { b } from "./b.js";\nexport const a = 1;\n`
+    );
+    await writeFile(
+      join(tmpDir, "src", "b.ts"),
+      `import { c } from "./c.js";\nexport const b = 2;\n`
+    );
+    await writeFile(
+      join(tmpDir, "src", "c.ts"),
+      `export const c = 3;\n`
+    );
+    await writeFile(
+      join(tmpDir, "src", "d.ts"),
+      `export const d = 4;\n`
+    );
+
+    const inv1 = await analyzeInventory(tmpDir) as InventoryResult;
+    const imp1 = await analyzeImports(tmpDir, inv1);
+
+    // b.ts now imports d instead of c
+    await new Promise((r) => setTimeout(r, 50));
+    await writeFile(
+      join(tmpDir, "src", "b.ts"),
+      `import { d } from "./d.js";\nexport const b = 2;\n`
+    );
+
+    const inv2 = await analyzeInventory(tmpDir, { previousInventory: inv1 }) as InventoryResult;
+
+    const incremental = await analyzeImports(tmpDir, inv2, {
+      previousImports: imp1,
+      changedFiles: inv2.changedFiles,
+      fileSetChanged: false,
+    });
+
+    const full = await analyzeImports(tmpDir, inv2);
+
+    // b→c edge should be gone, b→d edge should appear
+    expect(incremental.edges.some((e) => e.from === "src/b.ts" && e.to === "src/c.ts")).toBe(false);
+    expect(incremental.edges.some((e) => e.from === "src/b.ts" && e.to === "src/d.ts")).toBe(true);
+    // a→b should be preserved
+    expect(incremental.edges.some((e) => e.from === "src/a.ts" && e.to === "src/b.ts")).toBe(true);
+    expect(incremental.edges).toEqual(full.edges);
+    expect(incremental.summary).toEqual(full.summary);
+  });
+
+  it("drops stale external symbols when changed file removes an import", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-inc-ext-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+
+    // a.ts imports { x } from lodash, b.ts imports { y } from lodash
+    await writeFile(
+      join(tmpDir, "src", "a.ts"),
+      `import { x } from "lodash";\nexport const a = x;\n`
+    );
+    await writeFile(
+      join(tmpDir, "src", "b.ts"),
+      `import { y } from "lodash";\nexport const b = y;\n`
+    );
+
+    const inv1 = await analyzeInventory(tmpDir) as InventoryResult;
+    const imp1 = await analyzeImports(tmpDir, inv1);
+
+    expect(imp1.external).toHaveLength(1);
+    expect(imp1.external[0].symbols).toEqual(expect.arrayContaining(["x", "y"]));
+
+    // b.ts now imports z instead of y
+    await new Promise((r) => setTimeout(r, 50));
+    await writeFile(
+      join(tmpDir, "src", "b.ts"),
+      `import { z } from "lodash";\nexport const b = z;\n`
+    );
+
+    const inv2 = await analyzeInventory(tmpDir, { previousInventory: inv1 }) as InventoryResult;
+
+    const incremental = await analyzeImports(tmpDir, inv2, {
+      previousImports: imp1,
+      changedFiles: inv2.changedFiles,
+      fileSetChanged: false,
+    });
+
+    const full = await analyzeImports(tmpDir, inv2);
+
+    // y should no longer appear; x and z should
+    expect(incremental.external).toEqual(full.external);
+    expect(incremental.external[0].symbols).toContain("x");
+    expect(incremental.external[0].symbols).toContain("z");
+    expect(incremental.external[0].symbols).not.toContain("y");
+  });
+
+  it("removes external package when only importer changes away from it", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-inc-rm-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+
+    await writeFile(
+      join(tmpDir, "src", "a.ts"),
+      `import lodash from "lodash";\nexport const a = lodash;\n`
+    );
+    await writeFile(
+      join(tmpDir, "src", "b.ts"),
+      `export const b = 1;\n`
+    );
+
+    const inv1 = await analyzeInventory(tmpDir) as InventoryResult;
+    const imp1 = await analyzeImports(tmpDir, inv1);
+    expect(imp1.external).toHaveLength(1);
+
+    // a.ts removes lodash import
+    await new Promise((r) => setTimeout(r, 50));
+    await writeFile(
+      join(tmpDir, "src", "a.ts"),
+      `export const a = 42;\n`
+    );
+
+    const inv2 = await analyzeInventory(tmpDir, { previousInventory: inv1 }) as InventoryResult;
+
+    const incremental = await analyzeImports(tmpDir, inv2, {
+      previousImports: imp1,
+      changedFiles: inv2.changedFiles,
+      fileSetChanged: false,
+    });
+
+    const full = await analyzeImports(tmpDir, inv2);
+
+    expect(incremental.external).toHaveLength(0);
+    expect(incremental.external).toEqual(full.external);
   });
 });

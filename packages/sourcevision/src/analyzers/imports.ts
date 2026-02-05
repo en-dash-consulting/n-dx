@@ -257,6 +257,9 @@ export async function analyzeImports(
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
 
+  // Track which unchanged files need external symbol re-extraction
+  const unchangedExternalFiles = new Set<string>();
+
   if (canIncremental) {
     // Keep all edges FROM unchanged files
     for (const edge of prev.edges) {
@@ -266,15 +269,50 @@ export async function analyzeImports(
       }
     }
 
-    // Keep external imports from unchanged files
+    // Keep external imports from unchanged files (importedBy only, symbols rebuilt below)
     for (const ext of prev.external) {
       const unchangedImporters = ext.importedBy.filter((f) => !changedFiles.has(f));
+      const hasChangedImporters = unchangedImporters.length < ext.importedBy.length;
       if (unchangedImporters.length > 0) {
-        externalMap.set(ext.package, {
-          package: ext.package,
-          importedBy: [...unchangedImporters],
-          symbols: [...ext.symbols],
-        });
+        if (hasChangedImporters) {
+          // Mixed importers: need to re-extract symbols from unchanged files
+          for (const f of unchangedImporters) unchangedExternalFiles.add(f);
+          externalMap.set(ext.package, {
+            package: ext.package,
+            importedBy: [...unchangedImporters],
+            symbols: [], // rebuilt below
+          });
+        } else {
+          // All importers unchanged: symbols are accurate
+          externalMap.set(ext.package, {
+            package: ext.package,
+            importedBy: [...unchangedImporters],
+            symbols: [...ext.symbols],
+          });
+        }
+      }
+    }
+  }
+
+  // Re-extract external symbols from unchanged files that share packages with changed files
+  if (unchangedExternalFiles.size > 0) {
+    for (const filePath of unchangedExternalFiles) {
+      const fullPath = join(targetDir, filePath);
+      let sourceText: string;
+      try {
+        sourceText = await readFile(fullPath, "utf-8");
+      } catch {
+        continue;
+      }
+      const rawImports = extractImports(sourceText, filePath);
+      for (const raw of rawImports) {
+        if (raw.specifier.startsWith("node:") || raw.specifier.startsWith(".")) continue;
+        const pkg = extractPackageName(raw.specifier);
+        const existing = externalMap.get(pkg);
+        if (existing) {
+          const symbols = new Set([...existing.symbols, ...raw.symbols]);
+          existing.symbols = Array.from(symbols);
+        }
       }
     }
   }
