@@ -95,9 +95,15 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
+    // Truncate detail to prevent huge log entries
+    const MAX_DETAIL_LENGTH = 2000;
+    const sanitizedEntry =
+      entry.detail && entry.detail.length > MAX_DETAIL_LENGTH
+        ? { ...entry, detail: entry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
+        : entry;
     await appendFile(
       this.path("execution-log.jsonl"),
-      JSON.stringify(entry) + "\n",
+      JSON.stringify(sanitizedEntry) + "\n",
       "utf-8",
     );
   }
@@ -110,7 +116,14 @@ export class FileStore implements PRDStore {
       return [];
     }
     const lines = raw.trim().split("\n").filter(Boolean);
-    const entries = lines.map((line) => JSON.parse(line) as LogEntry);
+    const entries: LogEntry[] = [];
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line) as LogEntry);
+      } catch {
+        // Skip malformed lines (e.g., from truncated writes or unescaped newlines)
+      }
+    }
     if (limit !== undefined && limit > 0) {
       return entries.slice(-limit);
     }

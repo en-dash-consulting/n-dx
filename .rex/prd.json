@@ -2102,7 +2102,7 @@
             {
               "id": "7fef6cda-6eee-4b84-a515-6b5261c3cb2a",
               "title": "Add structured file format detection",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement detectFileFormat and parseStructuredFile",
               "acceptanceCriteria": [
@@ -2115,7 +2115,9 @@
                 "parsing",
                 "analysis"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T18:48:07.853Z",
+              "completedAt": "2026-02-05T18:51:08.203Z"
             },
             {
               "id": "aef1c182-56b1-4d01-829a-50d7fbe85a07",
