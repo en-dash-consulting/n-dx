@@ -2282,7 +2282,7 @@
             {
               "id": "d0f2be2c-a57a-4eac-946d-fee5a7bd0012",
               "title": "Implement cross-proposal validation and counting",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add validation that works across multiple proposals and provides accurate counts",
               "acceptanceCriteria": [
@@ -2295,7 +2295,9 @@
                 "validateProposalQuality",
                 "countProposalItems"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T21:05:33.545Z",
+              "completedAt": "2026-02-05T21:10:18.021Z"
             },
             {
               "id": "401c3c78-1fec-4402-9c07-eb0dc4af614f",
@@ -2323,7 +2325,7 @@
             {
               "id": "2354d362-6c8f-46df-8532-196f3b6e8aca",
               "title": "Implement findings-first analysis",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Support generating structural findings without requiring AI enrichment",
               "acceptanceCriteria": [
@@ -2335,7 +2337,8 @@
               "tags": [
                 "analyzeZones insights"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T21:10:50.476Z"
             },
             {
               "id": "dda88308-2bb6-4ce2-8d00-3ee31f43d2f4",
