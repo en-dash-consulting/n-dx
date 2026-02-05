@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execShell } from "./exec-shell.js";
 
 const ALLOWED_SUBCOMMANDS = [
   "status",
@@ -12,6 +12,8 @@ const ALLOWED_SUBCOMMANDS = [
   "show",
   "rev-parse",
 ];
+
+const GIT_TIMEOUT = 15000;
 
 export async function toolGit(
   projectDir: string,
@@ -29,25 +31,10 @@ export async function toolGit(
     args.push(...splitArgs(params.args));
   }
 
-  return new Promise((resolve, reject) => {
-    execFile(
-      "sh",
-      ["-c", args.join(" ")],
-      {
-        cwd: projectDir,
-        timeout: 15000,
-        maxBuffer: 1024 * 1024,
-      },
-      (error, stdout, stderr) => {
-        const output: string[] = [];
-        if (stdout) output.push(stdout);
-        if (stderr) output.push(`[stderr]\n${stderr}`);
-        if (error && !stdout && !stderr) {
-          output.push(`Git error: ${error.message}`);
-        }
-        resolve(output.join("\n").trim() || "(no output)");
-      },
-    );
+  return execShell({
+    command: args.join(" "),
+    cwd: projectDir,
+    timeout: GIT_TIMEOUT,
   });
 }
 
