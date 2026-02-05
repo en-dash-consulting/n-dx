@@ -227,8 +227,27 @@ export function promoteCrossings(sub: SubAnalysis): ZoneCrossing[] {
 }
 
 /**
+ * Get the path prefixes covered by sub-analyses.
+ * Files under these prefixes should be excluded from the root's Louvain analysis.
+ *
+ * We use prefix matching (not explicit file lists) because sub-analyses may be
+ * stale — new files added since the sub-analysis was run would otherwise leak
+ * into the root analysis.
+ */
+export function getSubAnalyzedPrefixes(subAnalyses: SubAnalysis[]): string[] {
+  return subAnalyses.map((sub) => sub.prefix + "/");
+}
+
+/**
+ * Check if a file path is covered by any sub-analysis prefix.
+ */
+export function isSubAnalyzedFile(path: string, prefixes: string[]): boolean {
+  return prefixes.some((prefix) => path.startsWith(prefix));
+}
+
+/**
  * Get the set of files that are covered by sub-analyses.
- * These should be excluded from the root's Louvain analysis.
+ * @deprecated Use getSubAnalyzedPrefixes + isSubAnalyzedFile for prefix-based matching.
  */
 export function getSubAnalyzedFiles(subAnalyses: SubAnalysis[]): Set<string> {
   const files = new Set<string>();

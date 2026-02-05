@@ -19,7 +19,8 @@ import type { SubAnalysis } from "./workspace.js";
 import {
   promoteZones,
   promoteCrossings,
-  getSubAnalyzedFiles,
+  getSubAnalyzedPrefixes,
+  isSubAnalyzedFile,
 } from "./workspace.js";
 import { sortZonesData } from "../util/sort.js";
 import {
@@ -512,11 +513,14 @@ export async function analyzeZones(
   const subAnalyses = options?.subAnalyses ?? [];
 
   // ── Exclude sub-analyzed files from Louvain ──
-  // Files already grouped by sub-analyses shouldn't be re-analyzed at root level
-  const subAnalyzedFiles = getSubAnalyzedFiles(subAnalyses);
-  const filteredEdges = subAnalyzedFiles.size > 0
+  // Files already grouped by sub-analyses shouldn't be re-analyzed at root level.
+  // Use prefix matching (not explicit file lists) because sub-analyses may be stale.
+  const subAnalyzedPrefixes = getSubAnalyzedPrefixes(subAnalyses);
+  const filteredEdges = subAnalyzedPrefixes.length > 0
     ? imports.edges.filter(
-        (e) => !subAnalyzedFiles.has(e.from) && !subAnalyzedFiles.has(e.to)
+        (e) =>
+          !isSubAnalyzedFile(e.from, subAnalyzedPrefixes) &&
+          !isSubAnalyzedFile(e.to, subAnalyzedPrefixes)
       )
     : imports.edges;
 
@@ -605,7 +609,7 @@ export async function analyzeZones(
   }
 
   // ── Assign unzoned files by directory proximity ──
-  // Exclude both zoned files and sub-analyzed files
+  // Exclude both zoned files and sub-analyzed files (by prefix)
 
   const zonedFiles = new Set<string>();
   for (const zone of zones) {
@@ -614,7 +618,10 @@ export async function analyzeZones(
   const initialUnzoned: string[] = [];
   for (const entry of inventory.files) {
     // Skip files that are in zones OR covered by sub-analyses
-    if (!zonedFiles.has(entry.path) && !subAnalyzedFiles.has(entry.path)) {
+    if (
+      !zonedFiles.has(entry.path) &&
+      !isSubAnalyzedFile(entry.path, subAnalyzedPrefixes)
+    ) {
       initialUnzoned.push(entry.path);
     }
   }
@@ -763,11 +770,16 @@ export async function analyzeZones(
   // ── Generate structural insights ──
   // Only generate insights for root zones (not promoted sub-analysis zones)
 
+  // Count files not covered by sub-analyses for proper percentage calculations
+  const rootFileCount = inventory.files.filter(
+    (f) => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes)
+  ).length;
+
   const structural = generateStructuralInsights(
     finalZones,
     crossings.filter((c) => !c.fromZone.includes(":") && !c.toZone.includes(":")),
     imports,
-    inventory.files.length - subAnalyzedFiles.size
+    rootFileCount
   );
 
   // ── Merge insights: structural (fresh) + accumulated AI ──
