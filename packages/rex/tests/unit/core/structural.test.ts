@@ -101,6 +101,114 @@ describe("validateStructure", () => {
       const result = validateStructure([]);
       expect(result.orphanedItems).toEqual([]);
     });
+
+    it("accepts full four-level hierarchy", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({
+              id: "f1",
+              title: "Feature",
+              level: "feature",
+              children: [
+                makeItem({
+                  id: "t1",
+                  title: "Task",
+                  level: "task",
+                  children: [
+                    makeItem({ id: "s1", title: "Subtask", level: "subtask" }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems).toEqual([]);
+      expect(result.valid).toBe(true);
+    });
+
+    it("detects subtask under feature (must be under task)", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({
+              id: "f1",
+              title: "Feature",
+              level: "feature",
+              children: [
+                makeItem({ id: "s1", title: "Subtask", level: "subtask" }),
+              ],
+            }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems.length).toBe(1);
+      expect(result.orphanedItems[0].itemId).toBe("s1");
+      expect(result.orphanedItems[0].reason).toMatch(/subtask.*under feature/i);
+    });
+
+    it("detects epic nested under another epic", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Outer epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "e2", title: "Inner epic", level: "epic" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems.length).toBe(1);
+      expect(result.orphanedItems[0].itemId).toBe("e2");
+      expect(result.orphanedItems[0].reason).toMatch(/epic.*under epic/i);
+    });
+
+    it("detects multiple orphans at different levels", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "f1", title: "Root feature", level: "feature" }),
+        makeItem({ id: "s1", title: "Root subtask", level: "subtask" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems.length).toBe(2);
+      expect(result.orphanedItems.map((o) => o.itemId).sort()).toEqual(["f1", "s1"]);
+    });
+
+    it("includes title in orphan result", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "s1", title: "My lost subtask", level: "subtask" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems[0].title).toBe("My lost subtask");
+      expect(result.orphanedItems[0].level).toBe("subtask");
+    });
+
+    it("valid items alongside orphans do not mask detection", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Valid epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Valid task", level: "task" }),
+          ],
+        }),
+        makeItem({ id: "s1", title: "Orphan subtask", level: "subtask" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.orphanedItems.length).toBe(1);
+      expect(result.orphanedItems[0].itemId).toBe("s1");
+      expect(result.valid).toBe(false);
+    });
   });
 
   describe("circular blockedBy references", () => {

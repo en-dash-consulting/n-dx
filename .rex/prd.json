@@ -2368,7 +2368,7 @@
             {
               "id": "ba5f2c5e-a388-4f2c-bf85-d21eed44865a",
               "title": "Enhance orphan detection validation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement comprehensive validation for hierarchical structure integrity",
               "acceptanceCriteria": [
@@ -2380,7 +2380,9 @@
               "tags": [
                 "validateStructure"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-05T03:24:11.314Z",
+              "completedAt": "2026-02-05T03:30:37.918Z"
             },
             {
               "id": "1f159794-2657-4ea3-ab70-e99fac7c5b2c",
@@ -7639,6 +7641,8 @@
           "level": "feature",
           "description": "Robust Notion API client with comprehensive operations",
           "source": "llm",
+          "startedAt": "2026-02-05T03:23:26.770Z",
+          "completedAt": "2026-02-05T03:23:26.770Z",
           "children": [
             {
               "id": "d69eda50-0e24-41a8-bae7-8ff2af8a58b3",
@@ -7662,9 +7666,7 @@
               "startedAt": "2026-02-05T03:18:11.873Z",
               "completedAt": "2026-02-05T03:23:26.704Z"
             }
-          ],
-          "startedAt": "2026-02-05T03:23:26.770Z",
-          "completedAt": "2026-02-05T03:23:26.770Z"
+          ]
         },
         {
           "id": "eda87221-68bc-4bd2-a399-afa8f1bf32cc",
