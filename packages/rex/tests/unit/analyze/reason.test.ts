@@ -1211,6 +1211,90 @@ describe("repairTruncatedJson", () => {
     const parsed = JSON.parse(repaired!);
     expect(parsed[0].epic.title).toBe("A");
   });
+
+  it("handles 4-level nesting truncated mid-criterion string", () => {
+    // epic > features > tasks > acceptanceCriteria — truncated inside a criterion
+    const truncated =
+      '[{"epic":{"title":"E1"},"features":[{"title":"F1","tasks":[{"title":"T1","description":"D","acceptanceCriteria":["handles deeply nested truncation","handles deeply nested tre';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("E1");
+    expect(parsed[0].features[0].tasks[0].acceptanceCriteria.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("handles multi-epic with second epic deeply truncated", () => {
+    const truncated =
+      '[{"epic":{"title":"E1"},"features":[{"title":"F1","tasks":[{"title":"T1","acceptanceCriteria":["c1"]}]}]},{"epic":{"title":"E2"},"features":[{"title":"F2","tasks":[{"title":"T2","acceptanceCriteria":["c1","c';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].epic.title).toBe("E1");
+    expect(parsed[1].epic.title).toBe("E2");
+  });
+
+  it("handles partial literal value at deep nesting (partial null)", () => {
+    // Truncated mid-literal: "description":nul
+    const truncated =
+      '[{"epic":{"title":"E"},"features":[{"title":"F","tasks":[{"title":"T","description":nul';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles partial literal value at deep nesting (partial false)", () => {
+    const truncated =
+      '[{"epic":{"title":"E"},"features":[{"title":"F","tasks":[{"title":"T","done":fals';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("handles partial literal value at deep nesting (partial true)", () => {
+    const truncated = '[{"epic":{"title":"E"},"features":[{"title":"F","tasks":[{"title":"T","flag":tr';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+  });
+
+  it("preserves complete siblings when last item is deeply truncated", () => {
+    // First feature is complete, second is truncated deep inside
+    const truncated =
+      '[{"epic":{"title":"E"},"features":[{"title":"F1","tasks":[{"title":"T1","acceptanceCriteria":["c1"]}]},{"title":"F2","tasks":[{"title":"T2","accept';
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].features[0].title).toBe("F1");
+    expect(parsed[0].features[0].tasks[0].acceptanceCriteria).toEqual(["c1"]);
+  });
+
+  it("handles pretty-printed JSON truncated at deep nesting", () => {
+    const truncated = `[
+  {
+    "epic": { "title": "Pipeline" },
+    "features": [
+      {
+        "title": "Parser",
+        "tasks": [
+          {
+            "title": "Handle nesting",
+            "acceptanceCriteria": [
+              "handles deeply nested truncation",
+              "handles deeply nested`;
+    const repaired = repairTruncatedJson(truncated);
+    expect(repaired).not.toBeNull();
+    expect(() => JSON.parse(repaired!)).not.toThrow();
+
+    const parsed = JSON.parse(repaired!);
+    expect(parsed[0].epic.title).toBe("Pipeline");
+  });
 });
 
 describe("parseProposalResponse — enhanced", () => {

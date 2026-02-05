@@ -312,6 +312,7 @@ export function repairTruncatedJson(text: string): string | null {
   //   - dangling colons (key with no value)
   //   - partial key-value pairs (e.g. `,"feat` or `,"key":"val`)
   //   - orphaned keys without values
+  //   - bare partial literals after a colon (e.g. `:"nul`, `:"fals`, `:"tr`)
   const stripPatterns = [
     // Trailing comma, colon, or whitespace
     /[,:\s]+$/,
@@ -321,6 +322,8 @@ export function repairTruncatedJson(text: string): string | null {
     /,\s*(?:"[^"]*"?|[\d.]+|true|false|null)\s*$/,
     // Orphan key without comma prefix: `"key":` at end of object
     /"\w*"?\s*:?\s*$/,
+    // Bare partial literal after colon (handles truncated true/false/null)
+    /:\s*(?:t(?:r(?:ue?)?)?|f(?:a(?:l(?:se?)?)?)?|n(?:u(?:ll?)?)?|[\d.]+)\s*$/,
   ];
 
   let content = trimmed;
