@@ -1,7 +1,7 @@
 {
   "id": "orchestration",
   "name": "Orchestration Layer",
-  "description": "Top-level CLI entry points that delegate to the three main packages (sourcevision, rex, hench).",
+  "description": "Top-level CLI entry points and configuration that coordinate the three sub-packages.",
   "files": [
     "ci.js",
     "cli.js",

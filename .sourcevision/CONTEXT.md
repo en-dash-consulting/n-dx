@@ -5,26 +5,26 @@
 <architecture>
 
 Project: n-dx
-Files: 347, Lines: 87449
-Languages: TypeScript(277) JSON(22) CSS(16) Other(10) Markdown(10)
-Import edges: 747, External packages: 12
+Files: 349, Lines: 89649
+Languages: TypeScript(279) JSON(22) CSS(16) Other(10) Markdown(10)
+Import edges: 751, External packages: 12
 
 </architecture>
 
 <zones>
 
-[hench] Hench (12 files, coh=0.72 coup=0.28)
-  12 files, primarily TypeScript
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/commands/show.ts, packages/hench/src/cli/commands/status.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/index.ts, packages/hench/src/cli/output.ts, packages/hench/tests/unit/agent/brief.test.ts, packages/hench/tests/unit/cli/commands/constants.test.ts +2
-[hench-2] Hench 2 (32 files, coh=0.81 coup=0.19)
-  32 files, primarily TypeScript
-  files: packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts, packages/hench/src/agent/prompt.ts, packages/hench/src/agent/review.ts, packages/hench/src/agent/stuck.ts, packages/hench/src/agent/summary.ts, packages/hench/src/agent/test-runner.ts, packages/hench/src/agent/token-budget.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/schema/index.ts +22
-[hench-3] Hench 3 (5 files, coh=0.67 coup=0.33)
-  5 files, primarily TypeScript
+[hench-core] Hench Agent Core (46 files, coh=0.94 coup=0.06)
+  Main autonomous agent implementation including the tool-use loop, prompt construction, and run management.
+  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts, packages/hench/src/agent/prompt.ts, packages/hench/src/agent/review.ts, packages/hench/src/agent/stuck.ts, packages/hench/src/agent/summary.ts, packages/hench/src/agent/token-budget.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/init.ts +36
+[hench-integration] Hench Integration Bridge (5 files, coh=0.67 coup=0.33)
+  Completion validation and Rex tool integration that bridges the agent with external systems.
   files: packages/hench/src/agent/completion.ts, packages/hench/src/tools/rex.ts, packages/hench/tests/unit/agent/completion.test.ts, packages/hench/tests/unit/tools/completion-validation.test.ts, packages/hench/tests/unit/tools/rex.test.ts
-[hench-4] Hench 4 (12 files, coh=0.84 coup=0.16)
-  12 files, primarily TypeScript
+[hench-tooling] Hench Tool Infrastructure (12 files, coh=0.80 coup=0.20)
+  Tool definitions, shell execution, and security guard system for safe autonomous operations.
   files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/shell.ts, packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/tools/files.test.ts +2
+[orchestration] Orchestration Layer (3 files, coh=1.00 coup=0.00)
+  Top-level CLI entry points and configuration that coordinate the three sub-packages.
+  files: ci.js, cli.js, config.js
 [packages-rex:rex-cli] Rex PRD Management CLI (36 files, coh=1.00 coup=0.00)
   A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
   files: packages/rex/src/analyze/index.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/next.ts, packages/rex/src/cli/commands/recommend.ts +26
@@ -40,9 +40,6 @@ Import edges: 747, External packages: 12
 [packages-sourcevision:test-suite] Test Suite (5 files, coh=0.46 coup=0.54)
   Unit, integration, and end-to-end tests covering analyzer logic, schema validation, CLI workflows, and the serve command, with imports reaching into both analyzer and viewer zones.
   files: packages/sourcevision/src/schema/validate.ts, packages/sourcevision/tests/e2e/cli-analyze.test.ts, packages/sourcevision/tests/e2e/cli-serve.test.ts, packages/sourcevision/tests/integration/pipeline.test.ts, packages/sourcevision/tests/unit/schema/validate.test.ts
-[root] Root (3 files, coh=1.00 coup=0.00)
-  3 files, primarily JavaScript
-  files: ci.js, cli.js, config.js
 [unzoned] 25 files: .claude/settings.local.json, .gitignore, .hench/config.json, .npmrc, .rex/config.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
@@ -80,58 +77,60 @@ Conventions: action(2) default(4) loader(2) meta(1)
 
 <findings>
 
-[warning] Bidirectional coupling: "hench" ↔ "hench-2" (9+8 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "hench-2" ↔ "hench-4" (4+3 crossings) — consider extracting shared interface
-[warning] Contains 36% of project files (32/89) — may be too broad, consider splitting [hench-2]
-[warning] All hench zones maintain cohesion above 0.67, indicating the package has solid internal architecture
-[warning] Bidirectional coupling with hench-2 (9 imports out, 8 in) suggests these zones could potentially be merged or boundaries clarified [hench-cli]
-[warning] Missing shared-types zone: bidirectional imports between CLI/core and core/tooling suggest common interfaces should be extracted to eliminate cycles
-[warning] CLI zone depends on core for agent execution, but core reaches back into CLI for output formatting—violation of layered architecture [hench-cli,hench-core]
-[warning] Core imports tooling (expected) but tooling also imports core types—tools should be self-contained with injected dependencies [hench-core,hench-tooling]
-[critical] No explicit shared-types or contracts zone exists despite bidirectional coupling—extract common interfaces to break circular dependencies
-[warning] CLI layer (12 files) is relatively large for what should be a thin wrapper—consider if some logic should move to hench-core [hench-cli]
-[warning] 32-file zone exceeds recommended zone size (15-20 files)—submodules like agent/, tools/, and run/ should be evaluated for promotion to separate zones [hench-core]
-[warning] guard/ subdirectory has 4 files with distinct responsibility (security enforcement) from tools/ (capability provision)—should be separate zones [hench-tooling]
-[warning] test-runner.ts embedded in agent/ creates implicit dependency on test framework—extract to tools/ if tests are treated as external operations [hench-core]
-[warning] Add integration tests for guard subsystem to verify command filtering works correctly with actual shell tool invocations [hench-tooling]
-[warning] Duplicate findings collapse: #0, #1, #6, #7, #13 all describe the same bidirectional coupling issue—single fix: create packages/hench/src/types/index.ts with shared interfaces
-... +4 more
+[warning] Bidirectional coupling: "hench-core" ↔ "hench-tooling" (4+5 crossings) — consider extracting shared interface
+[warning] Contains 51% of project files (46/91) — may be too broad, consider splitting [hench-core]
+[warning] Bidirectional imports between hench-core and hench-integration (4 each way via hench zones) may indicate opportunity to clarify API boundaries
+[warning] Both implementation files are entry points, suggesting this zone exports rather than encapsulates [hench-integration]
+[warning] Bidirectional hench-core ↔ hench-tooling coupling (4+5 imports) suggests shared types should be extracted to a dedicated types module
+[warning] Tooling imports from core (5) for shared types but core also imports tooling (4) — bidirectional coupling creates potential for circular dependency issues [hench-tooling]
+[critical] Hench depends on Rex at runtime but no workspace dependency declared in package.json — implicit coupling may break with package boundary changes
+[warning] Zone contains 46 files spanning agent logic, CLI, runs, storage, and utilities — violates single responsibility; recommend splitting into agent/, cli/, and storage/ zones [hench-core]
+[warning] rex.ts tool directly imports Rex types without a stable contract — Rex schema changes will break hench without compile-time guarantees [hench-integration]
+[warning] tools.ts re-exports individual tool modules but also contains orchestration logic — split into tools/index.ts (exports only) and tools/registry.ts (orchestration) [hench-tooling]
+[warning] Implement run history retention policy to prevent .hench/runs/ unbounded growth
+[warning] Standardize guard modules to use consistent allowlist or denylist pattern for both commands and paths [hench-tooling]
 
 </findings>
 
 <next-steps>
 
-[high] No explicit shared-types or contracts zone exists despite bidirectional couplin…
+[high] Hench depends on Rex at runtime but no workspace dependency declared in package…
   category: fix
-[medium] 32-file zone exceeds recommended zone size (15-20 files)—su… (+1 related)
+[medium] Zone contains 46 files spanning agent logic, CLI, runs, storage, and utilities …
+  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts
   category: refactor
-[medium] Missing shared-types zone: bidirectional imports between CL… (+1 related)
+[medium] rex.ts tool directly imports Rex types without a stable contract — Rex schema c…
+  files: packages/hench/src/agent/completion.ts, packages/hench/src/tools/rex.ts, packages/hench/tests/unit/agent/completion.test.ts
+  category: refactor
+[medium] tools.ts re-exports individual tool modules but also contains orchestration log…
+  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts
+  category: refactor
+[medium] Bidirectional hench-core ↔ hench-tooling coupling (4+5 imports) suggests shared…
   category: extract
-[medium] CLI layer (12 files) is relatively large for what should be a thin wrapper—cons…
-  category: refactor
-[medium] guard/ subdirectory has 4 files with distinct responsibility (security enforcem…
-  category: refactor
-[medium] CLI zone depends on core for agent execution, but core reaches back into CLI fo…
+[medium] Tooling imports from core (5) for shared types but core also imports tooling (4…
+  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts
   category: extract
-[medium] Core imports tooling (expected) but tooling also imports core types—tools shoul…
-  category: extract
-[medium] test-runner.ts embedded in agent/ creates implicit dependency on test framework…
+[medium] Implement run history retention policy to prevent .hench/runs/ unbounded growth
   category: refactor
-[medium] Add integration tests for guard subsystem to verify command filtering works cor…
+[medium] Standardize guard modules to use consistent allowlist or denylist pattern for b…
+  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts
   category: refactor
-[medium] Create packages/hench/src/types/index.ts exporting: RunContext, ToolResult, Bri…
+[medium] Bidirectional coupling: "hench-core" ↔ "hench-tooling" (4+5 crossings) — consid…
   category: refactor
-[medium] SINGLE ACTIONABLE FIX: Create packages/hench/src/types/index.ts exporting RunCo…
+[medium] Contains 51% of project files (46/91) — may be too broad, consider splitting
+  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts
   category: refactor
-[medium] Extract RunContext and ToolResult interfaces to a new hench/types.ts module, th…
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/run.ts
+[medium] Bidirectional imports between hench-core and hench-integration (4 each way via …
   category: refactor
-[medium] Split into hench-core (run loop, context) and hench-tooling (tool definitions, …
-  files: packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts, packages/hench/src/agent/prompt.ts
+[medium] Both implementation files are entry points, suggesting this zone exports rather…
+  files: packages/hench/src/agent/completion.ts, packages/hench/src/tools/rex.ts, packages/hench/tests/unit/agent/completion.test.ts
   category: refactor
-[medium] Bidirectional coupling: "hench" ↔ "hench-2" (9+8 crossings) — consider extracti…
+[low] Add shared error types package or module to formalize error contracts between z…
   category: refactor
-[medium] Bidirectional coupling: "hench-2" ↔ "hench-4" (4+3 crossings) — consider extrac…
+[low] Document the implicit contract that hench-integration serves as the only mutati…
+  category: refactor
+[low] agent/prompt.ts and agent/brief.ts both construct LLM prompts — consider consol…
+  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts
   category: refactor
 
 </next-steps>

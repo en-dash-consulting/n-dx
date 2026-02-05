@@ -6,7 +6,7 @@
 
 Zone: Orchestration Layer (`orchestration`)
 Files: 3, Cohesion: 1.00, Coupling: 0.00
-Description: Top-level CLI entry points that delegate to the three main packages (sourcevision, rex, hench).
+Description: Top-level CLI entry points and configuration that coordinate the three sub-packages.
 Lines: 893
 
 </zone>
@@ -30,17 +30,16 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Only 3 files suggests appropriate scope for top-level coordination
-[observation] [info] Zero coupling indicates clean separation from package internals, which is ideal for an orchestration layer
-[suggestion] [info] ci.js appears to be a standalone script not integrated into the main orchestration flow—verify if it should be documented separately or wired into cli.js
+[observation] [info] Only 3 files suggests appropriately thin orchestration layer without business logic leakage
+[observation] [info] Perfect cohesion (1.0) with zero coupling indicates clean separation from implementation packages
+[relationship] [info] Orchestration zone has zero inbound dependencies — acts as pure entry point with no reverse coupling
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Acts as the glue layer coordinating all n-dx subcommands
-- Keep this layer thin—complexity should live in package CLIs
-- ci.js is orphaned from the main CLI entry point—no imports link it to cli.js or config.js
+- Serves as the unified interface for n-dx commands
+- Delegates to package-specific CLIs rather than implementing logic directly
 
 </insights>

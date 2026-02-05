@@ -75,30 +75,10 @@
     },
     {
       "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/agent/test-runner.ts",
-      "type": "static",
-      "symbols": [
-        "runPostTaskTests"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/cli-loop.ts",
       "to": "packages/hench/src/agent/token-budget.ts",
       "type": "static",
       "symbols": [
         "checkTokenBudget"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/cli/output.ts",
-      "type": "static",
-      "symbols": [
-        "section",
-        "subsection",
-        "stream",
-        "detail",
-        "info"
       ]
     },
     {
@@ -128,6 +108,26 @@
       "symbols": [
         "toolRexUpdateStatus",
         "toolRexAppendLog"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/cli-loop.ts",
+      "to": "packages/hench/src/tools/test-runner.ts",
+      "type": "static",
+      "symbols": [
+        "runPostTaskTests"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/cli-loop.ts",
+      "to": "packages/hench/src/types/output.ts",
+      "type": "static",
+      "symbols": [
+        "section",
+        "subsection",
+        "stream",
+        "detail",
+        "info"
       ]
     },
     {
@@ -167,14 +167,6 @@
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/agent/test-runner.ts",
-      "type": "static",
-      "symbols": [
-        "runPostTaskTests"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/loop.ts",
       "to": "packages/hench/src/agent/token-budget.ts",
       "type": "static",
       "symbols": [
@@ -188,26 +180,6 @@
       "symbols": [
         "TOOL_DEFINITIONS",
         "dispatchTool"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/agent/tools.ts",
-      "type": "type",
-      "symbols": [
-        "ToolContext"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/cli/output.ts",
-      "type": "static",
-      "symbols": [
-        "section",
-        "subsection",
-        "stream",
-        "detail",
-        "info"
       ]
     },
     {
@@ -246,6 +218,34 @@
       ]
     },
     {
+      "from": "packages/hench/src/agent/loop.ts",
+      "to": "packages/hench/src/tools/test-runner.ts",
+      "type": "static",
+      "symbols": [
+        "runPostTaskTests"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/loop.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "type": "type",
+      "symbols": [
+        "ToolContext"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/loop.ts",
+      "to": "packages/hench/src/types/output.ts",
+      "type": "static",
+      "symbols": [
+        "section",
+        "subsection",
+        "stream",
+        "detail",
+        "info"
+      ]
+    },
+    {
       "from": "packages/hench/src/agent/prompt.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
@@ -256,7 +256,7 @@
     },
     {
       "from": "packages/hench/src/agent/review.ts",
-      "to": "packages/hench/src/cli/output.ts",
+      "to": "packages/hench/src/types/output.ts",
       "type": "static",
       "symbols": [
         "section",
@@ -301,14 +301,6 @@
     },
     {
       "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/guard/index.ts",
-      "type": "type",
-      "symbols": [
-        "GuardRails"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
       "to": "packages/hench/src/tools/files.ts",
       "type": "static",
       "symbols": [
@@ -342,6 +334,22 @@
       "type": "static",
       "symbols": [
         "toolRunCommand"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/tools.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "ToolContext"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/tools.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "type": "type",
+      "symbols": [
+        "ToolContext"
       ]
     },
     {
@@ -564,6 +572,21 @@
       ]
     },
     {
+      "from": "packages/hench/src/cli/output.ts",
+      "to": "packages/hench/src/types/output.ts",
+      "type": "reexport",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result",
+        "section",
+        "subsection",
+        "stream",
+        "detail"
+      ]
+    },
+    {
       "from": "packages/hench/src/guard/commands.ts",
       "to": "packages/hench/src/guard/paths.ts",
       "type": "static",
@@ -769,6 +792,29 @@
       ]
     },
     {
+      "from": "packages/hench/src/types/index.ts",
+      "to": "packages/hench/src/guard/index.ts",
+      "type": "type",
+      "symbols": [
+        "GuardRails"
+      ]
+    },
+    {
+      "from": "packages/hench/src/types/index.ts",
+      "to": "packages/hench/src/types/output.ts",
+      "type": "reexport",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result",
+        "section",
+        "subsection",
+        "stream",
+        "detail"
+      ]
+    },
+    {
       "from": "packages/hench/tests/integration/store-roundtrip.test.ts",
       "to": "packages/hench/src/schema/v1.ts",
       "type": "static",
@@ -845,6 +891,7 @@
       "symbols": [
         "formatTaskBrief",
         "assembleTaskBrief",
+        "getActionableTasks",
         "TaskNotActionableError"
       ]
     },
@@ -993,19 +1040,6 @@
       "type": "static",
       "symbols": [
         "initConfig"
-      ]
-    },
-    {
-      "from": "packages/hench/tests/unit/agent/test-runner.test.ts",
-      "to": "packages/hench/src/agent/test-runner.ts",
-      "type": "static",
-      "symbols": [
-        "isTestFile",
-        "candidateTestPaths",
-        "findRelevantTests",
-        "detectRunner",
-        "buildScopedCommand",
-        "runPostTaskTests"
       ]
     },
     {
@@ -1264,6 +1298,19 @@
       "type": "static",
       "symbols": [
         "toolRunCommand"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/test-runner.test.ts",
+      "to": "packages/hench/src/tools/test-runner.ts",
+      "type": "static",
+      "symbols": [
+        "isTestFile",
+        "candidateTestPaths",
+        "findRelevantTests",
+        "detectRunner",
+        "buildScopedCommand",
+        "runPostTaskTests"
       ]
     },
     {
@@ -6931,9 +6978,9 @@
         "packages/hench/src/agent/brief.ts",
         "packages/hench/src/agent/cli-loop.ts",
         "packages/hench/src/agent/loop.ts",
-        "packages/hench/src/agent/tools.ts",
         "packages/hench/src/cli/commands/run.ts",
         "packages/hench/src/tools/rex.ts",
+        "packages/hench/src/types/index.ts",
         "packages/hench/tests/unit/agent/atomic-transition.test.ts",
         "packages/hench/tests/unit/agent/brief.test.ts",
         "packages/hench/tests/unit/agent/loop.test.ts",
@@ -6990,7 +7037,6 @@
         "packages/hench/tests/unit/agent/stuck.test.ts",
         "packages/hench/tests/unit/agent/summary.test.ts",
         "packages/hench/tests/unit/agent/task-failure.test.ts",
-        "packages/hench/tests/unit/agent/test-runner.test.ts",
         "packages/hench/tests/unit/agent/token-budget.test.ts",
         "packages/hench/tests/unit/agent/token-tracking.test.ts",
         "packages/hench/tests/unit/cli/commands/constants.test.ts",
@@ -7006,6 +7052,7 @@
         "packages/hench/tests/unit/tools/git.test.ts",
         "packages/hench/tests/unit/tools/rex.test.ts",
         "packages/hench/tests/unit/tools/shell.test.ts",
+        "packages/hench/tests/unit/tools/test-runner.test.ts",
         "packages/hench/vitest.config.ts",
         "packages/rex/tests/e2e/cli-adapter.test.ts",
         "packages/rex/tests/e2e/cli-analyze.test.ts",
@@ -7124,7 +7171,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 747,
+    "totalEdges": 751,
     "totalExternal": 12,
     "circularCount": 0,
     "circulars": [],
@@ -7190,10 +7237,6 @@
         "count": 10
       },
       {
-        "path": "packages/hench/src/cli/output.ts",
-        "count": 9
-      },
-      {
         "path": "packages/rex/src/analyze/reason.ts",
         "count": 9
       },
@@ -7208,8 +7251,12 @@
       {
         "path": "packages/sourcevision/src/cli/commands/constants.ts",
         "count": 9
+      },
+      {
+        "path": "packages/rex/src/analyze/propose.ts",
+        "count": 8
       }
     ],
-    "avgImportsPerFile": 3.29
+    "avgImportsPerFile": 3.28
   }
 }

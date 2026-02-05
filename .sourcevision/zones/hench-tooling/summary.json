@@ -1,7 +1,7 @@
 {
   "id": "hench-tooling",
-  "name": "Hench Tool System",
-  "description": "Tool implementations (shell, git, files) and the security guard system that validates and sandboxes tool execution.",
+  "name": "Hench Tool Infrastructure",
+  "description": "Tool definitions, shell execution, and security guard system for safe autonomous operations.",
   "files": [
     "packages/hench/src/agent/tools.ts",
     "packages/hench/src/guard/commands.ts",
@@ -20,8 +20,8 @@
     "packages/hench/src/agent/tools.ts",
     "packages/hench/src/guard/index.ts"
   ],
-  "cohesion": 0.84,
-  "coupling": 0.16,
+  "cohesion": 0.8,
+  "coupling": 0.2,
   "fileCount": 12,
-  "lineCount": 1102
+  "lineCount": 1631
 }

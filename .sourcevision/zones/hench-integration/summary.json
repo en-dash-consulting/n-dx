@@ -1,0 +1,20 @@
+{
+  "id": "hench-integration",
+  "name": "Hench Integration Bridge",
+  "description": "Completion validation and Rex tool integration that bridges the agent with external systems.",
+  "files": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/tests/unit/agent/completion.test.ts",
+    "packages/hench/tests/unit/tools/completion-validation.test.ts",
+    "packages/hench/tests/unit/tools/rex.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/tools/rex.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 5,
+  "lineCount": 1238
+}

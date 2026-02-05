@@ -4,48 +4,47 @@
 
 ## Project Overview
 
-- **Files**: 347
-- **Lines of code**: 87,449
-- **Languages**: TypeScript (277), JSON (22), CSS (16), Other (10), Markdown (10)
-- **Analyzed**: 2026-02-05T12:39:21.227Z
+- **Files**: 349
+- **Lines of code**: 89,649
+- **Languages**: TypeScript (279), JSON (22), CSS (16), Other (10), Markdown (10)
+- **Analyzed**: 2026-02-05T14:03:09.135Z
 
 ## Architecture Zones
 
-### Hench (`hench`)
+### Hench Agent Core (`hench-core`)
 
-12 files, primarily TypeScript
+Main autonomous agent implementation including the tool-use loop, prompt construction, and run management.
 
-- Files: 12
-- Cohesion: 0.72, Coupling: 0.28
-- Entry points: packages/hench/src/agent/brief.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/output.ts
-- Detail: `.sourcevision/zones/hench/context.md`
+- Files: 46
+- Cohesion: 0.94, Coupling: 0.06
+- Entry points: packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/types/index.ts
+- Detail: `.sourcevision/zones/hench-core/context.md`
 
-### Hench 2 (`hench-2`)
+### Hench Integration Bridge (`hench-integration`)
 
-32 files, primarily TypeScript
-
-- Files: 32
-- Cohesion: 0.81, Coupling: 0.19
-- Entry points: packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/loop.ts, packages/hench/src/agent/stuck.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/schema/index.ts (+2 more)
-- Detail: `.sourcevision/zones/hench-2/context.md`
-
-### Hench 3 (`hench-3`)
-
-5 files, primarily TypeScript
+Completion validation and Rex tool integration that bridges the agent with external systems.
 
 - Files: 5
 - Cohesion: 0.67, Coupling: 0.33
 - Entry points: packages/hench/src/agent/completion.ts, packages/hench/src/tools/rex.ts
-- Detail: `.sourcevision/zones/hench-3/context.md`
+- Detail: `.sourcevision/zones/hench-integration/context.md`
 
-### Hench 4 (`hench-4`)
+### Hench Tool Infrastructure (`hench-tooling`)
 
-12 files, primarily TypeScript
+Tool definitions, shell execution, and security guard system for safe autonomous operations.
 
 - Files: 12
-- Cohesion: 0.84, Coupling: 0.16
+- Cohesion: 0.80, Coupling: 0.20
 - Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/guard/index.ts
-- Detail: `.sourcevision/zones/hench-4/context.md`
+- Detail: `.sourcevision/zones/hench-tooling/context.md`
+
+### Orchestration Layer (`orchestration`)
+
+Top-level CLI entry points and configuration that coordinate the three sub-packages.
+
+- Files: 3
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/orchestration/context.md`
 
 ### Rex PRD Management CLI (`packages-rex:rex-cli`)
 
@@ -89,14 +88,6 @@ Unit, integration, and end-to-end tests covering analyzer logic, schema validati
 - Cohesion: 0.46, Coupling: 0.54
 - Entry points: packages/sourcevision/src/schema/validate.ts
 - Detail: `.sourcevision/zones/packages-sourcevision:test-suite/context.md`
-
-### Root (`root`)
-
-3 files, primarily JavaScript
-
-- Files: 3
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/root/context.md`
 
 ## Key Dependencies
 
@@ -148,57 +139,53 @@ Unit, integration, and end-to-end tests covering analyzer logic, schema validati
 
 ### Anti-patterns
 
-- No explicit shared-types or contracts zone exists despite bidirectional coupling—extract common interfaces to break circular dependencies [critical]
-- Zone naming uses 'hench-' prefix redundantly when all non-orchestration zones are already in hench package—consider package-relative naming [info]
-- CLI layer (12 files) is relatively large for what should be a thin wrapper—consider if some logic should move to hench-core [warning] (hench-cli)
-- Test files in same zone as source (3 source + 2 test) artificially inflates cohesion metrics—zone boundaries should follow source structure only [info] (hench-completion)
-- 32-file zone exceeds recommended zone size (15-20 files)—submodules like agent/, tools/, and run/ should be evaluated for promotion to separate zones [warning] (hench-core)
-- review.ts, stuck.ts, and summary.ts form an implicit 'agent-state' submodule that could be extracted to reduce core zone complexity [info] (hench-core)
-- guard/ subdirectory has 4 files with distinct responsibility (security enforcement) from tools/ (capability provision)—should be separate zones [warning] (hench-tooling)
+- Hench depends on Rex at runtime but no workspace dependency declared in package.json — implicit coupling may break with package boundary changes [critical]
+- Test files (.test.ts) within hench-core and hench-tooling zones inflate cohesion metrics — consider whether test co-location masks actual coupling issues [info]
+- Token budget and prompt modules are tightly coupled to agent loop but have no clear interface boundary — changes to prompting strategy require touching multiple files [info] (hench-core)
+- Zone contains 46 files spanning agent logic, CLI, runs, storage, and utilities — violates single responsibility; recommend splitting into agent/, cli/, and storage/ zones [warning] (hench-core)
+- rex.ts tool directly imports Rex types without a stable contract — Rex schema changes will break hench without compile-time guarantees [warning] (hench-integration)
+- Guard modules (commands.ts, paths.ts) duplicate allowlist patterns that could be consolidated into a single declarative config [info] (hench-tooling)
+- tools.ts re-exports individual tool modules but also contains orchestration logic — split into tools/index.ts (exports only) and tools/registry.ts (orchestration) [warning] (hench-tooling)
 
 ### Patterns
 
-- Missing shared-types zone: bidirectional imports between CLI/core and core/tooling suggest common interfaces should be extracted to eliminate cycles [warning]
-- Zone encapsulates completion heuristics separately from execution—clean separation of 'what is done' from 'how to do it' [info] (hench-completion)
-- Zone acts as integration point for all other hench zones—any change here ripples outward [info] (hench-core)
-- Guard modules (commands, paths) form a cohesive security layer distinct from tool implementations—candidate for extraction if tooling grows [info] (hench-tooling)
-- DUPLICATE CONSOLIDATION: Findings #0, #1, #6, #7, #12, #13, #14 all describe the same issue (bidirectional coupling requiring shared interface extraction)—these 7 findings collapse to 1 action item: create packages/hench/src/types/index.ts [info]
-- Duplicate findings collapse: #0, #1, #6, #7, #13 all describe the same bidirectional coupling issue—single fix: create packages/hench/src/types/index.ts with shared interfaces [warning]
-- Duplicate findings detected: #0, #1, #6, #7 all point to bidirectional coupling requiring shared interface extraction—treat as single issue with one fix [info]
+- No sourcevision or rex packages detected in analysis — either excluded from scan or in separate workspaces [info]
+- Agent loop (loop.ts, cli-loop.ts) forms the spine that other zones attach to via well-defined interfaces [info] (hench-core)
+- Integration zone is thin (5 files) and focused — good separation of concerns for external tool coupling [info] (hench-integration)
+- Tools (files, git, shell) share guard infrastructure but remain individually testable [info] (hench-tooling)
 
 ### Relationships
 
-- CLI zone depends on core for agent execution, but core reaches back into CLI for output formatting—violation of layered architecture [warning] (hench-cli,hench-core)
-- Three-zone dependency triangle (CLI↔core↔tooling) creates implicit coupling—changes to shared concepts require coordinated updates [info] (hench-cli,hench-core,hench-tooling)
-- Core imports tooling (expected) but tooling also imports core types—tools should be self-contained with injected dependencies [warning] (hench-core,hench-tooling)
+- Bidirectional hench-core ↔ hench-tooling coupling (4+5 imports) suggests shared types should be extracted to a dedicated types module [warning]
+- Core zone accepts 9 inbound imports but only reaches out to tooling (4) — appropriate dependency direction [info] (hench-core)
+- Rex tool wrapper isolates PRD protocol details from core agent logic [info] (hench-integration)
+- Tooling imports from core (5) for shared types but core also imports tooling (4) — bidirectional coupling creates potential for circular dependency issues [warning] (hench-tooling)
+- Orchestration zone has zero inbound dependencies — acts as pure entry point with no reverse coupling [info] (orchestration)
 
 ### Observations
 
-- Bidirectional coupling: "hench" ↔ "hench-2" (9+8 crossings) — consider extracting shared interface [warning]
-- Bidirectional coupling: "hench-2" ↔ "hench-4" (4+3 crossings) — consider extracting shared interface [warning]
-- Size imbalance: largest zone has 32 files vs smallest with 3 — uneven decomposition [info]
-- Contains 36% of project files (32/89) — may be too broad, consider splitting [warning] (hench-2)
-- High cohesion (0.81) — files are tightly interconnected [info] (hench-2)
-- High cohesion (0.84) — files are tightly interconnected [info] (hench-4)
-- High cohesion (1) — files are tightly interconnected [info] (root)
-- All hench zones maintain cohesion above 0.67, indicating the package has solid internal architecture [warning]
-- Cross-zone import pattern shows hench-core as the hub with spokes to CLI, completion, and tooling—classic layered architecture [info]
-- Root orchestration zone has no coupling to internal zones, confirming clean package boundaries [info]
-- ... and 13 more
+- Bidirectional coupling: "hench-core" ↔ "hench-tooling" (4+5 crossings) — consider extracting shared interface [warning]
+- Size imbalance: largest zone has 46 files vs smallest with 3 — uneven decomposition [info]
+- Contains 51% of project files (46/91) — may be too broad, consider splitting [warning] (hench-core)
+- High cohesion (0.94) — files are tightly interconnected [info] (hench-core)
+- High cohesion (0.8) — files are tightly interconnected [info] (hench-tooling)
+- High cohesion (1) — files are tightly interconnected [info] (orchestration)
+- All four zones maintain cohesion above 0.67, indicating healthy module boundaries [info]
+- Bidirectional imports between hench-core and hench-integration (4 each way via hench zones) may indicate opportunity to clarify API boundaries [warning]
+- Orchestration layer has zero coupling which validates the delegation architecture [info]
+- 46 files with 0.94 cohesion demonstrates strong modular design within the agent package [info] (hench-core)
+- ... and 10 more
 
 ### Suggestions
 
-- Document the implicit 'thin CLI wrapper' convention in CLAUDE.md to prevent future violations [info]
-- Establish error transformation layer at zone boundaries—core should throw domain errors, CLI should catch and format for users [info]
-- init.ts performs filesystem operations directly rather than delegating to a core module, breaking the thin-wrapper pattern used by run.ts and status.ts [info] (hench-cli)
-- completion.ts + rex.ts coupling indicates task completion semantics are spread across two files—consider a unified TaskCompletionPolicy abstraction [info] (hench-completion)
-- Consider splitting agent/ into lifecycle (loop, cli-loop), planning (brief, prompt), and analysis (review, summary, stuck) subdirectories [info] (hench-core)
-- test-runner.ts embedded in agent/ creates implicit dependency on test framework—extract to tools/ if tests are treated as external operations [warning] (hench-core)
-- Add integration tests for guard subsystem to verify command filtering works correctly with actual shell tool invocations [warning] (hench-tooling)
-- Audit shell.ts and guard/commands.ts for duplicated command parsing/validation logic [info] (hench-tooling)
-- ci.js appears to be a standalone script not integrated into the main orchestration flow—verify if it should be documented separately or wired into cli.js [info] (orchestration)
-- Create packages/hench/src/types/index.ts exporting: RunContext, ToolResult, BriefingData, CompletionResult—then update imports in cli/, core/, tooling/ to use this shared module [warning]
-- ... and 9 more
+- Add shared error types package or module to formalize error contracts between zones [info]
+- Document the implicit contract that hench-integration serves as the only mutation path to Rex PRD [info]
+- Implement run history retention policy to prevent .hench/runs/ unbounded growth [warning]
+- agent/prompt.ts and agent/brief.ts both construct LLM prompts — consider consolidating prompt-building logic to reduce duplication [info] (hench-core)
+- stuck.ts detection logic could benefit from explicit state enum rather than heuristic string matching for robustness [info] (hench-core)
+- Merge completion.test.ts and completion-validation.test.ts or clarify distinct responsibilities in naming [info] (hench-integration)
+- Standardize guard modules to use consistent allowlist or denylist pattern for both commands and paths [warning] (hench-tooling)
+- tools/test-runner.ts was recently moved from agent/ — verify all imports updated and no stale references remain [info] (hench-tooling)
 
 ## Next Steps
 
@@ -206,51 +193,53 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **No explicit shared-types or contracts zone exists despite bidirectional couplin…**
+1. **Hench depends on Rex at runtime but no workspace dependency declared in package…**
 
 ### Medium Priority
 
-1. **32-file zone exceeds recommended zone size (15-20 files)—su… (+1 related)**
+1. **Zone contains 46 files spanning agent logic, CLI, runs, storage, and utilities …**
+   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/loop.ts`
 
-1. **Missing shared-types zone: bidirectional imports between CL… (+1 related)**
+1. **rex.ts tool directly imports Rex types without a stable contract — Rex schema c…**
+   Files: `packages/hench/src/agent/completion.ts`, `packages/hench/src/tools/rex.ts`, `packages/hench/tests/unit/agent/completion.test.ts`
 
-1. **CLI layer (12 files) is relatively large for what should be a thin wrapper—cons…**
+1. **tools.ts re-exports individual tool modules but also contains orchestration log…**
+   Files: `packages/hench/src/agent/tools.ts`, `packages/hench/src/guard/commands.ts`, `packages/hench/src/guard/index.ts`
 
-1. **guard/ subdirectory has 4 files with distinct responsibility (security enforcem…**
+1. **Bidirectional hench-core ↔ hench-tooling coupling (4+5 imports) suggests shared…**
 
-1. **CLI zone depends on core for agent execution, but core reaches back into CLI fo…**
+1. **Tooling imports from core (5) for shared types but core also imports tooling (4…**
+   Files: `packages/hench/src/agent/tools.ts`, `packages/hench/src/guard/commands.ts`, `packages/hench/src/guard/index.ts`
 
-1. **Core imports tooling (expected) but tooling also imports core types—tools shoul…**
+1. **Implement run history retention policy to prevent .hench/runs/ unbounded growth**
 
-1. **test-runner.ts embedded in agent/ creates implicit dependency on test framework…**
+1. **Standardize guard modules to use consistent allowlist or denylist pattern for b…**
+   Files: `packages/hench/src/agent/tools.ts`, `packages/hench/src/guard/commands.ts`, `packages/hench/src/guard/index.ts`
 
-1. **Add integration tests for guard subsystem to verify command filtering works cor…**
+1. **Bidirectional coupling: "hench-core" ↔ "hench-tooling" (4+5 crossings) — consid…**
 
-1. **Create packages/hench/src/types/index.ts exporting: RunContext, ToolResult, Bri…**
+1. **Contains 51% of project files (46/91) — may be too broad, consider splitting**
+   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/loop.ts`
 
-1. **SINGLE ACTIONABLE FIX: Create packages/hench/src/types/index.ts exporting RunCo…**
+1. **Bidirectional imports between hench-core and hench-integration (4 each way via …**
 
 ### Low Priority
 
-1. **Document the implicit 'thin CLI wrapper' convention in CLAUDE.md to prevent fut…**
+1. **Add shared error types package or module to formalize error contracts between z…**
 
-1. **Establish error transformation layer at zone boundaries—core should throw domai…**
+1. **Document the implicit contract that hench-integration serves as the only mutati…**
 
-1. **init.ts performs filesystem operations directly rather than delegating to a cor…**
+1. **agent/prompt.ts and agent/brief.ts both construct LLM prompts — consider consol…**
+   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/loop.ts`
 
-1. **completion.ts + rex.ts coupling indicates task completion semantics are spread …**
+1. **stuck.ts detection logic could benefit from explicit state enum rather than heu…**
+   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/loop.ts`
 
-1. **Consider splitting agent/ into lifecycle (loop, cli-loop), planning (brief, pro…**
+1. **Merge completion.test.ts and completion-validation.test.ts or clarify distinct …**
+   Files: `packages/hench/src/agent/completion.ts`, `packages/hench/src/tools/rex.ts`, `packages/hench/tests/unit/agent/completion.test.ts`
 
-1. **Audit shell.ts and guard/commands.ts for duplicated command parsing/validation …**
-
-1. **ci.js appears to be a standalone script not integrated into the main orchestrat…**
-
-1. **Documentation actions from findings #9, #10 should be deferred until after shar…**
-
-1. **Finding #7 (critical: no shared-types zone) directly contradicts finding #4 (in…**
-
-1. **Finding #7 claims 'no explicit shared-types zone exists' as critical, but findi…**
+1. **tools/test-runner.ts was recently moved from agent/ — verify all imports update…**
+   Files: `packages/hench/src/agent/tools.ts`, `packages/hench/src/guard/commands.ts`, `packages/hench/src/guard/index.ts`
 
 ## File Inventory
 
@@ -267,75 +256,77 @@ Prioritized work items derived from analysis:
 | `.rex/workflow.md` | docs |  |
 | `CLAUDE.md` | docs |  |
 | `README.md` | docs |  |
-| `ci.js` | source | root |
-| `cli.js` | source | root |
-| `config.js` | source | root |
+| `ci.js` | source | orchestration |
+| `cli.js` | source | orchestration |
+| `config.js` | source | orchestration |
 | `package.json` | config |  |
 | `packages/hench/Hench.png` | asset |  |
 | `packages/hench/README.md` | docs |  |
 | `packages/hench/package.json` | config |  |
-| `packages/hench/src/agent/brief.ts` | source | hench |
-| `packages/hench/src/agent/cli-loop.ts` | source | hench-2 |
-| `packages/hench/src/agent/completion.ts` | source | hench-3 |
-| `packages/hench/src/agent/loop.ts` | source | hench-2 |
-| `packages/hench/src/agent/prompt.ts` | source | hench-2 |
-| `packages/hench/src/agent/review.ts` | source | hench-2 |
-| `packages/hench/src/agent/stuck.ts` | source | hench-2 |
-| `packages/hench/src/agent/summary.ts` | source | hench-2 |
-| `packages/hench/src/agent/test-runner.ts` | source | hench-2 |
-| `packages/hench/src/agent/token-budget.ts` | source | hench-2 |
-| `packages/hench/src/agent/tools.ts` | source | hench-4 |
-| `packages/hench/src/cli/commands/constants.ts` | source | hench |
-| `packages/hench/src/cli/commands/init.ts` | source | hench-2 |
-| `packages/hench/src/cli/commands/run.ts` | source | hench |
-| `packages/hench/src/cli/commands/show.ts` | source | hench |
-| `packages/hench/src/cli/commands/status.ts` | source | hench |
-| `packages/hench/src/cli/errors.ts` | source | hench |
-| `packages/hench/src/cli/index.ts` | source | hench |
-| `packages/hench/src/cli/output.ts` | source | hench |
-| `packages/hench/src/guard/commands.ts` | source | hench-4 |
-| `packages/hench/src/guard/index.ts` | source | hench-4 |
-| `packages/hench/src/guard/paths.ts` | source | hench-4 |
-| `packages/hench/src/schema/index.ts` | source | hench-2 |
-| `packages/hench/src/schema/v1.ts` | source | hench-2 |
-| `packages/hench/src/schema/validate.ts` | source | hench-2 |
-| `packages/hench/src/store/config.ts` | source | hench-2 |
-| `packages/hench/src/store/index.ts` | source | hench-2 |
-| `packages/hench/src/store/json.ts` | source | hench-2 |
-| `packages/hench/src/store/project-config.ts` | source | hench-2 |
-| `packages/hench/src/store/runs.ts` | source | hench-2 |
-| `packages/hench/src/tools/files.ts` | source | hench-4 |
-| `packages/hench/src/tools/git.ts` | source | hench-4 |
-| `packages/hench/src/tools/rex.ts` | source | hench-3 |
-| `packages/hench/src/tools/shell.ts` | source | hench-4 |
+| `packages/hench/src/agent/brief.ts` | source | hench-core |
+| `packages/hench/src/agent/cli-loop.ts` | source | hench-core |
+| `packages/hench/src/agent/completion.ts` | source | hench-integration |
+| `packages/hench/src/agent/loop.ts` | source | hench-core |
+| `packages/hench/src/agent/prompt.ts` | source | hench-core |
+| `packages/hench/src/agent/review.ts` | source | hench-core |
+| `packages/hench/src/agent/stuck.ts` | source | hench-core |
+| `packages/hench/src/agent/summary.ts` | source | hench-core |
+| `packages/hench/src/agent/token-budget.ts` | source | hench-core |
+| `packages/hench/src/agent/tools.ts` | source | hench-tooling |
+| `packages/hench/src/cli/commands/constants.ts` | source | hench-core |
+| `packages/hench/src/cli/commands/init.ts` | source | hench-core |
+| `packages/hench/src/cli/commands/run.ts` | source | hench-core |
+| `packages/hench/src/cli/commands/show.ts` | source | hench-core |
+| `packages/hench/src/cli/commands/status.ts` | source | hench-core |
+| `packages/hench/src/cli/errors.ts` | source | hench-core |
+| `packages/hench/src/cli/index.ts` | source | hench-core |
+| `packages/hench/src/cli/output.ts` | source | hench-core |
+| `packages/hench/src/guard/commands.ts` | source | hench-tooling |
+| `packages/hench/src/guard/index.ts` | source | hench-tooling |
+| `packages/hench/src/guard/paths.ts` | source | hench-tooling |
+| `packages/hench/src/schema/index.ts` | source | hench-core |
+| `packages/hench/src/schema/v1.ts` | source | hench-core |
+| `packages/hench/src/schema/validate.ts` | source | hench-core |
+| `packages/hench/src/store/config.ts` | source | hench-core |
+| `packages/hench/src/store/index.ts` | source | hench-core |
+| `packages/hench/src/store/json.ts` | source | hench-core |
+| `packages/hench/src/store/project-config.ts` | source | hench-core |
+| `packages/hench/src/store/runs.ts` | source | hench-core |
+| `packages/hench/src/tools/files.ts` | source | hench-tooling |
+| `packages/hench/src/tools/git.ts` | source | hench-tooling |
+| `packages/hench/src/tools/rex.ts` | source | hench-integration |
+| `packages/hench/src/tools/shell.ts` | source | hench-tooling |
+| `packages/hench/src/tools/test-runner.ts` | source | hench-core |
+| `packages/hench/src/types/index.ts` | source | hench-core |
+| `packages/hench/src/types/output.ts` | source | hench-core |
 | `packages/hench/tests/e2e/cli-init.test.ts` | test |  |
-| `packages/hench/tests/integration/store-roundtrip.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/brief.test.ts` | test | hench |
-| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test | hench-3 |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/review.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/test-runner.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test | hench |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test | hench |
-| `packages/hench/tests/unit/cli/output.test.ts` | test | hench |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test | hench-4 |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test | hench-4 |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test | hench-2 |
-| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test | hench-3 |
-| `packages/hench/tests/unit/tools/files.test.ts` | test | hench-4 |
-| `packages/hench/tests/unit/tools/git.test.ts` | test | hench-4 |
-| `packages/hench/tests/unit/tools/rex.test.ts` | test | hench-3 |
-| `packages/hench/tests/unit/tools/shell.test.ts` | test | hench-4 |
+| `packages/hench/tests/integration/store-roundtrip.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/brief.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/completion.test.ts` | test | hench-integration |
+| `packages/hench/tests/unit/agent/loop.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/prompt.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/review.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/stuck.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/summary.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/task-failure.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/token-budget.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/cli/errors.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/cli/output.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/guard/commands.test.ts` | test | hench-tooling |
+| `packages/hench/tests/unit/guard/paths.test.ts` | test | hench-tooling |
+| `packages/hench/tests/unit/schema/validate.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/store/project-config.test.ts` | test | hench-core |
+| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test | hench-integration |
+| `packages/hench/tests/unit/tools/files.test.ts` | test | hench-tooling |
+| `packages/hench/tests/unit/tools/git.test.ts` | test | hench-tooling |
+| `packages/hench/tests/unit/tools/rex.test.ts` | test | hench-integration |
+| `packages/hench/tests/unit/tools/shell.test.ts` | test | hench-tooling |
+| `packages/hench/tests/unit/tools/test-runner.test.ts` | test | hench-core |
 | `packages/hench/tsconfig.json` | config |  |
 | `packages/hench/vitest.config.ts` | config |  |
 | `packages/rex/.claude/settings.local.json` | other |  |
