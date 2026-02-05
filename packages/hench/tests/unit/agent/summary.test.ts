@@ -38,6 +38,29 @@ describe("buildRunSummary", () => {
     expect(summary.filesChanged).toEqual(["src/foo.ts"]);
   });
 
+  it("deduplicates files written many times across turns", () => {
+    const calls = [
+      call("write_file", { path: "src/foo.ts", content: "v1" }),
+      call("write_file", { path: "src/bar.ts", content: "v1" }),
+      call("write_file", { path: "src/foo.ts", content: "v2" }),
+      call("write_file", { path: "src/foo.ts", content: "v3" }),
+      call("write_file", { path: "src/bar.ts", content: "v2" }),
+    ];
+    const summary = buildRunSummary(calls);
+    expect(summary.filesChanged).toEqual(["src/bar.ts", "src/foo.ts"]);
+    expect(summary.counts.filesChanged).toBe(2);
+  });
+
+  it("deduplicates files changed via both write_file and git add", () => {
+    const calls = [
+      call("write_file", { path: "src/foo.ts", content: "new" }),
+      call("git", { subcommand: "add", args: "src/foo.ts" }),
+    ];
+    const summary = buildRunSummary(calls);
+    expect(summary.filesChanged).toEqual(["src/foo.ts"]);
+    expect(summary.counts.filesChanged).toBe(1);
+  });
+
   it("tracks files read via read_file", () => {
     const calls = [
       call("read_file", { path: "src/foo.ts" }),
@@ -54,6 +77,20 @@ describe("buildRunSummary", () => {
     ];
     const summary = buildRunSummary(calls);
     expect(summary.filesRead).toEqual(["src/foo.ts"]);
+  });
+
+  it("deduplicates files read many times across turns", () => {
+    const calls = [
+      call("read_file", { path: "src/foo.ts" }),
+      call("read_file", { path: "src/bar.ts" }),
+      call("read_file", { path: "src/foo.ts" }),
+      call("read_file", { path: "src/baz.ts" }),
+      call("read_file", { path: "src/bar.ts" }),
+      call("read_file", { path: "src/foo.ts" }),
+    ];
+    const summary = buildRunSummary(calls);
+    expect(summary.filesRead).toEqual(["src/bar.ts", "src/baz.ts", "src/foo.ts"]);
+    expect(summary.counts.filesRead).toBe(3);
   });
 
   it("tracks commands executed via run_command", () => {

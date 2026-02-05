@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import {
   isTestFile,
   candidateTestPaths,
@@ -97,36 +99,143 @@ describe("candidateTestPaths", () => {
 // ---------------------------------------------------------------------------
 
 describe("findRelevantTests", () => {
-  // Use the actual project directory for these tests since we know
-  // its test file layout.
-  const projectDir = join(__dirname, "../../..");
+  let tmpDir: string;
 
-  it("finds co-located test files for known source files", async () => {
-    // We know summary.ts has summary.test.ts in the same relative test dir
-    const tests = await findRelevantTests(projectDir, ["src/agent/summary.ts"]);
-    // The test file is at tests/unit/agent/summary.test.ts which is found
-    // via the src → tests mirror: tests/(unit/)agent/summary.test.ts
-    // Since our heuristic mirrors src → tests, it should find it if the
-    // path structure is tests/agent/... However the actual path is
-    // tests/unit/agent/... so the mirror won't match exactly.
-    // This test verifies the mechanism works at a general level.
-    // At minimum, the function should return an array without errors.
-    expect(Array.isArray(tests)).toBe(true);
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "hench-test-discovery-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("finds co-located test file for a source file", async () => {
+    await mkdir(join(tmpDir, "src/agent"), { recursive: true });
+    await writeFile(join(tmpDir, "src/agent/loop.ts"), "");
+    await writeFile(join(tmpDir, "src/agent/loop.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
+    expect(tests).toEqual(["src/agent/loop.test.ts"]);
+  });
+
+  it("finds .spec variant co-located test file", async () => {
+    await mkdir(join(tmpDir, "src/utils"), { recursive: true });
+    await writeFile(join(tmpDir, "src/utils/helpers.ts"), "");
+    await writeFile(join(tmpDir, "src/utils/helpers.spec.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/utils/helpers.ts"]);
+    expect(tests).toContain("src/utils/helpers.spec.ts");
+  });
+
+  it("finds test files in __tests__ directory", async () => {
+    await mkdir(join(tmpDir, "src/agent"), { recursive: true });
+    await mkdir(join(tmpDir, "src/agent/__tests__"), { recursive: true });
+    await writeFile(join(tmpDir, "src/agent/loop.ts"), "");
+    await writeFile(join(tmpDir, "src/agent/__tests__/loop.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
+    expect(tests).toContain(join("src/agent/__tests__/loop.test.ts"));
+  });
+
+  it("finds test files via src → tests mirror", async () => {
+    await mkdir(join(tmpDir, "src/agent"), { recursive: true });
+    await mkdir(join(tmpDir, "tests/agent"), { recursive: true });
+    await writeFile(join(tmpDir, "src/agent/loop.ts"), "");
+    await writeFile(join(tmpDir, "tests/agent/loop.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
+    expect(tests).toContain(join("tests/agent/loop.test.ts"));
+  });
+
+  it("returns test file itself when a test file is in the changed list", async () => {
+    await mkdir(join(tmpDir, "src/agent"), { recursive: true });
+    await writeFile(join(tmpDir, "src/agent/loop.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/agent/loop.test.ts"]);
+    expect(tests).toEqual(["src/agent/loop.test.ts"]);
   });
 
   it("returns empty array for files with no related tests", async () => {
-    const tests = await findRelevantTests(projectDir, ["nonexistent/file.ts"]);
+    const tests = await findRelevantTests(tmpDir, ["nonexistent/file.ts"]);
     expect(tests).toEqual([]);
   });
 
-  it("deduplicates when multiple source files map to the same test", async () => {
-    const tests = await findRelevantTests(projectDir, [
-      "src/agent/summary.ts",
-      "src/agent/summary.ts", // duplicate
+  it("deduplicates when the same source file appears multiple times", async () => {
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "src/foo.ts"), "");
+    await writeFile(join(tmpDir, "src/foo.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, [
+      "src/foo.ts",
+      "src/foo.ts", // duplicate input
     ]);
-    // Even if no test is found, there should be no duplicates
+    expect(tests).toEqual(["src/foo.test.ts"]);
+  });
+
+  it("deduplicates when multiple source files map to the same test", async () => {
+    // Both source files are in the same directory and will generate
+    // the same candidate: src/agent/loop.test.ts
+    await mkdir(join(tmpDir, "src/agent"), { recursive: true });
+    await writeFile(join(tmpDir, "src/agent/loop.ts"), "");
+    await writeFile(join(tmpDir, "src/agent/loop.spec.ts"), "");
+    await writeFile(join(tmpDir, "src/agent/loop.test.ts"), "");
+
+    // loop.ts generates candidate loop.test.ts
+    // loop.spec.ts IS a test file → returns itself, but also loop.test.ts
+    // would be a candidate from loop.ts. No duplicate in results.
+    const tests = await findRelevantTests(tmpDir, [
+      "src/agent/loop.ts",
+      "src/agent/loop.ts",
+    ]);
     const unique = [...new Set(tests)];
     expect(tests).toEqual(unique);
+  });
+
+  it("deduplicates when different source files produce overlapping candidates", async () => {
+    // Two different source files whose candidates both include the same test file
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "src/foo.ts"), "");
+    await writeFile(join(tmpDir, "src/foo.test.ts"), "");
+
+    // foo.ts → candidate foo.test.ts (hit)
+    // foo.test.ts → returns itself (foo.test.ts)
+    // Both resolve to the same test file
+    const tests = await findRelevantTests(tmpDir, [
+      "src/foo.ts",
+      "src/foo.test.ts",
+    ]);
+    const unique = [...new Set(tests)];
+    expect(tests).toEqual(unique);
+    expect(tests).toContain("src/foo.test.ts");
+  });
+
+  it("finds tests for multiple distinct source files", async () => {
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "src/foo.ts"), "");
+    await writeFile(join(tmpDir, "src/foo.test.ts"), "");
+    await writeFile(join(tmpDir, "src/bar.ts"), "");
+    await writeFile(join(tmpDir, "src/bar.test.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/foo.ts", "src/bar.ts"]);
+    expect(tests).toContain("src/foo.test.ts");
+    expect(tests).toContain("src/bar.test.ts");
+    expect(tests).toHaveLength(2);
+  });
+
+  it("finds multiple test files for a single source file", async () => {
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "src/foo.ts"), "");
+    await writeFile(join(tmpDir, "src/foo.test.ts"), "");
+    await writeFile(join(tmpDir, "src/foo.spec.ts"), "");
+
+    const tests = await findRelevantTests(tmpDir, ["src/foo.ts"]);
+    expect(tests).toContain("src/foo.test.ts");
+    expect(tests).toContain("src/foo.spec.ts");
+  });
+
+  it("handles empty filesChanged array", async () => {
+    const tests = await findRelevantTests(tmpDir, []);
+    expect(tests).toEqual([]);
   });
 });
 

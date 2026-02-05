@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
-import { dirname, join, basename, extname } from "node:path";
+import { dirname, join, basename, extname, normalize } from "node:path";
 
 /**
  * Automatic test runner — identifies and runs relevant tests after task completion.
@@ -130,26 +130,35 @@ export function candidateTestPaths(filePath: string): string[] {
 
 /**
  * Find test files that exist on disk for the given changed files.
+ *
+ * Deduplicates at two levels:
+ * 1. Candidate paths — avoids redundant stat() calls when multiple source
+ *    files generate the same candidate.
+ * 2. Result paths — prevents the same test file appearing twice in the output,
+ *    even if reached through differently-formatted candidate paths.
  */
 export async function findRelevantTests(
   projectDir: string,
   filesChanged: string[],
 ): Promise<string[]> {
-  const seen = new Set<string>();
+  const seenCandidates = new Set<string>();
+  const seenResults = new Set<string>();
   const results: string[] = [];
 
   for (const file of filesChanged) {
     const candidates = candidateTestPaths(file);
 
     for (const candidate of candidates) {
-      if (seen.has(candidate)) continue;
-      seen.add(candidate);
+      const normalized = normalize(candidate);
+      if (seenCandidates.has(normalized)) continue;
+      seenCandidates.add(normalized);
 
       try {
-        const fullPath = join(projectDir, candidate);
+        const fullPath = join(projectDir, normalized);
         const s = await stat(fullPath);
-        if (s.isFile()) {
-          results.push(candidate);
+        if (s.isFile() && !seenResults.has(normalized)) {
+          seenResults.add(normalized);
+          results.push(normalized);
         }
       } catch {
         // File doesn't exist — skip
