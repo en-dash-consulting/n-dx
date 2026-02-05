@@ -58,6 +58,23 @@ describe("formatTaskBrief", () => {
     expect(output).toContain("Shows error on invalid login");
   });
 
+  it("includes acceptance criteria with file paths on tasks", () => {
+    const brief: TaskBrief = {
+      ...minimalBrief,
+      task: {
+        ...minimalBrief.task,
+        acceptanceCriteria: [
+          "Add validation to src/components/Form.tsx",
+          "Update tests in tests/form.test.ts",
+        ],
+      },
+    };
+    const output = formatTaskBrief(brief);
+    expect(output).toContain("Acceptance Criteria:");
+    expect(output).toContain("src/components/Form.tsx");
+    expect(output).toContain("tests/form.test.ts");
+  });
+
   it("includes parent chain", () => {
     const brief: TaskBrief = {
       ...minimalBrief,
@@ -338,6 +355,28 @@ describe("assembleTaskBrief — invalid task selection", () => {
     const { brief, taskId } = await assembleTaskBrief(store, "wip-1");
     expect(taskId).toBe("wip-1");
     expect(brief.task.status).toBe("in_progress");
+  });
+
+  it("includes the invalid value in the error message", async () => {
+    const items: PRDItem[] = [
+      {
+        id: "blocked-test",
+        title: "Blocked task",
+        status: "blocked",
+        level: "task",
+      },
+    ];
+    const store = mockStore(items);
+
+    try {
+      await assembleTaskBrief(store, "blocked-test");
+    } catch (err) {
+      const e = err as TaskNotActionableError;
+      // Error message should include the status value
+      expect(e.message).toContain("blocked");
+      // And the status property should match
+      expect(e.status).toBe("blocked");
+    }
   });
 
   it("includes task title in error message", async () => {
