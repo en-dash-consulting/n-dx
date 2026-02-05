@@ -20,6 +20,30 @@ export class CLIError extends Error {
   }
 }
 
+/** Thrown when an epic specified by --epic flag is not found. */
+export class EpicNotFoundError extends CLIError {
+  readonly searchTerm: string;
+  readonly availableEpics: Array<{ id: string; title: string }>;
+
+  constructor(
+    searchTerm: string,
+    availableEpics: Array<{ id: string; title: string }>,
+  ) {
+    const epicList =
+      availableEpics.length > 0
+        ? `\n\nAvailable epics:\n${availableEpics.map((e) => `  - ${e.title} (${e.id})`).join("\n")}`
+        : "\n\nNo epics found in PRD.";
+
+    super(
+      `Epic not found: "${searchTerm}"`,
+      `Use an epic ID or title from the PRD.${epicList}`,
+    );
+    this.name = "EpicNotFoundError";
+    this.searchTerm = searchTerm;
+    this.availableEpics = availableEpics;
+  }
+}
+
 /**
  * Known error patterns mapped to user-friendly messages and suggestions.
  * Each entry: [regex to match, user-friendly message, suggestion].

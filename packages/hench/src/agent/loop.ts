@@ -31,6 +31,8 @@ export interface AgentLoopOptions {
   review?: boolean;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
+  /** Restrict task selection to this epic (ID). */
+  epicId?: string;
 }
 
 export interface AgentLoopResult {
@@ -92,6 +94,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Assemble brief
   const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {
     excludeTaskIds: opts.excludeTaskIds,
+    epicId: opts.epicId,
   });
   const briefText = formatTaskBrief(brief);
 

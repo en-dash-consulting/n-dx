@@ -15,6 +15,8 @@ import type {
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
+  /** Restrict task selection to this epic (ID). */
+  epicId?: string;
 }
 
 // ---------------------------------------------------------------------------

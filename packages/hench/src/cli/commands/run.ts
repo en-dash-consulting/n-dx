@@ -1,14 +1,97 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { resolveStore } from "rex/dist/store/index.js";
+import { walkTree } from "rex/dist/core/tree.js";
+import type { PRDItem } from "rex/dist/schema/v1.js";
+import type { PRDStore } from "rex/dist/store/types.js";
 import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/loop.js";
 import { cliLoop } from "../../agent/cli-loop.js";
 import { getActionableTasks } from "../../agent/brief.js";
 import { getStuckTaskIds } from "../../agent/stuck.js";
 import { HENCH_DIR, safeParseInt } from "./constants.js";
-import { CLIError, requireClaudeCLI } from "../errors.js";
+import { CLIError, EpicNotFoundError, requireClaudeCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
+
+// ---------------------------------------------------------------------------
+// Epic resolution helpers (exported for testing)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedEpic {
+  id: string;
+  title: string;
+}
+
+/**
+ * List all epics in the PRD (root-level items with level === "epic").
+ */
+export function listEpics(items: PRDItem[]): ResolvedEpic[] {
+  const epics: ResolvedEpic[] = [];
+  for (const item of items) {
+    if (item.level === "epic") {
+      epics.push({ id: item.id, title: item.title });
+    }
+  }
+  return epics;
+}
+
+/**
+ * Find an epic by ID or title (case-insensitive title match).
+ * Returns the matched epic or null if not found.
+ */
+export function findEpicByIdOrTitle(
+  items: PRDItem[],
+  search: string,
+): ResolvedEpic | null {
+  const searchLower = search.toLowerCase();
+  for (const item of items) {
+    if (item.level === "epic") {
+      if (item.id === search || item.title.toLowerCase() === searchLower) {
+        return { id: item.id, title: item.title };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate and resolve the --epic flag value.
+ * Throws EpicNotFoundError with available epics if not found.
+ */
+export async function resolveEpicFlag(
+  store: PRDStore,
+  epicFlag: string,
+): Promise<ResolvedEpic> {
+  const doc = await store.loadDocument();
+  const epic = findEpicByIdOrTitle(doc.items, epicFlag);
+  if (!epic) {
+    const available = listEpics(doc.items);
+    throw new EpicNotFoundError(epicFlag, available);
+  }
+  return epic;
+}
+
+/**
+ * Collect all task/subtask IDs that belong to a specific epic.
+ * Includes all descendants of the epic.
+ */
+export function collectEpicTaskIds(items: PRDItem[], epicId: string): Set<string> {
+  const ids = new Set<string>();
+
+  // Find the epic and collect all its descendant task/subtask IDs
+  for (const { item, parents } of walkTree(items)) {
+    // Check if this item is inside the target epic
+    const isInEpic =
+      item.id === epicId ||
+      parents.some((p) => p.id === epicId);
+
+    if (isInEpic && (item.level === "task" || item.level === "subtask")) {
+      ids.add(item.id);
+    }
+  }
+
+  return ids;
+}
 
 // ---------------------------------------------------------------------------
 // Loop helpers (exported for testing)
@@ -88,12 +171,21 @@ function promptUser(question: string): Promise<string> {
 async function selectTask(
   dir: string,
   rexDir: string,
+  epicId?: string,
 ): Promise<string> {
   const store = await resolveStore(rexDir);
-  const tasks = await getActionableTasks(store);
+  let tasks = await getActionableTasks(store);
+
+  // Filter to tasks within the specified epic if provided
+  if (epicId) {
+    const doc = await store.loadDocument();
+    const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
+    tasks = tasks.filter((t) => epicTaskIds.has(t.id));
+  }
 
   if (tasks.length === 0) {
-    output("No actionable tasks found in PRD.");
+    const scope = epicId ? "within the specified epic" : "in PRD";
+    output(`No actionable tasks found ${scope}.`);
     process.exit(0);
   }
 
@@ -135,6 +227,7 @@ async function runOne(
   tokenBudget: number | undefined,
   review: boolean,
   excludeTaskIds?: Set<string>,
+  epicId?: string,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -155,6 +248,7 @@ async function runOne(
         model,
         review,
         excludeTaskIds,
+        epicId,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -168,6 +262,7 @@ async function runOne(
         model,
         review,
         excludeTaskIds,
+        epicId,
       });
 
   const { run } = result;
@@ -240,19 +335,28 @@ export async function cmdRun(
     ? safeParseInt(flags["loop-pause"], "loop-pause")
     : config.loopPauseMs;
 
+  // Validate epic flag if provided (validates existence before starting work)
+  let epicId: string | undefined;
+  if (flags.epic) {
+    const store = await resolveStore(rexDir);
+    const resolvedEpic = await resolveEpicFlag(store, flags.epic);
+    epicId = resolvedEpic.id;
+    info(`Epic scope: ${resolvedEpic.title} (${resolvedEpic.id})`);
+  }
+
   let taskId = flags.task;
 
   // Task selection: --task > interactive (TTY) > autoselect
   // In loop mode, always autoselect (skip interactive)
   if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-    taskId = await selectTask(dir, rexDir);
+    taskId = await selectTask(dir, rexDir, epicId);
   }
   // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
   if (loop) {
-    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review);
+    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId);
   } else {
-    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review);
+    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
   }
 }
 
@@ -273,6 +377,7 @@ async function runIterations(
   iterations: number,
   maxFailedAttempts: number,
   review: boolean,
+  epicId?: string,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
@@ -293,6 +398,7 @@ async function runIterations(
       dryRun, model, maxTurns, tokenBudget,
       review,
       stuckIds,
+      epicId,
     );
 
     if (status === "error_transient") {
@@ -326,6 +432,7 @@ async function runLoop(
   pauseMs: number,
   maxFailedAttempts: number,
   review: boolean,
+  epicId?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -374,11 +481,13 @@ async function runLoop(
           dryRun, model, maxTurns, tokenBudget,
           review,
           stuckIds,
+          epicId,
         );
         status = result.status;
       } catch (err) {
         if (isNoTasksError(err)) {
-          info(`\nAll tasks complete — loop finished after ${completed - 1} task(s).`);
+          const scope = epicId ? " in epic" : "";
+          info(`\nAll tasks${scope} complete — loop finished after ${completed - 1} task(s).`);
           break;
         }
         throw err;

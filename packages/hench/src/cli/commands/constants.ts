@@ -28,6 +28,7 @@ Commands:
 Options:
   --help, -h              Show this help
   --task=<id>             Target a specific Rex task ID (for run)
+  --epic=<id|title>       Only consider tasks within the specified epic (for run)
   --auto                  Skip interactive selection, autoselect by priority (for run)
   --iterations=<n>        Run multiple tasks sequentially (for run)
   --loop                  Run continuously until all tasks complete or Ctrl+C (for run)
