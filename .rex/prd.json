@@ -5819,7 +5819,7 @@
             {
               "id": "c4cef365-de7c-4c6c-a453-75b1ae90c215",
               "title": "Create standalone hench command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add hench binary that directly invokes hench package commands",
               "acceptanceCriteria": [
@@ -5833,7 +5833,9 @@
                 "hench",
                 "standalone"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-05T16:40:22.313Z",
+              "completedAt": "2026-02-05T16:45:11.934Z"
             }
           ]
         },
