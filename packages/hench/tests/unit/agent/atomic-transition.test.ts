@@ -205,6 +205,58 @@ describe("atomic task state transitions", () => {
     });
   });
 
+  describe("cliLoop (file store integration)", () => {
+    let projectDir: string;
+    let henchDir: string;
+    let rexDir: string;
+
+    beforeEach(async () => {
+      ({ projectDir, henchDir, rexDir } = await setupProjectDir());
+    });
+
+    afterEach(async () => {
+      await rm(projectDir, { recursive: true, force: true });
+    });
+
+    it("does not transition status on dry run", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        JSON.stringify({
+          schema: "rex/v1",
+          title: "Test",
+          items: [
+            {
+              id: "task-1",
+              title: "CLI dry run task",
+              status: "pending",
+              level: "task",
+              priority: "high",
+            },
+          ],
+        }),
+        "utf-8",
+      );
+
+      const { cliLoop } = await import("../../../src/agent/cli-loop.js");
+      const { createStore } = await import("rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+
+      const config = await loadConfig(henchDir);
+      const store = createStore("file", rexDir);
+
+      vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await cliLoop({ config, store, projectDir, henchDir, dryRun: true });
+
+      // Task should still be pending — dry run must not mutate state
+      const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
+      const task = prd.items.find((i: { id: string }) => i.id === "task-1");
+      expect(task.status).toBe("pending");
+
+      vi.restoreAllMocks();
+    });
+  });
+
   describe("toolRexUpdateStatus idempotency", () => {
     it("transitions pending to in_progress with startedAt", async () => {
       const store = mockStore();
@@ -246,6 +298,84 @@ describe("atomic task state transitions", () => {
       if (updateCall.startedAt) {
         expect(updateCall.startedAt).toBe("2025-06-01T00:00:00.000Z");
       }
+    });
+
+    it("sets completedAt when transitioning to completed", async () => {
+      const store = mockStore();
+      store.getItem.mockResolvedValue({
+        id: "task-1",
+        title: "Test",
+        status: "in_progress",
+        level: "task",
+        startedAt: "2025-06-01T00:00:00.000Z",
+      });
+      store.loadDocument.mockResolvedValue({
+        schema: "rex/v1",
+        title: "Test",
+        items: [],
+      });
+
+      await toolRexUpdateStatus(store, "task-1", { status: "completed" });
+
+      expect(store.updateItem).toHaveBeenCalledWith(
+        "task-1",
+        expect.objectContaining({
+          status: "completed",
+          completedAt: expect.any(String),
+        }),
+      );
+    });
+
+    it("does not overwrite startedAt when transitioning to deferred", async () => {
+      const existingStartedAt = "2025-06-01T00:00:00.000Z";
+      const store = mockStore();
+      const taskItem = {
+        id: "task-1",
+        title: "Test",
+        status: "in_progress",
+        level: "task",
+        startedAt: existingStartedAt,
+      };
+      store.getItem.mockResolvedValue(taskItem);
+      // loadDocument is called for parent auto-completion checks
+      store.loadDocument.mockResolvedValue({
+        schema: "rex/v1",
+        title: "Test",
+        items: [taskItem],
+      });
+
+      await toolRexUpdateStatus(store, "task-1", { status: "deferred" });
+
+      const updateCall = store.updateItem.mock.calls[0][1];
+      expect(updateCall.status).toBe("deferred");
+      // startedAt should not be included in the update (preserved)
+      expect(updateCall.startedAt).toBeUndefined();
+    });
+
+    it("sets startedAt when completing a pending task directly", async () => {
+      const store = mockStore();
+      store.getItem.mockResolvedValue({
+        id: "task-1",
+        title: "Test",
+        status: "pending",
+        level: "task",
+      });
+      store.loadDocument.mockResolvedValue({
+        schema: "rex/v1",
+        title: "Test",
+        items: [],
+      });
+
+      await toolRexUpdateStatus(store, "task-1", { status: "completed" });
+
+      expect(store.updateItem).toHaveBeenCalledWith(
+        "task-1",
+        expect.objectContaining({
+          status: "completed",
+          startedAt: expect.any(String),
+          completedAt: expect.any(String),
+        }),
+      );
     });
   });
 });
