@@ -13,7 +13,14 @@ import type {
   Zones,
   Finding,
   AnalyzeTokenUsage,
+  SubAnalysisRef,
 } from "../schema/index.js";
+import type { SubAnalysis } from "./workspace.js";
+import {
+  promoteZones,
+  promoteCrossings,
+  getSubAnalyzedFiles,
+} from "./workspace.js";
 import { sortZonesData } from "../util/sort.js";
 import {
   buildUndirectedGraph,
@@ -22,8 +29,8 @@ import {
   mergeSmallCommunities,
   capZoneCount,
 } from "./louvain.js";
-import { enrichZonesWithAI } from "./enrich.js";
-import type { EnrichResult } from "./enrich.js";
+import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
+import type { EnrichResult, PerZoneEnrichResult } from "./enrich.js";
 
 /** Result from analyzeZones, including the zones data and optional token usage. */
 export interface AnalyzeZonesResult {
@@ -205,6 +212,137 @@ export function assignByProximity(
   return { zones: expandedZones, remaining };
 }
 
+// ── Recursive subdivision ────────────────────────────────────────────────────
+
+/** Zones with more than this many files are subdivided recursively. */
+export const SUBDIVISION_THRESHOLD = 50;
+
+/** Maximum recursion depth for subdivision to prevent infinite loops. */
+export const MAX_SUBDIVISION_DEPTH = 3;
+
+/**
+ * Subdivide a large zone by running Louvain on its internal import graph.
+ * Returns sub-zones with IDs prefixed by parent zone ID.
+ */
+export function subdivideZone(
+  zone: Zone,
+  imports: Imports,
+  inventory: Inventory,
+  depth: number = 0
+): Zone[] {
+  // Don't subdivide small zones or if we've hit max depth
+  if (zone.files.length < SUBDIVISION_THRESHOLD || depth >= MAX_SUBDIVISION_DEPTH) {
+    return [];
+  }
+
+  const fileSet = new Set(zone.files);
+
+  // Extract edges internal to this zone
+  const internalEdges = imports.edges.filter(
+    (e) => fileSet.has(e.from) && fileSet.has(e.to)
+  );
+
+  // Need at least some edges to cluster
+  if (internalEdges.length < 3) {
+    return [];
+  }
+
+  // Build sub-graph and run Louvain
+  const subGraph = buildUndirectedGraph(internalEdges);
+  let community = louvainPhase1(subGraph);
+  community = mergeBidirectionalCoupling(community, subGraph);
+  community = mergeSmallCommunities(community, subGraph);
+  // Cap at 8 sub-zones per parent
+  community = capZoneCount(community, subGraph, 8);
+
+  // Gather community → members
+  const communityMembers = new Map<string, string[]>();
+  for (const [node, comm] of community) {
+    let list = communityMembers.get(comm);
+    if (!list) {
+      list = [];
+      communityMembers.set(comm, list);
+    }
+    list.push(node);
+  }
+
+  // If Louvain found only 1 community, no meaningful subdivision
+  if (communityMembers.size <= 1) {
+    return [];
+  }
+
+  // Build sub-zones
+  const usedIds = new Set<string>();
+  const subZones: Zone[] = [];
+
+  const sortedCommunities = [...communityMembers.entries()]
+    .map(([comm, members]) => [comm, members.sort()] as const)
+    .sort(([, a], [, b]) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+
+  for (const [, members] of sortedCommunities) {
+    let subId = deriveZoneId(members);
+    if (usedIds.has(subId)) {
+      let suffix = 2;
+      while (usedIds.has(`${subId}-${suffix}`)) suffix++;
+      subId = `${subId}-${suffix}`;
+    }
+    usedIds.add(subId);
+
+    // Prefix with parent zone ID
+    const fullId = `${zone.id}/${subId}`;
+
+    // Entry points: files imported from outside this sub-zone (but within parent zone)
+    const memberSet = new Set(members);
+    const entryPoints: string[] = [];
+    for (const edge of internalEdges) {
+      if (memberSet.has(edge.to) && !memberSet.has(edge.from)) {
+        if (!entryPoints.includes(edge.to)) {
+          entryPoints.push(edge.to);
+        }
+      }
+    }
+
+    // Cohesion / coupling from sub-graph
+    let internalEdgeCount = 0;
+    let totalEdgesFromSubZone = 0;
+    for (const node of members) {
+      const neighbors = subGraph.get(node);
+      if (!neighbors) continue;
+      for (const [neighbor] of neighbors) {
+        totalEdgesFromSubZone++;
+        if (memberSet.has(neighbor)) internalEdgeCount++;
+      }
+    }
+    const cohesion =
+      totalEdgesFromSubZone > 0 ? internalEdgeCount / totalEdgesFromSubZone : 1;
+    const coupling =
+      totalEdgesFromSubZone > 0
+        ? (totalEdgesFromSubZone - internalEdgeCount) / totalEdgesFromSubZone
+        : 0;
+
+    const subZone: Zone = {
+      id: fullId,
+      name: deriveZoneName(subId),
+      description: describeZone(members, inventory),
+      files: members,
+      entryPoints,
+      cohesion: Math.round(cohesion * 100) / 100,
+      coupling: Math.round(coupling * 100) / 100,
+      depth: (zone.depth ?? 0) + 1,
+    };
+
+    // Recursively subdivide if still large
+    const nestedSubZones = subdivideZone(subZone, imports, inventory, depth + 1);
+    if (nestedSubZones.length > 0) {
+      subZone.subZones = nestedSubZones;
+    }
+
+    subZones.push(subZone);
+  }
+
+  return subZones;
+}
+
 // ── Structure hash ──────────────────────────────────────────────────────────
 
 /**
@@ -361,11 +499,28 @@ export function generateStructuralInsights(
 export async function analyzeZones(
   inventory: Inventory,
   imports: Imports,
-  options?: { enrich?: boolean; previousZones?: Zones }
+  options?: {
+    enrich?: boolean;
+    previousZones?: Zones;
+    perZone?: boolean;
+    subAnalyses?: SubAnalysis[];
+  }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
+  const perZone = options?.perZone ?? false;
   const previousZones = options?.previousZones;
-  const graph = buildUndirectedGraph(imports.edges);
+  const subAnalyses = options?.subAnalyses ?? [];
+
+  // ── Exclude sub-analyzed files from Louvain ──
+  // Files already grouped by sub-analyses shouldn't be re-analyzed at root level
+  const subAnalyzedFiles = getSubAnalyzedFiles(subAnalyses);
+  const filteredEdges = subAnalyzedFiles.size > 0
+    ? imports.edges.filter(
+        (e) => !subAnalyzedFiles.has(e.from) && !subAnalyzedFiles.has(e.to)
+      )
+    : imports.edges;
+
+  const graph = buildUndirectedGraph(filteredEdges);
 
   // Run Louvain
   let community = louvainPhase1(graph);
@@ -430,7 +585,7 @@ export async function analyzeZones(
         ? (totalEdgesFromZone - internalEdges) / totalEdgesFromZone
         : 0;
 
-    zones.push({
+    const zone: Zone = {
       id,
       name: deriveZoneName(id),
       description: describeZone(members, inventory),
@@ -438,10 +593,19 @@ export async function analyzeZones(
       entryPoints,
       cohesion: Math.round(cohesion * 100) / 100,
       coupling: Math.round(coupling * 100) / 100,
-    });
+    };
+
+    // Recursively subdivide large zones
+    const subZones = subdivideZone(zone, imports, inventory);
+    if (subZones.length > 0) {
+      zone.subZones = subZones;
+    }
+
+    zones.push(zone);
   }
 
   // ── Assign unzoned files by directory proximity ──
+  // Exclude both zoned files and sub-analyzed files
 
   const zonedFiles = new Set<string>();
   for (const zone of zones) {
@@ -449,7 +613,8 @@ export async function analyzeZones(
   }
   const initialUnzoned: string[] = [];
   for (const entry of inventory.files) {
-    if (!zonedFiles.has(entry.path)) {
+    // Skip files that are in zones OR covered by sub-analyses
+    if (!zonedFiles.has(entry.path) && !subAnalyzedFiles.has(entry.path)) {
       initialUnzoned.push(entry.path);
     }
   }
@@ -495,22 +660,40 @@ export async function analyzeZones(
       }
     }
 
-    const result = await enrichZonesWithAI(
-      expandedZones,
-      preCrossings,
-      inventory,
-      imports,
-      validPrevious
-    );
-    finalZones = result.zones;
-    aiZoneInsights = result.newZoneInsights;
-    aiGlobalInsights = result.newGlobalInsights;
-    aiFindings = result.newFindings;
-    enrichmentPass = result.pass;
-    enrichTokenUsage = result.tokenUsage;
-    // Meta-evaluation may return updated findings with reassessed severities
-    if (result._updatedFindings) {
-      metaUpdatedFindings = result._updatedFindings;
+    if (perZone) {
+      // Per-zone enrichment mode: enrich each zone individually
+      const result = await enrichZonesPerZone(
+        expandedZones,
+        preCrossings,
+        inventory,
+        imports,
+        validPrevious
+      );
+      finalZones = result.zones;
+      aiZoneInsights = result.newZoneInsights;
+      aiGlobalInsights = result.newGlobalInsights;
+      aiFindings = result.newFindings;
+      enrichmentPass = result.pass;
+      enrichTokenUsage = result.tokenUsage;
+    } else {
+      // Batch mode (default): enrich zones in batches
+      const result = await enrichZonesWithAI(
+        expandedZones,
+        preCrossings,
+        inventory,
+        imports,
+        validPrevious
+      );
+      finalZones = result.zones;
+      aiZoneInsights = result.newZoneInsights;
+      aiGlobalInsights = result.newGlobalInsights;
+      aiFindings = result.newFindings;
+      enrichmentPass = result.pass;
+      enrichTokenUsage = result.tokenUsage;
+      // Meta-evaluation may return updated findings with reassessed severities
+      if (result._updatedFindings) {
+        metaUpdatedFindings = result._updatedFindings;
+      }
     }
   } else if (validPrevious) {
     // --fast with unchanged structure: apply previous AI names, preserve insights
@@ -545,14 +728,30 @@ export async function analyzeZones(
     enrichmentPass = validPrevious.enrichmentPass ?? 0;
   }
 
+  // ── Promote zones from sub-analyses ──
+  // Sub-analysis zones are added with prefixed IDs (e.g., "packages-rex:api")
+  // and marked with childId + depth fields
+
+  const promotedZones: Zone[] = [];
+  const promotedCrossings: ZoneCrossing[] = [];
+
+  for (const sub of subAnalyses) {
+    promotedZones.push(...promoteZones(sub));
+    promotedCrossings.push(...promoteCrossings(sub));
+  }
+
+  // Combine root zones with promoted zones
+  const allZones = [...finalZones, ...promotedZones];
+
   // ── Build final crossings with enriched zone IDs ──
 
   const fileToZone = new Map<string, string>();
-  for (const zone of finalZones) {
+  for (const zone of allZones) {
     for (const file of zone.files) fileToZone.set(file, zone.id);
   }
 
-  const crossings: ZoneCrossing[] = [];
+  // Build crossings from all import edges (root + cross-boundary)
+  const crossings: ZoneCrossing[] = [...promotedCrossings];
   for (const edge of imports.edges) {
     const fromZone = fileToZone.get(edge.from);
     const toZone = fileToZone.get(edge.to);
@@ -562,12 +761,13 @@ export async function analyzeZones(
   }
 
   // ── Generate structural insights ──
+  // Only generate insights for root zones (not promoted sub-analysis zones)
 
   const structural = generateStructuralInsights(
     finalZones,
-    crossings,
+    crossings.filter((c) => !c.fromZone.includes(":") && !c.toZone.includes(":")),
     imports,
-    inventory.files.length
+    inventory.files.length - subAnalyzedFiles.size
   );
 
   // ── Merge insights: structural (fresh) + accumulated AI ──
@@ -696,7 +896,7 @@ export async function analyzeZones(
 
   return {
     zones: sortZonesData({
-      zones: finalZones,
+      zones: allZones,
       crossings,
       unzoned,
       insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,

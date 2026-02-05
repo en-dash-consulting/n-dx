@@ -11,8 +11,22 @@ import type {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
+// ── Batch mode constants ─────────────────────────────────────────────────────
+
 export const ZONES_PER_BATCH = 5;
 export const MAX_CONCURRENT_BATCHES = 1;
+
+// ── Per-zone mode constants ──────────────────────────────────────────────────
+
+/** Max concurrent zone enrichments in per-zone mode */
+export const MAX_CONCURRENT_ZONES = 3;
+/** Max files to include in single-zone prompt (higher than batch since context is smaller) */
+export const PER_ZONE_MAX_FILES = 15;
+/** Max boundary crossings to include in single-zone prompt */
+export const PER_ZONE_MAX_CROSSINGS = 20;
+
+// ── Shared constants ─────────────────────────────────────────────────────────
+
 export const IDLE_TIMEOUT_MS = 120_000;   // 2 min with no output = stuck
 export const OVERALL_TIMEOUT_MS = 1_200_000; // 20 min hard cap
 
@@ -132,5 +146,19 @@ export function computeAttemptConfigs(totalFiles: number, zoneCount: number, pas
     { maxFiles: 8, maxCrossings: 15, timeout: Math.min(base, 600_000) },
     { maxFiles: 3, maxCrossings: 8,  timeout: Math.min(Math.round(base * 1.3), 600_000) },
     { maxFiles: 0, maxCrossings: 5,  timeout: Math.min(Math.round(base * 1.6), 600_000) },
+  ];
+}
+
+/** Compute attempt configs for per-zone enrichment (single zone at a time).
+ *  Since we're only sending one zone, we can include more files and crossings.
+ *  Shorter base timeout since context is smaller. */
+export function computePerZoneAttemptConfigs(zoneFileCount: number, passNumber: number = 1) {
+  const sizeBase = zoneFileCount * 600 + 10_000;
+  const passMultiplier = passNumber === 1 ? 1.3 : 1;
+  const base = Math.min(300_000, Math.max(120_000, Math.round(sizeBase * passMultiplier)));
+  return [
+    { maxFiles: PER_ZONE_MAX_FILES, maxCrossings: PER_ZONE_MAX_CROSSINGS, timeout: Math.min(base, 300_000) },
+    { maxFiles: 8,  maxCrossings: 12, timeout: Math.min(Math.round(base * 1.3), 300_000) },
+    { maxFiles: 3,  maxCrossings: 6,  timeout: Math.min(Math.round(base * 1.6), 300_000) },
   ];
 }

@@ -12,6 +12,8 @@ import { analyzeComponents } from "../../analyzers/components.js";
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
+import { emitZoneOutputs } from "../../analyzers/zone-output.js";
+import { detectSubAnalyses, buildSubAnalysisRefs } from "../../analyzers/workspace.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
@@ -165,6 +167,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
       updateManifestModule(absDir, "zones", "running");
 
       const enrich = !extraArgs.includes("--fast");
+      const perZone = extraArgs.includes("--per-zone");
 
       // Read previous zones.json for iterative enrichment
       let previousZones: any;
@@ -179,7 +182,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
       if (enrich) {
         const prevPass = previousZones?.enrichmentPass ?? 0;
-        info(`  Enriching zones (pass ${prevPass + 1})...`);
+        const modeLabel = perZone ? " (per-zone mode)" : "";
+        info(`  Enriching zones (pass ${prevPass + 1})${modeLabel}...`);
       } else {
         info("  (skipping AI enrichment)");
       }
@@ -189,7 +193,14 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const importsRaw = readFileSync(importsPath, "utf-8");
         const inventory = JSON.parse(inventoryRaw);
         const importsData = JSON.parse(importsRaw);
-        let zonesResult = await analyzeZones(inventory, importsData, { enrich, previousZones });
+
+        // Detect pre-analyzed subdirectories
+        const subAnalyses = detectSubAnalyses(absDir);
+        if (subAnalyses.length > 0) {
+          info(`  Found ${subAnalyses.length} sub-analysis: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
+        }
+
+        let zonesResult = await analyzeZones(inventory, importsData, { enrich, previousZones, perZone, subAnalyses });
         let zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {
           accumulateFromAggregate(tokenUsage, zonesResult.tokenUsage);
@@ -207,13 +218,20 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
           for (let p = 0; p < passesNeeded; p++) {
             info(`\n[phase 3] Enrichment pass ${currentPass + p + 2}...`);
             const prevZones = zones;
-            zonesResult = await analyzeZones(inventory, importsData, { enrich: true, previousZones: prevZones });
+            zonesResult = await analyzeZones(inventory, importsData, { enrich: true, previousZones: prevZones, perZone, subAnalyses });
             zones = zonesResult.zones;
             if (zonesResult.tokenUsage) {
               accumulateFromAggregate(tokenUsage, zonesResult.tokenUsage);
             }
             writeFileSync(outPath, toCanonicalJSON(zones));
           }
+        }
+
+        // Update manifest with children if sub-analyses were detected
+        if (subAnalyses.length > 0) {
+          const manifest = readManifest(absDir);
+          manifest.children = buildSubAnalysisRefs(subAnalyses);
+          writeManifest(absDir, manifest);
         }
 
         updateManifestModule(absDir, "zones", "complete");
@@ -317,7 +335,15 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const contextMd = generateContext(manifest, inventory, importsData, zonesData, componentsData);
         writeFileSync(join(svDir, SUPPLEMENTARY_FILES[1]), contextMd);
 
-        info(`[output] llms.txt + CONTEXT.md → ${svDir}`);
+        // Emit per-zone output files
+        if (zonesData.zones.length > 0) {
+          emitZoneOutputs(svDir, inventory, importsData, zonesData);
+          manifest.zoneOutputs = true;
+          writeManifest(absDir, manifest);
+          info(`[output] llms.txt + CONTEXT.md + zones/ → ${svDir}`);
+        } else {
+          info(`[output] llms.txt + CONTEXT.md → ${svDir}`);
+        }
       }
     } catch {
       // Non-critical — don't fail the analysis

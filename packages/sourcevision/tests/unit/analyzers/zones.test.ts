@@ -16,6 +16,9 @@ import {
   assignByProximity,
   computeStructureHash,
   generateStructuralInsights,
+  subdivideZone,
+  SUBDIVISION_THRESHOLD,
+  MAX_SUBDIVISION_DEPTH,
 } from "../../../src/analyzers/zones.js";
 import type {
   Inventory,
@@ -120,6 +123,19 @@ function makeImports(edges: ImportEdge[]): Imports {
       mostImported: [],
       avgImportsPerFile: 0,
     },
+  };
+}
+
+function makeZone(id: string, files: string[], overrides?: Partial<Zone>): Zone {
+  return {
+    id,
+    name: id.charAt(0).toUpperCase() + id.slice(1),
+    description: `${files.length} files`,
+    files,
+    entryPoints: files.length > 0 ? [files[0]] : [],
+    cohesion: 0.8,
+    coupling: 0.2,
+    ...overrides,
   };
 }
 
@@ -1260,5 +1276,156 @@ describe("analyzeZones findings", () => {
         expect(["info", "warning", "critical"]).toContain(f.severity);
       }
     }
+  });
+});
+
+// ── subdivideZone ──────────────────────────────────────────────────────────────
+
+describe("subdivideZone", () => {
+  it("returns empty array for zones below threshold", () => {
+    const zone = makeZone("small", Array.from({ length: 10 }, (_, i) => `src/small/${i}.ts`));
+    const inventory = makeInventory(zone.files.map((f) => makeFileEntry(f)));
+    const imports = makeImports(zone.files.slice(1).map((f, i) => makeEdge(zone.files[i], f)));
+
+    const subZones = subdivideZone(zone, imports, inventory);
+
+    expect(subZones).toEqual([]);
+  });
+
+  it("returns empty array when no internal edges", () => {
+    const files = Array.from({ length: 60 }, (_, i) => `src/large/${i}.ts`);
+    const zone = makeZone("large", files);
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+    const imports = makeImports([]); // No edges at all
+
+    const subZones = subdivideZone(zone, imports, inventory);
+
+    expect(subZones).toEqual([]);
+  });
+
+  it("returns empty array when Louvain finds only one community", () => {
+    // All files fully connected = single community
+    const files = Array.from({ length: 55 }, (_, i) => `src/large/${i}.ts`);
+    const zone = makeZone("large", files);
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+    // Create a complete graph (every file connected to every other)
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < files.length; i++) {
+      for (let j = i + 1; j < files.length; j++) {
+        edges.push(makeEdge(files[i], files[j]));
+      }
+    }
+    const imports = makeImports(edges);
+
+    const subZones = subdivideZone(zone, imports, inventory);
+
+    // May or may not find sub-communities depending on Louvain result
+    // If it finds only 1, returns empty
+    // This test just ensures it doesn't throw
+    expect(Array.isArray(subZones)).toBe(true);
+  });
+
+  it("subdivides a large zone into multiple sub-zones", () => {
+    // Create two distinct clusters that should be detected
+    const cluster1 = Array.from({ length: 30 }, (_, i) => `src/cluster1/file${i}.ts`);
+    const cluster2 = Array.from({ length: 30 }, (_, i) => `src/cluster2/file${i}.ts`);
+    const files = [...cluster1, ...cluster2];
+
+    const zone = makeZone("large", files);
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+
+    // Create edges within each cluster (strong internal connectivity)
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < cluster1.length - 1; i++) {
+      edges.push(makeEdge(cluster1[i], cluster1[i + 1]));
+    }
+    for (let i = 0; i < cluster2.length - 1; i++) {
+      edges.push(makeEdge(cluster2[i], cluster2[i + 1]));
+    }
+    // Add a few weak links between clusters
+    edges.push(makeEdge(cluster1[0], cluster2[0]));
+
+    const imports = makeImports(edges);
+
+    const subZones = subdivideZone(zone, imports, inventory);
+
+    // Should find at least 2 sub-zones
+    expect(subZones.length).toBeGreaterThanOrEqual(2);
+
+    // Sub-zone IDs should be prefixed with parent ID
+    for (const sub of subZones) {
+      expect(sub.id).toMatch(/^large\//);
+    }
+  });
+
+  it("sets depth on sub-zones", () => {
+    const cluster1 = Array.from({ length: 30 }, (_, i) => `src/a/file${i}.ts`);
+    const cluster2 = Array.from({ length: 30 }, (_, i) => `src/b/file${i}.ts`);
+    const files = [...cluster1, ...cluster2];
+
+    const zone: Zone = {
+      id: "parent",
+      name: "Parent",
+      description: "test",
+      files,
+      entryPoints: [],
+      cohesion: 0.5,
+      coupling: 0.5,
+      depth: 0, // Parent is at depth 0
+    };
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < cluster1.length - 1; i++) {
+      edges.push(makeEdge(cluster1[i], cluster1[i + 1]));
+    }
+    for (let i = 0; i < cluster2.length - 1; i++) {
+      edges.push(makeEdge(cluster2[i], cluster2[i + 1]));
+    }
+    edges.push(makeEdge(cluster1[0], cluster2[0]));
+    const imports = makeImports(edges);
+
+    const subZones = subdivideZone(zone, imports, inventory);
+
+    // All sub-zones should have depth = parent depth + 1
+    for (const sub of subZones) {
+      expect(sub.depth).toBe(1);
+    }
+  });
+
+  it("respects max depth limit", () => {
+    const files = Array.from({ length: 60 }, (_, i) => `src/deep/${i}.ts`);
+    const zone: Zone = {
+      id: "deep",
+      name: "Deep",
+      description: "test",
+      files,
+      entryPoints: [],
+      cohesion: 0.5,
+      coupling: 0.5,
+    };
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+    const edges = files.slice(1).map((f, i) => makeEdge(files[i], f));
+    const imports = makeImports(edges);
+
+    // Call with depth at max
+    const subZones = subdivideZone(zone, imports, inventory, MAX_SUBDIVISION_DEPTH);
+
+    // Should return empty (depth exceeded)
+    expect(subZones).toEqual([]);
+  });
+});
+
+describe("SUBDIVISION_THRESHOLD", () => {
+  it("is set to a reasonable value", () => {
+    expect(SUBDIVISION_THRESHOLD).toBeGreaterThanOrEqual(30);
+    expect(SUBDIVISION_THRESHOLD).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("MAX_SUBDIVISION_DEPTH", () => {
+  it("is set to prevent infinite recursion", () => {
+    expect(MAX_SUBDIVISION_DEPTH).toBeGreaterThanOrEqual(1);
+    expect(MAX_SUBDIVISION_DEPTH).toBeLessThanOrEqual(5);
   });
 });

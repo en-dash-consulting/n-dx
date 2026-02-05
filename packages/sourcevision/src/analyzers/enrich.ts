@@ -5,13 +5,15 @@
 
 // ── Barrel re-exports (keep consumers' imports stable) ───────────────────────
 
-export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs } from "./enrich-config.js";
+export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs, computePerZoneAttemptConfigs, MAX_CONCURRENT_ZONES, PER_ZONE_MAX_FILES, PER_ZONE_MAX_CROSSINGS } from "./enrich-config.js";
 export type { PassConfig } from "./enrich-config.js";
 export { tryCallClaude, parseStreamTokenUsage } from "./claude-cli.js";
 export type { ClaudeCallResult } from "./claude-cli.js";
 export { tryParseJSON, extractFindings, mergeZonesByName } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";
 export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
+export { enrichZonesPerZone, computeZoneStructureHash } from "./enrich-per-zone.js";
+export type { PerZoneEnrichResult } from "./enrich-per-zone.js";
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 

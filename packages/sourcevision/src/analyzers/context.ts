@@ -75,6 +75,9 @@ export function generateContext(
     }
 
     lines.push("");
+    lines.push("Detailed zone context: .sourcevision/zones/{id}/context.md");
+
+    lines.push("");
     lines.push("</zones>");
     lines.push("");
   }

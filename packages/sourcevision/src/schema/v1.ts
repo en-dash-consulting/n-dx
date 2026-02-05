@@ -25,6 +25,35 @@ export interface Manifest {
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;
+  /** Whether per-zone output files were emitted to zones/ directory. */
+  zoneOutputs?: boolean;
+  /** Incorporated sub-analyses (nested .sourcevision/ directories). */
+  children?: SubAnalysisRef[];
+}
+
+/** Reference to an incorporated sub-analysis. */
+export interface SubAnalysisRef {
+  /** Unique identifier for this sub-analysis (derived from directory path). */
+  id: string;
+  /** Path prefix for all files in this sub-analysis (relative to root). */
+  prefix: string;
+  /** Path to the sub-analysis manifest.json (relative to root). */
+  manifestPath: string;
+}
+
+// ── Zone Output ──────────────────────────────────────────────────────────────
+
+/** Per-zone summary metadata written to zones/{id}/summary.json */
+export interface ZoneSummary {
+  id: string;
+  name: string;
+  description: string;
+  files: string[];
+  entryPoints: string[];
+  cohesion: number;
+  coupling: number;
+  fileCount: number;
+  lineCount: number;
 }
 
 // ── Inventory ───────────────────────────────────────────────────────────────
@@ -131,6 +160,23 @@ export interface Zone {
   coupling: number;
   /** Actionable insights about this zone (structural + AI-generated) */
   insights?: string[];
+  /** Hash of this zone's file list for incremental enrichment */
+  structureHash?: string;
+  /** Token usage from per-zone enrichment */
+  tokenUsage?: ZoneTokenUsage;
+  /** ID of the sub-analysis this zone came from (if promoted from a child). */
+  childId?: string;
+  /** Nesting depth: 0 = root analysis, 1+ = from sub-analysis. */
+  depth?: number;
+  /** Sub-zones from recursive subdivision of large zones. */
+  subZones?: Zone[];
+}
+
+/** Token usage tracked per zone during per-zone enrichment */
+export interface ZoneTokenUsage {
+  calls: number;
+  input: number;
+  output: number;
 }
 
 export interface ZoneCrossing {
