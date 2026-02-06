@@ -4,7 +4,7 @@ import type { Manifest, Zones } from "../../schema/v1.js";
 import type { ViewId } from "../types.js";
 import { ENRICHMENT_THRESHOLDS } from "./constants.js";
 
-const LOGO_SRC = "./SourceVision.png";
+const LOGO_SRC = "./SourceVision-F.png";
 
 interface SidebarProps {
   view: ViewId;

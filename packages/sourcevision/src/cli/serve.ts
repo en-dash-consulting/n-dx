@@ -4,7 +4,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, existsSync, statSync, watch } from "node:fs";
+import { readFileSync, existsSync, statSync, watch, realpathSync } from "node:fs";
 import { join, resolve, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +56,26 @@ export function startServer(targetDir: string, port: number = 3117, opts: Server
   if (!viewerPath) {
     console.error("Viewer HTML not found. Run 'npm run build:viewer' first.");
     process.exit(1);
+  }
+
+  const viewerDir = dirname(viewerPath);
+  const packageRoot = resolve(thisDir, "../..");
+  // Resolve symlinks so asset paths work when run via n-dx from another project (e.g. node_modules/n-dx/...)
+  const resolvedViewerDir = resolveDirRealpath(viewerDir);
+  const resolvedPackageRoot = resolveDirRealpath(packageRoot);
+
+  function resolveDirRealpath(dir: string): string {
+    try {
+      return realpathSync(dir);
+    } catch {
+      return dir;
+    }
+  }
+
+  function findAssetPath(filename: string): string | null {
+    const inViewer = join(resolvedViewerDir, filename);
+    const inRoot = join(resolvedPackageRoot, filename);
+    return existsSync(inViewer) ? inViewer : existsSync(inRoot) ? inRoot : null;
   }
 
   // In production mode, cache the HTML once. In dev mode, re-read on each request.
@@ -132,6 +152,21 @@ export function startServer(targetDir: string, port: number = 3117, opts: Server
     if (url === "/" || url === "/index.html") {
       res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
       res.end(getViewerHtml());
+      return;
+    }
+
+    // Serve viewer static assets (e.g. logo) from viewer dir or package root (resolved for symlinked installs)
+    if (url === "/SourceVision.png" || url === "/SourceVision-F.png") {
+      const filename = url.slice(1);
+      const pngPath = findAssetPath(filename);
+      if (pngPath) {
+        const content = readFileSync(pngPath);
+        res.writeHead(200, { "Content-Type": "image/png" });
+        res.end(content);
+      } else {
+        res.writeHead(404);
+        res.end("Not found");
+      }
       return;
     }
 

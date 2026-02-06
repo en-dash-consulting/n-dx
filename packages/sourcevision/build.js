@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +39,9 @@ function buildHtml(jsCode, cssCode) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "index.html"), inlinedHtml);
   copyFileSync(resolve(__dirname, "SourceVision.png"), resolve(outDir, "SourceVision.png"));
+  if (existsSync(resolve(__dirname, "SourceVision-F.png"))) {
+    copyFileSync(resolve(__dirname, "SourceVision-F.png"), resolve(outDir, "SourceVision-F.png"));
+  }
 }
 
 async function bundleCss() {

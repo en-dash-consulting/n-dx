@@ -5328,7 +5328,7 @@
             {
               "id": "ae83f04a-1238-422a-a725-e7edaaaf7654",
               "title": "Implement interactive proposal chunking workflow",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Present proposals in user-specified chunks with options to accept current chunk, request more, or request fewer",
               "acceptanceCriteria": [
@@ -5342,7 +5342,8 @@
                 "rex",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-06T03:24:07.522Z"
             },
             {
               "id": "a59d064f-b71a-452a-89e6-251965e638ee",
