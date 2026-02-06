@@ -128,33 +128,64 @@ interface NodeRowProps {
   depth: number;
   isExpanded: boolean;
   hasChildren: boolean;
+  isSelected: boolean;
   onToggle: () => void;
+  onSelect?: (item: PRDItemData) => void;
 }
 
-function NodeRow({ item, depth, isExpanded, hasChildren, onToggle }: NodeRowProps) {
+function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect }: NodeRowProps) {
   const children = item.children ?? [];
   const stats = hasChildren ? computeBranchStats(children) : null;
   const ratio = stats ? completionRatio(stats) : 0;
 
   const indent = depth * 24;
 
+  const handleClick = (e: MouseEvent) => {
+    // If clicking the chevron area, toggle expand
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("prd-chevron")) {
+      if (hasChildren) onToggle();
+      return;
+    }
+    // Otherwise, select the item (and toggle expand if it has children)
+    if (onSelect) {
+      onSelect(item);
+    } else if (hasChildren) {
+      onToggle();
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (onSelect) {
+        onSelect(item);
+      } else if (hasChildren) {
+        onToggle();
+      }
+    }
+    // Arrow right to expand, left to collapse
+    if (hasChildren && e.key === "ArrowRight" && !isExpanded) {
+      e.preventDefault();
+      onToggle();
+    }
+    if (hasChildren && e.key === "ArrowLeft" && isExpanded) {
+      e.preventDefault();
+      onToggle();
+    }
+  };
+
   return h(
     "div",
     {
-      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""} prd-level-${item.level}`,
+      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""} prd-level-${item.level}`,
       style: `padding-left: ${indent + 8}px`,
-      onClick: hasChildren ? onToggle : undefined,
-      role: hasChildren ? "treeitem" : "none",
+      onClick: handleClick,
+      role: "treeitem",
       "aria-expanded": hasChildren ? String(isExpanded) : undefined,
-      tabIndex: hasChildren ? 0 : -1,
-      onKeyDown: hasChildren
-        ? (e: KeyboardEvent) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggle();
-            }
-          }
-        : undefined,
+      "aria-selected": String(isSelected),
+      tabIndex: 0,
+      onKeyDown: handleKeyDown,
     },
     // Chevron
     h(
@@ -201,10 +232,12 @@ interface TreeNodesProps {
   items: PRDItemData[];
   depth: number;
   expanded: Set<string>;
+  selectedItemId?: string | null;
   onToggle: (id: string) => void;
+  onSelectItem?: (item: PRDItemData) => void;
 }
 
-function TreeNodes({ items, depth, expanded, onToggle }: TreeNodesProps) {
+function TreeNodes({ items, depth, expanded, selectedItemId, onToggle, onSelectItem }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -221,7 +254,9 @@ function TreeNodes({ items, depth, expanded, onToggle }: TreeNodesProps) {
           depth,
           isExpanded: isOpen,
           hasChildren,
+          isSelected: selectedItemId === item.id,
           onToggle: () => onToggle(item.id),
+          onSelect: onSelectItem,
         }),
         hasChildren && isOpen
           ? h(
@@ -231,7 +266,9 @@ function TreeNodes({ items, depth, expanded, onToggle }: TreeNodesProps) {
                 items: children,
                 depth: depth + 1,
                 expanded,
+                selectedItemId,
                 onToggle,
+                onSelectItem,
               }),
             )
           : null,
@@ -326,9 +363,13 @@ export interface PRDTreeProps {
   document: PRDDocumentData;
   /** How many levels to expand by default (0 = all collapsed). */
   defaultExpandDepth?: number;
+  /** Called when an item is clicked for detail view. */
+  onSelectItem?: (item: PRDItemData) => void;
+  /** Currently selected item ID (highlights the row). */
+  selectedItemId?: string | null;
 }
 
-export function PRDTree({ document: doc, defaultExpandDepth = 2 }: PRDTreeProps) {
+export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId }: PRDTreeProps) {
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -390,7 +431,9 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2 }: PRDTreeProps)
         items: doc.items,
         depth: 0,
         expanded,
+        selectedItemId,
         onToggle: toggle,
+        onSelectItem,
       }),
     ),
   );

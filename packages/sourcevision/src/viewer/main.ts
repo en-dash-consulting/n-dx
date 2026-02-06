@@ -1,4 +1,5 @@
 import { h, render, Fragment } from "preact";
+import type { VNode } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import type { LoadedData, ViewId, NavigateTo, DetailItem } from "./types.js";
 import { loadFromServer, loadFromFiles, detectMode, onDataChange, startPolling, stopPolling } from "./loader.js";
@@ -15,10 +16,11 @@ import { ArchitectureView } from "./views/architecture.js";
 import { ProblemsView } from "./views/problems.js";
 import { SuggestionsView } from "./views/suggestions.js";
 import { RoutesView } from "./views/routes.js";
+import { PRDView } from "./views/prd.js";
 
 initTheme();
 
-const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"]);
+const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "prd"]);
 
 function getInitialView(): ViewId {
   const hash = location.hash.replace("#", "") as ViewId;
@@ -41,6 +43,8 @@ function App() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [prdDetailContent, setPrdDetailContent] = useState<VNode<any> | null>(null);
 
   const navigateTo: NavigateTo = useCallback((targetView, opts) => {
     const file = opts?.file ?? null;
@@ -165,6 +169,8 @@ function App() {
         return h(ProblemsView, { data });
       case "suggestions":
         return h(SuggestionsView, { data });
+      case "prd":
+        return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent });
       default:
         return null;
     }
@@ -187,7 +193,7 @@ function App() {
       ),
       renderView()
     ),
-    h(DetailPanel, { detail, data, navigateTo, onClose: () => setDetail(null) }),
+    h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent }),
     refreshToast
       ? h("div", { class: "refresh-toast", role: "status" }, "Data updated")
       : null,

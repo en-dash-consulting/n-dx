@@ -4796,7 +4796,7 @@
             {
               "id": "33c3b7ae-1072-4064-9ab7-37431ffeb554",
               "title": "Implement PRD hierarchy visualization",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Create interactive tree view for displaying epics, features, tasks, and subtasks with completion status and progress indicators",
               "acceptanceCriteria": [
@@ -4812,12 +4812,13 @@
                 "frontend"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-06T04:52:35.753Z"
+              "startedAt": "2026-02-06T04:52:35.753Z",
+              "completedAt": "2026-02-06T05:01:06.662Z"
             },
             {
               "id": "264f26ce-e433-4c4b-91c9-3981680ec771",
               "title": "Add task management interface",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Build UI for viewing task details, updating status, and managing task properties through web interface",
               "acceptanceCriteria": [
@@ -4831,7 +4832,9 @@
                 "task-management",
                 "frontend"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-06T05:01:44.862Z",
+              "completedAt": "2026-02-06T05:12:59.710Z"
             },
             {
               "id": "6a1a02c8-18c9-4967-9182-26cc98cc1850",

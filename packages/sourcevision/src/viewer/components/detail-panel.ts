@@ -3,15 +3,19 @@ import { useEffect } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
 import { ZONE_COLORS } from "./constants.js";
 import { meterClass } from "../utils.js";
+import type { VNode } from "preact";
 
 interface DetailPanelProps {
   detail: DetailItem | null;
   data?: LoadedData;
   navigateTo?: NavigateTo;
   onClose: () => void;
+  /** Optional custom content renderer for PRD details (injected from PRDView). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prdDetailContent?: VNode<any> | null;
 }
 
-export function DetailPanel({ detail, data, navigateTo, onClose }: DetailPanelProps) {
+export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailContent }: DetailPanelProps) {
   // Close on Escape
   useEffect(() => {
     if (!detail) return;
@@ -25,12 +29,14 @@ export function DetailPanel({ detail, data, navigateTo, onClose }: DetailPanelPr
   if (!detail) return null;
 
   let content;
-  if (detail.type === "file") {
+  if (detail.type === "prd" && prdDetailContent) {
+    content = prdDetailContent;
+  } else if (detail.type === "file") {
     content = renderFileDetail(detail, data, navigateTo, onClose);
   } else if (detail.type === "zone") {
     content = renderZoneDetail(detail, data, navigateTo);
   } else {
-    content = renderGenericDetail(detail);
+    content = renderGenericDetail(detail as unknown as Record<string, unknown>);
   }
 
   return h(Fragment, null,

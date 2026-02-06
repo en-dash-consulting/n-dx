@@ -4,7 +4,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, existsSync, statSync, watch, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, watch, realpathSync } from "node:fs";
 import { join, resolve, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,9 +27,20 @@ const LIVE_RELOAD_SNIPPET = `<script>
 (function(){var last="";setInterval(function(){fetch("/data/status").then(function(r){return r.json()}).then(function(d){var cur=JSON.stringify(d);if(last&&cur!==last)location.reload();last=cur}).catch(function(){})},1500)})();
 </script>`;
 
+/** Read the full request body as a string. */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    req.on("error", reject);
+  });
+}
+
 export function startServer(targetDir: string, port: number = 3117, opts: ServerOptions = {}): void {
   const absDir = resolve(targetDir);
   const svDir = join(absDir, ".sourcevision");
+  const rexDir = join(absDir, ".rex");
   const thisDir = dirname(fileURLToPath(import.meta.url));
   const dev = opts.dev ?? false;
 
@@ -145,9 +156,19 @@ export function startServer(targetDir: string, port: number = 3117, opts: Server
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const url = req.url || "/";
 
+    const method = req.method || "GET";
+
     // CORS headers for local dev
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    // Handle CORS preflight
+    if (method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url === "/" || url === "/index.html") {
       res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
@@ -179,9 +200,24 @@ export function startServer(targetDir: string, port: number = 3117, opts: Server
       return;
     }
 
-    // Serve .sourcevision/ data files
+    // Serve .sourcevision/ data files (also serves .rex/prd.json via /data/prd.json)
     if (url.startsWith("/data/")) {
       const dataFile = url.replace("/data/", "");
+
+      // Serve prd.json from .rex/ directory
+      if (dataFile === "prd.json") {
+        const prdPath = join(rexDir, "prd.json");
+        if (existsSync(prdPath)) {
+          const content = readFileSync(prdPath, "utf-8");
+          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+          res.end(content);
+        } else {
+          res.writeHead(404);
+          res.end("Not found");
+        }
+        return;
+      }
+
       const filePath = join(svDir, dataFile);
 
       // Prevent directory traversal
@@ -204,10 +240,71 @@ export function startServer(targetDir: string, port: number = 3117, opts: Server
       return;
     }
 
+    // Rex API: update a PRD item (PATCH /api/rex/items/:id)
+    if (url.startsWith("/api/rex/items/") && method === "PATCH") {
+      const itemId = url.replace("/api/rex/items/", "");
+      const prdPath = join(rexDir, "prd.json");
+
+      if (!existsSync(prdPath)) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: "No PRD data found" }));
+        return;
+      }
+
+      readBody(req).then((body) => {
+        try {
+          const updates = JSON.parse(body);
+          const doc = JSON.parse(readFileSync(prdPath, "utf-8"));
+
+          // Walk tree to find and update item
+          function updateInTree(items: Array<Record<string, unknown>>): boolean {
+            for (const item of items) {
+              if (item.id === itemId) {
+                // Apply auto-timestamps for status changes
+                if (updates.status === "in_progress" && item.status !== "in_progress") {
+                  updates.startedAt = updates.startedAt || new Date().toISOString();
+                }
+                if (updates.status === "completed" && item.status !== "completed") {
+                  updates.completedAt = updates.completedAt || new Date().toISOString();
+                }
+                Object.assign(item, updates);
+                return true;
+              }
+              if (Array.isArray(item.children) && updateInTree(item.children as Array<Record<string, unknown>>)) {
+                return true;
+              }
+            }
+            return false;
+          }
+
+          if (!updateInTree(doc.items)) {
+            res.writeHead(404);
+            res.end(JSON.stringify({ error: `Item "${itemId}" not found` }));
+            return;
+          }
+
+          writeFileSync(prdPath, JSON.stringify(doc, null, 2) + "\n");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+      }).catch(() => {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: "Failed to read request body" }));
+      });
+      return;
+    }
+
     // List available data files
     if (url === "/data") {
-      const files = [...ALL_DATA_FILES, ...SUPPLEMENTARY_FILES];
-      const available = files.filter((f) => existsSync(join(svDir, f)));
+      const files: string[] = [...ALL_DATA_FILES, ...SUPPLEMENTARY_FILES];
+      const available: string[] = files.filter((f) => existsSync(join(svDir, f)));
+      // Include prd.json if .rex/ exists
+      if (existsSync(join(rexDir, "prd.json"))) {
+        available.push("prd.json");
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ files: available }));
       return;

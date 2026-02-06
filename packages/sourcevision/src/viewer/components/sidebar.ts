@@ -15,6 +15,7 @@ interface SidebarProps {
 
 const NAV_ITEMS: Array<{ id: ViewId; icon: string; label: string; minPass: number }> = [
   { id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
+  { id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
   { id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
   { id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
   { id: "files", icon: "\u2630", label: "Files", minPass: 0 },

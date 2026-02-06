@@ -8,7 +8,7 @@ export interface LoadedData {
   components: Components | null;
 }
 
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions";
+export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "prd";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string }) => void;
 
@@ -44,4 +44,20 @@ export interface GenericDetail {
   [key: string]: unknown;
 }
 
-export type DetailItem = FileDetail | ZoneDetail | GenericDetail;
+export interface PRDDetail {
+  type: "prd";
+  title: string;
+  id: string;
+  level: string;
+  status: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  priority?: string;
+  tags?: string[];
+  blockedBy?: string[];
+  startedAt?: string;
+  completedAt?: string;
+  children?: Array<{ id: string; title: string; status: string; level: string }>;
+}
+
+export type DetailItem = FileDetail | ZoneDetail | GenericDetail | PRDDetail;
