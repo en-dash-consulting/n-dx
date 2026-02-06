@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
-import { TreeView, type TreeNode } from "../../../src/viewer/components/tree-view.js";
+import { TreeView, type TreeNode } from "../../../src/viewer/components/data-display/tree-view.js";
 
 describe("TreeView", () => {
   function renderToDiv(vnode: ReturnType<typeof h>) {

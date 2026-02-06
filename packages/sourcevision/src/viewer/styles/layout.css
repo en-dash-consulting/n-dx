@@ -30,6 +30,19 @@
   padding: 8px;
 }
 
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 12px 12px 4px;
+  opacity: 0.6;
+}
+
+.nav-section-label:first-child {
+  padding-top: 4px;
+}
+
 .nav-item {
   display: flex;
   align-items: center;

@@ -2,8 +2,8 @@ import { h, Fragment } from "preact";
 import { useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
 import type { Finding } from "../../schema/v1.js";
-import { FindingsList } from "../components/findings-list.js";
-import { BarChart } from "../components/mini-charts.js";
+import { FindingsList } from "../components/data-display/findings-list.js";
+import { BarChart } from "../components/data-display/mini-charts.js";
 import { ENRICHMENT_THRESHOLDS } from "../components/constants.js";
 
 interface ProblemsProps {

@@ -2,10 +2,10 @@ import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Zone, Finding } from "../../schema/v1.js";
-import { BarChart } from "../components/mini-charts.js";
-import { CollapsibleSection } from "../components/collapsible-section.js";
-import { HealthGauge, PatternBadge, MetricCard } from "../components/health-gauge.js";
-import { ZoneMap, ZoneDetail } from "../components/zone-map.js";
+import { BarChart } from "../components/data-display/mini-charts.js";
+import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
+import { HealthGauge, PatternBadge, MetricCard } from "../components/data-display/health-gauge.js";
+import { ZoneMap, ZoneDetail } from "../components/data-display/zone-map.js";
 import { ZONE_COLORS } from "../components/constants.js";
 
 interface OverviewProps {

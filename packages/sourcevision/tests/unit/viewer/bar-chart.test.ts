@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
-import { BarChart } from "../../../src/viewer/components/mini-charts.js";
+import { BarChart } from "../../../src/viewer/components/data-display/mini-charts.js";
 
 describe("BarChart", () => {
   function renderToDiv(vnode: ReturnType<typeof h>) {

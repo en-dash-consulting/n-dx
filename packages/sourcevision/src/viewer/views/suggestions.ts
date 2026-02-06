@@ -2,7 +2,7 @@ import { h } from "preact";
 import { useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
 import type { Finding } from "../../schema/v1.js";
-import { FindingsList } from "../components/findings-list.js";
+import { FindingsList } from "../components/data-display/findings-list.js";
 import { ENRICHMENT_THRESHOLDS } from "../components/constants.js";
 
 interface SuggestionsProps {

@@ -2,10 +2,10 @@ import { h, Fragment } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
 import type { RouteTreeNode, RouteExportKind, ComponentUsageEdge } from "../../schema/v1.js";
-import { TreeView, type TreeNode } from "../components/tree-view.js";
+import { TreeView, type TreeNode } from "../components/data-display/tree-view.js";
 import { SearchFilter } from "../components/search-filter.js";
-import { CollapsibleSection } from "../components/collapsible-section.js";
-import { BarChart } from "../components/mini-charts.js";
+import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
+import { BarChart } from "../components/data-display/mini-charts.js";
 
 interface RoutesViewProps {
   data: LoadedData;

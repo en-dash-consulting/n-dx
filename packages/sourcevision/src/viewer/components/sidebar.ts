@@ -13,16 +13,22 @@ interface SidebarProps {
   zones: Zones | null;
 }
 
-const NAV_ITEMS: Array<{ id: ViewId; icon: string; label: string; minPass: number }> = [
-  { id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
-  { id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
-  { id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
-  { id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
-  { id: "files", icon: "\u2630", label: "Files", minPass: 0 },
-  { id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
-  { id: "architecture", icon: "\u25E8", label: "Architecture", minPass: ENRICHMENT_THRESHOLDS.architecture },
-  { id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
-  { id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
+type NavEntry =
+  | { type: "item"; id: ViewId; icon: string; label: string; minPass: number }
+  | { type: "section"; label: string };
+
+const NAV_ENTRIES: NavEntry[] = [
+  { type: "section", label: "ANALYSIS" },
+  { type: "item", id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
+  { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
+  { type: "item", id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
+  { type: "item", id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
+  { type: "item", id: "files", icon: "\u2630", label: "Files", minPass: 0 },
+  { type: "item", id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
+  { type: "section", label: "ENRICHMENT" },
+  { type: "item", id: "architecture", icon: "\u25E8", label: "Architecture", minPass: ENRICHMENT_THRESHOLDS.architecture },
+  { type: "item", id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
+  { type: "item", id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
 ];
 
 export function Sidebar({ view, onNavigate, manifest, zones }: SidebarProps) {
@@ -52,8 +58,8 @@ export function Sidebar({ view, onNavigate, manifest, zones }: SidebarProps) {
   },
     h("div", { class: "sidebar-header" },
       h("div", { class: "flex-row" },
-        h("img", { src: LOGO_SRC, class: "sidebar-logo", alt: "SourceVision" }),
-        h("h1", null, "SourceVision"),
+        h("img", { src: LOGO_SRC, class: "sidebar-logo", alt: "n-dx" }),
+        h("h1", null, "n-dx"),
       ),
       manifest
         ? h("div", { class: "meta" },
@@ -68,27 +74,34 @@ export function Sidebar({ view, onNavigate, manifest, zones }: SidebarProps) {
       }, mobileOpen ? "\u2715" : "\u2630")
     ),
     h("nav", { class: "sidebar-nav", "aria-label": "View navigation" },
-      NAV_ITEMS.map((item) => {
-        const locked = item.minPass > 0 && enrichmentPass < item.minPass;
+      NAV_ENTRIES.map((entry, idx) => {
+        if (entry.type === "section") {
+          return h("div", {
+            key: `section-${idx}`,
+            class: "nav-section-label",
+            "aria-hidden": "true",
+          }, entry.label);
+        }
+        const locked = entry.minPass > 0 && enrichmentPass < entry.minPass;
         return h("div", {
-          key: item.id,
-          class: `nav-item ${view === item.id ? "active" : ""} ${locked ? "locked" : ""}`,
-          onClick: locked ? undefined : () => handleNav(item.id),
+          key: entry.id,
+          class: `nav-item ${view === entry.id ? "active" : ""} ${locked ? "locked" : ""}`,
+          onClick: locked ? undefined : () => handleNav(entry.id),
           role: "button",
           tabIndex: locked ? -1 : 0,
-          "aria-current": view === item.id ? "page" : undefined,
+          "aria-current": view === entry.id ? "page" : undefined,
           "aria-disabled": locked ? "true" : undefined,
           onKeyDown: (e: KeyboardEvent) => {
             if (!locked && (e.key === "Enter" || e.key === " ")) {
               e.preventDefault();
-              handleNav(item.id);
+              handleNav(entry.id);
             }
           },
         },
-          h("span", { class: "nav-icon", "aria-hidden": "true" }, item.icon),
-          item.label,
+          h("span", { class: "nav-icon", "aria-hidden": "true" }, entry.icon),
+          entry.label,
           locked
-            ? h("span", { class: "nav-badge" }, `P${item.minPass}`)
+            ? h("span", { class: "nav-badge" }, `P${entry.minPass}`)
             : null
         );
       })

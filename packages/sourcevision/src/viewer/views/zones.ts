@@ -3,9 +3,9 @@ import { useState, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Zone, Finding } from "../../schema/v1.js";
 import { ZONE_COLORS } from "../components/constants.js";
-import { CollapsibleSection } from "../components/collapsible-section.js";
+import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import { SearchFilter } from "../components/search-filter.js";
-import { FlowDiagram } from "../components/mini-charts.js";
+import { FlowDiagram } from "../components/data-display/mini-charts.js";
 import { meterClass, buildFlowNodes, buildFlowEdges } from "../utils.js";
 
 interface ZonesViewProps {

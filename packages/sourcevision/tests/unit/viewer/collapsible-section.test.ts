@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
-import { CollapsibleSection } from "../../../src/viewer/components/collapsible-section.js";
+import { CollapsibleSection } from "../../../src/viewer/components/data-display/collapsible-section.js";
 
 describe("CollapsibleSection", () => {
   function renderToDiv(vnode: ReturnType<typeof h>) {

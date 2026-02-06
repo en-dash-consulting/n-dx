@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useState, useMemo } from "preact/hooks";
-import type { Zone, ZoneCrossing } from "../../schema/v1.js";
-import { ZONE_COLORS } from "./constants.js";
+import type { Zone, ZoneCrossing } from "../../../schema/v1.js";
+import { ZONE_COLORS } from "../constants.js";
 
 /**
  * Zone Map - A hierarchical visualization of zones and their connections.
