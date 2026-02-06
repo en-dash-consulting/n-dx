@@ -1251,10 +1251,12 @@
         {
           "id": "8c669c14-56ac-476d-90e4-18bac1afce18",
           "title": "Error Handling Improvements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Better error messages and graceful degradation",
           "source": "llm",
+          "startedAt": "2026-02-06T14:35:05.946Z",
+          "completedAt": "2026-02-06T14:35:05.946Z",
           "children": [
             {
               "id": "79e45114-9bc1-4337-bfc7-c1c2e0d85a73",
@@ -1299,7 +1301,7 @@
             {
               "id": "4b2f9165-0f17-4060-b439-41e7ee7c4c33",
               "title": "Improve CLI error handling and validation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enhance error formatting, graceful dependency handling, move operation validation, and directory validation with clear actionable messages",
               "acceptanceCriteria": [
@@ -1316,7 +1318,9 @@
                 "error-handling",
                 "validation"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T14:26:30.127Z",
+              "completedAt": "2026-02-06T14:35:05.917Z"
             }
           ]
         },
