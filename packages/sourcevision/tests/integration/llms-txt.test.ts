@@ -63,7 +63,7 @@ const zones: Zones = {
 };
 
 describe("generateLlmsTxt", () => {
-  it("generates markdown with all sections", () => {
+  it("generates markdown with all required sections", () => {
     const result = generateLlmsTxt(manifest, inventory, imports, zones);
 
     expect(result).toContain("# my-app");
@@ -77,6 +77,30 @@ describe("generateLlmsTxt", () => {
     expect(result).toContain("`zod`");
     expect(result).toContain("## Findings");
     expect(result).toContain("## File Inventory");
+  });
+
+  it("mentions the description count", () => {
+    const result = generateLlmsTxt(manifest, inventory, imports, zones);
+    expect(result).toContain("**Zones**: 1 (1 with descriptions)");
+  });
+
+  it("shows correct description count with mixed zones", () => {
+    const mixedZones: Zones = {
+      ...zones,
+      zones: [
+        { id: "core", name: "Core", description: "Core logic", files: ["src/index.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+        { id: "utils", name: "Utils", description: "", files: ["src/utils.ts"], entryPoints: [], cohesion: 0.7, coupling: 0.3 },
+      ],
+    };
+
+    const result = generateLlmsTxt(manifest, inventory, imports, mixedZones);
+    expect(result).toContain("**Zones**: 2 (1 with descriptions)");
+  });
+
+  it("instructs LLM to group related and separate unrelated", () => {
+    const result = generateLlmsTxt(manifest, inventory, imports, zones);
+    expect(result).toContain("group related");
+    expect(result).toContain("separate unrelated");
   });
 
   it("includes route structure when components provided", () => {

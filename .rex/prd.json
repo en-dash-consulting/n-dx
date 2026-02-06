@@ -1327,10 +1327,12 @@
         {
           "id": "f7f698a6-7712-4713-a02a-d60535d24789",
           "title": "Command Validation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Improve command input validation and safety",
           "source": "llm",
+          "startedAt": "2026-02-06T15:39:26.006Z",
+          "completedAt": "2026-02-06T15:39:26.006Z",
           "children": [
             {
               "id": "b68a4841-3041-4c13-9e93-199b1eb13c0f",
@@ -1380,7 +1382,7 @@
             {
               "id": "4a10b43a-2675-452c-9692-926402d6e133",
               "title": "Implement smart defaults and flexible hierarchy",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Intelligent level inference, flexible hierarchy (tasks under epics), and blockedBy support in add command",
               "acceptanceCriteria": [
@@ -1400,7 +1402,9 @@
                 "flexibility",
                 "dependencies"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T15:35:50.704Z",
+              "completedAt": "2026-02-06T15:39:25.978Z"
             },
             {
               "id": "27ac198d-2a28-4c80-8870-d1ba3544840f",
@@ -1603,7 +1607,7 @@
             {
               "id": "35c1313b-473c-41d8-aca2-40e06306a029",
               "title": "Improve context and LLM text generation",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Context generation with XML markers and token budgets, and LLM-oriented markdown generation",
               "acceptanceCriteria": [
@@ -1617,7 +1621,8 @@
                 "generateContext",
                 "generateLlmsTxt"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T15:39:51.226Z"
             }
           ]
         },

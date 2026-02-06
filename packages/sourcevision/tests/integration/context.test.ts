@@ -67,12 +67,27 @@ describe("generateContext", () => {
     expect(result).toContain("</findings>");
   });
 
-  it("includes project metadata", () => {
+  it("includes project metadata with description count", () => {
     const result = generateContext(manifest, inventory, imports, zones);
 
     expect(result).toContain("Project: my-app");
     expect(result).toContain("Git: main @ abc1234");
     expect(result).toContain("Files: 1");
+    expect(result).toContain("Zones: 1, Described: 1");
+  });
+
+  it("shows correct description count when some zones lack descriptions", () => {
+    const mixedZones: Zones = {
+      ...zones,
+      zones: [
+        { id: "core", name: "Core", description: "Core logic", files: ["src/index.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 },
+        { id: "utils", name: "Utils", description: "", files: ["src/utils.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+        { id: "api", name: "API", description: "API layer", files: ["src/api.ts"], entryPoints: [], cohesion: 0.7, coupling: 0.3 },
+      ],
+    };
+
+    const result = generateContext(manifest, inventory, imports, mixedZones);
+    expect(result).toContain("Zones: 3, Described: 2");
   });
 
   it("includes zone data", () => {
@@ -123,6 +138,12 @@ describe("generateContext", () => {
     expect(result).toContain("<routes>");
     expect(result).toContain("</routes>");
     expect(result).toContain("Route modules: 1");
+  });
+
+  it("instructs LLM to group related and separate unrelated", () => {
+    const result = generateContext(manifest, inventory, imports, zones);
+    expect(result).toContain("group related");
+    expect(result).toContain("separate unrelated");
   });
 
   it("stays within reasonable token budget", () => {
