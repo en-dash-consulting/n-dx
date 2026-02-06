@@ -5438,7 +5438,7 @@
             {
               "id": "4f44a47e-ff74-4016-b44b-ee45b51479af",
               "title": "Implement task granularity assessment",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add LLM-powered analysis to evaluate whether proposed tasks are appropriately sized and suggest granularity improvements",
               "acceptanceCriteria": [
@@ -5452,7 +5452,9 @@
                 "llm",
                 "validation"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-06T04:20:58.826Z",
+              "completedAt": "2026-02-06T04:31:55.629Z"
             },
             {
               "id": "39263ff2-8324-43a7-a5ef-23cdaaedef0a",
@@ -5470,6 +5472,82 @@
               "tags": [
                 "batch",
                 "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7078cbce-5bcf-45c6-a52b-1780d191f77f",
+      "title": "Unified Configuration Management",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "e47412ba-b724-4b1c-9cce-707a1b6f36eb",
+          "title": "Claude API Configuration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Allow users to configure Claude Code CLI or Anthropic API Key settings that apply across all three packages (sourcevision, rex, hench)",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "0efd16aa-4cc9-4d5a-a7b6-22d614e9666b",
+              "title": "Add Claude API configuration options to unified config",
+              "status": "pending",
+              "level": "task",
+              "description": "Extend the existing unified config command to support Claude Code CLI path and Anthropic API key settings",
+              "acceptanceCriteria": [
+                "ndx config claude.cli_path sets Claude Code CLI path for all packages",
+                "ndx config claude.api_key sets Anthropic API key for all packages",
+                "ndx config --json shows Claude configuration options",
+                "Configuration is stored in project-level config file"
+              ],
+              "priority": "high",
+              "tags": [
+                "config",
+                "api"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "941e9fa4-9be4-4a2f-9a9b-7c01d8e20075",
+              "title": "Implement Claude configuration inheritance in packages",
+              "status": "pending",
+              "level": "task",
+              "description": "Update sourcevision, rex, and hench packages to read Claude configuration from unified config when not set locally",
+              "acceptanceCriteria": [
+                "All packages check unified config for Claude settings",
+                "Local package config overrides unified config",
+                "Packages fall back to environment variables if no config found",
+                "Clear error messages when Claude configuration is missing"
+              ],
+              "priority": "high",
+              "tags": [
+                "config",
+                "packages"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "bef0e5e7-d646-406d-a011-b52c7d987c53",
+              "title": "Add Claude configuration validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Validate Claude Code CLI path exists and API key format is correct when setting configuration",
+              "acceptanceCriteria": [
+                "CLI path validation checks file exists and is executable",
+                "API key validation checks format matches expected pattern",
+                "Helpful error messages for invalid configuration",
+                "Test connection option to verify API key works"
+              ],
+              "priority": "medium",
+              "tags": [
+                "config",
+                "validation"
               ],
               "source": "smart-add"
             }
