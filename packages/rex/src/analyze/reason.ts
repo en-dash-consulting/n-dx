@@ -1453,6 +1453,197 @@ export async function adjustGranularity(
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
 
+// ── Granularity assessment ──
+
+/** Assessment of a single proposal's task granularity. */
+export interface GranularityAssessment {
+  /** 0-based index of the assessed proposal. */
+  proposalIndex: number;
+  /** The epic title of the assessed proposal. */
+  epicTitle: string;
+  /** Overall verdict. */
+  recommendation: "break_down" | "consolidate" | "keep";
+  /** Human-readable reasoning for the recommendation. */
+  reasoning: string;
+  /** Specific issues found (e.g. "Task X is too broad"). */
+  issues: string[];
+}
+
+/** Result of assessing all proposals in a set. */
+export interface GranularityAssessmentResult {
+  assessments: GranularityAssessment[];
+  tokenUsage: AnalyzeTokenUsage;
+}
+
+/**
+ * Zod schema for validating the LLM's assessment response.
+ */
+const GranularityAssessmentSchema = z.object({
+  proposalIndex: z.number(),
+  recommendation: z.enum(["break_down", "consolidate", "keep"]),
+  reasoning: z.string(),
+  issues: z.array(z.string()),
+});
+
+const GranularityAssessmentArraySchema = z.array(GranularityAssessmentSchema);
+
+/**
+ * Build an LLM prompt to assess the granularity of proposals.
+ * The LLM evaluates whether tasks are appropriately sized and suggests
+ * when they should be broken down or consolidated.
+ * Pure function — no I/O.
+ */
+export function buildAssessmentPrompt(proposals: Proposal[]): string {
+  const proposalJson = JSON.stringify(
+    proposals.map((p, i) => ({ proposalIndex: i, ...p })),
+    null,
+    2,
+  );
+
+  return `You are a product requirements analyst specializing in task sizing and work breakdown. Analyze the following PRD proposals and assess whether each one has tasks at the right level of granularity.
+
+Proposals to assess:
+${proposalJson}
+
+For EACH proposal (by proposalIndex), evaluate the granularity of its tasks and provide:
+1. "recommendation": one of "break_down", "consolidate", or "keep"
+   - "break_down": tasks are too large/broad and should be split into smaller, more specific units
+   - "consolidate": tasks are too fine-grained and should be merged into larger, more meaningful units
+   - "keep": tasks are appropriately sized
+2. "reasoning": a concise explanation of why this recommendation was made
+3. "issues": specific problems found (empty array if recommendation is "keep")
+
+Assessment criteria:
+- Each task should represent a single unit of work completable in one focused session (roughly 1-4 hours of work)
+- Tasks with more than 3 acceptance criteria may be too broad and should be broken down
+- Tasks with vague descriptions like "implement the feature" are too broad
+- Tasks that are a single line change or trivial config tweak are too fine-grained
+- Features with more than 6 tasks may indicate tasks are too fine-grained
+- Features with only 1 task may indicate it should be broken down further
+- Multiple tasks that would naturally be done together should be consolidated
+- Tasks should be independently testable and deployable where possible
+
+Respond with ONLY a valid JSON array of assessment objects, one per proposal:
+[
+  {
+    "proposalIndex": 0,
+    "recommendation": "break_down",
+    "reasoning": "Several tasks cover broad functionality that spans multiple components.",
+    "issues": [
+      "Task 'Implement authentication system' covers login, signup, password reset, and session management — should be separate tasks",
+      "Task 'Add API endpoints' is vague and likely involves multiple distinct endpoints"
+    ]
+  }
+]
+
+No explanation or markdown fences — ONLY the JSON array.`;
+}
+
+/**
+ * Parse the LLM's granularity assessment response.
+ * Validates against schema and enriches with epic titles from proposals.
+ */
+export function parseAssessmentResponse(
+  raw: string,
+  proposals: Proposal[],
+): GranularityAssessment[] {
+  const text = extractJson(raw);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const repaired = repairTruncatedJson(text);
+    if (repaired) {
+      parsed = JSON.parse(repaired);
+    } else {
+      throw new Error(`Invalid JSON in assessment response: ${text.slice(0, 200)}`);
+    }
+  }
+
+  // Validate
+  const result = GranularityAssessmentArraySchema.safeParse(parsed);
+  if (!result.success) {
+    // Lenient fallback: parse valid items individually
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const valid: z.infer<typeof GranularityAssessmentSchema>[] = [];
+      for (const item of parsed) {
+        const single = GranularityAssessmentSchema.safeParse(item);
+        if (single.success) valid.push(single.data);
+      }
+      if (valid.length > 0) {
+        return valid.map((a) => ({
+          ...a,
+          epicTitle: proposals[a.proposalIndex]?.epic.title ?? `Proposal ${a.proposalIndex + 1}`,
+        }));
+      }
+    }
+    throw new Error(
+      `Assessment response failed schema validation: ${result.error.issues.map((i) => i.message).join("; ")}`,
+    );
+  }
+
+  return result.data.map((a) => ({
+    ...a,
+    epicTitle: proposals[a.proposalIndex]?.epic.title ?? `Proposal ${a.proposalIndex + 1}`,
+  }));
+}
+
+/**
+ * Format a granularity assessment for human-readable display.
+ * Pure function — returns a multi-line string.
+ */
+export function formatAssessment(assessments: GranularityAssessment[]): string {
+  if (assessments.length === 0) return "No proposals to assess.";
+
+  const lines: string[] = [];
+  lines.push("Granularity Assessment");
+  lines.push("─".repeat(40));
+
+  const actionable = assessments.filter((a) => a.recommendation !== "keep");
+  const good = assessments.filter((a) => a.recommendation === "keep");
+
+  for (const a of actionable) {
+    const icon = a.recommendation === "break_down" ? "⬇" : "⬆";
+    const label = a.recommendation === "break_down" ? "Break down" : "Consolidate";
+    lines.push(`${icon} ${a.epicTitle} → ${label}`);
+    lines.push(`  ${a.reasoning}`);
+    for (const issue of a.issues) {
+      lines.push(`  • ${issue}`);
+    }
+    lines.push("");
+  }
+
+  if (good.length > 0) {
+    const titles = good.map((a) => a.epicTitle).join(", ");
+    lines.push(`✓ Appropriately sized: ${titles}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Assess the granularity of proposals by calling the LLM.
+ * Returns assessments with recommendations and reasoning for each proposal.
+ */
+export async function assessGranularity(
+  proposals: Proposal[],
+  model?: string,
+): Promise<GranularityAssessmentResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
+  if (proposals.length === 0) {
+    return { assessments: [], tokenUsage };
+  }
+
+  const prompt = buildAssessmentPrompt(proposals);
+  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  accumulateTokenUsage(tokenUsage, result.tokenUsage);
+
+  const assessments = parseAssessmentResponse(result.text, proposals);
+  return { assessments, tokenUsage };
+}
+
 // ── Ideas file import ──
 
 /**

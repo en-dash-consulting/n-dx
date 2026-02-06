@@ -429,7 +429,7 @@ export async function cmdAnalyze(
   } else if (process.stdin.isTTY) {
     // Interactive: chunked review for multiple proposals, simple y/n for single
     const { runChunkedReview } = await import("./chunked-review.js");
-    const { adjustGranularity } = await import("../../analyze/index.js");
+    const { adjustGranularity, assessGranularity, formatAssessment } = await import("../../analyze/index.js");
     const granularityHandler = async (
       targetProposals: Proposal[],
       direction: "break_down" | "consolidate",
@@ -437,7 +437,16 @@ export async function cmdAnalyze(
       const result = await adjustGranularity(targetProposals, direction, model);
       return result.proposals;
     };
-    const { accepted, remaining, batchRecord } = await runChunkedReview(proposals, chunkSize, granularityHandler);
+    const assessmentHandler = async (
+      targetProposals: Proposal[],
+    ): Promise<{ assessments: import("./chunked-review.js").ProposalAssessment[]; formatted: string }> => {
+      const result = await assessGranularity(targetProposals, model);
+      return {
+        assessments: result.assessments,
+        formatted: formatAssessment(result.assessments),
+      };
+    };
+    const { accepted, remaining, batchRecord } = await runChunkedReview(proposals, chunkSize, granularityHandler, assessmentHandler);
 
     if (accepted.length > 0) {
       await acceptProposals(dir, accepted, batchRecord);

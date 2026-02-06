@@ -1450,5 +1450,54 @@ describe("granularity adjustment workflow", () => {
     const { message } = applyAction(state, { kind: "unknown" });
     expect(message).toContain("b#");
     expect(message).toContain("c#");
+    expect(message).toContain("g");
+  });
+});
+
+// ─── Granularity assessment ──────────────────────────────────────────
+
+describe("parseChunkInput assess", () => {
+  const state = createReviewState(makeProposals(5), 3);
+
+  it("parses 'g' as assess", () => {
+    expect(parseChunkInput("g", state).kind).toBe("assess");
+  });
+
+  it("parses 'assess' as assess", () => {
+    expect(parseChunkInput("assess", state).kind).toBe("assess");
+  });
+
+  it("parses 'granularity' as assess", () => {
+    expect(parseChunkInput("granularity", state).kind).toBe("assess");
+  });
+});
+
+describe("applyAction assess", () => {
+  it("returns assessRequested flag", () => {
+    const state = createReviewState(makeProposals(5), 5);
+    const { state: next, done, message, assessRequested } = applyAction(
+      state,
+      { kind: "assess" },
+    );
+
+    expect(done).toBe(false);
+    expect(message).toContain("Assessing");
+    expect(assessRequested).toBe(true);
+    // State is unchanged — caller handles the assessment
+    expect(next).toBe(state);
+  });
+
+  it("other actions do not return assessRequested", () => {
+    const state = createReviewState(makeProposals(5), 5);
+    const { assessRequested } = applyAction(state, { kind: "accept" });
+    expect(assessRequested).toBeUndefined();
+  });
+});
+
+describe("formatActionMenu assess option", () => {
+  it("includes assess option", () => {
+    const state = createReviewState(makeProposals(5), 3);
+    const menu = formatActionMenu(state);
+    expect(menu).toContain("g=assess");
   });
 });

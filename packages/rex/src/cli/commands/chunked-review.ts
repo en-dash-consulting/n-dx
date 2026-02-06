@@ -37,6 +37,7 @@ export type ChunkAction =
   | { kind: "select"; indices: number[] }  // accept specific proposals by number
   | { kind: "break_down"; indices: number[] }  // break down specific proposals into finer granularity
   | { kind: "consolidate"; indices: number[] }  // consolidate specific proposals into coarser granularity
+  | { kind: "assess" }       // run LLM-powered granularity assessment
   | { kind: "unknown" };
 
 /**
@@ -142,6 +143,7 @@ export function formatActionMenu(state: ChunkReviewState): string {
   options.push("R=reject all");
   options.push("b#=break down");
   options.push("c#=consolidate");
+  options.push("g=assess");
   options.push("d=done");
   options.push("#,#=select");
 
@@ -214,6 +216,9 @@ export function parseChunkInput(
   // Done
   if (["d", "done", "finish", "q", "quit"].includes(trimmed)) return { kind: "done" };
 
+  // Assess granularity
+  if (["g", "assess", "granularity"].includes(trimmed)) return { kind: "assess" };
+
   // Break down: "b1,3" or "break down 1,3" or "b 1 3"
   const breakMatch = raw.match(/^[bB](?:reak\s*down)?\s*(.+)$/i);
   if (breakMatch) {
@@ -275,7 +280,7 @@ export interface GranularityRequest {
 export function applyAction(
   state: ChunkReviewState,
   action: ChunkAction,
-): { state: ChunkReviewState; done: boolean; message?: string; granularityRequest?: GranularityRequest } {
+): { state: ChunkReviewState; done: boolean; message?: string; granularityRequest?: GranularityRequest; assessRequested?: boolean } {
   const total = state.proposals.length;
 
   switch (action.kind) {
@@ -415,11 +420,21 @@ export function applyAction(
       };
     }
 
+    case "assess": {
+      // Signal to the caller to run LLM-powered granularity assessment.
+      return {
+        state,
+        done: false,
+        message: "Assessing proposal granularity...",
+        assessRequested: true,
+      };
+    }
+
     case "unknown": {
       return {
         state,
         done: false,
-        message: "Unknown command. Use a/n/p/b#/c#/+/-/A/R/d or enter proposal numbers.",
+        message: "Unknown command. Use a/n/p/b#/c#/g/+/-/A/R/d or enter proposal numbers.",
       };
     }
   }
@@ -648,17 +663,38 @@ export type GranularityHandler = (
   direction: "break_down" | "consolidate",
 ) => Promise<Proposal[]>;
 
+/** Assessment of a single proposal's task granularity (re-exported for handler type). */
+export interface ProposalAssessment {
+  proposalIndex: number;
+  epicTitle: string;
+  recommendation: "break_down" | "consolidate" | "keep";
+  reasoning: string;
+  issues: string[];
+}
+
+/**
+ * Handler for LLM-powered granularity assessment.
+ * Receives all proposals and returns assessments for each.
+ */
+export type AssessmentHandler = (
+  proposals: Proposal[],
+) => Promise<{ assessments: ProposalAssessment[]; formatted: string }>;
+
 /**
  * Run the interactive chunked review loop.
  * Returns the proposals the user accepted (may be empty) and a batch record.
  *
  * When `onGranularityAdjust` is provided, the review loop supports `b#` (break down)
  * and `c#` (consolidate) commands that invoke the LLM to adjust proposal granularity.
+ *
+ * When `onAssess` is provided, the review loop supports `g` (assess) command
+ * that invokes the LLM to evaluate proposal granularity and display recommendations.
  */
 export async function runChunkedReview(
   proposals: Proposal[],
   chunkSize: number = DEFAULT_CHUNK_SIZE,
   onGranularityAdjust?: GranularityHandler,
+  onAssess?: AssessmentHandler,
 ): Promise<{ accepted: Proposal[]; remaining: Proposal[]; batchRecord: BatchAcceptanceRecord }> {
   // For single proposal or small batches, use simple y/n
   if (proposals.length <= 1) {
@@ -688,7 +724,7 @@ export async function runChunkedReview(
 
     const input = await promptLine(buildPrompt(state));
     const action = parseChunkInput(input, state);
-    const { state: newState, done, message, granularityRequest } = applyAction(state, action);
+    const { state: newState, done, message, granularityRequest, assessRequested } = applyAction(state, action);
 
     if (message) {
       info(message);
@@ -723,6 +759,21 @@ export async function runChunkedReview(
         } catch (err) {
           info(`Granularity adjustment failed: ${(err as Error).message}`);
           info("Original proposals unchanged.");
+        }
+      }
+    }
+
+    // Handle granularity assessment
+    if (assessRequested) {
+      if (!onAssess) {
+        info("Granularity assessment is not available in this context.");
+      } else {
+        try {
+          const { formatted } = await onAssess(state.proposals);
+          info("");
+          info(formatted);
+        } catch (err) {
+          info(`Granularity assessment failed: ${(err as Error).message}`);
         }
       }
     }
