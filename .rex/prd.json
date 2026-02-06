@@ -3039,7 +3039,9 @@
       "title": "PRD Management Enhancement",
       "status": "in_progress",
       "level": "epic",
+      "tags": [],
       "source": "llm",
+      "startedAt": "2026-02-06T17:33:11.608Z",
       "children": [
         {
           "id": "5ea113f8-18e8-44b4-afd8-b0c381520a36",
@@ -3337,9 +3339,7 @@
             }
           ]
         }
-      ],
-      "tags": [],
-      "startedAt": "2026-02-06T17:33:11.608Z"
+      ]
     },
     {
       "id": "d47b4acc-646f-4ef8-8d43-7387fc0bb5ed",
@@ -4546,6 +4546,206 @@
               "source": "smart-add",
               "startedAt": "2026-02-06T05:45:02.646Z",
               "completedAt": "2026-02-06T05:52:08.738Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e8da8d04-1016-42ae-96f4-5d94e2eb0391",
+      "title": "Report Generation and Export",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "7474c596-ce78-4e71-9628-c2d004a8c5c1",
+          "title": "PDF Export Functionality",
+          "status": "pending",
+          "level": "feature",
+          "description": "Generate comprehensive PDF reports from sourcevision analysis data for sharing and documentation purposes",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c8d334c5-f072-4260-8cad-1ce6f02b27a2",
+              "title": "Implement PDF report generation for sourcevision health metrics",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a PDF export feature that compiles sourcevision analysis results into a formatted health report including file inventory, zone architecture, component catalog, and import graph insights",
+              "acceptanceCriteria": [
+                "Generates PDF with sourcevision health overview and key metrics",
+                "Includes zone architecture visualization in PDF format",
+                "Contains component catalog summary with usage statistics",
+                "Shows import graph health indicators and dependency insights",
+                "PDF is properly formatted with sections, headers, and readable layout"
+              ],
+              "priority": "critical",
+              "tags": [
+                "sourcevision",
+                "export",
+                "reporting"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9aaf4ed7-577f-45ee-a812-05f46ef3f8c8",
+              "title": "Add PDF export command to sourcevision CLI",
+              "status": "pending",
+              "level": "task",
+              "description": "Expose the PDF generation functionality through a new sourcevision command that allows users to export analysis results",
+              "acceptanceCriteria": [
+                "Adds 'sourcevision export-pdf' command to CLI",
+                "Supports output file path specification",
+                "Validates that sourcevision analysis has been run before export",
+                "Provides clear error messages for missing analysis data",
+                "Integrates with existing sourcevision CLI help system"
+              ],
+              "priority": "medium",
+              "tags": [
+                "sourcevision",
+                "cli",
+                "export"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "f8fc3374-4926-43e7-be20-fb01dc821af9",
+      "title": "API Key Authentication Support",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "66f9d899-eb90-448d-860f-02ba401b4de1",
+          "title": "Direct Claude API Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Allow rex, hench, and sourcevision to authenticate with Claude API using API keys instead of requiring Claude Code CLI",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "f0d8a0de-4f9b-4d01-b83f-31178cc8384f",
+              "title": "Add API key configuration options to unified config",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend the unified configuration system to support Claude API key settings with proper validation and secure storage",
+              "acceptanceCriteria": [
+                "API key can be set via ndx config command",
+                "API key is stored securely with appropriate file permissions",
+                "Configuration includes API endpoint and model selection options",
+                "Validates API key format and accessibility"
+              ],
+              "priority": "high",
+              "tags": [
+                "config",
+                "security"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-06T21:32:53.050Z",
+              "completedAt": "2026-02-06T21:43:57.539Z"
+            },
+            {
+              "id": "789effcc-9c2f-4910-87fb-8d3a4389b1e4",
+              "title": "Implement API client abstraction layer",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a shared API client that can switch between Claude Code CLI and direct API calls based on configuration",
+              "acceptanceCriteria": [
+                "Single interface supports both CLI and API authentication methods",
+                "Graceful fallback when CLI is not available",
+                "Consistent error handling across authentication methods",
+                "Maintains feature parity between CLI and API modes"
+              ],
+              "priority": "high",
+              "tags": [
+                "architecture",
+                "api"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-06T21:44:23.736Z",
+              "completedAt": "2026-02-06T21:56:23.875Z"
+            },
+            {
+              "id": "2b0d10dc-a639-4183-9a2f-8e4b244309af",
+              "title": "Update rex package to support API key authentication",
+              "status": "pending",
+              "level": "task",
+              "description": "Modify rex analyze and other LLM-dependent commands to use the API client abstraction for Claude API calls",
+              "acceptanceCriteria": [
+                "Rex analyze works with direct API authentication",
+                "All LLM interactions respect API key configuration",
+                "Token tracking works correctly with API calls",
+                "Error messages clearly indicate authentication method being used"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "api"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "17ec3fca-6ae4-4534-ac22-b0e692f23c36",
+              "title": "Update hench package to support API key authentication",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify hench run command and agent loops to use direct API authentication when configured",
+              "acceptanceCriteria": [
+                "Hench runs execute successfully with API key authentication",
+                "Tool use loops work correctly with direct API calls",
+                "Run transcripts properly record API usage",
+                "Agent behavior is consistent between CLI and API modes"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "api"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-06T21:56:42.181Z",
+              "completedAt": "2026-02-06T22:04:26.497Z"
+            },
+            {
+              "id": "2baa9258-8099-4332-a064-e4fd30a5453b",
+              "title": "Update sourcevision package to support API key authentication",
+              "status": "pending",
+              "level": "task",
+              "description": "Modify sourcevision analyze and LLM-dependent features to use direct API authentication",
+              "acceptanceCriteria": [
+                "Sourcevision analyze generates context with API authentication",
+                "Zone detection and component analysis work with API calls",
+                "Token usage is properly tracked for API requests",
+                "Analysis quality remains consistent across authentication methods"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "api"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "b6515a61-9f9c-4cd5-8bd0-4c433d01e405",
+              "title": "Add authentication method detection and validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement logic to automatically detect available authentication methods and validate configuration",
+              "acceptanceCriteria": [
+                "Automatically detects if Claude Code CLI is available",
+                "Falls back to API key if CLI is not found",
+                "Validates API key accessibility before attempting requests",
+                "Provides clear error messages for authentication failures"
+              ],
+              "priority": "medium",
+              "tags": [
+                "validation",
+                "ux"
+              ],
+              "source": "smart-add"
             }
           ]
         }
