@@ -1,6 +1,5 @@
 import { join, resolve } from "node:path";
 import { access, writeFile, readFile, unlink } from "node:fs/promises";
-import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
@@ -71,16 +70,6 @@ function formatProposals(proposals: Proposal[]): string {
     }
   }
   return lines.join("\n");
-}
-
-function promptUser(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim().toLowerCase());
-    });
-  });
 }
 
 async function savePending(dir: string, proposals: Proposal[]): Promise<void> {
@@ -397,12 +386,20 @@ export async function cmdAnalyze(
     // Non-interactive: accept immediately
     await acceptProposals(dir, proposals);
   } else if (process.stdin.isTTY) {
-    // Interactive: prompt the user
-    const answer = await promptUser("Accept these proposals into the PRD? (y/n) ");
-    if (answer === "y" || answer === "yes") {
-      await acceptProposals(dir, proposals);
-    } else {
-      info("Proposals saved. Run `rex analyze --accept` to accept later.");
+    // Interactive: chunked review for multiple proposals, simple y/n for single
+    const { runChunkedReview } = await import("./chunked-review.js");
+    const { accepted, remaining } = await runChunkedReview(proposals);
+
+    if (accepted.length > 0) {
+      await acceptProposals(dir, accepted);
+    }
+
+    // Cache remaining proposals for later acceptance
+    if (remaining.length > 0) {
+      await savePending(dir, remaining);
+      info(
+        `${remaining.length} proposal(s) saved. Run \`rex analyze --accept\` to accept later.`,
+      );
     }
   } else {
     // Non-interactive without --accept: just show
