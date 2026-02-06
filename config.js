@@ -462,13 +462,17 @@ Examples:
   // Load project-level .n-dx.json overrides
   const projectConfig = await loadProjectConfig(dir);
 
-  // Load all available configs and merge with project overrides
+  // Load all available configs; keep raw copies for set operations.
+  // Merged configs (with project overrides) are used for display and get;
+  // raw configs are used for set so project overrides don't leak into package files.
   const configs = {};
+  const rawConfigs = {};
   for (const [pkg, meta] of Object.entries(PACKAGES)) {
     const configPath = join(dir, meta.dir, meta.file);
     if (await fileExists(configPath)) {
       try {
         const pkgConfig = await loadJSON(configPath);
+        rawConfigs[pkg] = pkgConfig;
         // Merge project config overrides (project takes precedence)
         configs[pkg] = projectConfig[pkg]
           ? deepMerge(pkgConfig, projectConfig[pkg])
@@ -636,11 +640,12 @@ Examples:
       process.exit(1);
     }
 
-    setByPath(configs[pkg], settingPath, coerced);
+    // Write to raw (un-merged) config so project overrides don't leak
+    setByPath(rawConfigs[pkg], settingPath, coerced);
 
     const meta = PACKAGES[pkg];
     const configPath = join(dir, meta.dir, meta.file);
-    await saveJSON(configPath, configs[pkg]);
+    await saveJSON(configPath, rawConfigs[pkg]);
 
     console.log(`${keyArg} = ${formatValue(coerced)}`);
     return;

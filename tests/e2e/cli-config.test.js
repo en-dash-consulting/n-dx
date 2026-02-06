@@ -497,6 +497,9 @@ describe("n-dx config", () => {
         await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
       );
       expect(henchConfig.maxTurns).toBe(75);
+
+      // Project overrides must NOT leak into package config
+      expect(henchConfig.model).toBe("sonnet");
     });
 
     it("array override replaces entire array", async () => {

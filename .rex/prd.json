@@ -1427,7 +1427,7 @@
         {
           "id": "749a57e8-c3c2-4a85-9603-298f69766902",
           "title": "Configuration Management",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Robust configuration loading, validation, and project-level overrides",
           "source": "llm",
@@ -1484,7 +1484,7 @@
             {
               "id": "c70b3fac-76ff-4563-9b99-0a35dfad37f3",
               "title": "Implement project-level configuration",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support .n-dx.json project-level config files that merge with and override package configs",
               "acceptanceCriteria": [
@@ -1499,7 +1499,9 @@
                 "project-config",
                 "merge"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T15:11:41.839Z",
+              "completedAt": "2026-02-06T15:17:39.580Z"
             },
             {
               "id": "e7e40a00-1ddd-4588-92d8-43805607f123",
@@ -1528,7 +1530,9 @@
               "startedAt": "2026-02-06T15:01:50.498Z",
               "completedAt": "2026-02-06T15:05:57.827Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-06T15:17:39.610Z",
+          "completedAt": "2026-02-06T15:17:39.610Z"
         },
         {
           "id": "09535ec7-03d8-458c-89c6-2af2eebe1689",
@@ -1537,6 +1541,8 @@
           "level": "feature",
           "description": "Consistent JSON output formats across commands",
           "source": "llm",
+          "startedAt": "2026-02-06T15:11:17.381Z",
+          "completedAt": "2026-02-06T15:11:17.381Z",
           "children": [
             {
               "id": "3371ae43-1936-4085-a1a0-0a42fee0d3c5",
@@ -1562,9 +1568,7 @@
               "startedAt": "2026-02-06T15:06:13.593Z",
               "completedAt": "2026-02-06T15:11:17.353Z"
             }
-          ],
-          "startedAt": "2026-02-06T15:11:17.381Z",
-          "completedAt": "2026-02-06T15:11:17.381Z"
+          ]
         },
         {
           "id": "5ff5ea73-7e97-456b-9d8a-32748edc9803",
