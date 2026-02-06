@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, access } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  RexConfigSchema,
+  PRDDocumentSchema,
+} from "../../src/schema/validate.js";
+import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -54,6 +59,61 @@ describe("rex init", () => {
     expect(typeof config.project).toBe("string");
   });
 
+  it("creates config.json that passes schema validation", async () => {
+    run(["init", tmpDir]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+    const result = RexConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(`Schema validation failed: ${result.error.message}`);
+    }
+  });
+
+  it("creates config.json matching DEFAULT_CONFIG", async () => {
+    run(["init", tmpDir]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+    const defaults = DEFAULT_CONFIG(basename(tmpDir));
+
+    expect(config).toEqual(defaults);
+  });
+
+  it("creates config.json with correct schema version", async () => {
+    run(["init", tmpDir]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+
+    expect(config.schema).toBe(SCHEMA_VERSION);
+  });
+
+  it("uses --project flag for project name", async () => {
+    run(["init", tmpDir, "--project=my-custom-project"]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+
+    expect(config.project).toBe("my-custom-project");
+
+    const doc = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+    expect(doc.title).toBe("my-custom-project");
+  });
+
+  it("defaults project name to directory basename", async () => {
+    run(["init", tmpDir]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+
+    expect(config.project).toBe(basename(tmpDir));
+  });
+
   it("creates valid prd.json", async () => {
     run(["init", tmpDir]);
     const doc = JSON.parse(
@@ -61,6 +121,49 @@ describe("rex init", () => {
     );
     expect(doc.schema).toBe("rex/v1");
     expect(doc.items).toEqual([]);
+  });
+
+  it("creates prd.json that passes schema validation", async () => {
+    run(["init", tmpDir]);
+    const doc = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+    const result = PRDDocumentSchema.safeParse(doc);
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(`Schema validation failed: ${result.error.message}`);
+    }
+  });
+
+  it("creates prd.json with correct schema version", async () => {
+    run(["init", tmpDir]);
+    const doc = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+
+    expect(doc.schema).toBe(SCHEMA_VERSION);
+  });
+
+  it("creates prd.json with title matching project name", async () => {
+    run(["init", tmpDir]);
+    const config = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+    );
+    const doc = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+
+    expect(doc.title).toBe(config.project);
+  });
+
+  it("creates empty execution-log.jsonl", async () => {
+    run(["init", tmpDir]);
+    const log = await readFile(
+      join(tmpDir, ".rex", "execution-log.jsonl"),
+      "utf-8",
+    );
+    expect(log).toBe("");
   });
 
   it("creates workflow.md with content", async () => {
@@ -82,5 +185,29 @@ describe("rex init", () => {
       await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
     );
     expect(doc.schema).toBe("rex/v1");
+  });
+
+  it("preserves valid files on re-run", async () => {
+    run(["init", tmpDir]);
+
+    const rexDir = join(tmpDir, ".rex");
+    const configRaw1 = await readFile(join(rexDir, "config.json"), "utf-8");
+    const prdRaw1 = await readFile(join(rexDir, "prd.json"), "utf-8");
+
+    run(["init", tmpDir]);
+
+    const configRaw2 = await readFile(join(rexDir, "config.json"), "utf-8");
+    const prdRaw2 = await readFile(join(rexDir, "prd.json"), "utf-8");
+
+    // Files unchanged
+    expect(configRaw2).toBe(configRaw1);
+    expect(prdRaw2).toBe(prdRaw1);
+
+    // Both still pass schema validation
+    const configResult = RexConfigSchema.safeParse(JSON.parse(configRaw2));
+    expect(configResult.success).toBe(true);
+
+    const docResult = PRDDocumentSchema.safeParse(JSON.parse(prdRaw2));
+    expect(docResult.success).toBe(true);
   });
 });
