@@ -5,14 +5,14 @@
     {
       "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
       "title": "Natural language PRD authoring",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "source": "llm",
       "children": [
         {
           "id": "5b558cbb-b329-45e8-af46-b102eada7929",
           "title": "Smart add functionality",
-          "status": "completed",
+          "status": "pending",
           "level": "feature",
           "description": "Allow natural language input that gets structured by LLM into proper PRD hierarchy",
           "source": "llm",
@@ -3588,72 +3588,45 @@
             },
             {
               "id": "ccafa952-4145-4bdc-9731-0ebff91290d1",
-              "title": "Improve tree statistics computation",
+              "title": "Improve tree operations and statistics",
               "status": "pending",
               "level": "task",
-              "description": "Enhance computeStats and getParentChain functions",
+              "description": "Harden tree traversal, search, manipulation (insert/update/remove), and statistics computation for correctness and performance",
               "acceptanceCriteria": [
-                "Progress statistics are accurate",
+                "Progress statistics are accurate (counts all statuses, nested items)",
                 "Parent chains are correctly computed",
-                "Performance is optimized for large trees"
+                "Performance is optimized for large trees",
+                "Tree structure remains consistent after insert/update/remove operations",
+                "ID collection is complete and accurate",
+                "Insertion respects hierarchy rules and creates children array if needed",
+                "Traversal visits all items depth-first with correct parent chains",
+                "findItem, updateInTree, and removeFromTree work for root and nested items"
               ],
               "priority": "medium",
               "tags": [
-                "data",
+                "tree-ops",
+                "data-structure",
                 "performance"
               ],
               "source": "llm"
             },
             {
-              "id": "a7249c9f-155e-48a9-97a8-c491c1d5403f",
-              "title": "Add robust tree manipulation",
-              "status": "pending",
-              "level": "task",
-              "description": "Test and improve insertChild and collectAllIds functions",
-              "acceptanceCriteria": [
-                "Tree structure remains consistent after operations",
-                "ID collection is complete and accurate",
-                "Insertion respects hierarchy rules"
-              ],
-              "priority": "medium",
-              "tags": [
-                "data-structure",
-                "validation"
-              ],
-              "source": "llm"
-            },
-            {
               "id": "18d30912-8cf0-4e84-9dae-3f5e18403b64",
-              "title": "Add keyword extraction for matching",
+              "title": "Improve next-task selection",
               "status": "pending",
               "level": "task",
-              "description": "Implement extractKeywords and scoreMatch functions",
+              "description": "Enhance task selection with keyword extraction for matching and priority-based sorting",
               "acceptanceCriteria": [
                 "Keywords are extracted from criteria and test names",
-                "Matching scores are accurate and useful",
-                "False positives are minimized"
+                "Matching scores are accurate and useful with minimal false positives",
+                "Tasks are sorted by priority (critical first)"
               ],
               "priority": "medium",
               "tags": [
                 "nlp",
-                "matching"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "72a0b52f-4413-4ec8-9fed-ad8af1f47bfb",
-              "title": "Implement priority-based task sorting",
-              "status": "pending",
-              "level": "task",
-              "description": "Sort tasks by priority with critical tasks first",
-              "acceptanceCriteria": [
-                "prioritizes by priority (critical first)"
-              ],
-              "priority": "medium",
-              "tags": [
+                "matching",
                 "sorting",
-                "priority",
-                "task-management"
+                "priority"
               ],
               "source": "llm"
             },
@@ -3676,62 +3649,6 @@
                 "matching"
               ],
               "source": "llm"
-            },
-            {
-              "id": "b73833de-c1c7-4487-a0d0-0fe618912bfc",
-              "title": "Enhance tree traversal",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve tree walking with proper parent chain tracking",
-              "acceptanceCriteria": [
-                "visits all items depth-first",
-                "provides correct parent chains"
-              ],
-              "priority": "medium",
-              "tags": [
-                "walkTree"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "2b0424a1-bda2-45aa-8ab7-3351da5faf18",
-              "title": "Improve tree search and manipulation",
-              "status": "pending",
-              "level": "task",
-              "description": "Enhance tree search and item manipulation operations",
-              "acceptanceCriteria": [
-                "finds root item",
-                "adds child to existing parent",
-                "creates children array if needed",
-                "updates item fields",
-                "removes root item"
-              ],
-              "priority": "medium",
-              "tags": [
-                "findItem",
-                "insertChild",
-                "updateInTree",
-                "removeFromTree"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "02d1ee55-b210-41df-94b3-39a09f6e0586",
-              "title": "Enhance tree statistics",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve tree statistics computation and ID collection",
-              "acceptanceCriteria": [
-                "counts all statuses",
-                "counts nested items",
-                "collects all ids from tree"
-              ],
-              "priority": "low",
-              "tags": [
-                "computeStats",
-                "collectAllIds"
-              ],
-              "source": "llm"
             }
           ]
         },
@@ -3745,101 +3662,21 @@
           "children": [
             {
               "id": "1cc66bdf-4559-406e-9f7a-2bb1ecb5f43a",
-              "title": "Implement comprehensive schema validation",
+              "title": "Implement schema validation with migration support",
               "status": "pending",
               "level": "task",
-              "description": "Validate all data structures with proper error messages",
+              "description": "Comprehensive schema validation for all data structures with backwards compatibility for legacy formats and clear error messages",
               "acceptanceCriteria": [
-                "Accepts valid default config",
-                "Accepts a valid config",
-                "Rejects config with missing fields",
-                "Rejects run with missing required fields",
-                "Rejects config missing project",
-                "Rejects manifest missing required fields",
-                "Rejects missing summary fields",
-                "Rejects missing required zone fields",
-                "Rejects config with invalid maxTurns",
-                "Rejects config with invalid retry values"
+                "Validates configs, run records, manifests, documents, inventory, imports, and zones",
+                "Rejects invalid values (bad status, priority, level, format, role, import type, finding type, number values)",
+                "Accepts legacy data formats with appropriate defaults (optional fields, missing retry section, backward-compat run fields)",
+                "Provides clear, actionable error messages for each validation failure"
               ],
               "priority": "high",
               "tags": [
-                "validateConfig",
-                "validateRunRecord",
-                "validateManifest",
-                "validateImports",
-                "validateZones"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "6cada7aa-d36d-4ef6-b9aa-8c5b427ea36c",
-              "title": "Add backwards compatibility support",
-              "status": "pending",
-              "level": "task",
-              "description": "Support legacy data formats while validating new features",
-              "acceptanceCriteria": [
-                "Accepts config with all fields",
-                "Accepts run with optional fields",
-                "Accepts items with all optional fields",
-                "Accepts config with optional fields",
-                "Accepts manifest with optional git fields",
-                "Accepts zones with optional fields",
-                "Accepts config with retry section",
-                "Provides retry defaults when retry section is missing",
-                "Accepts valid run record",
-                "Accepts run without retryAttempts (backward compat)",
-                "Accepts run with structuredSummary",
-                "Accepts run without structuredSummary (backward compat)",
-                "Accepts run with turnTokenUsage",
-                "Accepts run without turnTokenUsage (backward compat)",
-                "Accepts tokenUsage with cache fields",
-                "Accepts tokenUsage without cache fields (backward compat)",
-                "Accepts retryAttempts field"
-              ],
-              "priority": "medium",
-              "tags": [
-                "validateConfig",
-                "validateRunRecord",
-                "validateDocument",
-                "validateManifest",
-                "validateZones"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "aff507b3-4e26-4db1-8961-af17c11f93ce",
-              "title": "Implement validation error handling",
-              "status": "pending",
-              "level": "task",
-              "description": "Provide clear error messages for invalid data",
-              "acceptanceCriteria": [
-                "Rejects run with invalid status",
-                "Rejects run with invalid structuredSummary",
-                "Rejects run with invalid turnTokenUsage entries",
-                "Rejects invalid status",
-                "Rejects invalid priority",
-                "Rejects invalid priority values",
-                "Rejects invalid format",
-                "Rejects invalid group period",
-                "Rejects document with invalid item status",
-                "Rejects document with invalid item level",
-                "Rejects invalid role",
-                "Rejects invalid import type",
-                "Rejects invalid finding type",
-                "Rejects invalid number values"
-              ],
-              "priority": "medium",
-              "tags": [
-                "validateRunRecord",
-                "toolRexUpdateStatus",
-                "toolRexAddSubtask",
-                "parseProposalResponse",
-                "cmdUsage",
-                "validateDocument",
-                "validateInventory",
-                "validateImports",
-                "validateZones",
-                "n-dx config"
+                "validation",
+                "schema",
+                "backwards-compat"
               ],
               "source": "llm"
             },
@@ -3848,53 +3685,22 @@
               "title": "Implement completion validation workflow",
               "status": "pending",
               "level": "task",
-              "description": "Validate task completion through automated tests and validation",
+              "description": "Validate task completion through automated tests and handle guided flow activation in TTY/non-TTY environments",
               "acceptanceCriteria": [
-                "Rejects completion when validation fails",
-                "Rejects completion when tests fail",
+                "Rejects completion when validation or tests fail",
                 "Allows completion when validation passes",
                 "Passes testCommand to validation",
-                "Skips validation when no projectDir provided",
-                "Skips validation for non-completed statuses"
+                "Skips validation when no projectDir provided or for non-completed statuses",
+                "Invokes guided flow when empty PRD + no scan results + isTTY, or when --guided flag is set",
+                "Does NOT invoke guided flow when --no-llm is set",
+                "Prints hint when non-TTY without --guided flag; throws CLIError when --guided in non-TTY"
               ],
               "priority": "high",
               "tags": [
-                "toolRexUpdateStatus with completion validation"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "61cc554d-795f-4b4e-9425-86c9e1214c48",
-              "title": "Implement guided flow activation",
-              "status": "pending",
-              "level": "task",
-              "description": "Automatically trigger guided flow for empty PRDs with scan results in TTY environment",
-              "acceptanceCriteria": [
-                "invokes guided flow when empty PRD + no scan results + isTTY",
-                "invokes guided flow when --guided flag is set"
-              ],
-              "priority": "medium",
-              "tags": [
-                "analyze",
-                "guided integration"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "d128d932-58e2-4afd-903d-700f96d7d453",
-              "title": "Handle non-TTY environments gracefully",
-              "status": "pending",
-              "level": "task",
-              "description": "Provide appropriate feedback and prevent guided flow in non-interactive environments",
-              "acceptanceCriteria": [
-                "does NOT invoke guided flow when --no-llm is set",
-                "prints hint when non-TTY without --guided flag",
-                "throws CLIError when --guided in non-TTY"
-              ],
-              "priority": "medium",
-              "tags": [
-                "analyze",
-                "guided integration"
+                "validation",
+                "completion",
+                "guided-flow",
+                "tty"
               ],
               "source": "llm"
             }
@@ -3963,70 +3769,22 @@
           "children": [
             {
               "id": "e4cda52c-2124-4ce4-8a18-4210af010937",
-              "title": "Accept single blockedBy ID in add command",
+              "title": "Implement blockedBy dependency management",
               "status": "pending",
               "level": "task",
-              "description": "Allow specifying a single task dependency when adding new items",
+              "description": "Full blockedBy support in add and update commands: single ID, comma-separated multiple IDs, clearing, and validation",
               "acceptanceCriteria": [
-                "accepts single blockedBy ID"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdAdd",
-                "blockedBy support"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "c4596283-4184-488e-b6d2-3defc09124a8",
-              "title": "Validate blockedBy references",
-              "status": "pending",
-              "level": "task",
-              "description": "Ensure all blockedBy IDs reference existing tasks and prevent invalid configurations",
-              "acceptanceCriteria": [
-                "rejects blockedBy with nonexistent IDs",
-                "rejects blockedBy that creates a self-reference",
-                "rejects blockedBy that creates a cycle"
+                "Accepts single blockedBy ID in add command",
+                "Supports comma-separated blockedBy values in update command",
+                "Clears blockedBy with empty string",
+                "Rejects nonexistent IDs, self-references, and cycles"
               ],
               "priority": "high",
               "tags": [
                 "cmdAdd",
                 "cmdUpdate",
-                "blockedBy support",
+                "blockedBy",
                 "validation"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "b99bf85d-ddd0-4e0f-9bd7-2fee6bb43806",
-              "title": "Support comma-separated blockedBy values",
-              "status": "pending",
-              "level": "task",
-              "description": "Allow setting multiple dependencies using comma-separated string format",
-              "acceptanceCriteria": [
-                "sets blockedBy from comma-separated string",
-                "sets an array value from comma-separated string"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdUpdate",
-                "blockedBy support"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "55045b40-c794-430e-862c-b8f5c8b3182f",
-              "title": "Clear blockedBy dependencies",
-              "status": "pending",
-              "level": "task",
-              "description": "Allow removing all dependencies by setting empty string",
-              "acceptanceCriteria": [
-                "clears blockedBy with empty string"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdUpdate",
-                "blockedBy support"
               ],
               "source": "llm"
             }
@@ -4042,59 +3800,22 @@
           "children": [
             {
               "id": "a7b6aee4-621d-453e-94fd-6938d95ee0f4",
-              "title": "Validate move operations",
+              "title": "Implement item move command",
               "status": "pending",
               "level": "task",
-              "description": "Ensure moves maintain valid hierarchy and prevent circular references",
+              "description": "Move items between hierarchy locations with validation, execution, and error handling",
               "acceptanceCriteria": [
-                "accepts valid move (feature to different epic)",
-                "accepts valid move (task to different feature)",
-                "accepts valid move (subtask to different task)",
-                "rejects moving item under its own descendant",
-                "rejects no-op move (already under same parent)",
-                "rejects moving a non-root level to root"
+                "Accepts valid moves (feature→epic, task→feature, subtask→task)",
+                "Rejects moving item under its own descendant, no-op moves, and non-root to root",
+                "Preserves children and item properties after move",
+                "Logs the move event",
+                "Throws CLIError with clear message on validation failure"
               ],
               "priority": "high",
               "tags": [
                 "cmdMove",
-                "validateMove"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "8a5fa2f4-5dca-4819-9869-f262a96e3ac2",
-              "title": "Execute validated moves",
-              "status": "pending",
-              "level": "task",
-              "description": "Perform item moves while preserving all properties and children",
-              "acceptanceCriteria": [
-                "moves feature to different epic",
-                "moves task to different feature",
-                "moves subtask to different task",
-                "preserves children when moving",
-                "preserves item properties after move",
-                "logs the move event"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdMove",
+                "validateMove",
                 "moveItem"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "12c9049c-5f86-48b3-9ff7-9c341634d930",
-              "title": "Handle move errors appropriately",
-              "status": "pending",
-              "level": "task",
-              "description": "Provide clear error messages for invalid move operations",
-              "acceptanceCriteria": [
-                "throws CLIError when feature moved to root",
-                "throws on validation failure"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdMove"
               ],
               "source": "llm"
             }
@@ -4108,72 +3829,6 @@
           "description": "Proper handling of task status transitions with validation",
           "source": "llm",
           "children": [
-            {
-              "id": "1faf07df-6109-4f56-b963-e9a89f5c4a60",
-              "title": "Improve status transition error messages",
-              "status": "pending",
-              "level": "task",
-              "description": "Provide helpful error messages with force override hints",
-              "acceptanceCriteria": [
-                "includes --force hint in transition error",
-                "allows same-status no-op without error"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdUpdate",
-                "status transition validation"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "b7182837-cf91-4191-8580-6fbd36276209",
-              "title": "Handle non-status updates on completed items",
-              "status": "pending",
-              "level": "task",
-              "description": "Allow property updates on completed items without force flag",
-              "acceptanceCriteria": [
-                "does not require --force for non-status updates on completed items",
-                "does not add timestamps for non-status updates"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdUpdate",
-                "automatic timestamps"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "fb0b277e-b7f4-4609-a118-c3b064e875b9",
-              "title": "Support blocked status in validation",
-              "status": "pending",
-              "level": "task",
-              "description": "Properly validate documents containing blocked status items",
-              "acceptanceCriteria": [
-                "accepts blocked as a valid status",
-                "accepts a document with blocked status"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cmdUpdate",
-                "validateDocument"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "cf89a47f-8102-4453-829a-ebbf7155f5a4",
-              "title": "Enhance transition validation",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve status transition validation with better error messages",
-              "acceptanceCriteria": [
-                "includes allowed transitions in error message"
-              ],
-              "priority": "medium",
-              "tags": [
-                "validateTransition"
-              ],
-              "source": "llm"
-            },
             {
               "id": "73cbf527-e71e-497f-b37c-6d4878e19630",
               "title": "Add blocked status distinct from deferred",
@@ -4193,6 +3848,27 @@
               "source": "llm",
               "startedAt": "2026-02-05T01:54:16.173Z",
               "completedAt": "2026-02-05T02:03:55.707Z"
+            },
+            {
+              "id": "1faf07df-6109-4f56-b963-e9a89f5c4a60",
+              "title": "Harden status transition logic",
+              "status": "pending",
+              "level": "task",
+              "description": "Improve status transition validation, error messages, and edge case handling",
+              "acceptanceCriteria": [
+                "Includes --force hint and allowed transitions in transition error messages",
+                "Allows same-status no-op without error",
+                "Does not require --force for non-status updates on completed items",
+                "Does not add timestamps for non-status updates",
+                "Accepts blocked as a valid status in validation"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cmdUpdate",
+                "validateTransition",
+                "status"
+              ],
+              "source": "llm"
             },
             {
               "id": "68c010e6-6b62-4e56-87eb-cf4b8a25f841",
@@ -4224,195 +3900,64 @@
           "children": [
             {
               "id": "1ae1ab98-c9b0-47a6-ba63-dded0edb0d51",
-              "title": "Enhance token event extraction",
+              "title": "Implement token usage tracking and aggregation",
               "status": "pending",
               "level": "task",
-              "description": "Improve token usage event extraction with proper filtering and validation",
+              "description": "Extract, filter, aggregate, and group token usage across rex, hench, and sourcevision with time-based filtering and grouping",
               "acceptanceCriteria": [
-                "ignores non-token events",
-                "skips entries with malformed detail JSON",
-                "skips entries without detail field"
+                "Extracts token events from rex, hench, and sourcevision with proper filtering and error handling",
+                "Skips invalid/malformed entries and non-JSON files",
+                "Aggregates across multiple run files and all packages",
+                "Filters by --since and --until using appropriate timestamps",
+                "Maps event types to commands (e.g., smart_add_token_usage → smart-add)",
+                "Groups events by package:command sorted by total tokens descending",
+                "Groups events by time period (day/week/month) with correct boundary handling"
               ],
               "priority": "medium",
               "tags": [
-                "extractRexTokenUsage",
-                "extractRexTokenEvents"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "f3285c92-9f27-4bed-8612-9439fa1d9a41",
-              "title": "Implement time-based filtering",
-              "status": "pending",
-              "level": "task",
-              "description": "Add comprehensive time-based filtering for token usage analytics",
-              "acceptanceCriteria": [
-                "filters by --since",
-                "filters by --until",
-                "filters by both --since and --until",
-                "filters by --since using analyzedAt",
-                "filters by --until using analyzedAt"
-              ],
-              "priority": "medium",
-              "tags": [
-                "extractRexTokenUsage",
-                "extractHenchTokenUsage",
-                "extractSvTokenUsage"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "dbb1b243-8d86-4074-84b3-0850561cfa79",
-              "title": "Enhance Hench token usage extraction",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve Hench token usage extraction with error handling",
-              "acceptanceCriteria": [
-                "aggregates across multiple run files",
-                "skips invalid run files",
-                "skips non-json files"
-              ],
-              "priority": "medium",
-              "tags": [
-                "extractHenchTokenUsage"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "95f2f6e8-82e4-4c21-897e-b9a27f868a43",
-              "title": "Implement comprehensive token aggregation",
-              "status": "pending",
-              "level": "task",
-              "description": "Add comprehensive aggregation across all package token usage",
-              "acceptanceCriteria": [
-                "combines rex, hench, and sv token usage",
-                "passes filter to all extractors"
-              ],
-              "priority": "medium",
-              "tags": [
-                "aggregateTokenUsage"
+                "token-usage",
+                "aggregation",
+                "filtering",
+                "grouping"
               ],
               "source": "llm"
             },
             {
               "id": "c59a5f18-f1ae-4f10-b881-45c7abf10f69",
-              "title": "Enhance token usage formatting",
+              "title": "Implement token usage reporting and formatting",
               "status": "pending",
               "level": "task",
-              "description": "Improve formatting and display of token usage analytics",
+              "description": "Format and display token usage analytics and budget warnings",
               "acceptanceCriteria": [
-                "formats zero usage as ",
-                "omits packages with zero usage from breakdown"
+                "Formats zero usage appropriately",
+                "Omits packages with zero usage from breakdown",
+                "Formats warning and exceeded severity with appropriate headers"
               ],
               "priority": "low",
               "tags": [
-                "formatAggregateTokenUsage"
+                "token-usage",
+                "formatting",
+                "budget-warnings"
               ],
               "source": "llm"
             },
             {
               "id": "05285c37-123f-4ad2-977f-ea882e8ecc66",
-              "title": "Implement cost estimation",
+              "title": "Implement budget checking and cost estimation",
               "status": "pending",
               "level": "task",
-              "description": "Add cost estimation capabilities for token usage",
+              "description": "Cost estimation with custom pricing and budget checking for tokens and costs",
               "acceptanceCriteria": [
-                "accepts custom pricing",
-                "handles fractional token counts"
+                "Accepts custom pricing and handles fractional token counts",
+                "Checks both token and cost budgets simultaneously",
+                "Exceeded takes precedence over warning",
+                "Treats zero and negative budgets as unlimited"
               ],
               "priority": "medium",
               "tags": [
-                "estimateCost"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "c8dee14e-ae38-4abb-9276-cf7b1ba9a7de",
-              "title": "Enhance token event processing",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve token event processing and command mapping",
-              "acceptanceCriteria": [
-                "maps smart_add_token_usage events to smart-add command",
-                "collects events from all packages sorted by timestamp"
-              ],
-              "priority": "medium",
-              "tags": [
-                "extractRexTokenEvents",
-                "collectTokenEvents"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "cf20bb07-129d-497b-a5f0-aab7b6ccc8a8",
-              "title": "Implement command-based grouping",
-              "status": "pending",
-              "level": "task",
-              "description": "Add grouping and sorting capabilities for token usage by command",
-              "acceptanceCriteria": [
-                "groups events by package:command",
-                "sorts by total tokens descending"
-              ],
-              "priority": "medium",
-              "tags": [
-                "groupByCommand"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "a3aec1ec-53ab-4c91-8056-3a859f083f6d",
-              "title": "Enhance time period grouping",
-              "status": "pending",
-              "level": "task",
-              "description": "Add comprehensive time period grouping for token usage analytics",
-              "acceptanceCriteria": [
-                "handles year boundaries for week period",
-                "handles different months for day period",
-                "groups events by day",
-                "groups events by month",
-                "groups events by week",
-                "sorts buckets by period ascending"
-              ],
-              "priority": "medium",
-              "tags": [
-                "periodKey",
-                "groupByTimePeriod"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "ade792d2-ba2c-4639-83f6-71c10041d53f",
-              "title": "Implement budget checking",
-              "status": "pending",
-              "level": "task",
-              "description": "Add comprehensive budget checking for tokens and costs",
-              "acceptanceCriteria": [
-                "checks cost budget",
-                "checks both token and cost budgets simultaneously",
-                "exceeded takes precedence over warning",
-                "treats zero token budget as unlimited",
-                "treats zero cost budget as unlimited",
-                "treats negative budgets as unlimited"
-              ],
-              "priority": "medium",
-              "tags": [
-                "checkBudget"
-              ],
-              "source": "llm"
-            },
-            {
-              "id": "18ac7fe8-25bd-488f-bb14-0479ab33ec60",
-              "title": "Enhance budget warning formatting",
-              "status": "pending",
-              "level": "task",
-              "description": "Improve formatting and display of budget warnings",
-              "acceptanceCriteria": [
-                "formats warning severity with header",
-                "formats exceeded severity with header"
-              ],
-              "priority": "low",
-              "tags": [
-                "formatBudgetWarnings"
+                "token-usage",
+                "budget",
+                "cost-estimation"
               ],
               "source": "llm"
             }
@@ -5315,21 +4860,21 @@
     {
       "id": "c52ead17-736b-4488-a168-62778bc3d798",
       "title": "Interactive Proposal Management",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-02-06T04:00:51.672Z",
-      "completedAt": "2026-02-06T04:00:51.672Z",
+      "completedAt": "2026-02-06T04:43:01.194Z",
       "children": [
         {
           "id": "33907346-1639-4f74-9e6f-b3ba456cc911",
           "title": "Chunked proposal acceptance",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Allow users to accept proposals in smaller or larger batches instead of all-or-nothing",
           "source": "smart-add",
           "startedAt": "2026-02-06T04:00:51.629Z",
-          "completedAt": "2026-02-06T04:00:51.629Z",
+          "completedAt": "2026-02-06T04:43:01.162Z",
           "children": [
             {
               "id": "97487bb1-d42b-4296-b85a-223870f54268",
@@ -5459,7 +5004,7 @@
             {
               "id": "39263ff2-8324-43a7-a5ef-23cdaaedef0a",
               "title": "Add granularity controls to batch acceptance",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Integrate granularity adjustment options into the existing chunked proposal workflow so users can refine task sizing across proposal batches",
               "acceptanceCriteria": [
@@ -5473,7 +5018,9 @@
                 "batch",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-06T04:32:43.884Z",
+              "completedAt": "2026-02-06T04:43:01.129Z"
             }
           ]
         }
@@ -5548,6 +5095,179 @@
               "tags": [
                 "config",
                 "validation"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a162e544-564b-4174-a096-1e774c05f95e",
+      "title": "Web-based Dashboard",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "29a51b12-7b95-4b13-817b-18d1d7c27e31",
+          "title": "Unified web viewer architecture",
+          "status": "pending",
+          "level": "feature",
+          "description": "Create a consolidated web interface that integrates sourcevision's existing viewer capabilities with Rex PRD management functionality",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "7f9313f6-432a-4ed4-a67c-2605da0357ed",
+              "title": "Design unified web viewer architecture",
+              "status": "pending",
+              "level": "task",
+              "description": "Plan the integration of sourcevision's existing viewer with Rex UI components, determining shared components and navigation structure",
+              "acceptanceCriteria": [
+                "Architecture supports both sourcevision analysis views and Rex PRD management",
+                "Shared component library defined for consistent UI",
+                "Navigation structure allows seamless switching between analysis and PRD views"
+              ],
+              "priority": "high",
+              "tags": [
+                "architecture",
+                "frontend"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f8458852-4b09-43e3-93a2-45d0b4e49f28",
+              "title": "Migrate sourcevision viewer components",
+              "status": "pending",
+              "level": "task",
+              "description": "Extract and adapt existing sourcevision viewer components into the new unified web interface",
+              "acceptanceCriteria": [
+                "All sourcevision viewer functionality preserved",
+                "Components properly integrated into new architecture",
+                "Original sourcevision serve command still works or gracefully redirects"
+              ],
+              "priority": "high",
+              "tags": [
+                "migration",
+                "sourcevision",
+                "frontend"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "bb97c680-3f17-4afa-b291-fac6f9797db5",
+          "title": "Rex PRD management UI",
+          "status": "pending",
+          "level": "feature",
+          "description": "Build comprehensive web interface for viewing and managing Rex PRD hierarchy, tasks, and workflow",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "33c3b7ae-1072-4064-9ab7-37431ffeb554",
+              "title": "Implement PRD hierarchy visualization",
+              "status": "pending",
+              "level": "task",
+              "description": "Create interactive tree view for displaying epics, features, tasks, and subtasks with completion status and progress indicators",
+              "acceptanceCriteria": [
+                "Tree view shows full PRD hierarchy with proper nesting",
+                "Status indicators clearly show pending/in_progress/completed/blocked states",
+                "Progress bars display completion percentages at each level",
+                "Collapsible/expandable nodes for navigation"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "visualization",
+                "frontend"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "264f26ce-e433-4c4b-91c9-3981680ec771",
+              "title": "Add task management interface",
+              "status": "pending",
+              "level": "task",
+              "description": "Build UI for viewing task details, updating status, and managing task properties through web interface",
+              "acceptanceCriteria": [
+                "Task detail view shows description, acceptance criteria, and metadata",
+                "Status can be updated through dropdown or button interface",
+                "Priority and tags can be edited inline",
+                "Dependency relationships are clearly displayed"
+              ],
+              "priority": "high",
+              "tags": [
+                "task-management",
+                "frontend"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "6a1a02c8-18c9-4967-9182-26cc98cc1850",
+              "title": "Implement Rex command integration",
+              "status": "pending",
+              "level": "task",
+              "description": "Add web interface for executing Rex commands like add, update, and analyze through the browser",
+              "acceptanceCriteria": [
+                "Add new items form with type selection and parent constraint",
+                "Analyze command can be triggered with results displayed",
+                "Status updates can be applied to multiple items",
+                "Command execution provides real-time feedback"
+              ],
+              "priority": "medium",
+              "tags": [
+                "commands",
+                "integration",
+                "frontend"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "8a65d7cd-40ea-4f87-bf10-23396c378a35",
+          "title": "Web server and API integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement backend server to serve the web interface and provide API endpoints for Rex and sourcevision data",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "7bce80df-5df2-4dc9-88d3-947c72b4dbd0",
+              "title": "Create web server with API endpoints",
+              "status": "pending",
+              "level": "task",
+              "description": "Build Express/Fastify server that exposes Rex and sourcevision data through REST API and serves the web interface",
+              "acceptanceCriteria": [
+                "Server serves static web assets",
+                "API endpoints provide Rex PRD data",
+                "API endpoints provide sourcevision analysis data",
+                "WebSocket support for real-time updates"
+              ],
+              "priority": "high",
+              "tags": [
+                "backend",
+                "api"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "e68c5d72-833d-4766-908d-da8ab8517622",
+              "title": "Add web command to n-dx CLI",
+              "status": "pending",
+              "level": "task",
+              "description": "Extend n-dx orchestration with web server command that starts the unified viewer",
+              "acceptanceCriteria": [
+                "ndx web command starts server on configurable port",
+                "Command supports background/daemon mode",
+                "Proper shutdown handling and port management",
+                "Integration with existing n-dx config system"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "orchestration"
               ],
               "source": "smart-add"
             }
