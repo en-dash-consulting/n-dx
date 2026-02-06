@@ -4749,7 +4749,7 @@
             {
               "id": "7f9313f6-432a-4ed4-a67c-2605da0357ed",
               "title": "Design unified web viewer architecture",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Plan the integration of sourcevision's existing viewer with Rex UI components, determining shared components and navigation structure",
               "acceptanceCriteria": [
@@ -4762,7 +4762,9 @@
                 "architecture",
                 "frontend"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-06T05:27:48.480Z",
+              "completedAt": "2026-02-06T05:35:40.265Z"
             },
             {
               "id": "f8458852-4b09-43e3-93a2-45d0b4e49f28",
