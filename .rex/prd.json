@@ -1504,7 +1504,7 @@
             {
               "id": "e7e40a00-1ddd-4588-92d8-43805607f123",
               "title": "Implement config get/set with validation and docs",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Config display, get/set by dotted key, JSON output, validation rules, and help text for all config options",
               "acceptanceCriteria": [
@@ -1524,14 +1524,16 @@
                 "validation",
                 "help"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T15:01:50.498Z",
+              "completedAt": "2026-02-06T15:05:57.827Z"
             }
           ]
         },
         {
           "id": "09535ec7-03d8-458c-89c6-2af2eebe1689",
           "title": "JSON Output and Reporting",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Consistent JSON output formats across commands",
           "source": "llm",
@@ -1539,7 +1541,7 @@
             {
               "id": "3371ae43-1936-4085-a1a0-0a42fee0d3c5",
               "title": "Implement JSON report command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Structured JSON reports with health status, progress, level breakdown, and proper exit codes",
               "acceptanceCriteria": [
@@ -1556,9 +1558,13 @@
                 "health-status",
                 "exit-codes"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T15:06:13.593Z",
+              "completedAt": "2026-02-06T15:11:17.353Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-06T15:11:17.381Z",
+          "completedAt": "2026-02-06T15:11:17.381Z"
         },
         {
           "id": "5ff5ea73-7e97-456b-9d8a-32748edc9803",
@@ -1616,6 +1622,8 @@
           "level": "feature",
           "description": "Improve CI integration and reporting capabilities",
           "source": "llm",
+          "startedAt": "2026-02-06T14:57:18.614Z",
+          "completedAt": "2026-02-06T14:57:18.614Z",
           "children": [
             {
               "id": "4097dd91-741f-48ae-bfcd-28b781a036c9",
@@ -1656,9 +1664,7 @@
               "startedAt": "2026-02-06T14:48:55.961Z",
               "completedAt": "2026-02-06T14:57:18.586Z"
             }
-          ],
-          "startedAt": "2026-02-06T14:57:18.614Z",
-          "completedAt": "2026-02-06T14:57:18.614Z"
+          ]
         },
         {
           "id": "fdd4fece-07ba-47c9-9611-6603a8bed17f",
