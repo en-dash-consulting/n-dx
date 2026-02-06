@@ -7,6 +7,21 @@ const DEFAULT_CHUNK_SIZE = 5;
 // ─── Pure logic (no I/O, fully testable) ─────────────────────────────
 
 /**
+ * Record of a single granularity adjustment performed during a review session.
+ * Captures what was changed and how, providing an audit trail of adjustments.
+ */
+export interface GranularityAdjustmentRecord {
+  /** The direction of adjustment. */
+  direction: "break_down" | "consolidate";
+  /** Titles of the original proposals that were adjusted. */
+  originalTitles: string[];
+  /** Titles of the resulting proposals after adjustment. */
+  resultTitles: string[];
+  /** ISO 8601 timestamp of the adjustment. */
+  timestamp: string;
+}
+
+/**
  * State maintained across chunk navigation.
  * Tracks which proposals have been accepted, which rejected,
  * and the current page position.
@@ -22,6 +37,10 @@ export interface ChunkReviewState {
   accepted: Set<number>;
   /** Indices of explicitly rejected proposals. */
   rejected: Set<number>;
+  /** History of granularity adjustments made during this session. */
+  granularityHistory: GranularityAdjustmentRecord[];
+  /** Cached assessment from most recent `g` command, for use by `apply` action. */
+  lastAssessment?: import("./chunked-review.js").ProposalAssessment[];
 }
 
 /** User's choice from the chunk review menu. */
@@ -38,6 +57,9 @@ export type ChunkAction =
   | { kind: "break_down"; indices: number[] }  // break down specific proposals into finer granularity
   | { kind: "consolidate"; indices: number[] }  // consolidate specific proposals into coarser granularity
   | { kind: "assess" }       // run LLM-powered granularity assessment
+  | { kind: "apply" }        // apply cached assessment recommendations
+  | { kind: "break_down_chunk" }   // break down all proposals in current chunk
+  | { kind: "consolidate_chunk" }  // consolidate all proposals in current chunk
   | { kind: "unknown" };
 
 /**
@@ -53,6 +75,7 @@ export function createReviewState(
     chunkSize: Math.max(1, Math.min(chunkSize, proposals.length)),
     accepted: new Set(),
     rejected: new Set(),
+    granularityHistory: [],
   };
 }
 
@@ -143,7 +166,12 @@ export function formatActionMenu(state: ChunkReviewState): string {
   options.push("R=reject all");
   options.push("b#=break down");
   options.push("c#=consolidate");
+  options.push("ba=break chunk");
+  options.push("ca=consolidate chunk");
   options.push("g=assess");
+  if (state.lastAssessment && state.lastAssessment.length > 0) {
+    options.push("apply=apply assessment");
+  }
   options.push("d=done");
   options.push("#,#=select");
 
@@ -218,6 +246,15 @@ export function parseChunkInput(
 
   // Assess granularity
   if (["g", "assess", "granularity"].includes(trimmed)) return { kind: "assess" };
+
+  // Apply cached assessment recommendations
+  if (["apply", "apply assessment"].includes(trimmed)) return { kind: "apply" };
+
+  // Break down current chunk: "ba" or "break all"
+  if (["ba", "break all", "break chunk"].includes(trimmed)) return { kind: "break_down_chunk" };
+
+  // Consolidate current chunk: "ca" or "consolidate all"
+  if (["ca", "consolidate all", "consolidate chunk"].includes(trimmed)) return { kind: "consolidate_chunk" };
 
   // Break down: "b1,3" or "break down 1,3" or "b 1 3"
   const breakMatch = raw.match(/^[bB](?:reak\s*down)?\s*(.+)$/i);
@@ -430,11 +467,79 @@ export function applyAction(
       };
     }
 
+    case "apply": {
+      // Apply cached assessment recommendations. The caller handles the LLM calls.
+      if (!state.lastAssessment || state.lastAssessment.length === 0) {
+        return {
+          state,
+          done: false,
+          message: "No assessment available. Run 'g' first to assess granularity.",
+        };
+      }
+      // Build granularity requests from assessment recommendations.
+      // Process break_down and consolidate groups separately.
+      const breakDownIndices = state.lastAssessment
+        .filter((a) => a.recommendation === "break_down")
+        .map((a) => a.proposalIndex)
+        .filter((i) => i >= 0 && i < total);
+      const consolidateIndices = state.lastAssessment
+        .filter((a) => a.recommendation === "consolidate")
+        .map((a) => a.proposalIndex)
+        .filter((i) => i >= 0 && i < total);
+
+      if (breakDownIndices.length === 0 && consolidateIndices.length === 0) {
+        return {
+          state,
+          done: false,
+          message: "Assessment found no proposals needing adjustment. All are appropriately sized.",
+        };
+      }
+
+      // Prefer break_down first; if both exist, do break_down.
+      // The caller can re-run apply to process the remaining direction.
+      if (breakDownIndices.length > 0) {
+        return {
+          state,
+          done: false,
+          message: `Applying assessment: breaking down proposal(s) ${breakDownIndices.map((i) => i + 1).join(", ")}...`,
+          granularityRequest: { kind: "break_down", indices: breakDownIndices },
+        };
+      }
+      return {
+        state,
+        done: false,
+        message: `Applying assessment: consolidating proposal(s) ${consolidateIndices.map((i) => i + 1).join(", ")}...`,
+        granularityRequest: { kind: "consolidate", indices: consolidateIndices },
+      };
+    }
+
+    case "break_down_chunk": {
+      // Break down all proposals in the current chunk.
+      const { indices } = getCurrentChunk(state);
+      return {
+        state,
+        done: false,
+        message: `Breaking down all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        granularityRequest: { kind: "break_down", indices },
+      };
+    }
+
+    case "consolidate_chunk": {
+      // Consolidate all proposals in the current chunk.
+      const { indices } = getCurrentChunk(state);
+      return {
+        state,
+        done: false,
+        message: `Consolidating all proposals in current chunk (${indices.map((i) => i + 1).join(", ")})...`,
+        granularityRequest: { kind: "consolidate", indices },
+      };
+    }
+
     case "unknown": {
       return {
         state,
         done: false,
-        message: "Unknown command. Use a/n/p/b#/c#/g/+/-/A/R/d or enter proposal numbers.",
+        message: "Unknown command. Use a/n/p/b#/c#/ba/ca/g/apply/+/-/A/R/d or enter proposal numbers.",
       };
     }
   }
@@ -446,14 +551,17 @@ export function applyAction(
  *
  * - `indices`: 0-based indices of proposals to replace
  * - `replacements`: new proposals to insert at the positions of the originals
+ * - `direction`: the kind of adjustment (for history tracking)
  *
  * Accepted/rejected sets are updated: indices pointing to replaced proposals
  * are removed, and remaining indices are shifted to account for length changes.
+ * The adjustment is recorded in `granularityHistory`.
  */
 export function replaceProposals(
   state: ChunkReviewState,
   indices: number[],
   replacements: Proposal[],
+  direction?: "break_down" | "consolidate",
 ): ChunkReviewState {
   // Sort indices descending so removals don't shift earlier indices
   const sorted = [...indices].sort((a, b) => b - a);
@@ -489,12 +597,27 @@ export function replaceProposals(
   const maxOffset = Math.max(0, newProposals.length - state.chunkSize);
   const offset = Math.min(state.offset, maxOffset);
 
+  // Record the adjustment in history
+  const historyEntry: GranularityAdjustmentRecord | undefined = direction
+    ? {
+        direction,
+        originalTitles: indices.map((i) => state.proposals[i].epic.title),
+        resultTitles: replacements.map((p) => p.epic.title),
+        timestamp: new Date().toISOString(),
+      }
+    : undefined;
+
   return {
     proposals: newProposals,
     offset,
     chunkSize: Math.min(state.chunkSize, newProposals.length),
     accepted: newAccepted,
     rejected: newRejected,
+    granularityHistory: historyEntry
+      ? [...state.granularityHistory, historyEntry]
+      : state.granularityHistory,
+    // Clear cached assessment since proposal indices have changed
+    lastAssessment: undefined,
   };
 }
 
@@ -559,6 +682,8 @@ export interface BatchAcceptanceRecord {
   rejected: string[];
   /** How the decision was made. */
   mode: "interactive" | "auto" | "cached";
+  /** Granularity adjustments made during this batch review session. */
+  granularityAdjustments?: GranularityAdjustmentRecord[];
 }
 
 /**
@@ -587,7 +712,7 @@ export function buildBatchRecord(
   const accepted = getAcceptedProposals(state);
   const remaining = getRemainingProposals(state);
 
-  return {
+  const record: BatchAcceptanceRecord = {
     timestamp: new Date().toISOString(),
     totalProposals: state.proposals.length,
     acceptedCount: accepted.length,
@@ -597,6 +722,12 @@ export function buildBatchRecord(
     rejected: remaining.map((p) => p.epic.title),
     mode,
   };
+
+  if (state.granularityHistory.length > 0) {
+    record.granularityAdjustments = [...state.granularityHistory];
+  }
+
+  return record;
 }
 
 /**
@@ -635,6 +766,22 @@ export function formatBatchSummary(record: BatchAcceptanceRecord): string {
     lines.push("Skipped:");
     for (const title of record.rejected) {
       lines.push(`  ✗ ${title}`);
+    }
+  }
+
+  // Granularity adjustments
+  if (record.granularityAdjustments && record.granularityAdjustments.length > 0) {
+    lines.push("");
+    const adjustmentLabel = record.granularityAdjustments.length === 1
+      ? "1 granularity adjustment"
+      : `${record.granularityAdjustments.length} granularity adjustments`;
+    lines.push(`Granularity: ${adjustmentLabel} applied during review.`);
+    for (const adj of record.granularityAdjustments) {
+      const icon = adj.direction === "break_down" ? "⬇" : "⬆";
+      const label = adj.direction === "break_down" ? "broke down" : "consolidated";
+      lines.push(
+        `  ${icon} ${label} ${adj.originalTitles.join(", ")} → ${adj.resultTitles.join(", ")}`,
+      );
     }
   }
 
@@ -746,7 +893,7 @@ export async function runChunkedReview(
             granularityRequest.kind,
           );
           if (adjusted.length > 0) {
-            state = replaceProposals(state, granularityRequest.indices, adjusted);
+            state = replaceProposals(state, granularityRequest.indices, adjusted, granularityRequest.kind);
             const label = granularityRequest.kind === "break_down"
               ? "broken down"
               : "consolidated";
@@ -769,9 +916,15 @@ export async function runChunkedReview(
         info("Granularity assessment is not available in this context.");
       } else {
         try {
-          const { formatted } = await onAssess(state.proposals);
+          const { assessments, formatted } = await onAssess(state.proposals);
+          state = { ...state, lastAssessment: assessments };
           info("");
           info(formatted);
+          const actionable = assessments.filter((a) => a.recommendation !== "keep");
+          if (actionable.length > 0) {
+            info("");
+            info("Use 'apply' to apply these recommendations automatically.");
+          }
         } catch (err) {
           info(`Granularity assessment failed: ${(err as Error).message}`);
         }

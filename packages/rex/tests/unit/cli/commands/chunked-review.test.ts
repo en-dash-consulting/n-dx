@@ -19,6 +19,8 @@ import type {
   ChunkAction,
   BatchAcceptanceRecord,
   GranularityRequest,
+  GranularityAdjustmentRecord,
+  ProposalAssessment,
 } from "../../../../src/cli/commands/chunked-review.js";
 import type { Proposal } from "../../../../src/analyze/index.js";
 
@@ -1499,5 +1501,554 @@ describe("formatActionMenu assess option", () => {
     const state = createReviewState(makeProposals(5), 3);
     const menu = formatActionMenu(state);
     expect(menu).toContain("g=assess");
+  });
+});
+
+// ─── Batch granularity commands: parseChunkInput ─────────────────────
+
+describe("parseChunkInput batch granularity commands", () => {
+  const state = createReviewState(makeProposals(10), 5);
+
+  it("parses 'ba' as break_down_chunk", () => {
+    expect(parseChunkInput("ba", state).kind).toBe("break_down_chunk");
+  });
+
+  it("parses 'break all' as break_down_chunk", () => {
+    expect(parseChunkInput("break all", state).kind).toBe("break_down_chunk");
+  });
+
+  it("parses 'break chunk' as break_down_chunk", () => {
+    expect(parseChunkInput("break chunk", state).kind).toBe("break_down_chunk");
+  });
+
+  it("parses 'ca' as consolidate_chunk", () => {
+    expect(parseChunkInput("ca", state).kind).toBe("consolidate_chunk");
+  });
+
+  it("parses 'consolidate all' as consolidate_chunk", () => {
+    expect(parseChunkInput("consolidate all", state).kind).toBe("consolidate_chunk");
+  });
+
+  it("parses 'consolidate chunk' as consolidate_chunk", () => {
+    expect(parseChunkInput("consolidate chunk", state).kind).toBe("consolidate_chunk");
+  });
+
+  it("parses 'apply' as apply", () => {
+    expect(parseChunkInput("apply", state).kind).toBe("apply");
+  });
+
+  it("parses 'apply assessment' as apply", () => {
+    expect(parseChunkInput("apply assessment", state).kind).toBe("apply");
+  });
+});
+
+// ─── Batch granularity commands: applyAction ─────────────────────────
+
+describe("applyAction batch granularity", () => {
+  it("break_down_chunk returns granularity request for current chunk indices", () => {
+    const state = createReviewState(makeProposals(10), 3);
+    const { state: next, done, message, granularityRequest } = applyAction(
+      state,
+      { kind: "break_down_chunk" },
+    );
+
+    expect(done).toBe(false);
+    expect(message).toContain("Breaking down all proposals in current chunk");
+    expect(message).toContain("1, 2, 3");
+    expect(granularityRequest).toBeDefined();
+    expect(granularityRequest!.kind).toBe("break_down");
+    expect(granularityRequest!.indices).toEqual([0, 1, 2]);
+    // State is unchanged — caller handles replacement
+    expect(next).toBe(state);
+  });
+
+  it("break_down_chunk uses correct indices on non-first page", () => {
+    const state = { ...createReviewState(makeProposals(10), 3), offset: 6 };
+    const { granularityRequest } = applyAction(
+      state,
+      { kind: "break_down_chunk" },
+    );
+
+    expect(granularityRequest!.indices).toEqual([6, 7, 8]);
+  });
+
+  it("consolidate_chunk returns granularity request for current chunk indices", () => {
+    const state = createReviewState(makeProposals(10), 3);
+    const { state: next, done, message, granularityRequest } = applyAction(
+      state,
+      { kind: "consolidate_chunk" },
+    );
+
+    expect(done).toBe(false);
+    expect(message).toContain("Consolidating all proposals in current chunk");
+    expect(message).toContain("1, 2, 3");
+    expect(granularityRequest).toBeDefined();
+    expect(granularityRequest!.kind).toBe("consolidate");
+    expect(granularityRequest!.indices).toEqual([0, 1, 2]);
+    expect(next).toBe(state);
+  });
+
+  it("consolidate_chunk handles partial last page", () => {
+    const state = { ...createReviewState(makeProposals(7), 3), offset: 6 };
+    const { granularityRequest } = applyAction(
+      state,
+      { kind: "consolidate_chunk" },
+    );
+
+    // Only one proposal on the last page
+    expect(granularityRequest!.indices).toEqual([6]);
+  });
+});
+
+// ─── Apply cached assessment ─────────────────────────────────────────
+
+describe("applyAction apply", () => {
+  it("returns error message when no assessment cached", () => {
+    const state = createReviewState(makeProposals(5), 5);
+    const { done, message, granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(done).toBe(false);
+    expect(message).toContain("No assessment available");
+    expect(granularityRequest).toBeUndefined();
+  });
+
+  it("returns error message for empty assessment", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 5),
+      lastAssessment: [],
+    };
+    const { message, granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(message).toContain("No assessment available");
+    expect(granularityRequest).toBeUndefined();
+  });
+
+  it("returns message when all proposals are appropriately sized", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(3), 3),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 1, epicTitle: "E2", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 2, epicTitle: "E3", recommendation: "keep", reasoning: "", issues: [] },
+      ],
+    };
+    const { message, granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(message).toContain("no proposals needing adjustment");
+    expect(granularityRequest).toBeUndefined();
+  });
+
+  it("applies break_down recommendations first", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 5),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 1, epicTitle: "E2", recommendation: "break_down", reasoning: "too broad", issues: ["issue1"] },
+        { proposalIndex: 2, epicTitle: "E3", recommendation: "consolidate", reasoning: "too fine", issues: ["issue2"] },
+        { proposalIndex: 3, epicTitle: "E4", recommendation: "break_down", reasoning: "too broad", issues: ["issue3"] },
+        { proposalIndex: 4, epicTitle: "E5", recommendation: "keep", reasoning: "", issues: [] },
+      ],
+    };
+    const { message, granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(message).toContain("breaking down");
+    expect(message).toContain("2, 4");
+    expect(granularityRequest).toBeDefined();
+    expect(granularityRequest!.kind).toBe("break_down");
+    expect(granularityRequest!.indices).toEqual([1, 3]);
+  });
+
+  it("applies consolidate recommendations when no break_down", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 5),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 1, epicTitle: "E2", recommendation: "consolidate", reasoning: "too fine", issues: [] },
+        { proposalIndex: 2, epicTitle: "E3", recommendation: "consolidate", reasoning: "too fine", issues: [] },
+      ],
+    };
+    const { message, granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(message).toContain("consolidating");
+    expect(message).toContain("2, 3");
+    expect(granularityRequest).toBeDefined();
+    expect(granularityRequest!.kind).toBe("consolidate");
+    expect(granularityRequest!.indices).toEqual([1, 2]);
+  });
+
+  it("filters out-of-range assessment indices", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(3), 3),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "break_down", reasoning: "", issues: [] },
+        { proposalIndex: 99, epicTitle: "E99", recommendation: "break_down", reasoning: "", issues: [] },
+      ],
+    };
+    const { granularityRequest } = applyAction(
+      state,
+      { kind: "apply" },
+    );
+
+    expect(granularityRequest!.indices).toEqual([0]);
+  });
+});
+
+// ─── Granularity history tracking in replaceProposals ────────────────
+
+describe("replaceProposals granularity history", () => {
+  it("records break_down in granularity history", () => {
+    const proposals = makeProposals(5);
+    const state = createReviewState(proposals, 5);
+
+    const replacements = [makeProposal("Part A"), makeProposal("Part B")];
+    const newState = replaceProposals(state, [2], replacements, "break_down");
+
+    expect(newState.granularityHistory).toHaveLength(1);
+    expect(newState.granularityHistory[0].direction).toBe("break_down");
+    expect(newState.granularityHistory[0].originalTitles).toEqual(["Epic 3"]);
+    expect(newState.granularityHistory[0].resultTitles).toEqual(["Part A", "Part B"]);
+    expect(newState.granularityHistory[0].timestamp).toBeDefined();
+  });
+
+  it("records consolidate in granularity history", () => {
+    const proposals = makeProposals(5);
+    const state = createReviewState(proposals, 5);
+
+    const replacements = [makeProposal("Combined")];
+    const newState = replaceProposals(state, [1, 2, 3], replacements, "consolidate");
+
+    expect(newState.granularityHistory).toHaveLength(1);
+    expect(newState.granularityHistory[0].direction).toBe("consolidate");
+    expect(newState.granularityHistory[0].originalTitles).toEqual(["Epic 2", "Epic 3", "Epic 4"]);
+    expect(newState.granularityHistory[0].resultTitles).toEqual(["Combined"]);
+  });
+
+  it("accumulates history across multiple adjustments", () => {
+    const proposals = makeProposals(5);
+    let state = createReviewState(proposals, 5);
+
+    // First adjustment: break down proposal 3
+    state = replaceProposals(state, [2], [makeProposal("A"), makeProposal("B")], "break_down");
+    expect(state.granularityHistory).toHaveLength(1);
+
+    // Second adjustment: consolidate proposals 1 and 2
+    state = replaceProposals(state, [0, 1], [makeProposal("Merged")], "consolidate");
+    expect(state.granularityHistory).toHaveLength(2);
+    expect(state.granularityHistory[0].direction).toBe("break_down");
+    expect(state.granularityHistory[1].direction).toBe("consolidate");
+  });
+
+  it("does not record history when direction is omitted", () => {
+    const proposals = makeProposals(5);
+    const state = createReviewState(proposals, 5);
+
+    const newState = replaceProposals(state, [2], [makeProposal("New")]);
+    expect(newState.granularityHistory).toHaveLength(0);
+  });
+
+  it("clears lastAssessment after replacing proposals", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 5),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "keep", reasoning: "", issues: [] },
+      ],
+    };
+
+    const newState = replaceProposals(state, [0], [makeProposal("New")], "break_down");
+    expect(newState.lastAssessment).toBeUndefined();
+  });
+
+  it("preserves granularity history across replaceProposals calls", () => {
+    const proposals = makeProposals(5);
+    let state = createReviewState(proposals, 5);
+
+    state = replaceProposals(state, [0], [makeProposal("R1"), makeProposal("R2")], "break_down");
+    expect(state.granularityHistory).toHaveLength(1);
+
+    // History from first call should persist through second
+    state = replaceProposals(state, [3], [makeProposal("R3")], "consolidate");
+    expect(state.granularityHistory).toHaveLength(2);
+    // Verify first entry is still there
+    expect(state.granularityHistory[0].direction).toBe("break_down");
+    expect(state.granularityHistory[0].originalTitles).toEqual(["Epic 1"]);
+  });
+});
+
+// ─── Granularity tracking in batch records ───────────────────────────
+
+describe("buildBatchRecord granularity tracking", () => {
+  it("includes granularity adjustments when present", () => {
+    const proposals = makeProposals(5);
+    let state = createReviewState(proposals, 5);
+    state = replaceProposals(state, [2], [makeProposal("Part A"), makeProposal("Part B")], "break_down");
+    state.accepted.add(0);
+    state.accepted.add(1);
+
+    const record = buildBatchRecord(state);
+    expect(record.granularityAdjustments).toBeDefined();
+    expect(record.granularityAdjustments).toHaveLength(1);
+    expect(record.granularityAdjustments![0].direction).toBe("break_down");
+    expect(record.granularityAdjustments![0].originalTitles).toEqual(["Epic 3"]);
+  });
+
+  it("omits granularityAdjustments when no adjustments made", () => {
+    const proposals = makeProposals(3);
+    const state = createReviewState(proposals, 3);
+    state.accepted.add(0);
+
+    const record = buildBatchRecord(state);
+    expect(record.granularityAdjustments).toBeUndefined();
+  });
+
+  it("includes multiple adjustments in batch record", () => {
+    const proposals = makeProposals(5);
+    let state = createReviewState(proposals, 5);
+    state = replaceProposals(state, [0], [makeProposal("A1"), makeProposal("A2")], "break_down");
+    state = replaceProposals(state, [3, 4], [makeProposal("C1")], "consolidate");
+    state.accepted.add(0);
+
+    const record = buildBatchRecord(state);
+    expect(record.granularityAdjustments).toHaveLength(2);
+    expect(record.granularityAdjustments![0].direction).toBe("break_down");
+    expect(record.granularityAdjustments![1].direction).toBe("consolidate");
+  });
+});
+
+// ─── formatBatchSummary with granularity adjustments ─────────────────
+
+describe("formatBatchSummary granularity", () => {
+  it("shows granularity adjustments section when present", () => {
+    const record: BatchAcceptanceRecord = {
+      timestamp: "2026-02-06T00:00:00.000Z",
+      totalProposals: 5,
+      acceptedCount: 3,
+      rejectedCount: 2,
+      acceptedItemCount: 9,
+      accepted: ["Auth", "Dashboard", "Settings"],
+      rejected: ["Analytics", "Billing"],
+      mode: "interactive",
+      granularityAdjustments: [
+        {
+          direction: "break_down",
+          originalTitles: ["Auth"],
+          resultTitles: ["Auth Login", "Auth Signup"],
+          timestamp: "2026-02-06T00:00:00.000Z",
+        },
+      ],
+    };
+
+    const summary = formatBatchSummary(record);
+    expect(summary).toContain("1 granularity adjustment");
+    expect(summary).toContain("⬇");
+    expect(summary).toContain("broke down");
+    expect(summary).toContain("Auth → Auth Login, Auth Signup");
+  });
+
+  it("shows plural label for multiple adjustments", () => {
+    const record: BatchAcceptanceRecord = {
+      timestamp: "2026-02-06T00:00:00.000Z",
+      totalProposals: 5,
+      acceptedCount: 5,
+      rejectedCount: 0,
+      acceptedItemCount: 15,
+      accepted: ["A", "B", "C", "D", "E"],
+      rejected: [],
+      mode: "interactive",
+      granularityAdjustments: [
+        {
+          direction: "break_down",
+          originalTitles: ["A"],
+          resultTitles: ["A1", "A2"],
+          timestamp: "2026-02-06T00:00:00.000Z",
+        },
+        {
+          direction: "consolidate",
+          originalTitles: ["B", "C"],
+          resultTitles: ["BC"],
+          timestamp: "2026-02-06T00:00:00.000Z",
+        },
+      ],
+    };
+
+    const summary = formatBatchSummary(record);
+    expect(summary).toContain("2 granularity adjustments");
+    expect(summary).toContain("⬇");
+    expect(summary).toContain("⬆");
+    expect(summary).toContain("broke down A → A1, A2");
+    expect(summary).toContain("consolidated B, C → BC");
+  });
+
+  it("omits granularity section when no adjustments", () => {
+    const record: BatchAcceptanceRecord = {
+      timestamp: "2026-02-06T00:00:00.000Z",
+      totalProposals: 3,
+      acceptedCount: 3,
+      rejectedCount: 0,
+      acceptedItemCount: 9,
+      accepted: ["Auth", "Dashboard", "Settings"],
+      rejected: [],
+      mode: "interactive",
+    };
+
+    const summary = formatBatchSummary(record);
+    expect(summary).not.toContain("Granularity");
+    expect(summary).not.toContain("adjustment");
+  });
+});
+
+// ─── formatActionMenu with batch commands ────────────────────────────
+
+describe("formatActionMenu batch granularity options", () => {
+  it("includes break chunk option", () => {
+    const state = createReviewState(makeProposals(5), 3);
+    const menu = formatActionMenu(state);
+    expect(menu).toContain("ba=break chunk");
+  });
+
+  it("includes consolidate chunk option", () => {
+    const state = createReviewState(makeProposals(5), 3);
+    const menu = formatActionMenu(state);
+    expect(menu).toContain("ca=consolidate chunk");
+  });
+
+  it("shows apply option when assessment is cached", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 3),
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "E1", recommendation: "break_down", reasoning: "", issues: [] },
+      ],
+    };
+    const menu = formatActionMenu(state);
+    expect(menu).toContain("apply=apply assessment");
+  });
+
+  it("hides apply option when no assessment cached", () => {
+    const state = createReviewState(makeProposals(5), 3);
+    const menu = formatActionMenu(state);
+    expect(menu).not.toContain("apply=apply assessment");
+  });
+
+  it("hides apply option when assessment is empty", () => {
+    const state: ChunkReviewState = {
+      ...createReviewState(makeProposals(5), 3),
+      lastAssessment: [],
+    };
+    const menu = formatActionMenu(state);
+    expect(menu).not.toContain("apply=apply assessment");
+  });
+});
+
+// ─── createReviewState includes granularityHistory ───────────────────
+
+describe("createReviewState granularity fields", () => {
+  it("initializes with empty granularity history", () => {
+    const state = createReviewState(makeProposals(5));
+    expect(state.granularityHistory).toEqual([]);
+  });
+
+  it("initializes without lastAssessment", () => {
+    const state = createReviewState(makeProposals(5));
+    expect(state.lastAssessment).toBeUndefined();
+  });
+});
+
+// ─── End-to-end batch granularity workflow ────────────────────────────
+
+describe("batch granularity workflow", () => {
+  it("assess → apply → accept workflow", () => {
+    const proposals = makeProposals(5);
+    let state = createReviewState(proposals, 5);
+
+    // Simulate assessment cached
+    state = {
+      ...state,
+      lastAssessment: [
+        { proposalIndex: 0, epicTitle: "Epic 1", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 1, epicTitle: "Epic 2", recommendation: "break_down", reasoning: "too broad", issues: [] },
+        { proposalIndex: 2, epicTitle: "Epic 3", recommendation: "keep", reasoning: "", issues: [] },
+        { proposalIndex: 3, epicTitle: "Epic 4", recommendation: "consolidate", reasoning: "too fine", issues: [] },
+        { proposalIndex: 4, epicTitle: "Epic 5", recommendation: "keep", reasoning: "", issues: [] },
+      ],
+    };
+
+    // Apply: should break down first
+    const { granularityRequest: req1 } = applyAction(state, { kind: "apply" });
+    expect(req1!.kind).toBe("break_down");
+    expect(req1!.indices).toEqual([1]);
+
+    // Simulate LLM break down
+    state = replaceProposals(state, [1], [makeProposal("E2a"), makeProposal("E2b")], "break_down");
+    expect(state.granularityHistory).toHaveLength(1);
+    // Assessment should be cleared
+    expect(state.lastAssessment).toBeUndefined();
+
+    // Accept all
+    const { state: finalState, done } = applyAction(state, { kind: "accept_all" });
+    expect(done).toBe(true);
+    expect(getAcceptedProposals(finalState)).toHaveLength(6);
+
+    // Build batch record includes history
+    const record = buildBatchRecord(finalState);
+    expect(record.granularityAdjustments).toHaveLength(1);
+    expect(record.granularityAdjustments![0].direction).toBe("break_down");
+  });
+
+  it("break chunk → navigate → consolidate chunk workflow", () => {
+    const proposals = makeProposals(10);
+    let state = createReviewState(proposals, 3);
+
+    // Break down current chunk (0-2)
+    const { granularityRequest: req1 } = applyAction(state, { kind: "break_down_chunk" });
+    expect(req1!.indices).toEqual([0, 1, 2]);
+
+    // Simulate LLM returning 6 proposals (2 per original)
+    const broken = Array.from({ length: 6 }, (_, i) => makeProposal(`Broken ${i + 1}`));
+    state = replaceProposals(state, [0, 1, 2], broken, "break_down");
+    expect(state.proposals).toHaveLength(13);
+
+    // Navigate to next chunk
+    const { state: navState } = applyAction(state, { kind: "next" });
+    state = navState;
+    expect(state.offset).toBe(3);
+
+    // Consolidate current chunk (3-5)
+    const { granularityRequest: req2 } = applyAction(state, { kind: "consolidate_chunk" });
+    expect(req2!.indices).toEqual([3, 4, 5]);
+
+    // Simulate LLM consolidation
+    state = replaceProposals(state, [3, 4, 5], [makeProposal("Consolidated")], "consolidate");
+
+    // Verify history
+    expect(state.granularityHistory).toHaveLength(2);
+    expect(state.granularityHistory[0].direction).toBe("break_down");
+    expect(state.granularityHistory[1].direction).toBe("consolidate");
+
+    // Accept all
+    const { state: final } = applyAction(state, { kind: "accept_all" });
+    const record = buildBatchRecord(final);
+    expect(record.granularityAdjustments).toHaveLength(2);
+  });
+
+  it("unknown action message includes new commands", () => {
+    const state = createReviewState(makeProposals(5), 3);
+    const { message } = applyAction(state, { kind: "unknown" });
+    expect(message).toContain("ba");
+    expect(message).toContain("ca");
+    expect(message).toContain("apply");
   });
 });
