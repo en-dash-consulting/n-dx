@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -517,7 +517,7 @@ describe("n-dx config", () => {
 
   describe("claude config", () => {
     it("sets claude.cli_path in .n-dx.json", async () => {
-      const output = run(["claude.cli_path", "/usr/local/bin/claude", tmpDir]);
+      const output = run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
       expect(output).toContain("claude.cli_path = /usr/local/bin/claude");
 
       const ndxConfig = JSON.parse(
@@ -537,7 +537,7 @@ describe("n-dx config", () => {
     });
 
     it("gets claude.cli_path after setting it", async () => {
-      run(["claude.cli_path", "/opt/claude", tmpDir]);
+      run(["claude.cli_path", "/opt/claude", "--force", tmpDir]);
       const output = run(["claude.cli_path", tmpDir]);
       expect(output.trim()).toBe("/opt/claude");
     });
@@ -549,7 +549,7 @@ describe("n-dx config", () => {
     });
 
     it("shows claude section in --json output", async () => {
-      run(["claude.cli_path", "/usr/local/bin/claude", tmpDir]);
+      run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
       run(["claude.api_key", "sk-ant-key", tmpDir]);
 
       const output = run(["--json", tmpDir]);
@@ -559,7 +559,7 @@ describe("n-dx config", () => {
     });
 
     it("shows claude section with ndx config claude --json", async () => {
-      run(["claude.cli_path", "/usr/bin/claude", tmpDir]);
+      run(["claude.cli_path", "/usr/bin/claude", "--force", tmpDir]);
 
       const output = run(["claude", "--json", tmpDir]);
       const parsed = JSON.parse(output);
@@ -567,7 +567,7 @@ describe("n-dx config", () => {
     });
 
     it("shows claude section in show all output", async () => {
-      run(["claude.cli_path", "/usr/local/bin/claude", tmpDir]);
+      run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
       const output = run([tmpDir]);
       expect(output).toContain("claude");
@@ -577,7 +577,7 @@ describe("n-dx config", () => {
 
     it("creates .n-dx.json if it does not exist", async () => {
       // No .n-dx.json exists yet
-      run(["claude.cli_path", "/usr/local/bin/claude", tmpDir]);
+      run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
       const ndxConfig = JSON.parse(
         await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
@@ -601,7 +601,7 @@ describe("n-dx config", () => {
     });
 
     it("does not write to package config files", async () => {
-      run(["claude.cli_path", "/usr/local/bin/claude", tmpDir]);
+      run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
       // .hench/config.json should not have claude settings
       const henchConfig = JSON.parse(
@@ -622,8 +622,8 @@ describe("n-dx config", () => {
     });
 
     it("updates existing claude value", async () => {
-      run(["claude.cli_path", "/old/path", tmpDir]);
-      run(["claude.cli_path", "/new/path", tmpDir]);
+      run(["claude.cli_path", "/old/path", "--force", tmpDir]);
+      run(["claude.cli_path", "/new/path", "--force", tmpDir]);
 
       const output = run(["claude.cli_path", tmpDir]);
       expect(output.trim()).toBe("/new/path");
@@ -662,6 +662,126 @@ describe("n-dx config", () => {
       const output = run(["--help"]);
       expect(output).toContain("n-dx config claude.cli_path");
       expect(output).toContain("n-dx config claude.api_key");
+    });
+  });
+
+  // ── Claude config validation ────────────────────────────────────────────
+
+  describe("claude config validation", () => {
+    describe("cli_path validation", () => {
+      it("rejects cli_path when file does not exist", () => {
+        const stderr = runFail(["claude.cli_path", "/nonexistent/path/to/claude", tmpDir]);
+        expect(stderr).toContain("File not found");
+        expect(stderr).toContain("/nonexistent/path/to/claude");
+      });
+
+      it("rejects cli_path when file is not executable", async () => {
+        const nonExecPath = join(tmpDir, "not-executable");
+        await writeFile(nonExecPath, "#!/bin/sh\necho hi\n");
+        await chmod(nonExecPath, 0o644); // readable but not executable
+
+        const stderr = runFail(["claude.cli_path", nonExecPath, tmpDir]);
+        expect(stderr).toContain("not executable");
+      });
+
+      it("accepts cli_path when file exists and is executable", async () => {
+        const execPath = join(tmpDir, "fake-claude");
+        await writeFile(execPath, "#!/bin/sh\necho hi\n");
+        await chmod(execPath, 0o755);
+
+        const output = run(["claude.cli_path", execPath, tmpDir]);
+        expect(output).toContain(`claude.cli_path = ${execPath}`);
+      });
+
+      it("skips validation with --force flag", () => {
+        const output = run(["claude.cli_path", "/nonexistent/path", "--force", tmpDir]);
+        expect(output).toContain("claude.cli_path = /nonexistent/path");
+      });
+
+      it("provides hint to use --force on validation failure", () => {
+        const stderr = runFail(["claude.cli_path", "/nonexistent/path", tmpDir]);
+        expect(stderr).toContain("--force");
+      });
+    });
+
+    describe("api_key validation", () => {
+      it("rejects api_key with invalid format", () => {
+        const stderr = runFail(["claude.api_key", "invalid-key-format", tmpDir]);
+        expect(stderr).toContain('start with "sk-ant-"');
+      });
+
+      it("rejects empty string api_key", () => {
+        const stderr = runFail(["claude.api_key", "not-a-key", tmpDir]);
+        expect(stderr).toContain("Invalid API key format");
+      });
+
+      it("accepts api_key with correct format", () => {
+        const output = run(["claude.api_key", "sk-ant-api03-test-key-123", tmpDir]);
+        expect(output).toContain("claude.api_key = sk-ant-api03-test-key-123");
+      });
+
+      it("skips validation with --force flag", () => {
+        const output = run(["claude.api_key", "custom-key", "--force", tmpDir]);
+        expect(output).toContain("claude.api_key = custom-key");
+      });
+
+      it("provides helpful error with link to console", () => {
+        const stderr = runFail(["claude.api_key", "bad-key", tmpDir]);
+        expect(stderr).toContain("console.anthropic.com");
+      });
+    });
+
+    describe("help documents validation", () => {
+      it("documents --force flag", () => {
+        const output = run(["--help"]);
+        expect(output).toContain("--force");
+      });
+
+      it("documents --test-connection flag", () => {
+        const output = run(["--help"]);
+        expect(output).toContain("--test-connection");
+      });
+
+      it("notes validation on cli_path", () => {
+        const output = run(["--help"]);
+        expect(output).toContain("must exist and be");
+        expect(output).toContain("executable");
+      });
+
+      it("notes validation on api_key", () => {
+        const output = run(["--help"]);
+        expect(output).toContain('start with "sk-ant-"');
+      });
+    });
+  });
+
+  // ── Test connection ─────────────────────────────────────────────────────
+
+  describe("test connection", () => {
+    it("errors when no claude config exists", () => {
+      const stderr = runFail(["--test-connection", tmpDir]);
+      expect(stderr).toContain("No Claude configuration set");
+    });
+
+    it("tests cli_path with configured binary", async () => {
+      // Create a fake claude binary that outputs a version
+      const fakeClaude = join(tmpDir, "fake-claude");
+      await writeFile(fakeClaude, "#!/bin/sh\necho '1.0.0-test'\n");
+      await chmod(fakeClaude, 0o755);
+
+      run(["claude.cli_path", fakeClaude, tmpDir]);
+      const output = run(["--test-connection", tmpDir]);
+      expect(output).toContain("Testing CLI path...");
+      expect(output).toContain("✓");
+    });
+
+    it("reports cli_path failure for nonexistent binary", async () => {
+      // Use --force to set a bad path, then test
+      run(["claude.cli_path", "/nonexistent/claude-binary", "--force", tmpDir]);
+
+      const stderr = runFail(["--test-connection", tmpDir]);
+      expect(stderr).toContain("Testing CLI path...");
+      expect(stderr).toContain("✗");
     });
   });
 

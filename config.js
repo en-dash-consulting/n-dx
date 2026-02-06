@@ -8,8 +8,9 @@
  *   n-dx config --json [dir]             Output as JSON
  */
 
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access, constants } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 
@@ -144,6 +145,122 @@ function coerceValue(newValue, existingValue) {
   return newValue;
 }
 
+// ── Claude config validation ─────────────────────────────────────────────────
+
+/**
+ * Validate claude.cli_path: check the file exists and is executable.
+ * Throws with a helpful message on failure.
+ */
+async function validateCliPath(value) {
+  try {
+    await access(value, constants.F_OK);
+  } catch {
+    throw new Error(
+      `File not found: ${value}\n` +
+        "  Provide an absolute path to the Claude Code CLI binary."
+    );
+  }
+  try {
+    await access(value, constants.X_OK);
+  } catch {
+    throw new Error(
+      `File is not executable: ${value}\n` +
+        "  Run: chmod +x " + value
+    );
+  }
+}
+
+/**
+ * Validate claude.api_key: check the format matches the Anthropic key pattern.
+ * Throws with a helpful message on failure.
+ */
+function validateApiKey(value) {
+  if (typeof value !== "string" || !value.startsWith("sk-ant-")) {
+    throw new Error(
+      `Invalid API key format. Anthropic keys start with "sk-ant-".\n` +
+        "  Get your key at: https://console.anthropic.com/settings/keys"
+    );
+  }
+}
+
+/**
+ * Test that an Anthropic API key works by making a lightweight API call.
+ * Returns { ok: true } on success, { ok: false, error: string } on failure.
+ */
+async function testApiConnection(apiKey) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1,
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    });
+
+    if (res.ok) {
+      return { ok: true };
+    }
+
+    const body = await res.json().catch(() => ({}));
+    const msg = body?.error?.message || `HTTP ${res.status}`;
+
+    if (res.status === 401) {
+      return { ok: false, error: `Authentication failed: ${msg}` };
+    }
+    if (res.status === 403) {
+      return { ok: false, error: `Permission denied: ${msg}` };
+    }
+    // 400 with "credit balance is too low" still means the key is valid
+    if (res.status === 400 && msg.includes("credit")) {
+      return { ok: true };
+    }
+    // Overloaded / rate-limited — key is valid
+    if (res.status === 429 || res.status === 529) {
+      return { ok: true };
+    }
+    return { ok: false, error: msg };
+  } catch (err) {
+    return { ok: false, error: `Connection failed: ${err.message}` };
+  }
+}
+
+/**
+ * Validate CLI path by trying to run `<binary> --version`.
+ * Returns { ok, version?, error? }.
+ */
+function testCliPath(cliPath) {
+  try {
+    const output = execFileSync(cliPath, ["--version"], {
+      encoding: "utf-8",
+      timeout: 10000,
+      stdio: "pipe",
+    });
+    return { ok: true, version: output.trim() };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.code === "ENOENT"
+        ? `File not found: ${cliPath}`
+        : `Failed to run: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Validators for specific claude config keys.
+ * Each returns nothing on success or throws with a message.
+ */
+const CLAUDE_VALIDATORS = {
+  cli_path: validateCliPath,
+  api_key: validateApiKey,
+};
+
 // ── Display ──────────────────────────────────────────────────────────────────
 
 function formatValue(value) {
@@ -250,10 +367,13 @@ Sourcevision manifest (.sourcevision/manifest.json):
 Claude settings (.n-dx.json — shared across all packages):
   claude.cli_path          string    Path to Claude Code CLI binary (optional)
                                     When set, hench uses this path instead of looking
-                                    for "claude" on PATH.
+                                    for "claude" on PATH. Validated: must exist and be
+                                    executable. Use --force to skip validation.
   claude.api_key           string    Anthropic API key (optional)
                                     When set, packages use this key instead of reading
                                     from the ANTHROPIC_API_KEY environment variable.
+                                    Validated: must start with "sk-ant-". Use --force
+                                    to skip validation.
                                     Note: stored in .n-dx.json — add to .gitignore.
 
 Web dashboard settings (.n-dx.json):
@@ -274,6 +394,8 @@ Project config (.n-dx.json):
 
 Options:
   --json                   Output as JSON
+  --force                  Skip validation when setting claude config values
+  --test-connection        Test configured claude.api_key and/or claude.cli_path
   --help, -h               Show this help
 
 Type coercion:
@@ -295,8 +417,10 @@ Examples:
   n-dx config rex.budget.cost 10               Set cost budget to $10
   n-dx config rex.budget.abort true            Abort operations when exceeded
   n-dx config claude.cli_path /usr/local/bin/claude
-                                               Set Claude CLI binary path
-  n-dx config claude.api_key sk-ant-...        Set Anthropic API key
+                                               Set Claude CLI binary path (validates path)
+  n-dx config claude.cli_path /path --force    Set without validation
+  n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
+  n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON
   n-dx config claude --json                    Show Claude settings as JSON`);
@@ -367,6 +491,49 @@ Examples:
     process.exit(1);
   }
 
+  // --- Test connection mode: --test-connection ---
+  if (flags["test-connection"] === "true") {
+    const claudeConfig = configs.claude;
+    if (!claudeConfig) {
+      console.error("No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.");
+      process.exit(1);
+    }
+
+    let tested = false;
+    let hasFailure = false;
+
+    if (claudeConfig.api_key) {
+      tested = true;
+      const result = await testApiConnection(claudeConfig.api_key);
+      if (result.ok) {
+        console.log("Testing API key... ✓ API key is valid.");
+      } else {
+        console.error("Testing API key... ✗ " + result.error);
+        hasFailure = true;
+      }
+    }
+
+    if (claudeConfig.cli_path) {
+      tested = true;
+      const result = testCliPath(claudeConfig.cli_path);
+      if (result.ok) {
+        console.log("Testing CLI path... ✓ " + (result.version || "CLI is available."));
+      } else {
+        console.error("Testing CLI path... ✗ " + result.error);
+        hasFailure = true;
+      }
+    }
+
+    if (!tested) {
+      console.error("No claude.api_key or claude.cli_path configured to test.");
+      process.exit(1);
+    }
+    if (hasFailure) {
+      process.exit(1);
+    }
+    return;
+  }
+
   // --- SET mode: key + value ---
   if (keyArg && valueArg !== undefined) {
     const dotIdx = keyArg.indexOf(".");
@@ -398,6 +565,17 @@ Examples:
       } catch (err) {
         console.error(`Invalid value for "${keyArg}": ${err.message}`);
         process.exit(1);
+      }
+
+      // Validate claude-specific settings (skip with --force)
+      if (pkg === "claude" && CLAUDE_VALIDATORS[settingPath] && flags.force !== "true") {
+        try {
+          await CLAUDE_VALIDATORS[settingPath](coerced);
+        } catch (err) {
+          console.error(`Invalid value for "${keyArg}": ${err.message}`);
+          console.error("  Use --force to set this value anyway.");
+          process.exit(1);
+        }
       }
 
       setByPath(configs[pkg], settingPath, coerced);
