@@ -1,0 +1,340 @@
+/* PRD Tree Hierarchy View */
+
+.prd-tree-container {
+  padding: 0 4px;
+}
+
+/* Header with title and toolbar */
+.prd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prd-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Toolbar */
+.prd-toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.prd-toolbar-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.prd-toolbar-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Summary bar */
+.prd-summary {
+  margin-bottom: 20px;
+}
+
+.prd-summary-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+  margin-bottom: 8px;
+}
+
+.prd-summary-segment {
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.prd-status-bg-completed { background: var(--green); }
+.prd-status-bg-in_progress { background: var(--accent); }
+.prd-status-bg-pending { background: var(--text-dim); opacity: 0.4; }
+.prd-status-bg-blocked { background: var(--red); }
+.prd-status-bg-deferred { background: var(--orange); opacity: 0.5; }
+
+.prd-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.prd-summary-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.prd-summary-pct {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Status dot (inline, for summary) */
+.prd-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.prd-status-dot.prd-status-completed { background: var(--green); }
+.prd-status-dot.prd-status-in-progress { background: var(--accent); }
+.prd-status-dot.prd-status-pending { background: var(--text-dim); opacity: 0.4; }
+.prd-status-dot.prd-status-blocked { background: var(--red); }
+.prd-status-dot.prd-status-deferred { background: var(--orange); opacity: 0.5; }
+
+/* Tree structure */
+.prd-tree {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.prd-node {
+  position: relative;
+}
+
+.prd-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  transition: background-color 0.1s;
+}
+
+.prd-node:last-child > .prd-node-row {
+  border-bottom: none;
+}
+
+.prd-node-expandable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.prd-node-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Chevron */
+.prd-chevron {
+  width: 14px;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: center;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.prd-chevron-open {
+  transform: rotate(90deg);
+}
+
+/* Status icons */
+.prd-status-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+}
+
+.prd-status-completed { color: var(--green); }
+.prd-status-in-progress { color: var(--accent); }
+.prd-status-pending { color: var(--text-dim); opacity: 0.6; }
+.prd-status-deferred { color: var(--orange); opacity: 0.6; }
+.prd-status-blocked { color: var(--red); }
+
+/* Level badge */
+.prd-level-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.prd-level-badge.prd-level-epic {
+  background: color-mix(in srgb, var(--purple) 20%, transparent);
+  color: var(--purple);
+}
+
+.prd-level-badge.prd-level-feature {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+}
+
+.prd-level-badge.prd-level-task {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.prd-level-badge.prd-level-subtask {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+/* Node title */
+.prd-node-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.prd-level-epic > .prd-node-title {
+  font-weight: 600;
+}
+
+/* Priority badges */
+.prd-priority-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.prd-priority-critical {
+  background: color-mix(in srgb, var(--red) 20%, transparent);
+  color: var(--red);
+}
+
+.prd-priority-high {
+  background: color-mix(in srgb, var(--orange) 20%, transparent);
+  color: var(--orange);
+}
+
+.prd-priority-medium {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.prd-priority-low {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+/* Progress bar */
+.prd-progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.prd-progress-track {
+  width: 60px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.prd-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.prd-bar-done { background: var(--green); }
+.prd-bar-mid { background: var(--accent); }
+.prd-bar-low { background: var(--orange); }
+
+.prd-progress-pct {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  min-width: 30px;
+}
+
+/* Count badge */
+.prd-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* Tags */
+.prd-tag-list {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.prd-tag {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+/* Timestamp */
+.prd-timestamp {
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  font-style: italic;
+}
+
+/* Children container */
+.prd-children {
+  border-left: 2px solid var(--border);
+  margin-left: 18px;
+}
+
+/* Empty state */
+.prd-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+}
+
+.prd-empty p {
+  margin-bottom: 8px;
+}
+
+.prd-empty-hint {
+  font-size: 13px;
+}
+
+.prd-empty-hint code {
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--accent);
+}
