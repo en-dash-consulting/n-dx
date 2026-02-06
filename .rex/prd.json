@@ -2701,7 +2701,7 @@
             {
               "id": "a9a9d413-1372-4cc4-841a-44c0c214f46a",
               "title": "Implement token usage accumulation and formatting",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Build system to accumulate token usage across calls and format for display",
               "acceptanceCriteria": [
@@ -2715,7 +2715,9 @@
                 "accumulateTokenUsage",
                 "formatTokenUsage"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T02:50:11.070Z",
+              "completedAt": "2026-02-06T02:56:22.838Z"
             }
           ]
         },

@@ -45,8 +45,15 @@ export type { ReviewResult, ReviewDiff } from "./review.js";
 export { checkTokenBudget } from "./token-budget.js";
 export type { TokenBudgetResult } from "./token-budget.js";
 
-// Token usage parsing
-export { parseTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
+// Token usage parsing & accumulation
+export {
+  parseTokenUsage,
+  parseStreamTokenUsage,
+  emptyAggregateTokenUsage,
+  accumulateTokenUsage,
+  formatTokenUsage,
+} from "./token-usage.js";
+export type { AggregateTokenUsage } from "./token-usage.js";
 
 // Run summary
 export { buildRunSummary } from "./summary.js";
