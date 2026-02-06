@@ -10,14 +10,44 @@ import { runWeb } from "./web.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Known error patterns mapped to user-friendly suggestions.
+ * Each entry: [regex to match against the message, suggestion text].
+ */
+const ERROR_HINTS = [
+  [/ENOENT.*\.(rex|hench|sourcevision)/, "Run 'ndx init' to set up the project."],
+  [/ENOENT.*prd\.json/, "Run 'ndx init' to create the initial PRD."],
+  [/ENOENT.*config\.json/, "Run 'ndx init' to create default configuration."],
+  [/EACCES/, "Check file permissions for the project directory."],
+  [/Unexpected token/, "A JSON file may be corrupted. Check for syntax errors or re-initialize with 'ndx init'."],
+  [/EADDRINUSE/, "The port is already in use. Try a different port with --port=N."],
+];
+
+/**
+ * Format an error for CLI output — user-friendly with optional hint.
+ * Never shows stack traces.
+ */
+function formatError(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  // If the error already has a suggestion (e.g. from a CLIError-like object), use it
+  if (err && err.suggestion) {
+    return `Error: ${message}\nHint: ${err.suggestion}`;
+  }
+  for (const [pattern, suggestion] of ERROR_HINTS) {
+    if (pattern.test(message)) {
+      return `Error: ${message}\nHint: ${suggestion}`;
+    }
+  }
+  return `Error: ${message}`;
+}
+
 // Catch unhandled errors at the top level — never show stack traces
 process.on("uncaughtException", (err) => {
-  console.error(`Error: ${err.message}`);
+  console.error(formatError(err));
   process.exit(1);
 });
 process.on("unhandledRejection", (err) => {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(`Error: ${message}`);
+  console.error(formatError(err));
   process.exit(1);
 });
 
@@ -134,7 +164,7 @@ if (command === "ci") {
     const ok = await runCI(dir, flags, { run, tools });
     process.exit(ok ? 0 : 1);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    console.error(formatError(err));
     process.exit(1);
   }
 }
@@ -146,7 +176,7 @@ if (command === "web") {
     const code = await runWeb(dir, rest, { run, tools, __dir });
     process.exit(code);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    console.error(formatError(err));
     process.exit(1);
   }
 }
@@ -155,7 +185,7 @@ if (command === "config") {
   try {
     await runConfig(rest);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    console.error(formatError(err));
     process.exit(1);
   }
   process.exit(0);
@@ -197,4 +227,8 @@ Usage: ndx <command> [args...]
        n-dx <command> [args...]
 
 Standalone binaries (rex, hench, sourcevision, sv) are also available after install.`);
+if (command) {
+  console.error(`\nError: Unknown command: ${command}`);
+  console.error("Hint: Run 'ndx --help' to see available commands.");
+}
 process.exit(command ? 1 : 0);

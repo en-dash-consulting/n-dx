@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateMove, moveItem } from "../../../src/core/move.js";
+import { CLIError } from "../../../src/cli/errors.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
 function makeItem(overrides: Partial<PRDItem> & { id: string; title: string }): PRDItem {
@@ -236,14 +237,33 @@ describe("moveItem", () => {
     expect(() => moveItem(items, "e1", undefined)).toThrow(/already/);
   });
 
-  it("throws on validation failure", () => {
+  it("throws CLIError on validation failure", () => {
     const items = makeTree();
+    expect(() => moveItem(items, "nonexistent", "e1")).toThrow(CLIError);
     expect(() => moveItem(items, "nonexistent", "e1")).toThrow(/not found/);
   });
 
-  it("throws on circular move", () => {
+  it("throws CLIError with suggestion on circular move", () => {
     const items = makeTree();
-    expect(() => moveItem(items, "e1", "t1")).toThrow(/descendant/);
+    try {
+      moveItem(items, "e1", "t1");
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(CLIError);
+      expect((err as CLIError).message).toMatch(/descendant/);
+      expect((err as CLIError).suggestion).toMatch(/circular/i);
+    }
+  });
+
+  it("throws CLIError with message on no-op move", () => {
+    const items = makeTree();
+    try {
+      moveItem(items, "f1", "e1");
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(CLIError);
+      expect((err as CLIError).message).toMatch(/already/);
+    }
   });
 
   it("preserves item properties after move", () => {
