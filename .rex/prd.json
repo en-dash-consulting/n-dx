@@ -2809,7 +2809,7 @@
             {
               "id": "04470729-8b31-44f3-86fe-606446f7b9d9",
               "title": "Improve add command prompts",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enhance prompts for the smart add functionality",
               "acceptanceCriteria": [
@@ -2825,7 +2825,9 @@
                 "add-command",
                 "llm"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-06T02:57:05.685Z",
+              "completedAt": "2026-02-06T03:03:39.999Z"
             },
             {
               "id": "272d5ffc-a4f6-46f1-ae39-bb63e17b3b95",
@@ -5285,6 +5287,99 @@
               "source": "smart-add",
               "startedAt": "2026-02-05T16:23:22.499Z",
               "completedAt": "2026-02-05T16:26:43.051Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c52ead17-736b-4488-a168-62778bc3d798",
+      "title": "Interactive Proposal Management",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "33907346-1639-4f74-9e6f-b3ba456cc911",
+          "title": "Chunked proposal acceptance",
+          "status": "pending",
+          "level": "feature",
+          "description": "Allow users to accept proposals in smaller or larger batches instead of all-or-nothing",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "97487bb1-d42b-4296-b85a-223870f54268",
+              "title": "Add chunk size parameter to rex analyze command",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow users to specify how many proposals to present at once using --chunk-size flag",
+              "acceptanceCriteria": [
+                "Supports --chunk-size parameter with default of current behavior",
+                "Validates chunk size is positive integer",
+                "Handles edge cases when chunk size exceeds total proposals"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "cli"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "ae83f04a-1238-422a-a725-e7edaaaf7654",
+              "title": "Implement interactive proposal chunking workflow",
+              "status": "pending",
+              "level": "task",
+              "description": "Present proposals in user-specified chunks with options to accept current chunk, request more, or request fewer",
+              "acceptanceCriteria": [
+                "Shows current chunk with clear pagination (e.g., 'Proposals 1-5 of 23')",
+                "Provides options: Accept these, Show more, Show fewer, Accept all, Reject all",
+                "Maintains state between chunk selections",
+                "Allows navigation back to previous chunks"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ux"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a59d064f-b71a-452a-89e6-251965e638ee",
+              "title": "Add dynamic chunk resizing during proposal review",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow users to adjust chunk size on-the-fly while reviewing proposals",
+              "acceptanceCriteria": [
+                "Supports 'more' command to increase current chunk size",
+                "Supports 'fewer' command to decrease current chunk size",
+                "Preserves current position when resizing chunks",
+                "Updates pagination display after resize"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ux"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "efbf3759-abb6-406a-b96a-aa094309d3fb",
+              "title": "Implement proposal batch acceptance tracking",
+              "status": "pending",
+              "level": "task",
+              "description": "Track which proposals were accepted in which batches for better user feedback",
+              "acceptanceCriteria": [
+                "Records batch acceptance decisions in workflow state",
+                "Shows summary of accepted vs rejected proposals",
+                "Provides clear feedback about what was added to PRD"
+              ],
+              "priority": "low",
+              "tags": [
+                "rex",
+                "tracking"
+              ],
+              "source": "smart-add"
             }
           ]
         }
