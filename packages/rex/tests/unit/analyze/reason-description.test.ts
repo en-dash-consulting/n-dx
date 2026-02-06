@@ -94,12 +94,36 @@ describe("buildAddPrompt", () => {
 
     expect(prompt).toMatch(/description|acceptanceCriteria/);
     expect(prompt).toMatch(/actionable/);
+    // Should guide on description quality — explain the "why", not restate the title
+    expect(prompt).toMatch(/why/i);
+    expect(prompt).toMatch(/outcome/i);
+    // Should guide on verifiable acceptance criteria
+    expect(prompt).toMatch(/verifiable/i);
   });
 
-  it("instructs LLM to avoid duplicates", async () => {
+  it("instructs LLM to avoid duplicates against existing PRD", async () => {
     const prompt = await buildAddPrompt("Add feature X", [], tmpDir);
 
     expect(prompt).toMatch(/[Dd]o NOT include items that duplicate/);
+  });
+
+  it("instructs LLM to avoid duplicates within generated output", async () => {
+    const prompt = await buildAddPrompt("Add feature X", [], tmpDir);
+
+    // Should instruct to merge overlapping tasks within its own response
+    expect(prompt).toMatch(/duplicate tasks within/i);
+    expect(prompt).toMatch(/merge/i);
+  });
+
+  it("instructs LLM to create multiple epics for broad descriptions", async () => {
+    const prompt = await buildAddPrompt(
+      "Overhaul the frontend and backend architecture",
+      [],
+      tmpDir,
+    );
+
+    // Should guide the LLM to produce multiple epics when description is broad
+    expect(prompt).toMatch(/multiple epics/i);
   });
 
   it("includes parent constraint when provided", async () => {

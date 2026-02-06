@@ -75,6 +75,22 @@ describe("buildMultiAddPrompt", () => {
 
     expect(prompt).toMatch(/[Dd]uplicate/);
     expect(prompt).toMatch(/merge/i);
+    // Should mention merging into a single task with combined criteria
+    expect(prompt).toMatch(/combined criteria/i);
+  });
+
+  it("includes quality guidance about task descriptions", async () => {
+    const prompt = await buildMultiAddPrompt(
+      ["Add feature X"],
+      [],
+      tmpDir,
+    );
+
+    // Should guide on description quality — explain the "why"
+    expect(prompt).toMatch(/why/i);
+    expect(prompt).toMatch(/outcome/i);
+    // Should guide on verifiable acceptance criteria
+    expect(prompt).toMatch(/verifiable/i);
   });
 
   it("includes existing PRD summary for dedup", async () => {

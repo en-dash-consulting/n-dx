@@ -1209,16 +1209,24 @@ Each element must be an object with:
 
 ${FEW_SHOT_EXAMPLE}
 
-Guidelines:
-- Break the description into a logical hierarchy of epics, features, and tasks
-- Task titles must be specific and actionable (verb-first, e.g. "Implement X", "Add Y")
-- Every task MUST have either a description or acceptanceCriteria (preferably both)
-- Each task should represent a single unit of work completable in one session
-- Add acceptance criteria where requirements are clear
-- Assign priority based on: blocking dependencies → user-facing impact → technical debt
-- Group related work into features under appropriate epics
-- Do NOT include items that duplicate anything already in the existing PRD below
-- Use the project context to understand terminology and architecture
+Structuring guidelines:
+- Break the description into a logical hierarchy of epics, features, and tasks.
+- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.
+- Group related work into features under appropriate epics.
+- Each task should represent a single unit of work completable in one session.
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Task quality:
+- Task titles must be specific and actionable (verb-first, e.g. "Implement X", "Add Y").
+- Every task MUST have either a description or acceptanceCriteria (preferably both).
+- Descriptions should explain the "why" and expected outcome, not just restate the title. A good description gives enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria should be concrete and verifiable — each criterion is a pass/fail check.
+- Add acceptance criteria where requirements are clear.
+
+Deduplication:
+- Do NOT include items that duplicate anything already in the existing PRD below.
+- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
 ${parentConstraint}
 ${contextBlock}
 Existing PRD:
@@ -1311,18 +1319,24 @@ Each element must be an object with:
 
 ${FEW_SHOT_EXAMPLE}
 
-Guidelines:
+Structuring guidelines:
 - You are receiving ${descriptions.length} separate descriptions. Treat each one as a distinct piece of work.
 - Group related descriptions under the same epic when they naturally belong together.
 - Keep unrelated descriptions in separate epics.
-- Task titles must be specific and actionable (verb-first, e.g. "Implement X", "Add Y")
-- Every task MUST have either a description or acceptanceCriteria (preferably both)
-- Each task should represent a single unit of work completable in one session
-- Add acceptance criteria where requirements are clear
-- Assign priority based on: blocking dependencies → user-facing impact → technical debt
-- Do NOT include items that duplicate anything already in the existing PRD below
-- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them
-- Use the project context to understand terminology and architecture
+- Each task should represent a single unit of work completable in one session.
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Task quality:
+- Task titles must be specific and actionable (verb-first, e.g. "Implement X", "Add Y").
+- Every task MUST have either a description or acceptanceCriteria (preferably both).
+- Descriptions should explain the "why" and expected outcome, not just restate the title. A good description gives enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria should be concrete and verifiable — each criterion is a pass/fail check.
+- Add acceptance criteria where requirements are clear.
+
+Deduplication:
+- Do NOT include items that duplicate anything already in the existing PRD below.
+- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
 ${parentConstraint}
 ${contextBlock}
 Existing PRD:
