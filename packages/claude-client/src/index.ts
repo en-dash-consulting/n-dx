@@ -42,6 +42,7 @@ export {
   loadClaudeConfig,
   resolveApiKey,
   resolveCliPath,
+  resolveModel,
 } from "./config.js";
 
 // Token usage parsing

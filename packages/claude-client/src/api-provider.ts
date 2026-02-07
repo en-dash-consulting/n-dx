@@ -13,7 +13,7 @@ import type {
   CompletionResult,
 } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import { resolveApiKey } from "./config.js";
+import { resolveApiKey, resolveModel } from "./config.js";
 import { parseApiTokenUsage } from "./token-usage.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
@@ -70,7 +70,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await client.messages.create({
-            model: request.model,
+            model: resolveModel(request.model),
             max_tokens: maxTokens,
             messages: [{ role: "user", content: request.prompt }],
           });

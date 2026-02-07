@@ -1,0 +1,22 @@
+{
+  "id": "completion-validation",
+  "name": "Completion Validation",
+  "description": "Specialized module for AI completion processing, validation, and regex-based text operations.",
+  "files": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/src/validation/completion.ts",
+    "packages/hench/src/validation/index.ts",
+    "packages/hench/tests/unit/agent/completion.test.ts",
+    "packages/hench/tests/unit/tools/completion-validation.test.ts",
+    "packages/hench/tests/unit/tools/rex.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/src/validation/completion.ts"
+  ],
+  "cohesion": 0.74,
+  "coupling": 0.26,
+  "fileCount": 7,
+  "lineCount": 1267
+}

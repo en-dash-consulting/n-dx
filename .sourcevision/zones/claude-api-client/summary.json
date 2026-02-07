@@ -1,0 +1,25 @@
+{
+  "id": "claude-api-client",
+  "name": "Claude API Client",
+  "description": "Dedicated package for Claude API integration with provider abstraction and token management.",
+  "files": [
+    "packages/claude-client/src/api-provider.ts",
+    "packages/claude-client/src/cli-provider.ts",
+    "packages/claude-client/src/config.ts",
+    "packages/claude-client/src/create-client.ts",
+    "packages/claude-client/src/index.ts",
+    "packages/claude-client/src/token-usage.ts",
+    "packages/claude-client/src/types.ts",
+    "packages/claude-client/tests/unit/api-provider.test.ts",
+    "packages/claude-client/tests/unit/cli-provider.test.ts",
+    "packages/claude-client/tests/unit/config.test.ts",
+    "packages/claude-client/tests/unit/create-client.test.ts",
+    "packages/claude-client/tests/unit/token-usage.test.ts",
+    "packages/claude-client/tests/unit/types.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 13,
+  "lineCount": 1474
+}

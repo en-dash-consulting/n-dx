@@ -104,6 +104,11 @@
       "children": []
     },
     {
+      "file": "packages/sourcevision/tests/fixtures/remix-app/app/routes/_auth.login.tsx",
+      "routePattern": "/login",
+      "children": []
+    },
+    {
       "file": "packages/sourcevision/tests/fixtures/remix-app/app/routes/users.$id.tsx",
       "routePattern": "/users/:id",
       "children": []

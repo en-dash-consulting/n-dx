@@ -16,6 +16,7 @@ import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../tool
 import { section, subsection, stream, detail, info } from "../types/output.js";
 import type { ToolContext } from "../types/index.js";
 import { loadClaudeConfig, resolveApiKey } from "../store/project-config.js";
+import { resolveModel } from "@n-dx/claude-client";
 
 export interface AgentLoopOptions {
   config: HenchConfig;
@@ -90,7 +91,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const { config, store, projectDir, henchDir, dryRun } = opts;
   const maxTurns = opts.maxTurns ?? config.maxTurns;
   const tokenBudget = opts.tokenBudget ?? config.tokenBudget;
-  const model = opts.model ?? config.model;
+  const model = resolveModel(opts.model ?? config.model);
 
   // Assemble brief
   const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {

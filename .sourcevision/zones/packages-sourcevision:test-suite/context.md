@@ -34,7 +34,7 @@ Outgoing (this zone → other zones):
   → packages-sourcevision:interactive-viewer: packages/sourcevision/src/schema/validate.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/schema/validate.ts → packages/sourcevision/src/schema/v1.ts
 
 Incoming (other zones → this zone):
-  ← packages-sourcevision:analysis-engine: packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts
+  ← packages-sourcevision:analysis-engine: packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts
   ← packages-sourcevision:interactive-viewer: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/validate.ts
 
 </imports>

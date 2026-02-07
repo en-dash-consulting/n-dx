@@ -12,6 +12,27 @@ import type { ClaudeConfig } from "./types.js";
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 
 /**
+ * Map of shorthand model aliases to full Anthropic API model IDs.
+ * The Claude CLI resolves these internally, but the API requires full IDs.
+ */
+const MODEL_ALIASES: Record<string, string> = {
+  sonnet: "claude-sonnet-4-20250514",
+  opus: "claude-opus-4-20250514",
+  haiku: "claude-haiku-4-20250414",
+};
+
+/**
+ * Resolve a model string to a full Anthropic API model ID.
+ *
+ * Shorthand names like "sonnet", "opus", "haiku" are expanded to their full
+ * model IDs. Strings that already look like full model IDs (contain "claude-")
+ * are returned as-is.
+ */
+export function resolveModel(model: string): string {
+  return MODEL_ALIASES[model] ?? model;
+}
+
+/**
  * Load the "claude" section from .n-dx.json in the given directory.
  * Returns an empty object if the file doesn't exist, is invalid, or has
  * no claude section.

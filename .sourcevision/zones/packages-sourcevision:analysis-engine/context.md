@@ -8,43 +8,43 @@ Zone: Analysis Engine (`packages-sourcevision:analysis-engine`)
 Files: 33, Cohesion: 0.94, Coupling: 0.06
 Description: Core analysis pipeline including file inventory, import graph extraction, Louvain community detection, route parsing, AI enrichment, and CLI orchestration.
 Entry points: packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/imports.ts, packages/sourcevision/src/analyzers/inventory.ts, packages/sourcevision/src/analyzers/zones.ts, packages/sourcevision/src/schema/data-files.ts
-Lines: 9977
+Lines: 10490
 
 </zone>
 
 <files>
 
-packages/sourcevision/src/analyzers/components.ts (TypeScript, 735 lines, source)
-packages/sourcevision/src/analyzers/context.ts (TypeScript, 200 lines, source)
-packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 622 lines, source)
-packages/sourcevision/src/analyzers/imports.ts (TypeScript, 391 lines, source)
+packages/sourcevision/src/analyzers/components.ts (TypeScript, 739 lines, source)
+packages/sourcevision/src/analyzers/context.ts (TypeScript, 203 lines, source)
+packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 624 lines, source)
+packages/sourcevision/src/analyzers/imports.ts (TypeScript, 475 lines, source)
 packages/sourcevision/src/analyzers/index.ts (TypeScript, 24 lines, source)
-packages/sourcevision/src/analyzers/inventory.ts (TypeScript, 642 lines, source)
-packages/sourcevision/src/analyzers/llms-txt.ts (TypeScript, 246 lines, source)
+packages/sourcevision/src/analyzers/inventory.ts (TypeScript, 652 lines, source)
+packages/sourcevision/src/analyzers/llms-txt.ts (TypeScript, 250 lines, source)
 packages/sourcevision/src/analyzers/louvain.ts (TypeScript, 440 lines, source)
 packages/sourcevision/src/analyzers/manifest.ts (TypeScript, 97 lines, source)
-packages/sourcevision/src/analyzers/next-steps.ts (TypeScript, 178 lines, source)
-packages/sourcevision/src/analyzers/route-detection.ts (TypeScript, 364 lines, source)
-packages/sourcevision/src/analyzers/zones.ts (TypeScript, 922 lines, source)
-packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 386 lines, source)
+packages/sourcevision/src/analyzers/next-steps.ts (TypeScript, 215 lines, source)
+packages/sourcevision/src/analyzers/route-detection.ts (TypeScript, 372 lines, source)
+packages/sourcevision/src/analyzers/zones.ts (TypeScript, 954 lines, source)
+packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 403 lines, source)
 packages/sourcevision/src/cli/commands/constants.ts (TypeScript, 24 lines, source)
 packages/sourcevision/src/cli/commands/init.ts (TypeScript, 52 lines, source)
 packages/sourcevision/src/cli/commands/reset.ts (TypeScript, 43 lines, source)
 packages/sourcevision/src/cli/commands/validate.ts (TypeScript, 70 lines, source)
 packages/sourcevision/src/cli/index.ts (TypeScript, 99 lines, source)
 packages/sourcevision/src/cli/mcp.ts (TypeScript, 380 lines, source)
-packages/sourcevision/src/cli/serve.ts (TypeScript, 191 lines, source)
+packages/sourcevision/src/cli/serve.ts (TypeScript, 9 lines, source)
 packages/sourcevision/src/schema/data-files.ts (TypeScript, 11 lines, source)
 packages/sourcevision/src/schema/index.ts (TypeScript, 16 lines, source)
 packages/sourcevision/src/util/merge.ts (TypeScript, 186 lines, source)
 packages/sourcevision/src/util/sort.ts (TypeScript, 160 lines, source)
-packages/sourcevision/tests/integration/context.test.ts (TypeScript, 133 lines, test)
-packages/sourcevision/tests/integration/llms-txt.test.ts (TypeScript, 112 lines, test)
-packages/sourcevision/tests/unit/analyzers/components.test.ts (TypeScript, 695 lines, test)
-packages/sourcevision/tests/unit/analyzers/imports.test.ts (TypeScript, 276 lines, test)
-packages/sourcevision/tests/unit/analyzers/inventory.test.ts (TypeScript, 448 lines, test)
+packages/sourcevision/tests/integration/context.test.ts (TypeScript, 154 lines, test)
+packages/sourcevision/tests/integration/llms-txt.test.ts (TypeScript, 136 lines, test)
+packages/sourcevision/tests/unit/analyzers/components.test.ts (TypeScript, 845 lines, test)
+packages/sourcevision/tests/unit/analyzers/imports.test.ts (TypeScript, 522 lines, test)
+packages/sourcevision/tests/unit/analyzers/inventory.test.ts (TypeScript, 492 lines, test)
 packages/sourcevision/tests/unit/analyzers/manifest.test.ts (TypeScript, 81 lines, test)
-packages/sourcevision/tests/unit/analyzers/zones.test.ts (TypeScript, 1431 lines, test)
+packages/sourcevision/tests/unit/analyzers/zones.test.ts (TypeScript, 1440 lines, test)
 packages/sourcevision/tests/unit/util/merge.test.ts (TypeScript, 146 lines, test)
 packages/sourcevision/tests/unit/util/sort.test.ts (TypeScript, 176 lines, test)
 
@@ -67,7 +67,8 @@ Internal:
   packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/inventory.ts {analyzeInventory, detectLanguage, classifyRole, deriveCategory, isBinary, loadIgnoreFilter, IgnoreFilter}
   packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/manifest.ts {readManifest, writeManifest, updateManifestModule, updateManifestError}
   packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/route-detection.ts {parseFileRoutePattern, buildRouteTree, findRoutesConfig, parseRoutesConfig, findRoutesDir}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/zones.ts {analyzeZones, AnalyzeZonesResult}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/zones.ts {analyzeZones}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/zones.ts {AnalyzeZonesResult}
   packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/schema/index.ts {FileEntry, FileRole, Inventory}
   packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/util/merge.ts {computeInventorySummary}
   packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/util/sort.ts {sortInventory, toCanonicalJSON}
@@ -113,7 +114,6 @@ Internal:
   packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/commands/constants.ts {SV_DIR}
   packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
   packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/schema/index.ts {Manifest, Inventory, Imports, Zones, Components}
-  packages/sourcevision/src/cli/serve.ts → packages/sourcevision/src/schema/data-files.ts {ALL_DATA_FILES, SUPPLEMENTARY_FILES}
   packages/sourcevision/src/util/merge.ts → packages/sourcevision/src/schema/index.ts {FileEntry, Inventory, InventorySummary, ImportEdge, ExternalImport, Imports, FileRole}
   packages/sourcevision/src/util/merge.ts → packages/sourcevision/src/util/sort.ts {sortInventory, sortImports}
   packages/sourcevision/src/util/sort.ts → packages/sourcevision/src/schema/index.ts {FileEntry, ImportEdge, ExternalImport, Zone, ZoneCrossing, Inventory, Imports, Zones, Finding, ComponentDefinition, ComponentUsageEdge, RouteModule, Components}
@@ -142,7 +142,7 @@ Internal:
 
 Outgoing (this zone → other zones):
   → packages-sourcevision:interactive-viewer: packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/v1.ts
-  → packages-sourcevision:test-suite: packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts
+  → packages-sourcevision:test-suite: packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts
 
 Incoming (other zones → this zone):
   ← packages-sourcevision:interactive-viewer: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts

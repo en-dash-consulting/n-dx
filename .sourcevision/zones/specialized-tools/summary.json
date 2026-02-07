@@ -1,0 +1,22 @@
+{
+  "id": "specialized-tools",
+  "name": "Specialized Tools",
+  "description": "Specific tool implementations for development operations including shell execution, git operations, and test running.",
+  "files": [
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/index.ts",
+    "packages/hench/src/tools/test-runner.ts",
+    "packages/hench/tests/unit/tools/git.test.ts",
+    "packages/hench/tests/unit/tools/test-runner.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/index.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 6,
+  "lineCount": 1140
+}

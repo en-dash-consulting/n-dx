@@ -1,0 +1,29 @@
+{
+  "id": "agent-tools-layer",
+  "name": "Agent Tools Layer",
+  "description": "Core tool implementations and safety guards that provide controlled access to system operations for AI agents.",
+  "files": [
+    "packages/hench/src/agent/tools.ts",
+    "packages/hench/src/guard/commands.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts",
+    "packages/hench/src/tools/dispatch.ts",
+    "packages/hench/src/tools/files.ts",
+    "packages/hench/src/tools/shell.ts",
+    "packages/hench/tests/unit/guard/commands.test.ts",
+    "packages/hench/tests/unit/guard/paths.test.ts",
+    "packages/hench/tests/unit/tools/files.test.ts",
+    "packages/hench/tests/unit/tools/shell.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/tools.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/tools/dispatch.ts",
+    "packages/hench/src/tools/files.ts",
+    "packages/hench/src/tools/shell.ts"
+  ],
+  "cohesion": 0.69,
+  "coupling": 0.31,
+  "fileCount": 11,
+  "lineCount": 1331
+}

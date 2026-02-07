@@ -3160,7 +3160,7 @@
         {
           "id": "782a6e2b-5535-4507-a247-1a13aa604bc1",
           "title": "Status Transitions and Dependency Management",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Robust handling of task status transitions and blockedBy dependencies with proper validation, error messages, and edge case handling",
           "source": "llm",
@@ -3188,7 +3188,7 @@
             {
               "id": "e4cda52c-2124-4ce4-8a18-4210af010937",
               "title": "Harden status transitions and dependency management",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Improve status transition validation, error messages, and edge case handling. Implement full blockedBy support in add and update commands with proper validation.",
               "acceptanceCriteria": [
@@ -3210,9 +3210,12 @@
                 "validateTransition",
                 "status"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-07T22:03:22.142Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-07T22:03:22.357Z",
+          "completedAt": "2026-02-07T22:03:22.357Z"
         },
         {
           "id": "f7e6483d-d731-4923-b934-bba8d70151f2",
@@ -4569,7 +4572,7 @@
             {
               "id": "c8d334c5-f072-4260-8cad-1ce6f02b27a2",
               "title": "Implement PDF report generation for sourcevision health metrics",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Create a PDF export feature that compiles sourcevision analysis results into a formatted health report including file inventory, zone architecture, component catalog, and import graph insights",
               "acceptanceCriteria": [
@@ -4585,7 +4588,8 @@
                 "export",
                 "reporting"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-07T21:56:10.010Z"
             },
             {
               "id": "9aaf4ed7-577f-45ee-a812-05f46ef3f8c8",

@@ -17,6 +17,337 @@
       ]
     },
     {
+      "from": "cli.js",
+      "to": "web.js",
+      "type": "static",
+      "symbols": [
+        "runWeb"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/api-provider.ts",
+      "to": "packages/claude-client/src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveApiKey"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/api-provider.ts",
+      "to": "packages/claude-client/src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseApiTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/api-provider.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/api-provider.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/cli-provider.ts",
+      "to": "packages/claude-client/src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/cli-provider.ts",
+      "to": "packages/claude-client/src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/cli-provider.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/cli-provider.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult",
+        "TokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/config.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/api-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/api-provider.ts",
+      "type": "type",
+      "symbols": [
+        "ApiProviderOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/cli-provider.ts",
+      "type": "type",
+      "symbols": [
+        "CliProviderOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveApiKey"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/create-client.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "AuthMode",
+        "ClaudeClient",
+        "ClaudeClientOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/api-provider.ts",
+      "type": "reexport",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/api-provider.ts",
+      "type": "type",
+      "symbols": [
+        "ApiProviderOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/cli-provider.ts",
+      "type": "reexport",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/cli-provider.ts",
+      "type": "type",
+      "symbols": [
+        "CliProviderOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/config.ts",
+      "type": "reexport",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/create-client.ts",
+      "type": "reexport",
+      "symbols": [
+        "createClient",
+        "detectAuthMode"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/create-client.ts",
+      "type": "type",
+      "symbols": [
+        "CreateClientOptions"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/token-usage.ts",
+      "type": "reexport",
+      "symbols": [
+        "parseApiTokenUsage",
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "reexport",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/index.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage",
+        "ClaudeConfig",
+        "AuthMode",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult",
+        "ErrorReason",
+        "ClaudeClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/src/token-usage.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/api-provider.test.ts",
+      "to": "packages/claude-client/src/api-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/api-provider.test.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/cli-provider.test.ts",
+      "to": "packages/claude-client/src/cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/cli-provider.test.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/config.test.ts",
+      "to": "packages/claude-client/src/config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/create-client.test.ts",
+      "to": "packages/claude-client/src/create-client.ts",
+      "type": "static",
+      "symbols": [
+        "createClient",
+        "detectAuthMode"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/create-client.test.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/create-client.test.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/token-usage.test.ts",
+      "to": "packages/claude-client/src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseApiTokenUsage",
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/claude-client/tests/unit/types.test.ts",
+      "to": "packages/claude-client/src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
       "from": "packages/hench/src/agent/brief.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
@@ -36,15 +367,6 @@
       "symbols": [
         "assembleTaskBrief",
         "formatTaskBrief"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/agent/completion.ts",
-      "type": "static",
-      "symbols": [
-        "validateCompletion",
-        "formatValidationResult"
       ]
     },
     {
@@ -79,6 +401,15 @@
       "type": "static",
       "symbols": [
         "checkTokenBudget"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/cli-loop.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseTokenUsage",
+        "parseStreamTokenUsage"
       ]
     },
     {
@@ -103,18 +434,28 @@
     },
     {
       "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/store/project-config.ts",
       "type": "static",
       "symbols": [
-        "toolRexUpdateStatus",
-        "toolRexAppendLog"
+        "loadClaudeConfig",
+        "resolveCliPath"
       ]
     },
     {
       "from": "packages/hench/src/agent/cli-loop.ts",
-      "to": "packages/hench/src/tools/test-runner.ts",
+      "to": "packages/hench/src/store/project-config.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/cli-loop.ts",
+      "to": "packages/hench/src/tools/index.ts",
       "type": "static",
       "symbols": [
+        "toolRexUpdateStatus",
+        "toolRexAppendLog",
         "runPostTaskTests"
       ]
     },
@@ -128,6 +469,187 @@
         "stream",
         "detail",
         "info"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/cli-loop.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "static",
+      "symbols": [
+        "validateCompletion",
+        "formatValidationResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/completion.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateCompletion",
+        "formatValidationResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/completion.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionValidationResult",
+        "CompletionValidationOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/brief.ts",
+      "type": "reexport",
+      "symbols": [
+        "assembleTaskBrief",
+        "formatTaskBrief",
+        "getActionableTasks",
+        "collectEpicTaskIds",
+        "TaskNotActionableError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/brief.ts",
+      "type": "type",
+      "symbols": [
+        "AssembleBriefOptions",
+        "ActionableTask"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/cli-loop.ts",
+      "type": "reexport",
+      "symbols": [
+        "cliLoop"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/cli-loop.ts",
+      "type": "type",
+      "symbols": [
+        "CliLoopOptions",
+        "CliLoopResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/loop.ts",
+      "type": "reexport",
+      "symbols": [
+        "agentLoop"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/loop.ts",
+      "type": "type",
+      "symbols": [
+        "AgentLoopOptions",
+        "AgentLoopResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/prompt.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildSystemPrompt"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/review.ts",
+      "type": "reexport",
+      "symbols": [
+        "collectReviewDiff",
+        "promptReview",
+        "revertChanges"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/review.ts",
+      "type": "type",
+      "symbols": [
+        "ReviewResult",
+        "ReviewDiff"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/stuck.ts",
+      "type": "reexport",
+      "symbols": [
+        "countRecentFailures",
+        "isStuckTask",
+        "getStuckTaskIds"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/summary.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildRunSummary"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/token-budget.ts",
+      "type": "reexport",
+      "symbols": [
+        "checkTokenBudget"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/token-budget.ts",
+      "type": "type",
+      "symbols": [
+        "TokenBudgetResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
+      "type": "reexport",
+      "symbols": [
+        "parseTokenUsage",
+        "parseStreamTokenUsage",
+        "emptyAggregateTokenUsage",
+        "accumulateTokenUsage",
+        "formatTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateCompletion",
+        "formatValidationResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/index.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionValidationResult",
+        "CompletionValidationOptions"
       ]
     },
     {
@@ -175,11 +697,10 @@
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/agent/tools.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
       "type": "static",
       "symbols": [
-        "TOOL_DEFINITIONS",
-        "dispatchTool"
+        "parseTokenUsage"
       ]
     },
     {
@@ -210,18 +731,29 @@
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/store/project-config.ts",
       "type": "static",
       "symbols": [
-        "toolRexUpdateStatus",
-        "toolRexAppendLog"
+        "loadClaudeConfig",
+        "resolveApiKey"
       ]
     },
     {
       "from": "packages/hench/src/agent/loop.ts",
-      "to": "packages/hench/src/tools/test-runner.ts",
+      "to": "packages/hench/src/tools/dispatch.ts",
       "type": "static",
       "symbols": [
+        "TOOL_DEFINITIONS",
+        "dispatchTool"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/loop.ts",
+      "to": "packages/hench/src/tools/index.ts",
+      "type": "static",
+      "symbols": [
+        "toolRexUpdateStatus",
+        "toolRexAppendLog",
         "runPostTaskTests"
       ]
     },
@@ -292,56 +824,20 @@
       ]
     },
     {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/guard/index.ts",
-      "type": "static",
+      "from": "packages/hench/src/agent/token-usage.ts",
+      "to": "packages/hench/src/schema/index.ts",
+      "type": "type",
       "symbols": [
-        "GuardError"
+        "TokenUsage"
       ]
     },
     {
       "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/tools/files.ts",
-      "type": "static",
-      "symbols": [
-        "toolReadFile",
-        "toolWriteFile",
-        "toolListDirectory",
-        "toolSearchFiles"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/tools/git.ts",
-      "type": "static",
-      "symbols": [
-        "toolGit"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "type": "static",
-      "symbols": [
-        "toolRexUpdateStatus",
-        "toolRexAppendLog",
-        "toolRexAddSubtask"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/tools/shell.ts",
-      "type": "static",
-      "symbols": [
-        "toolRunCommand"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/tools.ts",
-      "to": "packages/hench/src/types/index.ts",
+      "to": "packages/hench/src/tools/dispatch.ts",
       "type": "reexport",
       "symbols": [
-        "ToolContext"
+        "TOOL_DEFINITIONS",
+        "dispatchTool"
       ]
     },
     {
@@ -462,6 +958,15 @@
       "symbols": [
         "loadConfig",
         "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveCliPath"
       ]
     },
     {
@@ -653,7 +1158,14 @@
       "type": "reexport",
       "symbols": [
         "HENCH_SCHEMA_VERSION",
-        "DEFAULT_HENCH_CONFIG",
+        "DEFAULT_HENCH_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/index.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
         "GuardConfig",
         "RetryConfig",
         "HenchConfig",
@@ -684,7 +1196,14 @@
         "HenchConfigSchema",
         "RunRecordSchema",
         "validateConfig",
-        "validateRunRecord",
+        "validateRunRecord"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/index.ts",
+      "to": "packages/hench/src/schema/validate.ts",
+      "type": "type",
+      "symbols": [
         "ValidationResult"
       ]
     },
@@ -769,6 +1288,59 @@
       ]
     },
     {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/guard/index.ts",
+      "type": "static",
+      "symbols": [
+        "GuardError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/tools/files.ts",
+      "type": "static",
+      "symbols": [
+        "toolReadFile",
+        "toolWriteFile",
+        "toolListDirectory",
+        "toolSearchFiles"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/tools/git.ts",
+      "type": "static",
+      "symbols": [
+        "toolGit"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/tools/rex.ts",
+      "type": "static",
+      "symbols": [
+        "toolRexUpdateStatus",
+        "toolRexAppendLog",
+        "toolRexAddSubtask"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/tools/shell.ts",
+      "type": "static",
+      "symbols": [
+        "toolRunCommand"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "type": "type",
+      "symbols": [
+        "ToolContext"
+      ]
+    },
+    {
       "from": "packages/hench/src/tools/files.ts",
       "to": "packages/hench/src/guard/index.ts",
       "type": "type",
@@ -785,8 +1357,92 @@
       ]
     },
     {
+      "from": "packages/hench/src/tools/git.ts",
+      "to": "packages/hench/src/tools/exec-shell.ts",
+      "type": "static",
+      "symbols": [
+        "execShell"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/dispatch.ts",
+      "type": "reexport",
+      "symbols": [
+        "TOOL_DEFINITIONS",
+        "dispatchTool"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/files.ts",
+      "type": "reexport",
+      "symbols": [
+        "toolReadFile",
+        "toolWriteFile",
+        "toolListDirectory",
+        "toolSearchFiles"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/git.ts",
+      "type": "reexport",
+      "symbols": [
+        "toolGit"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/rex.ts",
+      "type": "reexport",
+      "symbols": [
+        "toolRexUpdateStatus",
+        "toolRexAppendLog",
+        "toolRexAddSubtask"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/rex.ts",
+      "type": "type",
+      "symbols": [
+        "UpdateStatusOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/shell.ts",
+      "type": "reexport",
+      "symbols": [
+        "toolRunCommand"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/test-runner.ts",
+      "type": "reexport",
+      "symbols": [
+        "runPostTaskTests",
+        "findRelevantTests",
+        "isTestFile",
+        "candidateTestPaths",
+        "detectRunner",
+        "buildScopedCommand"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/test-runner.ts",
+      "type": "type",
+      "symbols": [
+        "PostRunTestResult",
+        "TestRunnerOptions"
+      ]
+    },
+    {
       "from": "packages/hench/src/tools/rex.ts",
-      "to": "packages/hench/src/agent/completion.ts",
+      "to": "packages/hench/src/validation/completion.ts",
       "type": "static",
       "symbols": [
         "validateCompletion",
@@ -799,6 +1455,14 @@
       "type": "type",
       "symbols": [
         "GuardRails"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/shell.ts",
+      "to": "packages/hench/src/tools/exec-shell.ts",
+      "type": "static",
+      "symbols": [
+        "execShell"
       ]
     },
     {
@@ -822,6 +1486,41 @@
         "subsection",
         "stream",
         "detail"
+      ]
+    },
+    {
+      "from": "packages/hench/src/validation/index.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateCompletion",
+        "formatValidationResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/validation/index.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionValidationResult",
+        "CompletionValidationOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/e2e/cli-init.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "DEFAULT_HENCH_CONFIG",
+        "HENCH_SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/e2e/cli-init.test.ts",
+      "to": "packages/hench/src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "HenchConfigSchema"
       ]
     },
     {
@@ -860,6 +1559,46 @@
         "saveRun",
         "loadRun",
         "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/api-auth.test.ts",
+      "to": "packages/hench/src/agent/cli-loop.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/api-auth.test.ts",
+      "to": "packages/hench/src/agent/loop.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/api-auth.test.ts",
+      "to": "packages/hench/src/store/config.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/api-auth.test.ts",
+      "to": "packages/hench/src/store/config.ts",
+      "type": "static",
+      "symbols": [
+        "initConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/api-auth.test.ts",
+      "to": "packages/hench/src/store/project-config.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
       ]
     },
     {
@@ -1066,7 +1805,14 @@
       "to": "packages/hench/src/agent/token-budget.ts",
       "type": "static",
       "symbols": [
-        "checkTokenBudget",
+        "checkTokenBudget"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/token-budget.test.ts",
+      "to": "packages/hench/src/agent/token-budget.ts",
+      "type": "type",
+      "symbols": [
         "TokenBudgetResult"
       ]
     },
@@ -1083,7 +1829,14 @@
       "to": "packages/hench/src/agent/cli-loop.ts",
       "type": "static",
       "symbols": [
-        "processStreamLine",
+        "processStreamLine"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/token-tracking.test.ts",
+      "to": "packages/hench/src/agent/cli-loop.ts",
+      "type": "type",
+      "symbols": [
         "CliRunResult"
       ]
     },
@@ -1093,6 +1846,26 @@
       "type": "type",
       "symbols": [
         "TurnTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/token-usage.test.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseTokenUsage",
+        "parseStreamTokenUsage",
+        "emptyAggregateTokenUsage",
+        "accumulateTokenUsage",
+        "formatTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/token-usage.test.ts",
+      "to": "packages/hench/src/agent/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage"
       ]
     },
     {
@@ -1120,7 +1893,14 @@
         "findEpicByIdOrTitle",
         "resolveEpicFlag",
         "collectEpicTaskIds",
-        "getEpicScopeInfo",
+        "getEpicScopeInfo"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+      "to": "packages/hench/src/cli/commands/run.ts",
+      "type": "type",
+      "symbols": [
         "EpicScopeInfo"
       ]
     },
@@ -1245,6 +2025,24 @@
       ]
     },
     {
+      "from": "packages/hench/tests/unit/store/claude-config.test.ts",
+      "to": "packages/hench/src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/claude-config.test.ts",
+      "to": "packages/hench/src/store/project-config.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
       "from": "packages/hench/tests/unit/store/project-config.test.ts",
       "to": "packages/hench/src/store/config.ts",
       "type": "static",
@@ -1256,19 +2054,19 @@
     },
     {
       "from": "packages/hench/tests/unit/tools/completion-validation.test.ts",
-      "to": "packages/hench/src/agent/completion.ts",
-      "type": "static",
-      "symbols": [
-        "validateCompletion",
-        "formatValidationResult"
-      ]
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/completion-validation.test.ts",
       "to": "packages/hench/src/tools/rex.ts",
       "type": "static",
       "symbols": [
         "toolRexUpdateStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/completion-validation.test.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "static",
+      "symbols": [
+        "validateCompletion",
+        "formatValidationResult"
       ]
     },
     {
@@ -1445,8 +2243,6 @@
       "to": "packages/rex/src/analyze/guided.ts",
       "type": "reexport",
       "symbols": [
-        "GuidedContext",
-        "ClarifyResponse",
         "runGuidedSpec",
         "clarify",
         "generateSpecFromContext"
@@ -1454,13 +2250,29 @@
     },
     {
       "from": "packages/rex/src/analyze/index.ts",
+      "to": "packages/rex/src/analyze/guided.ts",
+      "type": "type",
+      "symbols": [
+        "GuidedContext",
+        "ClarifyResponse"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/index.ts",
       "to": "packages/rex/src/analyze/propose.ts",
       "type": "reexport",
       "symbols": [
+        "buildProposals"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/index.ts",
+      "to": "packages/rex/src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
         "Proposal",
         "ProposalFeature",
-        "ProposalTask",
-        "buildProposals"
+        "ProposalTask"
       ]
     },
     {
@@ -1468,13 +2280,11 @@
       "to": "packages/rex/src/analyze/reason.ts",
       "type": "reexport",
       "symbols": [
-        "FileFormat",
-        "AddPromptOptions",
-        "QualityIssue",
-        "ClaudeResult",
-        "ReasonResult",
         "DEFAULT_MODEL",
         "MAX_RETRIES",
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode",
         "CHUNK_CHAR_LIMIT",
         "CHUNK_ITEM_LIMIT",
         "FEW_SHOT_EXAMPLE",
@@ -1496,6 +2306,13 @@
         "validateProposalQuality",
         "buildAddPrompt",
         "buildMultiAddPrompt",
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt",
+        "adjustGranularity",
+        "buildAssessmentPrompt",
+        "parseAssessmentResponse",
+        "formatAssessment",
+        "assessGranularity",
         "detectFileFormat",
         "parseStructuredFile",
         "mergeProposals",
@@ -1505,11 +2322,32 @@
     },
     {
       "from": "packages/rex/src/analyze/index.ts",
+      "to": "packages/rex/src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "FileFormat",
+        "AddPromptOptions",
+        "QualityIssue",
+        "ClaudeResult",
+        "ReasonResult",
+        "GranularityAssessment",
+        "GranularityAssessmentResult"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/index.ts",
       "to": "packages/rex/src/analyze/reconcile.ts",
       "type": "reexport",
       "symbols": [
-        "ReconcileStats",
         "reconcile"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/index.ts",
+      "to": "packages/rex/src/analyze/reconcile.ts",
+      "type": "type",
+      "symbols": [
+        "ReconcileStats"
       ]
     },
     {
@@ -1517,12 +2355,19 @@
       "to": "packages/rex/src/analyze/scanners.ts",
       "type": "reexport",
       "symbols": [
-        "ScanResult",
-        "ScanOptions",
         "scanTests",
         "scanDocs",
         "scanSourceVision",
         "scanPackageJson"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/index.ts",
+      "to": "packages/rex/src/analyze/scanners.ts",
+      "type": "type",
+      "symbols": [
+        "ScanResult",
+        "ScanOptions"
       ]
     },
     {
@@ -1574,6 +2419,14 @@
         "PRDItem",
         "TokenUsage",
         "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/reconcile.ts",
+      "to": "packages/rex/src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
       ]
     },
     {
@@ -1728,6 +2581,14 @@
     {
       "from": "packages/rex/src/cli/commands/analyze.ts",
       "to": "packages/rex/src/analyze/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/analyze/index.ts",
       "type": "static",
       "symbols": [
         "scanTests",
@@ -1741,7 +2602,9 @@
         "reasonFromScanResults",
         "emptyAnalyzeTokenUsage",
         "formatDiff",
-        "DEFAULT_MODEL"
+        "DEFAULT_MODEL",
+        "setClaudeConfig",
+        "getAuthMode"
       ]
     },
     {
@@ -1751,6 +2614,22 @@
       "symbols": [
         "ScanResult",
         "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/cli/commands/chunked-review.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/cli/commands/chunked-review.ts",
+      "type": "type",
+      "symbols": [
+        "BatchAcceptanceRecord"
       ]
     },
     {
@@ -1782,6 +2661,14 @@
     },
     {
       "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/cli/validate-input.ts",
+      "type": "static",
+      "symbols": [
+        "parseIntSafe"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
       "to": "packages/rex/src/core/token-usage.ts",
       "type": "static",
       "symbols": [
@@ -1805,6 +2692,31 @@
       "type": "static",
       "symbols": [
         "resolveStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/chunked-review.ts",
+      "to": "packages/rex/src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/chunked-review.ts",
+      "to": "packages/rex/src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
       ]
     },
     {
@@ -2105,12 +3017,22 @@
     {
       "from": "packages/rex/src/cli/commands/smart-add.ts",
       "to": "packages/rex/src/analyze/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/smart-add.ts",
+      "to": "packages/rex/src/analyze/index.ts",
       "type": "static",
       "symbols": [
         "reasonFromDescriptions",
         "reasonFromIdeasFile",
         "validateProposalQuality",
-        "DEFAULT_MODEL"
+        "DEFAULT_MODEL",
+        "setClaudeConfig",
+        "getAuthMode"
       ]
     },
     {
@@ -2171,6 +3093,14 @@
       "type": "static",
       "symbols": [
         "resolveStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/smart-add.ts",
+      "to": "packages/rex/src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig"
       ]
     },
     {
@@ -2843,6 +3773,30 @@
       ]
     },
     {
+      "from": "packages/rex/src/cli/validate-input.ts",
+      "to": "packages/rex/src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/validate-input.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/validate-input.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel"
+      ]
+    },
+    {
       "from": "packages/rex/src/core/canonical.ts",
       "to": "packages/rex/src/schema/index.ts",
       "type": "type",
@@ -2866,6 +3820,14 @@
       "type": "type",
       "symbols": [
         "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/src/core/move.ts",
+      "to": "packages/rex/src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
       ]
     },
     {
@@ -3018,7 +3980,14 @@
         "resolveConflicts",
         "stampSynced",
         "extractSyncMeta",
-        "conflictToLogEntry",
+        "conflictToLogEntry"
+      ]
+    },
+    {
+      "from": "packages/rex/src/core/sync-engine.ts",
+      "to": "packages/rex/src/core/sync.ts",
+      "type": "type",
+      "symbols": [
         "ConflictRecord"
       ]
     },
@@ -3122,13 +4091,88 @@
       ]
     },
     {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/next-task.ts",
+      "type": "reexport",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/parent-completion.ts",
+      "type": "reexport",
+      "symbols": [
+        "findAutoCompletions"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/timestamps.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "reexport",
+      "symbols": [
+        "findItem",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "type",
+      "symbols": [
+        "TreeEntry"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/store/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
       "from": "packages/rex/src/schema/index.ts",
       "to": "packages/rex/src/schema/v1.ts",
       "type": "reexport",
       "symbols": [
         "SCHEMA_VERSION",
         "LEVEL_HIERARCHY",
-        "DEFAULT_CONFIG",
+        "DEFAULT_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/rex/src/schema/index.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
         "ItemLevel",
         "ItemStatus",
         "Priority",
@@ -3152,7 +4196,14 @@
         "LogEntrySchema",
         "validateDocument",
         "validateConfig",
-        "validateLogEntry",
+        "validateLogEntry"
+      ]
+    },
+    {
+      "from": "packages/rex/src/schema/index.ts",
+      "to": "packages/rex/src/schema/validate.ts",
+      "type": "type",
+      "symbols": [
         "ValidationResult"
       ]
     },
@@ -3259,7 +4310,14 @@
       "to": "packages/rex/src/core/sync-engine.ts",
       "type": "reexport",
       "symbols": [
-        "SyncEngine",
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/index.ts",
+      "to": "packages/rex/src/core/sync-engine.ts",
+      "type": "type",
+      "symbols": [
         "SyncDirection",
         "SyncReport",
         "SyncOptions"
@@ -3272,12 +4330,7 @@
       "symbols": [
         "AdapterRegistry",
         "getDefaultRegistry",
-        "resetDefaultRegistry",
-        "AdapterDefinition",
-        "AdapterFactory",
-        "AdapterConfig",
-        "AdapterConfigField",
-        "AdapterInfo"
+        "resetDefaultRegistry"
       ]
     },
     {
@@ -3286,6 +4339,18 @@
       "type": "static",
       "symbols": [
         "getDefaultRegistry"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/index.ts",
+      "to": "packages/rex/src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
+        "AdapterDefinition",
+        "AdapterFactory",
+        "AdapterConfig",
+        "AdapterConfigField",
+        "AdapterInfo"
       ]
     },
     {
@@ -3327,8 +4392,6 @@
       "to": "packages/rex/src/store/notion-client.ts",
       "type": "reexport",
       "symbols": [
-        "NotionClient",
-        "NotionAdapterConfig",
         "LiveNotionClient"
       ]
     },
@@ -3345,16 +4408,8 @@
       "to": "packages/rex/src/store/notion-client.ts",
       "type": "type",
       "symbols": [
+        "NotionClient",
         "NotionAdapterConfig"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/index.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "reexport",
-      "symbols": [
-        "PRDStore",
-        "StoreCapabilities"
       ]
     },
     {
@@ -3362,7 +4417,8 @@
       "to": "packages/rex/src/store/types.ts",
       "type": "type",
       "symbols": [
-        "PRDStore"
+        "PRDStore",
+        "StoreCapabilities"
       ]
     },
     {
@@ -3473,6 +4529,52 @@
         "PRDItem",
         "RexConfig",
         "LogEntry"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/e2e/cli-init.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "DEFAULT_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/e2e/cli-init.test.ts",
+      "to": "packages/rex/src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "RexConfigSchema",
+        "PRDDocumentSchema"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/claude-config.test.ts",
+      "to": "packages/rex/src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/claude-config.test.ts",
+      "to": "packages/rex/src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveCliPath",
+        "resolveApiKey"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/claude-config.test.ts",
+      "to": "packages/rex/src/store/project-config.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
       ]
     },
     {
@@ -3633,12 +4735,55 @@
       ]
     },
     {
+      "from": "packages/rex/tests/unit/analyze/reason-assessment.test.ts",
+      "to": "packages/rex/src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/analyze/reason-assessment.test.ts",
+      "to": "packages/rex/src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildAssessmentPrompt",
+        "parseAssessmentResponse",
+        "formatAssessment"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/analyze/reason-assessment.test.ts",
+      "to": "packages/rex/src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "GranularityAssessment"
+      ]
+    },
+    {
       "from": "packages/rex/tests/unit/analyze/reason-description.test.ts",
       "to": "packages/rex/src/analyze/reason.ts",
       "type": "static",
       "symbols": [
         "parseProposalResponse",
         "buildAddPrompt"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/analyze/reason-granularity.test.ts",
+      "to": "packages/rex/src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/analyze/reason-granularity.test.ts",
+      "to": "packages/rex/src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt"
       ]
     },
     {
@@ -3793,6 +4938,47 @@
       ]
     },
     {
+      "from": "packages/rex/tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "packages/rex/src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "packages/rex/src/cli/commands/chunked-review.ts",
+      "type": "static",
+      "symbols": [
+        "createReviewState",
+        "getCurrentChunk",
+        "formatPaginationHeader",
+        "formatChunk",
+        "formatActionMenu",
+        "buildPrompt",
+        "parseChunkInput",
+        "applyAction",
+        "getAcceptedProposals",
+        "getRemainingProposals",
+        "replaceProposals",
+        "buildBatchRecord",
+        "formatBatchSummary"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "packages/rex/src/cli/commands/chunked-review.ts",
+      "type": "type",
+      "symbols": [
+        "ChunkReviewState",
+        "ChunkAction",
+        "BatchAcceptanceRecord",
+        "GranularityRequest",
+        "GranularityAdjustmentRecord",
+        "ProposalAssessment"
+      ]
+    },
+    {
       "from": "packages/rex/tests/unit/cli/commands/move.test.ts",
       "to": "packages/rex/src/cli/commands/move.ts",
       "type": "static",
@@ -3842,6 +5028,7 @@
         "countProposalItems",
         "filterProposalsByIndex",
         "parseApprovalInput",
+        "parseGranularityInput",
         "formatQualityWarnings"
       ]
     },
@@ -4036,6 +5223,26 @@
       ]
     },
     {
+      "from": "packages/rex/tests/unit/cli/validate-input.test.ts",
+      "to": "packages/rex/src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/cli/validate-input.test.ts",
+      "to": "packages/rex/src/cli/validate-input.ts",
+      "type": "static",
+      "symbols": [
+        "parseIntSafe",
+        "validateLevel",
+        "requireParent",
+        "validateFormat",
+        "requireUpdates"
+      ]
+    },
+    {
       "from": "packages/rex/tests/unit/core/canonical.test.ts",
       "to": "packages/rex/src/core/canonical.ts",
       "type": "static",
@@ -4066,6 +5273,14 @@
       "type": "type",
       "symbols": [
         "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/move.test.ts",
+      "to": "packages/rex/src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
       ]
     },
     {
@@ -4195,7 +5410,14 @@
       "to": "packages/rex/src/core/sync-engine.ts",
       "type": "static",
       "symbols": [
-        "SyncEngine",
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/sync-engine.test.ts",
+      "to": "packages/rex/src/core/sync-engine.ts",
+      "type": "type",
+      "symbols": [
         "SyncDirection",
         "SyncReport"
       ]
@@ -4391,7 +5613,14 @@
       "to": "packages/rex/src/store/adapter-registry.ts",
       "type": "static",
       "symbols": [
-        "AdapterRegistry",
+        "AdapterRegistry"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/store/adapter-registry.test.ts",
+      "to": "packages/rex/src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
         "AdapterDefinition",
         "AdapterConfig"
       ]
@@ -4590,16 +5819,7 @@
       ]
     },
     {
-      "from": "packages/sourcevision/src/analyzers/claude-cli.ts",
-      "to": "packages/sourcevision/src/analyzers/enrich-config.ts",
-      "type": "static",
-      "symbols": [
-        "IDLE_TIMEOUT_MS",
-        "OVERALL_TIMEOUT_MS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/analyzers/claude-cli.ts",
+      "from": "packages/sourcevision/src/analyzers/claude-client.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -4688,10 +5908,11 @@
     },
     {
       "from": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
-      "to": "packages/sourcevision/src/analyzers/claude-cli.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
       "type": "static",
       "symbols": [
-        "tryCallClaude"
+        "callClaude",
+        "ClaudeClientError"
       ]
     },
     {
@@ -4702,8 +5923,6 @@
         "MAX_CONCURRENT_ZONES",
         "PER_ZONE_MAX_FILES",
         "PER_ZONE_MAX_CROSSINGS",
-        "IDLE_TIMEOUT_MS",
-        "OVERALL_TIMEOUT_MS",
         "getPassConfig",
         "computePerZoneAttemptConfigs"
       ]
@@ -4752,20 +5971,31 @@
     },
     {
       "from": "packages/sourcevision/src/analyzers/enrich.ts",
-      "to": "packages/sourcevision/src/analyzers/claude-cli.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
       "type": "reexport",
       "symbols": [
-        "tryCallClaude",
-        "parseStreamTokenUsage",
-        "ClaudeCallResult"
+        "callClaude",
+        "setClaudeConfig",
+        "getAuthMode",
+        "ClaudeClientError",
+        "DEFAULT_MODEL"
       ]
     },
     {
       "from": "packages/sourcevision/src/analyzers/enrich.ts",
-      "to": "packages/sourcevision/src/analyzers/claude-cli.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
       "type": "static",
       "symbols": [
-        "tryCallClaude"
+        "callClaude",
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/enrich.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "type",
+      "symbols": [
+        "CallClaudeResult"
       ]
     },
     {
@@ -4780,8 +6010,7 @@
         "computePerZoneAttemptConfigs",
         "MAX_CONCURRENT_ZONES",
         "PER_ZONE_MAX_FILES",
-        "PER_ZONE_MAX_CROSSINGS",
-        "PassConfig"
+        "PER_ZONE_MAX_CROSSINGS"
       ]
     },
     {
@@ -4791,8 +6020,6 @@
       "symbols": [
         "ZONES_PER_BATCH",
         "MAX_CONCURRENT_BATCHES",
-        "IDLE_TIMEOUT_MS",
-        "OVERALL_TIMEOUT_MS",
         "getPassConfig",
         "computeAttemptConfigs",
         "buildMetaPrompt"
@@ -4813,8 +6040,7 @@
       "symbols": [
         "tryParseJSON",
         "extractFindings",
-        "mergeZonesByName",
-        "EnrichResult"
+        "mergeZonesByName"
       ]
     },
     {
@@ -4842,7 +6068,14 @@
       "type": "reexport",
       "symbols": [
         "enrichZonesPerZone",
-        "computeZoneStructureHash",
+        "computeZoneStructureHash"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/enrich.ts",
+      "to": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+      "type": "type",
+      "symbols": [
         "PerZoneEnrichResult"
       ]
     },
@@ -4982,7 +6215,14 @@
       "to": "packages/sourcevision/src/analyzers/zones.ts",
       "type": "reexport",
       "symbols": [
-        "analyzeZones",
+        "analyzeZones"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/index.ts",
+      "to": "packages/sourcevision/src/analyzers/zones.ts",
+      "type": "type",
+      "symbols": [
         "AnalyzeZonesResult"
       ]
     },
@@ -5209,6 +6449,15 @@
       "type": "static",
       "symbols": [
         "sortZonesData"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "static",
+      "symbols": [
+        "setClaudeConfig",
+        "getAuthMode"
       ]
     },
     {
@@ -5576,11 +6825,193 @@
     },
     {
       "from": "packages/sourcevision/src/cli/serve.ts",
+      "to": "packages/sourcevision/src/cli/server/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "startServer"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/serve.ts",
+      "to": "packages/sourcevision/src/cli/server/index.ts",
+      "type": "type",
+      "symbols": [
+        "ServerOptions"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/index.ts",
+      "to": "packages/sourcevision/src/cli/server/start.ts",
+      "type": "reexport",
+      "symbols": [
+        "startServer"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/index.ts",
+      "to": "packages/sourcevision/src/cli/server/start.ts",
+      "type": "type",
+      "symbols": [
+        "ServerOptions"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/index.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext",
+        "RouteHandler"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/index.ts",
+      "to": "packages/sourcevision/src/cli/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
       "to": "packages/sourcevision/src/schema/data-files.ts",
       "type": "static",
       "symbols": [
         "ALL_DATA_FILES",
         "SUPPLEMENTARY_FILES"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
+      "to": "packages/sourcevision/src/cli/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/routes-static.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-data.ts",
+      "type": "static",
+      "symbols": [
+        "createDataWatcher",
+        "handleDataRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-rex.ts",
+      "type": "static",
+      "symbols": [
+        "handleRexRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
+      "type": "static",
+      "symbols": [
+        "handleSourcevisionRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-static.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStaticAssets",
+        "handleStaticRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/cli/server/websocket.ts",
+      "type": "static",
+      "symbols": [
+        "createWebSocketManager"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/server/start.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES"
       ]
     },
     {
@@ -5607,7 +7038,14 @@
         "validateImports",
         "validateZones",
         "validateComponents",
-        "validateModule",
+        "validateModule"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/schema/index.ts",
+      "to": "packages/sourcevision/src/schema/validate.ts",
+      "type": "type",
+      "symbols": [
         "ValidationResult"
       ]
     },
@@ -5663,6 +7101,47 @@
       ]
     },
     {
+      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/sourcevision/src/viewer/components/search-filter.ts",
+      "type": "static",
+      "symbols": [
+        "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "ZoneCrossing"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
+      "to": "packages/sourcevision/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
       "from": "packages/sourcevision/src/viewer/components/detail-panel.ts",
       "to": "packages/sourcevision/src/viewer/components/constants.ts",
       "type": "static",
@@ -5691,27 +7170,176 @@
       ]
     },
     {
-      "from": "packages/sourcevision/src/viewer/components/findings-list.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
-        "Finding"
+        "PRDItemData",
+        "ItemLevel",
+        "Priority"
       ]
     },
     {
-      "from": "packages/sourcevision/src/viewer/components/findings-list.ts",
-      "to": "packages/sourcevision/src/viewer/components/collapsible-section.ts",
-      "type": "static",
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
       "symbols": [
-        "CollapsibleSection"
+        "ItemStatus"
       ]
     },
     {
-      "from": "packages/sourcevision/src/viewer/components/findings-list.ts",
-      "to": "packages/sourcevision/src/viewer/components/search-filter.ts",
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "BranchStats",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "reexport",
+      "symbols": [
+        "AddItemForm"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "type",
+      "symbols": [
+        "AddItemFormProps",
+        "AddItemInput"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "AnalyzePanel"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "type",
+      "symbols": [
+        "AnalyzePanelProps"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "reexport",
+      "symbols": [
+        "BulkActions"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "type",
+      "symbols": [
+        "BulkActionsProps"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeBranchStats",
+        "completionRatio",
+        "countChildStatuses",
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "reexport",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "type",
+      "symbols": [
+        "PRDTreeProps"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "reexport",
+      "symbols": [
+        "TaskDetail"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "type",
+      "symbols": [
+        "TaskDetailProps"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData",
+        "ItemLevel",
+        "ItemStatus",
+        "Priority",
+        "BranchStats"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
       "type": "static",
       "symbols": [
-        "SearchFilter"
+        "computeBranchStats",
+        "completionRatio",
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData",
+        "ItemStatus",
+        "ItemLevel",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus",
+        "Priority"
       ]
     },
     {
@@ -5740,31 +7368,21 @@
       ]
     },
     {
-      "from": "packages/sourcevision/src/viewer/components/zone-map.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "ZoneCrossing"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/zone-map.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
+      "from": "packages/sourcevision/src/viewer/graph/renderer.ts",
+      "to": "packages/sourcevision/src/viewer/graph/physics.ts",
       "type": "static",
       "symbols": [
-        "ZONE_COLORS"
+        "initZoneClusteredPositions",
+        "tick"
       ]
     },
     {
       "from": "packages/sourcevision/src/viewer/graph/renderer.ts",
       "to": "packages/sourcevision/src/viewer/graph/physics.ts",
-      "type": "static",
+      "type": "type",
       "symbols": [
         "SimState",
-        "TickCallbacks",
-        "initZoneClusteredPositions",
-        "tick"
+        "TickCallbacks"
       ]
     },
     {
@@ -5914,6 +7532,14 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/main.ts",
+      "to": "packages/sourcevision/src/viewer/views/prd.ts",
+      "type": "static",
+      "symbols": [
+        "PRDView"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/main.ts",
       "to": "packages/sourcevision/src/viewer/views/problems.ts",
       "type": "static",
       "symbols": [
@@ -6006,7 +7632,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/findings-list.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
       "type": "static",
       "symbols": [
         "FindingsList"
@@ -6014,7 +7640,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart",
@@ -6087,7 +7713,14 @@
       "to": "packages/sourcevision/src/viewer/graph/renderer.ts",
       "type": "static",
       "symbols": [
-        "GraphRenderer",
+        "GraphRenderer"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/graph.ts",
+      "to": "packages/sourcevision/src/viewer/graph/renderer.ts",
+      "type": "type",
+      "symbols": [
         "GraphNode",
         "GraphLink"
       ]
@@ -6112,14 +7745,6 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
       "to": "packages/sourcevision/src/viewer/components/constants.ts",
       "type": "static",
       "symbols": [
@@ -6128,7 +7753,15 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/health-gauge.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/overview.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
       "type": "static",
       "symbols": [
         "HealthGauge",
@@ -6138,7 +7771,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart"
@@ -6146,7 +7779,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/zone-map.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
       "type": "static",
       "symbols": [
         "ZoneMap",
@@ -6160,6 +7793,64 @@
       "symbols": [
         "LoadedData",
         "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "static",
+      "symbols": [
+        "AddItemForm"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "static",
+      "symbols": [
+        "AnalyzePanel"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "static",
+      "symbols": [
+        "BulkActions"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData",
+        "AddItemInput"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "static",
+      "symbols": [
+        "TaskDetail"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/prd.ts",
+      "to": "packages/sourcevision/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
         "DetailItem"
       ]
     },
@@ -6181,7 +7872,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/findings-list.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
       "type": "static",
       "symbols": [
         "FindingsList"
@@ -6189,7 +7880,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart"
@@ -6215,7 +7906,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/collapsible-section.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
       "type": "static",
       "symbols": [
         "CollapsibleSection"
@@ -6223,10 +7914,26 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/routes.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "type": "static",
+      "symbols": [
+        "TreeView"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/routes.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "type": "type",
+      "symbols": [
+        "TreeNode"
       ]
     },
     {
@@ -6235,15 +7942,6 @@
       "type": "static",
       "symbols": [
         "SearchFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/tree-view.ts",
-      "type": "static",
-      "symbols": [
-        "TreeView",
-        "TreeNode"
       ]
     },
     {
@@ -6272,7 +7970,7 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/viewer/components/findings-list.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
       "type": "static",
       "symbols": [
         "FindingsList"
@@ -6297,14 +7995,6 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
       "to": "packages/sourcevision/src/viewer/components/constants.ts",
       "type": "static",
       "symbols": [
@@ -6313,7 +8003,15 @@
     },
     {
       "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/viewer/views/zones.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "FlowDiagram"
@@ -6538,6 +8236,14 @@
     },
     {
       "from": "packages/sourcevision/tests/unit/analyzers/enrich-per-zone.test.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "static",
+      "symbols": [
+        "callClaude"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/enrich-per-zone.test.ts",
       "to": "packages/sourcevision/src/analyzers/enrich-config.ts",
       "type": "static",
       "symbols": [
@@ -6648,14 +8354,6 @@
     },
     {
       "from": "packages/sourcevision/tests/unit/analyzers/token-usage.test.ts",
-      "to": "packages/sourcevision/src/analyzers/claude-cli.ts",
-      "type": "static",
-      "symbols": [
-        "parseStreamTokenUsage"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/analyzers/token-usage.test.ts",
       "to": "packages/sourcevision/src/analyzers/token-usage.ts",
       "type": "static",
       "symbols": [
@@ -6682,7 +8380,14 @@
         "promoteZones",
         "promoteCrossings",
         "getSubAnalyzedFiles",
-        "buildSubAnalysisRefs",
+        "buildSubAnalysisRefs"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/workspace.test.ts",
+      "to": "packages/sourcevision/src/analyzers/workspace.ts",
+      "type": "type",
+      "symbols": [
         "SubAnalysis"
       ]
     },
@@ -6722,6 +8427,14 @@
         "ZoneCrossing",
         "Finding",
         "FileEntry"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/zones.test.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "static",
+      "symbols": [
+        "callClaude"
       ]
     },
     {
@@ -6821,6 +8534,63 @@
       ]
     },
     {
+      "from": "packages/sourcevision/tests/unit/server/routes-data.test.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-data.ts",
+      "type": "static",
+      "symbols": [
+        "createDataWatcher",
+        "handleDataRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/routes-data.test.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-rex.ts",
+      "type": "static",
+      "symbols": [
+        "handleRexRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
+      "to": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
+      "type": "static",
+      "symbols": [
+        "handleSourcevisionRoute"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
+      "to": "packages/sourcevision/src/cli/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/server/websocket.test.ts",
+      "to": "packages/sourcevision/src/cli/server/websocket.ts",
+      "type": "static",
+      "symbols": [
+        "createWebSocketManager"
+      ]
+    },
+    {
       "from": "packages/sourcevision/tests/unit/util/merge.test.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
@@ -6870,7 +8640,7 @@
     },
     {
       "from": "packages/sourcevision/tests/unit/viewer/bar-chart.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart"
@@ -6878,7 +8648,7 @@
     },
     {
       "from": "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/collapsible-section.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
       "type": "static",
       "symbols": [
         "CollapsibleSection"
@@ -6894,18 +8664,61 @@
     },
     {
       "from": "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/mini-charts.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "FlowDiagram"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/tree-view.ts",
+      "from": "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
       "type": "static",
       "symbols": [
-        "TreeView",
+        "computeBranchStats",
+        "completionRatio",
+        "countChildStatuses",
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "type": "static",
+      "symbols": [
+        "TreeView"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
+      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "type": "type",
+      "symbols": [
         "TreeNode"
       ]
     }
@@ -6914,8 +8727,10 @@
     {
       "package": "@anthropic-ai/sdk",
       "importedBy": [
+        "packages/claude-client/src/api-provider.ts",
         "packages/hench/src/agent/loop.ts",
-        "packages/hench/src/agent/tools.ts",
+        "packages/hench/src/tools/dispatch.ts",
+        "packages/hench/tests/unit/agent/api-auth.test.ts",
         "packages/hench/tests/unit/agent/task-failure.test.ts"
       ],
       "symbols": [
@@ -6934,10 +8749,37 @@
       ]
     },
     {
+      "package": "@n-dx/claude-client",
+      "importedBy": [
+        "packages/hench/src/store/project-config.ts",
+        "packages/rex/src/analyze/reason.ts",
+        "packages/rex/src/store/project-config.ts",
+        "packages/sourcevision/src/analyzers/claude-client.ts",
+        "packages/sourcevision/src/cli/commands/analyze.ts",
+        "packages/sourcevision/tests/unit/analyzers/enrich-per-zone.test.ts",
+        "packages/sourcevision/tests/unit/analyzers/zones.test.ts"
+      ],
+      "symbols": [
+        "*",
+        "AuthMode",
+        "ClaudeClient",
+        "ClaudeClientError",
+        "ClaudeConfig",
+        "CompletionResult",
+        "createClient",
+        "detectAuthMode",
+        "loadClaudeConfig",
+        "loadClaudeConfigFromDir",
+        "sharedResolveApiKey",
+        "sharedResolveCliPath"
+      ]
+    },
+    {
       "package": "child_process",
       "importedBy": [
         "ci.js",
-        "cli.js"
+        "cli.js",
+        "web.js"
       ],
       "symbols": [
         "spawn"
@@ -6955,17 +8797,33 @@
     {
       "package": "fs",
       "importedBy": [
-        "cli.js"
+        "ci.js",
+        "cli.js",
+        "web.js"
       ],
       "symbols": [
-        "existsSync"
+        "access",
+        "existsSync",
+        "readFile",
+        "unlink",
+        "writeFile"
+      ]
+    },
+    {
+      "package": "net",
+      "importedBy": [
+        "web.js"
+      ],
+      "symbols": [
+        "createConnection"
       ]
     },
     {
       "package": "path",
       "importedBy": [
         "ci.js",
-        "cli.js"
+        "cli.js",
+        "web.js"
       ],
       "symbols": [
         "dirname",
@@ -6976,22 +8834,28 @@
     {
       "package": "preact",
       "importedBy": [
-        "packages/sourcevision/src/viewer/components/collapsible-section.ts",
+        "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
+        "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
+        "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
+        "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
+        "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+        "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
         "packages/sourcevision/src/viewer/components/detail-panel.ts",
-        "packages/sourcevision/src/viewer/components/findings-list.ts",
         "packages/sourcevision/src/viewer/components/guide.ts",
-        "packages/sourcevision/src/viewer/components/health-gauge.ts",
-        "packages/sourcevision/src/viewer/components/mini-charts.ts",
+        "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
+        "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
+        "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
+        "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+        "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
         "packages/sourcevision/src/viewer/components/search-filter.ts",
         "packages/sourcevision/src/viewer/components/sidebar.ts",
         "packages/sourcevision/src/viewer/components/theme-toggle.ts",
-        "packages/sourcevision/src/viewer/components/tree-view.ts",
-        "packages/sourcevision/src/viewer/components/zone-map.ts",
         "packages/sourcevision/src/viewer/main.ts",
         "packages/sourcevision/src/viewer/views/architecture.ts",
         "packages/sourcevision/src/viewer/views/files.ts",
         "packages/sourcevision/src/viewer/views/graph.ts",
         "packages/sourcevision/src/viewer/views/overview.ts",
+        "packages/sourcevision/src/viewer/views/prd.ts",
         "packages/sourcevision/src/viewer/views/problems.ts",
         "packages/sourcevision/src/viewer/views/routes.ts",
         "packages/sourcevision/src/viewer/views/suggestions.ts",
@@ -7000,6 +8864,7 @@
         "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
         "packages/sourcevision/tests/unit/viewer/detail-panel.test.ts",
         "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
         "packages/sourcevision/tests/unit/viewer/tree-view.test.ts"
       ],
       "symbols": [
@@ -7024,6 +8889,7 @@
         "packages/hench/src/cli/commands/run.ts",
         "packages/hench/src/tools/rex.ts",
         "packages/hench/src/types/index.ts",
+        "packages/hench/tests/unit/agent/api-auth.test.ts",
         "packages/hench/tests/unit/agent/atomic-transition.test.ts",
         "packages/hench/tests/unit/agent/brief.test.ts",
         "packages/hench/tests/unit/agent/loop.test.ts",
@@ -7070,8 +8936,16 @@
     {
       "package": "vitest",
       "importedBy": [
+        "packages/claude-client/tests/unit/api-provider.test.ts",
+        "packages/claude-client/tests/unit/cli-provider.test.ts",
+        "packages/claude-client/tests/unit/config.test.ts",
+        "packages/claude-client/tests/unit/create-client.test.ts",
+        "packages/claude-client/tests/unit/token-usage.test.ts",
+        "packages/claude-client/tests/unit/types.test.ts",
+        "packages/claude-client/vitest.config.ts",
         "packages/hench/tests/e2e/cli-init.test.ts",
         "packages/hench/tests/integration/store-roundtrip.test.ts",
+        "packages/hench/tests/unit/agent/api-auth.test.ts",
         "packages/hench/tests/unit/agent/atomic-transition.test.ts",
         "packages/hench/tests/unit/agent/brief.test.ts",
         "packages/hench/tests/unit/agent/cli-retry.test.ts",
@@ -7084,6 +8958,7 @@
         "packages/hench/tests/unit/agent/task-failure.test.ts",
         "packages/hench/tests/unit/agent/token-budget.test.ts",
         "packages/hench/tests/unit/agent/token-tracking.test.ts",
+        "packages/hench/tests/unit/agent/token-usage.test.ts",
         "packages/hench/tests/unit/cli/commands/constants.test.ts",
         "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
         "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
@@ -7092,6 +8967,7 @@
         "packages/hench/tests/unit/guard/commands.test.ts",
         "packages/hench/tests/unit/guard/paths.test.ts",
         "packages/hench/tests/unit/schema/validate.test.ts",
+        "packages/hench/tests/unit/store/claude-config.test.ts",
         "packages/hench/tests/unit/store/project-config.test.ts",
         "packages/hench/tests/unit/tools/completion-validation.test.ts",
         "packages/hench/tests/unit/tools/files.test.ts",
@@ -7109,13 +8985,16 @@
         "packages/rex/tests/e2e/cli-smart-add.test.ts",
         "packages/rex/tests/e2e/cli-sync.test.ts",
         "packages/rex/tests/e2e/cli-workflow.test.ts",
+        "packages/rex/tests/integration/claude-config.test.ts",
         "packages/rex/tests/integration/project-config.test.ts",
         "packages/rex/tests/integration/store-roundtrip.test.ts",
         "packages/rex/tests/unit/analyze/dedupe.test.ts",
         "packages/rex/tests/unit/analyze/diff.test.ts",
         "packages/rex/tests/unit/analyze/guided.test.ts",
         "packages/rex/tests/unit/analyze/propose.test.ts",
+        "packages/rex/tests/unit/analyze/reason-assessment.test.ts",
         "packages/rex/tests/unit/analyze/reason-description.test.ts",
+        "packages/rex/tests/unit/analyze/reason-granularity.test.ts",
         "packages/rex/tests/unit/analyze/reason-ideas.test.ts",
         "packages/rex/tests/unit/analyze/reason-multi-description.test.ts",
         "packages/rex/tests/unit/analyze/reason.test.ts",
@@ -7124,6 +9003,7 @@
         "packages/rex/tests/unit/analyze/token-tracking.test.ts",
         "packages/rex/tests/unit/cli/commands/add.test.ts",
         "packages/rex/tests/unit/cli/commands/analyze-guided.test.ts",
+        "packages/rex/tests/unit/cli/commands/chunked-review.test.ts",
         "packages/rex/tests/unit/cli/commands/move.test.ts",
         "packages/rex/tests/unit/cli/commands/report.test.ts",
         "packages/rex/tests/unit/cli/commands/smart-add.test.ts",
@@ -7135,6 +9015,7 @@
         "packages/rex/tests/unit/cli/commands/verify.test.ts",
         "packages/rex/tests/unit/cli/errors.test.ts",
         "packages/rex/tests/unit/cli/output.test.ts",
+        "packages/rex/tests/unit/cli/validate-input.test.ts",
         "packages/rex/tests/unit/core/canonical.test.ts",
         "packages/rex/tests/unit/core/dag.test.ts",
         "packages/rex/tests/unit/core/move.test.ts",
@@ -7177,17 +9058,25 @@
         "packages/sourcevision/tests/unit/cli/output.test.ts",
         "packages/sourcevision/tests/unit/schema/data-files.test.ts",
         "packages/sourcevision/tests/unit/schema/validate.test.ts",
+        "packages/sourcevision/tests/unit/server/routes-data.test.ts",
+        "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
+        "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
+        "packages/sourcevision/tests/unit/server/websocket.test.ts",
         "packages/sourcevision/tests/unit/util/merge.test.ts",
         "packages/sourcevision/tests/unit/util/sort.test.ts",
         "packages/sourcevision/tests/unit/viewer/bar-chart.test.ts",
         "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
         "packages/sourcevision/tests/unit/viewer/detail-panel.test.ts",
         "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
+        "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
         "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
         "packages/sourcevision/vitest.config.ts",
         "tests/e2e/cli-ci.test.js",
         "tests/e2e/cli-config.test.js",
         "tests/e2e/cli-delegation.test.js",
+        "tests/e2e/cli-errors.test.js",
+        "tests/e2e/cli-web.test.js",
         "vitest.config.js"
       ],
       "symbols": [
@@ -7218,14 +9107,14 @@
     }
   ],
   "summary": {
-    "totalEdges": 755,
-    "totalExternal": 12,
+    "totalEdges": 965,
+    "totalExternal": 14,
     "circularCount": 0,
     "circulars": [],
     "mostImported": [
       {
         "path": "packages/rex/src/schema/index.ts",
-        "count": 76
+        "count": 78
       },
       {
         "path": "packages/sourcevision/src/schema/index.ts",
@@ -7233,18 +9122,22 @@
       },
       {
         "path": "packages/rex/src/core/tree.ts",
-        "count": 26
+        "count": 28
       },
       {
         "path": "packages/rex/src/store/index.ts",
+        "count": 23
+      },
+      {
+        "path": "packages/rex/src/cli/errors.ts",
         "count": 22
       },
       {
-        "path": "packages/rex/src/cli/commands/constants.ts",
-        "count": 19
+        "path": "packages/rex/src/cli/output.ts",
+        "count": 20
       },
       {
-        "path": "packages/rex/src/cli/output.ts",
+        "path": "packages/rex/src/cli/commands/constants.ts",
         "count": 19
       },
       {
@@ -7252,12 +9145,16 @@
         "count": 19
       },
       {
-        "path": "packages/rex/src/cli/errors.ts",
-        "count": 18
+        "path": "packages/hench/src/schema/v1.ts",
+        "count": 17
       },
       {
-        "path": "packages/hench/src/schema/v1.ts",
+        "path": "packages/claude-client/src/types.ts",
         "count": 15
+      },
+      {
+        "path": "packages/rex/src/analyze/reason.ts",
+        "count": 14
       },
       {
         "path": "packages/rex/src/core/canonical.ts",
@@ -7265,10 +9162,22 @@
       },
       {
         "path": "packages/sourcevision/src/viewer/types.ts",
-        "count": 13
+        "count": 14
       },
       {
         "path": "packages/hench/src/schema/index.ts",
+        "count": 12
+      },
+      {
+        "path": "packages/hench/src/store/config.ts",
+        "count": 12
+      },
+      {
+        "path": "packages/sourcevision/src/cli/server/types.ts",
+        "count": 12
+      },
+      {
+        "path": "packages/rex/src/analyze/propose.ts",
         "count": 11
       },
       {
@@ -7276,34 +9185,14 @@
         "count": 11
       },
       {
-        "path": "packages/hench/src/store/config.ts",
+        "path": "packages/rex/src/analyze/scanners.ts",
         "count": 10
       },
       {
         "path": "packages/rex/src/store/types.ts",
         "count": 10
-      },
-      {
-        "path": "packages/rex/src/analyze/reason.ts",
-        "count": 9
-      },
-      {
-        "path": "packages/rex/src/analyze/scanners.ts",
-        "count": 9
-      },
-      {
-        "path": "packages/sourcevision/src/analyzers/inventory.ts",
-        "count": 9
-      },
-      {
-        "path": "packages/sourcevision/src/cli/commands/constants.ts",
-        "count": 9
-      },
-      {
-        "path": "packages/rex/src/analyze/propose.ts",
-        "count": 8
       }
     ],
-    "avgImportsPerFile": 3.28
+    "avgImportsPerFile": 3.43
   }
 }
