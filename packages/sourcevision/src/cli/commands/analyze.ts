@@ -18,8 +18,8 @@ import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
 import type { AnalyzeTokenUsage } from "../../schema/index.js";
-import { loadClaudeConfig, resolveCliPath } from "../../util/project-config.js";
-import { setClaudeBinary } from "../../analyzers/claude-cli.js";
+import { loadClaudeConfig } from "@n-dx/claude-client";
+import { setClaudeConfig, getAuthMode } from "../../analyzers/claude-client.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -62,9 +62,10 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
   }
 
-  // Load unified Claude config for CLI path resolution
+  // Load unified Claude config
   const claudeConfig = await loadClaudeConfig(absDir);
-  setClaudeBinary(resolveCliPath(claudeConfig));
+  setClaudeConfig(claudeConfig);
+  if (getAuthMode() === "api") info("Using direct API authentication.");
 
   const filter = parsePhaseFilter(extraArgs);
 

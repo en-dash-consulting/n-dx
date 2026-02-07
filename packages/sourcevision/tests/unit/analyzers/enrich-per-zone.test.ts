@@ -18,49 +18,33 @@ import type {
   ZoneCrossing,
   Zones,
 } from "../../../src/schema/index.js";
-import { execFileSync, spawn } from "node:child_process";
-import { EventEmitter } from "node:events";
-import { Writable } from "node:stream";
+import { ClaudeClientError } from "@n-dx/claude-client";
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
+vi.mock("../../../src/analyzers/claude-client.js", async () => {
+  const actual = await import("@n-dx/claude-client");
   return {
-    ...actual,
-    execFileSync: vi.fn(actual.execFileSync),
-    spawn: vi.fn(actual.spawn),
+    callClaude: vi.fn(),
+    ClaudeClientError: actual.ClaudeClientError,
+    setClaudeConfig: vi.fn(),
+    getAuthMode: vi.fn(),
+    DEFAULT_MODEL: "claude-sonnet-4-20250514",
   };
 });
 
-const mockedExecFileSync = vi.mocked(execFileSync);
-const mockedSpawn = vi.mocked(spawn);
+import { callClaude } from "../../../src/analyzers/claude-client.js";
+const mockedCallClaude = vi.mocked(callClaude);
 
-/** Create a fake child process that emits stdout/stderr then closes */
-function fakeChild(stdout: string, stderr: string, code: number) {
-  const child = new EventEmitter() as any;
-  const stdoutEmitter = new EventEmitter();
-  const stderrEmitter = new EventEmitter();
-  child.stdout = stdoutEmitter;
-  child.stderr = stderrEmitter;
-  child.stdin = new Writable({ write(_chunk, _enc, cb) { cb(); } });
-  child.kill = vi.fn();
-  process.nextTick(() => {
-    if (stdout) stdoutEmitter.emit("data", Buffer.from(stdout));
-    if (stderr) stderrEmitter.emit("data", Buffer.from(stderr));
-    child.emit("close", code);
-  });
-  return child;
-}
-
-function streamJsonResult(text: string): string {
-  return JSON.stringify({ type: "result", subtype: "success", result: text }) + "\n";
-}
-
+/** Mock callClaude to return a successful response */
 function mockClaudeResponse(str: string) {
-  mockedSpawn.mockImplementationOnce(() => fakeChild(streamJsonResult(str), "", 0));
+  mockedCallClaude.mockResolvedValueOnce({ text: str });
 }
 
-function mockClaudeError(_msg: string, opts?: { stderr?: string }) {
-  mockedSpawn.mockImplementationOnce(() => fakeChild("", opts?.stderr ?? "", 1));
+/** Mock callClaude to reject with an error */
+function mockClaudeError(_msg: string, opts?: { reason?: string }) {
+  const reason = (opts?.reason ?? "unknown") as any;
+  mockedCallClaude.mockRejectedValueOnce(
+    new ClaudeClientError(_msg, reason, reason !== "auth")
+  );
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -207,8 +191,7 @@ describe("per-zone config constants", () => {
 
 describe("enrichZonesPerZone", () => {
   afterEach(() => {
-    mockedExecFileSync.mockReset();
-    mockedSpawn.mockReset();
+    mockedCallClaude.mockReset();
   });
 
   const sampleZones: Zone[] = [
@@ -241,10 +224,9 @@ describe("enrichZonesPerZone", () => {
     });
   }
 
-  it("returns unchanged zones when claude CLI not found", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => {
-      throw new Error("not found");
-    });
+  it("returns unchanged zones when claude not found", async () => {
+    mockClaudeError("Claude CLI not found", { reason: "not-found" });
+    mockClaudeError("Claude CLI not found", { reason: "not-found" });
 
     const result = await enrichZonesPerZone(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -255,7 +237,6 @@ describe("enrichZonesPerZone", () => {
   });
 
   it("enriches each zone individually with pass 1 response", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // Mock responses for each zone
     mockClaudeResponse(makePerZoneResponse(sampleZones[0]));
     mockClaudeResponse(makePerZoneResponse(sampleZones[1]));
@@ -271,15 +252,15 @@ describe("enrichZonesPerZone", () => {
   });
 
   it("tracks per-zone token usage", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
-    // Responses with token usage embedded
-    const responseWithUsage = (zone: Zone) => JSON.stringify({
-      type: "result",
-      result: makePerZoneResponse(zone),
-      usage: { input_tokens: 100, output_tokens: 50 },
+    // Responses with token usage
+    mockedCallClaude.mockResolvedValueOnce({
+      text: makePerZoneResponse(sampleZones[0]),
+      tokenUsage: { input: 100, output: 50 },
     });
-    mockedSpawn.mockImplementationOnce(() => fakeChild(responseWithUsage(sampleZones[0]) + "\n", "", 0));
-    mockedSpawn.mockImplementationOnce(() => fakeChild(responseWithUsage(sampleZones[1]) + "\n", "", 0));
+    mockedCallClaude.mockResolvedValueOnce({
+      text: makePerZoneResponse(sampleZones[1]),
+      tokenUsage: { input: 100, output: 50 },
+    });
 
     const result = await enrichZonesPerZone(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -290,7 +271,6 @@ describe("enrichZonesPerZone", () => {
   });
 
   it("sets structureHash on enriched zones", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(makePerZoneResponse(sampleZones[0]));
     mockClaudeResponse(makePerZoneResponse(sampleZones[1]));
 
@@ -329,7 +309,6 @@ describe("enrichZonesPerZone", () => {
       enrichmentPass: 1,
     };
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // Only one zone needs enrichment (api, since auth has matching structureHash)
     // Pass 2+ returns newInsights, not new id/name/description
     mockClaudeResponse(JSON.stringify({
@@ -366,7 +345,6 @@ describe("enrichZonesPerZone", () => {
       enrichmentPass: 1,
     };
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // No Claude calls should be made
 
     const result = await enrichZonesPerZone(
@@ -374,17 +352,16 @@ describe("enrichZonesPerZone", () => {
     );
 
     expect(result.pass).toBe(1); // Stays at previous pass
-    expect(mockedSpawn).not.toHaveBeenCalled();
+    expect(mockedCallClaude).not.toHaveBeenCalled();
   });
 
   it("handles partial failures gracefully", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // First zone succeeds
     mockClaudeResponse(makePerZoneResponse(sampleZones[0]));
     // Second zone fails all retries
-    mockClaudeError("timeout");
-    mockClaudeError("timeout");
-    mockClaudeError("timeout");
+    mockClaudeError("timeout", { reason: "timeout" });
+    mockClaudeError("timeout", { reason: "timeout" });
+    mockClaudeError("timeout", { reason: "timeout" });
 
     const result = await enrichZonesPerZone(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -398,9 +375,8 @@ describe("enrichZonesPerZone", () => {
   });
 
   it("returns empty result on auth error", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
-    mockClaudeError("auth", { stderr: "Not logged in." });
-    mockClaudeError("auth", { stderr: "Not logged in." });
+    mockClaudeError("Not logged in.", { reason: "auth" });
+    mockClaudeError("Not logged in.", { reason: "auth" });
 
     const result = await enrichZonesPerZone(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -411,7 +387,6 @@ describe("enrichZonesPerZone", () => {
   });
 
   it("extracts insights from successful enrichment", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(makePerZoneResponse(sampleZones[0]));
     mockClaudeResponse(makePerZoneResponse(sampleZones[1]));
 

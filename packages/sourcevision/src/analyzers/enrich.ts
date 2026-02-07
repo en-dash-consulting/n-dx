@@ -7,8 +7,8 @@
 
 export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs, computePerZoneAttemptConfigs, MAX_CONCURRENT_ZONES, PER_ZONE_MAX_FILES, PER_ZONE_MAX_CROSSINGS } from "./enrich-config.js";
 export type { PassConfig } from "./enrich-config.js";
-export { tryCallClaude, parseStreamTokenUsage, setClaudeBinary, getClaudeBinary } from "./claude-cli.js";
-export type { ClaudeCallResult } from "./claude-cli.js";
+export { callClaude, setClaudeConfig, getAuthMode, ClaudeClientError, DEFAULT_MODEL } from "./claude-client.js";
+export type { CallClaudeResult } from "./claude-client.js";
 export { tryParseJSON, extractFindings, mergeZonesByName } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";
 export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
@@ -18,7 +18,6 @@ export type { PerZoneEnrichResult } from "./enrich-per-zone.js";
 // ── Imports ──────────────────────────────────────────────────────────────────
 
 import { dirname } from "node:path";
-import { execFileSync } from "node:child_process";
 import type {
   Inventory,
   Imports,
@@ -33,14 +32,12 @@ import type {
 import {
   ZONES_PER_BATCH,
   MAX_CONCURRENT_BATCHES,
-  IDLE_TIMEOUT_MS,
-  OVERALL_TIMEOUT_MS,
   getPassConfig,
   computeAttemptConfigs,
   buildMetaPrompt,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { tryCallClaude, getClaudeBinary } from "./claude-cli.js";
+import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
@@ -244,24 +241,30 @@ Return ONLY JSON:
     }
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
-    console.log(`  [enrich]${batchLabel} Calling Claude (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt, ${Math.round(IDLE_TIMEOUT_MS / 60_000)}m idle / ${Math.round(OVERALL_TIMEOUT_MS / 60_000)}m max)...`);
+    console.log(`  [enrich]${batchLabel} Calling Claude (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
 
-    const callResult = await tryCallClaude(prompt, config.timeout);
-    accumulateTokenUsage(batchTokenUsage, callResult.ok ? callResult.tokenUsage : undefined);
-
-    if (!callResult.ok) {
-      if (callResult.reason === "auth") {
-        console.warn("  [enrich] Authentication error — run 'claude login' or check API key");
-        if (callResult.detail) console.warn(`  [enrich]   ${callResult.detail.slice(0, 200)}`);
-        return { authError: true };
+    let callText: string;
+    try {
+      const callResult = await callClaude(prompt);
+      accumulateTokenUsage(batchTokenUsage, callResult.tokenUsage);
+      callText = callResult.text;
+    } catch (err) {
+      if (err instanceof ClaudeClientError) {
+        if (err.reason === "auth" || err.reason === "not-found") {
+          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          console.warn(`  [enrich]   ${err.message.slice(0, 200)}`);
+          return { authError: true };
+        }
+        accumulateTokenUsage(batchTokenUsage, undefined);
+        const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying with simpler prompt" : "giving up on this batch";
+        console.warn(`  [enrich]${batchLabel} Attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length} failed (${err.reason}) — ${label}`);
+        console.warn(`  [enrich]   ${err.message.slice(0, 200)}`);
+        continue;
       }
-      const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying with simpler prompt" : "giving up on this batch";
-      console.warn(`  [enrich]${batchLabel} Attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length} failed (${callResult.reason}) — ${label}`);
-      if (callResult.detail) console.warn(`  [enrich]   ${callResult.detail.slice(0, 200)}`);
-      continue;
+      throw err;
     }
 
-    const candidate = tryParseJSON(callResult.response);
+    const candidate = tryParseJSON(callText);
     if (!candidate) {
       const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying with simpler prompt" : "giving up on this batch";
       console.warn(`  [enrich]${batchLabel} Attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}: invalid JSON response — ${label}`);
@@ -317,42 +320,31 @@ export async function enrichZonesWithAI(
     pass: previousZones?.enrichmentPass ?? 0,
   };
 
-  // 1. Check for claude CLI (respects unified config path)
-  const cliBinary = getClaudeBinary();
-  try {
-    if (cliBinary !== "claude") {
-      // Custom path from config — check file exists
-      const { existsSync } = await import("node:fs");
-      if (!existsSync(cliBinary)) {
-        console.warn(`  [enrich] Claude CLI not found at configured path: ${cliBinary}`);
-        return empty;
-      }
-    } else {
-      execFileSync("which", ["claude"], { stdio: "pipe" });
-    }
-  } catch {
-    console.warn("  [enrich] claude CLI not found — using algorithmic names. Install it or set path: n-dx config claude.cli_path /path/to/claude");
-    return empty;
-  }
-
-  // 1b. Meta-evaluation path (pass 5+) — single prompt, no batching
+  // 1. Meta-evaluation path (pass 5+) — single prompt, no batching
   if (isMetaPass && existingFindings.length > 0) {
     console.log(`  [enrich] Meta-evaluation pass (reviewing ${existingFindings.length} existing findings)...`);
     const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings);
-    const ATTEMPT_CONFIGS = computeAttemptConfigs(
-      zones.reduce((s, z) => s + z.files.length, 0), zones.length, passNumber
-    );
-    const config = ATTEMPT_CONFIGS[0];
     const metaTokenUsage = emptyAnalyzeTokenUsage();
 
-    const callResult = await tryCallClaude(metaPrompt, config.timeout);
-    accumulateTokenUsage(metaTokenUsage, callResult.ok ? callResult.tokenUsage : undefined);
-    if (!callResult.ok) {
-      console.warn(`  [enrich] Meta-evaluation failed (${callResult.reason})`);
-      return { ...empty, tokenUsage: metaTokenUsage };
+    let metaText: string;
+    try {
+      const callResult = await callClaude(metaPrompt);
+      accumulateTokenUsage(metaTokenUsage, callResult.tokenUsage);
+      metaText = callResult.text;
+    } catch (err) {
+      if (err instanceof ClaudeClientError) {
+        if (err.reason === "auth" || err.reason === "not-found") {
+          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error" : "Claude not found"} — using algorithmic names`);
+          return empty;
+        }
+        accumulateTokenUsage(metaTokenUsage, undefined);
+        console.warn(`  [enrich] Meta-evaluation failed (${err.reason})`);
+        return { ...empty, tokenUsage: metaTokenUsage };
+      }
+      throw err;
     }
 
-    const parsed = tryParseJSON(callResult.response);
+    const parsed = tryParseJSON(metaText);
     if (!parsed) {
       console.warn("  [enrich] Meta-evaluation: invalid JSON response");
       return empty;

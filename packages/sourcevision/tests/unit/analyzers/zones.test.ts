@@ -30,53 +30,33 @@ import type {
   Finding,
   FindingType,
 } from "../../../src/schema/index.js";
-import { execFileSync, spawn } from "node:child_process";
-import { EventEmitter } from "node:events";
-import { Writable } from "node:stream";
+import { ClaudeClientError } from "@n-dx/claude-client";
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
+vi.mock("../../../src/analyzers/claude-client.js", async () => {
+  const actual = await import("@n-dx/claude-client");
   return {
-    ...actual,
-    execFileSync: vi.fn(actual.execFileSync),
-    spawn: vi.fn(actual.spawn),
+    callClaude: vi.fn(),
+    ClaudeClientError: actual.ClaudeClientError,
+    setClaudeConfig: vi.fn(),
+    getAuthMode: vi.fn(),
+    DEFAULT_MODEL: "claude-sonnet-4-20250514",
   };
 });
 
-const mockedExecFileSync = vi.mocked(execFileSync);
-const mockedSpawn = vi.mocked(spawn);
+import { callClaude } from "../../../src/analyzers/claude-client.js";
+const mockedCallClaude = vi.mocked(callClaude);
 
-/** Create a fake child process that emits stdout/stderr then closes */
-function fakeChild(stdout: string, stderr: string, code: number) {
-  const child = new EventEmitter() as any;
-  const stdoutEmitter = new EventEmitter();
-  const stderrEmitter = new EventEmitter();
-  child.stdout = stdoutEmitter;
-  child.stderr = stderrEmitter;
-  child.stdin = new Writable({ write(_chunk, _enc, cb) { cb(); } });
-  child.kill = vi.fn();
-  // Emit data + close asynchronously so listeners are registered first
-  process.nextTick(() => {
-    if (stdout) stdoutEmitter.emit("data", Buffer.from(stdout));
-    if (stderr) stderrEmitter.emit("data", Buffer.from(stderr));
-    child.emit("close", code);
-  });
-  return child;
-}
-
-/** Wrap a response string in stream-json format (result line) */
-function streamJsonResult(text: string): string {
-  return JSON.stringify({ type: "result", subtype: "success", result: text }) + "\n";
-}
-
-/** Mock spawn to return a child that exits successfully with given response */
+/** Mock callClaude to return a successful response */
 function mockClaudeResponse(str: string) {
-  mockedSpawn.mockImplementationOnce(() => fakeChild(streamJsonResult(str), "", 0));
+  mockedCallClaude.mockResolvedValueOnce({ text: str });
 }
 
-/** Mock spawn to return a child that exits with an error */
-function mockClaudeError(_msg: string, opts?: { stderr?: string }) {
-  mockedSpawn.mockImplementationOnce(() => fakeChild("", opts?.stderr ?? "", 1));
+/** Mock callClaude to reject with an error */
+function mockClaudeError(_msg: string, opts?: { reason?: string }) {
+  const reason = (opts?.reason ?? "unknown") as any;
+  mockedCallClaude.mockRejectedValueOnce(
+    new ClaudeClientError(_msg, reason, reason !== "auth")
+  );
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -582,8 +562,7 @@ describe("generateStructuralInsights", () => {
 
 describe("enrichZonesWithAI", () => {
   afterEach(() => {
-    mockedExecFileSync.mockReset();
-    mockedSpawn.mockReset();
+    mockedCallClaude.mockReset();
   });
 
   const sampleZones: Zone[] = [
@@ -646,7 +625,6 @@ describe("enrichZonesWithAI", () => {
   }
 
   it("pass 1: replaces id/name/description and returns AI insights", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(makePass1Response());
 
     const result = await enrichZonesWithAI(
@@ -674,7 +652,6 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("handles AI response wrapped in markdown fences", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse("```json\n" + makePass1Response() + "\n```");
 
     const result = await enrichZonesWithAI(
@@ -685,10 +662,8 @@ describe("enrichZonesWithAI", () => {
     expect(result.zones[1].id).toBe("data-schema");
   });
 
-  it("returns zones unchanged when claude CLI not found", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => {
-      throw new Error("not found");
-    });
+  it("returns zones unchanged when claude not found", async () => {
+    mockClaudeError("Claude CLI not found", { reason: "not-found" });
 
     const result = await enrichZonesWithAI(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -699,7 +674,6 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("returns zones unchanged on invalid JSON response after all retries", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // All 3 retry attempts return invalid JSON
     mockClaudeResponse("This is not valid JSON");
     mockClaudeResponse("Still not JSON");
@@ -714,7 +688,6 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("returns zones unchanged when response has empty zones array", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     const emptyResponse = JSON.stringify({ zones: [], insights: [] });
     mockClaudeResponse(emptyResponse);
     mockClaudeResponse(emptyResponse);
@@ -729,7 +702,6 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("applies partial results when response has fewer zones", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(JSON.stringify({
       zones: [{ algorithmicId: "analyzers", id: "analysis-core", name: "Analysis Core", description: "Core analysis", insights: [] }],
       insights: [],
@@ -749,10 +721,9 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("returns zones unchanged when all claude calls throw", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
-    mockClaudeError("timed out");
-    mockClaudeError("timed out");
-    mockClaudeError("timed out");
+    mockClaudeError("timed out", { reason: "timeout" });
+    mockClaudeError("timed out", { reason: "timeout" });
+    mockClaudeError("timed out", { reason: "timeout" });
 
     const result = await enrichZonesWithAI(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -763,8 +734,7 @@ describe("enrichZonesWithAI", () => {
   });
 
   it("does not retry on auth errors", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
-    mockClaudeError("unauthorized", { stderr: "Not logged in. Run claude login first." });
+    mockClaudeError("Not logged in. Run claude login first.", { reason: "auth" });
 
     const result = await enrichZonesWithAI(
       sampleZones, sampleCrossings, sampleInventory, sampleImports
@@ -772,13 +742,11 @@ describe("enrichZonesWithAI", () => {
 
     expect(result.zones).toEqual(sampleZones);
     expect(result.pass).toBe(0);
-    // 1 execFileSync call (which) + 1 execFile call (claude, no retries)
-    expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
-    expect(mockedSpawn).toHaveBeenCalledTimes(1);
+    // Only 1 call — no retries after auth error
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
   });
 
   it("succeeds on retry after initial failure", async () => {
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // First attempt fails
     mockClaudeResponse("not json");
     // Second attempt succeeds
@@ -812,7 +780,6 @@ describe("enrichZonesWithAI", () => {
       insights: ["Consider extracting shared types"],
     });
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(pass2Response);
 
     const result = await enrichZonesWithAI(
@@ -837,8 +804,7 @@ describe("enrichZonesWithAI", () => {
 
 describe("enrichZonesWithAI batching", () => {
   afterEach(() => {
-    mockedExecFileSync.mockReset();
-    mockedSpawn.mockReset();
+    mockedCallClaude.mockReset();
   });
 
   function makeZone(id: string, fileCount: number): Zone {
@@ -872,7 +838,6 @@ describe("enrichZonesWithAI batching", () => {
     const inventory = makeInventory(zones.flatMap((z) => z.files.map((f) => makeFileEntry(f))));
     const imports = makeImports([]);
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(makeBatchResponse(zones));
 
     const result = await enrichZonesWithAI(zones, [], inventory, imports);
@@ -880,9 +845,7 @@ describe("enrichZonesWithAI batching", () => {
     expect(result.pass).toBe(1);
     expect(result.zones).toHaveLength(3);
     expect(result.zones[0].id).toBe("ai-zone0");
-    // 1 execFileSync call (which) + 1 execFile call (claude)
-    expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
-    expect(mockedSpawn).toHaveBeenCalledTimes(1);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
   });
 
   it("splits > 5 zones into multiple batches", async () => {
@@ -890,7 +853,6 @@ describe("enrichZonesWithAI batching", () => {
     const inventory = makeInventory(zones.flatMap((z) => z.files.map((f) => makeFileEntry(f))));
     const imports = makeImports([]);
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // Batch 1: zones 0-4
     mockClaudeResponse(makeBatchResponse(zones.slice(0, 5)));
     // Batch 2: zones 5-7
@@ -905,9 +867,7 @@ describe("enrichZonesWithAI batching", () => {
       expect(result.zones[i].id).toBe(`ai-zone${i}`);
       expect(result.zones[i].name).toBe(`AI Zone${i}`);
     }
-    // 1 execFileSync call (which) + 2 execFile calls (batches)
-    expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
-    expect(mockedSpawn).toHaveBeenCalledTimes(2);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(2);
   });
 
   it("preserves partial results when a batch fails", async () => {
@@ -915,13 +875,12 @@ describe("enrichZonesWithAI batching", () => {
     const inventory = makeInventory(zones.flatMap((z) => z.files.map((f) => makeFileEntry(f))));
     const imports = makeImports([]);
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     // Batch 1: succeeds
     mockClaudeResponse(makeBatchResponse(zones.slice(0, 5)));
     // Batch 2: all 3 retries fail
-    mockClaudeError("timed out");
-    mockClaudeError("timed out");
-    mockClaudeError("timed out");
+    mockClaudeError("timed out", { reason: "timeout" });
+    mockClaudeError("timed out", { reason: "timeout" });
+    mockClaudeError("timed out", { reason: "timeout" });
 
     const result = await enrichZonesWithAI(zones, [], inventory, imports);
 
@@ -942,7 +901,6 @@ describe("enrichZonesWithAI batching", () => {
     const inventory = makeInventory(zones.flatMap((z) => z.files.map((f) => makeFileEntry(f))));
     const imports = makeImports([]);
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(makeBatchResponse(zones.slice(0, 5)));
     mockClaudeResponse(makeBatchResponse(zones.slice(5, 8)));
 
@@ -970,7 +928,6 @@ describe("enrichZonesWithAI batching", () => {
       insights: ["Shared insight appears in both batches"],
     });
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
     mockClaudeResponse(responseWithDupInsight(zones.slice(0, 5)));
     mockClaudeResponse(responseWithDupInsight(zones.slice(5, 8)));
 
@@ -984,10 +941,8 @@ describe("enrichZonesWithAI batching", () => {
     const inventory = makeInventory(zones.flatMap((z) => z.files.map((f) => makeFileEntry(f))));
     const imports = makeImports([]);
 
-    mockedExecFileSync.mockImplementationOnce(() => Buffer.from("/usr/local/bin/claude\n"));
-    // Both batches get auth errors (they run in parallel)
-    mockClaudeError("unauthorized", { stderr: "Not logged in." });
-    mockClaudeError("unauthorized", { stderr: "Not logged in." });
+    // First batch gets auth error, stops processing
+    mockClaudeError("Not logged in.", { reason: "auth" });
 
     const result = await enrichZonesWithAI(zones, [], inventory, imports);
 
@@ -1062,27 +1017,13 @@ describe("computeAttemptConfigs", () => {
   });
 
   it("pass 1 gets 1.5x multiplier on size-based timeout", () => {
-    // 500*400 + 20*5000 = 200000 + 100000 = 300000; pass1: 300000 * 1.5 = 450000 → clamped to 480_000
     const configs = computeAttemptConfigs(500, 20, 1);
     expect(configs[0].timeout).toBe(480_000);
-    // pass 2+: 300000 * 1 = 300000 → clamped to 480_000
     const configs2 = computeAttemptConfigs(500, 20, 2);
     expect(configs2[0].timeout).toBe(480_000);
   });
 
   it("scales retry timeouts with 1.3x and 1.6x multipliers", () => {
-    // Need sizeBase*passMultiplier > 480_000 but base*1.3 < 600_000
-    // sizeBase = 350*400 + 8*5000 = 140000 + 40000 = 180000; pass2 multiplier=1: 180000 → clamped to 480_000
-    // Use pass=2 so multiplier is 1: need raw sizeBase > 480_000
-    // sizeBase = 1000*400 + 5*5000 = 425000; pass2: 425000 → clamped to 480_000
-    // sizeBase = 1100*400 + 5*5000 = 465000; pass2: 465000 → clamped to 480_000
-    // sizeBase = 1300*400 + 5*5000 = 545000; pass2: 545000 → above floor
-    // 545000*1.3 = 708500 → capped at 600_000. Still too high.
-    // Need base where base*1.3 ≤ 600_000 → base ≤ ~461_538
-    // But floor is 480_000 → base=480_000, 480_000*1.3=624_000 > 600_000. Hmm.
-    // So base>480_000 always has 1.3x > 600_000 unless base is exactly 480_000.
-    // The 1.3x retry will always be capped at 600_000 when base ≥ 480_000.
-    // Let's just test with base = 480_000 (the minimum) and verify capping.
     const configs = computeAttemptConfigs(10, 2, 1);
     expect(configs[0].timeout).toBe(480_000);
     expect(configs[1].timeout).toBe(600_000); // 480_000 * 1.3 = 624_000 → capped
@@ -1282,12 +1223,8 @@ describe("analyzeZones findings", () => {
   });
 
   it("structural findings have severity based on content — entry points get warning", async () => {
-    // "N entry points — wide API surface, consider consolidating exports"
-    // should map to "warning" severity since it suggests action
     const files = Array.from({ length: 10 }, (_, i) => `src/a/${String.fromCharCode(97 + i)}.ts`);
     const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
-    // Create enough edges so all files cluster into one zone,
-    // but set up entry points by having every file imported externally
     const imports = makeImports([
       makeEdge(files[0], files[1]),
       makeEdge(files[1], files[2]),
@@ -1298,7 +1235,6 @@ describe("analyzeZones findings", () => {
       makeEdge(files[6], files[7]),
       makeEdge(files[7], files[8]),
       makeEdge(files[8], files[9]),
-      // Lots of cross-edges to form one tight cluster
       makeEdge(files[0], files[5]),
       makeEdge(files[1], files[6]),
       makeEdge(files[2], files[7]),
@@ -1308,7 +1244,6 @@ describe("analyzeZones findings", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // Find a finding about entry points if it exists
     const entryPointFinding = result.findings?.find((f) => f.text.includes("entry points"));
     if (entryPointFinding) {
       expect(entryPointFinding.severity).toBe("warning");
@@ -1316,10 +1251,6 @@ describe("analyzeZones findings", () => {
   });
 
   it("back-populates findings into insights for backward compat", async () => {
-    // After AI enrichment produces findings in the new format, those findings
-    // should also appear in the legacy insights arrays on zones and at top level.
-    // This test uses enrich: false (structural only) where back-population
-    // already works — every zone insight text appears in findings and vice versa.
     const inventory = makeInventory([
       makeFileEntry("src/a/x.ts"),
       makeFileEntry("src/a/y.ts"),

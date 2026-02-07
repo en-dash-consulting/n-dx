@@ -25,11 +25,6 @@ export const PER_ZONE_MAX_FILES = 15;
 /** Max boundary crossings to include in single-zone prompt */
 export const PER_ZONE_MAX_CROSSINGS = 20;
 
-// ── Shared constants ─────────────────────────────────────────────────────────
-
-export const IDLE_TIMEOUT_MS = 120_000;   // 2 min with no output = stuck
-export const OVERALL_TIMEOUT_MS = 1_200_000; // 20 min hard cap
-
 // ── Pass configuration ───────────────────────────────────────────────────────
 
 /** Configuration for each enrichment pass — maps to expected finding types */

@@ -8,8 +8,6 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import type {
   Inventory,
   Imports,
@@ -24,13 +22,11 @@ import {
   MAX_CONCURRENT_ZONES,
   PER_ZONE_MAX_FILES,
   PER_ZONE_MAX_CROSSINGS,
-  IDLE_TIMEOUT_MS,
-  OVERALL_TIMEOUT_MS,
   getPassConfig,
   computePerZoneAttemptConfigs,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { tryCallClaude, getClaudeBinary } from "./claude-cli.js";
+import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 
@@ -161,24 +157,30 @@ Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine
     const promptLevel = config.maxFiles >= PER_ZONE_MAX_FILES ? "full" : config.maxFiles >= 8 ? "medium" : "minimal";
     console.log(`  [enrich] Zone "${zone.id}" (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
 
-    const callResult = await tryCallClaude(prompt, config.timeout);
-    zoneTokenUsage.calls++;
-    if (callResult.ok && callResult.tokenUsage) {
-      zoneTokenUsage.input += callResult.tokenUsage.input;
-      zoneTokenUsage.output += callResult.tokenUsage.output;
-    }
-
-    if (!callResult.ok) {
-      if (callResult.reason === "auth") {
-        console.warn("  [enrich] Authentication error — run 'claude login' or check API key");
-        return { zone, newInsights: [], newFindings: [], tokenUsage: zoneTokenUsage, success: false };
+    let callText: string;
+    try {
+      const callResult = await callClaude(prompt);
+      zoneTokenUsage.calls++;
+      if (callResult.tokenUsage) {
+        zoneTokenUsage.input += callResult.tokenUsage.input;
+        zoneTokenUsage.output += callResult.tokenUsage.output;
       }
-      const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying" : "giving up";
-      console.warn(`  [enrich] Zone "${zone.id}" attempt ${attempt + 1} failed (${callResult.reason}) — ${label}`);
-      continue;
+      callText = callResult.text;
+    } catch (err) {
+      if (err instanceof ClaudeClientError) {
+        zoneTokenUsage.calls++;
+        if (err.reason === "auth" || err.reason === "not-found") {
+          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          return { zone, newInsights: [], newFindings: [], tokenUsage: zoneTokenUsage, success: false };
+        }
+        const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying" : "giving up";
+        console.warn(`  [enrich] Zone "${zone.id}" attempt ${attempt + 1} failed (${err.reason}) — ${label}`);
+        continue;
+      }
+      throw err;
     }
 
-    const candidate = tryParseJSON(callResult.response);
+    const candidate = tryParseJSON(callText);
     if (!candidate) {
       const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying" : "giving up";
       console.warn(`  [enrich] Zone "${zone.id}" attempt ${attempt + 1}: invalid JSON — ${label}`);
@@ -258,23 +260,6 @@ export async function enrichZonesPerZone(
     newFindings: [],
     pass: previousZones?.enrichmentPass ?? 0,
   };
-
-  // Check for claude CLI (respects unified config path)
-  const cliBinary = getClaudeBinary();
-  try {
-    if (cliBinary !== "claude") {
-      // Custom path from config — check file exists
-      if (!existsSync(cliBinary)) {
-        console.warn(`  [enrich] Claude CLI not found at configured path: ${cliBinary}`);
-        return empty;
-      }
-    } else {
-      execFileSync("which", ["claude"], { stdio: "pipe" });
-    }
-  } catch {
-    console.warn("  [enrich] claude CLI not found — using algorithmic names. Install it or set path: n-dx config claude.cli_path /path/to/claude");
-    return empty;
-  }
 
   // Compute per-zone structure hashes
   const zoneHashes = new Map<string, string>();
