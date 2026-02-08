@@ -65,3 +65,12 @@ export {
   detectAuthMode,
 } from "./create-client.js";
 export type { CreateClientOptions } from "./create-client.js";
+
+// Auth detection and validation
+export {
+  detectCliAvailability,
+  validateApiKey,
+  detectAvailableAuth,
+  diagnoseAuth,
+} from "./auth.js";
+export type { AuthDetectionResult, AuthDiagnostics } from "./auth.js";
