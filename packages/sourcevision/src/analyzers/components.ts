@@ -330,6 +330,22 @@ export function extractConventionExports(
   }
 
   for (const stmt of sf.statements) {
+    // Handle export declarations (export { loader } from "...") or (export { loader })
+    if (ts.isExportDeclaration(stmt)) {
+      // export { default } from "./component.js"
+      if (stmt.exportClause && ts.isNamedExports(stmt.exportClause)) {
+        for (const el of stmt.exportClause.elements) {
+          const exportedName = el.name.text;
+          if (exportedName === "default") {
+            exports.push("default");
+          } else if (ROUTE_EXPORT_NAMES.has(exportedName)) {
+            exports.push(exportedName as RouteExportKind);
+          }
+        }
+      }
+      continue;
+    }
+
     const isExported = stmtHasModifier(stmt, ts.SyntaxKind.ExportKeyword);
     if (!isExported) continue;
 

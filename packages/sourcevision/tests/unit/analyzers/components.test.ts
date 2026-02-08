@@ -353,6 +353,48 @@ describe("extractConventionExports", () => {
     const result = extractConventionExports(source, "route.tsx");
     expect(result).toContain("ErrorBoundary");
   });
+
+  it("detects export-from", () => {
+    const source = `
+      export { loader } from "./loader.js";
+      export { action } from "./actions.js";
+    `;
+    const result = extractConventionExports(source, "route.tsx");
+    expect(result).toContain("loader");
+    expect(result).toContain("action");
+    expect(result).toHaveLength(2);
+  });
+
+  it("detects re-export without from", () => {
+    const source = `
+      function loader() { return null; }
+      function action() { return null; }
+      export { loader, action };
+    `;
+    const result = extractConventionExports(source, "route.tsx");
+    expect(result).toContain("loader");
+    expect(result).toContain("action");
+    expect(result).toHaveLength(2);
+  });
+
+  it("detects default export in export-from", () => {
+    const source = `export { default } from "./component.js";`;
+    const result = extractConventionExports(source, "route.tsx");
+    expect(result).toContain("default");
+  });
+
+  it("detects mixed export-from and regular exports", () => {
+    const source = `
+      export { loader } from "./loader.js";
+      export function action() { return null; }
+      export const meta = () => [];
+    `;
+    const result = extractConventionExports(source, "route.tsx");
+    expect(result).toContain("loader");
+    expect(result).toContain("action");
+    expect(result).toContain("meta");
+    expect(result).toHaveLength(3);
+  });
 });
 
 // ── parseFileRoutePattern ───────────────────────────────────────────────────
