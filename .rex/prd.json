@@ -4736,7 +4736,7 @@
             {
               "id": "2baa9258-8099-4332-a064-e4fd30a5453b",
               "title": "Update sourcevision package to support API key authentication",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Modify sourcevision analyze and LLM-dependent features to use direct API authentication",
               "acceptanceCriteria": [
@@ -4750,7 +4750,9 @@
                 "sourcevision",
                 "api"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-08T15:07:20.677Z",
+              "completedAt": "2026-02-08T15:11:42.842Z"
             },
             {
               "id": "b6515a61-9f9c-4cd5-8bd0-4c433d01e405",
