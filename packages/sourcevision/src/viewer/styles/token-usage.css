@@ -1,0 +1,457 @@
+/* Token Usage Analytics dashboard */
+
+.token-usage-container {
+  max-width: 1200px;
+  position: relative;
+}
+
+/* Header and controls */
+.token-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.token-header h2 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.token-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.filter-label .filter-input {
+  flex: none;
+  width: auto;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.btn {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:hover { opacity: 0.85; }
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* Metrics row (extends overview-metrics) */
+.token-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+/* Budget alert banner */
+.budget-alert {
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.budget-alert strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.budget-alert p { margin: 2px 0 0; }
+
+.budget-alert-warning {
+  background: color-mix(in srgb, var(--orange) 12%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
+  color: var(--orange);
+}
+
+.budget-alert-exceeded {
+  background: color-mix(in srgb, var(--red) 12%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border));
+  color: var(--red);
+}
+
+/* Token section container */
+.token-section {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.token-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Budget indicators */
+.budget-indicators {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.budget-indicator {
+  flex: 1;
+  min-width: 240px;
+}
+
+.budget-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.budget-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.budget-pct {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.budget-ok { color: var(--green); }
+.budget-warning { color: var(--orange); }
+.budget-exceeded { color: var(--red); }
+
+.budget-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.budget-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.budget-bar-ok { background: var(--green); }
+.budget-bar-warning { background: var(--orange); }
+.budget-bar-exceeded { background: var(--red); }
+
+.budget-threshold {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-dim);
+  opacity: 0.5;
+}
+
+.budget-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Period toggle buttons */
+.period-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.toggle-btn {
+  padding: 5px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+  color: var(--text);
+}
+
+.toggle-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Period chart */
+.period-chart-container {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.period-chart {
+  width: 100%;
+  min-height: 200px;
+}
+
+.chart-axis-label {
+  font-size: 10px;
+  fill: var(--text-dim);
+}
+
+/* Chart legend */
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Package breakdown (donut) */
+.pkg-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.donut-chart {
+  flex-shrink: 0;
+}
+
+.donut-total {
+  font-size: 18px;
+  font-weight: 700;
+  fill: var(--text);
+}
+
+.donut-label {
+  font-size: 10px;
+  fill: var(--text-dim);
+}
+
+.pkg-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.pkg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pkg-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.pkg-tokens {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.pkg-pct {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Token table */
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.token-table th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.token-table th.num,
+.token-table td.num {
+  text-align: right;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.token-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.token-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* Package badge */
+.pkg-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bg);
+  letter-spacing: 0.02em;
+}
+
+/* Cost breakdown */
+.cost-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cost-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.cost-item.cost-total {
+  border-top: 2px solid var(--border);
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.cost-label {
+  font-size: 13px;
+  min-width: 120px;
+}
+
+.cost-value {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--green);
+  min-width: 80px;
+}
+
+.cost-detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+/* Empty state */
+.token-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Error state */
+.token-error {
+  padding: 48px;
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.token-error h3 {
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+.token-error p {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Loading overlay for refresh */
+.token-loading-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .token-header {
+    flex-direction: column;
+  }
+
+  .token-controls {
+    width: 100%;
+  }
+
+  .budget-indicators {
+    flex-direction: column;
+  }
+
+  .pkg-breakdown {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .token-table {
+    font-size: 11px;
+  }
+
+  .token-table th,
+  .token-table td {
+    padding: 4px 8px;
+  }
+}
