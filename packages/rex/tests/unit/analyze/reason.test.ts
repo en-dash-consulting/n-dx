@@ -17,6 +17,8 @@ import {
   readProjectContext,
   chunkScanResults,
   summarizeScanResults,
+  estimateItemSize,
+  groupScanResults,
   CHUNK_CHAR_LIMIT,
   CHUNK_ITEM_LIMIT,
 } from "../../../src/analyze/reason.js";
@@ -953,14 +955,16 @@ describe("chunkScanResults", () => {
     }
   });
 
-  it("preserves result order within chunks", () => {
+  it("preserves all results across chunks", () => {
     const results = Array.from({ length: 5 }, (_, i) => makeScanResult(`task-${i}`));
     const chunks = chunkScanResults(results);
 
     const flattened = chunks.flat();
-    for (let i = 0; i < results.length; i++) {
-      expect(flattened[i].name).toBe(results[i].name);
+    const names = new Set(flattened.map((r) => r.name));
+    for (const r of results) {
+      expect(names.has(r.name)).toBe(true);
     }
+    expect(flattened.length).toBe(results.length);
   });
 
   it("puts a single oversized result in its own chunk", () => {
@@ -1043,6 +1047,181 @@ describe("chunkScanResults", () => {
 describe("CHUNK_ITEM_LIMIT", () => {
   it("is exported and equals 100", () => {
     expect(CHUNK_ITEM_LIMIT).toBe(100);
+  });
+});
+
+describe("estimateItemSize", () => {
+  it("matches actual summarized length for a minimal item", () => {
+    const result: import("../../../src/analyze/scanners.js").ScanResult = {
+      name: "Task A",
+      source: "test",
+      sourceFile: "src/a.ts",
+      kind: "task",
+    };
+
+    const estimated = estimateItemSize(result);
+    const actual = summarizeScanResults([result]).length;
+
+    expect(estimated).toBe(actual);
+  });
+
+  it("matches actual summarized length for an item with all fields", () => {
+    const result: import("../../../src/analyze/scanners.js").ScanResult = {
+      name: "Login flow validation",
+      source: "sourcevision",
+      sourceFile: "tests/auth/login.test.ts",
+      kind: "task",
+      description: "Validates the login flow end-to-end",
+      acceptanceCriteria: ["Email is validated", "Token is returned", "Error on bad password"],
+      priority: "high",
+      tags: ["auth", "security", "critical-path"],
+    };
+
+    const estimated = estimateItemSize(result);
+    const actual = summarizeScanResults([result]).length;
+
+    expect(estimated).toBe(actual);
+  });
+
+  it("matches actual summarized length for an epic with description only", () => {
+    const result: import("../../../src/analyze/scanners.js").ScanResult = {
+      name: "Infrastructure",
+      source: "package",
+      sourceFile: "package.json",
+      kind: "epic",
+      description: "Core infrastructure and tooling",
+    };
+
+    const estimated = estimateItemSize(result);
+    const actual = summarizeScanResults([result]).length;
+
+    expect(estimated).toBe(actual);
+  });
+
+  it("matches actual summarized length for tags-only item", () => {
+    const result: import("../../../src/analyze/scanners.js").ScanResult = {
+      name: "Fix circular dependency",
+      source: "sourcevision",
+      sourceFile: ".sourcevision/imports.json",
+      kind: "task",
+      tags: ["tech-debt"],
+    };
+
+    const estimated = estimateItemSize(result);
+    const actual = summarizeScanResults([result]).length;
+
+    expect(estimated).toBe(actual);
+  });
+});
+
+describe("groupScanResults", () => {
+  it("groups items by source file", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      { name: "Task B", source: "test", sourceFile: "src/b.ts", kind: "task" },
+      { name: "Task A", source: "test", sourceFile: "src/a.ts", kind: "task" },
+      { name: "Feature A", source: "test", sourceFile: "src/a.ts", kind: "feature" },
+    ];
+
+    const grouped = groupScanResults(results);
+
+    // src/a.ts items should come before src/b.ts
+    expect(grouped[0].sourceFile).toBe("src/a.ts");
+    expect(grouped[1].sourceFile).toBe("src/a.ts");
+    expect(grouped[2].sourceFile).toBe("src/b.ts");
+  });
+
+  it("sorts by kind within same source file (epic > feature > task)", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      { name: "Task", source: "test", sourceFile: "src/a.ts", kind: "task" },
+      { name: "Epic", source: "test", sourceFile: "src/a.ts", kind: "epic" },
+      { name: "Feature", source: "test", sourceFile: "src/a.ts", kind: "feature" },
+    ];
+
+    const grouped = groupScanResults(results);
+
+    expect(grouped[0].kind).toBe("epic");
+    expect(grouped[1].kind).toBe("feature");
+    expect(grouped[2].kind).toBe("task");
+  });
+
+  it("does not mutate input array", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      { name: "B", source: "test", sourceFile: "src/b.ts", kind: "task" },
+      { name: "A", source: "test", sourceFile: "src/a.ts", kind: "task" },
+    ];
+    const original = [...results];
+
+    groupScanResults(results);
+
+    expect(results[0].name).toBe(original[0].name);
+    expect(results[1].name).toBe(original[1].name);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(groupScanResults([])).toEqual([]);
+  });
+});
+
+describe("chunkScanResults — grouping behavior", () => {
+  it("keeps items from the same source file together in a chunk", () => {
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [
+      { name: "Task 1", source: "test", sourceFile: "src/b.ts", kind: "task" },
+      { name: "Task 2", source: "test", sourceFile: "src/a.ts", kind: "task" },
+      { name: "Task 3", source: "test", sourceFile: "src/a.ts", kind: "feature" },
+      { name: "Task 4", source: "test", sourceFile: "src/b.ts", kind: "feature" },
+    ];
+
+    const chunks = chunkScanResults(results);
+
+    // All should fit in one chunk, but verify grouping order
+    expect(chunks).toHaveLength(1);
+    const names = chunks[0].map((r) => r.sourceFile);
+    // src/a.ts items should be adjacent, src/b.ts items should be adjacent
+    const aIndices = names.map((n, i) => n === "src/a.ts" ? i : -1).filter((i) => i >= 0);
+    const bIndices = names.map((n, i) => n === "src/b.ts" ? i : -1).filter((i) => i >= 0);
+    // Check adjacency: max - min should equal count - 1
+    expect(Math.max(...aIndices) - Math.min(...aIndices)).toBe(aIndices.length - 1);
+    expect(Math.max(...bIndices) - Math.min(...bIndices)).toBe(bIndices.length - 1);
+  });
+
+  it("maintains grouping across chunk boundaries", () => {
+    // Create items from two source files, enough to require multiple chunks
+    const results: import("../../../src/analyze/scanners.js").ScanResult[] = [];
+    // 60 items from file-a, 60 items from file-b — exceeds CHUNK_ITEM_LIMIT of 100
+    for (let i = 0; i < 60; i++) {
+      results.push({
+        name: `A-Task-${i}`,
+        source: "test",
+        sourceFile: "src/file-a.ts",
+        kind: "task",
+        description: `Description for A task ${i}`,
+      });
+    }
+    for (let i = 0; i < 60; i++) {
+      results.push({
+        name: `B-Task-${i}`,
+        source: "test",
+        sourceFile: "src/file-b.ts",
+        kind: "task",
+        description: `Description for B task ${i}`,
+      });
+    }
+
+    const chunks = chunkScanResults(results);
+
+    // Should be at least 2 chunks
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+
+    // Verify total count preserved
+    const total = chunks.reduce((sum, c) => sum + c.length, 0);
+    expect(total).toBe(120);
+
+    // Due to grouping, file-a items should all appear before file-b items
+    // across the flattened chunk sequence
+    const flattened = chunks.flat();
+    const lastAIndex = flattened.findLastIndex((r) => r.sourceFile === "src/file-a.ts");
+    const firstBIndex = flattened.findIndex((r) => r.sourceFile === "src/file-b.ts");
+    expect(lastAIndex).toBeLessThan(firstBIndex);
   });
 });
 

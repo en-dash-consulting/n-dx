@@ -883,6 +883,66 @@ export function summarizeScanResults(results: ScanResult[]): string {
 }
 
 /**
+ * Estimate the serialized character length of a single ScanResult without
+ * allocating intermediate strings or arrays. Uses arithmetic on the existing
+ * field lengths to match what `summarizeScanResults([r])` would produce.
+ *
+ * This avoids O(N) full serializations during chunking — a significant
+ * saving for large codebases with thousands of scan results.
+ */
+export function estimateItemSize(r: ScanResult): number {
+  // Header: `[${r.kind}] ${r.name} (source: ${r.source}, file: ${r.sourceFile})`
+  //          [  kind     ]_  name    _(source:_  source   ,_file:_  sourceFile   )
+  let size = 1 + r.kind.length + 2 + r.name.length + 10 + r.source.length + 8 + r.sourceFile.length + 1;
+
+  if (r.description) {
+    // `\n  description: ${r.description}` — prefix is 16 chars
+    size += 16 + r.description.length;
+  }
+  if (r.acceptanceCriteria && r.acceptanceCriteria.length > 0) {
+    // `\n  criteria: ` + items joined by "; "
+    size += 13;
+    for (let i = 0; i < r.acceptanceCriteria.length; i++) {
+      if (i > 0) size += 2; // "; "
+      size += r.acceptanceCriteria[i].length;
+    }
+  }
+  if (r.priority) {
+    // `\n  priority: ${r.priority}`
+    size += 13 + r.priority.length;
+  }
+  if (r.tags && r.tags.length > 0) {
+    // `\n  tags: ` + items joined by ", "
+    size += 9;
+    for (let i = 0; i < r.tags.length; i++) {
+      if (i > 0) size += 2; // ", "
+      size += r.tags[i].length;
+    }
+  }
+  return size;
+}
+
+/** Kind ordering for grouping: epics first, then features, then tasks. */
+const KIND_ORDER: Record<string, number> = { epic: 0, feature: 1, task: 2 };
+
+/**
+ * Sort scan results so related items are adjacent: first by source file,
+ * then by kind (epic → feature → task). This keeps context together within
+ * chunks so the LLM sees complete feature areas rather than interleaved
+ * fragments from different parts of the codebase.
+ *
+ * Returns a new array — does not mutate the input.
+ */
+export function groupScanResults(results: ScanResult[]): ScanResult[] {
+  return [...results].sort((a, b) => {
+    if (a.sourceFile !== b.sourceFile) {
+      return a.sourceFile < b.sourceFile ? -1 : 1;
+    }
+    return (KIND_ORDER[a.kind] ?? 2) - (KIND_ORDER[b.kind] ?? 2);
+  });
+}
+
+/**
  * Split scan results into chunks that respect both `CHUNK_CHAR_LIMIT` and
  * `CHUNK_ITEM_LIMIT`. When all results fit in a single chunk, this returns
  * a one-element array — no overhead.
@@ -894,17 +954,25 @@ export function summarizeScanResults(results: ScanResult[]): string {
  * This dual constraint ensures both:
  * - Token budget stays within LLM limits (character-based)
  * - LLM reasoning quality stays high (item-count-based)
+ *
+ * Optimizations over naive chunking:
+ * - Uses `estimateItemSize()` for O(1) size calculation per item instead
+ *   of full serialization, reducing allocations for large result sets.
+ * - Groups related items by source file and kind so the LLM sees coherent
+ *   context per chunk rather than interleaved fragments.
  */
 export function chunkScanResults(results: ScanResult[]): ScanResult[][] {
   if (results.length === 0) return [];
+
+  // Group related items together before chunking
+  const sorted = groupScanResults(results);
 
   const chunks: ScanResult[][] = [];
   let current: ScanResult[] = [];
   let currentLen = 0;
 
-  for (const r of results) {
-    const itemText = summarizeScanResults([r]);
-    const itemLen = itemText.length;
+  for (const r of sorted) {
+    const itemLen = estimateItemSize(r);
 
     // Flush the current chunk if adding this item would exceed either limit
     // (unless it's empty — an oversized single item gets its own chunk).

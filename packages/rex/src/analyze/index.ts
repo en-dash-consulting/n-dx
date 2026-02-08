@@ -51,6 +51,8 @@ export {
   mergeProposals,
   chunkScanResults,
   summarizeScanResults,
+  estimateItemSize,
+  groupScanResults,
 } from "./reason.js";
 
 export type { GuidedContext, ClarifyResponse } from "./guided.js";
