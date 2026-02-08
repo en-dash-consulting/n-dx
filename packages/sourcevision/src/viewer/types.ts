@@ -8,7 +8,7 @@ export interface LoadedData {
   components: Components | null;
 }
 
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "prd" | "token-usage";
+export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "prd" | "token-usage" | "validation";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string }) => void;
 

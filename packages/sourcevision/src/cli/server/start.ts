@@ -11,6 +11,7 @@ import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
+import { handleValidationRoute } from "./routes-validation.js";
 import { createWebSocketManager } from "./websocket.js";
 import { ALL_DATA_FILES } from "../../schema/data-files.js";
 
@@ -123,13 +124,16 @@ export function startServer(
       return;
     }
 
-    // 3. Token usage API
+    // 3. Validation & dependency graph API
+    if (handleValidationRoute(req, res, ctx)) return;
+
+    // 4. Token usage API
     if (handleTokenUsageRoute(req, res, ctx)) return;
 
-    // 4. Data files (existing /data/* routes for backward compatibility)
+    // 5. Data files (existing /data/* routes for backward compatibility)
     if (handleDataRoute(req, res, ctx, watcher)) return;
 
-    // 5. Static assets
+    // 6. Static assets
     if (handleStaticRoute(req, res, ctx, assets)) return;
 
     // 404

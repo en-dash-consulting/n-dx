@@ -18,10 +18,11 @@ import { SuggestionsView } from "./views/suggestions.js";
 import { RoutesView } from "./views/routes.js";
 import { PRDView } from "./views/prd.js";
 import { TokenUsageView } from "./views/token-usage.js";
+import { ValidationView } from "./views/validation.js";
 
 initTheme();
 
-const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "prd", "token-usage"]);
+const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "prd", "token-usage", "validation"]);
 
 function getInitialView(): ViewId {
   const hash = location.hash.replace("#", "") as ViewId;
@@ -174,6 +175,8 @@ function App() {
         return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent });
       case "token-usage":
         return h(TokenUsageView, null);
+      case "validation":
+        return h(ValidationView, null);
       default:
         return null;
     }

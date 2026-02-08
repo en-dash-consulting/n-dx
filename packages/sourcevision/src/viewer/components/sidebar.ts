@@ -26,6 +26,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "files", icon: "\u2630", label: "Files", minPass: 0 },
   { type: "item", id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
+  { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
   { type: "section", label: "ENRICHMENT" },
   { type: "item", id: "architecture", icon: "\u25E8", label: "Architecture", minPass: ENRICHMENT_THRESHOLDS.architecture },
   { type: "item", id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
