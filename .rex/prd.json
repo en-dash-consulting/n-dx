@@ -3303,15 +3303,17 @@
         {
           "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
           "title": "PRD Enhancement Features in Web UI",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Expose PRD management enhancement capabilities through the Rex web dashboard",
           "source": "manual",
+          "startedAt": "2026-02-08T16:08:58.456Z",
+          "completedAt": "2026-02-08T16:08:58.456Z",
           "children": [
             {
               "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
               "title": "Add validation and dependency visualization to web UI",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add ability to run rex validate from the web UI and display results inline (orphaned items, circular dependencies, stuck tasks). Render blockedBy relationships as a visual dependency graph showing blocking chains, rather than just listing IDs in the detail panel.",
               "acceptanceCriteria": [
@@ -3328,12 +3330,14 @@
                 "dependency-graph",
                 "frontend"
               ],
-              "source": "manual"
+              "source": "manual",
+              "startedAt": "2026-02-08T15:58:45.600Z",
+              "completedAt": "2026-02-08T16:08:58.408Z"
             },
             {
               "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
               "title": "Add token usage analytics dashboard to web UI",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Build a dashboard view showing token consumption across packages (rex, hench, sourcevision), grouped by command and time period, with budget status indicators and trend visualization.",
               "acceptanceCriteria": [
@@ -3350,7 +3354,9 @@
                 "analytics",
                 "frontend"
               ],
-              "source": "manual"
+              "source": "manual",
+              "startedAt": "2026-02-08T15:48:30.167Z",
+              "completedAt": "2026-02-08T15:58:45.500Z"
             }
           ]
         }
@@ -3487,7 +3493,7 @@
             {
               "id": "449ebc63-c229-4e07-a797-e0f7c3fbe4a9",
               "title": "Define Notion database schema",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Specify complete database schema with proper field types and options",
               "acceptanceCriteria": [
@@ -3510,7 +3516,9 @@
                 "PRIORITY_OPTIONS",
                 "DATABASE_SCHEMA"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-08T16:09:21.659Z",
+              "completedAt": "2026-02-08T16:13:16.500Z"
             },
             {
               "id": "173a90ca-cfc3-4ed5-bfc2-a28e3a95341f",
@@ -4582,6 +4590,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-08T15:43:45.835Z",
+      "completedAt": "2026-02-08T15:43:45.835Z",
       "children": [
         {
           "id": "7474c596-ce78-4e71-9628-c2d004a8c5c1",
@@ -4640,9 +4650,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-08T15:43:45.835Z",
-      "completedAt": "2026-02-08T15:43:45.835Z"
+      ]
     },
     {
       "id": "f8fc3374-4926-43e7-be20-fb01dc821af9",
