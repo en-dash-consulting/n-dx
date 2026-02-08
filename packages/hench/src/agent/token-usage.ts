@@ -1,4 +1,13 @@
 import type { TokenUsage } from "../schema/index.js";
+import {
+  parseApiTokenUsage as parseTokenUsage,
+  parseStreamTokenUsage,
+} from "@n-dx/claude-client";
+
+// Re-export parsing functions from the canonical source (@n-dx/claude-client).
+// `parseTokenUsage` is an alias for `parseApiTokenUsage` — same function,
+// kept here for backward-compatible imports within hench.
+export { parseTokenUsage, parseStreamTokenUsage };
 
 // ── Aggregate token usage ──
 
@@ -63,93 +72,4 @@ export function formatTokenUsage(usage: AggregateTokenUsage): string {
   }
 
   return parts.join(" ");
-}
-
-// ── Parsing ──
-
-/**
- * Parse token usage from an Anthropic API SDK response `usage` object.
- *
- * The SDK response always has `input_tokens` / `output_tokens` at the top level.
- * Cache fields (`cache_creation_input_tokens`, `cache_read_input_tokens`) are
- * present on some models/versions but not typed in the SDK, so we extract them
- * from the raw object.
- *
- * Always returns a TokenUsage — missing numeric fields default to 0.
- * Cache fields are omitted when zero or absent.
- */
-export function parseTokenUsage(
-  raw: Record<string, unknown>,
-): TokenUsage {
-  const input = typeof raw.input_tokens === "number" ? raw.input_tokens : 0;
-  const output = typeof raw.output_tokens === "number" ? raw.output_tokens : 0;
-
-  const result: TokenUsage = { input, output };
-
-  const cacheCreation = raw.cache_creation_input_tokens;
-  if (typeof cacheCreation === "number" && cacheCreation > 0) {
-    result.cacheCreationInput = cacheCreation;
-  }
-
-  const cacheRead = raw.cache_read_input_tokens;
-  if (typeof cacheRead === "number" && cacheRead > 0) {
-    result.cacheReadInput = cacheRead;
-  }
-
-  return result;
-}
-
-/**
- * Parse token usage from a CLI stream-json event.
- *
- * Claude CLI stream-json events may include token usage:
- * - At the top level: `input_tokens`, `output_tokens`
- * - As fallback: `total_input_tokens`, `total_output_tokens`
- * - Inside a nested `usage` object (some CLI versions)
- *
- * Prefers `input_tokens` over `total_input_tokens`.
- * Prefers top-level fields over nested `usage` object.
- * Returns `undefined` when no token fields are found.
- * Cache fields are omitted when zero or absent.
- */
-export function parseStreamTokenUsage(
-  obj: Record<string, unknown>,
-): TokenUsage | undefined {
-  // Try direct fields first (prefer input_tokens over total_input_tokens)
-  let input = obj.input_tokens ?? obj.total_input_tokens;
-  let output = obj.output_tokens ?? obj.total_output_tokens;
-  let cacheCreation = obj.cache_creation_input_tokens;
-  let cacheRead = obj.cache_read_input_tokens;
-
-  // Try nested usage object (stream-json format) — only if top-level has nothing
-  if (
-    typeof input !== "number" &&
-    typeof output !== "number" &&
-    obj.usage &&
-    typeof obj.usage === "object"
-  ) {
-    const usage = obj.usage as Record<string, unknown>;
-    input = usage.input_tokens ?? usage.total_input_tokens;
-    output = usage.output_tokens ?? usage.total_output_tokens;
-    cacheCreation = usage.cache_creation_input_tokens;
-    cacheRead = usage.cache_read_input_tokens;
-  }
-
-  if (typeof input !== "number" && typeof output !== "number") {
-    return undefined;
-  }
-
-  const result: TokenUsage = {
-    input: typeof input === "number" ? input : 0,
-    output: typeof output === "number" ? output : 0,
-  };
-
-  if (typeof cacheCreation === "number" && cacheCreation > 0) {
-    result.cacheCreationInput = cacheCreation;
-  }
-  if (typeof cacheRead === "number" && cacheRead > 0) {
-    result.cacheReadInput = cacheRead;
-  }
-
-  return result;
 }
