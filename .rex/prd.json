@@ -5,17 +5,21 @@
     {
       "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
       "title": "Natural language PRD authoring",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
+      "startedAt": "2026-02-09T12:56:47.925Z",
+      "completedAt": "2026-02-09T12:56:47.925Z",
       "children": [
         {
           "id": "5b558cbb-b329-45e8-af46-b102eada7929",
           "title": "Smart add functionality",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Allow natural language input that gets structured by LLM into proper PRD hierarchy",
           "source": "llm",
+          "startedAt": "2026-02-09T12:56:47.907Z",
+          "completedAt": "2026-02-09T12:56:47.907Z",
           "children": [
             {
               "id": "75e2da1b-51c2-4dab-a9fe-c0f8591ea24e",
@@ -76,7 +80,7 @@
             {
               "id": "f6d75214-9714-41b0-8467-7ae40e412dc3",
               "title": "Implement bidirectional parent status cascade",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Automatically manage parent status in both directions: reset completed parents when new children are added, and auto-complete parents when all children are completed.",
               "acceptanceCriteria": [
@@ -94,7 +98,9 @@
                 "hierarchy",
                 "status"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-09T12:49:54.488Z",
+              "completedAt": "2026-02-09T12:56:47.857Z"
             }
           ]
         },
@@ -3064,7 +3070,7 @@
         {
           "id": "5ea113f8-18e8-44b4-afd8-b0c381520a36",
           "title": "Core Tree Operations",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Improve PRD tree manipulation and navigation",
           "source": "llm",
@@ -3122,7 +3128,7 @@
             {
               "id": "cdca0347-b1a1-4de3-a5ef-bc864bdfad58",
               "title": "Implement proposal reconciliation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Reconcile new proposals against existing PRD structure",
               "acceptanceCriteria": [
@@ -3137,9 +3143,13 @@
                 "proposals",
                 "matching"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T13:40:05.986Z",
+              "completedAt": "2026-02-09T13:45:09.429Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-09T13:45:09.477Z",
+          "completedAt": "2026-02-09T13:45:09.477Z"
         },
         {
           "id": "fb8d363f-e8c3-495a-8cb9-2ac680525b3e",
@@ -3602,7 +3612,7 @@
             {
               "id": "c48c1ca6-9de1-417a-bfb9-a6e916a1e6e8",
               "title": "Implement adapter registry and store creation",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Complete adapter registration, store creation with configuration validation, secure config persistence, and store resolution from saved adapter config.",
               "acceptanceCriteria": [
@@ -3628,7 +3638,8 @@
                 "AdapterRegistry"
               ],
               "source": "llm",
-              "startedAt": "2026-02-09T12:40:32.466Z"
+              "startedAt": "2026-02-09T12:40:32.466Z",
+              "completedAt": "2026-02-09T12:49:05.579Z"
             },
             {
               "id": "60781b1f-d3bf-4604-a787-aba02a492339",
