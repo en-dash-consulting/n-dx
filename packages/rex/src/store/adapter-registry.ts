@@ -29,6 +29,8 @@ export interface AdapterConfigField {
   required: boolean;
   /** Human-readable description shown in help output. */
   description: string;
+  /** Whether this field contains sensitive data (tokens, secrets, passwords). */
+  sensitive?: boolean;
 }
 
 /**
@@ -80,6 +82,69 @@ interface AdaptersFile {
 }
 
 // ---------------------------------------------------------------------------
+// Sensitive field helpers
+// ---------------------------------------------------------------------------
+
+/** Key names that are always treated as sensitive, regardless of schema. */
+const SENSITIVE_KEYS = new Set(["token", "secret", "apikey", "api_key", "password"]);
+
+/**
+ * Determine whether a config field holds sensitive data.
+ *
+ * A field is sensitive if:
+ * 1. The adapter schema explicitly marks it `sensitive: true`, OR
+ * 2. The field key matches a well-known sensitive name (case-insensitive).
+ */
+function fieldIsSensitive(
+  key: string,
+  schema?: Record<string, AdapterConfigField>,
+): boolean {
+  if (schema?.[key]?.sensitive) return true;
+  return SENSITIVE_KEYS.has(key.toLowerCase());
+}
+
+/**
+ * Derive the environment variable name for a sensitive adapter config field.
+ *
+ * Convention: `REX_<ADAPTER>_<FIELD>` in upper-snake-case.
+ *
+ * @example envVarName("notion", "token") => "REX_NOTION_TOKEN"
+ */
+function envVarName(adapterName: string, field: string): string {
+  const toUpper = (s: string) =>
+    s.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/-/g, "_").toUpperCase();
+  return `REX_${toUpper(adapterName)}_${toUpper(field)}`;
+}
+
+/**
+ * Redact a sensitive value for on-disk storage.
+ *
+ * Shows first 4 and last 4 characters if long enough, otherwise `****`.
+ */
+function redactValue(value: string): string {
+  if (value.length <= 8) return "****";
+  return value.slice(0, 4) + "****" + value.slice(-4);
+}
+
+/** Marker stored in adapters.json for sensitive fields. */
+interface RedactedField {
+  __redacted: true;
+  /** Environment variable to read at runtime. */
+  envVar: string;
+  /** Masked preview for display purposes. */
+  hint: string;
+}
+
+export function isRedactedField(v: unknown): v is RedactedField {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    (v as Record<string, unknown>).__redacted === true &&
+    typeof (v as Record<string, unknown>).envVar === "string"
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Built-in adapter definitions
 // ---------------------------------------------------------------------------
 
@@ -99,7 +164,7 @@ function notionAdapterDef(): AdapterDefinition {
     name: "notion",
     description: "Notion database backend",
     configSchema: {
-      token: { required: true, description: "Notion integration token (secret_xxx or ntn_xxx)" },
+      token: { required: true, sensitive: true, description: "Notion integration token (secret_xxx or ntn_xxx)" },
       databaseId: { required: true, description: "Notion database ID" },
     },
     factory: (rexDir, config) => {
@@ -221,7 +286,11 @@ export class AdapterRegistry {
   /**
    * Create a store using a saved adapter config from `adapters.json`.
    *
-   * @throws If no config exists for the adapter, or the adapter is unknown.
+   * Redacted sensitive fields are resolved from environment variables
+   * before passing the config to the adapter factory.
+   *
+   * @throws If no config exists for the adapter, or the adapter is unknown,
+   *         or required env vars for sensitive fields are not set.
    */
   async createFromConfig(rexDir: string, adapterName: string): Promise<PRDStore> {
     const adapterConfig = await this.getAdapterConfig(rexDir, adapterName);
@@ -231,7 +300,26 @@ export class AdapterRegistry {
         `Run 'rex adapter add ${adapterName}' to configure it.`,
       );
     }
-    return this.create(adapterName, rexDir, adapterConfig.config);
+
+    // Resolve redacted fields from environment variables
+    const resolvedConfig: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(adapterConfig.config)) {
+      if (isRedactedField(val)) {
+        const envVal = process.env[val.envVar];
+        if (!envVal) {
+          throw new Error(
+            `Environment variable ${val.envVar} is required for ` +
+            `adapter "${adapterName}" field "${key}". ` +
+            `Set it before running sync.`,
+          );
+        }
+        resolvedConfig[key] = envVal;
+      } else {
+        resolvedConfig[key] = val;
+      }
+    }
+
+    return this.create(adapterName, rexDir, resolvedConfig);
   }
 
   // ---- Config persistence ------------------------------------------------
@@ -260,14 +348,38 @@ export class AdapterRegistry {
    * Save (or overwrite) an adapter configuration.
    *
    * If an entry for the same adapter name already exists, it is replaced.
+   * Sensitive fields (tokens, secrets) are redacted on disk and must be
+   * provided via environment variables at runtime.
    */
   async saveAdapterConfig(rexDir: string, entry: AdapterConfig): Promise<void> {
+    const def = this.adapters.get(entry.name);
+    const schema = def?.configSchema;
+
+    // Redact sensitive fields before persisting
+    const persistedConfig: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(entry.config)) {
+      if (fieldIsSensitive(key, schema) && typeof val === "string") {
+        persistedConfig[key] = {
+          __redacted: true,
+          envVar: envVarName(entry.name, key),
+          hint: redactValue(val),
+        } satisfies RedactedField;
+      } else {
+        persistedConfig[key] = val;
+      }
+    }
+
+    const persistedEntry: AdapterConfig = {
+      name: entry.name,
+      config: persistedConfig,
+    };
+
     const file = await this.readAdaptersFile(rexDir);
     const idx = file.adapters.findIndex((a) => a.name === entry.name);
     if (idx >= 0) {
-      file.adapters[idx] = entry;
+      file.adapters[idx] = persistedEntry;
     } else {
-      file.adapters.push(entry);
+      file.adapters.push(persistedEntry);
     }
     await this.writeAdaptersFile(rexDir, file);
   }

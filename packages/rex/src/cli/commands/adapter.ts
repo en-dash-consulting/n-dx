@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { CLIError } from "../errors.js";
-import { getDefaultRegistry } from "../../store/adapter-registry.js";
+import { getDefaultRegistry, isRedactedField } from "../../store/adapter-registry.js";
 import type { AdapterConfig } from "../../store/adapter-registry.js";
 
 // ---------------------------------------------------------------------------
@@ -186,8 +186,14 @@ async function adapterShow(
   if (config) {
     info("  Configuration:");
     for (const [key, val] of Object.entries(config.config)) {
-      // Redact sensitive-looking values in display
-      const display = isSensitive(key) ? redact(String(val)) : String(val);
+      let display: string;
+      if (isRedactedField(val)) {
+        display = `${val.hint} (via ${val.envVar})`;
+      } else if (isSensitive(key)) {
+        display = redact(String(val));
+      } else {
+        display = String(val);
+      }
       info(`    ${key}: ${display}`);
     }
   } else {

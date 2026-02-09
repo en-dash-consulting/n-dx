@@ -133,7 +133,10 @@ describe("rex adapter", () => {
     const data = JSON.parse(raw);
     expect(data.adapters).toHaveLength(1);
     expect(data.adapters[0].name).toBe("notion");
-    expect(data.adapters[0].config.token).toBe("secret_test123");
+    // Token is redacted on disk — stored as a marker with env var reference
+    expect(data.adapters[0].config.token.__redacted).toBe(true);
+    expect(data.adapters[0].config.token.envVar).toBe("REX_NOTION_TOKEN");
+    // Non-sensitive fields stored as-is
     expect(data.adapters[0].config.databaseId).toBe("db-abc");
   });
 
@@ -255,7 +258,9 @@ describe("rex adapter", () => {
     const raw = await readFile(join(tmpDir, ".rex", "adapters.json"), "utf-8");
     const data = JSON.parse(raw);
     expect(data.adapters).toHaveLength(1);
-    expect(data.adapters[0].config.token).toBe("new_token");
+    // Token is redacted — only the hint reflects the latest value
+    expect(data.adapters[0].config.token.__redacted).toBe(true);
+    expect(raw).not.toContain("new_token");
     expect(data.adapters[0].config.databaseId).toBe("db-new");
   });
 });

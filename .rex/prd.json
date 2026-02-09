@@ -3602,7 +3602,7 @@
             {
               "id": "c48c1ca6-9de1-417a-bfb9-a6e916a1e6e8",
               "title": "Implement adapter registry and store creation",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Complete adapter registration, store creation with configuration validation, secure config persistence, and store resolution from saved adapter config.",
               "acceptanceCriteria": [
@@ -3627,7 +3627,8 @@
               "tags": [
                 "AdapterRegistry"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T12:40:32.466Z"
             },
             {
               "id": "60781b1f-d3bf-4604-a787-aba02a492339",

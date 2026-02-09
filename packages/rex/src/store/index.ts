@@ -9,6 +9,7 @@ export {
   AdapterRegistry,
   getDefaultRegistry,
   resetDefaultRegistry,
+  isRedactedField,
 } from "./adapter-registry.js";
 export type {
   AdapterDefinition,
