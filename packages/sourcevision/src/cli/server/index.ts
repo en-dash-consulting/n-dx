@@ -2,14 +2,15 @@
  * Web server for the n-dx dashboard.
  *
  * Serves the sourcevision viewer, provides REST API endpoints for
- * both Rex (PRD data) and sourcevision (analysis data), and supports
- * WebSocket connections for real-time updates.
+ * Rex (PRD data), sourcevision (analysis data), and Hench (agent runs),
+ * and supports WebSocket connections for real-time updates.
  *
  * Architecture:
  *   Static assets   → routes-static.ts
  *   /data/*          → routes-data.ts    (sourcevision data files, live-reload)
  *   /api/rex/*       → routes-rex.ts     (PRD CRUD, stats, next task, log)
  *   /api/sv/*        → routes-sourcevision.ts (analysis data endpoints)
+ *   /api/hench/*     → routes-hench.ts   (agent run history, run detail)
  *   WebSocket        → websocket.ts      (upgrade handler, broadcast)
  */
 

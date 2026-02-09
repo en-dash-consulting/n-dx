@@ -12,6 +12,7 @@ import { handleRexRoute } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
+import { handleHenchRoute } from "./routes-hench.js";
 import { createWebSocketManager } from "./websocket.js";
 import { ALL_DATA_FILES } from "../../schema/data-files.js";
 
@@ -85,6 +86,24 @@ export function startServer(
     }
   }
 
+  // Watch .hench/runs/ for run file changes
+  const henchRunsDir = join(absDir, ".hench", "runs");
+  if (existsSync(henchRunsDir)) {
+    try {
+      watch(henchRunsDir, (_eventType, filename) => {
+        if (filename && filename.endsWith(".json")) {
+          ws.broadcast({
+            type: "hench:run-changed",
+            file: filename,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   // In dev mode, also watch the viewer HTML for rebuilds
   if (dev && assets.viewerPath) {
     try {
@@ -124,16 +143,19 @@ export function startServer(
       return;
     }
 
-    // 3. Validation & dependency graph API
+    // 3. Hench API
+    if (handleHenchRoute(req, res, ctx)) return;
+
+    // 4. Validation & dependency graph API
     if (handleValidationRoute(req, res, ctx)) return;
 
-    // 4. Token usage API
+    // 5. Token usage API
     if (handleTokenUsageRoute(req, res, ctx)) return;
 
-    // 5. Data files (existing /data/* routes for backward compatibility)
+    // 6. Data files (existing /data/* routes for backward compatibility)
     if (handleDataRoute(req, res, ctx, watcher)) return;
 
-    // 6. Static assets
+    // 7. Static assets
     if (handleStaticRoute(req, res, ctx, assets)) return;
 
     // 404
@@ -151,6 +173,9 @@ export function startServer(
     console.log(`Serving data from: ${svDir}`);
     if (existsSync(rexDir)) {
       console.log(`Rex PRD data from: ${rexDir}`);
+    }
+    if (existsSync(henchRunsDir)) {
+      console.log(`Hench runs from: ${henchRunsDir}`);
     }
     console.log(`WebSocket available at ws://localhost:${port}`);
     if (dev) console.log("Dev mode: live reload enabled");
