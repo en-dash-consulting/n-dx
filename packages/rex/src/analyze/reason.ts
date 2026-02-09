@@ -739,40 +739,54 @@ export function parseStructuredFile(
       if (fenceMatch) text = fenceMatch[1].trim();
 
       const parsed = JSON.parse(text);
-      const validated = ProposalArraySchema.parse(parsed);
 
-      if (validated.length === 0) return null;
+      // Try as array first, then as single object
+      let validated: z.infer<typeof ProposalArraySchema> | null = null;
+      const arrayResult = ProposalArraySchema.safeParse(parsed);
+      if (arrayResult.success) {
+        validated = arrayResult.data;
+      } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const singleResult = ProposalSchema.safeParse(parsed);
+        if (singleResult.success) {
+          validated = [singleResult.data];
+        }
+      }
 
-      // Existing title set for dedup
-      const existingTitles = new Set(
-        existingItems.map((item) => normalize(item.title)),
-      );
+      if (validated && validated.length > 0) {
+        // Existing title set for dedup
+        const existingTitles = new Set(
+          existingItems.map((item) => normalize(item.title)),
+        );
 
-      return validated
-        .map((p) => ({
-          epic: { title: p.epic.title, source: "file-import" },
-          features: p.features
-            .filter((f) => !existingTitles.has(normalize(f.title)))
-            .map((f) => ({
-              title: f.title,
-              source: "file-import",
-              description: f.description,
-              tasks: f.tasks
-                .filter((t) => !existingTitles.has(normalize(t.title)))
-                .map((t) => ({
-                  title: t.title,
-                  source: "file-import",
-                  sourceFile: "",
-                  description: t.description,
-                  acceptanceCriteria: t.acceptanceCriteria,
-                  priority: t.priority,
-                  tags: t.tags,
-                })),
-            })),
-        }))
-        .filter((p) => p.features.length > 0 || !existingTitles.has(normalize(p.epic.title)));
+        const result = validated
+          .map((p) => ({
+            epic: { title: p.epic.title, source: "file-import" },
+            features: p.features
+              .filter((f) => !existingTitles.has(normalize(f.title)))
+              .map((f) => ({
+                title: f.title,
+                source: "file-import",
+                description: f.description,
+                tasks: f.tasks
+                  .filter((t) => !existingTitles.has(normalize(t.title)))
+                  .map((t) => ({
+                    title: t.title,
+                    source: "file-import",
+                    sourceFile: "",
+                    description: t.description,
+                    acceptanceCriteria: t.acceptanceCriteria,
+                    priority: t.priority,
+                    tags: t.tags,
+                  })),
+              })),
+          }))
+          .filter((p) => p.features.length > 0 || !existingTitles.has(normalize(p.epic.title)));
+
+        if (result.length > 0) return result;
+        return null;
+      }
     } catch {
-      // Not in Proposal schema — fall through to generic extraction
+      // Not valid JSON or not in Proposal schema — fall through to generic extraction
     }
   }
 

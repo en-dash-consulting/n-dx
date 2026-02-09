@@ -228,6 +228,26 @@ describe("detectFileFormat", () => {
     expect(detectFileFormat("/home/user/project/reqs.json")).toBe("json");
     expect(detectFileFormat("./docs/plan.yml")).toBe("yaml");
   });
+
+  it("handles paths with dots in directory names", () => {
+    expect(detectFileFormat("/home/.config/project/reqs.json")).toBe("json");
+    expect(detectFileFormat("/opt/v2.1.0/specs/plan.yaml")).toBe("yaml");
+  });
+
+  it("handles paths with multiple dots in filename", () => {
+    expect(detectFileFormat("/home/project/my.data.json")).toBe("json");
+    expect(detectFileFormat("backup.2024-01-01.yml")).toBe("yaml");
+  });
+
+  it("handles paths with spaces", () => {
+    expect(detectFileFormat("/home/my project/features.json")).toBe("json");
+    expect(detectFileFormat("My Documents/plan.yaml")).toBe("yaml");
+  });
+
+  it("handles hidden files", () => {
+    expect(detectFileFormat(".requirements.yaml")).toBe("yaml");
+    expect(detectFileFormat("/project/.data.json")).toBe("json");
+  });
 });
 
 describe("parseStructuredFile", () => {
@@ -319,6 +339,62 @@ name: Rate Limiter
     const featureTitles = proposals[0].features.map((f) => f.title);
     expect(featureTitles).toContain("Cache Layer");
     expect(featureTitles).toContain("Rate Limiter");
+  });
+
+  it("parses single JSON Proposal object (not wrapped in array)", () => {
+    const content = JSON.stringify({
+      epic: { title: "Auth" },
+      features: [
+        {
+          title: "Login",
+          tasks: [
+            { title: "Validate email", priority: "high" },
+          ],
+        },
+      ],
+    });
+
+    const proposals = parseStructuredFile(content, "json", []);
+
+    expect(proposals).toHaveLength(1);
+    expect(proposals![0].epic.title).toBe("Auth");
+    expect(proposals![0].epic.source).toBe("file-import");
+    expect(proposals![0].features[0].title).toBe("Login");
+    expect(proposals![0].features[0].tasks[0].title).toBe("Validate email");
+    expect(proposals![0].features[0].tasks[0].priority).toBe("high");
+  });
+
+  it("deduplicates single Proposal object against existing items", () => {
+    const content = JSON.stringify({
+      epic: { title: "Auth" },
+      features: [
+        {
+          title: "Login",
+          tasks: [
+            { title: "Validate email" },
+            { title: "Existing Task" },
+          ],
+        },
+        { title: "Existing Feature", tasks: [] },
+      ],
+    });
+
+    const existing = [
+      { id: "1", title: "Existing Task", level: "task" as const, status: "pending" as const },
+      { id: "2", title: "Existing Feature", level: "feature" as const, status: "pending" as const },
+    ];
+
+    const proposals = parseStructuredFile(content, "json", existing);
+
+    expect(proposals).toHaveLength(1);
+    // "Existing Feature" should be filtered out
+    const featureTitles = proposals![0].features.map((f) => f.title);
+    expect(featureTitles).toContain("Login");
+    expect(featureTitles).not.toContain("Existing Feature");
+    // "Existing Task" should be filtered from Login's tasks
+    const taskTitles = proposals![0].features[0].tasks.map((t) => t.title);
+    expect(taskTitles).toContain("Validate email");
+    expect(taskTitles).not.toContain("Existing Task");
   });
 
   it("returns null for markdown format", () => {
