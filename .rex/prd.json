@@ -2741,7 +2741,7 @@
         {
           "id": "90236be2-2366-4464-bc68-0e8617f71144",
           "title": "Import Analysis Enhancement",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Comprehensive import dependency tracking and analysis",
           "source": "llm",
@@ -2772,7 +2772,7 @@
             {
               "id": "af00c704-7915-46e1-ba93-c58413698e80",
               "title": "Improve package name extraction",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enhance package name extraction from import paths",
               "acceptanceCriteria": [
@@ -2783,7 +2783,9 @@
               "tags": [
                 "extractPackageName"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T15:57:41.319Z",
+              "completedAt": "2026-02-09T16:02:49.400Z"
             },
             {
               "id": "940e4d2b-bb03-42ba-ac94-2eba699fe21e",
@@ -2805,7 +2807,9 @@
               "startedAt": "2026-02-05T19:07:51.305Z",
               "completedAt": "2026-02-05T19:14:58.344Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-09T16:02:49.453Z",
+          "completedAt": "2026-02-09T16:02:49.453Z"
         },
         {
           "id": "e30b964c-8f8a-4a66-82f9-58eb481eba41",
@@ -2814,6 +2818,8 @@
           "level": "feature",
           "description": "Comprehensive file classification and metadata extraction",
           "source": "llm",
+          "startedAt": "2026-02-09T15:55:13.442Z",
+          "completedAt": "2026-02-09T15:55:13.442Z",
           "children": [
             {
               "id": "a89e8e90-e4a3-40f1-a966-118ab58c62a7",
@@ -2854,9 +2860,7 @@
               "startedAt": "2026-02-05T19:23:19.470Z",
               "completedAt": "2026-02-05T19:29:49.257Z"
             }
-          ],
-          "startedAt": "2026-02-09T15:55:13.442Z",
-          "completedAt": "2026-02-09T15:55:13.442Z"
+          ]
         },
         {
           "id": "97819b45-d93d-41de-98b9-330d3bf28832",

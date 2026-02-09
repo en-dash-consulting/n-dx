@@ -219,6 +219,22 @@ describe("extractPackageName", () => {
   it("strips subpath from unscoped package", () => {
     expect(extractPackageName("react/jsx-runtime")).toBe("react");
   });
+
+  it("returns scoped package with no subpath", () => {
+    expect(extractPackageName("@scope/pkg")).toBe("@scope/pkg");
+  });
+
+  it("strips deeply nested subpath from scoped package", () => {
+    expect(extractPackageName("@angular/core/testing/init")).toBe("@angular/core");
+  });
+
+  it("strips deeply nested subpath from unscoped package", () => {
+    expect(extractPackageName("lodash/fp/map")).toBe("lodash");
+  });
+
+  it("handles scoped package with hyphenated names", () => {
+    expect(extractPackageName("@my-org/my-pkg/utils")).toBe("@my-org/my-pkg");
+  });
 });
 
 // ── analyzeImports integration ────────────────────────────────────────────────
