@@ -373,4 +373,278 @@ describe("deriveNextSteps", () => {
     const result = deriveNextSteps(makeZones(findings, zones));
     expect(result[0].description).toContain("src/a.ts");
   });
+
+  // ── Zone metric impact scoring ──────────────────────────────────────────
+
+  describe("zone metric impact scoring", () => {
+    it("promotes warning finding to high when zone has low cohesion and high coupling", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "bad-zone",
+          text: "Problem in poorly structured zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "bad-zone",
+        name: "Bad Zone",
+        description: "Low cohesion, high coupling",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.2,
+        coupling: 0.9,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("high");
+    });
+
+    it("does not promote warning finding when zone has good cohesion and low coupling", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "good-zone",
+          text: "Problem in well-structured zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "good-zone",
+        name: "Good Zone",
+        description: "High cohesion, low coupling",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.9,
+        coupling: 0.1,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("medium");
+    });
+
+    it("uses zone metrics as tiebreaker: worse zone health sorts first", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "healthy-zone",
+          text: "Issue in healthy zone",
+        }),
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "unhealthy-zone",
+          text: "Issue in unhealthy zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [
+        {
+          id: "healthy-zone",
+          name: "Healthy",
+          description: "",
+          files: ["src/a.ts"],
+          entryPoints: [],
+          cohesion: 0.9,
+          coupling: 0.1,
+        },
+        {
+          id: "unhealthy-zone",
+          name: "Unhealthy",
+          description: "",
+          files: ["src/b.ts"],
+          entryPoints: [],
+          cohesion: 0.2,
+          coupling: 0.8,
+        },
+      ];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(2);
+      // Unhealthy zone should sort first due to higher impact score
+      expect(result[0].scope).toBe("unhealthy-zone");
+      expect(result[1].scope).toBe("healthy-zone");
+    });
+
+    it("combines related count and zone metrics for sorting", () => {
+      const findings = [
+        // Zone A: good health, many related items (below promotion threshold)
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "zone-a",
+          text: "Broad issue in healthy zone",
+          related: ["z1", "z2", "z3"],
+        }),
+        // Zone B: moderate health (not enough to promote), fewer related items
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "zone-b",
+          text: "Local issue in moderate zone",
+          related: ["z1"],
+        }),
+      ];
+      const zones: Zones["zones"] = [
+        {
+          id: "zone-a",
+          name: "Zone A",
+          description: "",
+          files: ["src/a.ts"],
+          entryPoints: [],
+          cohesion: 0.9,
+          coupling: 0.1,
+        },
+        {
+          id: "zone-b",
+          name: "Zone B",
+          description: "",
+          files: ["src/b.ts"],
+          entryPoints: [],
+          cohesion: 0.5,
+          coupling: 0.5,
+        },
+      ];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(2);
+      // Both stay medium — neither hits related threshold nor zone health threshold
+      expect(result[0].priority).toBe("medium");
+      expect(result[1].priority).toBe("medium");
+      // Zone B has worse health (penalty 1.0) + 1 related = 2.0
+      // Zone A has good health (penalty 0.2) + 3 related = 3.2
+      // Zone A sorts first due to higher combined score
+      expect(result[0].scope).toBe("zone-a");
+      expect(result[1].scope).toBe("zone-b");
+    });
+
+    it("promotes warning relationship finding with bad zone health", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "relationship",
+          scope: "coupled-zone",
+          text: "Tight coupling in already coupled zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "coupled-zone",
+        name: "Coupled",
+        description: "",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.3,
+        coupling: 0.85,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("high");
+    });
+
+    it("promotes warning suggestion with bad zone health", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "suggestion",
+          scope: "messy-zone",
+          text: "Refactoring needed in messy zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "messy-zone",
+        name: "Messy",
+        description: "",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.15,
+        coupling: 0.9,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("high");
+    });
+
+    it("does not promote info suggestions even with bad zone health", () => {
+      const findings = [
+        makeFinding({
+          severity: "info",
+          type: "suggestion",
+          scope: "bad-zone",
+          text: "Low severity stays low",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "bad-zone",
+        name: "Bad",
+        description: "",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.1,
+        coupling: 0.9,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("low");
+    });
+
+    it("handles finding scoped to zone not in zones array gracefully", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "missing-zone",
+          text: "Zone not found",
+        }),
+      ];
+      const result = deriveNextSteps(makeZones(findings, []));
+      expect(result).toHaveLength(1);
+      // Without zone metrics, falls back to existing behavior
+      expect(result[0].priority).toBe("medium");
+    });
+
+    it("handles global-scoped findings without zone metrics", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "anti-pattern",
+          scope: "global",
+          text: "Global finding",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "some-zone",
+        name: "Zone",
+        description: "",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.1,
+        coupling: 0.9,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      // Global findings don't match any zone, so no zone boost
+      expect(result[0].priority).toBe("medium");
+    });
+
+    it("promotes remaining warning findings with bad zone health", () => {
+      const findings = [
+        makeFinding({
+          severity: "warning",
+          type: "observation",
+          scope: "bad-zone",
+          text: "Observation in bad zone",
+        }),
+      ];
+      const zones: Zones["zones"] = [{
+        id: "bad-zone",
+        name: "Bad",
+        description: "",
+        files: ["src/a.ts"],
+        entryPoints: [],
+        cohesion: 0.2,
+        coupling: 0.9,
+      }];
+      const result = deriveNextSteps(makeZones(findings, zones));
+      expect(result).toHaveLength(1);
+      expect(result[0].priority).toBe("high");
+    });
+  });
 });

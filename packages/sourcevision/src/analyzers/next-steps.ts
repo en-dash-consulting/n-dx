@@ -2,7 +2,7 @@
  * Derive prioritized, agent-ready next steps from analysis findings.
  */
 
-import type { Zones, Finding, NextStep } from "../schema/index.js";
+import type { Zones, Zone, Finding, NextStep } from "../schema/index.js";
 
 export type { NextStep };
 
@@ -14,6 +14,7 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
   const findings = zones.findings ?? [];
   if (findings.length === 0) return [];
 
+  const zoneList = zones.zones;
   const steps: NextStep[] = [];
   const usedFindings = new Set<number>();
 
@@ -33,7 +34,7 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
       }
     }
 
-    const zone = zones.zones.find((z) => z.id === f.scope);
+    const zone = zoneList.find((z) => z.id === f.scope);
     const files = zone ? zone.files.slice(0, 3) : [];
     const filesStr = files.length > 0 ? ` Files: ${files.join(", ")}` : "";
 
@@ -64,12 +65,12 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
       }
     }
 
-    const zone = zones.zones.find((z) => z.id === f.scope);
+    const zone = zoneList.find((z) => z.id === f.scope);
     const files = zone ? zone.files.slice(0, 3) : [];
     const filesStr = files.length > 0 ? ` Files: ${files.join(", ")}` : "";
 
-    // Promote to high when any grouped finding has broad impact
-    const apImpact = related.some((idx) => isHighImpact(findings[idx]));
+    // Promote to high when any grouped finding has broad impact or zone health is poor
+    const apImpact = related.some((idx) => isHighImpact(findings[idx], zoneList));
 
     steps.push({
       priority: apImpact ? "high" : "medium",
@@ -99,11 +100,11 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
       }
     }
 
-    const zone = zones.zones.find((z) => z.id === f.scope);
+    const zone = zoneList.find((z) => z.id === f.scope);
     const files = zone ? zone.files.slice(0, 3) : [];
     const filesStr = files.length > 0 ? ` Files: ${files.join(", ")}` : "";
 
-    const relImpact = related.some((idx) => isHighImpact(findings[idx]));
+    const relImpact = related.some((idx) => isHighImpact(findings[idx], zoneList));
 
     steps.push({
       priority: relImpact ? "high" : "medium",
@@ -126,7 +127,7 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
 
     let sugPriority: NextStep["priority"];
     if (f.severity === "warning") {
-      sugPriority = isHighImpact(f) ? "high" : "medium";
+      sugPriority = isHighImpact(f, zoneList) ? "high" : "medium";
     } else {
       sugPriority = "low";
     }
@@ -149,12 +150,12 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
 
     usedFindings.add(i);
 
-    const zone = zones.zones.find((z) => z.id === f.scope);
+    const zone = zoneList.find((z) => z.id === f.scope);
     const files = zone ? zone.files.slice(0, 3) : [];
     const filesStr = files.length > 0 ? ` Files: ${files.join(", ")}` : "";
 
     steps.push({
-      priority: isHighImpact(f) ? "high" : "medium",
+      priority: isHighImpact(f, zoneList) ? "high" : "medium",
       title: truncateText(f.text, 80),
       description: `${f.text}${filesStr}`,
       category: categorizeFromType(f.type),
@@ -163,13 +164,13 @@ export function deriveNextSteps(zones: Zones): NextStep[] {
     });
   }
 
-  // Sort: high > medium > low, then by impact score (related count), then by grouped findings count
+  // Sort: high > medium > low, then by impact score (related count + zone metrics), then by grouped findings count
   const priorityOrder = { high: 0, medium: 1, low: 2 };
   steps.sort((a, b) => {
     const po = priorityOrder[a.priority] - priorityOrder[b.priority];
     if (po !== 0) return po;
-    const impactA = groupImpactScore(findings, a.relatedFindings);
-    const impactB = groupImpactScore(findings, b.relatedFindings);
+    const impactA = groupImpactScore(findings, a.relatedFindings, zoneList);
+    const impactB = groupImpactScore(findings, b.relatedFindings, zoneList);
     if (impactA !== impactB) return impactB - impactA;
     return b.relatedFindings.length - a.relatedFindings.length;
   });
@@ -191,23 +192,45 @@ function truncateText(text: string, max: number): string {
 }
 
 /** Threshold of related items at which a warning finding is considered high-impact. */
-const HIGH_IMPACT_THRESHOLD = 4;
+const HIGH_IMPACT_RELATED_THRESHOLD = 4;
+
+/** Zone health penalty threshold for priority promotion (0–2 scale). */
+const ZONE_HEALTH_THRESHOLD = 1.2;
 
 /**
- * Determine whether a finding's impact warrants priority promotion.
- * Findings that reference many related zones/files have broader impact.
+ * Compute a zone health penalty from cohesion and coupling metrics.
+ * Returns 0–2 range: 0 = perfectly healthy, 2 = worst possible health.
+ * Low cohesion (loosely related files) and high coupling (many cross-zone deps)
+ * both increase the penalty.
  */
-function isHighImpact(finding: Finding): boolean {
-  return (finding.related?.length ?? 0) >= HIGH_IMPACT_THRESHOLD;
+function zoneHealthPenalty(zone: Zone): number {
+  return (1 - zone.cohesion) + zone.coupling;
 }
 
 /**
- * Sum the related counts across a group of findings.
+ * Determine whether a finding's impact warrants priority promotion.
+ * Considers both the breadth of related items and the health of the
+ * zone the finding is scoped to (low cohesion + high coupling = higher impact).
  */
-function groupImpactScore(findings: Finding[], indices: number[]): number {
+function isHighImpact(finding: Finding, zoneList: Zone[]): boolean {
+  if ((finding.related?.length ?? 0) >= HIGH_IMPACT_RELATED_THRESHOLD) return true;
+
+  const zone = zoneList.find((z) => z.id === finding.scope);
+  if (zone && zoneHealthPenalty(zone) >= ZONE_HEALTH_THRESHOLD) return true;
+
+  return false;
+}
+
+/**
+ * Compute an impact score for a group of findings, combining related counts
+ * with zone health penalties. Higher score = higher impact.
+ */
+function groupImpactScore(findings: Finding[], indices: number[], zoneList: Zone[]): number {
   let score = 0;
   for (const i of indices) {
     score += findings[i].related?.length ?? 0;
+    const zone = zoneList.find((z) => z.id === findings[i].scope);
+    if (zone) score += zoneHealthPenalty(zone);
   }
   return score;
 }

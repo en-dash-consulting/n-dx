@@ -1714,11 +1714,11 @@
     {
       "id": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
       "title": "Analysis Pipeline Optimization",
-      "status": "in_progress",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
       "startedAt": "2026-02-09T18:57:57.186Z",
-      "completedAt": "2026-02-09T18:45:45.951Z",
+      "completedAt": "2026-02-09T19:05:28.857Z",
       "children": [
         {
           "id": "8a4773af-894f-4245-9bbf-7bf676abd527",
@@ -2945,12 +2945,12 @@
         {
           "id": "8ddf135c-6f39-4a94-bba1-83c0a2674cc7",
           "title": "Scanner Enhancements",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "description": "Improve individual scanner output quality and filtering",
           "source": "llm",
           "startedAt": "2026-02-09T18:57:55.421Z",
-          "completedAt": "2026-02-09T15:23:55.607Z",
+          "completedAt": "2026-02-09T19:05:28.823Z",
           "children": [
             {
               "id": "e6615ff0-9b2f-4e35-bd69-51e0b06e68db",
@@ -2995,10 +2995,12 @@
             {
               "id": "ed9582a2-6b8a-437d-826b-f7636488dc3d",
               "title": "Enhance next-steps impact scoring with zone metrics",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Improve deriveNextSteps priority scoring by incorporating zone cohesion and coupling metrics alongside the existing related-count threshold",
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-09T18:59:04.383Z",
+              "completedAt": "2026-02-09T19:05:28.783Z"
             }
           ]
         },
