@@ -1,7 +1,7 @@
 {
-  "id": "root",
-  "name": "Root",
-  "description": "4 files, primarily JavaScript",
+  "id": "orchestration-layer",
+  "name": "Orchestration Layer",
+  "description": "Top-level command coordination and cross-package workflow management.",
   "files": [
     "ci.js",
     "cli.js",

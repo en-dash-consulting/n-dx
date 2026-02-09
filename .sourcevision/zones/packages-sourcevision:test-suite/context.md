@@ -8,17 +8,17 @@ Zone: Test Suite (`packages-sourcevision:test-suite`)
 Files: 5, Cohesion: 0.46, Coupling: 0.54
 Description: Unit, integration, and end-to-end tests covering analyzer logic, schema validation, CLI workflows, and the serve command, with imports reaching into both analyzer and viewer zones.
 Entry points: packages/sourcevision/src/schema/validate.ts
-Lines: 1135
+Lines: 1375
 
 </zone>
 
 <files>
 
-packages/sourcevision/src/schema/validate.ts (TypeScript, 302 lines, source)
+packages/sourcevision/src/schema/validate.ts (TypeScript, 315 lines, source)
 packages/sourcevision/tests/e2e/cli-analyze.test.ts (TypeScript, 154 lines, test)
 packages/sourcevision/tests/e2e/cli-serve.test.ts (TypeScript, 79 lines, test)
 packages/sourcevision/tests/integration/pipeline.test.ts (TypeScript, 93 lines, test)
-packages/sourcevision/tests/unit/schema/validate.test.ts (TypeScript, 507 lines, test)
+packages/sourcevision/tests/unit/schema/validate.test.ts (TypeScript, 734 lines, test)
 
 </files>
 
@@ -27,7 +27,7 @@ packages/sourcevision/tests/unit/schema/validate.test.ts (TypeScript, 507 lines,
 Internal:
   packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/schema/validate.ts {validateInventory, validateImports, validateZones, validateComponents}
   packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/schema/validate.ts {validateInventory, validateImports, validateZones, validateComponents}
-  packages/sourcevision/tests/unit/schema/validate.test.ts → packages/sourcevision/src/schema/validate.ts {validateManifest, validateInventory, validateImports, validateZones, validateComponents, validateModule}
+  packages/sourcevision/tests/unit/schema/validate.test.ts → packages/sourcevision/src/schema/validate.ts {validateManifest, validateInventory, validateImports, validateZones, validateComponents, validateModule, formatValidationErrors}
 
 Outgoing (this zone → other zones):
   → packages-sourcevision:analysis-engine: packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/components.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/components.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/imports.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/imports.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/inventory.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/inventory.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/zones.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/zones.ts

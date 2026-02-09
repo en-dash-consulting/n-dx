@@ -1,7 +1,7 @@
 {
-  "id": "specialized-tools",
-  "name": "Specialized Tools",
-  "description": "Implements domain-specific tools for git operations, test execution, and shell command invocation with focused functionality.",
+  "id": "hench-5",
+  "name": "Hench 5",
+  "description": "6 files, primarily TypeScript",
   "files": [
     "packages/hench/src/tools/exec-shell.ts",
     "packages/hench/src/tools/git.ts",

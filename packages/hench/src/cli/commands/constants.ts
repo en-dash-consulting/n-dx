@@ -14,6 +14,17 @@ export function safeParseInt(value: string, name: string): number {
   return n;
 }
 
+export function safeParseNonNegInt(value: string, name: string): number {
+  const n = parseInt(value, 10);
+  if (isNaN(n) || n < 0) {
+    throw new CLIError(
+      `Invalid --${name} value: "${value}"`,
+      `Must be a non-negative integer (0 = unlimited).`,
+    );
+  }
+  return n;
+}
+
 export function usage(): void {
   console.log(`hench v${TOOL_VERSION} — autonomous AI agent for Rex tasks
 
@@ -36,7 +47,7 @@ Options:
   --dry-run               Print brief without calling Claude API (for run)
   --review                Show proposed changes and prompt for approval (for run)
   --max-turns=<n>         Override max turns (for run)
-  --token-budget=<n>      Cap total tokens (input+output) per run (for run)
+  --token-budget=<n>      Cap total tokens (input+output) per run; 0 = unlimited (for run)
   --model=<m>             Override model (for run)
   --format=json           Output as JSON (for status/show)
   --last=<n>              Number of recent runs to show (for status)

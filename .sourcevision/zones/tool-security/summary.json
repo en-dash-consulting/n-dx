@@ -1,7 +1,7 @@
 {
-  "id": "hench-4",
-  "name": "Hench 4",
-  "description": "11 files, primarily TypeScript",
+  "id": "tool-security",
+  "name": "Tool Security & Dispatch",
+  "description": "Manages secure tool invocation with guardrails for path validation, command filtering, and tool dispatch orchestration.",
   "files": [
     "packages/hench/src/agent/tools.ts",
     "packages/hench/src/guard/commands.ts",

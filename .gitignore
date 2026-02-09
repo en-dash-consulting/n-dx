@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 .hench/runs/
+.n-dx.json
+.n-dx2.json

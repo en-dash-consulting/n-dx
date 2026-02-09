@@ -8,7 +8,7 @@ Zone: Interactive Viewer (`packages-sourcevision:interactive-viewer`)
 Files: 46, Cohesion: 0.96, Coupling: 0.04
 Description: Preact single-page application that visualizes analysis results through force-directed graphs, zone maps, route trees, and findings panels, consuming only schema types with zero analyzer dependencies.
 Entry points: packages/sourcevision/src/schema/v1.ts
-Lines: 5291
+Lines: 5301
 
 </zone>
 
@@ -19,14 +19,14 @@ packages/sourcevision/src/viewer/components/constants.ts (TypeScript, 16 lines, 
 packages/sourcevision/src/viewer/components/detail-panel.ts (TypeScript, 309 lines, source)
 packages/sourcevision/src/viewer/components/guide.ts (TypeScript, 94 lines, source)
 packages/sourcevision/src/viewer/components/search-filter.ts (TypeScript, 68 lines, source)
-packages/sourcevision/src/viewer/components/sidebar.ts (TypeScript, 129 lines, source)
+packages/sourcevision/src/viewer/components/sidebar.ts (TypeScript, 131 lines, source)
 packages/sourcevision/src/viewer/components/theme-toggle.ts (TypeScript, 28 lines, source)
 packages/sourcevision/src/viewer/darkmode_logo.png (Other, 0 lines, asset)
 packages/sourcevision/src/viewer/graph/physics.ts (TypeScript, 325 lines, source)
 packages/sourcevision/src/viewer/index.html (HTML, 21 lines, other)
 packages/sourcevision/src/viewer/lightmode_logo.png (Other, 0 lines, asset)
 packages/sourcevision/src/viewer/loader.ts (TypeScript, 172 lines, source)
-packages/sourcevision/src/viewer/main.ts (TypeScript, 214 lines, source)
+packages/sourcevision/src/viewer/main.ts (TypeScript, 220 lines, source)
 packages/sourcevision/src/viewer/schema-compat.ts (TypeScript, 68 lines, source)
 packages/sourcevision/src/viewer/styles/a11y.css (CSS, 46 lines, other)
 packages/sourcevision/src/viewer/styles/base.css (CSS, 18 lines, other)
@@ -35,7 +35,7 @@ packages/sourcevision/src/viewer/styles/components.css (CSS, 192 lines, other)
 packages/sourcevision/src/viewer/styles/detail.css (CSS, 134 lines, other)
 packages/sourcevision/src/viewer/styles/forms.css (CSS, 93 lines, other)
 packages/sourcevision/src/viewer/styles/graph.css (CSS, 100 lines, other)
-packages/sourcevision/src/viewer/styles/index.css (CSS, 16 lines, other)
+packages/sourcevision/src/viewer/styles/index.css (CSS, 18 lines, other)
 packages/sourcevision/src/viewer/styles/layout.css (CSS, 122 lines, other)
 packages/sourcevision/src/viewer/styles/responsive.css (CSS, 125 lines, other)
 packages/sourcevision/src/viewer/styles/routes.css (CSS, 39 lines, other)

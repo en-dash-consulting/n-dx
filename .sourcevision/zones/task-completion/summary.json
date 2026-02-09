@@ -1,7 +1,7 @@
 {
-  "id": "hench-2",
-  "name": "Hench 2",
-  "description": "7 files, primarily TypeScript",
+  "id": "task-completion",
+  "name": "Task Completion",
+  "description": "Task completion validation and Rex integration for autonomous execution workflows.",
   "files": [
     "packages/hench/src/agent/completion.ts",
     "packages/hench/src/tools/rex.ts",

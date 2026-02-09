@@ -339,4 +339,38 @@ describe("deriveNextSteps", () => {
     expect(result[3].priority).toBe("medium"); // observation warning
     expect(result[4].priority).toBe("low"); // info suggestion
   });
+
+  it("includes zone files in description for relationship findings", () => {
+    const findings = [
+      makeFinding({ severity: "warning", type: "relationship", scope: "test-zone", text: "Coupling issue" }),
+    ];
+    const zones: Zones["zones"] = [{
+      id: "test-zone",
+      name: "Test Zone",
+      description: "Test",
+      files: ["src/a.ts", "src/b.ts"],
+      entryPoints: [],
+      cohesion: 0.8,
+      coupling: 0.2,
+    }];
+    const result = deriveNextSteps(makeZones(findings, zones));
+    expect(result[0].description).toContain("src/a.ts");
+  });
+
+  it("includes zone files in description for remaining warning findings", () => {
+    const findings = [
+      makeFinding({ severity: "warning", type: "observation", scope: "test-zone", text: "General warning" }),
+    ];
+    const zones: Zones["zones"] = [{
+      id: "test-zone",
+      name: "Test Zone",
+      description: "Test",
+      files: ["src/a.ts", "src/b.ts"],
+      entryPoints: [],
+      cohesion: 0.8,
+      coupling: 0.2,
+    }];
+    const result = deriveNextSteps(makeZones(findings, zones));
+    expect(result[0].description).toContain("src/a.ts");
+  });
 });

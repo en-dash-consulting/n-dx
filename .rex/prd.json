@@ -1714,9 +1714,11 @@
     {
       "id": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
       "title": "Analysis Pipeline Optimization",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
+      "startedAt": "2026-02-09T16:13:11.752Z",
+      "completedAt": "2026-02-09T16:13:11.752Z",
       "children": [
         {
           "id": "8a4773af-894f-4245-9bbf-7bf676abd527",
@@ -2402,15 +2404,17 @@
         {
           "id": "fe3eb56e-a017-4e19-980d-d3590b632824",
           "title": "File and Format Detection",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Improve file handling and format detection capabilities",
           "source": "llm",
+          "startedAt": "2026-02-09T16:13:11.734Z",
+          "completedAt": "2026-02-09T16:13:11.734Z",
           "children": [
             {
               "id": "72444020-200d-4aee-bc4a-34b223d74925",
               "title": "Improve file format detection and import",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enhance file format detection for full paths and support multiple JSON/YAML schemas for PRD import with deduplication.",
               "acceptanceCriteria": [
@@ -2428,7 +2432,9 @@
               "tags": [
                 "detectFileFormat"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T16:03:37.651Z",
+              "completedAt": "2026-02-09T16:13:11.683Z"
             },
             {
               "id": "bfe24c09-b4f7-4a4f-9999-80a69cf1d5d9",
@@ -2745,6 +2751,8 @@
           "level": "feature",
           "description": "Comprehensive import dependency tracking and analysis",
           "source": "llm",
+          "startedAt": "2026-02-09T16:02:49.453Z",
+          "completedAt": "2026-02-09T16:02:49.453Z",
           "children": [
             {
               "id": "ff4cd814-d51a-4d1e-bde9-479a1ee1ac6d",
@@ -2807,9 +2815,7 @@
               "startedAt": "2026-02-05T19:07:51.305Z",
               "completedAt": "2026-02-05T19:14:58.344Z"
             }
-          ],
-          "startedAt": "2026-02-09T16:02:49.453Z",
-          "completedAt": "2026-02-09T16:02:49.453Z"
+          ]
         },
         {
           "id": "e30b964c-8f8a-4a66-82f9-58eb481eba41",

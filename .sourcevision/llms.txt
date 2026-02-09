@@ -5,65 +5,66 @@
 
 ## Project Overview
 
-- **Files**: 417
-- **Lines of code**: 101,081
-- **Languages**: TypeScript (335), JSON (25), CSS (17), Other (13), JavaScript (12)
+- **Files**: 441
+- **Lines of code**: 112,407
+- **Languages**: TypeScript (356), JSON (26), CSS (19), Other (13), JavaScript (12)
 - **Zones**: 12 (12 with descriptions)
-- **Analyzed**: 2026-02-07T21:07:31.375Z
+- **Analyzed**: 2026-02-09T16:51:42.575Z
 
 ## Architecture Zones
 
-### Agent Core System (`agent-core`)
+### Claude Client (`claude-client`)
 
-Core agent functionality including CLI loops, prompts, and token management with high internal coupling.
+15 files, primarily TypeScript
 
-- Files: 22
-- Cohesion: 0.73, Coupling: 0.27
-- Entry points: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/prompt.ts, packages/hench/src/agent/stuck.ts, packages/hench/src/agent/summary.ts (+4 more)
-- Detail: `.sourcevision/zones/agent-core/context.md`
-
-### Agent Tools Layer (`agent-tools-layer`)
-
-Core tool implementations and safety guards that provide controlled access to system operations for AI agents.
-
-- Files: 11
-- Cohesion: 0.69, Coupling: 0.31
-- Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/guard/index.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/shell.ts
-- Detail: `.sourcevision/zones/agent-tools-layer/context.md`
-
-### Application Entry Points (`application-entry`)
-
-Top-level application configuration and entry points for different execution modes.
-
-- Files: 4
+- Files: 15
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/application-entry/context.md`
+- Detail: `.sourcevision/zones/claude-client/context.md`
 
-### Application Orchestration (`application-orchestration`)
+### Hench (`hench`)
 
-Main application logic coordinating CLI commands, agent loops, storage, and system configuration.
+24 files, primarily TypeScript
 
-- Files: 29
-- Cohesion: 0.78, Coupling: 0.22
-- Entry points: packages/hench/src/agent/loop.ts, packages/hench/src/agent/review.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/store/config.ts, packages/hench/src/store/index.ts (+3 more)
-- Detail: `.sourcevision/zones/application-orchestration/context.md`
+- Files: 24
+- Cohesion: 0.71, Coupling: 0.29
+- Entry points: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/token-budget.ts (+5 more)
+- Detail: `.sourcevision/zones/hench/context.md`
 
-### Claude API Client (`claude-api-client`)
+### Hench 2 (`hench-2`)
 
-Dedicated package for Claude API integration with provider abstraction and token management.
-
-- Files: 13
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/claude-api-client/context.md`
-
-### Completion Validation (`completion-validation`)
-
-Specialized module for AI completion processing, validation, and regex-based text operations.
+7 files, primarily TypeScript
 
 - Files: 7
-- Cohesion: 0.74, Coupling: 0.26
+- Cohesion: 0.67, Coupling: 0.33
 - Entry points: packages/hench/src/tools/rex.ts, packages/hench/src/validation/completion.ts
-- Detail: `.sourcevision/zones/completion-validation/context.md`
+- Detail: `.sourcevision/zones/hench-2/context.md`
+
+### Hench 3 (`hench-3`)
+
+27 files, primarily TypeScript
+
+- Files: 27
+- Cohesion: 0.77, Coupling: 0.23
+- Entry points: packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/store/config.ts, packages/hench/src/store/index.ts, packages/hench/src/store/project-config.ts (+2 more)
+- Detail: `.sourcevision/zones/hench-3/context.md`
+
+### Hench 4 (`hench-4`)
+
+11 files, primarily TypeScript
+
+- Files: 11
+- Cohesion: 0.68, Coupling: 0.33
+- Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/guard/index.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/shell.ts
+- Detail: `.sourcevision/zones/hench-4/context.md`
+
+### Hench 5 (`hench-5`)
+
+6 files, primarily TypeScript
+
+- Files: 6
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts
+- Detail: `.sourcevision/zones/hench-5/context.md`
 
 ### Rex PRD Management CLI (`packages-rex:rex-cli`)
 
@@ -108,38 +109,37 @@ Unit, integration, and end-to-end tests covering analyzer logic, schema validati
 - Entry points: packages/sourcevision/src/schema/validate.ts
 - Detail: `.sourcevision/zones/packages-sourcevision:test-suite/context.md`
 
-### Specialized Tools (`specialized-tools`)
+### Root (`root`)
 
-Specific tool implementations for development operations including shell execution, git operations, and test running.
+4 files, primarily JavaScript
 
-- Files: 6
-- Cohesion: 0.56, Coupling: 0.44
-- Entry points: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts
-- Detail: `.sourcevision/zones/specialized-tools/context.md`
+- Files: 4
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/root/context.md`
 
 ## Key Dependencies
 
 ### Most-Imported Files
 
-- `packages/rex/src/schema/index.ts` (78 imports)
-- `packages/sourcevision/src/schema/index.ts` (31 imports)
-- `packages/rex/src/core/tree.ts` (28 imports)
-- `packages/rex/src/store/index.ts` (23 imports)
+- `packages/rex/src/core/tree.ts` (26 imports)
 - `packages/rex/src/cli/errors.ts` (22 imports)
 - `packages/rex/src/cli/output.ts` (20 imports)
+- `packages/rex/src/schema/index.ts` (20 imports)
+- `packages/rex/src/store/index.ts` (20 imports)
 - `packages/rex/src/cli/commands/constants.ts` (19 imports)
-- `packages/sourcevision/src/schema/v1.ts` (19 imports)
-- `packages/hench/src/schema/v1.ts` (17 imports)
-- `packages/claude-client/src/types.ts` (15 imports)
+- `packages/rex/src/core/canonical.ts` (14 imports)
+- `packages/hench/src/store/config.ts` (12 imports)
+- `packages/rex/src/analyze/reason.ts` (11 imports)
+- `packages/sourcevision/src/schema/data-files.ts` (11 imports)
 
 ### External Packages
 
-- `vitest` (used by 142 files)
-- `preact` (used by 32 files)
+- `vitest` (used by 153 files)
+- `preact` (used by 34 files)
 - `rex` (used by 12 files)
-- `@n-dx/claude-client` (used by 7 files)
+- `@n-dx/claude-client` (used by 10 files)
+- `@anthropic-ai/sdk` (used by 7 files)
 - `zod` (used by 7 files)
-- `@anthropic-ai/sdk` (used by 5 files)
 - `child_process` (used by 3 files)
 - `fs` (used by 3 files)
 - `path` (used by 3 files)
@@ -166,68 +166,132 @@ Specific tool implementations for development operations including shell executi
 
 ## Findings
 
+### Anti-patterns
+
+- Token budget and usage tracking logic duplicated across lifecycle files instead of centralized service [warning] (agent-core)
+- Zone mixes three distinct architectural layers: analysis (review, summary), planning (brief, context), and lifecycle (loops, token management) that should be separate zones [warning] (agent-core)
+- CLI commands import packages/hench/src/agent/lifecycle/loop.ts directly, violating layer separation and creating tight coupling [critical] (cli-infrastructure)
+- Error handling logic embedded in CLI layer instead of using domain service abstractions [warning] (cli-infrastructure)
+- CLI commands bypass service layer to directly manipulate agent lifecycle internals, violating clean architecture principles [critical]
+- Multiple bidirectional coupling patterns between hench zones (hench↔hench-3, hench-3↔hench-4, hench-4↔hench-5) create circular dependency chains that complicate module loading and increase risk of deadlocks [critical]
+- Token management logic distributed across agent-core lifecycle files and task-completion validation without centralized abstraction [warning]
+- Tool ecosystem lacks standardized interface contract between security validation and tool implementation layers, creating fragile coupling through implicit assumptions about validation behavior [warning]
+- Each specialized tool implements its own command parsing and execution without shared abstractions, leading to inconsistent interfaces and duplicated validation logic [warning] (specialized-tools)
+- Critical architectural debt: circular dependency chains (hench zones) + hub topology (rex.ts) + dependency inversion violations (CLI→agent-core) form triple threat to module loading stability [critical]
+- ... and 1 more
+
 ### Patterns
 
-- Security-first architecture with guard mechanisms controlling tool access creates proper safety boundaries [info] (agent-tools-layer)
-- Entry zone maintains clean downstream dependency flow with zero coupling to other zones [info] (application-entry)
-- Demonstrates ideal package encapsulation pattern that could be replicated across hench packages [info] (claude-api-client)
-- Rex tool serving 3 zones indicates successful shared utility extraction that could be model for other cross-cutting concerns [info] (completion-validation)
-- Architecture exhibits classic layered pattern with proper top-down dependency flow, but middle layers show concerning bidirectional coupling [info]
-- Security boundary pattern emerges with guard mechanisms providing controlled access layer between AI agents and system operations [info]
-- Incomplete test coverage for high-risk shell execution tools creates potential reliability issues [warning] (specialized-tools)
+- Clean adapter pattern implementation allowing swappable Claude API providers while maintaining consistent client interface [critical] (claude-integration)
+- Clear layered architecture with orchestration layer at top, CLI infrastructure in middle, and agent core at bottom provides good separation of concerns [info]
+- Tool ecosystem demonstrates proper layered security architecture with no privilege escalation paths [info]
+- Implements facade pattern with four distinct entry points (ci, cli, config, web) that coordinate package interactions without creating dependencies [info] (orchestration-layer)
+- Command pattern with validation pipeline provides robust task completion workflow with proper state management [info] (task-completion)
+- Security zone properly gates all tool access without creating backdoors or escape hatches [info] (tool-security)
+- Agent subsystem violates dependency inversion principle - high-level modules (cli-infrastructure, orchestration-layer) depend directly on low-level modules (agent-core) instead of abstractions [critical]
+- Zone naming inconsistency reveals architectural confusion - mixing domain concepts (task-completion) with technical layers (cli-infrastructure) indicates unclear separation of concerns [warning]
 
 ### Relationships
 
-- Acts as architectural hub but bidirectional coupling with application-orchestration creates circular dependency risk [warning] (agent-core)
-- High import volume (20+ from agent-core) combined with 29 files indicates potential architectural antipattern of god zone [warning] (application-orchestration)
-- Hench package zones collectively show 53 cross-imports while claude package maintains zero, indicating inconsistent architectural discipline [warning]
-- Tool zones demonstrate proper dependency inversion with specialized implementations depending on abstract agent layer [info]
+- Heavy bidirectional coupling with cli-infrastructure (30 total imports) suggests agent logic bleeding into CLI concerns [warning] (agent-core)
+- Bidirectional coupling with agent-core may indicate CLI commands directly manipulating agent internals instead of using clean interfaces [warning] (cli-infrastructure)
+- Clear separation between security concerns (tool-security) and functionality (specialized-tools) with well-defined interfaces [info]
+- Hub-and-spoke pattern centered on packages/hench/src/tools/rex.ts creates single point of dependency across multiple zones [warning]
+- Missing interface abstraction between agent-core and cli-infrastructure zones leads to tight coupling through direct imports [warning]
+- Clean consumer relationship with tool-security zone - accepts validation without coupling to implementation [info] (specialized-tools)
 
 ### Observations
 
-- 9 entry points — wide API surface, consider consolidating exports [warning] (agent-core)
-- High cohesion (1) — files are tightly interconnected [info] (application-entry)
-- High cohesion (1) — files are tightly interconnected [info] (claude-api-client)
-- Bidirectional coupling: "agent-core" ↔ "application-orchestration" (11+20 crossings) — consider extracting shared interface [warning]
-- Bidirectional coupling: "agent-tools-layer" ↔ "application-orchestration" (2+4 crossings) — consider extracting shared interface [warning]
-- Bidirectional coupling: "agent-tools-layer" ↔ "specialized-tools" (2+3 crossings) — consider extracting shared interface [warning]
+- High cohesion (1) — files are tightly interconnected [info] (claude-client)
+- Bidirectional coupling: "hench" ↔ "hench-3" (9+21 crossings) — consider extracting shared interface [warning]
+- Bidirectional coupling: "hench-3" ↔ "hench-4" (4+2 crossings) — consider extracting shared interface [warning]
+- Bidirectional coupling: "hench-4" ↔ "hench-5" (2+3 crossings) — consider extracting shared interface [warning]
 - Hub: packages/hench/src/tools/rex.ts is imported by 3 zones — cross-cutting dependency [info]
-- Size imbalance: largest zone has 29 files vs smallest with 4 — uneven decomposition [info]
-- Heavy cross-zone import activity (31 total imports with hench-3) indicates tight coupling with main application logic [warning] (agent-core)
-- High coupling (0.27) with 9 entry points indicates potential over-fragmentation of responsibilities [warning] (agent-core)
-- ... and 25 more
+- Size imbalance: largest zone has 27 files vs smallest with 4 — uneven decomposition [info]
+- 10 entry points — wide API surface, consider consolidating exports [warning] (hench)
+- High cohesion (1) — files are tightly interconnected [info] (root)
+- Well-architected agent core with strong cohesion and manageable coupling [critical] (agent-core)
+- Exemplary client library design with perfect cohesion and encapsulation [info] (claude-integration)
+- ... and 14 more
+
+### Suggestions
+
+- Analysis subfolder implements post-execution concerns mixed with core logic - separate into analysis-reporting zone [warning] (agent-core)
+- Token management files in lifecycle/ subfolder violate single responsibility - extract to dedicated resource-management zone [warning] (agent-core)
+- token-usage.ts mixing client concerns with analytics creates implicit service responsibility - consider extracting to dedicated analytics zone [info] (claude-integration)
+- CLI importing agent/lifecycle/loop.ts creates architectural layer violation - implement service interface to decouple CLI from agent internals [warning] (cli-infrastructure)
+- cli/errors.ts contains domain-specific error types rather than infrastructure errors - creates tight coupling between presentation and business layers [warning] (cli-infrastructure)
+- commands/constants.ts mixing configuration with command logic - extract to centralized configuration management [info] (cli-infrastructure)
+- Add tool execution session management to track validation failures and implement progressive restrictions for tools that repeatedly fail security checks [info]
+- Consider bypassing dispatch layer for tools that require no external resources (like pure computation tools) to reduce serialization overhead [info]
+- Create centralized resource-management zone to consolidate token budget, usage tracking, and other resource concerns scattered across agent-core and task-completion [warning]
+- Establish consistent zone naming convention - current zones mix functional (task-completion) and architectural (cli-infrastructure) naming styles [info]
+- ... and 16 more
 
 ## Next Steps
 
 Prioritized work items derived from analysis:
 
+### High Priority
+
+1. **Exceptionally well-architected codebase with strong zone co… (+7 related)**
+
+1. **Well-architected agent core with strong cohesion and manage… (+1 related)**
+
+1. **Extract packages/hench/src/tools/rex.ts into shared-interfa… (+1 related)**
+   Files: `packages/hench/src/agent/analysis/review.ts`, `packages/hench/src/agent/analysis/stuck.ts`, `packages/hench/src/agent/analysis/summary.ts`
+
+1. **Git tool properly restricts allowed subcommands for security**
+
+1. **Backward compatibility shim in agent/tools.ts maintains API stability during re…**
+
+1. **Clean adapter pattern implementation allowing swappable Claude API providers wh…**
+
+1. **CLI commands import packages/hench/src/agent/lifecycle/loop.ts directly, violat…**
+
 ### Medium Priority
 
-1. **Incomplete test coverage for high-risk shell execution tools creates potential …**
-   Files: `packages/hench/src/tools/exec-shell.ts`, `packages/hench/src/tools/git.ts`, `packages/hench/src/tools/index.ts`
+1. **Hub-and-spoke pattern centered on packages/hench/src/tools/… (+2 related)**
 
-1. **Acts as architectural hub but bidirectional coupling with application-orchestra…**
-   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/index.ts`
+1. **Token budget and usage tracking logic duplicated across lif… (+1 related)**
 
-1. **High import volume (20+ from agent-core) combined with 29 files indicates poten…**
-   Files: `packages/hench/src/agent/loop.ts`, `packages/hench/src/agent/review.ts`, `packages/hench/src/cli/commands/constants.ts`
+1. **Token management logic distributed across agent-core lifecy… (+1 related)**
 
-1. **Hench package zones collectively show 53 cross-imports while claude package mai…**
+1. **Error handling logic embedded in CLI layer instead of using domain service abst…**
 
-1. **9 entry points — wide API surface, consider consolidating exports**
-   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/index.ts`
+1. **Each specialized tool implements its own command parsing and execution without …**
 
-1. **Bidirectional coupling: "agent-core" ↔ "application-orchestration" (11+20 cross…**
+1. **Heavy bidirectional coupling with cli-infrastructure (30 total imports) suggest…**
 
-1. **Bidirectional coupling: "agent-tools-layer" ↔ "application-orchestration" (2+4 …**
+1. **Bidirectional coupling with agent-core may indicate CLI commands directly manip…**
 
-1. **Bidirectional coupling: "agent-tools-layer" ↔ "specialized-tools" (2+3 crossing…**
+1. **Analysis subfolder implements post-execution concerns mixed with core logic - s…**
 
-1. **Heavy cross-zone import activity (31 total imports with hench-3) indicates tigh…**
-   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/index.ts`
+1. **Token management files in lifecycle/ subfolder violate single responsibility - …**
 
-1. **High coupling (0.27) with 9 entry points indicates potential over-fragmentation…**
-   Files: `packages/hench/src/agent/brief.ts`, `packages/hench/src/agent/cli-loop.ts`, `packages/hench/src/agent/index.ts`
+1. **CLI importing agent/lifecycle/loop.ts creates architectural layer violation - i…**
+
+### Low Priority
+
+1. **token-usage.ts mixing client concerns with analytics creates implicit service r…**
+
+1. **commands/constants.ts mixing configuration with command logic - extract to cent…**
+
+1. **Add tool execution session management to track validation failures and implemen…**
+
+1. **Consider bypassing dispatch layer for tools that require no external resources …**
+
+1. **Establish consistent zone naming convention - current zones mix functional (tas…**
+
+1. **config.js implements cross-package configuration management rather than orchest…**
+
+1. **Consolidate duplicate argument parsing logic between git.ts and test-runner.ts …**
+
+1. **Test naming inconsistency between completion-validation.test.ts and rex.test.ts…**
+
+1. **validation/completion.ts and agent/completion.ts create split validation respon…**
+
+1. **Consider adding structured error types for different validation failures to ena…**
 
 ## File Inventory
 
@@ -237,6 +301,7 @@ Prioritized work items derived from analysis:
 | `.gitignore` | config |  |
 | `.hench/config.json` | other |  |
 | `.n-dx.json` | other |  |
+| `.n-dx2.json` | other |  |
 | `.npmrc` | config |  |
 | `.rex/config.json` | other |  |
 | `.rex/execution-log.jsonl` | other |  |
@@ -245,105 +310,107 @@ Prioritized work items derived from analysis:
 | `.rex/workflow.md` | docs |  |
 | `CLAUDE.md` | docs |  |
 | `README.md` | docs |  |
-| `ci.js` | source | application-entry |
-| `cli.js` | source | application-entry |
-| `config.js` | source | application-entry |
+| `ci.js` | source | root |
+| `cli.js` | source | root |
+| `config.js` | source | root |
 | `package.json` | config |  |
 | `packages/claude-client/package.json` | config |  |
-| `packages/claude-client/src/api-provider.ts` | source | claude-api-client |
-| `packages/claude-client/src/cli-provider.ts` | source | claude-api-client |
-| `packages/claude-client/src/config.ts` | source | claude-api-client |
-| `packages/claude-client/src/create-client.ts` | source | claude-api-client |
-| `packages/claude-client/src/index.ts` | source | claude-api-client |
-| `packages/claude-client/src/token-usage.ts` | source | claude-api-client |
-| `packages/claude-client/src/types.ts` | source | claude-api-client |
-| `packages/claude-client/tests/unit/api-provider.test.ts` | test | claude-api-client |
-| `packages/claude-client/tests/unit/cli-provider.test.ts` | test | claude-api-client |
-| `packages/claude-client/tests/unit/config.test.ts` | test | claude-api-client |
-| `packages/claude-client/tests/unit/create-client.test.ts` | test | claude-api-client |
-| `packages/claude-client/tests/unit/token-usage.test.ts` | test | claude-api-client |
-| `packages/claude-client/tests/unit/types.test.ts` | test | claude-api-client |
+| `packages/claude-client/src/api-provider.ts` | source | claude-client |
+| `packages/claude-client/src/auth.ts` | source | claude-client |
+| `packages/claude-client/src/cli-provider.ts` | source | claude-client |
+| `packages/claude-client/src/config.ts` | source | claude-client |
+| `packages/claude-client/src/create-client.ts` | source | claude-client |
+| `packages/claude-client/src/index.ts` | source | claude-client |
+| `packages/claude-client/src/token-usage.ts` | source | claude-client |
+| `packages/claude-client/src/types.ts` | source | claude-client |
+| `packages/claude-client/tests/unit/api-provider.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/auth.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/cli-provider.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/config.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/create-client.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/token-usage.test.ts` | test | claude-client |
+| `packages/claude-client/tests/unit/types.test.ts` | test | claude-client |
 | `packages/claude-client/tsconfig.json` | config |  |
 | `packages/claude-client/vitest.config.ts` | config |  |
 | `packages/hench/Hench-F.png` | asset |  |
 | `packages/hench/Hench.png` | asset |  |
 | `packages/hench/README.md` | docs |  |
 | `packages/hench/package.json` | config |  |
-| `packages/hench/src/agent/brief.ts` | source | agent-core |
-| `packages/hench/src/agent/cli-loop.ts` | source | agent-core |
-| `packages/hench/src/agent/completion.ts` | source | completion-validation |
-| `packages/hench/src/agent/index.ts` | source | agent-core |
-| `packages/hench/src/agent/loop.ts` | source | application-orchestration |
-| `packages/hench/src/agent/prompt.ts` | source | agent-core |
-| `packages/hench/src/agent/review.ts` | source | application-orchestration |
-| `packages/hench/src/agent/stuck.ts` | source | agent-core |
-| `packages/hench/src/agent/summary.ts` | source | agent-core |
-| `packages/hench/src/agent/token-budget.ts` | source | agent-core |
-| `packages/hench/src/agent/token-usage.ts` | source | agent-core |
-| `packages/hench/src/agent/tools.ts` | source | agent-tools-layer |
-| `packages/hench/src/cli/commands/constants.ts` | source | application-orchestration |
-| `packages/hench/src/cli/commands/init.ts` | source | application-orchestration |
-| `packages/hench/src/cli/commands/run.ts` | source | application-orchestration |
-| `packages/hench/src/cli/commands/show.ts` | source | application-orchestration |
-| `packages/hench/src/cli/commands/status.ts` | source | application-orchestration |
-| `packages/hench/src/cli/errors.ts` | source | application-orchestration |
-| `packages/hench/src/cli/index.ts` | source | application-orchestration |
-| `packages/hench/src/cli/output.ts` | source | application-orchestration |
-| `packages/hench/src/guard/commands.ts` | source | agent-tools-layer |
-| `packages/hench/src/guard/index.ts` | source | agent-tools-layer |
-| `packages/hench/src/guard/paths.ts` | source | agent-tools-layer |
-| `packages/hench/src/schema/index.ts` | source | agent-core |
-| `packages/hench/src/schema/v1.ts` | source | agent-core |
-| `packages/hench/src/schema/validate.ts` | source | agent-core |
-| `packages/hench/src/store/config.ts` | source | application-orchestration |
-| `packages/hench/src/store/index.ts` | source | application-orchestration |
-| `packages/hench/src/store/json.ts` | source | application-orchestration |
-| `packages/hench/src/store/project-config.ts` | source | application-orchestration |
-| `packages/hench/src/store/runs.ts` | source | application-orchestration |
-| `packages/hench/src/tools/dispatch.ts` | source | agent-tools-layer |
-| `packages/hench/src/tools/exec-shell.ts` | source | specialized-tools |
-| `packages/hench/src/tools/files.ts` | source | agent-tools-layer |
-| `packages/hench/src/tools/git.ts` | source | specialized-tools |
-| `packages/hench/src/tools/index.ts` | source | specialized-tools |
-| `packages/hench/src/tools/rex.ts` | source | completion-validation |
-| `packages/hench/src/tools/shell.ts` | source | agent-tools-layer |
-| `packages/hench/src/tools/test-runner.ts` | source | specialized-tools |
-| `packages/hench/src/types/index.ts` | source | application-orchestration |
-| `packages/hench/src/types/output.ts` | source | application-orchestration |
-| `packages/hench/src/validation/completion.ts` | source | completion-validation |
-| `packages/hench/src/validation/index.ts` | source | completion-validation |
-| `packages/hench/tests/e2e/cli-init.test.ts` | test | agent-core |
-| `packages/hench/tests/integration/store-roundtrip.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/api-auth.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/brief.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test | completion-validation |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/review.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/agent/token-usage.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/cli/output.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test | agent-tools-layer |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test | agent-tools-layer |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test | agent-core |
-| `packages/hench/tests/unit/store/claude-config.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test | application-orchestration |
-| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test | completion-validation |
-| `packages/hench/tests/unit/tools/files.test.ts` | test | agent-tools-layer |
-| `packages/hench/tests/unit/tools/git.test.ts` | test | specialized-tools |
-| `packages/hench/tests/unit/tools/rex.test.ts` | test | completion-validation |
-| `packages/hench/tests/unit/tools/shell.test.ts` | test | agent-tools-layer |
-| `packages/hench/tests/unit/tools/test-runner.test.ts` | test | specialized-tools |
+| `packages/hench/src/agent/analysis/review.ts` | source | hench |
+| `packages/hench/src/agent/analysis/stuck.ts` | source | hench |
+| `packages/hench/src/agent/analysis/summary.ts` | source | hench |
+| `packages/hench/src/agent/completion.ts` | source | hench-2 |
+| `packages/hench/src/agent/index.ts` | source | hench |
+| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | hench |
+| `packages/hench/src/agent/lifecycle/loop.ts` | source | hench-3 |
+| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | hench |
+| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | hench |
+| `packages/hench/src/agent/planning/brief.ts` | source | hench |
+| `packages/hench/src/agent/planning/prompt.ts` | source | hench |
+| `packages/hench/src/agent/tools.ts` | source | hench-4 |
+| `packages/hench/src/cli/commands/constants.ts` | source | hench-3 |
+| `packages/hench/src/cli/commands/init.ts` | source | hench-3 |
+| `packages/hench/src/cli/commands/run.ts` | source | hench-3 |
+| `packages/hench/src/cli/commands/show.ts` | source | hench-3 |
+| `packages/hench/src/cli/commands/status.ts` | source | hench-3 |
+| `packages/hench/src/cli/errors.ts` | source | hench-3 |
+| `packages/hench/src/cli/index.ts` | source | hench-3 |
+| `packages/hench/src/cli/output.ts` | source | hench-3 |
+| `packages/hench/src/guard/commands.ts` | source | hench-4 |
+| `packages/hench/src/guard/index.ts` | source | hench-4 |
+| `packages/hench/src/guard/paths.ts` | source | hench-4 |
+| `packages/hench/src/schema/index.ts` | source | hench |
+| `packages/hench/src/schema/v1.ts` | source | hench |
+| `packages/hench/src/schema/validate.ts` | source | hench |
+| `packages/hench/src/store/config.ts` | source | hench-3 |
+| `packages/hench/src/store/index.ts` | source | hench-3 |
+| `packages/hench/src/store/json.ts` | source | hench-3 |
+| `packages/hench/src/store/project-config.ts` | source | hench-3 |
+| `packages/hench/src/store/runs.ts` | source | hench-3 |
+| `packages/hench/src/tools/dispatch.ts` | source | hench-4 |
+| `packages/hench/src/tools/exec-shell.ts` | source | hench-5 |
+| `packages/hench/src/tools/files.ts` | source | hench-4 |
+| `packages/hench/src/tools/git.ts` | source | hench-5 |
+| `packages/hench/src/tools/index.ts` | source | hench-5 |
+| `packages/hench/src/tools/rex.ts` | source | hench-2 |
+| `packages/hench/src/tools/shell.ts` | source | hench-4 |
+| `packages/hench/src/tools/test-runner.ts` | source | hench-5 |
+| `packages/hench/src/types/index.ts` | source | hench-3 |
+| `packages/hench/src/types/output.ts` | source | hench-3 |
+| `packages/hench/src/validation/completion.ts` | source | hench-2 |
+| `packages/hench/src/validation/index.ts` | source | hench-2 |
+| `packages/hench/tests/e2e/cli-init.test.ts` | test | hench |
+| `packages/hench/tests/integration/store-roundtrip.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/agent/api-auth.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/agent/brief.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/completion.test.ts` | test | hench-2 |
+| `packages/hench/tests/unit/agent/loop.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/agent/prompt.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/review.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/stuck.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/summary.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/task-failure.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/agent/token-budget.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test | hench |
+| `packages/hench/tests/unit/agent/token-usage.test.ts` | test | hench |
+| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test | hench |
+| `packages/hench/tests/unit/cli/errors.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/cli/output.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/guard/commands.test.ts` | test | hench-4 |
+| `packages/hench/tests/unit/guard/paths.test.ts` | test | hench-4 |
+| `packages/hench/tests/unit/schema/validate.test.ts` | test | hench |
+| `packages/hench/tests/unit/store/claude-config.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/store/project-config.test.ts` | test | hench-3 |
+| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test | hench-2 |
+| `packages/hench/tests/unit/tools/files.test.ts` | test | hench-4 |
+| `packages/hench/tests/unit/tools/git.test.ts` | test | hench-5 |
+| `packages/hench/tests/unit/tools/rex.test.ts` | test | hench-2 |
+| `packages/hench/tests/unit/tools/shell.test.ts` | test | hench-4 |
+| `packages/hench/tests/unit/tools/test-runner.test.ts` | test | hench-5 |
 | `packages/hench/tsconfig.json` | config |  |
 | `packages/hench/vitest.config.ts` | config |  |
 | `packages/rex/.claude/settings.local.json` | other |  |
@@ -389,11 +456,14 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/cli/output.ts` | source |  |
 | `packages/rex/src/cli/validate-input.ts` | source |  |
 | `packages/rex/src/core/canonical.ts` | source | packages-rex:rex-cli |
+| `packages/rex/src/core/cascade-reset.ts` | source |  |
 | `packages/rex/src/core/dag.ts` | source | packages-rex:rex-cli |
+| `packages/rex/src/core/keywords.ts` | source |  |
 | `packages/rex/src/core/move.ts` | source |  |
 | `packages/rex/src/core/next-task.ts` | source | packages-rex:rex-cli |
 | `packages/rex/src/core/notion-map.ts` | source |  |
 | `packages/rex/src/core/parent-completion.ts` | source |  |
+| `packages/rex/src/core/parent-reset.ts` | source |  |
 | `packages/rex/src/core/prune.ts` | source |  |
 | `packages/rex/src/core/structural.ts` | source |  |
 | `packages/rex/src/core/sync-engine.ts` | source |  |
@@ -461,10 +531,14 @@ Prioritized work items derived from analysis:
 | `packages/rex/tests/unit/cli/validate-input.test.ts` | test |  |
 | `packages/rex/tests/unit/core/canonical.test.ts` | test | packages-rex:rex-cli |
 | `packages/rex/tests/unit/core/dag.test.ts` | test | packages-rex:rex-cli |
+| `packages/rex/tests/unit/core/keywords.test.ts` | test |  |
 | `packages/rex/tests/unit/core/move.test.ts` | test |  |
+| `packages/rex/tests/unit/core/next-task-matching.test.ts` | test |  |
+| `packages/rex/tests/unit/core/next-task-scoring.test.ts` | test |  |
 | `packages/rex/tests/unit/core/next-task.test.ts` | test | packages-rex:rex-cli |
 | `packages/rex/tests/unit/core/notion-map.test.ts` | test |  |
 | `packages/rex/tests/unit/core/parent-completion.test.ts` | test |  |
+| `packages/rex/tests/unit/core/parent-reset.test.ts` | test |  |
 | `packages/rex/tests/unit/core/prune.test.ts` | test |  |
 | `packages/rex/tests/unit/core/structural.test.ts` | test |  |
 | `packages/rex/tests/unit/core/sync-engine.test.ts` | test |  |
@@ -472,6 +546,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/tests/unit/core/timestamps.test.ts` | test |  |
 | `packages/rex/tests/unit/core/token-usage.test.ts` | test |  |
 | `packages/rex/tests/unit/core/transitions.test.ts` | test |  |
+| `packages/rex/tests/unit/core/tree-hardened.test.ts` | test |  |
 | `packages/rex/tests/unit/core/tree.test.ts` | test | packages-rex:rex-cli |
 | `packages/rex/tests/unit/core/verify.test.ts` | test |  |
 | `packages/rex/tests/unit/schema/validate.test.ts` | test | packages-rex:rex-cli |
@@ -513,6 +588,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/zones.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/cli/commands/analyze.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/cli/commands/constants.ts` | source | packages-sourcevision:analysis-engine |
+| `packages/sourcevision/src/cli/commands/export-pdf.ts` | source |  |
 | `packages/sourcevision/src/cli/commands/init.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/cli/commands/reset.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/cli/commands/validate.ts` | source | packages-sourcevision:analysis-engine |
@@ -526,9 +602,12 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/cli/server/routes-rex.ts` | source |  |
 | `packages/sourcevision/src/cli/server/routes-sourcevision.ts` | source |  |
 | `packages/sourcevision/src/cli/server/routes-static.ts` | source |  |
+| `packages/sourcevision/src/cli/server/routes-token-usage.ts` | source |  |
+| `packages/sourcevision/src/cli/server/routes-validation.ts` | source |  |
 | `packages/sourcevision/src/cli/server/start.ts` | source |  |
 | `packages/sourcevision/src/cli/server/types.ts` | source |  |
 | `packages/sourcevision/src/cli/server/websocket.ts` | source |  |
+| `packages/sourcevision/src/export/pdf-report.ts` | source |  |
 | `packages/sourcevision/src/schema/data-files.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/schema/index.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/schema/v1.ts` | source | packages-sourcevision:interactive-viewer |
@@ -577,8 +656,10 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/viewer/styles/responsive.css` | other | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/styles/routes.css` | other | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/styles/tables.css` | other | packages-sourcevision:interactive-viewer |
+| `packages/sourcevision/src/viewer/styles/token-usage.css` | other |  |
 | `packages/sourcevision/src/viewer/styles/tokens.css` | other | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/styles/utils.css` | other | packages-sourcevision:interactive-viewer |
+| `packages/sourcevision/src/viewer/styles/validation.css` | other |  |
 | `packages/sourcevision/src/viewer/styles/zone-map.css` | other |  |
 | `packages/sourcevision/src/viewer/types.ts` | source | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/utils.ts` | source |  |
@@ -590,6 +671,8 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/viewer/views/problems.ts` | source | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/views/routes.ts` | source | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/src/viewer/views/suggestions.ts` | source | packages-sourcevision:interactive-viewer |
+| `packages/sourcevision/src/viewer/views/token-usage.ts` | source |  |
+| `packages/sourcevision/src/viewer/views/validation.ts` | source |  |
 | `packages/sourcevision/src/viewer/views/zones.ts` | source | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/tests/e2e/cli-analyze.test.ts` | test | packages-sourcevision:test-suite |
 | `packages/sourcevision/tests/e2e/cli-serve.test.ts` | test | packages-sourcevision:test-suite |
@@ -607,6 +690,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/tests/fixtures/small-ts-project/src/utils/format.ts` | test | packages-sourcevision:test-fixtures |
 | `packages/sourcevision/tests/fixtures/small-ts-project/src/utils/validate.ts` | test | packages-sourcevision:test-fixtures |
 | `packages/sourcevision/tests/fixtures/small-ts-project/tsconfig.json` | test |  |
+| `packages/sourcevision/tests/integration/claude-config.test.ts` | test |  |
 | `packages/sourcevision/tests/integration/context.test.ts` | test | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/tests/integration/llms-txt.test.ts` | test | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/tests/integration/pipeline.test.ts` | test | packages-sourcevision:test-suite |
@@ -621,12 +705,16 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/tests/unit/analyzers/zone-output.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/analyzers/zones.test.ts` | test | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/tests/unit/cli/errors.test.ts` | test |  |
+| `packages/sourcevision/tests/unit/cli/export-pdf.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/cli/output.test.ts` | test |  |
+| `packages/sourcevision/tests/unit/export/pdf-report.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/schema/data-files.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/schema/validate.test.ts` | test | packages-sourcevision:test-suite |
 | `packages/sourcevision/tests/unit/server/routes-data.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/server/routes-rex.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts` | test |  |
+| `packages/sourcevision/tests/unit/server/routes-token-usage.test.ts` | test |  |
+| `packages/sourcevision/tests/unit/server/routes-validation.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/server/websocket.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/util/merge.test.ts` | test | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/tests/unit/util/sort.test.ts` | test | packages-sourcevision:analysis-engine |
@@ -649,4 +737,4 @@ Prioritized work items derived from analysis:
 | `tests/e2e/cli-web.test.js` | test |  |
 | `tsconfig.base.json` | config |  |
 | `vitest.config.js` | config |  |
-| `web.js` | source | application-entry |
+| `web.js` | source | root |

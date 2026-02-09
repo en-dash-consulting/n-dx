@@ -1,34 +1,34 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-07T21:07:31.375Z",
+  "analyzedAt": "2026-02-09T16:51:42.575Z",
   "targetPath": "/Users/nick/development/endash/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-07T21:07:06.352Z",
-      "completedAt": "2026-02-07T21:07:06.366Z"
+      "startedAt": "2026-02-09T16:51:29.289Z",
+      "completedAt": "2026-02-09T16:51:29.304Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-07T21:07:06.366Z",
-      "completedAt": "2026-02-07T21:07:06.370Z"
+      "startedAt": "2026-02-09T16:51:29.305Z",
+      "completedAt": "2026-02-09T16:51:29.309Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-07T21:07:06.370Z",
-      "completedAt": "2026-02-07T21:07:31.368Z"
+      "startedAt": "2026-02-09T16:51:29.309Z",
+      "completedAt": "2026-02-09T16:51:42.566Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-07T21:07:31.369Z",
-      "completedAt": "2026-02-07T21:07:31.375Z"
+      "startedAt": "2026-02-09T16:51:42.568Z",
+      "completedAt": "2026-02-09T16:51:42.575Z"
     }
   },
   "tokenUsage": {
-    "calls": 2,
-    "inputTokens": 3611,
-    "outputTokens": 1255
+    "calls": 1,
+    "inputTokens": 0,
+    "outputTokens": 0
   },
   "children": [
     {

@@ -6,33 +6,33 @@
 <architecture>
 
 Project: n-dx
-Files: 417, Lines: 101081
-Languages: TypeScript(335) JSON(25) CSS(17) Other(13) JavaScript(12)
+Files: 441, Lines: 112407
+Languages: TypeScript(356) JSON(26) CSS(19) Other(13) JavaScript(12)
 Zones: 12, Described: 12
-Import edges: 965, External packages: 14
+Import edges: 1026, External packages: 15
 
 </architecture>
 
 <zones>
 
-[agent-core] Agent Core System (22 files, coh=0.73 coup=0.27)
-  Core agent functionality including CLI loops, prompts, and token management with high internal coupling.
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/index.ts, packages/hench/src/agent/prompt.ts, packages/hench/src/agent/stuck.ts, packages/hench/src/agent/summary.ts, packages/hench/src/agent/token-budget.ts, packages/hench/src/agent/token-usage.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts +12
-[agent-tools-layer] Agent Tools Layer (11 files, coh=0.69 coup=0.31)
-  Core tool implementations and safety guards that provide controlled access to system operations for AI agents.
-  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/shell.ts, packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/tools/files.test.ts +1
-[application-entry] Application Entry Points (4 files, coh=1.00 coup=0.00)
-  Top-level application configuration and entry points for different execution modes.
-  files: ci.js, cli.js, config.js, web.js
-[application-orchestration] Application Orchestration (29 files, coh=0.78 coup=0.22)
-  Main application logic coordinating CLI commands, agent loops, storage, and system configuration.
-  files: packages/hench/src/agent/loop.ts, packages/hench/src/agent/review.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/commands/show.ts, packages/hench/src/cli/commands/status.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/index.ts, packages/hench/src/cli/output.ts +19
-[claude-api-client] Claude API Client (13 files, coh=1.00 coup=0.00)
-  Dedicated package for Claude API integration with provider abstraction and token management.
-  files: packages/claude-client/src/api-provider.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/config.ts, packages/claude-client/src/create-client.ts, packages/claude-client/src/index.ts, packages/claude-client/src/token-usage.ts, packages/claude-client/src/types.ts, packages/claude-client/tests/unit/api-provider.test.ts, packages/claude-client/tests/unit/cli-provider.test.ts, packages/claude-client/tests/unit/config.test.ts +3
-[completion-validation] Completion Validation (7 files, coh=0.74 coup=0.26)
-  Specialized module for AI completion processing, validation, and regex-based text operations.
+[claude-client] Claude Client (15 files, coh=1.00 coup=0.00)
+  15 files, primarily TypeScript
+  files: packages/claude-client/src/api-provider.ts, packages/claude-client/src/auth.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/config.ts, packages/claude-client/src/create-client.ts, packages/claude-client/src/index.ts, packages/claude-client/src/token-usage.ts, packages/claude-client/src/types.ts, packages/claude-client/tests/unit/api-provider.test.ts, packages/claude-client/tests/unit/auth.test.ts +5
+[hench] Hench (24 files, coh=0.71 coup=0.29)
+  24 files, primarily TypeScript
+  files: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/index.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/schema/index.ts +14
+[hench-2] Hench 2 (7 files, coh=0.67 coup=0.33)
+  7 files, primarily TypeScript
   files: packages/hench/src/agent/completion.ts, packages/hench/src/tools/rex.ts, packages/hench/src/validation/completion.ts, packages/hench/src/validation/index.ts, packages/hench/tests/unit/agent/completion.test.ts, packages/hench/tests/unit/tools/completion-validation.test.ts, packages/hench/tests/unit/tools/rex.test.ts
+[hench-3] Hench 3 (27 files, coh=0.77 coup=0.23)
+  27 files, primarily TypeScript
+  files: packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/commands/show.ts, packages/hench/src/cli/commands/status.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/index.ts, packages/hench/src/cli/output.ts, packages/hench/src/store/config.ts +17
+[hench-4] Hench 4 (11 files, coh=0.68 coup=0.33)
+  11 files, primarily TypeScript
+  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/shell.ts, packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/tools/files.test.ts +1
+[hench-5] Hench 5 (6 files, coh=0.50 coup=0.50)
+  6 files, primarily TypeScript
+  files: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts, packages/hench/src/tools/test-runner.ts, packages/hench/tests/unit/tools/git.test.ts, packages/hench/tests/unit/tools/test-runner.test.ts
 [packages-rex:rex-cli] Rex PRD Management CLI (36 files, coh=1.00 coup=0.00)
   A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
   files: packages/rex/src/analyze/index.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/next.ts, packages/rex/src/cli/commands/recommend.ts +26
@@ -48,10 +48,10 @@ Import edges: 965, External packages: 14
 [packages-sourcevision:test-suite] Test Suite (5 files, coh=0.46 coup=0.54)
   Unit, integration, and end-to-end tests covering analyzer logic, schema validation, CLI workflows, and the serve command, with imports reaching into both analyzer and viewer zones.
   files: packages/sourcevision/src/schema/validate.ts, packages/sourcevision/tests/e2e/cli-analyze.test.ts, packages/sourcevision/tests/e2e/cli-serve.test.ts, packages/sourcevision/tests/integration/pipeline.test.ts, packages/sourcevision/tests/unit/schema/validate.test.ts
-[specialized-tools] Specialized Tools (6 files, coh=0.56 coup=0.44)
-  Specific tool implementations for development operations including shell execution, git operations, and test running.
-  files: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts, packages/hench/src/tools/test-runner.ts, packages/hench/tests/unit/tools/git.test.ts, packages/hench/tests/unit/tools/test-runner.test.ts
-[unzoned] 32 files: .claude/settings.local.json, .gitignore, .hench/config.json, .n-dx.json, .npmrc ...
+[root] Root (4 files, coh=1.00 coup=0.00)
+  4 files, primarily JavaScript
+  files: ci.js, cli.js, config.js, web.js
+[unzoned] 33 files: .claude/settings.local.json, .gitignore, .hench/config.json, .n-dx.json, .n-dx2.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -60,16 +60,16 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 <imports>
 
 Most imported:
-  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add.ts +73
-  packages/sourcevision/src/schema/index.ts ← packages/sourcevision/src/analyzers/claude-client.ts, packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/context.ts, packages/sourcevision/src/analyzers/enrich-config.ts, packages/sourcevision/src/analyzers/enrich-parsing.ts +26
-  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/report.ts +23
-  packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/next.ts +18
+  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/report.ts +25
   packages/rex/src/cli/errors.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/prune.ts +17
   packages/rex/src/cli/output.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/chunked-review.ts +15
+  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add.ts +80
+  packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/next.ts +19
   packages/rex/src/cli/commands/constants.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts +14
-  packages/sourcevision/src/schema/v1.ts ← packages/sourcevision/src/cli/commands/init.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/schema/validate.ts, packages/sourcevision/src/viewer/components/data-display/findings-list.ts, packages/sourcevision/src/viewer/components/data-display/zone-map.ts +14
-  packages/hench/src/schema/v1.ts ← packages/hench/src/agent/summary.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/index.ts, packages/hench/tests/e2e/cli-init.test.ts, packages/hench/tests/integration/store-roundtrip.test.ts +12
-  packages/claude-client/src/types.ts ← packages/claude-client/src/api-provider.ts, packages/claude-client/src/api-provider.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/config.ts +10
+  packages/rex/src/core/canonical.ts ← packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/prune.ts, packages/rex/src/store/adapter-registry.ts, packages/rex/src/store/file-adapter.ts, packages/rex/src/store/notion-adapter.ts +9
+  packages/hench/src/store/config.ts ← packages/hench/src/store/index.ts, packages/hench/tests/integration/store-roundtrip.test.ts, packages/hench/tests/unit/agent/api-auth.test.ts, packages/hench/tests/unit/agent/api-auth.test.ts, packages/hench/tests/unit/agent/atomic-transition.test.ts +7
+  packages/rex/src/analyze/reason.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/index.ts, packages/rex/tests/integration/claude-config.test.ts +9
+  packages/sourcevision/src/schema/data-files.ts ← packages/sourcevision/src/analyzers/workspace.ts, packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/commands/export-pdf.ts, packages/sourcevision/src/cli/commands/validate.ts, packages/sourcevision/src/cli/mcp.ts +6
 
 </imports>
 
@@ -89,64 +89,57 @@ Conventions: action(2) default(4) loader(2) meta(1)
 
 <findings>
 
-[warning] 9 entry points — wide API surface, consider consolidating exports [agent-core]
-[warning] Bidirectional coupling: "agent-core" ↔ "application-orchestration" (11+20 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "agent-tools-layer" ↔ "application-orchestration" (2+4 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "agent-tools-layer" ↔ "specialized-tools" (2+3 crossings) — consider extracting shared interface
-[warning] Heavy cross-zone import activity (31 total imports with hench-3) indicates tight coupling with main application logic [agent-core]
-[warning] High coupling (0.27) with 9 entry points indicates potential over-fragmentation of responsibilities [agent-core]
-[warning] Heavy bidirectional coupling with agent-core (31 total imports) indicates tight architectural dependency [application-orchestration]
-[warning] Largest zone (29 files) with 8 entry points suggests this may be handling too many responsibilities [application-orchestration]
-[warning] Application Orchestration zone has the highest import activity (20+ imports) suggesting it may be taking on too many responsibilities
-[warning] Heavy cross-zone coupling within hench packages (53 total imports) suggests need for better architectural boundaries
-[warning] Limited test coverage with only git and test-runner tools having dedicated test files [specialized-tools]
-[warning] Incomplete test coverage for high-risk shell execution tools creates potential reliability issues [specialized-tools]
-[warning] Acts as architectural hub but bidirectional coupling with application-orchestration creates circular dependency risk [agent-core]
-[warning] High import volume (20+ from agent-core) combined with 29 files indicates potential architectural antipattern of god zone [application-orchestration]
-[warning] Hench package zones collectively show 53 cross-imports while claude package maintains zero, indicating inconsistent architectural discipline
+[warning] Bidirectional coupling: "hench" ↔ "hench-3" (9+21 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "hench-3" ↔ "hench-4" (4+2 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "hench-4" ↔ "hench-5" (2+3 crossings) — consider extracting shared interface
+[warning] 10 entry points — wide API surface, consider consolidating exports [hench]
+[critical] Well-architected agent core with strong cohesion and manageable coupling [agent-core]
+[warning] Bidirectional imports between zones may indicate circular dependencies that could complicate testing and maintenance
+[critical] Exceptionally well-architected codebase with strong zone cohesion across all analyzed components
+[warning] High interconnectivity between hench zones (21 imports hench-3→hench, 9 reverse) suggests tight coupling in agent subsystem
+[critical] Git tool properly restricts allowed subcommands for security [specialized-tools]
+[warning] Moderate cohesion (0.5) and coupling (0.5) indicates loosely related tools that could benefit from stronger unifying patterns [specialized-tools]
+[critical] Backward compatibility shim in agent/tools.ts maintains API stability during refactoring [tool-security]
+[critical] Clean adapter pattern implementation allowing swappable Claude API providers while maintaining consistent client interface [claude-integration]
+[warning] Heavy bidirectional coupling with cli-infrastructure (30 total imports) suggests agent logic bleeding into CLI concerns [agent-core]
+[warning] Bidirectional coupling with agent-core may indicate CLI commands directly manipulating agent internals instead of using clean interfaces [cli-infrastructure]
+[warning] Hub-and-spoke pattern centered on packages/hench/src/tools/rex.ts creates single point of dependency across multiple zones
+... +30 more
 
 </findings>
 
 <next-steps>
 
-[medium] Incomplete test coverage for high-risk shell execution tools creates potential …
-  files: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts
+[high] Exceptionally well-architected codebase with strong zone co… (+7 related)
+  category: fix
+[high] Well-architected agent core with strong cohesion and manage… (+1 related)
+  category: fix
+[high] Extract packages/hench/src/tools/rex.ts into shared-interfa… (+1 related)
+  files: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/analysis/summary.ts
+  category: fix
+[high] Git tool properly restricts allowed subcommands for security
+  category: fix
+[high] Backward compatibility shim in agent/tools.ts maintains API stability during re…
+  category: fix
+[high] Clean adapter pattern implementation allowing swappable Claude API providers wh…
+  category: fix
+[high] CLI commands import packages/hench/src/agent/lifecycle/loop.ts directly, violat…
+  category: fix
+[medium] Hub-and-spoke pattern centered on packages/hench/src/tools/… (+2 related)
   category: extract
-[medium] Acts as architectural hub but bidirectional coupling with application-orchestra…
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/index.ts
+[medium] Token budget and usage tracking logic duplicated across lif… (+1 related)
+  category: refactor
+[medium] Token management logic distributed across agent-core lifecy… (+1 related)
+  category: refactor
+[medium] Error handling logic embedded in CLI layer instead of using domain service abst…
+  category: refactor
+[medium] Each specialized tool implements its own command parsing and execution without …
+  category: refactor
+[medium] Heavy bidirectional coupling with cli-infrastructure (30 total imports) suggest…
   category: extract
-[medium] High import volume (20+ from agent-core) combined with 29 files indicates poten…
-  files: packages/hench/src/agent/loop.ts, packages/hench/src/agent/review.ts, packages/hench/src/cli/commands/constants.ts
+[medium] Bidirectional coupling with agent-core may indicate CLI commands directly manip…
   category: extract
-[medium] Hench package zones collectively show 53 cross-imports while claude package mai…
-  category: extract
-[medium] 9 entry points — wide API surface, consider consolidating exports
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/index.ts
-  category: refactor
-[medium] Bidirectional coupling: "agent-core" ↔ "application-orchestration" (11+20 cross…
-  category: refactor
-[medium] Bidirectional coupling: "agent-tools-layer" ↔ "application-orchestration" (2+4 …
-  category: refactor
-[medium] Bidirectional coupling: "agent-tools-layer" ↔ "specialized-tools" (2+3 crossing…
-  category: refactor
-[medium] Heavy cross-zone import activity (31 total imports with hench-3) indicates tigh…
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/index.ts
-  category: refactor
-[medium] High coupling (0.27) with 9 entry points indicates potential over-fragmentation…
-  files: packages/hench/src/agent/brief.ts, packages/hench/src/agent/cli-loop.ts, packages/hench/src/agent/index.ts
-  category: refactor
-[medium] Heavy bidirectional coupling with agent-core (31 total imports) indicates tight…
-  files: packages/hench/src/agent/loop.ts, packages/hench/src/agent/review.ts, packages/hench/src/cli/commands/constants.ts
-  category: refactor
-[medium] Largest zone (29 files) with 8 entry points suggests this may be handling too m…
-  files: packages/hench/src/agent/loop.ts, packages/hench/src/agent/review.ts, packages/hench/src/cli/commands/constants.ts
-  category: refactor
-[medium] Application Orchestration zone has the highest import activity (20+ imports) su…
-  category: refactor
-[medium] Heavy cross-zone coupling within hench packages (53 total imports) suggests nee…
-  category: refactor
-[medium] Limited test coverage with only git and test-runner tools having dedicated test…
-  files: packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/index.ts
+[medium] Analysis subfolder implements post-execution concerns mixed with core logic - s…
   category: refactor
 
 </next-steps>

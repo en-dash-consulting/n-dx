@@ -7,17 +7,17 @@
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 8732
+Lines: 9367
 
 </zone>
 
 <files>
 
-packages/rex/src/analyze/index.ts (TypeScript, 57 lines, source)
+packages/rex/src/analyze/index.ts (TypeScript, 59 lines, source)
 packages/rex/src/analyze/propose.ts (TypeScript, 311 lines, source)
 packages/rex/src/analyze/reconcile.ts (TypeScript, 56 lines, source)
 packages/rex/src/analyze/scanners.ts (TypeScript, 935 lines, source)
-packages/rex/src/cli/commands/add.ts (TypeScript, 152 lines, source)
+packages/rex/src/cli/commands/add.ts (TypeScript, 159 lines, source)
 packages/rex/src/cli/commands/analyze.ts (TypeScript, 486 lines, source)
 packages/rex/src/cli/commands/constants.ts (TypeScript, 61 lines, source)
 packages/rex/src/cli/commands/init.ts (TypeScript, 71 lines, source)
@@ -25,21 +25,21 @@ packages/rex/src/cli/commands/next.ts (TypeScript, 69 lines, source)
 packages/rex/src/cli/commands/recommend.ts (TypeScript, 145 lines, source)
 packages/rex/src/cli/commands/status.ts (TypeScript, 279 lines, source)
 packages/rex/src/cli/commands/update.ts (TypeScript, 177 lines, source)
-packages/rex/src/cli/commands/validate.ts (TypeScript, 176 lines, source)
+packages/rex/src/cli/commands/validate.ts (TypeScript, 199 lines, source)
 packages/rex/src/cli/index.ts (TypeScript, 288 lines, source)
-packages/rex/src/cli/mcp.ts (TypeScript, 659 lines, source)
+packages/rex/src/cli/mcp.ts (TypeScript, 664 lines, source)
 packages/rex/src/core/canonical.ts (TypeScript, 27 lines, source)
 packages/rex/src/core/dag.ts (TypeScript, 84 lines, source)
-packages/rex/src/core/next-task.ts (TypeScript, 292 lines, source)
-packages/rex/src/core/tree.ts (TypeScript, 131 lines, source)
-packages/rex/src/schema/index.ts (TypeScript, 30 lines, source)
+packages/rex/src/core/next-task.ts (TypeScript, 452 lines, source)
+packages/rex/src/core/tree.ts (TypeScript, 145 lines, source)
+packages/rex/src/schema/index.ts (TypeScript, 31 lines, source)
 packages/rex/src/schema/v1.ts (TypeScript, 113 lines, source)
-packages/rex/src/schema/validate.ts (TypeScript, 96 lines, source)
+packages/rex/src/schema/validate.ts (TypeScript, 120 lines, source)
 packages/rex/src/store/file-adapter.ts (TypeScript, 152 lines, source)
-packages/rex/src/store/index.ts (TypeScript, 104 lines, source)
+packages/rex/src/store/index.ts (TypeScript, 105 lines, source)
 packages/rex/src/store/types.ts (TypeScript, 177 lines, source)
 packages/rex/src/workflow/default.ts (TypeScript, 20 lines, source)
-packages/rex/tests/integration/store-roundtrip.test.ts (TypeScript, 153 lines, test)
+packages/rex/tests/integration/store-roundtrip.test.ts (TypeScript, 258 lines, test)
 packages/rex/tests/unit/analyze/propose.test.ts (TypeScript, 355 lines, test)
 packages/rex/tests/unit/analyze/reconcile.test.ts (TypeScript, 168 lines, test)
 packages/rex/tests/unit/analyze/scanners.test.ts (TypeScript, 1199 lines, test)
@@ -47,7 +47,7 @@ packages/rex/tests/unit/core/canonical.test.ts (TypeScript, 89 lines, test)
 packages/rex/tests/unit/core/dag.test.ts (TypeScript, 120 lines, test)
 packages/rex/tests/unit/core/next-task.test.ts (TypeScript, 762 lines, test)
 packages/rex/tests/unit/core/tree.test.ts (TypeScript, 233 lines, test)
-packages/rex/tests/unit/schema/validate.test.ts (TypeScript, 240 lines, test)
+packages/rex/tests/unit/schema/validate.test.ts (TypeScript, 533 lines, test)
 packages/rex/tests/unit/store/file-adapter.test.ts (TypeScript, 265 lines, test)
 
 </files>
@@ -128,10 +128,11 @@ Internal:
   packages/rex/src/core/next-task.ts → packages/rex/src/core/tree.ts {walkTree}
   packages/rex/src/core/next-task.ts → packages/rex/src/core/tree.ts {TreeEntry}
   packages/rex/src/core/next-task.ts → packages/rex/src/schema/index.ts {PRDItem, Priority}
-  packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {PRDItem}
+  packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY}
+  packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel}
   packages/rex/src/schema/index.ts → packages/rex/src/schema/v1.ts {SCHEMA_VERSION, LEVEL_HIERARCHY, DEFAULT_CONFIG}
   packages/rex/src/schema/index.ts → packages/rex/src/schema/v1.ts {ItemLevel, ItemStatus, Priority, PRDItem, PRDDocument, RexConfig, BudgetThresholds, LogEntry, TokenUsage, AnalyzeTokenUsage}
-  packages/rex/src/schema/index.ts → packages/rex/src/schema/validate.ts {PRDItemSchema, PRDDocumentSchema, RexConfigSchema, LogEntrySchema, validateDocument, validateConfig, validateLogEntry}
+  packages/rex/src/schema/index.ts → packages/rex/src/schema/validate.ts {PRDItemSchema, PRDDocumentSchema, RexConfigSchema, LogEntrySchema, validateDocument, validateConfig, validateLogEntry, formatValidationErrors}
   packages/rex/src/schema/index.ts → packages/rex/src/schema/validate.ts {ValidationResult}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/core/canonical.ts {toCanonicalJSON}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/core/tree.ts {findItem, insertChild, updateInTree, removeFromTree}
@@ -161,7 +162,7 @@ Internal:
   packages/rex/tests/unit/core/next-task.test.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/tests/unit/core/tree.test.ts → packages/rex/src/core/tree.ts {walkTree, findItem, insertChild, updateInTree, removeFromTree, computeStats, getParentChain, collectAllIds}
   packages/rex/tests/unit/core/tree.test.ts → packages/rex/src/schema/index.ts {PRDItem}
-  packages/rex/tests/unit/schema/validate.test.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry}
+  packages/rex/tests/unit/schema/validate.test.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry, formatValidationErrors}
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/core/canonical.ts {toCanonicalJSON}
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem}

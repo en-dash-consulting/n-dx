@@ -1,7 +1,7 @@
 {
-  "id": "hench-3",
-  "name": "Hench 3",
-  "description": "27 files, primarily TypeScript",
+  "id": "cli-infrastructure",
+  "name": "CLI Infrastructure",
+  "description": "Command-line interface, configuration management, and agent execution infrastructure.",
   "files": [
     "packages/hench/src/agent/lifecycle/loop.ts",
     "packages/hench/src/cli/commands/constants.ts",
