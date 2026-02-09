@@ -1,19 +1,19 @@
 import { spawn, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
-import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../schema/index.js";
-import { assembleTaskBrief, formatTaskBrief } from "./brief.js";
-import { buildSystemPrompt } from "./prompt.js";
-import { saveRun } from "../store/index.js";
-import { buildRunSummary } from "./summary.js";
-import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../tools/index.js";
-import { validateCompletion, formatValidationResult } from "../validation/completion.js";
-import { collectReviewDiff, promptReview, revertChanges } from "./review.js";
+import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
+import { buildSystemPrompt } from "../planning/prompt.js";
+import { saveRun } from "../../store/index.js";
+import { buildRunSummary } from "../analysis/summary.js";
+import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../../tools/index.js";
+import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
-import { section, subsection, stream, detail, info } from "../types/output.js";
-import { loadClaudeConfig, resolveCliPath } from "../store/project-config.js";
-import type { ClaudeConfig } from "../store/project-config.js";
+import { section, subsection, stream, detail, info } from "../../types/output.js";
+import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
+import type { ClaudeConfig } from "../../store/project-config.js";
 
 export interface CliLoopOptions {
   config: HenchConfig;

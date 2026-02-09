@@ -113,7 +113,7 @@ describe("API loop authentication and endpoint config", () => {
       usage: { input_tokens: 10, output_tokens: 5 },
     });
 
-    const { agentLoop } = await import("../../../src/agent/loop.js");
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -246,7 +246,7 @@ describe("API loop authentication and endpoint config", () => {
       "utf-8",
     );
 
-    const { agentLoop } = await import("../../../src/agent/loop.js");
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -297,7 +297,7 @@ describe("API loop authentication and endpoint config", () => {
       Object.assign(new Error("test error"), { status: 401 }),
     );
 
-    const { agentLoop } = await import("../../../src/agent/loop.js");
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -369,7 +369,7 @@ describe("CLI loop claude-client integration", () => {
       "utf-8",
     );
 
-    const { cliLoop } = await import("../../../src/agent/cli-loop.js");
+    const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
     const { createStore } = await import("rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 

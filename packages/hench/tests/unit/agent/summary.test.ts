@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildRunSummary } from "../../../src/agent/summary.js";
+import { buildRunSummary } from "../../../src/agent/analysis/summary.js";
 import type { ToolCallRecord } from "../../../src/schema/v1.js";
 
 function call(

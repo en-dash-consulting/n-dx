@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { TaskNotActionableError } from "../agent/brief.js";
+import { TaskNotActionableError } from "../agent/planning/brief.js";
 
 const HENCH_DIR = ".hench";
 

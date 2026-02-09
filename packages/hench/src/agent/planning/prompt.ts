@@ -1,4 +1,4 @@
-import type { HenchConfig, TaskBriefProject } from "../schema/index.js";
+import type { HenchConfig, TaskBriefProject } from "../../schema/index.js";
 
 export function buildSystemPrompt(
   project: TaskBriefProject,

@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe("collectReviewDiff", () => {
   it("returns diff and stat from git", async () => {
-    const { collectReviewDiff } = await import("../../../src/agent/review.js");
+    const { collectReviewDiff } = await import("../../../src/agent/analysis/review.js");
 
     let callCount = 0;
     mockExecFile.mockImplementation(
@@ -58,7 +58,7 @@ describe("collectReviewDiff", () => {
   });
 
   it("handles empty diff gracefully", async () => {
-    const { collectReviewDiff } = await import("../../../src/agent/review.js");
+    const { collectReviewDiff } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -73,7 +73,7 @@ describe("collectReviewDiff", () => {
   });
 
   it("handles git errors without crashing", async () => {
-    const { collectReviewDiff } = await import("../../../src/agent/review.js");
+    const { collectReviewDiff } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -95,7 +95,7 @@ describe("collectReviewDiff", () => {
 
 describe("promptReview", () => {
   it("approves on empty input (default yes)", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -109,7 +109,7 @@ describe("promptReview", () => {
   });
 
   it("approves on 'y' input", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -122,7 +122,7 @@ describe("promptReview", () => {
   });
 
   it("approves on 'yes' input", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -135,7 +135,7 @@ describe("promptReview", () => {
   });
 
   it("approves on 'Y' input (case-insensitive)", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -148,7 +148,7 @@ describe("promptReview", () => {
   });
 
   it("rejects on 'n' input", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -162,7 +162,7 @@ describe("promptReview", () => {
   });
 
   it("rejects on 'no' input", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -176,7 +176,7 @@ describe("promptReview", () => {
   });
 
   it("rejects on any non-yes input", async () => {
-    const { promptReview } = await import("../../../src/agent/review.js");
+    const { promptReview } = await import("../../../src/agent/analysis/review.js");
 
     const diff = {
       diff: "+added line",
@@ -196,7 +196,7 @@ describe("promptReview", () => {
 
 describe("revertChanges", () => {
   it("runs git reset, checkout, and clean", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -221,7 +221,7 @@ describe("revertChanges", () => {
   });
 
   it("handles git errors without crashing", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -234,7 +234,7 @@ describe("revertChanges", () => {
   });
 
   it("passes correct arguments to git reset", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -249,7 +249,7 @@ describe("revertChanges", () => {
   });
 
   it("passes correct arguments to git checkout", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -264,7 +264,7 @@ describe("revertChanges", () => {
   });
 
   it("passes correct arguments to git clean", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -279,7 +279,7 @@ describe("revertChanges", () => {
   });
 
   it("passes projectDir as cwd to all git commands", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -297,7 +297,7 @@ describe("revertChanges", () => {
   });
 
   it("uses custom timeout when provided", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -315,7 +315,7 @@ describe("revertChanges", () => {
   });
 
   it("uses default timeout when none specified", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     mockExecFile.mockImplementation(
       ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
@@ -333,7 +333,7 @@ describe("revertChanges", () => {
   });
 
   it("continues with subsequent commands even if earlier commands fail", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     let callCount = 0;
     mockExecFile.mockImplementation(
@@ -355,7 +355,7 @@ describe("revertChanges", () => {
   });
 
   it("runs commands sequentially (reset before checkout before clean)", async () => {
-    const { revertChanges } = await import("../../../src/agent/review.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     const commandOrder: string[] = [];
     mockExecFile.mockImplementation(

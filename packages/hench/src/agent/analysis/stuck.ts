@@ -1,4 +1,4 @@
-import type { RunRecord } from "../schema/index.js";
+import type { RunRecord } from "../../schema/index.js";
 
 /**
  * Statuses that count as a hard failure for stuck-task detection.

@@ -5,8 +5,8 @@ import {
   emptyAggregateTokenUsage,
   accumulateTokenUsage,
   formatTokenUsage,
-} from "../../../src/agent/token-usage.js";
-import type { AggregateTokenUsage } from "../../../src/agent/token-usage.js";
+} from "../../../src/agent/lifecycle/token-usage.js";
+import type { AggregateTokenUsage } from "../../../src/agent/lifecycle/token-usage.js";
 
 // ── parseTokenUsage (API SDK response.usage) ────────────────────────────────
 

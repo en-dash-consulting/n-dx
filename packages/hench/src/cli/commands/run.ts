@@ -3,11 +3,11 @@ import { createInterface } from "node:readline";
 import { resolveStore } from "rex";
 import type { PRDItem, PRDStore } from "rex";
 import { loadConfig, listRuns } from "../../store/index.js";
-import { agentLoop } from "../../agent/loop.js";
-import { cliLoop } from "../../agent/cli-loop.js";
-import { getActionableTasks, collectEpicTaskIds } from "../../agent/brief.js";
-import { getStuckTaskIds } from "../../agent/stuck.js";
-import { HENCH_DIR, safeParseInt } from "./constants.js";
+import { agentLoop } from "../../agent/lifecycle/loop.js";
+import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
+import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
+import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
+import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireClaudeCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
 import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
@@ -71,7 +71,7 @@ export async function resolveEpicFlag(
 }
 
 // Re-export collectEpicTaskIds from brief.ts for backward compatibility with tests
-export { collectEpicTaskIds } from "../../agent/brief.js";
+export { collectEpicTaskIds } from "../../agent/planning/brief.js";
 
 // ---------------------------------------------------------------------------
 // Epic scope info
@@ -383,7 +383,7 @@ export async function cmdRun(
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;
   const maxTurns = flags["max-turns"] ? safeParseInt(flags["max-turns"], "max-turns") : undefined;
-  const tokenBudget = flags["token-budget"] ? safeParseInt(flags["token-budget"], "token-budget") : undefined;
+  const tokenBudget = flags["token-budget"] != null ? safeParseNonNegInt(flags["token-budget"], "token-budget") : undefined;
   const pauseMs = flags["loop-pause"]
     ? safeParseInt(flags["loop-pause"], "loop-pause")
     : config.loopPauseMs;

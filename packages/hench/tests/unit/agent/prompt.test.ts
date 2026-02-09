@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSystemPrompt } from "../../../src/agent/prompt.js";
+import { buildSystemPrompt } from "../../../src/agent/planning/prompt.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import type { TaskBriefProject } from "../../../src/schema/v1.js";
 

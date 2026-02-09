@@ -5,7 +5,7 @@ import {
   getActionableTasks,
   TaskNotActionableError,
   collectEpicTaskIds,
-} from "../../../src/agent/brief.js";
+} from "../../../src/agent/planning/brief.js";
 import type { TaskBrief } from "../../../src/schema/v1.js";
 import type { PRDStore, PRDItem } from "rex";
 

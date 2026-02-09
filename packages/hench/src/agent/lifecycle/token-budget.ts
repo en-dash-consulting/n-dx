@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../schema/index.js";
+import type { TokenUsage } from "../../schema/index.js";
 
 export interface TokenBudgetResult {
   /** Whether the token budget has been met or exceeded. */

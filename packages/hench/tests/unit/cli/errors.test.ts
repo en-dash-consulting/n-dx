@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI } from "../../../src/cli/errors.js";
-import { TaskNotActionableError } from "../../../src/agent/brief.js";
+import { TaskNotActionableError } from "../../../src/agent/planning/brief.js";
 
 describe("CLIError", () => {
   it("stores message and suggestion", () => {

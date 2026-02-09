@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../schema/index.js";
+import type { TokenUsage } from "../../schema/index.js";
 import {
   parseApiTokenUsage as parseTokenUsage,
   parseStreamTokenUsage,

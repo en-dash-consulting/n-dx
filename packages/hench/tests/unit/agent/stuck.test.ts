@@ -30,7 +30,7 @@ function makeRun(
 
 describe("countRecentFailures", () => {
   it("counts consecutive failed runs for a task", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -42,7 +42,7 @@ describe("countRecentFailures", () => {
   });
 
   it("stops counting at first non-failure", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -55,7 +55,7 @@ describe("countRecentFailures", () => {
   });
 
   it("returns 0 when no runs for the task", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-b", "failed", "2024-01-01T01:00:00Z"),
@@ -65,7 +65,7 @@ describe("countRecentFailures", () => {
   });
 
   it("filters to the correct taskId only", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -78,7 +78,7 @@ describe("countRecentFailures", () => {
   });
 
   it("counts timeout as a failure", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "timeout", "2024-01-01T03:00:00Z"),
@@ -89,7 +89,7 @@ describe("countRecentFailures", () => {
   });
 
   it("counts budget_exceeded as a failure", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "budget_exceeded", "2024-01-01T03:00:00Z"),
@@ -100,7 +100,7 @@ describe("countRecentFailures", () => {
   });
 
   it("does not count error_transient as a failure for stuck detection", async () => {
-    const { countRecentFailures } = await import("../../../src/agent/stuck.js");
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "error_transient", "2024-01-01T03:00:00Z"),
@@ -114,7 +114,7 @@ describe("countRecentFailures", () => {
 
 describe("getStuckTaskIds", () => {
   it("returns task IDs with 3+ consecutive failures", async () => {
-    const { getStuckTaskIds } = await import("../../../src/agent/stuck.js");
+    const { getStuckTaskIds } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -130,7 +130,7 @@ describe("getStuckTaskIds", () => {
   });
 
   it("returns empty set when no tasks are stuck", async () => {
-    const { getStuckTaskIds } = await import("../../../src/agent/stuck.js");
+    const { getStuckTaskIds } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T02:00:00Z"),
@@ -142,7 +142,7 @@ describe("getStuckTaskIds", () => {
   });
 
   it("respects custom threshold", async () => {
-    const { getStuckTaskIds } = await import("../../../src/agent/stuck.js");
+    const { getStuckTaskIds } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T02:00:00Z"),
@@ -154,12 +154,12 @@ describe("getStuckTaskIds", () => {
   });
 
   it("handles empty runs array", async () => {
-    const { getStuckTaskIds } = await import("../../../src/agent/stuck.js");
+    const { getStuckTaskIds } = await import("../../../src/agent/analysis/stuck.js");
     expect(getStuckTaskIds([], 3).size).toBe(0);
   });
 
   it("detects multiple stuck tasks", async () => {
-    const { getStuckTaskIds } = await import("../../../src/agent/stuck.js");
+    const { getStuckTaskIds } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -179,7 +179,7 @@ describe("getStuckTaskIds", () => {
 
 describe("isStuckTask", () => {
   it("returns true when task has enough failures", async () => {
-    const { isStuckTask } = await import("../../../src/agent/stuck.js");
+    const { isStuckTask } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
@@ -191,7 +191,7 @@ describe("isStuckTask", () => {
   });
 
   it("returns false when task has fewer failures than threshold", async () => {
-    const { isStuckTask } = await import("../../../src/agent/stuck.js");
+    const { isStuckTask } = await import("../../../src/agent/analysis/stuck.js");
 
     const runs: RunRecord[] = [
       makeRun("task-a", "failed", "2024-01-01T02:00:00Z"),

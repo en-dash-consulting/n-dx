@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createInterface } from "node:readline";
-import { section, subsection, info } from "../types/output.js";
+import { section, subsection, info } from "../../types/output.js";
 
 /**
  * Review mode — shows proposed changes and prompts for approval

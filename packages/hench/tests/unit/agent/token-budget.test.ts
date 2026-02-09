@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkTokenBudget,
   type TokenBudgetResult,
-} from "../../../src/agent/token-budget.js";
+} from "../../../src/agent/lifecycle/token-budget.js";
 import type { TokenUsage } from "../../../src/schema/v1.js";
 
 describe("checkTokenBudget", () => {

@@ -13,7 +13,7 @@ import type {
   TaskBriefSibling,
   TaskBriefProject,
   TaskBriefLogEntry,
-} from "../schema/index.js";
+} from "../../schema/index.js";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */

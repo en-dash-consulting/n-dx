@@ -3,7 +3,7 @@ import {
   isTransientError,
   computeDelay,
   buildRetryNotice,
-} from "../../../src/agent/cli-loop.js";
+} from "../../../src/agent/lifecycle/cli-loop.js";
 
 describe("isTransientError", () => {
   describe("transient HTTP status codes", () => {

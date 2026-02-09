@@ -84,7 +84,7 @@ describe("atomic task state transitions", () => {
         "utf-8",
       );
 
-      const { agentLoop } = await import("../../../src/agent/loop.js");
+      const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -136,7 +136,7 @@ describe("atomic task state transitions", () => {
         "utf-8",
       );
 
-      const { agentLoop } = await import("../../../src/agent/loop.js");
+      const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -185,7 +185,7 @@ describe("atomic task state transitions", () => {
         "utf-8",
       );
 
-      const { agentLoop } = await import("../../../src/agent/loop.js");
+      const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
@@ -237,7 +237,7 @@ describe("atomic task state transitions", () => {
         "utf-8",
       );
 
-      const { cliLoop } = await import("../../../src/agent/cli-loop.js");
+      const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
       const { createStore } = await import("rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
