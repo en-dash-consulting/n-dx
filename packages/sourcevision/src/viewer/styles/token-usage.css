@@ -302,6 +302,12 @@
 }
 
 /* Token table */
+.token-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .token-table {
   width: 100%;
   border-collapse: collapse;

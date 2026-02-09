@@ -196,6 +196,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
     ),
 
     // Table
+    h("div", { class: "data-table-wrapper" },
     h("table", { class: "data-table" },
       h("thead", null,
         h("tr", null,
@@ -236,7 +237,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           );
         })
       )
-    ),
+    )),
 
     remaining > 0
       ? h("div", { class: "empty-state" },

@@ -9,10 +9,26 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 #app {
   display: flex;
   height: 100vh;
   height: 100dvh;
+}
+
+/* Prevent images and embedded content from overflowing */
+img, svg, video, canvas, iframe {
+  max-width: 100%;
+}
+
+/* Code blocks should scroll horizontally, not push layout */
+pre, code {
+  max-width: 100%;
+}
+
+pre {
+  overflow-x: auto;
 }

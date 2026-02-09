@@ -187,21 +187,23 @@ export function ZonesView({ data, onSelect }: ZonesViewProps) {
             defaultOpen: true,
             threshold: 20,
           },
-            h("table", { class: "data-table" },
-              h("thead", null,
-                h("tr", null,
-                  h("th", null, "Path"),
-                  h("th", null, "Entry Point")
-                )
-              ),
-              h("tbody", null,
-                zone.files.map((f) =>
-                  h("tr", { key: f },
-                    h("td", { class: "mono-sm" }, f),
-                    h("td", null,
-                      zone.entryPoints.includes(f)
-                        ? h("span", { class: "tag tag-test" }, "entry")
-                        : null
+            h("div", { class: "data-table-wrapper" },
+              h("table", { class: "data-table" },
+                h("thead", null,
+                  h("tr", null,
+                    h("th", null, "Path"),
+                    h("th", null, "Entry Point")
+                  )
+                ),
+                h("tbody", null,
+                  zone.files.map((f) =>
+                    h("tr", { key: f },
+                      h("td", { class: "mono-sm" }, f),
+                      h("td", null,
+                        zone.entryPoints.includes(f)
+                          ? h("span", { class: "tag tag-test" }, "entry")
+                          : null
+                      )
                     )
                   )
                 )

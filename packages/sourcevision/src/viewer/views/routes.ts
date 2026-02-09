@@ -263,32 +263,34 @@ export function RoutesView({ data }: RoutesViewProps) {
           defaultOpen: true,
           threshold: 20,
         },
-          h("table", { class: "data-table" },
-            h("thead", null,
-              h("tr", null,
-                h("th", null, "File"),
-                h("th", null, "Pattern"),
-                h("th", null, "Exports"),
-                h("th", null, "Layout"),
-              )
-            ),
-            h("tbody", null,
-              routeModules.map((mod) =>
-                h("tr", { key: mod.file },
-                  h("td", null, mod.file),
-                  h("td", null, mod.routePattern || h("span", { class: "route-file" }, "(pathless)")),
-                  h("td", null,
-                    mod.exports.map((exp) =>
-                      h("span", {
-                        key: exp,
-                        class: `route-badge route-badge-${badgeClass(exp)}`,
-                      }, exp)
-                    )
-                  ),
-                  h("td", null,
-                    mod.isLayout ? h("span", { class: "tag tag-source" }, "layout") : null,
-                    mod.isIndex ? h("span", { class: "tag tag-test" }, "index") : null,
-                  ),
+          h("div", { class: "data-table-wrapper" },
+            h("table", { class: "data-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, "File"),
+                  h("th", null, "Pattern"),
+                  h("th", null, "Exports"),
+                  h("th", null, "Layout"),
+                )
+              ),
+              h("tbody", null,
+                routeModules.map((mod) =>
+                  h("tr", { key: mod.file },
+                    h("td", null, mod.file),
+                    h("td", null, mod.routePattern || h("span", { class: "route-file" }, "(pathless)")),
+                    h("td", null,
+                      mod.exports.map((exp) =>
+                        h("span", {
+                          key: exp,
+                          class: `route-badge route-badge-${badgeClass(exp)}`,
+                        }, exp)
+                      )
+                    ),
+                    h("td", null,
+                      mod.isLayout ? h("span", { class: "tag tag-source" }, "layout") : null,
+                      mod.isIndex ? h("span", { class: "tag tag-test" }, "index") : null,
+                    ),
+                  )
                 )
               )
             )
@@ -304,20 +306,22 @@ export function RoutesView({ data }: RoutesViewProps) {
           defaultOpen: true,
           threshold: 15,
         },
-          h("table", { class: "data-table component-usage-table" },
-            h("thead", null,
-              h("tr", null,
-                h("th", null, "Component"),
-                h("th", null, "File"),
-                h("th", null, "Usage Count"),
-              )
-            ),
-            h("tbody", null,
-              summary.mostUsedComponents.map((comp) =>
-                h("tr", { key: `${comp.file}:${comp.name}` },
-                  h("td", null, comp.name),
-                  h("td", null, comp.file),
-                  h("td", null, String(comp.usageCount)),
+          h("div", { class: "data-table-wrapper" },
+            h("table", { class: "data-table component-usage-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, "Component"),
+                  h("th", null, "File"),
+                  h("th", null, "Usage Count"),
+                )
+              ),
+              h("tbody", null,
+                summary.mostUsedComponents.map((comp) =>
+                  h("tr", { key: `${comp.file}:${comp.name}` },
+                    h("td", null, comp.name),
+                    h("td", null, comp.file),
+                    h("td", null, String(comp.usageCount)),
+                  )
                 )
               )
             )

@@ -12,6 +12,28 @@
   .zone-grid {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
+
+  .dep-legend {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .val-summary {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .dep-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .rex-bulk-bar {
+    max-width: calc(100vw - 40px);
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
 }
 
 /* Responsive — mobile */
@@ -144,6 +166,7 @@
   .data-table {
     display: block;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .graph-container {
@@ -166,5 +189,90 @@
   /* Touch-friendly section headers on mobile */
   .nav-section-header {
     padding: 10px 12px 6px;
+  }
+
+  /* Command bar wraps on mobile */
+  .rex-command-bar {
+    flex-wrap: wrap;
+  }
+
+  /* Validation tabs scroll on mobile */
+  .val-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Validation summary stacks on mobile */
+  .val-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .val-summary-stats {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Dependency stats wrap on mobile */
+  .dep-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .dep-legend {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  /* Hench filter bar wraps on mobile */
+  .hench-filter-bar {
+    flex-wrap: wrap;
+  }
+
+  /* Bulk actions bar fits mobile screen */
+  .rex-bulk-bar {
+    max-width: calc(100vw - 32px);
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .rex-bulk-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Attention items stack on narrow screens */
+  .attention-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .attention-issues {
+    flex-wrap: wrap;
+  }
+
+  /* Cost breakdown items stack on mobile */
+  .cost-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  /* Analysis history entries wrap on mobile */
+  .rex-analysis-history-entry {
+    flex-wrap: wrap;
+  }
+
+  /* Zone map grid single column on mobile */
+  .zone-map-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dep grid single column on mobile */
+  .dep-grid {
+    grid-template-columns: 1fr;
   }
 }
