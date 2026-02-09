@@ -18,20 +18,22 @@ type NavEntry =
   | { type: "section"; label: string };
 
 const NAV_ENTRIES: NavEntry[] = [
-  { type: "section", label: "ANALYSIS" },
+  { type: "section", label: "SOURCEVISION" },
   { type: "item", id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
-  { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Rex Dashboard", minPass: 0 },
-  { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
   { type: "item", id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
   { type: "item", id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
   { type: "item", id: "files", icon: "\u2630", label: "Files", minPass: 0 },
   { type: "item", id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
-  { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
-  { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
-  { type: "section", label: "ENRICHMENT" },
   { type: "item", id: "architecture", icon: "\u25E8", label: "Architecture", minPass: ENRICHMENT_THRESHOLDS.architecture },
   { type: "item", id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
   { type: "item", id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
+  { type: "section", label: "REX" },
+  { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
+  { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
+  { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
+  { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
+  { type: "section", label: "HENCH" },
+  { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
 ];
 
 export function Sidebar({ view, onNavigate, manifest, zones }: SidebarProps) {

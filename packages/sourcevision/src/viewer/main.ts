@@ -23,7 +23,7 @@ import { ValidationView } from "./views/validation.js";
 
 initTheme();
 
-const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "rex-dashboard", "prd", "token-usage", "validation"]);
+const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "rex-dashboard", "prd", "token-usage", "validation", "hench-runs"]);
 
 function getInitialView(): ViewId {
   const hash = location.hash.replace("#", "") as ViewId;
@@ -180,6 +180,11 @@ function App() {
         return h(TokenUsageView, null);
       case "validation":
         return h(ValidationView, null);
+      case "hench-runs":
+        return h("div", { class: "view-placeholder" },
+          h("h2", null, "Hench Runs"),
+          h("p", { style: "color: var(--text-dim)" }, "Execution history coming soon.")
+        );
       default:
         return null;
     }
