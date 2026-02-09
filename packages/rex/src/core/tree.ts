@@ -1,4 +1,5 @@
-import type { PRDItem } from "../schema/index.js";
+import type { PRDItem, ItemLevel } from "../schema/index.js";
+import { LEVEL_HIERARCHY } from "../schema/index.js";
 
 export interface TreeEntry {
   item: PRDItem;
@@ -36,6 +37,19 @@ export function insertChild(
 ): boolean {
   for (const entry of walkTree(items)) {
     if (entry.item.id === parentId) {
+      // Validate hierarchy: child's allowed parents must include this parent's level
+      const allowedParents = LEVEL_HIERARCHY[child.level];
+      if (allowedParents) {
+        const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
+        // If only null is allowed, this item can only be root (no parent)
+        if (allowedParentLevels.length === 0) {
+          return false;
+        }
+        if (!allowedParentLevels.includes(entry.item.level)) {
+          return false;
+        }
+      }
+
       if (!entry.item.children) {
         entry.item.children = [];
       }

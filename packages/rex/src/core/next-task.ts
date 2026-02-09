@@ -1,6 +1,7 @@
 import type { PRDItem, Priority } from "../schema/index.js";
 import type { TreeEntry } from "./tree.js";
 import { walkTree } from "./tree.js";
+import { extractKeywords, scoreMatch } from "./keywords.js";
 
 const PRIORITY_ORDER: Record<Priority, number> = {
   critical: 0,
@@ -289,4 +290,88 @@ export function explainSelection(
     traversalPath,
     skipped,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Keyword-based task matching
+// ---------------------------------------------------------------------------
+
+export interface TaskMatch {
+  item: PRDItem;
+  parents: PRDItem[];
+  score: number;
+  keywords: string[];
+}
+
+/**
+ * Extract searchable keywords from a PRD item.
+ *
+ * Combines keywords from:
+ * - Title
+ * - Acceptance criteria
+ * - Tags
+ * - Description
+ *
+ * Returns deduplicated, lowercased tokens with stop words removed.
+ */
+export function extractTaskKeywords(item: PRDItem): string[] {
+  const sources: string[] = [item.title];
+
+  if (item.acceptanceCriteria) {
+    sources.push(...item.acceptanceCriteria);
+  }
+
+  if (item.description) {
+    sources.push(item.description);
+  }
+
+  // Tags are kept as-is (already meaningful identifiers), but lowercased
+  const tagKeywords = (item.tags ?? [])
+    .map((t) => t.toLowerCase())
+    .filter((t) => t.length > 2);
+
+  const textKeywords = extractKeywords(sources.join(" "));
+
+  // Deduplicate across all sources
+  return [...new Set([...textKeywords, ...tagKeywords])];
+}
+
+/**
+ * Find tasks matching a set of search keywords.
+ *
+ * Walks the full tree and scores each item against the search keywords.
+ * Returns matching items sorted by score (descending), then by priority
+ * (critical first).
+ *
+ * @param items      - The PRD item tree.
+ * @param keywords   - Search keywords to match against.
+ * @param minScore   - Minimum score to include (default: 1).
+ * @returns Matching tasks sorted by relevance then priority.
+ */
+export function matchTasksByKeywords(
+  items: PRDItem[],
+  keywords: string[],
+  minScore = 1,
+): TaskMatch[] {
+  const matches: TaskMatch[] = [];
+
+  for (const { item, parents } of walkTree(items)) {
+    const taskKeywords = extractTaskKeywords(item);
+    const keywordsStr = taskKeywords.join(" ");
+    const score = scoreMatch(keywordsStr, keywords);
+
+    if (score >= minScore) {
+      matches.push({ item, parents, score, keywords: taskKeywords });
+    }
+  }
+
+  // Sort by score descending, then by priority (critical first)
+  matches.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    const pa = PRIORITY_ORDER[a.item.priority ?? "medium"];
+    const pb = PRIORITY_ORDER[b.item.priority ?? "medium"];
+    return pa - pb;
+  });
+
+  return matches;
 }

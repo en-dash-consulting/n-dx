@@ -19,8 +19,8 @@ export type { PRDItem, ItemStatus } from "./schema/v1.js";
 
 // ---- Core: tree utilities ---------------------------------------------------
 
-export { findItem, walkTree } from "./core/tree.js";
-export type { TreeEntry } from "./core/tree.js";
+export { findItem, walkTree, computeStats, collectAllIds } from "./core/tree.js";
+export type { TreeEntry, TreeStats } from "./core/tree.js";
 
 // ---- Core: task selection ---------------------------------------------------
 
@@ -28,7 +28,14 @@ export {
   findNextTask,
   findActionableTasks,
   collectCompletedIds,
+  extractTaskKeywords,
+  matchTasksByKeywords,
 } from "./core/next-task.js";
+export type { TaskMatch } from "./core/next-task.js";
+
+// ---- Core: keywords ---------------------------------------------------------
+
+export { extractKeywords, scoreMatch } from "./core/keywords.js";
 
 // ---- Core: timestamps -------------------------------------------------------
 

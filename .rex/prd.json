@@ -2029,10 +2029,12 @@
         {
           "id": "d9c40582-36ed-4426-862a-5dad0a402e3c",
           "title": "LLM Integration Robustness",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Improve reliability of AI-powered analysis",
           "source": "llm",
+          "startedAt": "2026-02-08T16:27:52.564Z",
+          "completedAt": "2026-02-08T16:27:52.564Z",
           "children": [
             {
               "id": "53825594-2a47-4a28-9cfd-b41960d92b3d",
@@ -2057,7 +2059,7 @@
             {
               "id": "b152ce55-8c25-45a7-b712-6d7fa9c1203e",
               "title": "Optimize scan result chunking",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Improve chunkScanResults for large analysis jobs",
               "acceptanceCriteria": [
@@ -2070,7 +2072,9 @@
                 "performance",
                 "analysis"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-08T16:23:03.957Z",
+              "completedAt": "2026-02-08T16:27:52.514Z"
             },
             {
               "id": "8d448bbb-3a2e-43e6-b7a9-2acc8fa44b38",
@@ -2223,7 +2227,7 @@
             {
               "id": "9a6d5e8e-c1c7-46ff-9d6f-976b8dbee8b9",
               "title": "Improve project context reading",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Better processing of project documentation files",
               "acceptanceCriteria": [
@@ -2870,7 +2874,7 @@
             {
               "id": "e6b015e9-7116-4a58-aa03-bbf97c0b0ad4",
               "title": "Improve findings grouping, sorting, and presentation",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Enhance grouping logic to organize findings by scope and type, with priority-based sorting and clean presentation.",
               "acceptanceCriteria": [
@@ -3088,7 +3092,7 @@
             {
               "id": "ccafa952-4145-4bdc-9731-0ebff91290d1",
               "title": "Harden tree operations and task selection",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Harden tree traversal, search, manipulation (insert/update/remove), and statistics computation for correctness and performance. Enhance next-task selection with keyword extraction for matching and priority-based sorting.",
               "acceptanceCriteria": [
@@ -3111,7 +3115,9 @@
                 "performance",
                 "task-selection"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T12:31:06.097Z",
+              "completedAt": "2026-02-09T12:39:27.948Z"
             },
             {
               "id": "cdca0347-b1a1-4de3-a5ef-bc864bdfad58",

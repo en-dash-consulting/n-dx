@@ -12,7 +12,11 @@ import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname, relative } from "node:path";
 import { walkTree } from "./tree.js";
+import { extractKeywords, scoreMatch, STOP_WORDS } from "./keywords.js";
 import type { PRDItem } from "../schema/index.js";
+
+// Re-export for backward compatibility
+export { extractKeywords, scoreMatch };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,18 +86,6 @@ const DEFAULT_TIMEOUT = 120_000;
 /** Common test file patterns — matches *.test.ts, *.spec.js, *_test.ts, etc. */
 const TEST_FILE_RE = /[._](test|spec)\.[jt]sx?$/;
 
-/** Words to ignore when matching criteria to file names. */
-const STOP_WORDS = new Set([
-  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-  "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-  "should", "may", "might", "must", "can", "could",
-  "and", "but", "or", "nor", "not", "no", "so", "if", "then",
-  "for", "in", "on", "at", "to", "of", "by", "with", "from",
-  "up", "out", "off", "over", "under", "into", "through",
-  "that", "this", "it", "its",
-  "test", "tests", "when", "each", "all", "any",
-]);
-
 // ---------------------------------------------------------------------------
 // Test file discovery
 // ---------------------------------------------------------------------------
@@ -129,33 +121,6 @@ export async function findTestFiles(dir: string): Promise<string[]> {
 
   await walk(dir);
   return results.sort();
-}
-
-/**
- * Extract matching keywords from a criterion string.
- * Returns lowercased tokens suitable for fuzzy matching against file paths.
- */
-export function extractKeywords(criterion: string): string[] {
-  return criterion
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-_]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
-}
-
-/**
- * Score how well a test file path matches a set of keywords.
- * Returns 0 for no match, higher values for better matches.
- */
-export function scoreMatch(filePath: string, keywords: string[]): number {
-  const normalized = filePath.toLowerCase().replace(/[/\\]/g, " ").replace(/[.-]/g, " ");
-  let score = 0;
-  for (const keyword of keywords) {
-    if (normalized.includes(keyword)) {
-      score += 1;
-    }
-  }
-  return score;
 }
 
 /**
