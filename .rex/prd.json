@@ -1721,7 +1721,7 @@
         {
           "id": "8a4773af-894f-4245-9bbf-7bf676abd527",
           "title": "Scan Result Processing",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Improve the quality and accuracy of code analysis",
           "source": "llm",
@@ -1841,7 +1841,7 @@
             {
               "id": "5591cc9b-d36e-45de-9647-8203ad7b6362",
               "title": "Support multi-file reasoning",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Process and combine multiple input files",
               "acceptanceCriteria": [
@@ -1855,7 +1855,9 @@
                 "processing",
                 "combination"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T15:23:55.726Z",
+              "completedAt": "2026-02-09T15:29:11.073Z"
             },
             {
               "id": "cdf959a7-803d-435b-b27b-0f2f32b66379",
@@ -2030,7 +2032,9 @@
               "startedAt": "2026-02-05T18:29:13.448Z",
               "completedAt": "2026-02-05T18:37:44.423Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-09T15:29:11.123Z",
+          "completedAt": "2026-02-09T15:29:11.123Z"
         },
         {
           "id": "d9c40582-36ed-4426-862a-5dad0a402e3c",
@@ -2923,11 +2927,12 @@
         {
           "id": "8ddf135c-6f39-4a94-bba1-83c0a2674cc7",
           "title": "Scanner Enhancements",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "description": "Improve individual scanner output quality and filtering",
           "source": "llm",
           "startedAt": "2026-02-09T15:12:52.788Z",
+          "completedAt": "2026-02-09T15:23:55.607Z",
           "children": [
             {
               "id": "e6615ff0-9b2f-4e35-bd69-51e0b06e68db",
