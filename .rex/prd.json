@@ -2523,6 +2523,7 @@
           "description": "Advanced algorithms for selecting optimal next tasks",
           "source": "llm",
           "startedAt": "2026-02-09T15:33:53.407Z",
+          "completedAt": "2026-02-09T15:42:15.466Z",
           "children": [
             {
               "id": "65c11692-f57b-463d-8e9f-79706efbd04d",
@@ -2607,8 +2608,7 @@
               "startedAt": "2026-02-05T21:01:43.806Z",
               "completedAt": "2026-02-05T21:04:38.560Z"
             }
-          ],
-          "completedAt": "2026-02-09T15:42:15.466Z"
+          ]
         },
         {
           "id": "9cb0e329-c261-4103-b544-b556d98861e8",
@@ -2810,7 +2810,7 @@
         {
           "id": "e30b964c-8f8a-4a66-82f9-58eb481eba41",
           "title": "File Inventory Enhancement",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Comprehensive file classification and metadata extraction",
           "source": "llm",
@@ -2818,7 +2818,7 @@
             {
               "id": "a89e8e90-e4a3-40f1-a966-118ab58c62a7",
               "title": "Harden file inventory classification",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Improve file language detection, role classification, and structural hashing for accurate inventory results.",
               "acceptanceCriteria": [
@@ -2833,7 +2833,9 @@
               "tags": [
                 "detectLanguage"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T15:47:51.358Z",
+              "completedAt": "2026-02-09T15:55:13.392Z"
             },
             {
               "id": "842e4e87-f444-47d0-b44c-6340f0d339ab",
@@ -2852,7 +2854,9 @@
               "startedAt": "2026-02-05T19:23:19.470Z",
               "completedAt": "2026-02-05T19:29:49.257Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-09T15:55:13.442Z",
+          "completedAt": "2026-02-09T15:55:13.442Z"
         },
         {
           "id": "97819b45-d93d-41de-98b9-330d3bf28832",
@@ -3452,17 +3456,21 @@
     {
       "id": "d47b4acc-646f-4ef8-8d43-7387fc0bb5ed",
       "title": "External Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "llm",
+      "startedAt": "2026-02-09T15:47:21.698Z",
+      "completedAt": "2026-02-09T15:47:21.698Z",
       "children": [
         {
           "id": "d92eac9c-85cc-4f70-998e-51b353990939",
           "title": "Notion Database Integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Complete mapping between PRD structure and Notion databases",
           "source": "llm",
+          "startedAt": "2026-02-09T15:47:21.681Z",
+          "completedAt": "2026-02-09T15:47:21.681Z",
           "children": [
             {
               "id": "b23b4a4a-12e0-4060-b5aa-dfc270ff0453",
@@ -3610,7 +3618,7 @@
             {
               "id": "173a90ca-cfc3-4ed5-bfc2-a28e3a95341f",
               "title": "Validate database schema",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure Notion databases have required properties with correct types",
               "acceptanceCriteria": [
@@ -3622,7 +3630,9 @@
               "tags": [
                 "validateDatabaseSchema"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T15:43:05.478Z",
+              "completedAt": "2026-02-09T15:47:21.627Z"
             },
             {
               "id": "81c39b5e-f127-416a-9bec-674eaed34f01",

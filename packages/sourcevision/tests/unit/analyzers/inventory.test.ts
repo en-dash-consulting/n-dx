@@ -35,6 +35,43 @@ describe("detectLanguage", () => {
   it("returns Other for unknown extensions", () => {
     expect(detectLanguage("data.xyz")).toBe("Other");
   });
+
+  it("maps .mts to TypeScript", () => {
+    expect(detectLanguage("src/server.mts")).toBe("TypeScript");
+  });
+
+  it("maps .cts to TypeScript", () => {
+    expect(detectLanguage("src/require.cts")).toBe("TypeScript");
+  });
+
+  it("maps .d.ts to TypeScript (via .ts extension)", () => {
+    expect(detectLanguage("src/types.d.ts")).toBe("TypeScript");
+  });
+
+  it("maps Dockerfile.dev to Dockerfile", () => {
+    expect(detectLanguage("Dockerfile.dev")).toBe("Dockerfile");
+  });
+
+  it("maps Dockerfile.prod to Dockerfile", () => {
+    expect(detectLanguage("deploy/Dockerfile.prod")).toBe("Dockerfile");
+  });
+
+  it("maps GNUmakefile to Makefile", () => {
+    expect(detectLanguage("GNUmakefile")).toBe("Makefile");
+  });
+
+  it("maps Justfile to Just", () => {
+    expect(detectLanguage("Justfile")).toBe("Just");
+  });
+
+  it("maps CMakeLists.txt to CMake", () => {
+    expect(detectLanguage("CMakeLists.txt")).toBe("CMake");
+  });
+
+  it("handles case-insensitive extensions", () => {
+    // extname returns lowercase via .toLowerCase()
+    expect(detectLanguage("README.MD")).toBe("Markdown");
+  });
 });
 
 // ── classifyRole ──────────────────────────────────────────────────────────────
@@ -74,6 +111,89 @@ describe("classifyRole", () => {
 
   it("test takes priority over source", () => {
     expect(classifyRole("src/__tests__/app.ts", "TypeScript")).toBe("test");
+  });
+
+  // ── Hardening: .env variants ──
+
+  it("classifies .env as config", () => {
+    expect(classifyRole(".env", "Other")).toBe("config");
+  });
+
+  it("classifies .env.local as config", () => {
+    expect(classifyRole(".env.local", "Other")).toBe("config");
+  });
+
+  it("classifies .env.development as config", () => {
+    expect(classifyRole(".env.development", "Other")).toBe("config");
+  });
+
+  it("classifies .env.production as config", () => {
+    expect(classifyRole(".env.production", "Other")).toBe("config");
+  });
+
+  it("classifies .env.example as config", () => {
+    expect(classifyRole(".env.example", "Other")).toBe("config");
+  });
+
+  // ── Hardening: ESM/CJS config variants ──
+
+  it("classifies vitest.config.mjs as config", () => {
+    expect(classifyRole("vitest.config.mjs", "JavaScript")).toBe("config");
+  });
+
+  it("classifies jest.config.mjs as config", () => {
+    expect(classifyRole("jest.config.mjs", "JavaScript")).toBe("config");
+  });
+
+  it("classifies eslint.config.ts as config", () => {
+    expect(classifyRole("eslint.config.ts", "TypeScript")).toBe("config");
+  });
+
+  it("classifies next.config.ts as config", () => {
+    expect(classifyRole("next.config.ts", "TypeScript")).toBe("config");
+  });
+
+  // ── Hardening: rc file CJS/MJS variants ──
+
+  it("classifies .eslintrc.cjs as config", () => {
+    expect(classifyRole(".eslintrc.cjs", "JavaScript")).toBe("config");
+  });
+
+  it("classifies .prettierrc.mjs as config", () => {
+    expect(classifyRole(".prettierrc.mjs", "JavaScript")).toBe("config");
+  });
+
+  // ── Hardening: test directory boundaries ──
+
+  it("does not misclassify test-utils as test dir", () => {
+    expect(classifyRole("src/test-utils/helpers.ts", "TypeScript")).toBe("source");
+  });
+
+  it("classifies files in exact test/ dir as test", () => {
+    expect(classifyRole("test/unit/app.ts", "TypeScript")).toBe("test");
+  });
+
+  it("classifies files in exact tests/ dir as test", () => {
+    expect(classifyRole("tests/integration/api.ts", "TypeScript")).toBe("test");
+  });
+
+  it("classifies .spec.js as test", () => {
+    expect(classifyRole("src/app.spec.js", "JavaScript")).toBe("test");
+  });
+
+  // ── Hardening: build role ──
+
+  it("classifies GitHub Actions workflow as build", () => {
+    expect(classifyRole(".github/workflows/ci.yml", "YAML")).toBe("build");
+  });
+
+  it("classifies root Makefile as config (build tool config)", () => {
+    // Makefile is in CONFIG_FILENAMES — config takes priority over build
+    expect(classifyRole("Makefile", "Makefile")).toBe("config");
+  });
+
+  it("classifies scripts dir files as build", () => {
+    expect(classifyRole("scripts/deploy.sh", "Shell")).toBe("build");
   });
 });
 

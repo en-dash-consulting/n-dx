@@ -34,6 +34,8 @@ const SKIP_DIRS = new Set([
 const EXT_TO_LANGUAGE: Record<string, string> = {
   ".ts": "TypeScript",
   ".tsx": "TypeScript",
+  ".mts": "TypeScript",
+  ".cts": "TypeScript",
   ".js": "JavaScript",
   ".jsx": "JavaScript",
   ".mjs": "JavaScript",
@@ -104,17 +106,19 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
 };
 
 export function detectLanguage(filePath: string): string {
-  const ext = extname(filePath).toLowerCase();
-  if (ext && EXT_TO_LANGUAGE[ext]) return EXT_TO_LANGUAGE[ext];
-
-  // Filename-based detection
   const name = basename(filePath);
+  const ext = extname(filePath).toLowerCase();
+
+  // Filename-based detection (more specific, checked first)
   if (name === "Makefile" || name === "GNUmakefile") return "Makefile";
   if (name === "Dockerfile" || name.startsWith("Dockerfile.")) return "Dockerfile";
   if (name === "Vagrantfile") return "Ruby";
   if (name === "Rakefile" || name === "Gemfile") return "Ruby";
   if (name === "Justfile") return "Just";
   if (name === "CMakeLists.txt" || ext === ".cmake") return "CMake";
+
+  // Extension-based detection
+  if (ext && EXT_TO_LANGUAGE[ext]) return EXT_TO_LANGUAGE[ext];
 
   return "Other";
 }
@@ -137,6 +141,7 @@ const CONFIG_FILENAMES = new Set([
   "prettier.config.js",
   "eslint.config.js",
   "eslint.config.mjs",
+  "eslint.config.ts",
   ".editorconfig",
   ".gitignore",
   ".gitattributes",
@@ -151,21 +156,38 @@ const CONFIG_FILENAMES = new Set([
   ".babelrc",
   "jest.config.js",
   "jest.config.ts",
+  "jest.config.mjs",
   "vitest.config.ts",
   "vitest.config.js",
+  "vitest.config.mjs",
   "webpack.config.js",
+  "webpack.config.ts",
   "rollup.config.js",
+  "rollup.config.mjs",
+  "rollup.config.ts",
   "vite.config.ts",
   "vite.config.js",
+  "vite.config.mjs",
   "esbuild.config.js",
+  "esbuild.config.mjs",
   "postcss.config.js",
+  "postcss.config.mjs",
+  "postcss.config.cjs",
   "tailwind.config.js",
   "tailwind.config.ts",
+  "tailwind.config.mjs",
   "next.config.js",
   "next.config.mjs",
+  "next.config.ts",
   "nuxt.config.ts",
+  "nuxt.config.js",
   "svelte.config.js",
   "astro.config.mjs",
+  "astro.config.ts",
+  "prettier.config.mjs",
+  "prettier.config.ts",
+  "babel.config.mjs",
+  "babel.config.cjs",
   "Cargo.toml",
   "Cargo.lock",
   "go.mod",
@@ -283,7 +305,9 @@ export function classifyRole(filePath: string, language: string): FileRole {
   if (
     CONFIG_FILENAMES.has(name) ||
     name.startsWith("tsconfig") ||
-    (name.startsWith(".") && (name.endsWith("rc") || name.endsWith("rc.js") || name.endsWith("rc.json") || name.endsWith("rc.yml")))
+    name === ".env" ||
+    name.startsWith(".env.") ||
+    (name.startsWith(".") && (name.endsWith("rc") || name.endsWith("rc.js") || name.endsWith("rc.json") || name.endsWith("rc.yml") || name.endsWith("rc.cjs") || name.endsWith("rc.mjs")))
   ) {
     return "config";
   }
