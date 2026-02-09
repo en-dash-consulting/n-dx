@@ -4,6 +4,7 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
+import { cascadeParentReset } from "../../core/cascade-reset.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, warn, result } from "../output.js";
@@ -450,6 +451,9 @@ async function acceptProposals(
       }
     }
   }
+
+  // Reset completed ancestors when adding under a completed parent
+  await cascadeParentReset(store, parentId);
 
   await store.appendLog({
     timestamp: new Date().toISOString(),

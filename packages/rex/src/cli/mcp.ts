@@ -11,6 +11,7 @@ import { validateTransition } from "../core/transitions.js";
 import { computeTimestampUpdates } from "../core/timestamps.js";
 import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
+import { cascadeParentReset } from "../core/cascade-reset.js";
 import { validateMove, moveItem } from "../core/move.js";
 import { verify } from "../core/verify.js";
 import { TOOL_VERSION } from "./commands/constants.js";
@@ -264,6 +265,10 @@ export async function startMcpServer(dir: string): Promise<void> {
         }
 
         await store.addItem(item, args.parentId);
+
+        // Reset completed ancestors when adding under a completed parent
+        const { resetItems } = await cascadeParentReset(store, args.parentId);
+
         await store.appendLog({
           timestamp: new Date().toISOString(),
           event: "item_added",
@@ -275,7 +280,7 @@ export async function startMcpServer(dir: string): Promise<void> {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ id, level: args.level, title: args.title }),
+              text: JSON.stringify({ id, level: args.level, title: args.title, resetItems }),
             },
           ],
         };

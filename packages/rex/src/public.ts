@@ -44,3 +44,8 @@ export { computeTimestampUpdates } from "./core/timestamps.js";
 // ---- Core: parent auto-completion -------------------------------------------
 
 export { findAutoCompletions } from "./core/parent-completion.js";
+
+// ---- Core: parent status reset ----------------------------------------------
+
+export { findParentResets } from "./core/parent-reset.js";
+export { cascadeParentReset } from "./core/cascade-reset.js";

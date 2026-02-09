@@ -5,6 +5,7 @@ import { LEVEL_HIERARCHY } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { REX_DIR } from "./constants.js";
+import { cascadeParentReset } from "../../core/cascade-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";
@@ -135,6 +136,9 @@ export async function cmdAdd(
 
   await store.addItem(item, parentId);
 
+  // Reset completed ancestors when adding under a completed parent
+  const { resetItems } = await cascadeParentReset(store, parentId);
+
   // Log the addition
   await store.appendLog({
     timestamp: new Date().toISOString(),
@@ -144,9 +148,12 @@ export async function cmdAdd(
   });
 
   if (flags.format === "json") {
-    result(JSON.stringify({ id, level: resolvedLevel, title }, null, 2));
+    result(JSON.stringify({ id, level: resolvedLevel, title, resetItems }, null, 2));
   } else {
     result(`Created ${resolvedLevel}: ${title}`);
     result(`  ID: ${id}`);
+    for (const ri of resetItems) {
+      info(`  ↺ Reset ${ri.level}: ${ri.title} (was completed)`);
+    }
   }
 }
