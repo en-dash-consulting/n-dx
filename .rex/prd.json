@@ -3074,6 +3074,8 @@
           "level": "feature",
           "description": "Improve PRD tree manipulation and navigation",
           "source": "llm",
+          "startedAt": "2026-02-09T13:45:09.477Z",
+          "completedAt": "2026-02-09T13:45:09.477Z",
           "children": [
             {
               "id": "823574a9-471e-4bc5-b4f2-daab3d9c3767",
@@ -3147,9 +3149,7 @@
               "startedAt": "2026-02-09T13:40:05.986Z",
               "completedAt": "2026-02-09T13:45:09.429Z"
             }
-          ],
-          "startedAt": "2026-02-09T13:45:09.477Z",
-          "completedAt": "2026-02-09T13:45:09.477Z"
+          ]
         },
         {
           "id": "fb8d363f-e8c3-495a-8cb9-2ac680525b3e",
@@ -3604,7 +3604,7 @@
         {
           "id": "5dd8d651-69fd-4deb-a2c0-39af061e0e9b",
           "title": "Store Architecture Enhancement",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Comprehensive store architecture with adapter support",
           "source": "llm",
@@ -3644,7 +3644,7 @@
             {
               "id": "60781b1f-d3bf-4604-a787-aba02a492339",
               "title": "Implement sync command operations",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support push, pull, and bidirectional sync operations",
               "acceptanceCriteria": [
@@ -3658,9 +3658,13 @@
               "tags": [
                 "cmdSync"
               ],
-              "source": "llm"
+              "source": "llm",
+              "startedAt": "2026-02-09T13:46:09.437Z",
+              "completedAt": "2026-02-09T13:50:55.963Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-09T13:50:56.013Z",
+          "completedAt": "2026-02-09T13:50:56.013Z"
         },
         {
           "id": "650a6619-ba5f-4e24-bb4d-6d389521c2ef",
