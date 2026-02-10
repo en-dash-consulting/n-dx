@@ -8,6 +8,8 @@ export { AnalyzePanel } from "./analyze-panel.js";
 export type { AnalyzePanelProps } from "./analyze-panel.js";
 export { BulkActions } from "./bulk-actions.js";
 export type { BulkActionsProps } from "./bulk-actions.js";
+export { MergePreview } from "./merge-preview.js";
+export type { MergePreviewProps } from "./merge-preview.js";
 export { StatusFilter, defaultStatusFilter, ALL_STATUSES, FILTER_PRESETS, activePresetKey } from "./status-filter.js";
 export type { StatusFilterProps, FilterPreset } from "./status-filter.js";
 export type {

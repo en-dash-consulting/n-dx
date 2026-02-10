@@ -16,6 +16,7 @@ const EXPECTED_TOOLS = [
   "update_task_status",
   "add_item",
   "move_item",
+  "merge_items",
   "get_item",
   "append_log",
   "sync_with_remote",

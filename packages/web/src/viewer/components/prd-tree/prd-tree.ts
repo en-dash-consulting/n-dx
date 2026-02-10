@@ -2,7 +2,8 @@
  * PRD hierarchy tree view component.
  *
  * Renders a collapsible/expandable tree of epics → features → tasks → subtasks
- * with status indicators, progress bars, and completion percentages.
+ * with status indicators, progress bars, completion percentages, and optional
+ * multi-select checkboxes for bulk operations (status update, merge).
  */
 
 import { h, Fragment, VNode } from "preact";
@@ -141,9 +142,13 @@ interface NodeRowProps {
   isSelected: boolean;
   onToggle: () => void;
   onSelect?: (item: PRDItemData) => void;
+  /** Whether the checkbox for bulk selection is checked. */
+  isBulkSelected?: boolean;
+  /** Called when the checkbox is toggled. */
+  onToggleBulkSelect?: (item: PRDItemData) => void;
 }
 
-function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect }: NodeRowProps) {
+function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect }: NodeRowProps) {
   const children = item.children ?? [];
   const stats = hasChildren ? computeBranchStats(children) : null;
   const ratio = stats ? completionRatio(stats) : 0;
@@ -151,8 +156,12 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
   const indent = depth * 24;
 
   const handleClick = (e: MouseEvent) => {
-    // If clicking the chevron area, toggle expand
     const target = e.target as HTMLElement;
+    // If clicking the checkbox or its container, don't process as row click
+    if (target.classList.contains("prd-bulk-checkbox") || target.closest(".prd-bulk-checkbox-wrapper")) {
+      return;
+    }
+    // If clicking the chevron area, toggle expand
     if (target.classList.contains("prd-chevron")) {
       if (hasChildren) onToggle();
       return;
@@ -199,10 +208,17 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
     }
   };
 
+  const handleCheckboxChange = (e: Event) => {
+    e.stopPropagation();
+    if (onToggleBulkSelect) {
+      onToggleBulkSelect(item);
+    }
+  };
+
   return h(
     "div",
     {
-      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""} prd-level-${item.level}`,
+      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""} prd-level-${item.level}`,
       style: `padding-left: ${indent + 8}px`,
       onClick: handleClick,
       role: "treeitem",
@@ -211,6 +227,19 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
       tabIndex: 0,
       onKeyDown: handleKeyDown,
     },
+    // Bulk selection checkbox
+    onToggleBulkSelect
+      ? h("span", { class: "prd-bulk-checkbox-wrapper" },
+          h("input", {
+            type: "checkbox",
+            class: "prd-bulk-checkbox",
+            checked: isBulkSelected,
+            onChange: handleCheckboxChange,
+            "aria-label": `Select ${item.title} for bulk action`,
+            onClick: (e: MouseEvent) => e.stopPropagation(),
+          }),
+        )
+      : null,
     // Chevron
     h(
       "span",
@@ -260,9 +289,11 @@ interface TreeNodesProps {
   activeStatuses: Set<ItemStatus>;
   onToggle: (id: string) => void;
   onSelectItem?: (item: PRDItemData) => void;
+  bulkSelectedIds?: Set<string>;
+  onToggleBulkSelect?: (item: PRDItemData) => void;
 }
 
-function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem }: TreeNodesProps) {
+function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -284,6 +315,8 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
             isSelected: selectedItemId === item.id,
             onToggle: () => onToggle(item.id),
             onSelect: onSelectItem,
+            isBulkSelected: bulkSelectedIds?.has(item.id),
+            onToggleBulkSelect,
           }),
           hasChildren && isOpen
             ? h(
@@ -297,6 +330,8 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
                   activeStatuses,
                   onToggle,
                   onSelectItem,
+                  bulkSelectedIds,
+                  onToggleBulkSelect,
                 }),
               )
             : null,
@@ -396,9 +431,13 @@ export interface PRDTreeProps {
   onSelectItem?: (item: PRDItemData) => void;
   /** Currently selected item ID (highlights the row). */
   selectedItemId?: string | null;
+  /** IDs of items selected for bulk operations (shows checkboxes). */
+  bulkSelectedIds?: Set<string>;
+  /** Called when a bulk-select checkbox is toggled. */
+  onToggleBulkSelect?: (item: PRDItemData) => void;
 }
 
-export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId }: PRDTreeProps) {
+export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect }: PRDTreeProps) {
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -470,6 +509,8 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, s
         activeStatuses,
         onToggle: toggle,
         onSelectItem,
+        bulkSelectedIds,
+        onToggleBulkSelect,
       }),
     ),
   );

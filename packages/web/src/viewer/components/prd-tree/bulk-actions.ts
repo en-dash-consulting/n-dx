@@ -2,7 +2,7 @@
  * Bulk actions bar for PRD items.
  *
  * Shows a floating action bar when items are selected, with options
- * to bulk-update status across multiple items.
+ * to bulk-update status across multiple items or merge/consolidate them.
  */
 
 import { h } from "preact";
@@ -18,6 +18,8 @@ export interface BulkActionsProps {
   onClearSelection: () => void;
   /** Called after a bulk action completes (to refresh data). */
   onActionComplete: () => void;
+  /** Called when user clicks "Merge" — opens merge preview panel. */
+  onMerge?: () => void;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -33,7 +35,7 @@ const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> 
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function BulkActions({ selectedIds, onClearSelection, onActionComplete }: BulkActionsProps) {
+export function BulkActions({ selectedIds, onClearSelection, onActionComplete, onMerge }: BulkActionsProps) {
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -81,6 +83,8 @@ export function BulkActions({ selectedIds, onClearSelection, onActionComplete }:
 
   if (selectedIds.size === 0) return null;
 
+  const canMerge = selectedIds.size >= 2 && onMerge;
+
   return h(
     "div",
     { class: "rex-bulk-bar" },
@@ -108,6 +112,18 @@ export function BulkActions({ selectedIds, onClearSelection, onActionComplete }:
               h("span", { class: "rex-bulk-action-label" }, opt.label),
             ),
           ),
+          // Merge button — only when 2+ items selected
+          canMerge
+            ? h("button", {
+                class: "rex-bulk-action-btn rex-bulk-merge-btn",
+                onClick: onMerge,
+                disabled: applying,
+                title: "Merge selected items into one",
+              },
+                h("span", { class: "rex-bulk-action-icon" }, "\u2A06"),
+                h("span", { class: "rex-bulk-action-label" }, "Merge"),
+              )
+            : null,
         ),
 
     // Clear selection

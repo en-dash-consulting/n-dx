@@ -3,16 +3,17 @@
  *
  * Loads PRD data from /data/prd.json (served by the unified web server)
  * or accepts it via props. Manages task selection, detail panel content,
- * add item form, and bulk actions.
+ * add item form, bulk actions, and merge preview.
  */
 
 import { h, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { PRDTree } from "../components/prd-tree/index.js";
 import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
+import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { BrandedHeader } from "../components/logos.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
 import type { DetailItem } from "../types.js";
@@ -28,7 +29,7 @@ export interface PRDViewProps {
 }
 
 /** Active tab in the command bar. */
-type CommandTab = null | "add";
+type CommandTab = null | "add" | "merge";
 
 /** Walk the tree to find an item by ID. */
 function findItemById(items: PRDItemData[], id: string): PRDItemData | null {
@@ -51,6 +52,17 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+
+  // Resolve selected items for merge preview
+  const selectedItems = useMemo(() => {
+    if (!data || bulkSelectedIds.size === 0) return [];
+    const items: PRDItemData[] = [];
+    for (const id of bulkSelectedIds) {
+      const item = findItemById(data.items, id);
+      if (item) items.push(item);
+    }
+    return items;
+  }, [data, bulkSelectedIds]);
 
   // Fetch PRD data
   const fetchPRDData = useCallback(async () => {
@@ -104,7 +116,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
     [fetchPRDData],
   );
 
-  // Handle item selection — opens detail panel
+  // Handle item selection — opens detail panel (single click)
   const handleSelectItem = useCallback(
     (item: PRDItemData) => {
       setSelectedItemId(item.id);
@@ -126,6 +138,22 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
       }
     },
     [onSelectItem],
+  );
+
+  // Handle checkbox toggle for bulk selection
+  const handleToggleBulkSelect = useCallback(
+    (item: PRDItemData) => {
+      setBulkSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(item.id)) {
+          next.delete(item.id);
+        } else {
+          next.add(item.id);
+        }
+        return next;
+      });
+    },
+    [],
   );
 
   // Navigate to a different item (from dependencies/children in the detail panel)
@@ -190,6 +218,20 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
     [fetchPRDData],
   );
 
+  // Handle merge completion
+  const handleMergeComplete = useCallback(() => {
+    setActiveTab(null);
+    setBulkSelectedIds(new Set());
+    setToast("Items merged successfully");
+    setTimeout(() => setToast(null), 3000);
+    fetchPRDData();
+  }, [fetchPRDData]);
+
+  // Open merge preview
+  const handleOpenMerge = useCallback(() => {
+    setActiveTab("merge");
+  }, []);
+
   if (loading) {
     return h("div", { class: "loading" }, "Loading PRD...");
   }
@@ -238,19 +280,31 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
         })
       : null,
 
+    // Merge preview panel
+    activeTab === "merge" && selectedItems.length >= 2
+      ? h(MergePreview, {
+          selectedItems,
+          onMergeComplete: handleMergeComplete,
+          onCancel: () => setActiveTab(null),
+        })
+      : null,
+
     // PRD tree
     h(PRDTree, {
       document: data,
       defaultExpandDepth: 2,
       onSelectItem: handleSelectItem,
       selectedItemId,
+      bulkSelectedIds,
+      onToggleBulkSelect: handleToggleBulkSelect,
     }),
 
     // Bulk actions bar (floating at bottom)
     h(BulkActions, {
       selectedIds: bulkSelectedIds,
-      onClearSelection: () => setBulkSelectedIds(new Set()),
+      onClearSelection: () => { setBulkSelectedIds(new Set()); setActiveTab(null); },
       onActionComplete: fetchPRDData,
+      onMerge: handleOpenMerge,
     }),
 
     // Toast notification

@@ -11,6 +11,7 @@
  * POST  /api/rex/items            — add a new item
  * PATCH /api/rex/items/:id        — update item fields
  * PATCH /api/rex/items/bulk       — bulk update multiple items
+ * POST  /api/rex/items/merge     — consolidate/merge sibling items
  * POST  /api/rex/analyze          — trigger analysis (scan project)
  * GET   /api/rex/proposals        — get pending proposals
  * POST  /api/rex/proposals/accept — accept pending proposals
@@ -477,6 +478,11 @@ export function handleRexRoute(
     return handleBulkUpdate(req, res, ctx, broadcast);
   }
 
+  // POST /api/rex/items/merge — consolidate/merge sibling items
+  if (path === "items/merge" && method === "POST") {
+    return handleItemMerge(req, res, ctx, broadcast);
+  }
+
   // Routes under /api/rex/items/:id
   const itemsMatch = path.match(/^items\/([^/?]+)/);
   if (itemsMatch) {
@@ -753,6 +759,348 @@ async function handleBulkUpdate(
     }
 
     jsonResponse(res, 200, { ok: true, results });
+  } catch (err) {
+    errorResponse(res, 400, String(err));
+  }
+  return true;
+}
+
+// --------------------------------------------------------------------------
+// Merge helpers — duplicated from packages/rex/src/core/merge.ts to keep
+// the web package independent of Rex at compile time.
+// @see packages/rex/src/core/merge.ts — canonical source
+// --------------------------------------------------------------------------
+
+interface MergeValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+interface TreeEntryLocal {
+  item: PRDItemRecord;
+  parentId: string | null;
+}
+
+/** Walk tree and yield items with their parent ID. */
+function* walkTreeLocal(
+  items: PRDItemRecord[],
+  parentId: string | null = null,
+): Generator<TreeEntryLocal> {
+  for (const item of items) {
+    yield { item, parentId };
+    if (Array.isArray(item.children) && item.children.length > 0) {
+      yield* walkTreeLocal(item.children, item.id);
+    }
+  }
+}
+
+/** Find an item by ID, returning it with its parent ID. */
+function findWithParent(items: PRDItemRecord[], id: string): TreeEntryLocal | null {
+  for (const entry of walkTreeLocal(items)) {
+    if (entry.item.id === id) return entry;
+  }
+  return null;
+}
+
+/** Remove an item from the tree by ID. */
+function removeItem(items: PRDItemRecord[], id: string): PRDItemRecord | null {
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].id === id) return items.splice(i, 1)[0];
+    if (Array.isArray(items[i].children)) {
+      const removed = removeItem(items[i].children!, id);
+      if (removed) return removed;
+    }
+  }
+  return null;
+}
+
+/** Validate a merge is structurally valid. */
+function validateMergeLocal(
+  items: PRDItemRecord[],
+  sourceIds: string[],
+  targetId: string,
+): MergeValidationResult {
+  if (sourceIds.length < 2) {
+    return { valid: false, error: "At least 2 items are required for a merge." };
+  }
+  if (!sourceIds.includes(targetId)) {
+    return { valid: false, error: "Target must be one of the source items." };
+  }
+
+  const parentIds: Array<string | null> = [];
+  const levels: string[] = [];
+
+  for (const id of sourceIds) {
+    const entry = findWithParent(items, id);
+    if (!entry) return { valid: false, error: `Item "${id}" not found.` };
+    parentIds.push(entry.parentId);
+    levels.push(entry.item.level);
+  }
+
+  if (!levels.every((l) => l === levels[0])) {
+    return { valid: false, error: "All items must be at the same level to merge." };
+  }
+  if (!parentIds.every((p) => p === parentIds[0])) {
+    return { valid: false, error: "All items must be siblings (same parent) to merge." };
+  }
+
+  return { valid: true };
+}
+
+/** Build a merge preview (non-destructive). */
+function buildMergePreview(
+  items: PRDItemRecord[],
+  sourceIds: string[],
+  targetId: string,
+  options?: { title?: string; description?: string },
+) {
+  const target = findItemById(items, targetId)!;
+  const absorbedIds = sourceIds.filter((id) => id !== targetId);
+
+  // Combine acceptance criteria
+  const seenCriteria = new Set<string>();
+  const allCriteria: string[] = [];
+  for (const id of [targetId, ...absorbedIds]) {
+    const item = findItemById(items, id)!;
+    for (const ac of (item.acceptanceCriteria as string[] | undefined) ?? []) {
+      if (!seenCriteria.has(ac)) { seenCriteria.add(ac); allCriteria.push(ac); }
+    }
+  }
+
+  // Combine tags
+  const allTags = new Set<string>();
+  for (const id of sourceIds) {
+    const item = findItemById(items, id)!;
+    for (const tag of (item.tags as string[] | undefined) ?? []) allTags.add(tag);
+  }
+
+  // Combine blockedBy (exclude source IDs)
+  const allBlockedBy = new Set<string>();
+  for (const id of sourceIds) {
+    const item = findItemById(items, id)!;
+    for (const dep of (item.blockedBy as string[] | undefined) ?? []) {
+      if (!sourceIds.includes(dep)) allBlockedBy.add(dep);
+    }
+  }
+
+  // Count children to reparent
+  let reparentedChildCount = 0;
+  for (const id of absorbedIds) {
+    const item = findItemById(items, id)!;
+    reparentedChildCount += (item.children ?? []).length;
+  }
+
+  // Count blockedBy references to absorbed items across the tree
+  const absorbedSet = new Set(absorbedIds);
+  let rewrittenDependencyCount = 0;
+  for (const { item } of walkTreeLocal(items)) {
+    if (sourceIds.includes(item.id)) continue;
+    if (Array.isArray(item.blockedBy)) {
+      for (const dep of item.blockedBy as string[]) {
+        if (absorbedSet.has(dep)) rewrittenDependencyCount++;
+      }
+    }
+  }
+
+  // Combine descriptions
+  let combinedDescription = options?.description;
+  if (combinedDescription === undefined) {
+    const descriptions: string[] = [];
+    for (const id of [targetId, ...absorbedIds]) {
+      const item = findItemById(items, id)!;
+      if (item.description) descriptions.push(item.description as string);
+    }
+    combinedDescription = descriptions.length > 0
+      ? descriptions.join("\n\n---\n\n")
+      : undefined;
+  }
+
+  return {
+    target: {
+      id: target.id,
+      title: options?.title ?? target.title,
+      description: combinedDescription,
+      acceptanceCriteria: allCriteria,
+      tags: [...allTags].sort(),
+      blockedBy: [...allBlockedBy],
+      childCount: (target.children ?? []).length + reparentedChildCount,
+    },
+    absorbed: absorbedIds.map((id) => {
+      const item = findItemById(items, id)!;
+      return {
+        id: item.id,
+        title: item.title,
+        level: item.level,
+        status: item.status,
+        childCount: (item.children ?? []).length,
+      };
+    }),
+    rewrittenDependencyCount,
+  };
+}
+
+/** Execute a merge in place. */
+function executeMerge(
+  items: PRDItemRecord[],
+  sourceIds: string[],
+  targetId: string,
+  options?: { title?: string; description?: string },
+) {
+  const absorbedIds = sourceIds.filter((id) => id !== targetId);
+  const absorbedSet = new Set(absorbedIds);
+  const target = findItemById(items, targetId)!;
+
+  // Title
+  if (options?.title) target.title = options.title;
+
+  // Description
+  if (options?.description !== undefined) {
+    target.description = options.description;
+  } else {
+    const descriptions: string[] = [];
+    for (const id of [targetId, ...absorbedIds]) {
+      const item = findItemById(items, id)!;
+      if (item.description) descriptions.push(item.description as string);
+    }
+    if (descriptions.length > 0) target.description = descriptions.join("\n\n---\n\n");
+  }
+
+  // Acceptance criteria (deduplicated)
+  const seenCriteria = new Set<string>();
+  const allCriteria: string[] = [];
+  for (const id of [targetId, ...absorbedIds]) {
+    const item = findItemById(items, id)!;
+    for (const ac of (item.acceptanceCriteria as string[] | undefined) ?? []) {
+      if (!seenCriteria.has(ac)) { seenCriteria.add(ac); allCriteria.push(ac); }
+    }
+  }
+  if (allCriteria.length > 0) target.acceptanceCriteria = allCriteria;
+
+  // Tags (deduplicated)
+  const allTags = new Set<string>();
+  for (const id of sourceIds) {
+    const item = findItemById(items, id)!;
+    for (const tag of (item.tags as string[] | undefined) ?? []) allTags.add(tag);
+  }
+  if (allTags.size > 0) target.tags = [...allTags].sort();
+
+  // BlockedBy (union, excluding source IDs)
+  const allBlockedBy = new Set<string>();
+  for (const id of sourceIds) {
+    const item = findItemById(items, id)!;
+    for (const dep of (item.blockedBy as string[] | undefined) ?? []) {
+      if (!sourceIds.includes(dep)) allBlockedBy.add(dep);
+    }
+  }
+  if (allBlockedBy.size > 0) {
+    target.blockedBy = [...allBlockedBy];
+  } else {
+    delete target.blockedBy;
+  }
+
+  // Reparent children
+  const reparentedChildIds: string[] = [];
+  if (!target.children) target.children = [];
+  for (const id of absorbedIds) {
+    const item = findItemById(items, id)!;
+    const children = item.children ?? [];
+    for (const child of children) reparentedChildIds.push(child.id);
+    target.children.push(...children);
+    item.children = [];
+  }
+
+  // Rewrite blockedBy references
+  let rewrittenDependencyCount = 0;
+  for (const { item } of walkTreeLocal(items)) {
+    if (Array.isArray(item.blockedBy) && (item.blockedBy as string[]).length > 0) {
+      let changed = false;
+      const newBlockedBy: string[] = [];
+      const seen = new Set<string>();
+      for (const dep of item.blockedBy as string[]) {
+        const resolved = absorbedSet.has(dep) ? targetId : dep;
+        if (dep !== resolved) { changed = true; rewrittenDependencyCount++; }
+        if (!seen.has(resolved)) { seen.add(resolved); newBlockedBy.push(resolved); }
+      }
+      if (changed) item.blockedBy = newBlockedBy;
+    }
+  }
+
+  // Remove absorbed items
+  for (const id of absorbedIds) removeItem(items, id);
+
+  return { targetId, absorbedIds, reparentedChildIds, rewrittenDependencyCount };
+}
+
+/** Handle POST /api/rex/items/merge — consolidate/merge sibling items */
+async function handleItemMerge(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const doc = loadPRD(ctx);
+  if (!doc) {
+    errorResponse(res, 404, "No PRD data found");
+    return true;
+  }
+
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as {
+      sourceIds: string[];
+      targetId: string;
+      preview?: boolean;
+      title?: string;
+      description?: string;
+    };
+
+    if (!Array.isArray(input.sourceIds) || input.sourceIds.length < 2) {
+      errorResponse(res, 400, "sourceIds must be an array of at least 2 item IDs");
+      return true;
+    }
+    if (!input.targetId || typeof input.targetId !== "string") {
+      errorResponse(res, 400, "targetId is required");
+      return true;
+    }
+
+    const validation = validateMergeLocal(doc.items, input.sourceIds, input.targetId);
+    if (!validation.valid) {
+      errorResponse(res, 400, validation.error!);
+      return true;
+    }
+
+    const options = {
+      ...(input.title ? { title: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    };
+
+    // Preview mode
+    if (input.preview) {
+      const preview = buildMergePreview(doc.items, input.sourceIds, input.targetId, options);
+      jsonResponse(res, 200, { ok: true, preview });
+      return true;
+    }
+
+    // Execute merge
+    const result = executeMerge(doc.items, input.sourceIds, input.targetId, options);
+    savePRD(ctx, doc);
+
+    // Log the merge
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "items_merged",
+      itemId: input.targetId,
+      detail: `Merged ${input.sourceIds.length} items into "${input.targetId}". Absorbed: ${result.absorbedIds.join(", ")}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency refs rewritten (via web).`,
+    });
+
+    if (broadcast) {
+      broadcast({
+        type: "rex:prd-changed",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    jsonResponse(res, 200, { ok: true, ...result });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }

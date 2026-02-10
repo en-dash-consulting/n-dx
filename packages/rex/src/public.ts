@@ -64,6 +64,11 @@ export { findAutoCompletions } from "./core/parent-completion.js";
 export { findParentResets } from "./core/parent-reset.js";
 export { cascadeParentReset } from "./core/cascade-reset.js";
 
+// ---- Core: merge/consolidation ----------------------------------------------
+
+export { validateMerge, previewMerge, mergeItems } from "./core/merge.js";
+export type { MergeOptions, MergeValidation, MergePreview, MergeResult } from "./core/merge.js";
+
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";

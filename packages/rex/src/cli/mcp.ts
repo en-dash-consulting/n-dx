@@ -13,6 +13,7 @@ import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
 import { cascadeParentReset } from "../core/cascade-reset.js";
 import { validateMove, moveItem } from "../core/move.js";
+import { validateMerge, previewMerge, mergeItems } from "../core/merge.js";
 import { verify } from "../core/verify.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
@@ -392,6 +393,88 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
                 previousParentId: result.previousParentId,
                 newParentId: result.newParentId,
               }),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${(err as Error).message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
+    "merge_items",
+    "Consolidate multiple sibling items into one, combining descriptions, acceptance criteria, and tags",
+    {
+      sourceIds: z.array(z.string()).describe("IDs of items to merge (must be siblings at the same level)"),
+      targetId: z.string().describe("ID of the item that survives (must be in sourceIds)"),
+      preview: z.boolean().optional().describe("If true, return a preview without executing the merge"),
+      title: z.string().optional().describe("New title for the merged item (default: keep target's title)"),
+      description: z.string().optional().describe("New description (default: combine all descriptions)"),
+    },
+    async ({ sourceIds, targetId, preview, title, description }) => {
+      try {
+        const doc = await store.loadDocument();
+
+        const validation = validateMerge(doc.items, sourceIds, targetId);
+        if (!validation.valid) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `${validation.error}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const options = {
+          ...(title ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
+        };
+
+        // Preview mode — return what would happen without modifying
+        if (preview) {
+          const previewResult = previewMerge(doc.items, sourceIds, targetId, options);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(previewResult, null, 2),
+              },
+            ],
+          };
+        }
+
+        // Execute the merge
+        const result = mergeItems(doc.items, sourceIds, targetId, options);
+        await store.saveDocument(doc);
+
+        // Log the merge
+        const absorbedTitles = result.absorbedIds
+          .map((id) => `"${id}"`)
+          .join(", ");
+        await store.appendLog({
+          timestamp: new Date().toISOString(),
+          event: "items_merged",
+          itemId: targetId,
+          detail: `Merged ${sourceIds.length} items into "${targetId}". Absorbed: ${absorbedTitles}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency references rewritten.`,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
