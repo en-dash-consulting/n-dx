@@ -6084,7 +6084,7 @@
     {
       "id": "1d4105c1-0d27-48a9-b5a8-6dbcf2a43b5f",
       "title": "Rex Prune & Status UX Improvements",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Two related UX improvements: (1) prune should reconsolidate remaining items after archiving completed ones, not just remove them; (2) completed items should be hidden by default in both CLI and web views so active work isn't buried.",
       "priority": "high",
@@ -6094,11 +6094,13 @@
         "prune",
         "status"
       ],
+      "startedAt": "2026-02-10T14:36:17.816Z",
+      "completedAt": "2026-02-10T14:36:17.816Z",
       "children": [
         {
           "id": "bfc28370-cb4b-42ca-9f68-2e3bf2e401ea",
           "title": "Post-prune reconsolidation via LLM reshape",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "After archiving completed subtrees, prune should run a reshape pass on remaining items to reconsolidate and regroup them into logical groupings. Currently prune just removes completed items, leaving scattered/orphaned items behind. The new behavior chains a reshape call with a consolidation-focused LLM prompt that can reparent, merge, split, and update remaining items to create a clean, well-organized PRD.",
           "acceptanceCriteria": [
@@ -6117,11 +6119,13 @@
             "prune",
             "reshape"
           ],
+          "startedAt": "2026-02-10T14:22:14.029Z",
+          "completedAt": "2026-02-10T14:22:14.029Z",
           "children": [
             {
               "id": "2a2f6c59-ba4d-41a3-84b6-a64facbed3d4",
               "title": "Chain reshape consolidation pass after prune archiving in cmdPrune",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Modify packages/rex/src/cli/commands/prune.ts to add a consolidation phase after the existing prune step. Implementation plan:\n\n1. In reshape-reason.ts, add a new POST_PRUNE_CONSOLIDATION_PROMPT constant. This prompt should instruct the LLM to analyze remaining (non-completed) PRD items and propose regrouping: reparent orphaned items under logical parent epics/features, merge similar scattered items, split overly broad items into focused children, and update stale titles/descriptions. Use the full reshape action set (merge, reparent, split, update, obsolete). The prompt should emphasize creating clean logical groupings rather than just cosmetic changes.\n\n2. In reshape-reason.ts, add a new option to ReshapeReasonOptions: `consolidateMode?: boolean`. When true, use the new consolidation prompt instead of RESHAPE_SYSTEM_PROMPT or SMART_PRUNE_PROMPT.\n\n3. In prune.ts cmdPrune function, after the existing prune-and-archive step (line ~105), add the consolidation phase:\n   - Load Claude config (same pattern as smartPrune)\n   - Call reasonForReshape(doc.items, { dir, model, consolidateMode: true })\n   - If proposals returned, show them interactively (reuse the interactive pattern from interactiveSmartPrune, or extract to shared helper)\n   - Apply accepted proposals via applyReshape()\n   - Archive any items removed during consolidation\n   - Save document and log the action\n\n4. Gate the consolidation behind behavior: always run consolidation after prune (it will be a no-op if the LLM finds nothing to consolidate). Support --no-consolidate flag to skip it. Support --accept to auto-accept consolidation proposals. In --dry-run mode, show both what would be pruned AND what consolidation proposals would be made.\n\nKey files to modify:\n- packages/rex/src/analyze/reshape-reason.ts (new prompt + consolidateMode option)\n- packages/rex/src/cli/commands/prune.ts (chain consolidation after prune)\n- packages/rex/src/cli/commands/constants.ts (update help text for prune command)",
               "acceptanceCriteria": [
@@ -6143,14 +6147,15 @@
                 "reshape",
                 "llm"
               ],
-              "startedAt": "2026-02-10T14:14:58.147Z"
+              "startedAt": "2026-02-10T14:14:58.147Z",
+              "completedAt": "2026-02-10T14:22:13.980Z"
             }
           ]
         },
         {
           "id": "41f5c040-e836-40ee-97af-ae5477fe6ae1",
           "title": "Hide completed items by default in status views",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Completed items dominate the PRD display when most work is done, burying active/new items at the bottom. Both the CLI and web UI should default to hiding completed items, with an easy way to show them when needed.",
           "acceptanceCriteria": [
@@ -6166,11 +6171,13 @@
             "status",
             "web"
           ],
+          "startedAt": "2026-02-10T14:36:17.763Z",
+          "completedAt": "2026-02-10T14:36:17.763Z",
           "children": [
             {
               "id": "2be4350b-29a7-4249-b640-3b0201f51ce1",
               "title": "Default to hiding completed items in CLI status and web PRD tree",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Two changes to default completed items to hidden:\n\n1. **CLI status** (packages/rex/src/cli/commands/status.ts):\n   - Add filtering to renderTree: before rendering, filter out items where status === \"completed\" AND all children are also completed (same logic as isFullyCompleted from core/prune.ts). Items that are completed but have non-completed children should still show (with their non-completed children visible).\n   - Add --all flag: when present, skip the filtering and show everything (current behavior).\n   - Update the stats summary line to note when completed items are hidden, e.g. \"3 pending, 2 in progress — 80% complete (showing active items, use --all for full tree)\"\n   - Update help text in constants.ts.\n\n2. **Web PRD tree** (packages/web/src/viewer/components/prd-tree/status-filter.ts):\n   - Change defaultStatusFilter() to return the \"Active Work\" set: new Set([\"pending\", \"in_progress\", \"blocked\"]) instead of the current all-except-deleted set.\n   - The existing filter UI already supports switching to \"All Items\" — no other web changes needed.\n\nKey files to modify:\n- packages/rex/src/cli/commands/status.ts (add filtering logic + --all flag)\n- packages/rex/src/cli/commands/constants.ts (update help text)\n- packages/web/src/viewer/components/prd-tree/status-filter.ts (change defaultStatusFilter return value)",
               "acceptanceCriteria": [
@@ -6189,11 +6196,65 @@
                 "cli",
                 "web",
                 "status"
-              ]
+              ],
+              "startedAt": "2026-02-10T14:22:40.011Z",
+              "completedAt": "2026-02-10T14:36:17.718Z"
             }
           ]
         }
       ]
+    },
+    {
+      "id": "f297d88f-d236-4fe6-b844-1093c014eba4",
+      "title": "Web UI Branding Consistency",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "10fc1872-82b5-4a09-9006-73e84636d06a",
+          "title": "Favicon Standardization",
+          "status": "completed",
+          "level": "feature",
+          "description": "Update all favicon implementations across the entire n-dx toolkit to use the product-F.png branding for consistency",
+          "source": "smart-add",
+          "startedAt": "2026-02-10T14:51:10.867Z",
+          "completedAt": "2026-02-10T14:51:10.867Z",
+          "children": [
+            {
+              "id": "96a88223-7a7c-46ce-8f56-e83d4c4256c5",
+              "title": "Standardize favicon implementation across all packages",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace all SVG favicon references with product-F.png across web package, sourcevision standalone viewer, and all other HTML templates in the n-dx toolkit",
+              "acceptanceCriteria": [
+                "Web dashboard displays product-F.png as favicon",
+                "Sourcevision standalone viewer displays product-F.png favicon",
+                "All HTML templates use product-F.png favicon",
+                "No SVG favicon references remain in any package",
+                "Favicon loads correctly in all major browsers",
+                "Dynamic favicon switching still works with PNG format",
+                "No inconsistent favicon implementations exist",
+                "Documentation reflects the standardized favicon approach"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "sourcevision",
+                "branding",
+                "ui",
+                "audit",
+                "consistency"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-10T14:45:05.141Z",
+              "completedAt": "2026-02-10T14:51:10.827Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-02-10T14:51:10.922Z",
+      "completedAt": "2026-02-10T14:51:10.922Z"
     }
   ]
 }

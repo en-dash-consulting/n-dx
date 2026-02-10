@@ -3,17 +3,15 @@
  * Tests for dynamic favicon management.
  *
  * Verifies that the favicon updates correctly based on the active
- * view/product section, falls back to n-dx for non-package pages,
- * and avoids redundant DOM updates.
+ * view/product section using PNG favicons, falls back to n-dx for
+ * non-package pages, and avoids redundant DOM updates.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   updateFavicon,
   resetFavicon,
-  FAVICON_URIS,
+  FAVICON_PNGS,
   VIEW_TO_PRODUCT,
-  svgToDataUri,
-  FAVICON_SVGS,
 } from "../../../src/viewer/components/favicon.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
@@ -42,58 +40,28 @@ describe("favicon", () => {
     document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((l) => l.remove());
   });
 
-  describe("svgToDataUri", () => {
-    it("converts SVG to a data URI", () => {
-      const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>';
-      const uri = svgToDataUri(svg);
-      expect(uri).toMatch(/^data:image\/svg\+xml,/);
-      expect(uri).toContain("svg");
+  describe("FAVICON_PNGS", () => {
+    it("has PNG paths for all products plus ndx", () => {
+      expect(FAVICON_PNGS).toHaveProperty("ndx");
+      expect(FAVICON_PNGS).toHaveProperty("sourcevision");
+      expect(FAVICON_PNGS).toHaveProperty("rex");
+      expect(FAVICON_PNGS).toHaveProperty("hench");
     });
 
-    it("strips whitespace from multi-line SVG", () => {
-      const svg = `<svg>
-        <rect/>
-      </svg>`;
-      const uri = svgToDataUri(svg);
-      expect(uri).not.toContain("%0A"); // no encoded newlines
-    });
-  });
-
-  describe("FAVICON_URIS", () => {
-    it("has URIs for all products plus ndx", () => {
-      expect(FAVICON_URIS).toHaveProperty("ndx");
-      expect(FAVICON_URIS).toHaveProperty("sourcevision");
-      expect(FAVICON_URIS).toHaveProperty("rex");
-      expect(FAVICON_URIS).toHaveProperty("hench");
-    });
-
-    it("all URIs are data URIs", () => {
-      for (const uri of Object.values(FAVICON_URIS)) {
-        expect(uri).toMatch(/^data:image\/svg\+xml,/);
+    it("all paths are PNG file references", () => {
+      for (const path of Object.values(FAVICON_PNGS)) {
+        expect(path).toMatch(/\.png$/);
       }
     });
 
-    it("each URI contains valid SVG content", () => {
-      for (const [key, uri] of Object.entries(FAVICON_URIS)) {
-        const decoded = decodeURIComponent(uri.replace("data:image/svg+xml,", ""));
-        expect(decoded).toContain("<svg");
-        expect(decoded).toContain("</svg>");
-      }
-    });
-  });
-
-  describe("FAVICON_SVGS", () => {
-    it("has SVGs for all products and ndx", () => {
-      expect(FAVICON_SVGS).toHaveProperty("ndx");
-      expect(FAVICON_SVGS).toHaveProperty("sourcevision");
-      expect(FAVICON_SVGS).toHaveProperty("rex");
-      expect(FAVICON_SVGS).toHaveProperty("hench");
+    it("ndx favicon points to n-dx.png", () => {
+      expect(FAVICON_PNGS.ndx).toBe("/n-dx.png");
     });
 
-    it("all SVGs include xmlns attribute", () => {
-      for (const svg of Object.values(FAVICON_SVGS)) {
-        expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
-      }
+    it("product favicons use -F.png naming convention", () => {
+      expect(FAVICON_PNGS.sourcevision).toBe("/SourceVision-F.png");
+      expect(FAVICON_PNGS.rex).toBe("/Rex-F.png");
+      expect(FAVICON_PNGS.hench).toBe("/Hench-F.png");
     });
   });
 
@@ -128,7 +96,7 @@ describe("favicon", () => {
       updateFavicon("overview");
       const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
       expect(link).not.toBeNull();
-      expect(link!.type).toBe("image/svg+xml");
+      expect(link!.type).toBe("image/png");
     });
 
     it("reuses an existing favicon link element", () => {
@@ -143,36 +111,42 @@ describe("favicon", () => {
       const allLinks = document.querySelectorAll('link[rel="icon"]');
       expect(allLinks.length).toBe(1);
       expect(allLinks[0]).toBe(existing);
-      expect(existing.type).toBe("image/svg+xml");
+      expect(existing.type).toBe("image/png");
     });
 
     it("sets sourcevision favicon for sourcevision views", () => {
       updateFavicon("overview");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.sourcevision);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
 
       updateFavicon("graph");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.sourcevision);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
 
       updateFavicon("zones");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.sourcevision);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
     });
 
     it("sets rex favicon for rex views", () => {
       updateFavicon("rex-dashboard");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.rex);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.rex);
 
       updateFavicon("prd");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.rex);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.rex);
     });
 
     it("sets hench favicon for hench views", () => {
       updateFavicon("hench-runs");
-      expect(getFaviconHref()).toBe(FAVICON_URIS.hench);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.hench);
     });
 
-    it("sets type to image/svg+xml", () => {
+    it("sets type to image/png", () => {
       updateFavicon("prd");
-      expect(getFaviconType()).toBe("image/svg+xml");
+      expect(getFaviconType()).toBe("image/png");
+    });
+
+    it("falls back to n-dx favicon for unmapped views", () => {
+      // Cast to ViewId to test fallback behavior for a view not in VIEW_TO_PRODUCT
+      updateFavicon("unknown-view" as ViewId);
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.ndx);
     });
   });
 });
