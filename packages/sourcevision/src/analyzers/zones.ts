@@ -400,6 +400,9 @@ export function computeStructureHash(zones: Zone[]): string {
  * - **Low cohesion** (<0.4): files are loosely related — consider splitting.
  * - **High coupling** (>0.5): heavy cross-zone imports — may need refactoring.
  * - **Size imbalance**: uneven zone sizes suggest decomposition issues.
+ * - **Large zone with sub-zones**: zones exceeding 35% of project files that
+ *   have been successfully subdivided get an informational insight rather than
+ *   a "consider splitting" warning — the subdivision already addresses breadth.
  * - **Hub files**: files imported across 3+ zones are cross-cutting dependencies.
  * - **Bidirectional coupling**: zone pairs that import from each other.
  *
@@ -456,9 +459,15 @@ export function generateStructuralInsights(
     }
 
     if (pct > 35) {
-      insights.push(
-        `Contains ${pct}% of project files (${zone.files.length}/${totalFiles}) — may be too broad, consider splitting`
-      );
+      if (zone.subZones && zone.subZones.length > 1) {
+        insights.push(
+          `Contains ${pct}% of project files (${zone.files.length}/${totalFiles}) — subdivided into ${zone.subZones.length} sub-zones`
+        );
+      } else {
+        insights.push(
+          `Contains ${pct}% of project files (${zone.files.length}/${totalFiles}) — may be too broad, consider splitting`
+        );
+      }
     }
 
     if (zone.entryPoints.length > 8) {
