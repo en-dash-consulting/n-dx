@@ -18,9 +18,11 @@
   ],
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "validate": "tsc --noEmit && vitest run",
     "prepare": "npm run build"
   },
   "dependencies": {

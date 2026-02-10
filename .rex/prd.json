@@ -6466,11 +6466,12 @@
     {
       "id": "de38ce2a-58b9-456b-95ac-1b73a8433528",
       "title": "Address observation issues (2 findings)",
-      "status": "pending",
+      "status": "in_progress",
       "level": "feature",
       "description": "- Size distribution reflects natural complexity: foundation (15 files), domain (~65 files each), orchestration (114 files)\n- Standardization debt exists across package exports, naming conventions, and test directory structures",
       "priority": "critical",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T18:06:56.883Z"
     },
     {
       "id": "163cb3aa-a35c-4987-ae70-1af57c393a4a",
@@ -6484,12 +6485,13 @@
     {
       "id": "1327aba8-a350-469a-bd16-23fbebbbf845",
       "title": "Address anti-pattern issues (2 findings)",
-      "status": "in_progress",
+      "status": "completed",
       "level": "feature",
       "description": "- Inconsistent public API standardization — hench exports only schema types while rex and sourcevision provide comprehensive runtime function exports\n- Configuration export inconsistency breaks consumer expectations - hench exports DEFAULT_CONFIG while rex/sourcevision hide defaults internally, forcing consumers to use different integration patterns per package",
       "priority": "critical",
       "source": "sourcevision",
-      "startedAt": "2026-02-10T17:58:52.381Z"
+      "startedAt": "2026-02-10T17:58:52.381Z",
+      "completedAt": "2026-02-10T18:06:33.870Z"
     },
     {
       "id": "b9b5f52c-51c5-44b4-b2a1-6b6df5444969",
@@ -6499,6 +6501,280 @@
       "description": "- Directory constants (REX_DIR, HENCH_DIR, SV_DIR) hardcoded with string literals instead of shared constants — creates silent drift risk when CLI and MCP implementations diverge\n- Standardize hench public API exports to match rex/sourcevision pattern by exporting runtime functions alongside schema types in src/public.ts\n- Extract hardcoded directory constants (REX_DIR, HENCH_DIR, SV_DIR) into claude-client foundation package as shared PROJECT_CONSTANTS export\n- Standardize DEFAULT_CONFIG export pattern by adding to rex and sourcevision public APIs to match hench implementation",
       "priority": "critical",
       "source": "sourcevision"
+    },
+    {
+      "id": "2c763628-bbea-40a1-91e4-65f66e5ddaf4",
+      "title": "Web UI Navigation and Branding Integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "9cf29710-2ab4-4a76-981b-c7dc729c6202",
+          "title": "Redesign header layout with integrated controls and repositioned branding",
+          "status": "pending",
+          "level": "feature",
+          "description": "Consolidate all header controls into a unified navigation experience and reposition branding elements for improved visual hierarchy",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "8e0b1f26-b8f1-40fc-808c-b06b2fe5aa39",
+              "title": "Integrate header controls and reposition branding elements",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a unified header control bar with sidebar toggle, theme toggle, and FAQ button, while moving package logo and name to right-aligned position next to page-specific FAQ button for better visual hierarchy",
+              "acceptanceCriteria": [
+                "Sidebar toggle, light mode toggle, and FAQ are grouped together in header",
+                "Controls maintain consistent visual styling and spacing",
+                "All controls remain functional after integration",
+                "Package logo and name appear right-aligned in content area header",
+                "Branding is positioned adjacent to page-specific FAQ button",
+                "Header control bar works across all viewport sizes",
+                "Layout remains responsive across different screen sizes",
+                "Visual hierarchy clearly separates global controls from page-specific elements"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "header",
+                "navigation",
+                "branding",
+                "layout"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a6dd7b7c-9e74-4626-8e27-e4aa11e771ea",
+              "title": "Implement floating FAQ button for page-specific help",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a floating FAQ button that appears in the content area header, providing contextual help for the current page/section",
+              "acceptanceCriteria": [
+                "FAQ button floats in content area header next to repositioned branding",
+                "Button provides page-specific help content based on current view",
+                "FAQ content is contextually relevant to SourceVision, Rex, or Hench sections",
+                "Button maintains consistent styling with other UI controls"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "help",
+                "floating-button"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aab3e41d-5c6e-4d79-b7c0-04c01ad9e4c8",
+      "title": "Rex Smart Operations UI Integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "07c19b0f-f2f0-40d7-a6e5-3da7354e9bbd",
+          "title": "Smart Pruning UI Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Expose Rex's smart pruning and restructuring capabilities in the web UI with visual diff and confirmation flow",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "377d0c69-c006-4324-b462-bed82d698739",
+              "title": "Add pruning interface to Rex dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a dedicated pruning section in the Rex dashboard that shows archivable items and allows users to configure pruning criteria",
+              "acceptanceCriteria": [
+                "Displays list of completed items eligible for archiving",
+                "Shows estimated storage savings from pruning",
+                "Provides pruning criteria configuration (age thresholds, completion status)",
+                "Includes dry-run mode to preview changes"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "pruning"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "277e3243-02f3-4f64-a903-4d9a0abc84e7",
+              "title": "Implement visual diff for pruning operations",
+              "status": "pending",
+              "level": "task",
+              "description": "Show before/after tree structure with highlighted changes when users initiate pruning operations",
+              "acceptanceCriteria": [
+                "Displays tree diff showing items to be archived",
+                "Highlights structural changes from reshaping consolidation",
+                "Shows impact on completion percentages and epic structure",
+                "Provides expandable detail view for each change"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "diff"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "79cf9a3f-8e1e-4454-910b-ce3043feebf2",
+              "title": "Add confirmation flow for destructive pruning operations",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement multi-step confirmation process for pruning operations with clear impact messaging",
+              "acceptanceCriteria": [
+                "Requires explicit confirmation before executing prune",
+                "Shows clear warning for irreversible operations",
+                "Displays summary of items to be affected",
+                "Provides option to backup PRD before pruning"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "safety"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "61c178cc-d07e-4f59-8f2b-7ae496a4e5e6",
+              "title": "Enhance CLI pruning with interactive mode",
+              "status": "pending",
+              "level": "task",
+              "description": "Add interactive confirmation and preview capabilities to the CLI prune command",
+              "acceptanceCriteria": [
+                "Shows interactive preview of pruning changes in CLI",
+                "Prompts for confirmation with item counts and impact",
+                "Supports --dry-run flag for safe preview",
+                "Displays progress during restructuring operations"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "cli",
+                "pruning"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "6efaf2cb-7ad8-454f-8cf7-14ff7eea6119",
+          "title": "Smart Add UI Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Integrate Rex's intelligent add functionality into the web UI with natural language input and real-time proposal generation",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
+              "title": "Create smart add interface in Rex dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Add a prominent smart add section to the Rex dashboard with natural language input field and context selection",
+              "acceptanceCriteria": [
+                "Provides large text area for natural language input",
+                "Includes context selection dropdown (epic/feature scope)",
+                "Shows real-time character count and input validation",
+                "Displays helpful examples and prompts for better input"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "smart-add"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "7e6f03b5-dcf9-4f4e-a9bb-7a69a12cb058",
+              "title": "Implement real-time proposal generation and preview",
+              "status": "pending",
+              "level": "task",
+              "description": "Generate and display LLM proposals as users type with debounced API calls and progressive enhancement",
+              "acceptanceCriteria": [
+                "Generates proposals with debounced input (500ms delay)",
+                "Shows loading states during LLM processing",
+                "Displays structured proposal preview with hierarchy",
+                "Includes confidence indicators for generated content"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "llm"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "e158fc9c-8367-452b-839e-f41d7aa176ff",
+              "title": "Add proposal review and editing interface",
+              "status": "pending",
+              "level": "task",
+              "description": "Allow users to review, edit, and selectively accept generated proposals before adding to PRD",
+              "acceptanceCriteria": [
+                "Displays proposals in editable tree structure",
+                "Allows selective acceptance of individual items",
+                "Provides inline editing for titles and descriptions",
+                "Shows validation errors for incomplete proposals"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "review"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "7316018e-0db5-460e-9554-68ec66314c62",
+              "title": "Integrate batch import functionality for multiple ideas",
+              "status": "pending",
+              "level": "task",
+              "description": "Support importing multiple ideas from various sources with unified smart processing",
+              "acceptanceCriteria": [
+                "Supports file upload for bulk idea import",
+                "Handles multiple input formats (text, markdown, JSON)",
+                "Processes each idea through smart add pipeline",
+                "Provides consolidated review interface for all proposals"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ui",
+                "import"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "58d8cb47-1df8-4387-8251-02f222021212",
+              "title": "Enhance CLI smart add with improved feedback",
+              "status": "pending",
+              "level": "task",
+              "description": "Improve the CLI smart add experience with better progress indication and proposal formatting",
+              "acceptanceCriteria": [
+                "Shows detailed progress during LLM processing",
+                "Displays formatted proposal tree in terminal",
+                "Provides better error messages for failed generations",
+                "Supports piped input with progress indication"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "cli",
+                "smart-add"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
