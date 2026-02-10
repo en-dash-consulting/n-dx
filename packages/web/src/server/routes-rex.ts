@@ -1252,6 +1252,128 @@ function estimateSubtreeBytes(item: PRDItemRecord): number {
 }
 
 // --------------------------------------------------------------------------
+// Visual diff helpers — collect IDs and compute before/after impact
+// --------------------------------------------------------------------------
+
+/** Collect all IDs from a list of subtree roots (item + all descendants). */
+function collectSubtreeIds(items: PRDItemRecord[]): Set<string> {
+  const ids = new Set<string>();
+  function walk(node: PRDItemRecord): void {
+    ids.add(node.id);
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) walk(child);
+    }
+  }
+  for (const item of items) walk(item);
+  return ids;
+}
+
+interface EpicImpactEntry {
+  id: string;
+  title: string;
+  before: { total: number; completed: number; pct: number };
+  after: { total: number; completed: number; pct: number };
+  removedCount: number;
+}
+
+/**
+ * Compute per-epic before/after completion impact from pruning.
+ *
+ * Counts tasks/subtasks (matching Rex's computeStats behavior) in the
+ * "before" tree, then simulates removal of prunable items to get "after"
+ * counts. Epics not affected by pruning are omitted.
+ */
+function computeEpicImpact(
+  items: PRDItemRecord[],
+  prunableIds: Set<string>,
+): EpicImpactEntry[] {
+  const impact: EpicImpactEntry[] = [];
+
+  for (const epic of items) {
+    if (epic.level !== "epic") continue;
+
+    // Count tasks/subtasks in the epic subtree
+    let beforeTotal = 0;
+    let beforeCompleted = 0;
+    let removedCount = 0;
+
+    function countBefore(node: PRDItemRecord): void {
+      if (node.level === "task" || node.level === "subtask") {
+        if (node.status !== "deleted") {
+          beforeTotal++;
+          if (node.status === "completed") beforeCompleted++;
+        }
+      }
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) countBefore(child);
+      }
+    }
+
+    function countRemoved(node: PRDItemRecord): void {
+      if (prunableIds.has(node.id)) {
+        // Count all tasks/subtasks in this subtree as removed
+        function countAll(n: PRDItemRecord): void {
+          if (n.level === "task" || n.level === "subtask") {
+            if (n.status !== "deleted") removedCount++;
+          }
+          if (Array.isArray(n.children)) {
+            for (const child of n.children) countAll(child);
+          }
+        }
+        countAll(node);
+      } else if (Array.isArray(node.children)) {
+        for (const child of node.children) countRemoved(child);
+      }
+    }
+
+    countBefore(epic);
+    countRemoved(epic);
+
+    if (removedCount === 0) continue;
+
+    const afterTotal = beforeTotal - removedCount;
+    // After pruning, completed count drops by however many completed tasks/subtasks were removed
+    let removedCompleted = 0;
+    function countRemovedCompleted(node: PRDItemRecord): void {
+      if (prunableIds.has(node.id)) {
+        function countComp(n: PRDItemRecord): void {
+          if ((n.level === "task" || n.level === "subtask") && n.status === "completed") {
+            removedCompleted++;
+          }
+          if (Array.isArray(n.children)) {
+            for (const child of n.children) countComp(child);
+          }
+        }
+        countComp(node);
+      } else if (Array.isArray(node.children)) {
+        for (const child of node.children) countRemovedCompleted(child);
+      }
+    }
+    countRemovedCompleted(epic);
+
+    const afterCompleted = beforeCompleted - removedCompleted;
+
+    impact.push({
+      id: epic.id,
+      title: epic.title,
+      before: {
+        total: beforeTotal,
+        completed: beforeCompleted,
+        pct: beforeTotal > 0 ? Math.round((beforeCompleted / beforeTotal) * 100) : 0,
+      },
+      after: {
+        total: afterTotal,
+        completed: afterCompleted,
+        pct: afterTotal > 0 ? Math.round((afterCompleted / afterTotal) * 100) : 0,
+      },
+      removedCount,
+    });
+  }
+
+  return impact;
+}
+
+// --------------------------------------------------------------------------
 // Archive helpers — matching structure from packages/rex/src/cli/commands/prune.ts
 // --------------------------------------------------------------------------
 
@@ -1282,7 +1404,8 @@ function loadArchiveSync(archivePath: string): PruneArchiveRecord {
  *   ?minAge=N      — minimum completion age in days (default: 0)
  *   ?statuses=a,b  — comma-separated statuses to include (default: "completed")
  *
- * Response includes storage estimation (estimatedBytes) and level breakdown.
+ * Response includes storage estimation (estimatedBytes), level breakdown,
+ * and diff data (prunableIds, epicImpact) for visual diff rendering.
  */
 function handlePrunePreview(
   req: IncomingMessage,
@@ -1328,6 +1451,12 @@ function handlePrunePreview(
   // Total PRD size for context
   const totalPrdBytes = JSON.stringify(doc).length;
 
+  // Collect all IDs in prunable subtrees (for visual diff highlighting)
+  const prunableIds = collectSubtreeIds(prunable);
+
+  // Compute per-epic impact (before/after completion stats)
+  const epicImpact = computeEpicImpact(doc.items, prunableIds);
+
   jsonResponse(res, 200, {
     ok: true,
     items: prunable.map(summarizeItem),
@@ -1340,6 +1469,9 @@ function handlePrunePreview(
       minAgeDays: criteria.minAgeDays,
       statuses: criteria.statuses,
     },
+    // Visual diff data
+    prunableIds: [...prunableIds],
+    epicImpact,
   });
   return true;
 }

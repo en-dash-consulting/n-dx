@@ -12,6 +12,8 @@ export { MergePreview } from "./merge-preview.js";
 export type { MergePreviewProps } from "./merge-preview.js";
 export { PruneConfirmation } from "./prune-confirmation.js";
 export type { PruneConfirmationProps } from "./prune-confirmation.js";
+export { PruneDiffTree } from "./prune-diff-tree.js";
+export type { PruneDiffTreeProps, EpicImpact } from "./prune-diff-tree.js";
 export { StatusFilter, defaultStatusFilter, ALL_STATUSES, FILTER_PRESETS, activePresetKey } from "./status-filter.js";
 export type { StatusFilterProps, FilterPreset } from "./status-filter.js";
 export type {

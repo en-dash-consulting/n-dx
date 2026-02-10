@@ -465,6 +465,71 @@ describe("Rex API routes", () => {
       expect(data.items).toHaveLength(1);
       expect(data.items[0].completedAt).toBe("2026-01-01T00:00:00.000Z");
     });
+
+    it("returns prunableIds for visual diff highlighting", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const data = await res.json();
+      expect(data.prunableIds).toBeDefined();
+      expect(Array.isArray(data.prunableIds)).toBe(true);
+      // task-3 is a leaf, so prunableIds should contain exactly one ID
+      expect(data.prunableIds).toContain("task-3");
+      expect(data.prunableIds).toHaveLength(1);
+    });
+
+    it("returns prunableIds with all subtree descendants", async () => {
+      // Make the entire epic fully completed so the whole subtree is prunable
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      for (const child of prd.items[0].children) {
+        child.status = "completed";
+        child.completedAt = "2026-01-01T00:00:00.000Z";
+      }
+      prd.items[0].status = "completed";
+      prd.items[0].completedAt = "2026-01-01T00:00:00.000Z";
+      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const data = await res.json();
+      // prunableIds should include epic-1 + all 3 children
+      expect(data.prunableIds).toHaveLength(4);
+      expect(data.prunableIds).toContain("epic-1");
+      expect(data.prunableIds).toContain("task-1");
+      expect(data.prunableIds).toContain("task-2");
+      expect(data.prunableIds).toContain("task-3");
+    });
+
+    it("returns epicImpact with before/after completion stats", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const data = await res.json();
+      expect(data.epicImpact).toBeDefined();
+      expect(Array.isArray(data.epicImpact)).toBe(true);
+      // epic-1 has task-3 (completed) being pruned
+      expect(data.epicImpact).toHaveLength(1);
+      const impact = data.epicImpact[0];
+      expect(impact.id).toBe("epic-1");
+      expect(impact.title).toBe("Epic One");
+      // Before: 3 tasks (task-1 in_progress, task-2 pending, task-3 completed) → 1 completed / 3 total
+      expect(impact.before.total).toBe(3);
+      expect(impact.before.completed).toBe(1);
+      expect(impact.before.pct).toBe(33);
+      // After: 2 tasks (task-1 in_progress, task-2 pending) → 0 completed / 2 total
+      expect(impact.after.total).toBe(2);
+      expect(impact.after.completed).toBe(0);
+      expect(impact.after.pct).toBe(0);
+      expect(impact.removedCount).toBe(1);
+    });
+
+    it("returns empty epicImpact when nothing is prunable", async () => {
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      for (const child of prd.items[0].children) {
+        if (child.status === "completed") child.status = "pending";
+      }
+      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const data = await res.json();
+      expect(data.epicImpact).toEqual([]);
+      expect(data.prunableIds).toEqual([]);
+    });
   });
 
   describe("POST /api/rex/prune", () => {

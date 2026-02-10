@@ -18,6 +18,8 @@
 import { h } from "preact";
 import { useState, useCallback } from "preact/hooks";
 import type { ItemLevel } from "./types.js";
+import { PruneDiffTree } from "./prune-diff-tree.js";
+import type { EpicImpact } from "./prune-diff-tree.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -49,6 +51,10 @@ interface PrunePreview {
     minAgeDays: number;
     statuses: string[];
   };
+  /** All item IDs in prunable subtrees (for visual diff highlighting). */
+  prunableIds?: string[];
+  /** Per-epic before/after completion impact. */
+  epicImpact?: EpicImpact[];
 }
 
 interface PruneResult {
@@ -130,6 +136,9 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
   // Criteria state
   const [minAgeDays, setMinAgeDays] = useState(0);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["completed"]);
+
+  // Diff view state: "list" (flat item list) or "diff" (tree diff)
+  const [previewView, setPreviewView] = useState<"list" | "diff">("diff");
 
   // Build criteria object from state
   const buildCriteria = useCallback((): PruneCriteria => ({
@@ -480,35 +489,60 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
         : null,
     ) : null,
 
-    // Prunable items list (preview step — dry-run details)
+    // Preview step — view toggle and details
     step === "preview" && preview ? h("div", { class: "prune-confirmation-items" },
-      h("h4", null, "Items to be pruned:"),
-      h("div", { class: "prune-confirmation-item-list" },
-        preview.items.map((item) =>
-          h("div", {
-            key: item.id,
-            class: "prune-confirmation-item",
-          },
-            h("span", { class: `prune-confirmation-item-icon prd-level-${item.level}` },
-              LEVEL_ICONS[item.level] ?? "\u2022",
-            ),
-            h("span", { class: "prune-confirmation-item-title" }, item.title),
-            h("span", { class: `prd-level-badge prd-level-${item.level}` },
-              LEVEL_LABELS[item.level as ItemLevel] ?? item.level,
-            ),
-            item.totalCount > 1
-              ? h("span", { class: "prune-confirmation-item-count" },
-                  `${item.totalCount} items`,
-                )
-              : null,
-            item.completedAt
-              ? h("span", { class: "prune-confirmation-item-age" },
-                  formatAge(item.completedAt),
-                )
-              : null,
-          ),
-        ),
+      // View toggle tabs
+      h("div", { class: "prune-diff-view-toggle" },
+        h("button", {
+          class: `prune-diff-view-tab${previewView === "diff" ? " active" : ""}`,
+          onClick: () => setPreviewView("diff"),
+        }, "\u{1F333} Tree Diff"),
+        h("button", {
+          class: `prune-diff-view-tab${previewView === "list" ? " active" : ""}`,
+          onClick: () => setPreviewView("list"),
+        }, "\u{1F4CB} Item List"),
       ),
+
+      // Diff tree view
+      previewView === "diff" && preview.prunableIds && preview.epicImpact
+        ? h(PruneDiffTree, {
+            prunableIds: new Set(preview.prunableIds),
+            epicImpact: preview.epicImpact,
+          })
+        : null,
+
+      // Flat list view (original)
+      previewView === "list"
+        ? h("div", null,
+            h("h4", null, "Items to be pruned:"),
+            h("div", { class: "prune-confirmation-item-list" },
+              preview.items.map((item) =>
+                h("div", {
+                  key: item.id,
+                  class: "prune-confirmation-item",
+                },
+                  h("span", { class: `prune-confirmation-item-icon prd-level-${item.level}` },
+                    LEVEL_ICONS[item.level] ?? "\u2022",
+                  ),
+                  h("span", { class: "prune-confirmation-item-title" }, item.title),
+                  h("span", { class: `prd-level-badge prd-level-${item.level}` },
+                    LEVEL_LABELS[item.level as ItemLevel] ?? item.level,
+                  ),
+                  item.totalCount > 1
+                    ? h("span", { class: "prune-confirmation-item-count" },
+                        `${item.totalCount} items`,
+                      )
+                    : null,
+                  item.completedAt
+                    ? h("span", { class: "prune-confirmation-item-age" },
+                        formatAge(item.completedAt),
+                      )
+                    : null,
+                ),
+              ),
+            ),
+          )
+        : null,
     ) : null,
 
     // Backup option (confirm step)
