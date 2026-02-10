@@ -4708,26 +4708,26 @@
     {
       "id": "e8da8d04-1016-42ae-96f4-5d94e2eb0391",
       "title": "Report Generation and Export",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-02-09T21:19:49.255Z",
-      "completedAt": "2026-02-08T15:43:45.835Z",
+      "completedAt": "2026-02-10T05:37:05.219Z",
       "children": [
         {
           "id": "7474c596-ce78-4e71-9628-c2d004a8c5c1",
           "title": "PDF Export Functionality",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Generate comprehensive PDF reports from sourcevision analysis data for sharing and documentation purposes",
           "source": "smart-add",
           "startedAt": "2026-02-09T21:19:46.867Z",
-          "completedAt": "2026-02-08T15:43:45.818Z",
+          "completedAt": "2026-02-10T05:37:05.168Z",
           "children": [
             {
               "id": "c8d334c5-f072-4260-8cad-1ce6f02b27a2",
               "title": "Implement PDF report generation for sourcevision health metrics",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a PDF export feature that compiles sourcevision analysis results into a formatted health report including file inventory, zone architecture, component catalog, and import graph insights",
               "acceptanceCriteria": [
@@ -4744,7 +4744,8 @@
                 "reporting"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-07T21:56:10.010Z"
+              "startedAt": "2026-02-07T21:56:10.010Z",
+              "completedAt": "2026-02-10T05:37:05.120Z"
             },
             {
               "id": "9aaf4ed7-577f-45ee-a812-05f46ef3f8c8",
@@ -5729,6 +5730,8 @@
         "dx",
         "server"
       ],
+      "startedAt": "2026-02-10T05:31:42.596Z",
+      "completedAt": "2026-02-10T05:31:42.596Z",
       "children": [
         {
           "id": "36e132ef-5b70-4ddd-8469-daf8be5cf497",
@@ -5838,9 +5841,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-10T05:31:42.596Z",
-      "completedAt": "2026-02-10T05:31:42.596Z"
+      ]
     },
     {
       "id": "ed4461f5-7667-4c72-bbee-f39457b951fe",
