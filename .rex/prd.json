@@ -5720,7 +5720,7 @@
     {
       "id": "e96db771-5ed0-4ba8-a70b-74a30f462f65",
       "title": "Unified server: MCP over HTTP and `ndx start`",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Replace the current stdio-only MCP setup with HTTP-served MCP endpoints, and introduce a single `ndx start` command that spins up both the web dashboard and MCP servers. Currently MCP requires manual `claude mcp add` per-server (stdio transport), and the web dashboard runs independently via `ndx web`. Goal: one command, one port, everything running — browser dashboard + MCP endpoints for any MCP client.",
       "priority": "high",
@@ -5795,7 +5795,7 @@
         {
           "id": "64fcec7c-8979-4771-bcb6-9c48edb75cad",
           "title": "`ndx start` orchestration command",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Introduce `ndx start` as the unified entrypoint that starts both the web dashboard and MCP HTTP endpoints on a single port. Supports `--background`, `stop`, `status` (extending the existing `ndx web` pattern). `ndx web` becomes an alias or is deprecated in favor of `ndx start`.",
           "priority": "high",
@@ -5803,6 +5803,8 @@
             "cli",
             "dx"
           ],
+          "startedAt": "2026-02-10T05:31:42.546Z",
+          "completedAt": "2026-02-10T05:31:42.546Z",
           "children": [
             {
               "id": "3e08d89e-3488-4220-b9c8-c5511b6c2be5",
@@ -5823,18 +5825,22 @@
             {
               "id": "16b5e4ae-b595-4ac0-9c5a-d2664336540d",
               "title": "Document MCP HTTP endpoints and update Claude Code config",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Update CLAUDE.md and README with the new `ndx start` workflow. Document how to point Claude Code at the HTTP MCP endpoints instead of stdio (e.g. `claude mcp add rex --transport http --url http://localhost:3117/mcp/rex`). Consider whether `ndx start` should auto-configure this.",
               "acceptanceCriteria": [
                 "CLAUDE.md documents `ndx start` and MCP HTTP URLs",
                 "Clear migration path from stdio to HTTP MCP"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-10T05:27:11.525Z",
+              "completedAt": "2026-02-10T05:31:42.501Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-10T05:31:42.596Z",
+      "completedAt": "2026-02-10T05:31:42.596Z"
     },
     {
       "id": "ed4461f5-7667-4c72-bbee-f39457b951fe",

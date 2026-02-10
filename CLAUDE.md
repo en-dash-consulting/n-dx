@@ -18,7 +18,7 @@ packages/
 ci.js              # CI pipeline (analysis + PRD health validation)
 cli.js             # n-dx entry point (orchestration + delegation)
 config.js          # unified config command (view/edit all package settings)
-web.js             # web dashboard orchestration (start/stop/status)
+web.js             # server orchestration: dashboard + MCP (start/stop/status)
 ```
 
 Build and test:
@@ -44,7 +44,8 @@ ndx work [dir]            # hench run (pass --task=ID, --dry-run, etc.)
 ndx status [dir]          # rex status (pass --format=json)
 ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)
 ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
-ndx web [dir]             # start dashboard (--port=N, --background, stop, status)
+ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
+ndx web [dir]             # alias for start (legacy name)
 ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
 ndx config [key] [value]  # view/edit settings (--json, --help)
 ```
@@ -79,12 +80,41 @@ sv <command> [args]               # alias for sourcevision
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers for Claude Code tool use:
+Rex and sourcevision expose MCP servers for Claude Code tool use. Two transport options are available: **HTTP** (recommended) and **stdio** (legacy).
+
+### HTTP transport (recommended)
+
+Start the unified server, then point Claude Code at the HTTP endpoints:
+
+```sh
+# 1. Start the server (dashboard + MCP on one port)
+ndx start .
+
+# 2. Add HTTP MCP servers to Claude Code
+claude mcp add --transport http rex http://localhost:3117/mcp/rex
+claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+```
+
+The server runs on port 3117 by default. If you use a custom port (`--port=N` or `web.port` in `.n-dx.json`), update the URLs accordingly.
+
+HTTP transport uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management. Sessions are created automatically on the first request and identified by the `Mcp-Session-Id` header.
+
+### stdio transport (legacy)
+
+Stdio spawns a separate process per MCP server. No `ndx start` required, but each server runs independently:
 
 ```sh
 claude mcp add rex -- node packages/rex/dist/cli/index.js mcp .
 claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp .
 ```
+
+### Migrating from stdio to HTTP
+
+1. Start the server: `ndx start --background .`
+2. Remove old stdio servers: `claude mcp remove rex && claude mcp remove sourcevision`
+3. Add HTTP servers: `claude mcp add --transport http rex http://localhost:3117/mcp/rex && claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision`
+
+Benefits of HTTP over stdio: single process, shared port with the web dashboard, session management, no per-tool process overhead.
 
 ### Rex MCP tools
 
@@ -107,11 +137,13 @@ claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp 
 ## Development Workflow
 
 1. `ndx init .` — set up all tool directories
-2. `ndx plan .` — analyze codebase, review proposals
-3. `ndx plan --accept .` — accept proposals into PRD
-4. `ndx work .` — execute next task autonomously
-5. `ndx status .` — check progress
-6. `ndx web .` — open dashboard (or `ndx web --background .` for daemon mode)
+2. `ndx start .` — start server (dashboard + MCP endpoints)
+3. `ndx plan .` — analyze codebase, review proposals
+4. `ndx plan --accept .` — accept proposals into PRD
+5. `ndx work .` — execute next task autonomously
+6. `ndx status .` — check progress
+
+Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
 
 ## Key Files
 
