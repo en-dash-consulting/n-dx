@@ -416,6 +416,21 @@ export async function cmdRun(
     }
   }
 
+  const epicByEpic = flags["epic-by-epic"] === "true";
+
+  // --epic-by-epic and --epic are mutually exclusive
+  if (epicByEpic && flags.epic) {
+    throw new CLIError(
+      "Cannot use --epic-by-epic with --epic.",
+      "Use --epic to scope to a single epic, or --epic-by-epic to process all epics sequentially.",
+    );
+  }
+
+  if (epicByEpic) {
+    await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review);
+    return;
+  }
+
   let taskId = flags.task;
 
   // Task selection: --task > interactive (TTY) > autoselect
@@ -590,4 +605,266 @@ async function runLoop(
   } finally {
     process.removeListener("SIGINT", onSignal);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Epic-by-epic execution mode (--epic-by-epic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-epic summary collected during epic-by-epic execution.
+ */
+export interface EpicRunSummary {
+  id: string;
+  title: string;
+  tasksCompleted: number;
+  tasksFailed: number;
+  /** "completed" | "no_actionable_tasks" | "skipped" | "interrupted" */
+  outcome: string;
+}
+
+/**
+ * Collect ordered list of epics that have actionable tasks.
+ * Returns all epics in PRD order, including those that are fully complete
+ * (so the caller can decide what to process).
+ */
+export async function getOrderedEpics(
+  store: PRDStore,
+): Promise<EpicScopeInfo[]> {
+  const doc = await store.loadDocument();
+  const epics = listEpics(doc.items);
+  const result: EpicScopeInfo[] = [];
+  for (const epic of epics) {
+    const scopeInfo = await getEpicScopeInfo(store, epic.id);
+    result.push(scopeInfo);
+  }
+  return result;
+}
+
+/**
+ * Run tasks across all epics sequentially. For each epic that has
+ * actionable tasks, runs tasks in a loop until the epic is complete,
+ * blocked, or interrupted, then advances to the next epic.
+ */
+async function runEpicByEpic(
+  dir: string,
+  henchDir: string,
+  rexDir: string,
+  provider: "cli" | "api",
+  dryRun: boolean,
+  model: string | undefined,
+  maxTurns: number | undefined,
+  tokenBudget: number | undefined,
+  pauseMs: number,
+  maxFailedAttempts: number,
+  review: boolean,
+): Promise<void> {
+  // Graceful shutdown via SIGINT (Ctrl-C)
+  const ac = new AbortController();
+  let stopping = false;
+
+  const onSignal = () => {
+    if (stopping) {
+      process.exit(1);
+    }
+    stopping = true;
+    ac.abort();
+    info("\nReceived interrupt — finishing current task then stopping…");
+  };
+
+  process.on("SIGINT", onSignal);
+
+  const summaries: EpicRunSummary[] = [];
+
+  try {
+    const store = await resolveStore(rexDir);
+    const allEpics = await getOrderedEpics(store);
+
+    if (allEpics.length === 0) {
+      output("No epics found in PRD.");
+      return;
+    }
+
+    // Filter to epics that need work
+    const actionableEpics = allEpics.filter((e) => !e.isComplete);
+    if (actionableEpics.length === 0) {
+      output("✓ All epics are complete.");
+      return;
+    }
+
+    info(`Epic-by-epic mode: ${actionableEpics.length} epic(s) to process\n`);
+    for (const epic of actionableEpics) {
+      const progress = `${epic.completedTasks}/${epic.totalTasks} tasks complete`;
+      info(`  • ${epic.title} — ${progress}`);
+    }
+
+    for (let epicIdx = 0; epicIdx < actionableEpics.length; epicIdx++) {
+      if (stopping) {
+        // Mark remaining epics as interrupted
+        for (let j = epicIdx; j < actionableEpics.length; j++) {
+          summaries.push({
+            id: actionableEpics[j].id,
+            title: actionableEpics[j].title,
+            tasksCompleted: 0,
+            tasksFailed: 0,
+            outcome: "interrupted",
+          });
+        }
+        break;
+      }
+
+      const epic = actionableEpics[epicIdx];
+
+      info(`\n${"═".repeat(60)}`);
+      info(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`);
+      info(`${"═".repeat(60)}`);
+
+      // Re-check epic scope (tasks may have changed from prior epic's work)
+      const freshScope = await getEpicScopeInfo(store, epic.id);
+
+      if (freshScope.isComplete) {
+        info(`✓ Epic "${epic.title}" is already complete.`);
+        summaries.push({
+          id: epic.id,
+          title: epic.title,
+          tasksCompleted: 0,
+          tasksFailed: 0,
+          outcome: "completed",
+        });
+        continue;
+      }
+
+      if (!freshScope.hasActionableTasks) {
+        info(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`);
+        summaries.push({
+          id: epic.id,
+          title: epic.title,
+          tasksCompleted: 0,
+          tasksFailed: 0,
+          outcome: "no_actionable_tasks",
+        });
+        continue;
+      }
+
+      const progress = `${freshScope.completedTasks}/${freshScope.totalTasks} tasks complete`;
+      info(`Starting: ${freshScope.actionableTasks} actionable task(s), ${progress}`);
+
+      let tasksCompleted = 0;
+      let tasksFailed = 0;
+
+      // Inner loop: run tasks within this epic
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (stopping) break;
+
+        const stuckIds = await loadStuckTaskIds(henchDir, maxFailedAttempts);
+
+        let status: string;
+        try {
+          const result = await runOne(
+            dir, henchDir, rexDir, provider,
+            undefined, // autoselect within epic
+            dryRun, model, maxTurns, tokenBudget,
+            review,
+            stuckIds,
+            epic.id,
+          );
+          status = result.status;
+        } catch (err) {
+          if (isNoTasksError(err)) {
+            // All tasks in this epic are done
+            break;
+          }
+          throw err;
+        }
+
+        if (status === "completed") {
+          tasksCompleted++;
+        } else if (status === "failed" || status === "timeout" || status === "budget_exceeded") {
+          tasksFailed++;
+        }
+
+        if (dryRun) {
+          info("\nDry run — stopping after one task.");
+          break;
+        }
+
+        // Re-check epic scope after each task
+        const updated = await getEpicScopeInfo(store, epic.id);
+        if (updated.isComplete) {
+          info(`\n✓ Epic "${epic.title}" is now complete!`);
+          break;
+        }
+        if (!updated.hasActionableTasks) {
+          info(`\n⚠ Epic "${epic.title}" has no more actionable tasks.`);
+          break;
+        }
+
+        // Pause between tasks (interruptible)
+        if (!stopping && pauseMs > 0) {
+          info(`\nPausing ${pauseMs}ms before next task...`);
+          await loopPause(pauseMs, ac.signal);
+        }
+      }
+
+      const epicOutcome = stopping ? "interrupted" : (
+        (await getEpicScopeInfo(store, epic.id)).isComplete
+          ? "completed"
+          : "no_actionable_tasks"
+      );
+
+      summaries.push({
+        id: epic.id,
+        title: epic.title,
+        tasksCompleted,
+        tasksFailed,
+        outcome: epicOutcome,
+      });
+
+      if (dryRun) break;
+
+      // Pause between epics (interruptible)
+      if (!stopping && epicIdx < actionableEpics.length - 1 && pauseMs > 0) {
+        info(`\nPausing ${pauseMs}ms before next epic...`);
+        await loopPause(pauseMs, ac.signal);
+      }
+    }
+
+    // Print final summary
+    printEpicByEpicSummary(summaries);
+  } finally {
+    process.removeListener("SIGINT", onSignal);
+  }
+}
+
+/**
+ * Print a summary table of epic-by-epic execution results.
+ */
+export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
+  info(`\n${"═".repeat(60)}`);
+  info("Epic-by-Epic Execution Summary");
+  info(`${"═".repeat(60)}`);
+
+  let totalCompleted = 0;
+  let totalFailed = 0;
+
+  for (const s of summaries) {
+    const icon =
+      s.outcome === "completed" ? "✓" :
+      s.outcome === "interrupted" ? "⊘" :
+      s.outcome === "no_actionable_tasks" ? "⚠" :
+      s.outcome === "skipped" ? "–" :
+      "?";
+
+    const stats = s.tasksCompleted > 0 || s.tasksFailed > 0
+      ? ` (${s.tasksCompleted} done, ${s.tasksFailed} failed)`
+      : "";
+
+    output(`  ${icon} ${s.title} — ${s.outcome}${stats}`);
+    totalCompleted += s.tasksCompleted;
+    totalFailed += s.tasksFailed;
+  }
+
+  const epicsDone = summaries.filter((s) => s.outcome === "completed").length;
+  output(`\nEpics: ${epicsDone}/${summaries.length} completed | Tasks: ${totalCompleted} done, ${totalFailed} failed`);
 }

@@ -290,7 +290,7 @@ Orchestration:
   init [dir]            Initialize all tools (sourcevision + rex + hench)
   plan [dir]            Analyze codebase and show PRD proposals (--guided for new projects)
   plan --accept [dir]   Analyze and accept proposals into PRD
-  work [dir]            Run next task (--task=ID, --epic=ID, --auto, --iterations=N)
+  work [dir]            Run next task (--task=ID, --epic=ID, --epic-by-epic, --auto)
   status [dir]          Show PRD status (--format=json, --since, --until)
   usage [dir]           Token usage analytics (--format=json, --group=day|week|month)
   sync [dir]            Sync local PRD with remote adapter (--push, --pull)
