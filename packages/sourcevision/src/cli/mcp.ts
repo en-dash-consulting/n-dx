@@ -1,6 +1,6 @@
 /**
  * MCP (Model Context Protocol) server for Sourcevision.
- * Exposes codebase analysis data via stdio-based MCP protocol.
+ * Exposes codebase analysis data via MCP protocol (stdio or HTTP).
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -18,7 +18,7 @@ import type {
 import { DATA_FILES } from "../schema/data-files.js";
 import { generateContext } from "../analyzers/context.js";
 import { deriveNextSteps } from "../analyzers/next-steps.js";
-import { SV_DIR } from "./commands/constants.js";
+import { SV_DIR, TOOL_VERSION } from "./commands/constants.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;
@@ -62,21 +62,30 @@ function loadData(targetDir: string): SourcevisionData {
   return data;
 }
 
-export async function startMcpServer(targetDir: string): Promise<void> {
+/**
+ * Create a configured Sourcevision MCP server without connecting a transport.
+ *
+ * Returns the McpServer instance with all tools and resources registered.
+ * The caller is responsible for connecting a transport (stdio, HTTP, etc.):
+ *
+ * ```ts
+ * // Stdio (CLI usage)
+ * const server = await createSourcevisionMcpServer(dir);
+ * await server.connect(new StdioServerTransport());
+ *
+ * // HTTP (web server usage)
+ * const server = await createSourcevisionMcpServer(dir);
+ * const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
+ * await server.connect(transport);
+ * ```
+ */
+export function createSourcevisionMcpServer(targetDir: string): McpServer {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, SV_DIR);
-
-  if (!existsSync(svDir)) {
-    console.error(`No .sourcevision/ directory found in: ${absDir}`);
-    console.error("Run 'sourcevision analyze' first.");
-    process.exit(1);
-  }
-
   const data = loadData(absDir);
 
   const server = new McpServer({
     name: "sourcevision",
-    version: "0.1.0",
+    version: TOOL_VERSION,
   });
 
   // ── Tools ──────────────────────────────────────────────────────────────
@@ -373,8 +382,26 @@ export async function startMcpServer(targetDir: string): Promise<void> {
     }
   );
 
-  // ── Start ──────────────────────────────────────────────────────────────
+  return server;
+}
 
+/**
+ * Start the Sourcevision MCP server over stdio (for `sv mcp <dir>` CLI command).
+ *
+ * This is the original entry point preserved for backward compatibility.
+ * For HTTP or other transports, use {@link createSourcevisionMcpServer} instead.
+ */
+export async function startMcpServer(targetDir: string): Promise<void> {
+  const absDir = resolve(targetDir);
+  const svDir = join(absDir, SV_DIR);
+
+  if (!existsSync(svDir)) {
+    console.error(`No .sourcevision/ directory found in: ${absDir}`);
+    console.error("Run 'sourcevision analyze' first.");
+    process.exit(1);
+  }
+
+  const server = createSourcevisionMcpServer(absDir);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
