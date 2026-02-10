@@ -6080,6 +6080,120 @@
       "source": "sourcevision",
       "startedAt": "2026-02-10T05:02:21.023Z",
       "completedAt": "2026-02-10T05:06:37.050Z"
+    },
+    {
+      "id": "1d4105c1-0d27-48a9-b5a8-6dbcf2a43b5f",
+      "title": "Rex Prune & Status UX Improvements",
+      "status": "pending",
+      "level": "epic",
+      "description": "Two related UX improvements: (1) prune should reconsolidate remaining items after archiving completed ones, not just remove them; (2) completed items should be hidden by default in both CLI and web views so active work isn't buried.",
+      "priority": "high",
+      "tags": [
+        "rex",
+        "ux",
+        "prune",
+        "status"
+      ],
+      "children": [
+        {
+          "id": "bfc28370-cb4b-42ca-9f68-2e3bf2e401ea",
+          "title": "Post-prune reconsolidation via LLM reshape",
+          "status": "pending",
+          "level": "feature",
+          "description": "After archiving completed subtrees, prune should run a reshape pass on remaining items to reconsolidate and regroup them into logical groupings. Currently prune just removes completed items, leaving scattered/orphaned items behind. The new behavior chains a reshape call with a consolidation-focused LLM prompt that can reparent, merge, split, and update remaining items to create a clean, well-organized PRD.",
+          "acceptanceCriteria": [
+            "rex prune archives completed subtrees (existing behavior preserved)",
+            "After archiving, a reshape pass runs on remaining items using a new consolidation-focused prompt",
+            "The consolidation prompt instructs the LLM to: regroup orphaned items under logical parents, merge similar remaining items, reparent misplaced items, and split overly broad items",
+            "Interactive UX: proposals shown to user with y/n/a/q prompts (reuse existing interactive pattern from smartPrune)",
+            "Supports --accept flag to auto-accept all consolidation proposals",
+            "Supports --dry-run to preview both prune targets and consolidation proposals without changes",
+            "New prompt added to reshape-reason.ts as POST_PRUNE_CONSOLIDATION_PROMPT",
+            "Consolidation proposals use full reshape action set (merge, reparent, split, update, obsolete) not just the limited prune subset"
+          ],
+          "priority": "high",
+          "tags": [
+            "rex",
+            "prune",
+            "reshape"
+          ],
+          "children": [
+            {
+              "id": "2a2f6c59-ba4d-41a3-84b6-a64facbed3d4",
+              "title": "Chain reshape consolidation pass after prune archiving in cmdPrune",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Modify packages/rex/src/cli/commands/prune.ts to add a consolidation phase after the existing prune step. Implementation plan:\n\n1. In reshape-reason.ts, add a new POST_PRUNE_CONSOLIDATION_PROMPT constant. This prompt should instruct the LLM to analyze remaining (non-completed) PRD items and propose regrouping: reparent orphaned items under logical parent epics/features, merge similar scattered items, split overly broad items into focused children, and update stale titles/descriptions. Use the full reshape action set (merge, reparent, split, update, obsolete). The prompt should emphasize creating clean logical groupings rather than just cosmetic changes.\n\n2. In reshape-reason.ts, add a new option to ReshapeReasonOptions: `consolidateMode?: boolean`. When true, use the new consolidation prompt instead of RESHAPE_SYSTEM_PROMPT or SMART_PRUNE_PROMPT.\n\n3. In prune.ts cmdPrune function, after the existing prune-and-archive step (line ~105), add the consolidation phase:\n   - Load Claude config (same pattern as smartPrune)\n   - Call reasonForReshape(doc.items, { dir, model, consolidateMode: true })\n   - If proposals returned, show them interactively (reuse the interactive pattern from interactiveSmartPrune, or extract to shared helper)\n   - Apply accepted proposals via applyReshape()\n   - Archive any items removed during consolidation\n   - Save document and log the action\n\n4. Gate the consolidation behind behavior: always run consolidation after prune (it will be a no-op if the LLM finds nothing to consolidate). Support --no-consolidate flag to skip it. Support --accept to auto-accept consolidation proposals. In --dry-run mode, show both what would be pruned AND what consolidation proposals would be made.\n\nKey files to modify:\n- packages/rex/src/analyze/reshape-reason.ts (new prompt + consolidateMode option)\n- packages/rex/src/cli/commands/prune.ts (chain consolidation after prune)\n- packages/rex/src/cli/commands/constants.ts (update help text for prune command)",
+              "acceptanceCriteria": [
+                "POST_PRUNE_CONSOLIDATION_PROMPT exists in reshape-reason.ts with clear instructions for regrouping remaining items",
+                "consolidateMode option added to ReshapeReasonOptions and wired through reasonForReshape",
+                "cmdPrune chains consolidation after archiving completed items",
+                "Interactive proposal acceptance works (y/n/a/q pattern)",
+                "--accept auto-accepts consolidation proposals",
+                "--dry-run previews both prune targets and consolidation proposals",
+                "--no-consolidate flag skips the reshape pass",
+                "Help text in constants.ts updated to reflect new prune behavior",
+                "All existing prune tests still pass",
+                "Consolidation uses full reshape action set (merge, reparent, split, update, obsolete)"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "prune",
+                "reshape",
+                "llm"
+              ],
+              "startedAt": "2026-02-10T14:14:58.147Z"
+            }
+          ]
+        },
+        {
+          "id": "41f5c040-e836-40ee-97af-ae5477fe6ae1",
+          "title": "Hide completed items by default in status views",
+          "status": "pending",
+          "level": "feature",
+          "description": "Completed items dominate the PRD display when most work is done, burying active/new items at the bottom. Both the CLI and web UI should default to hiding completed items, with an easy way to show them when needed.",
+          "acceptanceCriteria": [
+            "CLI rex status hides completed items by default",
+            "CLI rex status --all shows all items including completed",
+            "Web PRD tree defaults to Active Work filter (pending, in_progress, blocked)",
+            "Users can still manually switch to All Items filter in the web UI"
+          ],
+          "priority": "high",
+          "tags": [
+            "rex",
+            "ux",
+            "status",
+            "web"
+          ],
+          "children": [
+            {
+              "id": "2be4350b-29a7-4249-b640-3b0201f51ce1",
+              "title": "Default to hiding completed items in CLI status and web PRD tree",
+              "status": "pending",
+              "level": "task",
+              "description": "Two changes to default completed items to hidden:\n\n1. **CLI status** (packages/rex/src/cli/commands/status.ts):\n   - Add filtering to renderTree: before rendering, filter out items where status === \"completed\" AND all children are also completed (same logic as isFullyCompleted from core/prune.ts). Items that are completed but have non-completed children should still show (with their non-completed children visible).\n   - Add --all flag: when present, skip the filtering and show everything (current behavior).\n   - Update the stats summary line to note when completed items are hidden, e.g. \"3 pending, 2 in progress — 80% complete (showing active items, use --all for full tree)\"\n   - Update help text in constants.ts.\n\n2. **Web PRD tree** (packages/web/src/viewer/components/prd-tree/status-filter.ts):\n   - Change defaultStatusFilter() to return the \"Active Work\" set: new Set([\"pending\", \"in_progress\", \"blocked\"]) instead of the current all-except-deleted set.\n   - The existing filter UI already supports switching to \"All Items\" — no other web changes needed.\n\nKey files to modify:\n- packages/rex/src/cli/commands/status.ts (add filtering logic + --all flag)\n- packages/rex/src/cli/commands/constants.ts (update help text)\n- packages/web/src/viewer/components/prd-tree/status-filter.ts (change defaultStatusFilter return value)",
+              "acceptanceCriteria": [
+                "renderTree in status.ts filters out fully-completed subtrees by default",
+                "Items with mixed children (some completed, some not) still show with non-completed children",
+                "--all flag shows all items including completed (preserves current behavior)",
+                "Stats summary indicates when completed items are hidden",
+                "Help text updated in constants.ts for new --all flag",
+                "defaultStatusFilter() in status-filter.ts returns Active Work set by default",
+                "Web UI filter presets still work correctly with new default",
+                "All existing tests pass"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "cli",
+                "web",
+                "status"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }
