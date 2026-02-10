@@ -53,6 +53,8 @@ import { deduplicateFindings } from "./enrich-parsing.js";
 export interface AnalyzeZonesResult {
   zones: Zones;
   tokenUsage?: AnalyzeTokenUsage;
+  /** True when zone structure changed and enrichment pass was reset to 1 */
+  structureChanged: boolean;
 }
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
@@ -1116,5 +1118,6 @@ export async function analyzeZones(
       zoneContentHashes,
     }),
     tokenUsage: enrichTokenUsage,
+    structureChanged,
   };
 }

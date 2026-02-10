@@ -190,9 +190,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
       }
 
       if (enrich) {
-        const prevPass = previousZones?.enrichmentPass ?? 0;
         const modeLabel = perZone ? " (per-zone mode)" : "";
-        info(`  Enriching zones (pass ${prevPass + 1})${modeLabel}...`);
+        info(`  Enriching zones${modeLabel}...`);
       } else {
         info("  Structural analysis only (skipping AI enrichment)");
       }
@@ -211,6 +210,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
         let zonesResult = await analyzeZones(inventory, importsData, { enrich, previousZones, perZone, subAnalyses });
         let zones = zonesResult.zones;
+
+        // Show actual pass number after analysis completes (avoids showing stale pass on structure reset)
+        if (enrich && zonesResult.structureChanged && previousZones?.enrichmentPass) {
+          info(`  Structure changed — reset from pass ${previousZones.enrichmentPass} to pass ${zones.enrichmentPass ?? 1}`);
+        }
         if (zonesResult.tokenUsage) {
           accumulateFromAggregate(tokenUsage, zonesResult.tokenUsage);
         }
