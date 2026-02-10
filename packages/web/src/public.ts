@@ -8,5 +8,5 @@
 
 export { startServer } from "./server/start.js";
 export type { ServerOptions } from "./server/start.js";
-export type { ServerContext, RouteHandler } from "./server/types.js";
+export type { ServerContext, RouteHandler, ViewerScope } from "./server/types.js";
 export type { WebSocketBroadcaster } from "./server/websocket.js";

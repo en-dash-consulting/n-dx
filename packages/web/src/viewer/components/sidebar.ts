@@ -16,6 +16,8 @@ interface SidebarProps {
   zones: Zones | null;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  /** When set, restricts sidebar to a single package section. */
+  scope?: string | null;
 }
 
 type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number };
@@ -95,9 +97,18 @@ for (const section of SECTIONS) {
 }
 
 
-export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar }: SidebarProps) {
+export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar, scope }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string>(() => getInitialExpanded(view));
+
+  /** Sections filtered by scope — when scoped, show only the matching section. */
+  const visibleSections = useMemo(() => {
+    if (!scope) return SECTIONS;
+    return SECTIONS.filter((s) => s.product === scope);
+  }, [scope]);
+
+  const [expandedSection, setExpandedSection] = useState<string>(() =>
+    scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)
+  );
 
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -179,24 +190,27 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     // ── Collapsed rail: visible only when sidebar is collapsed (desktop) ──
     sidebarCollapsed
       ? h("div", { class: "sidebar-rail", "aria-label": "Collapsed navigation" },
-          // n-dx logo
+          // Logo — scoped: product logo, unscoped: n-dx logo
           h("div", {
             class: "sidebar-rail-logo",
-            onClick: () => handleNav("overview"),
+            onClick: () => handleNav(visibleSections[0]?.items[0]?.id ?? "overview"),
             role: "button",
             tabIndex: 0,
-            title: "n-dx \u2014 Overview",
-            "aria-label": "Go to Overview",
+            title: scope ? `${scope} \u2014 Home` : "n-dx \u2014 Overview",
+            "aria-label": scope ? `Go to ${scope} home` : "Go to Overview",
             onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleNav("overview"); }
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleNav(visibleSections[0]?.items[0]?.id ?? "overview"); }
             },
-          }, h(NdxLogoPng, { size: 48 })),
+          }, scope
+            ? h(ProductLogoPng, { product: scope as "sourcevision" | "rex" | "hench", size: 48 })
+            : h(NdxLogoPng, { size: 48 }),
+          ),
 
           h("div", { class: "sidebar-rail-divider", "aria-hidden": "true" }),
 
           // Section icons
           h("nav", { class: "sidebar-rail-nav", "aria-label": "Section navigation" },
-            SECTIONS.filter((s) => s.product).map((section) => {
+            visibleSections.filter((s) => s.product).map((section) => {
               const product = section.product!;
               const isActive = activeProduct === product;
               const defaultView = SECTION_DEFAULT_VIEW[product];
@@ -246,10 +260,14 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
 
     h("div", { class: "sidebar-header" },
       h("div", { class: "sidebar-brand" },
-        h(NdxLogoPng, { size: 36, class: "sidebar-logo" }),
+        scope
+          ? h(ProductLogoPng, { product: scope as "sourcevision" | "rex" | "hench", size: 36, class: "sidebar-logo" })
+          : h(NdxLogoPng, { size: 36, class: "sidebar-logo" }),
         h("div", { class: "sidebar-brand-text" },
-          h("h1", null, "n-dx"),
-          h("div", { class: "sidebar-subtitle" }, "Developer Experience,", h("br", null), "by En Dash"),
+          h("h1", null, scope ?? "n-dx"),
+          scope
+            ? h("div", { class: "sidebar-subtitle" }, "standalone viewer")
+            : h("div", { class: "sidebar-subtitle" }, "Developer Experience,", h("br", null), "by En Dash"),
         ),
       ),
       h("button", {
@@ -260,7 +278,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
       }, mobileOpen ? "\u2715" : "\u2630")
     ),
     h("nav", { class: "sidebar-nav", "aria-label": "View navigation" },
-      SECTIONS.map((section) => {
+      visibleSections.map((section) => {
         const isExpanded = expandedSection === section.label;
         return h("div", { key: section.label, class: "nav-section" },
           // Section header (clickable)

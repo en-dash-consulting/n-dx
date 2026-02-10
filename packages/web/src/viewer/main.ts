@@ -1,6 +1,6 @@
 import { h, render, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { LoadedData, ViewId, NavigateTo, DetailItem } from "./types.js";
 import { loadFromServer, loadFromFiles, detectMode, onDataChange, startPolling, stopPolling } from "./loader.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
@@ -25,11 +25,36 @@ import { HenchRunsView } from "./views/hench-runs.js";
 
 initTheme();
 
-const VALID_VIEWS = new Set<ViewId>(["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions", "rex-dashboard", "prd", "rex-analysis", "token-usage", "validation", "hench-runs"]);
+/** All known views grouped by product scope. */
+const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
+  sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
+  rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation"],
+  hench: ["hench-runs"],
+};
 
-function getInitialView(): ViewId {
+const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
+
+/** Build the valid view set based on an optional scope. */
+function buildValidViews(scope: string | null): Set<ViewId> {
+  if (!scope) return ALL_VIEWS;
+  return new Set<ViewId>((VIEWS_BY_SCOPE[scope] ?? []) as ViewId[]);
+}
+
+/** Fetch viewer scope from the server config endpoint. */
+async function fetchScope(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/config");
+    if (!res.ok) return null;
+    const config: { scope?: string | null } = await res.json();
+    return config.scope ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getInitialView(validViews: Set<ViewId>): ViewId {
   const hash = location.hash.replace("#", "") as ViewId;
-  return VALID_VIEWS.has(hash) ? hash : "overview";
+  return validViews.has(hash) ? hash : validViews.values().next().value as ViewId;
 }
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
@@ -42,8 +67,9 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
-function App() {
-  const [view, setView] = useState<ViewId>(getInitialView);
+function App({ scope }: { scope: string | null }) {
+  const validViews = useMemo(() => buildValidViews(scope), [scope]);
+  const [view, setView] = useState<ViewId>(() => getInitialView(validViews));
   const [data, setData] = useState<LoadedData>({
     manifest: null,
     inventory: null,
@@ -98,7 +124,7 @@ function App() {
     const handlePopState = (e: PopStateEvent) => {
       if (e.state) {
         const s = e.state as { view?: string; file?: string | null; zone?: string | null };
-        if (s.view && VALID_VIEWS.has(s.view as ViewId)) {
+        if (s.view && validViews.has(s.view as ViewId)) {
           setView(s.view as ViewId);
           setSelectedFile(s.file ?? null);
           setSelectedZone(s.zone ?? null);
@@ -107,7 +133,7 @@ function App() {
         // Handle history entries created by direct hash assignment (e.g. window.location.hash = "#prd")
         // These entries have no state object, so parse the hash from the URL
         const hash = location.hash.replace("#", "") as ViewId;
-        if (VALID_VIEWS.has(hash)) {
+        if (validViews.has(hash)) {
           setView(hash);
           setSelectedFile(null);
           setSelectedZone(null);
@@ -122,7 +148,7 @@ function App() {
     // hashchange fires when the hash is set directly but popstate does not.
     const handleHashChange = () => {
       const hash = location.hash.replace("#", "") as ViewId;
-      if (VALID_VIEWS.has(hash)) {
+      if (validViews.has(hash)) {
         setView(hash);
         setSelectedFile(null);
         setSelectedZone(null);
@@ -238,7 +264,7 @@ function App() {
 
   return h(Fragment, null,
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
-    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar }),
+    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
     h("main", {
       id: "main-content",
       class: "main",
@@ -269,5 +295,8 @@ function App() {
 
 const root = document.getElementById("app");
 if (root) {
-  render(h(App, null), root);
+  // Fetch scope before first render to avoid flash of unscoped content
+  fetchScope().then((scope) => {
+    render(h(App, { scope }), root);
+  });
 }

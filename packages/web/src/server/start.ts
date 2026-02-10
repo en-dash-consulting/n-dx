@@ -5,7 +5,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, watch } from "node:fs";
 import { resolve, join, dirname } from "node:path";
-import type { ServerContext } from "./types.js";
+import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute } from "./routes-rex.js";
@@ -18,6 +18,8 @@ import { ALL_DATA_FILES } from "../schema/data-files.js";
 
 export interface ServerOptions {
   dev?: boolean;
+  /** Restrict dashboard to a single package's views and APIs. */
+  scope?: ViewerScope;
 }
 
 export function startServer(
@@ -29,8 +31,12 @@ export function startServer(
   const svDir = join(absDir, ".sourcevision");
   const rexDir = join(absDir, ".rex");
   const dev = opts.dev ?? false;
+  const scope = opts.scope;
 
-  if (!existsSync(svDir)) {
+  // Helper: is this package in scope?
+  const inScope = (pkg: ViewerScope): boolean => !scope || scope === pkg;
+
+  if (inScope("sourcevision") && !existsSync(svDir)) {
     console.error(`No .sourcevision/ directory found in: ${absDir}`);
     console.error("Run 'sourcevision analyze' first.");
     process.exit(1);
@@ -44,7 +50,7 @@ export function startServer(
   }
 
   // Create server context
-  const ctx: ServerContext = { projectDir: absDir, svDir, rexDir, dev };
+  const ctx: ServerContext = { projectDir: absDir, svDir, rexDir, dev, scope };
 
   // Set up data watcher for live-reload
   const watcher = createDataWatcher(ctx, assets.viewerPath);
@@ -53,24 +59,26 @@ export function startServer(
   const ws = createWebSocketManager();
 
   // Watch .sourcevision/ for changes
-  try {
-    watch(svDir, (_eventType, filename) => {
-      if (filename && (ALL_DATA_FILES as readonly string[]).includes(filename)) {
-        watcher.refresh();
-        // Broadcast file-change event over WebSocket
-        ws.broadcast({
-          type: "sv:data-changed",
-          file: filename,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    });
-  } catch {
-    // fs.watch may not be supported everywhere
+  if (inScope("sourcevision") && existsSync(svDir)) {
+    try {
+      watch(svDir, (_eventType, filename) => {
+        if (filename && (ALL_DATA_FILES as readonly string[]).includes(filename)) {
+          watcher.refresh();
+          // Broadcast file-change event over WebSocket
+          ws.broadcast({
+            type: "sv:data-changed",
+            file: filename,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
+    } catch {
+      // fs.watch may not be supported everywhere
+    }
   }
 
   // Watch .rex/ for prd.json changes
-  if (existsSync(rexDir)) {
+  if (inScope("rex") && existsSync(rexDir)) {
     try {
       watch(rexDir, (_eventType, filename) => {
         if (filename === "prd.json") {
@@ -88,7 +96,7 @@ export function startServer(
 
   // Watch .hench/runs/ for run file changes
   const henchRunsDir = join(absDir, ".hench", "runs");
-  if (existsSync(henchRunsDir)) {
+  if (inScope("hench") && existsSync(henchRunsDir)) {
     try {
       watch(henchRunsDir, (_eventType, filename) => {
         if (filename && filename.endsWith(".json")) {
@@ -131,26 +139,35 @@ export function startServer(
       return;
     }
 
-    // Try each route handler in order
-    // 1. Sourcevision API
-    if (handleSourcevisionRoute(req, res, ctx)) return;
-
-    // 2. Rex API
-    const rexResult = handleRexRoute(req, res, ctx, ws.broadcast);
-    if (rexResult instanceof Promise) {
-      if (await rexResult) return;
-    } else if (rexResult) {
+    // Viewer config endpoint — exposes scope to the client
+    if ((req.url === "/api/config") && (req.method || "GET") === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+      res.end(JSON.stringify({ scope: scope ?? null }));
       return;
     }
 
+    // Try each route handler in order
+    // 1. Sourcevision API
+    if (inScope("sourcevision") && handleSourcevisionRoute(req, res, ctx)) return;
+
+    // 2. Rex API
+    if (inScope("rex")) {
+      const rexResult = handleRexRoute(req, res, ctx, ws.broadcast);
+      if (rexResult instanceof Promise) {
+        if (await rexResult) return;
+      } else if (rexResult) {
+        return;
+      }
+    }
+
     // 3. Hench API
-    if (handleHenchRoute(req, res, ctx)) return;
+    if (inScope("hench") && handleHenchRoute(req, res, ctx)) return;
 
-    // 4. Validation & dependency graph API
-    if (handleValidationRoute(req, res, ctx)) return;
+    // 4. Validation & dependency graph API (rex-related)
+    if (inScope("rex") && handleValidationRoute(req, res, ctx)) return;
 
-    // 5. Token usage API
-    if (handleTokenUsageRoute(req, res, ctx)) return;
+    // 5. Token usage API (cross-cutting, but lives in rex section)
+    if (inScope("rex") && handleTokenUsageRoute(req, res, ctx)) return;
 
     // 6. Data files (existing /data/* routes for backward compatibility)
     if (handleDataRoute(req, res, ctx, watcher)) return;
@@ -169,15 +186,19 @@ export function startServer(
   });
 
   server.listen(port, () => {
-    console.log(`n-dx dashboard running at http://localhost:${port}`);
-    console.log(`Serving data from: ${svDir}`);
-    if (existsSync(rexDir)) {
+    const label = scope ? `${scope} viewer` : "n-dx dashboard";
+    console.log(`${label} running at http://localhost:${port}`);
+    if (inScope("sourcevision")) {
+      console.log(`Serving data from: ${svDir}`);
+    }
+    if (inScope("rex") && existsSync(rexDir)) {
       console.log(`Rex PRD data from: ${rexDir}`);
     }
-    if (existsSync(henchRunsDir)) {
+    if (inScope("hench") && existsSync(henchRunsDir)) {
       console.log(`Hench runs from: ${henchRunsDir}`);
     }
     console.log(`WebSocket available at ws://localhost:${port}`);
+    if (scope) console.log(`Scope: ${scope} (standalone mode)`);
     if (dev) console.log("Dev mode: live reload enabled");
     console.log("Press Ctrl+C to stop.");
   });

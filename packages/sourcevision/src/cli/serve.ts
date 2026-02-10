@@ -15,7 +15,7 @@ export function startServe(dir: string, port: number = 3117): void {
   const webCli = resolve(__dirname, "../../../web/dist/cli/index.js");
   const child = spawn(
     process.execPath,
-    [webCli, "serve", `--port=${port}`, dir],
+    [webCli, "serve", "--scope=sourcevision", `--port=${port}`, dir],
     { stdio: "inherit" },
   );
   child.on("close", (code) => process.exit(code ?? 1));

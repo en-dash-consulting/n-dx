@@ -495,4 +495,70 @@ describe("Sidebar", () => {
       expect(progress).not.toBeNull();
     });
   });
+
+  describe("scope filtering", () => {
+    it("shows all three sections when no scope is set", () => {
+      renderSidebar({ scope: null });
+      const sectionHeaders = root.querySelectorAll(".nav-section-header");
+      expect(sectionHeaders.length).toBe(3);
+    });
+
+    it("shows only sourcevision section when scope=sourcevision", () => {
+      renderSidebar({ scope: "sourcevision", view: "overview" as const });
+      const sectionHeaders = root.querySelectorAll(".nav-section-header");
+      expect(sectionHeaders.length).toBe(1);
+      const label = sectionHeaders[0].querySelector(".nav-section-label");
+      expect(label?.textContent).toBe("SOURCEVISION");
+    });
+
+    it("shows only rex section when scope=rex", () => {
+      renderSidebar({ scope: "rex", view: "rex-dashboard" as const });
+      const sectionHeaders = root.querySelectorAll(".nav-section-header");
+      expect(sectionHeaders.length).toBe(1);
+      const label = sectionHeaders[0].querySelector(".nav-section-label");
+      expect(label?.textContent).toBe("REX");
+    });
+
+    it("shows only hench section when scope=hench", () => {
+      renderSidebar({ scope: "hench", view: "hench-runs" as const });
+      const sectionHeaders = root.querySelectorAll(".nav-section-header");
+      expect(sectionHeaders.length).toBe(1);
+      const label = sectionHeaders[0].querySelector(".nav-section-label");
+      expect(label?.textContent).toBe("HENCH");
+    });
+
+    it("shows sourcevision nav items when scope=sourcevision", () => {
+      renderSidebar({ scope: "sourcevision", view: "overview" as const });
+      const navItems = root.querySelectorAll(".nav-item");
+      // 8 sourcevision items: overview, graph, zones, files, routes, architecture, problems, suggestions
+      expect(navItems.length).toBe(8);
+    });
+
+    it("does not show rex or hench nav items when scope=sourcevision", () => {
+      renderSidebar({ scope: "sourcevision", view: "overview" as const });
+      const navItems = root.querySelectorAll(".nav-item");
+      const labels = Array.from(navItems).map((item) => item.textContent?.trim());
+      expect(labels).not.toContain("Dashboard");
+      expect(labels).not.toContain("Tasks");
+      expect(labels).not.toContain("Runs");
+    });
+
+    it("brand shows product name when scoped", () => {
+      renderSidebar({ scope: "sourcevision", view: "overview" as const });
+      const brandTitle = root.querySelector(".sidebar-brand-text h1");
+      expect(brandTitle?.textContent).toBe("sourcevision");
+    });
+
+    it("brand shows n-dx when not scoped", () => {
+      renderSidebar({ scope: null, view: "overview" as const });
+      const brandTitle = root.querySelector(".sidebar-brand-text h1");
+      expect(brandTitle?.textContent).toBe("n-dx");
+    });
+
+    it("subtitle shows standalone viewer when scoped", () => {
+      renderSidebar({ scope: "sourcevision", view: "overview" as const });
+      const subtitle = root.querySelector(".sidebar-subtitle");
+      expect(subtitle?.textContent).toBe("standalone viewer");
+    });
+  });
 });

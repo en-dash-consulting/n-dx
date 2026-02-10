@@ -5938,7 +5938,7 @@
             {
               "id": "fca6ae59-b5af-4b83-adb6-d0f863e18951",
               "title": "Implement standalone `sourcevision serve` viewer",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When sourcevision is installed independently (without n-dx), `sourcevision serve` should show a minimal viewer with just analysis data — zones, imports, inventory, findings. No rex or hench sections. This could be a lightweight server bundled with sourcevision, or the composable architecture falling back to sourcevision-only mode.",
               "acceptanceCriteria": [
@@ -5946,7 +5946,9 @@
                 "Shows analysis data: zones, imports, inventory, findings",
                 "No broken references to rex/hench when those packages are absent"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-10T03:56:17.395Z",
+              "completedAt": "2026-02-10T04:05:21.517Z"
             },
             {
               "id": "ccfabe5d-8d15-410a-8aa0-fde270b70a6d",
