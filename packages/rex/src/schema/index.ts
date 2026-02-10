@@ -14,6 +14,13 @@ export {
   SCHEMA_VERSION,
   LEVEL_HIERARCHY,
   PRIORITY_ORDER,
+  VALID_LEVELS,
+  VALID_STATUSES,
+  VALID_PRIORITIES,
+  CHILD_LEVEL,
+  isPriority,
+  isItemLevel,
+  isItemStatus,
   DEFAULT_CONFIG,
 } from "./v1.js";
 

@@ -17,18 +17,11 @@ import {
   getAuthMode,
 } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
+import { CHILD_LEVEL } from "../../schema/index.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import { loadClaudeConfig } from "../../store/project-config.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
-
-/** Map a parent level to the level its children should have. */
-const CHILD_LEVEL: Record<ItemLevel, ItemLevel | null> = {
-  epic: "feature",
-  feature: "task",
-  task: "subtask",
-  subtask: null,
-};
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {

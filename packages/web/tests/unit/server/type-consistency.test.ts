@@ -18,6 +18,13 @@ import { describe, it, expect } from "vitest";
 import {
   PRIORITY_ORDER as CANONICAL_PRIORITY_ORDER,
   LEVEL_HIERARCHY as CANONICAL_LEVEL_HIERARCHY,
+  VALID_LEVELS as CANONICAL_VALID_LEVELS,
+  VALID_STATUSES as CANONICAL_VALID_STATUSES,
+  VALID_PRIORITIES as CANONICAL_VALID_PRIORITIES,
+  CHILD_LEVEL as CANONICAL_CHILD_LEVEL,
+  isPriority as canonicalIsPriority,
+  isItemLevel as canonicalIsItemLevel,
+  isItemStatus as canonicalIsItemStatus,
   type Priority,
   type ItemLevel,
   type ItemStatus,
@@ -58,33 +65,24 @@ describe("Rex domain constant consistency", () => {
     expect(priorities).toContain("low");
   });
 
-  it("VALID_LEVELS matches LEVEL_HIERARCHY keys", () => {
-    const canonicalLevels = new Set(Object.keys(CANONICAL_LEVEL_HIERARCHY));
-    expect(VALID_LEVELS).toEqual(canonicalLevels);
+  it("VALID_LEVELS matches canonical VALID_LEVELS", () => {
+    expect(VALID_LEVELS).toEqual(CANONICAL_VALID_LEVELS);
   });
 
   it("VALID_STATUSES covers API-settable statuses", () => {
-    // The canonical statuses include "deleted" which VALID_STATUSES omits
-    // because deleted items shouldn't be settable via API.
-    const canonicalStatuses: ItemStatus[] = [
-      "pending",
-      "in_progress",
-      "completed",
-      "deferred",
-      "blocked",
-      "deleted",
-    ];
-    expect(canonicalStatuses).toHaveLength(6);
-    // VALID_STATUSES should be a subset (minus "deleted")
+    // The canonical VALID_STATUSES includes "deleted", but the web
+    // VALID_STATUSES omits it because deleted items shouldn't be
+    // settable via the API.
     for (const status of VALID_STATUSES) {
-      expect(canonicalStatuses).toContain(status);
+      expect(CANONICAL_VALID_STATUSES.has(status as ItemStatus)).toBe(true);
     }
     expect(VALID_STATUSES.has("deleted" as never)).toBe(false);
+    // The web set should be exactly canonical minus "deleted"
+    expect(VALID_STATUSES.size).toBe(CANONICAL_VALID_STATUSES.size - 1);
   });
 
-  it("VALID_PRIORITIES matches canonical Priority", () => {
-    const canonicalPriorities: Priority[] = ["critical", "high", "medium", "low"];
-    expect(VALID_PRIORITIES).toEqual(new Set(canonicalPriorities));
+  it("VALID_PRIORITIES matches canonical VALID_PRIORITIES", () => {
+    expect(VALID_PRIORITIES).toEqual(CANONICAL_VALID_PRIORITIES);
   });
 
   it("PRIORITY_ORDER keys exactly match the Priority type members", () => {
@@ -101,22 +99,38 @@ describe("Rex domain constant consistency", () => {
     expect(keys).toHaveLength(expected.length);
   });
 
-  it("isPriority type guard works correctly", () => {
-    expect(isPriority("critical")).toBe(true);
-    expect(isPriority("high")).toBe(true);
-    expect(isPriority("medium")).toBe(true);
-    expect(isPriority("low")).toBe(true);
-    expect(isPriority("invalid")).toBe(false);
-    expect(isPriority(undefined)).toBe(false);
+  it("isPriority type guard matches canonical behaviour", () => {
+    const testValues = ["critical", "high", "medium", "low", "invalid", "", "CRITICAL"];
+    for (const v of testValues) {
+      expect(isPriority(v)).toBe(canonicalIsPriority(v));
+    }
+    expect(isPriority(undefined)).toBe(canonicalIsPriority(undefined));
   });
 
-  it("isItemLevel type guard works correctly", () => {
-    expect(isItemLevel("epic")).toBe(true);
-    expect(isItemLevel("feature")).toBe(true);
-    expect(isItemLevel("task")).toBe(true);
-    expect(isItemLevel("subtask")).toBe(true);
-    expect(isItemLevel("invalid")).toBe(false);
-    expect(isItemLevel(undefined)).toBe(false);
+  it("isItemLevel type guard matches canonical behaviour", () => {
+    const testValues = ["epic", "feature", "task", "subtask", "invalid", "", "EPIC"];
+    for (const v of testValues) {
+      expect(isItemLevel(v)).toBe(canonicalIsItemLevel(v));
+    }
+    expect(isItemLevel(undefined)).toBe(canonicalIsItemLevel(undefined));
+  });
+
+  it("canonical isItemStatus type guard works correctly", () => {
+    expect(canonicalIsItemStatus("pending")).toBe(true);
+    expect(canonicalIsItemStatus("in_progress")).toBe(true);
+    expect(canonicalIsItemStatus("completed")).toBe(true);
+    expect(canonicalIsItemStatus("deferred")).toBe(true);
+    expect(canonicalIsItemStatus("blocked")).toBe(true);
+    expect(canonicalIsItemStatus("deleted")).toBe(true);
+    expect(canonicalIsItemStatus("invalid")).toBe(false);
+    expect(canonicalIsItemStatus(undefined)).toBe(false);
+  });
+
+  it("canonical CHILD_LEVEL maps every level correctly", () => {
+    expect(CANONICAL_CHILD_LEVEL.epic).toBe("feature");
+    expect(CANONICAL_CHILD_LEVEL.feature).toBe("task");
+    expect(CANONICAL_CHILD_LEVEL.task).toBe("subtask");
+    expect(CANONICAL_CHILD_LEVEL.subtask).toBeNull();
   });
 
   it("viewer type mirrors have expected shape", () => {

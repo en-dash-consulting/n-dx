@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
-import { LEVEL_HIERARCHY } from "../../schema/index.js";
+import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { REX_DIR } from "./constants.js";
@@ -9,15 +9,6 @@ import { cascadeParentReset } from "../../core/cascade-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";
-
-const VALID_LEVELS = new Set(Object.keys(LEVEL_HIERARCHY));
-
-/** Map parent level → default child level for inference. */
-const CHILD_LEVEL: Record<string, ItemLevel> = {
-  epic: "feature",
-  feature: "task",
-  task: "subtask",
-};
 
 export async function cmdAdd(
   dir: string,
@@ -64,10 +55,10 @@ export async function cmdAdd(
     resolvedLevel = "epic";
   }
 
-  if (!VALID_LEVELS.has(resolvedLevel)) {
+  if (!isItemLevel(resolvedLevel)) {
     throw new CLIError(
       `Invalid level "${resolvedLevel}".`,
-      `Must be one of: ${[...VALID_LEVELS].join(", ")}`,
+      `Must be one of: ${Object.keys(LEVEL_HIERARCHY).join(", ")}`,
     );
   }
 

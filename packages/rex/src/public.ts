@@ -29,7 +29,17 @@ export type { PRDStore } from "./store/types.js";
 // ---- Schema types & constants -----------------------------------------------
 
 export type { PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority } from "./schema/v1.js";
-export { PRIORITY_ORDER, LEVEL_HIERARCHY } from "./schema/v1.js";
+export {
+  PRIORITY_ORDER,
+  LEVEL_HIERARCHY,
+  VALID_LEVELS,
+  VALID_STATUSES,
+  VALID_PRIORITIES,
+  CHILD_LEVEL,
+  isPriority,
+  isItemLevel,
+  isItemStatus,
+} from "./schema/v1.js";
 
 // ---- Core: tree utilities ---------------------------------------------------
 

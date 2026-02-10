@@ -8,17 +8,8 @@ import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { findAutoCompletions } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
 import { findItem, deleteItem, cleanBlockedByRefs } from "../../core/tree.js";
+import { VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority } from "../../schema/index.js";
 import type { PRDItem, ItemStatus, Priority } from "../../schema/index.js";
-
-const VALID_STATUSES = new Set([
-  "pending",
-  "in_progress",
-  "completed",
-  "deferred",
-  "blocked",
-  "deleted",
-]);
-const VALID_PRIORITIES = new Set(["critical", "high", "medium", "low"]);
 
 export async function cmdUpdate(
   dir: string,
@@ -47,7 +38,7 @@ export async function cmdUpdate(
   const updates: Partial<PRDItem> = {};
 
   if (flags.status) {
-    if (!VALID_STATUSES.has(flags.status)) {
+    if (!isItemStatus(flags.status)) {
       throw new CLIError(
         `Invalid status "${flags.status}".`,
         `Must be one of: ${[...VALID_STATUSES].join(", ")}`,
@@ -98,13 +89,13 @@ export async function cmdUpdate(
   }
 
   if (flags.priority) {
-    if (!VALID_PRIORITIES.has(flags.priority)) {
+    if (!isPriority(flags.priority)) {
       throw new CLIError(
         `Invalid priority "${flags.priority}".`,
         `Must be one of: ${[...VALID_PRIORITIES].join(", ")}`,
       );
     }
-    updates.priority = flags.priority as Priority;
+    updates.priority = flags.priority;
   }
 
   if (flags.title) updates.title = flags.title;

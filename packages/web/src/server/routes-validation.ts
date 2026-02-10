@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
-import { type ItemLevel, LEVEL_HIERARCHY } from "./rex-domain.js";
+import { type ItemLevel, LEVEL_HIERARCHY, isItemLevel } from "./rex-domain.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
@@ -98,11 +98,6 @@ interface StuckResult {
   title: string;
   stuckSinceMs: number;
   reason: string;
-}
-
-/** Type guard: narrows a string to ItemLevel. */
-function isItemLevel(value: string): value is ItemLevel {
-  return (value === "epic" || value === "feature" || value === "task" || value === "subtask");
 }
 
 function findOrphanedItems(items: PRDItemRecord[]): OrphanResult[] {

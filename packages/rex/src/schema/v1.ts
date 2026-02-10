@@ -17,17 +17,14 @@
  *   The duplicates are documented with `@see` back-references and
  *   verified by compile-time consistency tests.
  *
- * - **Web server routes** duplicate domain constants (PRIORITY_ORDER,
- *   LEVEL_HIERARCHY) and type aliases (Priority, ItemLevel) to avoid a
- *   package dependency. Each duplicate uses local type aliases with type
- *   guards at the JSON boundary, ensuring type-safe constant lookups while
- *   handling unvalidated input. Each duplicate is annotated with `@see`
- *   references to this file.
+ * - **Web server routes** consolidate domain constants and type guards
+ *   into a single shared module (rex-domain.ts) to avoid a package
+ *   dependency on Rex. Each duplicate is annotated with `@see` references
+ *   to this file and verified by type-consistency tests.
  *
  * When modifying types or constants here, also update:
- *   - packages/web/src/viewer/components/prd-tree/types.ts
- *   - packages/web/src/server/routes-rex.ts
- *   - packages/web/src/server/routes-validation.ts
+ *   - packages/web/src/server/rex-domain.ts (server-side shared module)
+ *   - packages/web/src/viewer/components/prd-tree/types.ts (viewer types)
  *   - packages/web/tests/unit/server/type-consistency.test.ts
  *
  * @module rex/schema/v1
@@ -148,6 +145,63 @@ export const LEVEL_HIERARCHY: Record<ItemLevel, Array<ItemLevel | null>> = {
   task: ["feature", "epic"],
   subtask: ["task"],
 };
+
+// ── Validation sets ────────────────────────────────────────────────
+
+/** All valid item levels as a Set (derived from LEVEL_HIERARCHY keys). */
+export const VALID_LEVELS = new Set<ItemLevel>(
+  Object.keys(LEVEL_HIERARCHY) as ItemLevel[],
+);
+
+/**
+ * All valid item statuses as a Set.
+ * Includes "deleted" — downstream consumers may exclude it for API-settable
+ * status lists (e.g. the web server's VALID_STATUSES omits "deleted").
+ */
+export const VALID_STATUSES = new Set<ItemStatus>([
+  "pending",
+  "in_progress",
+  "completed",
+  "deferred",
+  "blocked",
+  "deleted",
+]);
+
+/** All valid priority values as a Set (derived from PRIORITY_ORDER keys). */
+export const VALID_PRIORITIES = new Set<Priority>(
+  Object.keys(PRIORITY_ORDER) as Priority[],
+);
+
+// ── Child level inference ──────────────────────────────────────────
+
+/**
+ * Map parent level → default child level for inference.
+ * Used when adding items under a parent without specifying a level.
+ * Subtasks have no children, so they map to null.
+ */
+export const CHILD_LEVEL: Record<ItemLevel, ItemLevel | null> = {
+  epic: "feature",
+  feature: "task",
+  task: "subtask",
+  subtask: null,
+};
+
+// ── Type guards ────────────────────────────────────────────────────
+
+/** Type guard: narrows a string to Priority if it's a valid priority value. */
+export function isPriority(value: string | undefined): value is Priority {
+  return value !== undefined && VALID_PRIORITIES.has(value as Priority);
+}
+
+/** Type guard: narrows a string to ItemLevel if it's a valid level value. */
+export function isItemLevel(value: string | undefined): value is ItemLevel {
+  return value !== undefined && VALID_LEVELS.has(value as ItemLevel);
+}
+
+/** Type guard: narrows a string to ItemStatus if it's a valid status value. */
+export function isItemStatus(value: string | undefined): value is ItemStatus {
+  return value !== undefined && VALID_STATUSES.has(value as ItemStatus);
+}
 
 export function DEFAULT_CONFIG(project: string): RexConfig {
   return {

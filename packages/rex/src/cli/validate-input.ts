@@ -6,24 +6,18 @@
  */
 
 import { CLIError } from "./errors.js";
-import { LEVEL_HIERARCHY } from "../schema/index.js";
+import { LEVEL_HIERARCHY, VALID_LEVELS, isItemLevel } from "../schema/index.js";
 import type { ItemLevel } from "../schema/index.js";
-
-/* ------------------------------------------------------------------ */
-/*  Level helpers                                                      */
-/* ------------------------------------------------------------------ */
-
-const VALID_LEVELS = Object.keys(LEVEL_HIERARCHY) as ItemLevel[];
 
 /**
  * Validate that `level` is a recognised hierarchy level.
  * Throws a CLIError listing valid levels when it isn't.
  */
 export function validateLevel(level: string): asserts level is ItemLevel {
-  if (!(level in LEVEL_HIERARCHY)) {
+  if (!isItemLevel(level)) {
     throw new CLIError(
       `Invalid level "${level}".`,
-      `Valid levels: ${VALID_LEVELS.join(", ")}`,
+      `Valid levels: ${[...VALID_LEVELS].join(", ")}`,
     );
   }
 }
