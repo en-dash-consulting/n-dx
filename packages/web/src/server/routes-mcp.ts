@@ -6,14 +6,20 @@
  *
  * Each endpoint manages its own transport + MCP server lifecycle.
  * Sessions are stateful (session ID generated per initialize request).
+ *
+ * Unlike the REST API routes (which read JSON files from disk and shell
+ * out to CLIs), MCP routes require the actual MCP server factory
+ * functions at runtime.  These are the **only** cross-package runtime
+ * imports in the web package, isolated in `mcp-deps.ts`.
+ *
+ * @see ./mcp-deps.ts — gateway that centralises the two runtime imports
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createRexMcpServer } from "rex";
-import { createSourcevisionMcpServer } from "sourcevision";
+import { createRexMcpServer, createSourcevisionMcpServer } from "./mcp-deps.js";
 import type { ServerContext } from "./types.js";
 
 const MCP_REX_PATH = "/mcp/rex";

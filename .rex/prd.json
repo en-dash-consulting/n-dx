@@ -6210,6 +6210,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-10T14:51:10.922Z",
+      "completedAt": "2026-02-10T14:51:10.922Z",
       "children": [
         {
           "id": "10fc1872-82b5-4a09-9006-73e84636d06a",
@@ -6252,9 +6254,155 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-10T14:51:10.922Z",
-      "completedAt": "2026-02-10T14:51:10.922Z"
+      ]
+    },
+    {
+      "id": "3e648b61-d923-450a-b6db-2e419ed7e296",
+      "title": "Rex UI Calculation and Display Improvements",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-02-10T15:46:19.337Z",
+      "completedAt": "2026-02-10T15:46:19.337Z",
+      "children": [
+        {
+          "id": "efdead52-9f54-438f-87a1-9641ac9459a9",
+          "title": "Completion Percentage Calculation Fix",
+          "status": "completed",
+          "level": "feature",
+          "description": "Fix completion percentage calculations to exclude deleted items from the denominator, ensuring accurate progress tracking across all Rex UI components including CLI and web dashboard",
+          "source": "smart-add",
+          "startedAt": "2026-02-10T15:38:34.839Z",
+          "completedAt": "2026-02-10T15:38:34.839Z",
+          "children": [
+            {
+              "id": "bda6e2f4-fdc8-42ab-b36f-126df8181160",
+              "title": "Fix completion percentage calculations across all Rex interfaces",
+              "status": "completed",
+              "level": "task",
+              "description": "Update completion percentage calculation logic to exclude deleted items and apply the fix consistently across CLI status command, web dashboard, and all other Rex UI components",
+              "acceptanceCriteria": [
+                "Deleted items are excluded from total item count in percentage calculations",
+                "Completion percentages accurately reflect progress of active items only",
+                "CLI status command shows accurate completion percentages with corrected progress bars",
+                "Web dashboard Rex section displays updated metrics and PRD tree visualization",
+                "All rex UI components show consistent updated percentage calculations"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "calculation",
+                "cli",
+                "web",
+                "dashboard"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-10T15:30:03.298Z",
+              "completedAt": "2026-02-10T15:38:34.789Z"
+            }
+          ]
+        },
+        {
+          "id": "8e212604-6ce7-486b-91b6-9907ee7831bc",
+          "title": "Rex Dashboard UX Redesign",
+          "status": "completed",
+          "level": "feature",
+          "description": "Redesign the Rex dashboard interface to improve user experience, navigation, and information hierarchy for better task management workflow with responsive design support",
+          "source": "smart-add",
+          "startedAt": "2026-02-10T15:46:19.282Z",
+          "completedAt": "2026-02-10T15:46:19.282Z",
+          "children": [
+            {
+              "id": "57cc9d88-0fdc-45a0-9388-0ad576923ed8",
+              "title": "Redesign Rex dashboard with improved UX and task management workflow",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a comprehensive Rex dashboard redesign featuring improved visual hierarchy, streamlined task management workflows, and responsive design patterns for optimal experience across all devices",
+              "acceptanceCriteria": [
+                "Dashboard uses clear visual hierarchy with proper typography and spacing",
+                "Key metrics and actions are prominently displayed",
+                "Navigation between epic/feature/task levels is intuitive",
+                "Information density is optimized for scanning and decision-making",
+                "Task selection and status updates are streamlined",
+                "Next actionable task is clearly highlighted",
+                "Bulk operations are supported where appropriate",
+                "Task context and dependencies are clearly visible",
+                "Dashboard is fully functional on mobile devices",
+                "Layout adapts gracefully to different screen sizes",
+                "Touch interactions work properly on mobile"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "web",
+                "ux",
+                "design",
+                "workflow",
+                "tasks",
+                "responsive",
+                "mobile"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-10T15:39:25.629Z",
+              "completedAt": "2026-02-10T15:46:19.245Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b9caa923-3977-43e3-b86b-07bc069bf148",
+      "title": "Address observation issues (2 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Clean dependency inversion through claude-client shared foundation prevents circular dependencies between domain packages\n- Perfect architectural isolation with no circular dependencies enables independent development and testing of each subsystem",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T16:29:40.795Z",
+      "completedAt": "2026-02-10T16:35:39.108Z"
+    },
+    {
+      "id": "afabc78a-d5c9-498b-a536-2510c9d8e6fc",
+      "title": "Address pattern issues (2 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Architecture follows clean dependency rules: orchestration→execution→domain→foundation with minimal controlled cross-coupling\n- Standardization debt cluster: 5 related findings around package exports, naming conventions, and test structure indicate coordinated refactoring opportunity rather than independent fixes",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T16:35:55.786Z",
+      "completedAt": "2026-02-10T16:43:40.885Z"
+    },
+    {
+      "id": "afe6598d-b9d8-464f-9247-0837bce17e42",
+      "title": "Address relationship issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Two controlled coupling points: hench imports rex for task management, web imports all packages for unified interface",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T16:44:02.991Z",
+      "completedAt": "2026-02-10T16:49:25.109Z"
+    },
+    {
+      "id": "d6342c76-d17b-49c7-b5e9-4e43a0dc64c5",
+      "title": "Address anti-pattern issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Hench maintains 14 direct imports from rex package across 9 files, creating controlled but extensive runtime dependency on PRD operations beyond just type contracts",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T16:22:32.832Z",
+      "completedAt": "2026-02-10T16:29:11.518Z"
+    },
+    {
+      "id": "73089778-e778-4c7d-acb8-01ceadc24e3e",
+      "title": "Address suggestion issues (3 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Execute standardization in dependency order: first complete hench public.ts exports (packages/hench/src/public.ts), then migrate test directories (packages/hench/__tests__ → packages/hench/tests/, packages/web/src/__tests__ → packages/web/tests/), finally establish monorepo naming convention\n- Create packages/hench/src/public.ts exporting AgentConfig, RunConfig, RunResult, ExecutionEngine and update packages/hench/package.json exports field to include './public': './dist/public.js'\n- Move packages/web/src/__tests__ to packages/web/tests/ with domain subdirectories (dashboard/, mcp/, server/) to align with rex and sourcevision patterns",
+      "priority": "high",
+      "source": "sourcevision"
     }
   ]
 }

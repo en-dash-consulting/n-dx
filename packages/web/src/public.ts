@@ -3,7 +3,48 @@
  *
  * Re-exports the server entry point for programmatic use.
  *
+ * ## Architectural role — coordination facade
+ *
+ * The web package is the **only** package that surfaces all three domain
+ * packages (rex, sourcevision, hench) through a unified interface.  It
+ * sits alongside the orchestration layer in the dependency hierarchy:
+ *
+ * ```
+ *   Orchestration   cli.js, web.js          (spawn CLIs, no library imports)
+ *        ↓
+ *   Coordination    @n-dx/web               (reads domain data, hosts MCP)
+ *        ↓
+ *   Execution       hench                   (agent loops → imports rex)
+ *        ↓
+ *   Domain          rex · sourcevision      (independent, never import each other)
+ *        ↓
+ *   Foundation      @n-dx/claude-client     (shared types, API client)
+ * ```
+ *
+ * ## Coupling strategy — filesystem-first, gateway-gated
+ *
+ * Unlike hench (which imports rex functions at runtime), the web package
+ * minimises runtime imports from domain packages.  Instead it reads
+ * their JSON artefacts directly from disk:
+ *
+ * | Data source       | Mechanism          | Module               |
+ * |------------------|--------------------|----------------------|
+ * | PRD tree          | `readFileSync`     | routes-rex.ts        |
+ * | Analysis data     | `readFileSync`     | routes-sourcevision.ts |
+ * | Agent run history | `readFileSync`     | routes-hench.ts      |
+ * | Rex CLI commands  | `execFile`         | routes-rex.ts        |
+ * | Rex domain types  | Duplication        | rex-domain.ts        |
+ * | MCP servers       | Runtime import ⚠️  | mcp-deps.ts (gateway) |
+ *
+ * The **only** runtime imports — `createRexMcpServer` and
+ * `createSourcevisionMcpServer` — are funnelled through a single
+ * gateway module (`server/mcp-deps.ts`) to keep the coupling surface
+ * explicit and auditable.
+ *
  * @module @n-dx/web
+ * @see packages/web/src/server/mcp-deps.ts — runtime import gateway
+ * @see packages/web/src/server/rex-domain.ts — duplicated types (avoids import)
+ * @see packages/hench/src/prd/ops.ts — hench's equivalent gateway pattern
  */
 
 export { startServer } from "./server/start.js";
