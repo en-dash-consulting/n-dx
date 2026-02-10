@@ -17,7 +17,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
-import { DATA_FILES } from "../../schema/data-files.js";
+import { DATA_FILES } from "../schema/data-files.js";
 
 const SV_PREFIX = "/api/sv/";
 

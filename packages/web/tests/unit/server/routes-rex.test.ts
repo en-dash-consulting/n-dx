@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import type { ServerContext } from "../../../src/cli/server/types.js";
-import { handleRexRoute } from "../../../src/cli/server/routes-rex.js";
+import type { ServerContext } from "../../../src/server/types.js";
+import { handleRexRoute } from "../../../src/server/routes-rex.js";
 
 /** Minimal PRD document fixture. */
 function makePRD() {

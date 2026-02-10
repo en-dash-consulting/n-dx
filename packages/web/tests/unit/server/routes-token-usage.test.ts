@@ -3,8 +3,8 @@ import { mkdtemp, writeFile, mkdir, rm, appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import type { ServerContext } from "../../../src/cli/server/types.js";
-import { handleTokenUsageRoute } from "../../../src/cli/server/routes-token-usage.js";
+import type { ServerContext } from "../../../src/server/types.js";
+import { handleTokenUsageRoute } from "../../../src/server/routes-token-usage.js";
 
 /** Create a hench run record with token usage. */
 function makeRun(id: string, startedAt: string, inputTokens: number, outputTokens: number) {

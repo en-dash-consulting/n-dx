@@ -14,7 +14,7 @@ import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute } from "./routes-hench.js";
 import { createWebSocketManager } from "./websocket.js";
-import { ALL_DATA_FILES } from "../../schema/data-files.js";
+import { ALL_DATA_FILES } from "../schema/data-files.js";
 
 export interface ServerOptions {
   dev?: boolean;

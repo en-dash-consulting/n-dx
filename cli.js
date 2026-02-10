@@ -56,6 +56,7 @@ const tools = {
   hench: "packages/hench/dist/cli/index.js",
   sourcevision: "packages/sourcevision/dist/cli/index.js",
   sv: "packages/sourcevision/dist/cli/index.js",
+  web: "packages/web/dist/cli/index.js",
 };
 
 function run(script, args) {

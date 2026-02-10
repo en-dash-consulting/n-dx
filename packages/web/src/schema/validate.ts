@@ -1,0 +1,316 @@
+import { z } from "zod";
+import type * as V1 from "./v1.js";
+
+// ── Manifest ────────────────────────────────────────────────────────────────
+
+const ModuleStatusSchema = z.enum(["pending", "running", "complete", "error"]);
+
+const ModuleInfoSchema = z.object({
+  status: ModuleStatusSchema,
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  error: z.string().optional(),
+  chunks: z.number().int().positive().optional(),
+});
+
+export const ManifestSchema = z.object({
+  schemaVersion: z.string(),
+  toolVersion: z.string(),
+  analyzedAt: z.string(),
+  gitSha: z.string().optional(),
+  gitBranch: z.string().optional(),
+  targetPath: z.string(),
+  modules: z.record(z.string(), ModuleInfoSchema),
+});
+
+// ── Inventory ───────────────────────────────────────────────────────────────
+
+const FileRoleSchema = z.enum([
+  "source",
+  "test",
+  "config",
+  "docs",
+  "generated",
+  "asset",
+  "build",
+  "other",
+]);
+
+const FileEntrySchema = z.object({
+  path: z.string(),
+  size: z.number().int().nonnegative(),
+  language: z.string(),
+  lineCount: z.number().int().nonnegative(),
+  hash: z.string(),
+  role: FileRoleSchema,
+  category: z.string(),
+  lastModified: z.number().int().nonnegative().optional(),
+});
+
+const InventorySummarySchema = z.object({
+  totalFiles: z.number().int().nonnegative(),
+  totalLines: z.number().int().nonnegative(),
+  byLanguage: z.record(z.string(), z.number().int().nonnegative()),
+  byRole: z.record(z.string(), z.number().int().nonnegative()),
+  byCategory: z.record(z.string(), z.number().int().nonnegative()),
+});
+
+export const InventorySchema = z.object({
+  files: z.array(FileEntrySchema),
+  summary: InventorySummarySchema,
+});
+
+// ── Imports ─────────────────────────────────────────────────────────────────
+
+const ImportTypeSchema = z.enum([
+  "static",
+  "dynamic",
+  "require",
+  "reexport",
+  "type",
+]);
+
+const ImportEdgeSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  type: ImportTypeSchema,
+  symbols: z.array(z.string()),
+});
+
+const ExternalImportSchema = z.object({
+  package: z.string(),
+  importedBy: z.array(z.string()),
+  symbols: z.array(z.string()),
+});
+
+const CircularDependencySchema = z.object({
+  cycle: z.array(z.string()),
+});
+
+const ImportsSummarySchema = z.object({
+  totalEdges: z.number().int().nonnegative(),
+  totalExternal: z.number().int().nonnegative(),
+  circularCount: z.number().int().nonnegative(),
+  circulars: z.array(CircularDependencySchema),
+  mostImported: z.array(
+    z.object({
+      path: z.string(),
+      count: z.number().int().nonnegative(),
+    })
+  ),
+  avgImportsPerFile: z.number().nonnegative(),
+});
+
+export const ImportsSchema = z.object({
+  edges: z.array(ImportEdgeSchema),
+  external: z.array(ExternalImportSchema),
+  summary: ImportsSummarySchema,
+});
+
+// ── Findings ─────────────────────────────────────────────────────────────────
+
+const FindingTypeSchema = z.enum([
+  "observation",
+  "pattern",
+  "relationship",
+  "anti-pattern",
+  "suggestion",
+]);
+
+export const FindingSchema = z.object({
+  type: FindingTypeSchema,
+  pass: z.number().int().nonnegative(),
+  scope: z.string(),
+  text: z.string(),
+  severity: z.enum(["info", "warning", "critical"]).optional(),
+  related: z.array(z.string()).optional(),
+});
+
+// ── Zones ───────────────────────────────────────────────────────────────────
+
+const ZoneSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  files: z.array(z.string()),
+  entryPoints: z.array(z.string()),
+  cohesion: z.number().min(0).max(1),
+  coupling: z.number().min(0).max(1),
+  insights: z.array(z.string()).optional(),
+});
+
+const ZoneCrossingSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  fromZone: z.string(),
+  toZone: z.string(),
+});
+
+export const ZonesSchema = z.object({
+  zones: z.array(ZoneSchema),
+  crossings: z.array(ZoneCrossingSchema),
+  unzoned: z.array(z.string()),
+  insights: z.array(z.string()).optional(),
+  findings: z.array(FindingSchema).optional(),
+  enrichmentPass: z.number().int().nonnegative().optional(),
+  metaEvaluationCount: z.number().int().nonnegative().optional(),
+  structureHash: z.string().optional(),
+  zoneContentHashes: z.record(z.string()).optional(),
+});
+
+// ── Components ──────────────────────────────────────────────────────────────
+
+const ComponentKindSchema = z.enum(["function", "arrow", "class", "forwardRef"]);
+
+const ComponentDefinitionSchema = z.object({
+  file: z.string(),
+  name: z.string(),
+  kind: ComponentKindSchema,
+  line: z.number().int().positive(),
+  isDefaultExport: z.boolean(),
+  conventionExports: z.array(z.string()),
+});
+
+const ComponentUsageEdgeSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  componentName: z.string(),
+  usageCount: z.number().int().positive(),
+});
+
+const RouteExportKindSchema = z.enum([
+  "loader",
+  "action",
+  "default",
+  "meta",
+  "links",
+  "headers",
+  "ErrorBoundary",
+  "shouldRevalidate",
+  "handle",
+  "HydrateFallback",
+]);
+
+const RouteModuleSchema = z.object({
+  file: z.string(),
+  routePattern: z.string().nullable(),
+  exports: z.array(RouteExportKindSchema),
+  parentLayout: z.string().nullable(),
+  isLayout: z.boolean(),
+  isIndex: z.boolean(),
+});
+
+const RouteTreeNodeSchema: z.ZodType<V1.RouteTreeNode> = z.lazy(() =>
+  z.object({
+    file: z.string(),
+    routePattern: z.string(),
+    children: z.array(RouteTreeNodeSchema),
+  })
+);
+
+const ComponentsSummarySchema = z.object({
+  totalComponents: z.number().int().nonnegative(),
+  totalRouteModules: z.number().int().nonnegative(),
+  totalUsageEdges: z.number().int().nonnegative(),
+  routeConventions: z.record(z.string(), z.number().int().nonnegative()),
+  mostUsedComponents: z.array(
+    z.object({
+      name: z.string(),
+      file: z.string(),
+      usageCount: z.number().int().positive(),
+    })
+  ),
+  layoutDepth: z.number().int().nonnegative(),
+});
+
+export const ComponentsSchema = z.object({
+  components: z.array(ComponentDefinitionSchema),
+  usageEdges: z.array(ComponentUsageEdgeSchema),
+  routeModules: z.array(RouteModuleSchema),
+  routeTree: z.array(RouteTreeNodeSchema),
+  summary: ComponentsSummarySchema,
+});
+
+// ── Validation helpers ──────────────────────────────────────────────────────
+
+export type ValidationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; errors: z.ZodError };
+
+function validate<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown
+): ValidationResult<T> {
+  const result = schema.safeParse(data);
+  if (result.success) {
+    return { ok: true, data: result.data };
+  }
+  return { ok: false, errors: result.error };
+}
+
+export function validateManifest(data: unknown): ValidationResult<V1.Manifest> {
+  return validate(ManifestSchema, data);
+}
+
+export function validateInventory(
+  data: unknown
+): ValidationResult<V1.Inventory> {
+  return validate(InventorySchema, data);
+}
+
+export function validateImports(data: unknown): ValidationResult<V1.Imports> {
+  return validate(ImportsSchema, data);
+}
+
+export function validateZones(data: unknown): ValidationResult<V1.Zones> {
+  return validate(ZonesSchema, data);
+}
+
+export function validateComponents(
+  data: unknown
+): ValidationResult<V1.Components> {
+  return validate(ComponentsSchema, data);
+}
+
+/** Validate any module output by name */
+export function validateModule(
+  name: string,
+  data: unknown
+): ValidationResult<unknown> {
+  switch (name) {
+    case "manifest":
+      return validate(ManifestSchema, data);
+    case "inventory":
+      return validate(InventorySchema, data);
+    case "imports":
+      return validate(ImportsSchema, data);
+    case "zones":
+      return validate(ZonesSchema, data);
+    case "components":
+      return validate(ComponentsSchema, data);
+    default:
+      return {
+        ok: false,
+        errors: new z.ZodError([
+          {
+            code: "custom",
+            path: [],
+            message: `Unknown module: ${name}`,
+          },
+        ]),
+      };
+  }
+}
+
+/**
+ * Format Zod validation errors into clear, actionable messages.
+ *
+ * Each error includes the field path and what was expected, making it
+ * easy to pinpoint and fix the issue.
+ */
+export function formatValidationErrors(errors: z.ZodError): string[] {
+  return errors.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+    return `${path}: ${issue.message}`;
+  });
+}

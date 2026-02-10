@@ -3,8 +3,8 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import type { ServerContext } from "../../../src/cli/server/types.js";
-import { handleSourcevisionRoute } from "../../../src/cli/server/routes-sourcevision.js";
+import type { ServerContext } from "../../../src/server/types.js";
+import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
 
 /** Start a test server that only runs sourcevision routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
-import { createWebSocketManager } from "../../../src/cli/server/websocket.js";
+import { createWebSocketManager } from "../../../src/server/websocket.js";
 
 /**
  * Connect a raw TCP socket to the server and perform the WebSocket handshake.

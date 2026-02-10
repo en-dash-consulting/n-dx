@@ -1,8 +1,8 @@
 /**
- * Type consistency tests — verify duplicated Rex domain constants in sourcevision
- * match the canonical definitions in packages/rex/src/schema/v1.ts.
+ * Type consistency tests — verify duplicated Rex domain constants in the web
+ * server match the canonical definitions in packages/rex/src/schema/v1.ts.
  *
- * Sourcevision intentionally duplicates Rex types and constants to avoid a
+ * The web server intentionally duplicates Rex types and constants to avoid a
  * compile-time dependency, but the duplicates must stay in sync with the
  * canonical definitions. These tests catch drift early.
  *
@@ -12,8 +12,8 @@
  * LEVEL_HIERARCHY while handling unvalidated input.
  *
  * @see packages/rex/src/schema/v1.ts — canonical definitions
- * @see packages/sourcevision/src/cli/server/routes-rex.ts — server-side duplicates (with local type aliases)
- * @see packages/sourcevision/src/cli/server/routes-validation.ts — validation duplicates (with local type alias)
+ * @see packages/web/src/server/routes-rex.ts — server-side duplicates (with local type aliases)
+ * @see packages/web/src/server/routes-validation.ts — validation duplicates (with local type alias)
  */
 
 import { describe, it, expect } from "vitest";

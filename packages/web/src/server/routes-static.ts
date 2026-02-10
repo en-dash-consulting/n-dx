@@ -34,8 +34,8 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
   const thisDir = dirname(fileURLToPath(import.meta.url));
 
   const viewerCandidates = [
-    resolve(thisDir, "../../../dist/viewer/index.html"),
-    resolve(thisDir, "../../viewer/index.html"),
+    resolve(thisDir, "../viewer/index.html"),
+    resolve(thisDir, "../../src/viewer/index.html"),
   ];
 
   let viewerPath: string | null = null;
@@ -49,7 +49,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
   if (!viewerPath) return null;
 
   const viewerDir = dirname(viewerPath);
-  const packageRoot = resolve(thisDir, "../../..");
+  const packageRoot = resolve(thisDir, "../..");
   const resolvedViewerDir = resolveDirRealpath(viewerDir);
   const resolvedPackageRoot = resolveDirRealpath(packageRoot);
 

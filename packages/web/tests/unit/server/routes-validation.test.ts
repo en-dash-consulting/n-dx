@@ -3,8 +3,8 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
-import type { ServerContext } from "../../../src/cli/server/types.js";
-import { handleValidationRoute } from "../../../src/cli/server/routes-validation.js";
+import type { ServerContext } from "../../../src/server/types.js";
+import { handleValidationRoute } from "../../../src/server/routes-validation.js";
 
 /** Create a minimal valid PRD document. */
 function makePRD(items: unknown[]) {

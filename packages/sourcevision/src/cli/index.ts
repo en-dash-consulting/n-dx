@@ -51,8 +51,8 @@ const targetArg = args.slice(1).find((a) => !a.startsWith("-"));
 
 async function cmdServe(dir: string, port: number): Promise<void> {
   const absDir = resolve(dir);
-  const { startServer } = await import("./serve.js");
-  startServer(absDir, port);
+  const { startServe } = await import("./serve.js");
+  startServe(absDir, port);
 }
 
 async function cmdMcp(dir: string): Promise<void> {

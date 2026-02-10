@@ -37,7 +37,7 @@ setTimeout(() => {
   run("serve", "node", [
     "--input-type=module",
     "-e",
-    `import("./dist/cli/serve.js").then(m => m.startServer(".", 3117, { dev: true }));`,
+    `import("./dist/server/start.js").then(m => m.startServer(".", 3117, { dev: true }));`,
   ]);
 }, startDelay);
 

@@ -1,7 +1,7 @@
 /**
  * Web server orchestration for n-dx.
  *
- * Starts the unified dashboard (sourcevision serve) with support for:
+ * Starts the unified dashboard (@n-dx/web serve) with support for:
  *   - Configurable port (--port, config, default 3117)
  *   - Background/daemon mode (--background)
  *   - PID file management (.n-dx-web.pid)
@@ -268,7 +268,7 @@ export async function runWeb(dir, rest, { run, tools, __dir }) {
 
   // --- Background mode ---
   if (isBackground) {
-    const script = resolve(__dir, tools.sourcevision);
+    const script = resolve(__dir, tools.web);
     const child = spawn(process.execPath, [script, ...serveArgs], {
       stdio: "ignore",
       detached: true,
@@ -295,7 +295,7 @@ export async function runWeb(dir, rest, { run, tools, __dir }) {
     process.exit(0);
   });
 
-  const code = await run(tools.sourcevision, serveArgs);
+  const code = await run(tools.web, serveArgs);
   await cleanup();
   return code;
 }
