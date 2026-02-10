@@ -115,6 +115,11 @@ async function main(): Promise<void> {
         await cmdConfig(resolveDir(), positional, flags);
         break;
       }
+      case "template": {
+        const { cmdTemplate } = await import("./commands/template.js");
+        await cmdTemplate(resolveDir(), positional, flags);
+        break;
+      }
       default:
         throw new CLIError(
           `Unknown command: ${command}`,

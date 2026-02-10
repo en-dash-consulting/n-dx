@@ -36,3 +36,7 @@ export {
 } from "./validate.js";
 
 export type { ValidationResult } from "./validate.js";
+
+export { BUILT_IN_TEMPLATES, findBuiltInTemplate } from "./templates.js";
+
+export type { WorkflowTemplate, TemplateConfigOverlay } from "./templates.js";

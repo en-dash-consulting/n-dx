@@ -35,6 +35,7 @@ Commands:
   init [dir]              Create .hench/ with config.json and runs/
   run [dir]               Execute one task from Rex PRD
   config [key] [value]    View or edit workflow configuration
+  template [subcommand]   Manage workflow templates (list, show, apply, save, delete)
   status [dir]            Show recent run history
   show <run-id> [dir]     Show full details of a specific run
 

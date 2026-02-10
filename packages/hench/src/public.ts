@@ -59,6 +59,15 @@ export type {
   TaskBriefLogEntry,
 } from "./schema/v1.js";
 
+// ---- Workflow template types -----------------------------------------------
+
+export { BUILT_IN_TEMPLATES } from "./schema/templates.js";
+
+export type {
+  WorkflowTemplate,
+  TemplateConfigOverlay,
+} from "./schema/templates.js";
+
 // ---- Agent lifecycle types -------------------------------------------------
 
 export type { AgentLoopOptions, AgentLoopResult } from "./agent/lifecycle/loop.js";
