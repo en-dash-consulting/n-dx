@@ -4,6 +4,18 @@
  * These types define the unified interface that both CLI and API providers
  * implement, plus common token usage and configuration types shared across
  * all n-dx packages.
+ *
+ * ## Architectural role
+ *
+ * These types form the **cross-package contract** for the n-dx monorepo.
+ * Domain packages (rex, sourcevision, hench) import these types to
+ * interact with Claude without coupling to each other. Keeping the
+ * contract here — in the leaf of the dependency DAG — prevents circular
+ * dependencies and allows each package to be built and tested in
+ * isolation.
+ *
+ * When adding new shared types, add them here rather than in a domain
+ * package to preserve the acyclic dependency graph.
  */
 
 // ── Token usage ──────────────────────────────────────────────────────────────

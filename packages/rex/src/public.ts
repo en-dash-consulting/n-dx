@@ -5,6 +5,20 @@
  * downstream packages (hench, cli.js, etc.). All other modules are
  * implementation details and should not be imported directly.
  *
+ * ## Architectural isolation
+ *
+ * Rex depends only on `@n-dx/claude-client` (the shared foundation)
+ * and has **no dependency on hench or sourcevision**. This strict
+ * one-way dependency ensures the monorepo's DAG remains acyclic:
+ *
+ * ```
+ *   hench → rex → claude-client ← sourcevision
+ * ```
+ *
+ * Rex can be built, tested, and published independently. Changes here
+ * never create import cycles because no rex module imports from a
+ * downstream package.
+ *
  * ## Cross-package imports
  *
  * Hench uses `import type { PRDStore, PRDItem, ... } from "rex"` for
@@ -12,6 +26,10 @@
  * during compilation and create zero runtime coupling — the packages
  * remain independently deployable. This is the correct pattern for
  * sharing domain contracts across Node.js packages.
+ *
+ * Runtime imports from rex are funnelled through a single gateway module
+ * (`hench/src/prd/ops.ts`) to keep the cross-package surface explicit
+ * and auditable.
  *
  * Validation functions (Zod schemas) are NOT exported here. Consumers
  * that need runtime validation should import directly from

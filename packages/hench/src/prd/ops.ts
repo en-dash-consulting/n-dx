@@ -7,6 +7,22 @@
  * import is funnelled through this single module.  This makes the
  * cross-package dependency surface explicit and easy to audit.
  *
+ * ## Dependency DAG invariant
+ *
+ * Hench is the only domain package that imports from another domain
+ * package (rex).  This creates a strict one-way dependency:
+ *
+ * ```
+ *   hench → rex → claude-client ← sourcevision
+ * ```
+ *
+ * By concentrating all hench→rex runtime imports here, we ensure:
+ * - The cross-package surface is **explicit** (8 re-exports, not 14
+ *   scattered imports).
+ * - The DAG stays **acyclic** — rex never imports from hench.
+ * - Future changes to rex's public API need only be updated in this
+ *   single file.
+ *
  * **Type-only** imports (`import type { PRDStore, … } from "rex"`)
  * are deliberately excluded — they are erased at compile time and
  * create zero runtime coupling.  Those stay at the call-site where

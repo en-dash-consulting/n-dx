@@ -1,6 +1,30 @@
 /**
  * @n-dx/claude-client — Unified Claude API client abstraction layer.
  *
+ * ## Dependency inversion foundation
+ *
+ * This package is the **shared foundation** of the n-dx monorepo. It sits
+ * at the root of the dependency DAG, imported by every domain package but
+ * importing none of them:
+ *
+ * ```
+ *   hench ──→ rex ──→ claude-client
+ *     │                    ↑
+ *     └────────────────────┘
+ *   sourcevision ──→ claude-client
+ *   web ──→ rex, sourcevision
+ * ```
+ *
+ * By centralizing Claude API concerns here, the domain packages (rex,
+ * sourcevision, hench) avoid any direct dependency on each other's
+ * internals for AI communication. This **dependency inversion** ensures:
+ *
+ * - **No circular dependencies** — the DAG is strictly acyclic.
+ * - **Independent development** — each domain package can be built and
+ *   tested in isolation, with only claude-client as a shared contract.
+ * - **Single point of change** — provider upgrades, auth changes, and
+ *   retry policy updates happen here without touching domain packages.
+ *
  * ## Architecture
  *
  * This package encapsulates all Claude API concerns behind a single
