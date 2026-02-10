@@ -7,14 +7,14 @@
 Zone: Orchestration Layer (`orchestration-layer`)
 Files: 4, Cohesion: 1.00, Coupling: 0.00
 Description: Top-level command router and tool coordination that delegates workflow commands to specialized packages.
-Lines: 1604
+Lines: 1614
 
 </zone>
 
 <files>
 
 ci.js (JavaScript, 263 lines, source)
-cli.js (JavaScript, 241 lines, source)
+cli.js (JavaScript, 251 lines, source)
 config.js (JavaScript, 799 lines, source)
 web.js (JavaScript, 301 lines, source)
 
@@ -32,7 +32,9 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution
+[observation] [info] Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling
+[observation] [warning] Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution
+[observation] [info] Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations
 
 </findings>
 
@@ -43,11 +45,7 @@ Internal:
 - Provides error handling with user-friendly hints and suggestions for common failure scenarios
 - Coordinates sequential tool execution (sourcevision → rex → hench) for end-to-end workflows
 - Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations
-- Implements command dispatch pattern via shell spawning rather than direct imports for loose coupling
-- Uses compiled CLI entry points (/dist/cli/) to avoid build-time dependencies between packages
 - Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling
-- Uses hardcoded relative paths (packages/*/dist/cli/index.js) in cli.js:55-59 creating implicit coupling to build output structure
-- Tool dispatch table uses string keys matching package names, creating implicit naming contract between orchestration and package structure
 - Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution
 
 </insights>

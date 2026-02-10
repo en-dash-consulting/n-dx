@@ -8,7 +8,7 @@ Zone: Analysis Engine (`packages-sourcevision:analysis-engine`)
 Files: 33, Cohesion: 0.94, Coupling: 0.06
 Description: Core analysis pipeline including file inventory, import graph extraction, Louvain community detection, route parsing, AI enrichment, and CLI orchestration.
 Entry points: packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/imports.ts, packages/sourcevision/src/analyzers/inventory.ts, packages/sourcevision/src/analyzers/zones.ts, packages/sourcevision/src/schema/data-files.ts
-Lines: 11488
+Lines: 11501
 
 </zone>
 
@@ -33,7 +33,7 @@ packages/sourcevision/src/cli/commands/reset.ts (TypeScript, 43 lines, source)
 packages/sourcevision/src/cli/commands/validate.ts (TypeScript, 70 lines, source)
 packages/sourcevision/src/cli/index.ts (TypeScript, 107 lines, source)
 packages/sourcevision/src/cli/mcp.ts (TypeScript, 407 lines, source)
-packages/sourcevision/src/cli/serve.ts (TypeScript, 9 lines, source)
+packages/sourcevision/src/cli/serve.ts (TypeScript, 22 lines, source)
 packages/sourcevision/src/schema/data-files.ts (TypeScript, 11 lines, source)
 packages/sourcevision/src/schema/index.ts (TypeScript, 17 lines, source)
 packages/sourcevision/src/util/merge.ts (TypeScript, 186 lines, source)
@@ -145,7 +145,7 @@ Outgoing (this zone → other zones):
   → packages-sourcevision:test-suite: packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/validate.ts
 
 Incoming (other zones → this zone):
-  ← packages-sourcevision:interactive-viewer: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts
+  ← packages-sourcevision:interactive-viewer: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts
   ← packages-sourcevision:test-suite: packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/components.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/components.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/imports.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/imports.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/inventory.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/inventory.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/zones.ts; packages/sourcevision/tests/integration/pipeline.test.ts → packages/sourcevision/src/analyzers/zones.ts
 
 </imports>

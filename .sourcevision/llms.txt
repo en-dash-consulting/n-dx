@@ -5,12 +5,12 @@
 
 ## Project Overview
 
-- **Files**: 474
-- **Lines of code**: 125,015
-- **Languages**: TypeScript (384), CSS (25), JSON (24), Other (14), JavaScript (12)
-- **Zones**: 8 (8 with descriptions)
+- **Files**: 494
+- **Lines of code**: 129,508
+- **Languages**: TypeScript (397), JSON (26), CSS (25), Other (16), Markdown (13)
+- **Zones**: 9 (9 with descriptions)
 - **Git**: feature/from-recommend @ a67e98f
-- **Analyzed**: 2026-02-10T03:30:53.703Z
+- **Analyzed**: 2026-02-10T04:42:49.067Z
 
 ## Architecture Zones
 
@@ -29,6 +29,14 @@ Unified Claude API client abstraction supporting dual provider architecture (API
 - Files: 15
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/claude-integration-layer/context.md`
+
+### Integrated Web Dashboard (`integrated-web-dashboard`)
+
+Multi-package web interface providing unified visualization and control for sourcevision analysis, rex PRD management, and hench execution monitoring.
+
+- Files: 111
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/integrated-web-dashboard/context.md`
 
 ### Orchestration Layer (`orchestration-layer`)
 
@@ -85,24 +93,24 @@ Unit, integration, and end-to-end tests covering analyzer logic, schema validati
 
 ### Most-Imported Files
 
-- `packages/rex/src/core/tree.ts` (29 imports)
+- `packages/rex/src/core/tree.ts` (31 imports)
 - `packages/rex/src/cli/errors.ts` (23 imports)
 - `packages/rex/src/store/index.ts` (23 imports)
 - `packages/rex/src/cli/output.ts` (22 imports)
 - `packages/rex/src/cli/commands/constants.ts` (21 imports)
 - `packages/rex/src/schema/index.ts` (21 imports)
 - `packages/rex/src/core/canonical.ts` (16 imports)
-- `packages/sourcevision/src/viewer/components/logos.ts` (15 imports)
+- `packages/web/src/viewer/components/logos.ts` (15 imports)
 - `packages/hench/src/store/config.ts` (14 imports)
 - `packages/rex/src/analyze/reason.ts` (14 imports)
 
 ### External Packages
 
-- `vitest` (used by 165 files)
-- `preact` (used by 44 files)
+- `vitest` (used by 171 files)
+- `preact` (used by 45 files)
 - `rex` (used by 13 files)
 - `@n-dx/claude-client` (used by 10 files)
-- `zod` (used by 8 files)
+- `zod` (used by 9 files)
 - `@anthropic-ai/sdk` (used by 7 files)
 - `@modelcontextprotocol/sdk` (used by 4 files)
 - `child_process` (used by 3 files)
@@ -130,58 +138,25 @@ Unit, integration, and end-to-end tests covering analyzer logic, schema validati
 
 ## Findings
 
-### Anti-patterns
-
-- Multi-package web server (with rex, hench, and sourcevision routes) is architecturally misplaced inside packages/sourcevision/ rather than at the orchestration layer where cross-package concerns belong. This creates artificial coupling and violates the clean three-layer architecture. [critical]
-
-### Patterns
-
-- Hybrid architectural pattern combines process-based orchestration with selective direct imports for performance-critical paths [info]
-
-### Relationships
-
-- Clean dependency inversion through claude-client shared foundation prevents circular dependencies between domain packages [info]
-
 ### Observations
 
-- Contains 61% of project files (80/131) — subdivided into 5 sub-zones [info] (autonomous-agent-system)
 - High cohesion (1) — files are tightly interconnected [info] (autonomous-agent-system)
 - High cohesion (1) — files are tightly interconnected [info] (claude-integration-layer)
-- Size imbalance: largest zone has 80 files vs smallest with 4 — uneven decomposition [info]
+- Size imbalance: largest zone has 111 files vs smallest with 4 — uneven decomposition [info]
+- Contains 44% of project files (111/252) — subdivided into 4 sub-zones [info] (integrated-web-dashboard)
+- High cohesion (1) — files are tightly interconnected [info] (integrated-web-dashboard)
 - High cohesion (1) — files are tightly interconnected [info] (orchestration-layer)
-- Perfect architectural isolation with no circular dependencies enables independent development and testing of each subsystem [info]
-
-### Suggestions
-
+- Direct import coupling with rex package for PRD operations while maintaining clean boundaries with sourcevision [info] (autonomous-agent-system)
 - Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach [info] (autonomous-agent-system)
-- Uses wildcard version 'rex': '*' instead of workspace protocol for local dependency consistency [info] (autonomous-agent-system)
-- Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, hench, sourcevision use unscoped names [info] (claude-integration-layer)
-- Inconsistent package export strategies across packages - standardize exports field usage for programmatic consumption [info]
-- Mixed workspace dependency protocols: 'workspace:*' vs '*' wildcard - standardize to workspace protocol for local packages [info]
-- Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution [info] (orchestration-layer)
+- Large subsystem with strong internal cohesion indicates well-organized autonomous execution capabilities [info] (autonomous-agent-system)
+- Excellent architectural isolation with 15 focused files providing complete Claude API abstraction [info] (claude-integration-layer)
+- ... and 11 more
 
 ## Next Steps
 
 Prioritized work items derived from analysis:
 
-### High Priority
-
-1. **Multi-package web server (with rex, hench, and sourcevision routes) is architec…**
-
-### Low Priority
-
-1. **Inconsistent rex import patterns: static imports in some files, dynamic imports…**
-   Files: `packages/hench/src/agent/analysis/review.ts`, `packages/hench/src/agent/analysis/stuck.ts`, `packages/hench/src/agent/analysis/summary.ts`
-
-1. **Uses wildcard version 'rex': '*' instead of workspace protocol for local depend…**
-   Files: `packages/hench/src/agent/analysis/review.ts`, `packages/hench/src/agent/analysis/stuck.ts`, `packages/hench/src/agent/analysis/summary.ts`
-
-1. **Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, …**
-   Files: `packages/claude-client/src/api-provider.ts`, `packages/claude-client/src/auth.ts`, `packages/claude-client/src/cli-provider.ts`
-
-1. **Inconsistent package export strategies across packages - standardize exports fi…**
-
-1. **Mixed workspace dependency protocols: 'workspace:*' vs '*' wildcard - standardi…**
+### Medium Priority
 
 1. **Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - con…**
    Files: `ci.js`, `cli.js`, `config.js`
@@ -204,6 +179,8 @@ Prioritized work items derived from analysis:
 | `ci.js` | source | orchestration-layer |
 | `cli.js` | source | orchestration-layer |
 | `config.js` | source | orchestration-layer |
+| `docs/viewer-architecture.md` | docs |  |
+| `docs/viewer-audit.md` | docs |  |
 | `n-dx.png` | asset |  |
 | `package.json` | config |  |
 | `packages/claude-client/package.json` | config |  |
@@ -360,6 +337,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/core/dag.ts` | source | packages-rex:rex-cli |
 | `packages/rex/src/core/fix.ts` | source |  |
 | `packages/rex/src/core/keywords.ts` | source |  |
+| `packages/rex/src/core/merge.ts` | source |  |
 | `packages/rex/src/core/move.ts` | source |  |
 | `packages/rex/src/core/next-task.ts` | source | packages-rex:rex-cli |
 | `packages/rex/src/core/notion-map.ts` | source |  |
@@ -437,6 +415,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/tests/unit/core/dag.test.ts` | test | packages-rex:rex-cli |
 | `packages/rex/tests/unit/core/fix.test.ts` | test |  |
 | `packages/rex/tests/unit/core/keywords.test.ts` | test |  |
+| `packages/rex/tests/unit/core/merge.test.ts` | test |  |
 | `packages/rex/tests/unit/core/move.test.ts` | test |  |
 | `packages/rex/tests/unit/core/next-task-matching.test.ts` | test |  |
 | `packages/rex/tests/unit/core/next-task-scoring.test.ts` | test |  |
@@ -469,8 +448,6 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/README.md` | docs |  |
 | `packages/sourcevision/SourceVision-F.png` | asset |  |
 | `packages/sourcevision/SourceVision.png` | asset |  |
-| `packages/sourcevision/build.js` | source |  |
-| `packages/sourcevision/dev.js` | source |  |
 | `packages/sourcevision/package.json` | config |  |
 | `packages/sourcevision/src/analyzers/claude-client.ts` | source |  |
 | `packages/sourcevision/src/analyzers/components.ts` | source | packages-sourcevision:analysis-engine |
@@ -502,17 +479,6 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/cli/mcp.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/cli/output.ts` | source |  |
 | `packages/sourcevision/src/cli/serve.ts` | source | packages-sourcevision:analysis-engine |
-| `packages/sourcevision/src/cli/server/index.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-data.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-hench.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-rex.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-sourcevision.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-static.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-token-usage.ts` | source |  |
-| `packages/sourcevision/src/cli/server/routes-validation.ts` | source |  |
-| `packages/sourcevision/src/cli/server/start.ts` | source |  |
-| `packages/sourcevision/src/cli/server/types.ts` | source |  |
-| `packages/sourcevision/src/cli/server/websocket.ts` | source |  |
 | `packages/sourcevision/src/export/pdf-report.ts` | source |  |
 | `packages/sourcevision/src/public.ts` | source |  |
 | `packages/sourcevision/src/schema/data-files.ts` | source | packages-sourcevision:analysis-engine |
@@ -521,79 +487,6 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/schema/validate.ts` | source | packages-sourcevision:test-suite |
 | `packages/sourcevision/src/util/merge.ts` | source | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/src/util/sort.ts` | source | packages-sourcevision:analysis-engine |
-| `packages/sourcevision/src/viewer/components/constants.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/data-display/findings-list.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/data-display/health-gauge.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/data-display/mini-charts.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/data-display/tree-view.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/data-display/zone-map.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/detail-panel.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/components/faq.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/guide.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/components/logos.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/compute.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/index.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/prd-tree/types.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/rex-task-link.ts` | source |  |
-| `packages/sourcevision/src/viewer/components/search-filter.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/components/sidebar.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/components/theme-toggle.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/darkmode_logo.png` | asset | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/graph/physics.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/graph/renderer.ts` | source |  |
-| `packages/sourcevision/src/viewer/index.html` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/lightmode_logo.png` | asset | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/loader.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/main.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/schema-compat.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/a11y.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/analysis.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/base.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/branding.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/cards.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/components.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/detail.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/faq.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/forms.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/graph.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/hench-runs.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/index.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/layout.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/overview.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/prd-tree.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/responsive.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/rex-dashboard.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/routes.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/tables.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/task-link.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/token-usage.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/tokens.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/utils.css` | other | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/styles/validation.css` | other |  |
-| `packages/sourcevision/src/viewer/styles/zone-map.css` | other |  |
-| `packages/sourcevision/src/viewer/types.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/utils.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/analysis.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/architecture.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/files.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/graph.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/hench-runs.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/overview.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/prd.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/problems.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/rex-dashboard.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/routes.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/suggestions.ts` | source | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/src/viewer/views/token-usage.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/validation.ts` | source |  |
-| `packages/sourcevision/src/viewer/views/zones.ts` | source | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/tests/e2e/cli-analyze.test.ts` | test | packages-sourcevision:test-suite |
 | `packages/sourcevision/tests/e2e/cli-serve.test.ts` | test | packages-sourcevision:test-suite |
 | `packages/sourcevision/tests/fixtures/remix-app/app/root.tsx` | test |  |
@@ -632,33 +525,135 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/tests/unit/export/pdf-report.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/schema/data-files.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/schema/validate.test.ts` | test | packages-sourcevision:test-suite |
-| `packages/sourcevision/tests/unit/server/routes-data.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/routes-rex.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/routes-token-usage.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/routes-validation.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/type-consistency.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/server/websocket.test.ts` | test |  |
 | `packages/sourcevision/tests/unit/util/merge.test.ts` | test | packages-sourcevision:analysis-engine |
 | `packages/sourcevision/tests/unit/util/sort.test.ts` | test | packages-sourcevision:analysis-engine |
-| `packages/sourcevision/tests/unit/viewer/accessibility.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/viewer/bar-chart.test.ts` | test | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts` | test | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/tests/unit/viewer/detail-panel.test.ts` | test | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts` | test | packages-sourcevision:interactive-viewer |
-| `packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/viewer/prd-tree.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/viewer/sidebar.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/viewer/status-filter.test.ts` | test |  |
-| `packages/sourcevision/tests/unit/viewer/tree-view.test.ts` | test | packages-sourcevision:interactive-viewer |
 | `packages/sourcevision/tsconfig.json` | config |  |
 | `packages/sourcevision/vitest.config.ts` | config |  |
+| `packages/web/SourceVision-F.png` | asset |  |
+| `packages/web/SourceVision.png` | asset |  |
+| `packages/web/build.js` | source |  |
+| `packages/web/dev.js` | source |  |
+| `packages/web/package.json` | config |  |
+| `packages/web/src/cli/index.ts` | source | integrated-web-dashboard |
+| `packages/web/src/public.ts` | source | integrated-web-dashboard |
+| `packages/web/src/schema/data-files.ts` | source | integrated-web-dashboard |
+| `packages/web/src/schema/v1.ts` | source | integrated-web-dashboard |
+| `packages/web/src/schema/validate.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/index.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-data.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-hench.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-rex.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-sourcevision.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-static.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-token-usage.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/routes-validation.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/start.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/types.ts` | source | integrated-web-dashboard |
+| `packages/web/src/server/websocket.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/constants.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/collapsible-section.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/findings-list.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/health-gauge.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/mini-charts.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/tree-view.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/data-display/zone-map.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/detail-panel.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/faq.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/favicon.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/guide.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/logos.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/add-item-form.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/analyze-panel.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/compute.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/index.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/merge-preview.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/prd-tree.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/types.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/rex-task-link.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/search-filter.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/sidebar.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/components/theme-toggle.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/darkmode_logo.png` | asset | integrated-web-dashboard |
+| `packages/web/src/viewer/graph/physics.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/graph/renderer.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/index.html` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/lightmode_logo.png` | asset | integrated-web-dashboard |
+| `packages/web/src/viewer/loader.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/main.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/schema-compat.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/a11y.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/analysis.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/base.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/branding.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/cards.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/components.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/detail.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/faq.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/forms.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/graph.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/hench-runs.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/index.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/layout.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/overview.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/prd-tree.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/responsive.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/rex-dashboard.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/routes.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/tables.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/task-link.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/token-usage.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/tokens.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/utils.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/validation.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/styles/zone-map.css` | other | integrated-web-dashboard |
+| `packages/web/src/viewer/types.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/utils.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/analysis.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/architecture.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/files.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/graph.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/hench-runs.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/overview.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/prd.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/problems.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/rex-dashboard.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/routes.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/suggestions.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/token-usage.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/validation.ts` | source | integrated-web-dashboard |
+| `packages/web/src/viewer/views/zones.ts` | source | integrated-web-dashboard |
+| `packages/web/tests/unit/server/dev-reload.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/routes-data.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/routes-rex.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/routes-sourcevision.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/routes-token-usage.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/routes-validation.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/scope.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/type-consistency.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/server/websocket.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/accessibility.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/bar-chart.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/detail-panel.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/favicon.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/prd-tree-compute.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/prd-tree.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/sidebar.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/status-filter.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tests/unit/viewer/tree-view.test.ts` | test | integrated-web-dashboard |
+| `packages/web/tsconfig.json` | config |  |
+| `packages/web/vitest.config.ts` | config |  |
 | `pnpm-lock.yaml` | generated |  |
 | `pnpm-workspace.yaml` | other |  |
 | `prd.md` | docs |  |
 | `tests/e2e/cli-ci.test.js` | test |  |
 | `tests/e2e/cli-config.test.js` | test |  |
 | `tests/e2e/cli-delegation.test.js` | test |  |
+| `tests/e2e/cli-dev.test.js` | test |  |
 | `tests/e2e/cli-errors.test.js` | test |  |
 | `tests/e2e/cli-web.test.js` | test |  |
 | `tsconfig.base.json` | config |  |

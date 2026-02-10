@@ -1,0 +1,36 @@
+{
+  "id": "web/server",
+  "name": "Server",
+  "description": "22 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/cli/index.ts",
+    "packages/web/src/public.ts",
+    "packages/web/src/schema/data-files.ts",
+    "packages/web/src/server/index.ts",
+    "packages/web/src/server/routes-data.ts",
+    "packages/web/src/server/routes-hench.ts",
+    "packages/web/src/server/routes-rex.ts",
+    "packages/web/src/server/routes-sourcevision.ts",
+    "packages/web/src/server/routes-static.ts",
+    "packages/web/src/server/routes-token-usage.ts",
+    "packages/web/src/server/routes-validation.ts",
+    "packages/web/src/server/start.ts",
+    "packages/web/src/server/types.ts",
+    "packages/web/src/server/websocket.ts",
+    "packages/web/tests/unit/server/dev-reload.test.ts",
+    "packages/web/tests/unit/server/routes-data.test.ts",
+    "packages/web/tests/unit/server/routes-rex.test.ts",
+    "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+    "packages/web/tests/unit/server/routes-token-usage.test.ts",
+    "packages/web/tests/unit/server/routes-validation.test.ts",
+    "packages/web/tests/unit/server/scope.test.ts",
+    "packages/web/tests/unit/server/websocket.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/schema/data-files.ts"
+  ],
+  "cohesion": 0.98,
+  "coupling": 0.02,
+  "fileCount": 22,
+  "lineCount": 5560
+}

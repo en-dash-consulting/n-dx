@@ -5731,7 +5731,7 @@
         {
           "id": "36e132ef-5b70-4ddd-8469-daf8be5cf497",
           "title": "MCP over HTTP transport",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Add StreamableHTTP transport to both rex and sourcevision MCP servers, mounted as endpoints on the existing web HTTP server. This enables any MCP client (not just Claude Code via stdio) to connect over HTTP. The existing stdio transport remains for backward compatibility with `claude mcp add`.",
           "priority": "high",
@@ -5739,6 +5739,8 @@
             "mcp",
             "transport"
           ],
+          "startedAt": "2026-02-10T04:53:57.230Z",
+          "completedAt": "2026-02-10T04:53:57.230Z",
           "children": [
             {
               "id": "79e9634f-ee12-435f-b2b2-327eb2ca5409",
@@ -5773,7 +5775,7 @@
             {
               "id": "3e31381a-d48d-4223-88f3-d9a121893d46",
               "title": "Mount MCP endpoints on web HTTP server",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "In the web server (`start.ts`), add `/mcp/rex` and `/mcp/sourcevision` routes that use StreamableHTTPServerTransport from `@modelcontextprotocol/sdk`. These endpoints handle MCP JSON-RPC over HTTP alongside the existing REST API routes and static assets, all on the same port.",
               "acceptanceCriteria": [
@@ -5782,7 +5784,9 @@
                 "Existing REST API routes and viewer continue working",
                 "CORS headers allow cross-origin MCP connections"
               ],
-              "priority": "high"
+              "priority": "high",
+              "startedAt": "2026-02-10T04:46:54.747Z",
+              "completedAt": "2026-02-10T04:53:57.186Z"
             }
           ]
         },
@@ -5801,7 +5805,7 @@
             {
               "id": "3e08d89e-3488-4220-b9c8-c5511b6c2be5",
               "title": "Implement `ndx start` command with web + MCP",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Add `ndx start` to cli.js that starts the unified server (web dashboard + MCP HTTP endpoints). Supports `--port`, `--background`, `stop`, `status` (same UX as current `ndx web`). Make `ndx web` either an alias for `ndx start` or keep it as web-only for backward compatibility.",
               "acceptanceCriteria": [
@@ -5810,7 +5814,8 @@
                 "`ndx start stop` and `ndx start status` work",
                 "PID file management works correctly"
               ],
-              "priority": "high"
+              "priority": "high",
+              "startedAt": "2026-02-10T04:54:21.510Z"
             },
             {
               "id": "16b5e4ae-b595-4ac0-9c5a-d2664336540d",
@@ -5840,6 +5845,8 @@
         "architecture",
         "dx"
       ],
+      "startedAt": "2026-02-10T04:35:42.328Z",
+      "completedAt": "2026-02-10T04:35:42.328Z",
       "children": [
         {
           "id": "e49a1812-e055-435f-8c78-b059cc724fc4",
@@ -6007,9 +6014,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-10T04:35:42.328Z",
-      "completedAt": "2026-02-10T04:35:42.328Z"
+      ]
     },
     {
       "id": "42236330-dbea-4f88-ab7a-4544cda68cc6",

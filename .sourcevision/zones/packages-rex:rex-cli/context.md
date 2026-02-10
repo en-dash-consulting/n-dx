@@ -7,7 +7,7 @@
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 9642
+Lines: 9725
 
 </zone>
 
@@ -27,7 +27,7 @@ packages/rex/src/cli/commands/status.ts (TypeScript, 280 lines, source)
 packages/rex/src/cli/commands/update.ts (TypeScript, 200 lines, source)
 packages/rex/src/cli/commands/validate.ts (TypeScript, 200 lines, source)
 packages/rex/src/cli/index.ts (TypeScript, 298 lines, source)
-packages/rex/src/cli/mcp.ts (TypeScript, 720 lines, source)
+packages/rex/src/cli/mcp.ts (TypeScript, 803 lines, source)
 packages/rex/src/core/canonical.ts (TypeScript, 21 lines, source)
 packages/rex/src/core/dag.ts (TypeScript, 84 lines, source)
 packages/rex/src/core/next-task.ts (TypeScript, 446 lines, source)
@@ -170,6 +170,9 @@ Internal:
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem}
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
+
+Incoming (other zones → this zone):
+  ← integrated-web-dashboard: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
 
 </imports>
 

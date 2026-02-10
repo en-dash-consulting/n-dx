@@ -4206,6 +4206,16 @@
     },
     {
       "from": "packages/rex/src/cli/mcp.ts",
+      "to": "packages/rex/src/core/merge.ts",
+      "type": "static",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/mcp.ts",
       "to": "packages/rex/src/core/move.ts",
       "type": "static",
       "symbols": [
@@ -4402,6 +4412,25 @@
       "symbols": [
         "PRDItem",
         "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/rex/src/core/merge.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "removeFromTree",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/rex/src/core/merge.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
       ]
     },
     {
@@ -4774,6 +4803,27 @@
       "symbols": [
         "extractKeywords",
         "scoreMatch"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/merge.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/core/merge.ts",
+      "type": "type",
+      "symbols": [
+        "MergeOptions",
+        "MergeValidation",
+        "MergePreview",
+        "MergeResult"
       ]
     },
     {
@@ -6069,6 +6119,32 @@
         "extractKeywords",
         "scoreMatch",
         "STOP_WORDS"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/merge.test.ts",
+      "to": "packages/rex/src/core/merge.ts",
+      "type": "static",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/merge.test.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/merge.test.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
       ]
     },
     {
@@ -7799,272 +7875,6 @@
       ]
     },
     {
-      "from": "packages/sourcevision/src/cli/serve.ts",
-      "to": "packages/sourcevision/src/cli/server/index.ts",
-      "type": "reexport",
-      "symbols": [
-        "startServer"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/serve.ts",
-      "to": "packages/sourcevision/src/cli/server/index.ts",
-      "type": "type",
-      "symbols": [
-        "ServerOptions"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/index.ts",
-      "to": "packages/sourcevision/src/cli/server/start.ts",
-      "type": "reexport",
-      "symbols": [
-        "startServer"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/index.ts",
-      "to": "packages/sourcevision/src/cli/server/start.ts",
-      "type": "type",
-      "symbols": [
-        "ServerOptions"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/index.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext",
-        "RouteHandler"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/index.ts",
-      "to": "packages/sourcevision/src/cli/server/websocket.ts",
-      "type": "type",
-      "symbols": [
-        "WebSocketBroadcaster"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-data.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES",
-        "SUPPLEMENTARY_FILES"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-hench.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse",
-        "errorResponse"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-hench.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse",
-        "errorResponse",
-        "readBody"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-rex.ts",
-      "to": "packages/sourcevision/src/cli/server/websocket.ts",
-      "type": "type",
-      "symbols": [
-        "WebSocketBroadcaster"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse",
-        "errorResponse"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-static.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-token-usage.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse",
-        "errorResponse"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-token-usage.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-validation.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "static",
-      "symbols": [
-        "jsonResponse",
-        "errorResponse"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/routes-validation.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-data.ts",
-      "type": "static",
-      "symbols": [
-        "createDataWatcher",
-        "handleDataRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-hench.ts",
-      "type": "static",
-      "symbols": [
-        "handleHenchRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-rex.ts",
-      "type": "static",
-      "symbols": [
-        "handleRexRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
-      "type": "static",
-      "symbols": [
-        "handleSourcevisionRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-static.ts",
-      "type": "static",
-      "symbols": [
-        "resolveStaticAssets",
-        "handleStaticRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "handleTokenUsageRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-validation.ts",
-      "type": "static",
-      "symbols": [
-        "handleValidationRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/cli/server/websocket.ts",
-      "type": "static",
-      "symbols": [
-        "createWebSocketManager"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/cli/server/start.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES"
-      ]
-    },
-    {
       "from": "packages/sourcevision/src/export/pdf-report.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
@@ -8169,1241 +7979,6 @@
         "ComponentUsageEdge",
         "RouteModule",
         "Components"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "to": "packages/sourcevision/src/viewer/components/search-filter.ts",
-      "type": "static",
-      "symbols": [
-        "SearchFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "ZoneCrossing"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/detail-panel.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/detail-panel.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "NavigateTo",
-        "DetailItem",
-        "FileDetail",
-        "ZoneDetail"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/detail-panel.ts",
-      "to": "packages/sourcevision/src/viewer/utils.ts",
-      "type": "static",
-      "symbols": [
-        "meterClass"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "ItemLevel",
-        "Priority"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "ItemStatus"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "BranchStats",
-        "ItemStatus"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
-      "type": "reexport",
-      "symbols": [
-        "AddItemForm"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
-      "type": "type",
-      "symbols": [
-        "AddItemFormProps",
-        "AddItemInput"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
-      "type": "reexport",
-      "symbols": [
-        "AnalyzePanel"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
-      "type": "type",
-      "symbols": [
-        "AnalyzePanelProps"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
-      "type": "reexport",
-      "symbols": [
-        "BulkActions"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
-      "type": "type",
-      "symbols": [
-        "BulkActionsProps"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
-      "type": "reexport",
-      "symbols": [
-        "computeBranchStats",
-        "completionRatio",
-        "countChildStatuses",
-        "formatTimestamp",
-        "itemMatchesFilter",
-        "filterTree"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-      "type": "reexport",
-      "symbols": [
-        "PRDTree"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-      "type": "type",
-      "symbols": [
-        "PRDTreeProps"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
-      "type": "reexport",
-      "symbols": [
-        "StatusFilter",
-        "defaultStatusFilter",
-        "ALL_STATUSES",
-        "FILTER_PRESETS",
-        "activePresetKey"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
-      "type": "type",
-      "symbols": [
-        "StatusFilterProps",
-        "FilterPreset"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "reexport",
-      "symbols": [
-        "TaskDetail"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "type",
-      "symbols": [
-        "TaskDetailProps"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "PRDDocumentData",
-        "ItemLevel",
-        "ItemStatus",
-        "Priority",
-        "BranchStats"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
-      "type": "static",
-      "symbols": [
-        "computeBranchStats",
-        "completionRatio",
-        "formatTimestamp",
-        "itemMatchesFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
-      "type": "static",
-      "symbols": [
-        "StatusFilter",
-        "defaultStatusFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "PRDDocumentData",
-        "ItemStatus",
-        "ItemLevel",
-        "Priority"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "ItemStatus"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
-      "type": "static",
-      "symbols": [
-        "formatTimestamp"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "ItemStatus",
-        "Priority"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/rex-task-link.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Manifest",
-        "Zones"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/viewer/components/faq.ts",
-      "type": "static",
-      "symbols": [
-        "FAQ"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "NdxLogoPng",
-        "ProductLogoPng"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/viewer/components/theme-toggle.ts",
-      "type": "static",
-      "symbols": [
-        "SidebarThemeToggle"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/graph/renderer.ts",
-      "to": "packages/sourcevision/src/viewer/graph/physics.ts",
-      "type": "static",
-      "symbols": [
-        "initZoneClusteredPositions",
-        "tick"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/graph/renderer.ts",
-      "to": "packages/sourcevision/src/viewer/graph/physics.ts",
-      "type": "type",
-      "symbols": [
-        "SimState",
-        "TickCallbacks"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Manifest",
-        "Inventory",
-        "Imports",
-        "Zones",
-        "Components"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/schema/validate.ts",
-      "type": "static",
-      "symbols": [
-        "validateManifest",
-        "validateInventory",
-        "validateImports",
-        "validateZones",
-        "validateComponents"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/viewer/schema-compat.ts",
-      "type": "static",
-      "symbols": [
-        "migrateData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/components/detail-panel.ts",
-      "type": "static",
-      "symbols": [
-        "DetailPanel"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/components/guide.ts",
-      "type": "static",
-      "symbols": [
-        "Guide"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/components/sidebar.ts",
-      "type": "static",
-      "symbols": [
-        "Sidebar"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/components/theme-toggle.ts",
-      "type": "static",
-      "symbols": [
-        "initTheme"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/loader.ts",
-      "type": "static",
-      "symbols": [
-        "loadFromServer",
-        "loadFromFiles",
-        "detectMode",
-        "onDataChange",
-        "startPolling",
-        "stopPolling"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "ViewId",
-        "NavigateTo",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/analysis.ts",
-      "type": "static",
-      "symbols": [
-        "AnalysisView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "type": "static",
-      "symbols": [
-        "ArchitectureView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/files.ts",
-      "type": "static",
-      "symbols": [
-        "FilesView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/graph.ts",
-      "type": "static",
-      "symbols": [
-        "Graph"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/hench-runs.ts",
-      "type": "static",
-      "symbols": [
-        "HenchRunsView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/overview.ts",
-      "type": "static",
-      "symbols": [
-        "Overview"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/prd.ts",
-      "type": "static",
-      "symbols": [
-        "PRDView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/problems.ts",
-      "type": "static",
-      "symbols": [
-        "ProblemsView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-      "type": "static",
-      "symbols": [
-        "RexDashboard"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/routes.ts",
-      "type": "static",
-      "symbols": [
-        "RoutesView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "type": "static",
-      "symbols": [
-        "SuggestionsView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "TokenUsageView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/validation.ts",
-      "type": "static",
-      "symbols": [
-        "ValidationView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/viewer/views/zones.ts",
-      "type": "static",
-      "symbols": [
-        "ZonesView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/schema-compat.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "static",
-      "symbols": [
-        "SCHEMA_VERSION"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/schema-compat.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/types.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Manifest",
-        "Inventory",
-        "Imports",
-        "Zones",
-        "Components"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/utils.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zones"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/utils.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/analysis.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/analysis.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
-      "type": "static",
-      "symbols": [
-        "AnalyzePanel"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
-      "symbols": [
-        "FindingsList"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart",
-        "FlowDiagram"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "NavigateTo",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/architecture.ts",
-      "to": "packages/sourcevision/src/viewer/utils.ts",
-      "type": "static",
-      "symbols": [
-        "buildFlowNodes",
-        "buildFlowEdges"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/files.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "FileEntry"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/files.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/files.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/files.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "NavigateTo",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/files.ts",
-      "to": "packages/sourcevision/src/viewer/utils.ts",
-      "type": "static",
-      "symbols": [
-        "buildFileToZoneMap"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/graph.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/graph.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/graph.ts",
-      "to": "packages/sourcevision/src/viewer/graph/renderer.ts",
-      "type": "static",
-      "symbols": [
-        "GraphRenderer"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/graph.ts",
-      "to": "packages/sourcevision/src/viewer/graph/renderer.ts",
-      "type": "type",
-      "symbols": [
-        "GraphNode",
-        "GraphLink"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/graph.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/hench-runs.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/hench-runs.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/hench-runs.ts",
-      "to": "packages/sourcevision/src/viewer/components/rex-task-link.ts",
-      "type": "static",
-      "symbols": [
-        "RexTaskLink"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/hench-runs.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "NavigateTo"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "HealthGauge",
-        "PatternBadge",
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
-      "type": "static",
-      "symbols": [
-        "ZoneMap",
-        "ZoneDetail"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/overview.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "NavigateTo",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
-      "type": "static",
-      "symbols": [
-        "AddItemForm"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
-      "type": "static",
-      "symbols": [
-        "BulkActions"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "type": "static",
-      "symbols": [
-        "PRDTree"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/index.ts",
-      "type": "type",
-      "symbols": [
-        "PRDDocumentData",
-        "PRDItemData",
-        "AddItemInput"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "static",
-      "symbols": [
-        "TaskDetail"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/prd.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
-      "symbols": [
-        "FindingsList"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/problems.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/sourcevision/src/viewer/components/rex-task-link.ts",
-      "type": "static",
-      "symbols": [
-        "RexTaskLink"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId",
-        "NavigateTo"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "RouteTreeNode",
-        "RouteExportKind",
-        "ComponentUsageEdge"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
-      "type": "static",
-      "symbols": [
-        "TreeView"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
-      "type": "type",
-      "symbols": [
-        "TreeNode"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/components/search-filter.ts",
-      "type": "static",
-      "symbols": [
-        "SearchFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/routes.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
-      "symbols": [
-        "FindingsList"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/suggestions.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/token-usage.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/token-usage.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/token-usage.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/validation.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ZONE_COLORS"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "FlowDiagram"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/components/search-filter.ts",
-      "type": "static",
-      "symbols": [
-        "SearchFilter"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "LoadedData",
-        "NavigateTo",
-        "DetailItem"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/views/zones.ts",
-      "to": "packages/sourcevision/src/viewer/utils.ts",
-      "type": "static",
-      "symbols": [
-        "meterClass",
-        "buildFlowNodes",
-        "buildFlowEdges"
       ]
     },
     {
@@ -9986,114 +8561,6 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/server/routes-data.test.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-data.ts",
-      "type": "static",
-      "symbols": [
-        "createDataWatcher",
-        "handleDataRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-data.test.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-rex.ts",
-      "type": "static",
-      "symbols": [
-        "handleRexRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-sourcevision.ts",
-      "type": "static",
-      "symbols": [
-        "handleSourcevisionRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-token-usage.test.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "handleTokenUsageRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-token-usage.test.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-validation.test.ts",
-      "to": "packages/sourcevision/src/cli/server/routes-validation.ts",
-      "type": "static",
-      "symbols": [
-        "handleValidationRoute"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/routes-validation.test.ts",
-      "to": "packages/sourcevision/src/cli/server/types.ts",
-      "type": "type",
-      "symbols": [
-        "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/type-consistency.test.ts",
-      "to": "packages/rex/src/schema/v1.ts",
-      "type": "static",
-      "symbols": [
-        "PRIORITY_ORDER",
-        "LEVEL_HIERARCHY"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/type-consistency.test.ts",
-      "to": "packages/rex/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Priority",
-        "ItemLevel",
-        "ItemStatus"
-      ]
-    },
-    {
-      "from": "packages/sourcevision/tests/unit/server/websocket.test.ts",
-      "to": "packages/sourcevision/src/cli/server/websocket.ts",
-      "type": "static",
-      "symbols": [
-        "createWebSocketManager"
-      ]
-    },
-    {
       "from": "packages/sourcevision/tests/unit/util/merge.test.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
@@ -10142,24 +8609,586 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/guide.ts",
+      "from": "packages/web/src/cli/index.ts",
+      "to": "packages/web/src/server/start.ts",
       "type": "static",
       "symbols": [
-        "Guide"
+        "startServer"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "from": "packages/web/src/cli/index.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewerScope"
+      ]
+    },
+    {
+      "from": "packages/web/src/public.ts",
+      "to": "packages/web/src/server/start.ts",
+      "type": "reexport",
+      "symbols": [
+        "startServer"
+      ]
+    },
+    {
+      "from": "packages/web/src/public.ts",
+      "to": "packages/web/src/server/start.ts",
+      "type": "type",
+      "symbols": [
+        "ServerOptions"
+      ]
+    },
+    {
+      "from": "packages/web/src/public.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext",
+        "RouteHandler",
+        "ViewerScope"
+      ]
+    },
+    {
+      "from": "packages/web/src/public.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/schema/validate.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/index.ts",
+      "to": "packages/web/src/server/start.ts",
+      "type": "reexport",
+      "symbols": [
+        "startServer"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/index.ts",
+      "to": "packages/web/src/server/start.ts",
+      "type": "type",
+      "symbols": [
+        "ServerOptions"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/index.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext",
+        "RouteHandler"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/index.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-data.ts",
+      "to": "packages/web/src/schema/data-files.ts",
       "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES",
+        "SUPPLEMENTARY_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-data.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-data.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-sourcevision.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-sourcevision.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-sourcevision.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-static.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-token-usage.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-token-usage.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-validation.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-validation.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-data.ts",
+      "type": "static",
+      "symbols": [
+        "createDataWatcher",
+        "handleDataRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-hench.ts",
+      "type": "static",
+      "symbols": [
+        "handleHenchRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-rex.ts",
+      "type": "static",
+      "symbols": [
+        "handleRexRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-sourcevision.ts",
+      "type": "static",
+      "symbols": [
+        "handleSourcevisionRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-static.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStaticAssets",
+        "handleStaticRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "handleTokenUsageRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-validation.ts",
+      "type": "static",
+      "symbols": [
+        "handleValidationRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext",
+        "ViewerScope"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "static",
+      "symbols": [
+        "createWebSocketManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/web/src/viewer/components/search-filter.ts",
+      "type": "static",
+      "symbols": [
+        "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/data-display/zone-map.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "ZoneCrossing"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/data-display/zone-map.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/detail-panel.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/detail-panel.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "DetailItem",
+        "FileDetail",
+        "ZoneDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/detail-panel.ts",
+      "to": "packages/web/src/viewer/utils.ts",
+      "type": "static",
+      "symbols": [
+        "meterClass"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/favicon.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemLevel",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "BranchStats",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "reexport",
+      "symbols": [
+        "AddItemForm"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "type",
+      "symbols": [
+        "AddItemFormProps",
+        "AddItemInput"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "AnalyzePanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "type",
+      "symbols": [
+        "AnalyzePanelProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "reexport",
+      "symbols": [
+        "BulkActions"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "type",
+      "symbols": [
+        "BulkActionsProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeBranchStats",
+        "completionRatio",
+        "countChildStatuses",
+        "formatTimestamp",
+        "itemMatchesFilter",
+        "filterTree"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+      "type": "reexport",
+      "symbols": [
+        "MergePreview"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+      "type": "type",
+      "symbols": [
+        "MergePreviewProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "reexport",
       "symbols": [
         "PRDTree"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "type",
+      "symbols": [
+        "PRDTreeProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+      "type": "reexport",
+      "symbols": [
+        "StatusFilter",
+        "defaultStatusFilter",
+        "ALL_STATUSES",
+        "FILTER_PRESETS",
+        "activePresetKey"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+      "type": "type",
+      "symbols": [
+        "StatusFilterProps",
+        "FilterPreset"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "reexport",
+      "symbols": [
+        "TaskDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "type",
+      "symbols": [
+        "TaskDetailProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData",
+        "ItemLevel",
+        "ItemStatus",
+        "Priority",
+        "BranchStats"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "computeBranchStats",
+        "completionRatio",
+        "formatTimestamp",
+        "itemMatchesFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
       "type": "static",
       "symbols": [
         "StatusFilter",
@@ -10167,16 +9196,1213 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData",
+        "ItemStatus",
+        "ItemLevel",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/rex-task-link.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Manifest",
+        "Zones"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/components/faq.ts",
+      "type": "static",
+      "symbols": [
+        "FAQ"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "NdxLogoPng",
+        "ProductLogoPng"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/components/theme-toggle.ts",
+      "type": "static",
+      "symbols": [
+        "SidebarThemeToggle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/graph/renderer.ts",
+      "to": "packages/web/src/viewer/graph/physics.ts",
+      "type": "static",
+      "symbols": [
+        "initZoneClusteredPositions",
+        "tick"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/graph/renderer.ts",
+      "to": "packages/web/src/viewer/graph/physics.ts",
+      "type": "type",
+      "symbols": [
+        "SimState",
+        "TickCallbacks"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Manifest",
+        "Inventory",
+        "Imports",
+        "Zones",
+        "Components"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateManifest",
+        "validateInventory",
+        "validateImports",
+        "validateZones",
+        "validateComponents"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/viewer/schema-compat.ts",
+      "type": "static",
+      "symbols": [
+        "migrateData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/detail-panel.ts",
+      "type": "static",
+      "symbols": [
+        "DetailPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/favicon.ts",
+      "type": "static",
+      "symbols": [
+        "updateFavicon"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/guide.ts",
+      "type": "static",
+      "symbols": [
+        "Guide"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/sidebar.ts",
+      "type": "static",
+      "symbols": [
+        "Sidebar"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/theme-toggle.ts",
+      "type": "static",
+      "symbols": [
+        "initTheme"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/loader.ts",
+      "type": "static",
+      "symbols": [
+        "loadFromServer",
+        "loadFromFiles",
+        "detectMode",
+        "onDataChange",
+        "startPolling",
+        "stopPolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "ViewId",
+        "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/analysis.ts",
+      "type": "static",
+      "symbols": [
+        "AnalysisView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/architecture.ts",
+      "type": "static",
+      "symbols": [
+        "ArchitectureView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/files.ts",
+      "type": "static",
+      "symbols": [
+        "FilesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/graph.ts",
+      "type": "static",
+      "symbols": [
+        "Graph"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/hench-runs.ts",
+      "type": "static",
+      "symbols": [
+        "HenchRunsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/overview.ts",
+      "type": "static",
+      "symbols": [
+        "Overview"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/prd.ts",
+      "type": "static",
+      "symbols": [
+        "PRDView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/problems.ts",
+      "type": "static",
+      "symbols": [
+        "ProblemsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "type": "static",
+      "symbols": [
+        "RexDashboard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/routes.ts",
+      "type": "static",
+      "symbols": [
+        "RoutesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/suggestions.ts",
+      "type": "static",
+      "symbols": [
+        "SuggestionsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "TokenUsageView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/validation.ts",
+      "type": "static",
+      "symbols": [
+        "ValidationView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/views/zones.ts",
+      "type": "static",
+      "symbols": [
+        "ZonesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/schema-compat.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/schema-compat.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/types.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Manifest",
+        "Inventory",
+        "Imports",
+        "Zones",
+        "Components"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/utils.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zones"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/utils.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/analysis.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/analysis.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+      "type": "static",
+      "symbols": [
+        "AnalyzePanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart",
+        "FlowDiagram"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/utils.ts",
+      "type": "static",
+      "symbols": [
+        "buildFlowNodes",
+        "buildFlowEdges"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "FileEntry"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/utils.ts",
+      "type": "static",
+      "symbols": [
+        "buildFileToZoneMap"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/graph.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/graph.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/graph.ts",
+      "to": "packages/web/src/viewer/graph/renderer.ts",
+      "type": "static",
+      "symbols": [
+        "GraphRenderer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/graph.ts",
+      "to": "packages/web/src/viewer/graph/renderer.ts",
+      "type": "type",
+      "symbols": [
+        "GraphNode",
+        "GraphLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/graph.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
+      "type": "static",
+      "symbols": [
+        "MetricCard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/rex-task-link.ts",
+      "type": "static",
+      "symbols": [
+        "RexTaskLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "NavigateTo"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
+      "type": "static",
+      "symbols": [
+        "HealthGauge",
+        "PatternBadge",
+        "MetricCard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/data-display/zone-map.ts",
+      "type": "static",
+      "symbols": [
+        "ZoneMap",
+        "ZoneDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "static",
+      "symbols": [
+        "AddItemForm"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+      "type": "static",
+      "symbols": [
+        "BulkActions"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData",
+        "AddItemInput"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+      "type": "static",
+      "symbols": [
+        "MergePreview"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "static",
+      "symbols": [
+        "TaskDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
+      "type": "static",
+      "symbols": [
+        "MetricCard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "to": "packages/web/src/viewer/components/rex-task-link.ts",
+      "type": "static",
+      "symbols": [
+        "RexTaskLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId",
+        "NavigateTo"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "RouteTreeNode",
+        "RouteExportKind",
+        "ComponentUsageEdge"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
+      "type": "static",
+      "symbols": [
+        "TreeView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
+      "type": "type",
+      "symbols": [
+        "TreeNode"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/components/search-filter.ts",
+      "type": "static",
+      "symbols": [
+        "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
+      "type": "static",
+      "symbols": [
+        "MetricCard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/validation.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "static",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "static",
+      "symbols": [
+        "FlowDiagram"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "static",
+      "symbols": [
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/components/search-filter.ts",
+      "type": "static",
+      "symbols": [
+        "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/utils.ts",
+      "type": "static",
+      "symbols": [
+        "meterClass",
+        "buildFlowNodes",
+        "buildFlowEdges"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/dev-reload.test.ts",
+      "to": "packages/web/src/server/routes-static.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStaticAssets",
+        "handleStaticRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/dev-reload.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-data.test.ts",
+      "to": "packages/web/src/server/routes-data.ts",
+      "type": "static",
+      "symbols": [
+        "createDataWatcher",
+        "handleDataRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-data.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-rex.test.ts",
+      "to": "packages/web/src/server/routes-rex.ts",
+      "type": "static",
+      "symbols": [
+        "handleRexRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-rex.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+      "to": "packages/web/src/server/routes-sourcevision.ts",
+      "type": "static",
+      "symbols": [
+        "handleSourcevisionRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-token-usage.test.ts",
+      "to": "packages/web/src/server/routes-token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "handleTokenUsageRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-token-usage.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-validation.test.ts",
+      "to": "packages/web/src/server/routes-validation.ts",
+      "type": "static",
+      "symbols": [
+        "handleValidationRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-validation.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/scope.test.ts",
+      "to": "packages/web/src/server/routes-hench.ts",
+      "type": "static",
+      "symbols": [
+        "handleHenchRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/scope.test.ts",
+      "to": "packages/web/src/server/routes-rex.ts",
+      "type": "static",
+      "symbols": [
+        "handleRexRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/scope.test.ts",
+      "to": "packages/web/src/server/routes-sourcevision.ts",
+      "type": "static",
+      "symbols": [
+        "handleSourcevisionRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/scope.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/scope.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext",
+        "ViewerScope"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER",
+        "LEVEL_HIERARCHY"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Priority",
+        "ItemLevel",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/websocket.test.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "static",
+      "symbols": [
+        "createWebSocketManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
+      "to": "packages/web/src/viewer/components/guide.ts",
+      "type": "static",
+      "symbols": [
+        "Guide"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+      "type": "static",
+      "symbols": [
+        "StatusFilter",
+        "defaultStatusFilter"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
         "PRDDocumentData"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/theme-toggle.ts",
+      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
+      "to": "packages/web/src/viewer/components/theme-toggle.ts",
       "type": "static",
       "symbols": [
         "ThemeToggle",
@@ -10184,40 +10410,61 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/bar-chart.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
+      "from": "packages/web/tests/unit/viewer/bar-chart.test.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "BarChart"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
+      "from": "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
       "type": "static",
       "symbols": [
         "CollapsibleSection"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/detail-panel.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/detail-panel.ts",
+      "from": "packages/web/tests/unit/viewer/detail-panel.test.ts",
+      "to": "packages/web/src/viewer/components/detail-panel.ts",
       "type": "static",
       "symbols": [
         "DetailPanel"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
+      "from": "packages/web/tests/unit/viewer/favicon.test.ts",
+      "to": "packages/web/src/viewer/components/favicon.ts",
+      "type": "static",
+      "symbols": [
+        "updateFavicon",
+        "resetFavicon",
+        "FAVICON_URIS",
+        "VIEW_TO_PRODUCT",
+        "svgToDataUri",
+        "FAVICON_SVGS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/favicon.test.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
       "type": "static",
       "symbols": [
         "FlowDiagram"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/compute.ts",
+      "from": "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
       "type": "static",
       "symbols": [
         "computeBranchStats",
@@ -10229,8 +10476,8 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "from": "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
         "PRDItemData",
@@ -10238,32 +10485,32 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
+      "from": "packages/web/tests/unit/viewer/prd-tree.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
       "type": "static",
       "symbols": [
         "PRDTree"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "from": "packages/web/tests/unit/viewer/prd-tree.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
         "PRDDocumentData"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/sidebar.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/sidebar.ts",
+      "from": "packages/web/tests/unit/viewer/sidebar.test.ts",
+      "to": "packages/web/src/viewer/components/sidebar.ts",
       "type": "static",
       "symbols": [
         "Sidebar"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/status-filter.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
+      "from": "packages/web/tests/unit/viewer/status-filter.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
       "type": "static",
       "symbols": [
         "StatusFilter",
@@ -10274,24 +10521,24 @@
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/status-filter.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/prd-tree/types.ts",
+      "from": "packages/web/tests/unit/viewer/status-filter.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
         "ItemStatus"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "from": "packages/web/tests/unit/viewer/tree-view.test.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
       "type": "static",
       "symbols": [
         "TreeView"
       ]
     },
     {
-      "from": "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
-      "to": "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
+      "from": "packages/web/tests/unit/viewer/tree-view.test.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
       "type": "type",
       "symbols": [
         "TreeNode"
@@ -10377,7 +10624,7 @@
     {
       "package": "esbuild",
       "importedBy": [
-        "packages/sourcevision/build.js"
+        "packages/web/build.js"
       ],
       "symbols": [
         "*"
@@ -10432,50 +10679,51 @@
     {
       "package": "preact",
       "importedBy": [
-        "packages/sourcevision/src/viewer/components/data-display/collapsible-section.ts",
-        "packages/sourcevision/src/viewer/components/data-display/findings-list.ts",
-        "packages/sourcevision/src/viewer/components/data-display/health-gauge.ts",
-        "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
-        "packages/sourcevision/src/viewer/components/data-display/tree-view.ts",
-        "packages/sourcevision/src/viewer/components/data-display/zone-map.ts",
-        "packages/sourcevision/src/viewer/components/detail-panel.ts",
-        "packages/sourcevision/src/viewer/components/faq.ts",
-        "packages/sourcevision/src/viewer/components/guide.ts",
-        "packages/sourcevision/src/viewer/components/logos.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/add-item-form.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/analyze-panel.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/bulk-actions.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/prd-tree.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/status-filter.ts",
-        "packages/sourcevision/src/viewer/components/prd-tree/task-detail.ts",
-        "packages/sourcevision/src/viewer/components/rex-task-link.ts",
-        "packages/sourcevision/src/viewer/components/search-filter.ts",
-        "packages/sourcevision/src/viewer/components/sidebar.ts",
-        "packages/sourcevision/src/viewer/components/theme-toggle.ts",
-        "packages/sourcevision/src/viewer/main.ts",
-        "packages/sourcevision/src/viewer/views/analysis.ts",
-        "packages/sourcevision/src/viewer/views/architecture.ts",
-        "packages/sourcevision/src/viewer/views/files.ts",
-        "packages/sourcevision/src/viewer/views/graph.ts",
-        "packages/sourcevision/src/viewer/views/hench-runs.ts",
-        "packages/sourcevision/src/viewer/views/overview.ts",
-        "packages/sourcevision/src/viewer/views/prd.ts",
-        "packages/sourcevision/src/viewer/views/problems.ts",
-        "packages/sourcevision/src/viewer/views/rex-dashboard.ts",
-        "packages/sourcevision/src/viewer/views/routes.ts",
-        "packages/sourcevision/src/viewer/views/suggestions.ts",
-        "packages/sourcevision/src/viewer/views/token-usage.ts",
-        "packages/sourcevision/src/viewer/views/validation.ts",
-        "packages/sourcevision/src/viewer/views/zones.ts",
-        "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-        "packages/sourcevision/tests/unit/viewer/bar-chart.test.ts",
-        "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
-        "packages/sourcevision/tests/unit/viewer/detail-panel.test.ts",
-        "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
-        "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
-        "packages/sourcevision/tests/unit/viewer/sidebar.test.ts",
-        "packages/sourcevision/tests/unit/viewer/status-filter.test.ts",
-        "packages/sourcevision/tests/unit/viewer/tree-view.test.ts"
+        "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+        "packages/web/src/viewer/components/data-display/findings-list.ts",
+        "packages/web/src/viewer/components/data-display/health-gauge.ts",
+        "packages/web/src/viewer/components/data-display/mini-charts.ts",
+        "packages/web/src/viewer/components/data-display/tree-view.ts",
+        "packages/web/src/viewer/components/data-display/zone-map.ts",
+        "packages/web/src/viewer/components/detail-panel.ts",
+        "packages/web/src/viewer/components/faq.ts",
+        "packages/web/src/viewer/components/guide.ts",
+        "packages/web/src/viewer/components/logos.ts",
+        "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+        "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+        "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+        "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+        "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+        "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+        "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+        "packages/web/src/viewer/components/rex-task-link.ts",
+        "packages/web/src/viewer/components/search-filter.ts",
+        "packages/web/src/viewer/components/sidebar.ts",
+        "packages/web/src/viewer/components/theme-toggle.ts",
+        "packages/web/src/viewer/main.ts",
+        "packages/web/src/viewer/views/analysis.ts",
+        "packages/web/src/viewer/views/architecture.ts",
+        "packages/web/src/viewer/views/files.ts",
+        "packages/web/src/viewer/views/graph.ts",
+        "packages/web/src/viewer/views/hench-runs.ts",
+        "packages/web/src/viewer/views/overview.ts",
+        "packages/web/src/viewer/views/prd.ts",
+        "packages/web/src/viewer/views/problems.ts",
+        "packages/web/src/viewer/views/rex-dashboard.ts",
+        "packages/web/src/viewer/views/routes.ts",
+        "packages/web/src/viewer/views/suggestions.ts",
+        "packages/web/src/viewer/views/token-usage.ts",
+        "packages/web/src/viewer/views/validation.ts",
+        "packages/web/src/viewer/views/zones.ts",
+        "packages/web/tests/unit/viewer/accessibility.test.ts",
+        "packages/web/tests/unit/viewer/bar-chart.test.ts",
+        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+        "packages/web/tests/unit/viewer/detail-panel.test.ts",
+        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/web/tests/unit/viewer/prd-tree.test.ts",
+        "packages/web/tests/unit/viewer/sidebar.test.ts",
+        "packages/web/tests/unit/viewer/status-filter.test.ts",
+        "packages/web/tests/unit/viewer/tree-view.test.ts"
       ],
       "symbols": [
         "ComponentChildren",
@@ -10637,6 +10885,7 @@
         "packages/rex/tests/unit/core/dag.test.ts",
         "packages/rex/tests/unit/core/fix.test.ts",
         "packages/rex/tests/unit/core/keywords.test.ts",
+        "packages/rex/tests/unit/core/merge.test.ts",
         "packages/rex/tests/unit/core/move.test.ts",
         "packages/rex/tests/unit/core/next-task-matching.test.ts",
         "packages/rex/tests/unit/core/next-task-scoring.test.ts",
@@ -10686,29 +10935,34 @@
         "packages/sourcevision/tests/unit/export/pdf-report.test.ts",
         "packages/sourcevision/tests/unit/schema/data-files.test.ts",
         "packages/sourcevision/tests/unit/schema/validate.test.ts",
-        "packages/sourcevision/tests/unit/server/routes-data.test.ts",
-        "packages/sourcevision/tests/unit/server/routes-rex.test.ts",
-        "packages/sourcevision/tests/unit/server/routes-sourcevision.test.ts",
-        "packages/sourcevision/tests/unit/server/routes-token-usage.test.ts",
-        "packages/sourcevision/tests/unit/server/routes-validation.test.ts",
-        "packages/sourcevision/tests/unit/server/type-consistency.test.ts",
-        "packages/sourcevision/tests/unit/server/websocket.test.ts",
         "packages/sourcevision/tests/unit/util/merge.test.ts",
         "packages/sourcevision/tests/unit/util/sort.test.ts",
-        "packages/sourcevision/tests/unit/viewer/accessibility.test.ts",
-        "packages/sourcevision/tests/unit/viewer/bar-chart.test.ts",
-        "packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts",
-        "packages/sourcevision/tests/unit/viewer/detail-panel.test.ts",
-        "packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts",
-        "packages/sourcevision/tests/unit/viewer/prd-tree-compute.test.ts",
-        "packages/sourcevision/tests/unit/viewer/prd-tree.test.ts",
-        "packages/sourcevision/tests/unit/viewer/sidebar.test.ts",
-        "packages/sourcevision/tests/unit/viewer/status-filter.test.ts",
-        "packages/sourcevision/tests/unit/viewer/tree-view.test.ts",
         "packages/sourcevision/vitest.config.ts",
+        "packages/web/tests/unit/server/dev-reload.test.ts",
+        "packages/web/tests/unit/server/routes-data.test.ts",
+        "packages/web/tests/unit/server/routes-rex.test.ts",
+        "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+        "packages/web/tests/unit/server/routes-token-usage.test.ts",
+        "packages/web/tests/unit/server/routes-validation.test.ts",
+        "packages/web/tests/unit/server/scope.test.ts",
+        "packages/web/tests/unit/server/type-consistency.test.ts",
+        "packages/web/tests/unit/server/websocket.test.ts",
+        "packages/web/tests/unit/viewer/accessibility.test.ts",
+        "packages/web/tests/unit/viewer/bar-chart.test.ts",
+        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+        "packages/web/tests/unit/viewer/detail-panel.test.ts",
+        "packages/web/tests/unit/viewer/favicon.test.ts",
+        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+        "packages/web/tests/unit/viewer/prd-tree.test.ts",
+        "packages/web/tests/unit/viewer/sidebar.test.ts",
+        "packages/web/tests/unit/viewer/status-filter.test.ts",
+        "packages/web/tests/unit/viewer/tree-view.test.ts",
+        "packages/web/vitest.config.ts",
         "tests/e2e/cli-ci.test.js",
         "tests/e2e/cli-config.test.js",
         "tests/e2e/cli-delegation.test.js",
+        "tests/e2e/cli-dev.test.js",
         "tests/e2e/cli-errors.test.js",
         "tests/e2e/cli-web.test.js",
         "vitest.config.js"
@@ -10733,7 +10987,8 @@
         "packages/rex/src/cli/mcp.ts",
         "packages/rex/src/schema/validate.ts",
         "packages/sourcevision/src/cli/mcp.ts",
-        "packages/sourcevision/src/schema/validate.ts"
+        "packages/sourcevision/src/schema/validate.ts",
+        "packages/web/src/schema/validate.ts"
       ],
       "symbols": [
         "ZodError",
@@ -10742,14 +10997,14 @@
     }
   ],
   "summary": {
-    "totalEdges": 1145,
+    "totalEdges": 1173,
     "totalExternal": 15,
     "circularCount": 0,
     "circulars": [],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
-        "count": 29
+        "count": 31
       },
       {
         "path": "packages/rex/src/cli/errors.ts",
@@ -10776,7 +11031,7 @@
         "count": 16
       },
       {
-        "path": "packages/sourcevision/src/viewer/components/logos.ts",
+        "path": "packages/web/src/viewer/components/logos.ts",
         "count": 15
       },
       {
@@ -10788,11 +11043,7 @@
         "count": 14
       },
       {
-        "path": "packages/sourcevision/src/schema/data-files.ts",
-        "count": 12
-      },
-      {
-        "path": "packages/sourcevision/src/viewer/components/constants.ts",
+        "path": "packages/web/src/viewer/components/constants.ts",
         "count": 11
       },
       {
@@ -10820,14 +11071,18 @@
         "count": 8
       },
       {
-        "path": "packages/sourcevision/src/viewer/components/data-display/mini-charts.ts",
+        "path": "packages/web/src/viewer/components/data-display/mini-charts.ts",
         "count": 8
       },
       {
         "path": "packages/hench/src/cli/commands/constants.ts",
         "count": 7
+      },
+      {
+        "path": "packages/rex/src/store/project-config.ts",
+        "count": 7
       }
     ],
-    "avgImportsPerFile": 3.5
+    "avgImportsPerFile": 3.49
   }
 }

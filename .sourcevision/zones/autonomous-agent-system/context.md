@@ -321,30 +321,22 @@ Internal:
 
 <findings>
 
-[observation] [info] Contains 61% of project files (80/131) — subdivided into 5 sub-zones
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach
-[suggestion] [info] Uses wildcard version 'rex': '*' instead of workspace protocol for local dependency consistency
+[observation] [info] Direct import coupling with rex package for PRD operations while maintaining clean boundaries with sourcevision
+[observation] [info] Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach
+[observation] [info] Large subsystem with strong internal cohesion indicates well-organized autonomous execution capabilities
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Contains 61% of project files (80/131) — subdivided into 5 sub-zones
 - Comprehensive agent architecture spanning 80 files with clear separation between lifecycle, planning, and analysis concerns
 - Implements sophisticated token budget management and stuck task detection for robust autonomous operation
 - Provides dual execution modes (API and CLI) with complete tool ecosystem for project manipulation
 - Large subsystem with strong internal cohesion indicates well-organized autonomous execution capabilities
-- Imports rex package types and functions directly for type-safe PRD manipulation
-- Maintains architectural isolation by avoiding direct sourcevision imports despite functional overlap
 - Direct import coupling with rex package for PRD operations while maintaining clean boundaries with sourcevision
-- Hench package imports rex functions directly from package name 'rex', not internal dist/ paths, indicating proper public API usage
-- Web server functionality (routes-rex.ts, routes-hench.ts, websocket.ts, viewer HTML/CSS/JS) is misplaced inside packages/sourcevision/ despite importing from rex and hench packages. This violates zone boundaries - orchestration concerns should live at the orchestration layer, not embedded within a single package.
-- Uses mix of dynamic imports (await import('rex')) and static imports from same package, creating inconsistent dependency patterns
-- Direct dependency on rex package ('rex': '*') in package.json uses wildcard version instead of workspace protocol
 - Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach
-- Uses wildcard version 'rex': '*' instead of workspace protocol for local dependency consistency
 
 </insights>
 

@@ -255,20 +255,12 @@
       ],
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "Contains 61% of project files (80/131) — subdivided into 5 sub-zones",
         "Comprehensive agent architecture spanning 80 files with clear separation between lifecycle, planning, and analysis concerns",
         "Implements sophisticated token budget management and stuck task detection for robust autonomous operation",
         "Provides dual execution modes (API and CLI) with complete tool ecosystem for project manipulation",
         "Large subsystem with strong internal cohesion indicates well-organized autonomous execution capabilities",
-        "Imports rex package types and functions directly for type-safe PRD manipulation",
-        "Maintains architectural isolation by avoiding direct sourcevision imports despite functional overlap",
         "Direct import coupling with rex package for PRD operations while maintaining clean boundaries with sourcevision",
-        "Hench package imports rex functions directly from package name 'rex', not internal dist/ paths, indicating proper public API usage",
-        "Web server functionality (routes-rex.ts, routes-hench.ts, websocket.ts, viewer HTML/CSS/JS) is misplaced inside packages/sourcevision/ despite importing from rex and hench packages. This violates zone boundaries - orchestration concerns should live at the orchestration layer, not embedded within a single package.",
-        "Uses mix of dynamic imports (await import('rex')) and static imports from same package, creating inconsistent dependency patterns",
-        "Direct dependency on rex package ('rex': '*') in package.json uses wildcard version instead of workspace protocol",
-        "Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach",
-        "Uses wildcard version 'rex': '*' instead of workspace protocol for local dependency consistency"
+        "Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach"
       ]
     },
     {
@@ -301,12 +293,282 @@
         "Encapsulates all Claude API concerns behind a single interface achieving zero coupling with other packages",
         "Implements comprehensive authentication detection, token usage tracking, and error classification",
         "Excellent architectural isolation with 15 focused files providing complete Claude API abstraction",
-        "Acts as shared foundation consumed by both rex and hench packages for Claude API access",
-        "Provides clean dependency inversion allowing packages to focus on domain logic",
         "Serves as clean dependency foundation for rex and hench, eliminating Claude API concerns from domain packages",
-        "Uses scoped package naming (@n-dx/claude-client) inconsistent with other packages (rex, hench, sourcevision)",
-        "Only package with exports field providing both import and types mappings - other packages inconsistently implement module exports",
         "Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, hench, sourcevision use unscoped names"
+      ]
+    },
+    {
+      "id": "integrated-web-dashboard",
+      "name": "Integrated Web Dashboard",
+      "description": "Multi-package web interface providing unified visualization and control for sourcevision analysis, rex PRD management, and hench execution monitoring.",
+      "files": [
+        "packages/web/src/cli/index.ts",
+        "packages/web/src/public.ts",
+        "packages/web/src/schema/data-files.ts",
+        "packages/web/src/schema/v1.ts",
+        "packages/web/src/schema/validate.ts",
+        "packages/web/src/server/index.ts",
+        "packages/web/src/server/routes-data.ts",
+        "packages/web/src/server/routes-hench.ts",
+        "packages/web/src/server/routes-rex.ts",
+        "packages/web/src/server/routes-sourcevision.ts",
+        "packages/web/src/server/routes-static.ts",
+        "packages/web/src/server/routes-token-usage.ts",
+        "packages/web/src/server/routes-validation.ts",
+        "packages/web/src/server/start.ts",
+        "packages/web/src/server/types.ts",
+        "packages/web/src/server/websocket.ts",
+        "packages/web/src/viewer/components/constants.ts",
+        "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+        "packages/web/src/viewer/components/data-display/findings-list.ts",
+        "packages/web/src/viewer/components/data-display/health-gauge.ts",
+        "packages/web/src/viewer/components/data-display/mini-charts.ts",
+        "packages/web/src/viewer/components/data-display/tree-view.ts",
+        "packages/web/src/viewer/components/data-display/zone-map.ts",
+        "packages/web/src/viewer/components/detail-panel.ts",
+        "packages/web/src/viewer/components/faq.ts",
+        "packages/web/src/viewer/components/favicon.ts",
+        "packages/web/src/viewer/components/guide.ts",
+        "packages/web/src/viewer/components/logos.ts",
+        "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+        "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+        "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+        "packages/web/src/viewer/components/prd-tree/compute.ts",
+        "packages/web/src/viewer/components/prd-tree/index.ts",
+        "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+        "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+        "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+        "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+        "packages/web/src/viewer/components/prd-tree/types.ts",
+        "packages/web/src/viewer/components/rex-task-link.ts",
+        "packages/web/src/viewer/components/search-filter.ts",
+        "packages/web/src/viewer/components/sidebar.ts",
+        "packages/web/src/viewer/components/theme-toggle.ts",
+        "packages/web/src/viewer/darkmode_logo.png",
+        "packages/web/src/viewer/graph/physics.ts",
+        "packages/web/src/viewer/graph/renderer.ts",
+        "packages/web/src/viewer/index.html",
+        "packages/web/src/viewer/lightmode_logo.png",
+        "packages/web/src/viewer/loader.ts",
+        "packages/web/src/viewer/main.ts",
+        "packages/web/src/viewer/schema-compat.ts",
+        "packages/web/src/viewer/styles/a11y.css",
+        "packages/web/src/viewer/styles/analysis.css",
+        "packages/web/src/viewer/styles/base.css",
+        "packages/web/src/viewer/styles/branding.css",
+        "packages/web/src/viewer/styles/cards.css",
+        "packages/web/src/viewer/styles/components.css",
+        "packages/web/src/viewer/styles/detail.css",
+        "packages/web/src/viewer/styles/faq.css",
+        "packages/web/src/viewer/styles/forms.css",
+        "packages/web/src/viewer/styles/graph.css",
+        "packages/web/src/viewer/styles/hench-runs.css",
+        "packages/web/src/viewer/styles/index.css",
+        "packages/web/src/viewer/styles/layout.css",
+        "packages/web/src/viewer/styles/overview.css",
+        "packages/web/src/viewer/styles/prd-tree.css",
+        "packages/web/src/viewer/styles/responsive.css",
+        "packages/web/src/viewer/styles/rex-dashboard.css",
+        "packages/web/src/viewer/styles/routes.css",
+        "packages/web/src/viewer/styles/tables.css",
+        "packages/web/src/viewer/styles/task-link.css",
+        "packages/web/src/viewer/styles/token-usage.css",
+        "packages/web/src/viewer/styles/tokens.css",
+        "packages/web/src/viewer/styles/utils.css",
+        "packages/web/src/viewer/styles/validation.css",
+        "packages/web/src/viewer/styles/zone-map.css",
+        "packages/web/src/viewer/types.ts",
+        "packages/web/src/viewer/utils.ts",
+        "packages/web/src/viewer/views/analysis.ts",
+        "packages/web/src/viewer/views/architecture.ts",
+        "packages/web/src/viewer/views/files.ts",
+        "packages/web/src/viewer/views/graph.ts",
+        "packages/web/src/viewer/views/hench-runs.ts",
+        "packages/web/src/viewer/views/overview.ts",
+        "packages/web/src/viewer/views/prd.ts",
+        "packages/web/src/viewer/views/problems.ts",
+        "packages/web/src/viewer/views/rex-dashboard.ts",
+        "packages/web/src/viewer/views/routes.ts",
+        "packages/web/src/viewer/views/suggestions.ts",
+        "packages/web/src/viewer/views/token-usage.ts",
+        "packages/web/src/viewer/views/validation.ts",
+        "packages/web/src/viewer/views/zones.ts",
+        "packages/web/tests/unit/server/dev-reload.test.ts",
+        "packages/web/tests/unit/server/routes-data.test.ts",
+        "packages/web/tests/unit/server/routes-rex.test.ts",
+        "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+        "packages/web/tests/unit/server/routes-token-usage.test.ts",
+        "packages/web/tests/unit/server/routes-validation.test.ts",
+        "packages/web/tests/unit/server/scope.test.ts",
+        "packages/web/tests/unit/server/type-consistency.test.ts",
+        "packages/web/tests/unit/server/websocket.test.ts",
+        "packages/web/tests/unit/viewer/accessibility.test.ts",
+        "packages/web/tests/unit/viewer/bar-chart.test.ts",
+        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+        "packages/web/tests/unit/viewer/detail-panel.test.ts",
+        "packages/web/tests/unit/viewer/favicon.test.ts",
+        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+        "packages/web/tests/unit/viewer/prd-tree.test.ts",
+        "packages/web/tests/unit/viewer/sidebar.test.ts",
+        "packages/web/tests/unit/viewer/status-filter.test.ts",
+        "packages/web/tests/unit/viewer/tree-view.test.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "subZones": [
+        {
+          "id": "web/server",
+          "name": "Server",
+          "description": "22 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/cli/index.ts",
+            "packages/web/src/public.ts",
+            "packages/web/src/schema/data-files.ts",
+            "packages/web/src/server/index.ts",
+            "packages/web/src/server/routes-data.ts",
+            "packages/web/src/server/routes-hench.ts",
+            "packages/web/src/server/routes-rex.ts",
+            "packages/web/src/server/routes-sourcevision.ts",
+            "packages/web/src/server/routes-static.ts",
+            "packages/web/src/server/routes-token-usage.ts",
+            "packages/web/src/server/routes-validation.ts",
+            "packages/web/src/server/start.ts",
+            "packages/web/src/server/types.ts",
+            "packages/web/src/server/websocket.ts",
+            "packages/web/tests/unit/server/dev-reload.test.ts",
+            "packages/web/tests/unit/server/routes-data.test.ts",
+            "packages/web/tests/unit/server/routes-rex.test.ts",
+            "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+            "packages/web/tests/unit/server/routes-token-usage.test.ts",
+            "packages/web/tests/unit/server/routes-validation.test.ts",
+            "packages/web/tests/unit/server/scope.test.ts",
+            "packages/web/tests/unit/server/websocket.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/schema/data-files.ts"
+          ],
+          "cohesion": 0.98,
+          "coupling": 0.02,
+          "depth": 1
+        },
+        {
+          "id": "web/viewer",
+          "name": "Viewer",
+          "description": "42 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/schema/v1.ts",
+            "packages/web/src/schema/validate.ts",
+            "packages/web/src/viewer/components/constants.ts",
+            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+            "packages/web/src/viewer/components/data-display/findings-list.ts",
+            "packages/web/src/viewer/components/data-display/health-gauge.ts",
+            "packages/web/src/viewer/components/data-display/tree-view.ts",
+            "packages/web/src/viewer/components/data-display/zone-map.ts",
+            "packages/web/src/viewer/components/detail-panel.ts",
+            "packages/web/src/viewer/components/faq.ts",
+            "packages/web/src/viewer/components/favicon.ts",
+            "packages/web/src/viewer/components/guide.ts",
+            "packages/web/src/viewer/components/logos.ts",
+            "packages/web/src/viewer/components/rex-task-link.ts",
+            "packages/web/src/viewer/components/search-filter.ts",
+            "packages/web/src/viewer/components/sidebar.ts",
+            "packages/web/src/viewer/components/theme-toggle.ts",
+            "packages/web/src/viewer/graph/physics.ts",
+            "packages/web/src/viewer/graph/renderer.ts",
+            "packages/web/src/viewer/loader.ts",
+            "packages/web/src/viewer/main.ts",
+            "packages/web/src/viewer/schema-compat.ts",
+            "packages/web/src/viewer/types.ts",
+            "packages/web/src/viewer/utils.ts",
+            "packages/web/src/viewer/views/analysis.ts",
+            "packages/web/src/viewer/views/architecture.ts",
+            "packages/web/src/viewer/views/files.ts",
+            "packages/web/src/viewer/views/graph.ts",
+            "packages/web/src/viewer/views/hench-runs.ts",
+            "packages/web/src/viewer/views/overview.ts",
+            "packages/web/src/viewer/views/problems.ts",
+            "packages/web/src/viewer/views/rex-dashboard.ts",
+            "packages/web/src/viewer/views/routes.ts",
+            "packages/web/src/viewer/views/suggestions.ts",
+            "packages/web/src/viewer/views/validation.ts",
+            "packages/web/src/viewer/views/zones.ts",
+            "packages/web/tests/unit/viewer/accessibility.test.ts",
+            "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+            "packages/web/tests/unit/viewer/detail-panel.test.ts",
+            "packages/web/tests/unit/viewer/favicon.test.ts",
+            "packages/web/tests/unit/viewer/sidebar.test.ts",
+            "packages/web/tests/unit/viewer/tree-view.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/viewer/components/logos.ts",
+            "packages/web/src/viewer/types.ts",
+            "packages/web/src/viewer/components/data-display/health-gauge.ts"
+          ],
+          "cohesion": 0.93,
+          "coupling": 0.07,
+          "depth": 1
+        },
+        {
+          "id": "web/tests",
+          "name": "Tests",
+          "description": "4 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/viewer/components/data-display/mini-charts.ts",
+            "packages/web/src/viewer/views/token-usage.ts",
+            "packages/web/tests/unit/viewer/bar-chart.test.ts",
+            "packages/web/tests/unit/viewer/flow-diagram.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/viewer/views/token-usage.ts",
+            "packages/web/src/viewer/components/data-display/mini-charts.ts"
+          ],
+          "cohesion": 0.43,
+          "coupling": 0.57,
+          "depth": 1
+        },
+        {
+          "id": "web/viewer-2",
+          "name": "Viewer 2",
+          "description": "14 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+            "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+            "packages/web/src/viewer/components/prd-tree/compute.ts",
+            "packages/web/src/viewer/components/prd-tree/index.ts",
+            "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+            "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+            "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+            "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+            "packages/web/src/viewer/components/prd-tree/types.ts",
+            "packages/web/src/viewer/views/prd.ts",
+            "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+            "packages/web/tests/unit/viewer/prd-tree.test.ts",
+            "packages/web/tests/unit/viewer/status-filter.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/viewer/views/prd.ts",
+            "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+            "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+            "packages/web/src/viewer/components/prd-tree/types.ts"
+          ],
+          "cohesion": 0.9,
+          "coupling": 0.1,
+          "depth": 1
+        }
+      ],
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Contains 44% of project files (111/252) — subdivided into 4 sub-zones",
+        "Provides comprehensive web-based dashboard for all three core packages with real-time updates",
+        "Implements WebSocket-based live reload and dynamic favicon changes based on active sections",
+        "Serves as the primary user interface for monitoring and controlling the entire n-dx toolkit",
+        "Contains 111 files spanning visualization, server routes, and client-side components for complete web experience",
+        "Web server functionality correctly orchestrates multiple packages through unified interface with clean API boundaries",
+        "Implements sophisticated client-server communication with WebSocket support for real-time updates and live development workflow"
       ]
     },
     {
@@ -328,11 +590,7 @@
         "Provides error handling with user-friendly hints and suggestions for common failure scenarios",
         "Coordinates sequential tool execution (sourcevision → rex → hench) for end-to-end workflows",
         "Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations",
-        "Implements command dispatch pattern via shell spawning rather than direct imports for loose coupling",
-        "Uses compiled CLI entry points (/dist/cli/) to avoid build-time dependencies between packages",
         "Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling",
-        "Uses hardcoded relative paths (packages/*/dist/cli/index.js) in cli.js:55-59 creating implicit coupling to build output structure",
-        "Tool dispatch table uses string keys matching package names, creating implicit naming contract between orchestration and package structure",
         "Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution"
       ]
     },
@@ -629,10 +887,16 @@
   ],
   "crossings": [
     {
-      "from": "packages/sourcevision/src/cli/commands/init.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "fromZone": "packages-sourcevision:analysis-engine",
-      "toZone": "packages-sourcevision:interactive-viewer"
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "fromZone": "integrated-web-dashboard",
+      "toZone": "packages-rex:rex-cli"
+    },
+    {
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "fromZone": "integrated-web-dashboard",
+      "toZone": "packages-rex:rex-cli"
     },
     {
       "from": "packages/sourcevision/src/cli/commands/init.ts",
@@ -641,7 +905,7 @@
       "toZone": "packages-sourcevision:interactive-viewer"
     },
     {
-      "from": "packages/sourcevision/src/schema/index.ts",
+      "from": "packages/sourcevision/src/cli/commands/init.ts",
       "to": "packages/sourcevision/src/schema/v1.ts",
       "fromZone": "packages-sourcevision:analysis-engine",
       "toZone": "packages-sourcevision:interactive-viewer"
@@ -654,9 +918,9 @@
     },
     {
       "from": "packages/sourcevision/src/schema/index.ts",
-      "to": "packages/sourcevision/src/schema/validate.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
       "fromZone": "packages-sourcevision:analysis-engine",
-      "toZone": "packages-sourcevision:test-suite"
+      "toZone": "packages-sourcevision:interactive-viewer"
     },
     {
       "from": "packages/sourcevision/src/schema/index.ts",
@@ -671,10 +935,10 @@
       "toZone": "packages-sourcevision:test-suite"
     },
     {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:interactive-viewer",
-      "toZone": "packages-sourcevision:analysis-engine"
+      "from": "packages/sourcevision/src/schema/index.ts",
+      "to": "packages/sourcevision/src/schema/validate.ts",
+      "fromZone": "packages-sourcevision:analysis-engine",
+      "toZone": "packages-sourcevision:test-suite"
     },
     {
       "from": "packages/sourcevision/src/viewer/loader.ts",
@@ -687,18 +951,6 @@
       "to": "packages/sourcevision/src/schema/data-files.ts",
       "fromZone": "packages-sourcevision:interactive-viewer",
       "toZone": "packages-sourcevision:analysis-engine"
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/main.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:interactive-viewer",
-      "toZone": "packages-sourcevision:analysis-engine"
-    },
-    {
-      "from": "packages/sourcevision/src/viewer/loader.ts",
-      "to": "packages/sourcevision/src/schema/validate.ts",
-      "fromZone": "packages-sourcevision:interactive-viewer",
-      "toZone": "packages-sourcevision:test-suite"
     },
     {
       "from": "packages/sourcevision/src/viewer/loader.ts",
@@ -779,6 +1031,8 @@
     ".rex/workflow.md",
     "CLAUDE.md",
     "README.md",
+    "docs/viewer-architecture.md",
+    "docs/viewer-audit.md",
     "n-dx.png",
     "package.json",
     "packages/claude-client/package.json",
@@ -790,45 +1044,35 @@
     "packages/hench/package.json",
     "packages/hench/tsconfig.json",
     "packages/hench/vitest.config.ts",
+    "packages/web/SourceVision-F.png",
+    "packages/web/SourceVision.png",
+    "packages/web/build.js",
+    "packages/web/dev.js",
+    "packages/web/package.json",
+    "packages/web/tsconfig.json",
+    "packages/web/vitest.config.ts",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
     "prd.md",
     "tests/e2e/cli-ci.test.js",
     "tests/e2e/cli-config.test.js",
     "tests/e2e/cli-delegation.test.js",
+    "tests/e2e/cli-dev.test.js",
     "tests/e2e/cli-errors.test.js",
     "tests/e2e/cli-web.test.js",
     "tsconfig.base.json",
     "vitest.config.js"
   ],
   "insights": [
-    "Size imbalance: largest zone has 80 files vs smallest with 4 — uneven decomposition",
+    "Size imbalance: largest zone has 111 files vs smallest with 4 — uneven decomposition",
     "Zero cross-zone imports demonstrate excellent architectural boundaries and package independence",
     "Each zone has perfect cohesion (1.0) indicating strong internal coherence within domain boundaries",
-    "The three-layer architecture (orchestration → integration → execution) provides clear separation of concerns",
+    "The four-layer architecture provides clear separation between orchestration, integration, execution, and presentation concerns",
     "Perfect architectural isolation with no circular dependencies enables independent development and testing of each subsystem",
-    "Implements hybrid coupling strategy: orchestration uses process isolation, domain packages use direct imports",
-    "Claude-client serves as clean shared dependency eliminating API coupling between rex and hench",
-    "Rex package acts as both CLI tool and importable library, supporting dual access patterns",
-    "Hybrid architectural pattern combines process-based orchestration with selective direct imports for performance-critical paths",
     "Clean dependency inversion through claude-client shared foundation prevents circular dependencies between domain packages",
-    "Rex package correctly implements public API exports field mapping rex → dist/public.js, resolving the previously identified coupling issue",
-    "Web server architecture violates zone boundaries by placing multi-package orchestration logic inside sourcevision package rather than orchestration layer",
-    "Multi-package web server (with rex, hench, and sourcevision routes) is architecturally misplaced inside packages/sourcevision/ rather than at the orchestration layer where cross-package concerns belong. This creates artificial coupling and violates the clean three-layer architecture.",
-    "Package export strategy inconsistency: only claude-client and rex provide exports field, while hench and sourcevision rely solely on bin field",
-    "Binary naming follows package names exactly (rex→rex, hench→hench, sourcevision→sourcevision) but orchestrator creates additional alias (sv→sourcevision)",
-    "Workspace dependency patterns inconsistent: claude-client uses 'workspace:*' protocol, rex uses '*' wildcard for hench dependency",
-    "Inconsistent package export strategies across packages - standardize exports field usage for programmatic consumption",
-    "Mixed workspace dependency protocols: 'workspace:*' vs '*' wildcard - standardize to workspace protocol for local packages"
+    "Size imbalance: largest zone has 111 files vs smallest with 4 - indicates natural complexity distribution across architectural layers"
   ],
   "findings": [
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "autonomous-agent-system",
-      "text": "Contains 61% of project files (80/131) — subdivided into 5 sub-zones",
-      "severity": "info"
-    },
     {
       "type": "observation",
       "pass": 0,
@@ -847,7 +1091,21 @@
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Size imbalance: largest zone has 80 files vs smallest with 4 — uneven decomposition",
+      "text": "Size imbalance: largest zone has 111 files vs smallest with 4 — uneven decomposition",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "integrated-web-dashboard",
+      "text": "Contains 44% of project files (111/252) — subdivided into 4 sub-zones",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "integrated-web-dashboard",
+      "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
@@ -860,79 +1118,115 @@
     {
       "type": "observation",
       "pass": 1,
-      "scope": "global",
-      "text": "Perfect architectural isolation with no circular dependencies enables independent development and testing of each subsystem",
+      "scope": "autonomous-agent-system",
+      "text": "Direct import coupling with rex package for PRD operations while maintaining clean boundaries with sourcevision",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "global",
-      "text": "Hybrid architectural pattern combines process-based orchestration with selective direct imports for performance-critical paths",
-      "severity": "info"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "global",
-      "text": "Clean dependency inversion through claude-client shared foundation prevents circular dependencies between domain packages",
-      "severity": "info"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "global",
-      "text": "Multi-package web server (with rex, hench, and sourcevision routes) is architecturally misplaced inside packages/sourcevision/ rather than at the orchestration layer where cross-package concerns belong. This creates artificial coupling and violates the clean three-layer architecture.",
-      "severity": "critical"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
+      "type": "observation",
+      "pass": 1,
       "scope": "autonomous-agent-system",
       "text": "Inconsistent rex import patterns: static imports in some files, dynamic imports in task-lookup.ts - standardize approach",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 4,
+      "type": "observation",
+      "pass": 1,
       "scope": "autonomous-agent-system",
-      "text": "Uses wildcard version 'rex': '*' instead of workspace protocol for local dependency consistency",
+      "text": "Large subsystem with strong internal cohesion indicates well-organized autonomous execution capabilities",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 4,
+      "type": "observation",
+      "pass": 1,
+      "scope": "claude-integration-layer",
+      "text": "Excellent architectural isolation with 15 focused files providing complete Claude API abstraction",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
       "scope": "claude-integration-layer",
       "text": "Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, hench, sourcevision use unscoped names",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Inconsistent package export strategies across packages - standardize exports field usage for programmatic consumption",
+      "type": "observation",
+      "pass": 1,
+      "scope": "claude-integration-layer",
+      "text": "Serves as clean dependency foundation for rex and hench, eliminating Claude API concerns from domain packages",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 4,
+      "type": "observation",
+      "pass": 1,
       "scope": "global",
-      "text": "Mixed workspace dependency protocols: 'workspace:*' vs '*' wildcard - standardize to workspace protocol for local packages",
+      "text": "Clean dependency inversion through claude-client shared foundation prevents circular dependencies between domain packages",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 4,
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "Perfect architectural isolation with no circular dependencies enables independent development and testing of each subsystem",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "Size imbalance: largest zone has 111 files vs smallest with 4 - indicates natural complexity distribution across architectural layers",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "integrated-web-dashboard",
+      "text": "Contains 111 files spanning visualization, server routes, and client-side components for complete web experience",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "integrated-web-dashboard",
+      "text": "Implements sophisticated client-server communication with WebSocket support for real-time updates and live development workflow",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "integrated-web-dashboard",
+      "text": "Web server functionality correctly orchestrates multiple packages through unified interface with clean API boundaries",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "orchestration-layer",
+      "text": "Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
       "scope": "orchestration-layer",
       "text": "Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "orchestration-layer",
+      "text": "Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations",
       "severity": "info"
     }
   ],
-  "enrichmentPass": 4,
-  "structureHash": "4d0d599445e1fb02",
+  "enrichmentPass": 1,
+  "structureHash": "56f62467abcdd0a1",
   "zoneContentHashes": {
-    "root": "940aad957a87c79d",
+    "root": "1fc597a19c3a90c0",
     "claude-client": "4b831571ae3e5a29",
-    "hench": "a6b2b28d4ea56373"
+    "hench": "a6b2b28d4ea56373",
+    "web": "517b6d59699afb74"
   }
 }

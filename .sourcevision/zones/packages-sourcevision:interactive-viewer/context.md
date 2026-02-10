@@ -8,115 +8,22 @@ Zone: Interactive Viewer (`packages-sourcevision:interactive-viewer`)
 Files: 46, Cohesion: 0.96, Coupling: 0.04
 Description: Preact single-page application that visualizes analysis results through force-directed graphs, zone maps, route trees, and findings panels, consuming only schema types with zero analyzer dependencies.
 Entry points: packages/sourcevision/src/schema/v1.ts
-Lines: 6188
+Lines: 316
 
 </zone>
 
 <files>
 
 packages/sourcevision/src/schema/v1.ts (TypeScript, 316 lines, source)
-packages/sourcevision/src/viewer/components/constants.ts (TypeScript, 16 lines, source)
-packages/sourcevision/src/viewer/components/detail-panel.ts (TypeScript, 309 lines, source)
-packages/sourcevision/src/viewer/components/guide.ts (TypeScript, 106 lines, source)
-packages/sourcevision/src/viewer/components/search-filter.ts (TypeScript, 68 lines, source)
-packages/sourcevision/src/viewer/components/sidebar.ts (TypeScript, 377 lines, source)
-packages/sourcevision/src/viewer/components/theme-toggle.ts (TypeScript, 47 lines, source)
-packages/sourcevision/src/viewer/darkmode_logo.png (Other, 0 lines, asset)
-packages/sourcevision/src/viewer/graph/physics.ts (TypeScript, 325 lines, source)
-packages/sourcevision/src/viewer/index.html (HTML, 21 lines, other)
-packages/sourcevision/src/viewer/lightmode_logo.png (Other, 0 lines, asset)
-packages/sourcevision/src/viewer/loader.ts (TypeScript, 172 lines, source)
-packages/sourcevision/src/viewer/main.ts (TypeScript, 273 lines, source)
-packages/sourcevision/src/viewer/schema-compat.ts (TypeScript, 68 lines, source)
-packages/sourcevision/src/viewer/styles/a11y.css (CSS, 46 lines, other)
-packages/sourcevision/src/viewer/styles/base.css (CSS, 34 lines, other)
-packages/sourcevision/src/viewer/styles/cards.css (CSS, 253 lines, other)
-packages/sourcevision/src/viewer/styles/components.css (CSS, 192 lines, other)
-packages/sourcevision/src/viewer/styles/detail.css (CSS, 134 lines, other)
-packages/sourcevision/src/viewer/styles/forms.css (CSS, 103 lines, other)
-packages/sourcevision/src/viewer/styles/graph.css (CSS, 100 lines, other)
-packages/sourcevision/src/viewer/styles/index.css (CSS, 24 lines, other)
-packages/sourcevision/src/viewer/styles/layout.css (CSS, 345 lines, other)
-packages/sourcevision/src/viewer/styles/responsive.css (CSS, 293 lines, other)
-packages/sourcevision/src/viewer/styles/routes.css (CSS, 39 lines, other)
-packages/sourcevision/src/viewer/styles/tables.css (CSS, 74 lines, other)
-packages/sourcevision/src/viewer/styles/tokens.css (CSS, 109 lines, other)
-packages/sourcevision/src/viewer/styles/utils.css (CSS, 232 lines, other)
-packages/sourcevision/src/viewer/types.ts (TypeScript, 63 lines, source)
-packages/sourcevision/src/viewer/views/architecture.ts (TypeScript, 136 lines, source)
-packages/sourcevision/src/viewer/views/files.ts (TypeScript, 261 lines, source)
-packages/sourcevision/src/viewer/views/graph.ts (TypeScript, 174 lines, source)
-packages/sourcevision/src/viewer/views/overview.ts (TypeScript, 351 lines, source)
-packages/sourcevision/src/viewer/views/problems.ts (TypeScript, 103 lines, source)
-packages/sourcevision/src/viewer/views/routes.ts (TypeScript, 356 lines, source)
-packages/sourcevision/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
-packages/sourcevision/src/viewer/views/zones.ts (TypeScript, 238 lines, source)
-packages/sourcevision/tests/unit/viewer/bar-chart.test.ts (TypeScript, 47 lines, test)
-packages/sourcevision/tests/unit/viewer/collapsible-section.test.ts (TypeScript, 87 lines, test)
-packages/sourcevision/tests/unit/viewer/detail-panel.test.ts (TypeScript, 101 lines, test)
-packages/sourcevision/tests/unit/viewer/flow-diagram.test.ts (TypeScript, 55 lines, test)
-packages/sourcevision/tests/unit/viewer/tree-view.test.ts (TypeScript, 58 lines, test)
 
 </files>
 
 <imports>
 
-Internal:
-  packages/sourcevision/src/viewer/components/detail-panel.ts → packages/sourcevision/src/viewer/components/constants.ts {ZONE_COLORS}
-  packages/sourcevision/src/viewer/components/detail-panel.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail}
-  packages/sourcevision/src/viewer/components/sidebar.ts → packages/sourcevision/src/schema/v1.ts {Manifest, Zones}
-  packages/sourcevision/src/viewer/components/sidebar.ts → packages/sourcevision/src/viewer/components/constants.ts {ENRICHMENT_THRESHOLDS}
-  packages/sourcevision/src/viewer/components/sidebar.ts → packages/sourcevision/src/viewer/components/theme-toggle.ts {SidebarThemeToggle}
-  packages/sourcevision/src/viewer/components/sidebar.ts → packages/sourcevision/src/viewer/types.ts {ViewId}
-  packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components}
-  packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/viewer/schema-compat.ts {migrateData}
-  packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/viewer/types.ts {LoadedData}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/components/detail-panel.ts {DetailPanel}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/components/guide.ts {Guide}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/components/sidebar.ts {Sidebar}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/components/theme-toggle.ts {initTheme}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/loader.ts {loadFromServer, loadFromFiles, detectMode, onDataChange, startPolling, stopPolling}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, ViewId, NavigateTo, DetailItem}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/architecture.ts {ArchitectureView}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/files.ts {FilesView}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/graph.ts {Graph}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/overview.ts {Overview}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/problems.ts {ProblemsView}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/routes.ts {RoutesView}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/suggestions.ts {SuggestionsView}
-  packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/viewer/views/zones.ts {ZonesView}
-  packages/sourcevision/src/viewer/schema-compat.ts → packages/sourcevision/src/schema/v1.ts {SCHEMA_VERSION}
-  packages/sourcevision/src/viewer/schema-compat.ts → packages/sourcevision/src/viewer/types.ts {LoadedData}
-  packages/sourcevision/src/viewer/types.ts → packages/sourcevision/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components}
-  packages/sourcevision/src/viewer/views/architecture.ts → packages/sourcevision/src/schema/v1.ts {Finding}
-  packages/sourcevision/src/viewer/views/architecture.ts → packages/sourcevision/src/viewer/components/constants.ts {ENRICHMENT_THRESHOLDS}
-  packages/sourcevision/src/viewer/views/architecture.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/sourcevision/src/viewer/views/files.ts → packages/sourcevision/src/schema/v1.ts {FileEntry}
-  packages/sourcevision/src/viewer/views/files.ts → packages/sourcevision/src/viewer/components/constants.ts {ZONE_COLORS}
-  packages/sourcevision/src/viewer/views/files.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/sourcevision/src/viewer/views/graph.ts → packages/sourcevision/src/viewer/components/constants.ts {ZONE_COLORS}
-  packages/sourcevision/src/viewer/views/graph.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, DetailItem}
-  packages/sourcevision/src/viewer/views/overview.ts → packages/sourcevision/src/schema/v1.ts {Zone, Finding}
-  packages/sourcevision/src/viewer/views/overview.ts → packages/sourcevision/src/viewer/components/constants.ts {ZONE_COLORS}
-  packages/sourcevision/src/viewer/views/overview.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/sourcevision/src/viewer/views/problems.ts → packages/sourcevision/src/schema/v1.ts {Finding}
-  packages/sourcevision/src/viewer/views/problems.ts → packages/sourcevision/src/viewer/components/constants.ts {ENRICHMENT_THRESHOLDS}
-  packages/sourcevision/src/viewer/views/problems.ts → packages/sourcevision/src/viewer/types.ts {LoadedData}
-  packages/sourcevision/src/viewer/views/routes.ts → packages/sourcevision/src/schema/v1.ts {RouteTreeNode, RouteExportKind, ComponentUsageEdge}
-  packages/sourcevision/src/viewer/views/routes.ts → packages/sourcevision/src/viewer/components/search-filter.ts {SearchFilter}
-  packages/sourcevision/src/viewer/views/routes.ts → packages/sourcevision/src/viewer/types.ts {LoadedData}
-  packages/sourcevision/src/viewer/views/suggestions.ts → packages/sourcevision/src/schema/v1.ts {Finding}
-  packages/sourcevision/src/viewer/views/suggestions.ts → packages/sourcevision/src/viewer/components/constants.ts {ENRICHMENT_THRESHOLDS}
-  packages/sourcevision/src/viewer/views/suggestions.ts → packages/sourcevision/src/viewer/types.ts {LoadedData}
-  packages/sourcevision/src/viewer/views/zones.ts → packages/sourcevision/src/schema/v1.ts {Zone, Finding}
-  packages/sourcevision/src/viewer/views/zones.ts → packages/sourcevision/src/viewer/components/constants.ts {ZONE_COLORS}
-  packages/sourcevision/src/viewer/views/zones.ts → packages/sourcevision/src/viewer/components/search-filter.ts {SearchFilter}
-  packages/sourcevision/src/viewer/views/zones.ts → packages/sourcevision/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/sourcevision/tests/unit/viewer/detail-panel.test.ts → packages/sourcevision/src/viewer/components/detail-panel.ts {DetailPanel}
 
 Outgoing (this zone → other zones):
-  → packages-sourcevision:analysis-engine: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts
-  → packages-sourcevision:test-suite: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/validate.ts
+  → packages-sourcevision:analysis-engine: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/src/viewer/main.ts → packages/sourcevision/src/schema/data-files.ts
+  → packages-sourcevision:test-suite: packages/sourcevision/src/viewer/loader.ts → packages/sourcevision/src/schema/validate.ts
 
 Incoming (other zones → this zone):
   ← packages-sourcevision:analysis-engine: packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/v1.ts; packages/sourcevision/src/schema/index.ts → packages/sourcevision/src/schema/v1.ts

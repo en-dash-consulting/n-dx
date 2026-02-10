@@ -7,10 +7,10 @@
 
 Project: n-dx
 Git: feature/from-recommend @ a67e98f
-Files: 474, Lines: 125015
-Languages: TypeScript(384) CSS(25) JSON(24) Other(14) JavaScript(12)
-Zones: 8, Described: 8
-Import edges: 1145, External packages: 15
+Files: 494, Lines: 129508
+Languages: TypeScript(397) JSON(26) CSS(25) Other(16) Markdown(13)
+Zones: 9, Described: 9
+Import edges: 1173, External packages: 15
 
 </architecture>
 
@@ -22,6 +22,9 @@ Import edges: 1145, External packages: 15
 [claude-integration-layer] Claude Integration Layer (15 files, coh=1.00 coup=0.00)
   Unified Claude API client abstraction supporting dual provider architecture (API and CLI modes) with automatic failover.
   files: packages/claude-client/src/api-provider.ts, packages/claude-client/src/auth.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/config.ts, packages/claude-client/src/create-client.ts, packages/claude-client/src/index.ts, packages/claude-client/src/token-usage.ts, packages/claude-client/src/types.ts, packages/claude-client/tests/unit/api-provider.test.ts, packages/claude-client/tests/unit/auth.test.ts +5
+[integrated-web-dashboard] Integrated Web Dashboard (111 files, coh=1.00 coup=0.00)
+  Multi-package web interface providing unified visualization and control for sourcevision analysis, rex PRD management, and hench execution monitoring.
+  files: packages/web/src/cli/index.ts, packages/web/src/public.ts, packages/web/src/schema/data-files.ts, packages/web/src/schema/v1.ts, packages/web/src/schema/validate.ts, packages/web/src/server/index.ts, packages/web/src/server/routes-data.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-rex.ts, packages/web/src/server/routes-sourcevision.ts +101
 [orchestration-layer] Orchestration Layer (4 files, coh=1.00 coup=0.00)
   Top-level command router and tool coordination that delegates workflow commands to specialized packages.
   files: ci.js, cli.js, config.js, web.js
@@ -40,7 +43,7 @@ Import edges: 1145, External packages: 15
 [packages-sourcevision:test-suite] Test Suite (5 files, coh=0.46 coup=0.54)
   Unit, integration, and end-to-end tests covering analyzer logic, schema validation, CLI workflows, and the serve command, with imports reaching into both analyzer and viewer zones.
   files: packages/sourcevision/src/schema/validate.ts, packages/sourcevision/tests/e2e/cli-analyze.test.ts, packages/sourcevision/tests/e2e/cli-serve.test.ts, packages/sourcevision/tests/integration/pipeline.test.ts, packages/sourcevision/tests/unit/schema/validate.test.ts
-[unzoned] 32 files: .claude/settings.local.json, .gitignore, .hench/config.json, .npmrc, .rex/config.json ...
+[unzoned] 42 files: .claude/settings.local.json, .gitignore, .hench/config.json, .npmrc, .rex/config.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -49,14 +52,14 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 <imports>
 
 Most imported:
-  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add.ts +28
+  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add.ts +30
   packages/rex/src/cli/errors.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/prune.ts +18
   packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts +22
   packages/rex/src/cli/output.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/chunked-review.ts +17
   packages/rex/src/cli/commands/constants.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts +16
-  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts +88
+  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts +90
   packages/rex/src/core/canonical.ts ← packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/prune.ts, packages/rex/src/cli/commands/reshape.ts, packages/rex/src/store/adapter-registry.ts, packages/rex/src/store/file-adapter.ts +11
-  packages/sourcevision/src/viewer/components/logos.ts ← packages/sourcevision/src/viewer/components/sidebar.ts, packages/sourcevision/src/viewer/views/analysis.ts, packages/sourcevision/src/viewer/views/architecture.ts, packages/sourcevision/src/viewer/views/files.ts, packages/sourcevision/src/viewer/views/graph.ts +10
+  packages/web/src/viewer/components/logos.ts ← packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/views/analysis.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/graph.ts +10
   packages/hench/src/store/config.ts ← packages/hench/src/cli/commands/task-lookup.ts, packages/hench/src/store/index.ts, packages/hench/tests/integration/store-roundtrip.test.ts, packages/hench/tests/unit/agent/api-auth.test.ts, packages/hench/tests/unit/agent/api-auth.test.ts +9
   packages/rex/src/analyze/reason.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/reshape-reason.ts +12
 
@@ -78,13 +81,14 @@ Conventions: action(2) default(4) loader(2) meta(1)
 
 <findings>
 
-[critical] Multi-package web server (with rex, hench, and sourcevision routes) is architecturally misplaced inside packages/sourcevision/ rather than at the orchestration layer where cross-package concerns belong. This creates artificial coupling and violates the clean three-layer architecture.
+[warning] Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution [orchestration-layer]
 
 </findings>
 
 <next-steps>
 
-[high] Multi-package web server (with rex, hench, and sourcevision routes) is architec…
-  category: fix
+[medium] Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - con…
+  files: ci.js, cli.js, config.js
+  category: refactor
 
 </next-steps>

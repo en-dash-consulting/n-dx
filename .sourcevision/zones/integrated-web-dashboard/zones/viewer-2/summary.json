@@ -1,0 +1,32 @@
+{
+  "id": "web/viewer-2",
+  "name": "Viewer 2",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+    "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+    "packages/web/src/viewer/components/prd-tree/compute.ts",
+    "packages/web/src/viewer/components/prd-tree/index.ts",
+    "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+    "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+    "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+    "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+    "packages/web/src/viewer/components/prd-tree/types.ts",
+    "packages/web/src/viewer/views/prd.ts",
+    "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+    "packages/web/tests/unit/viewer/prd-tree.test.ts",
+    "packages/web/tests/unit/viewer/status-filter.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/prd.ts",
+    "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+    "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+    "packages/web/src/viewer/components/prd-tree/types.ts"
+  ],
+  "cohesion": 0.9,
+  "coupling": 0.1,
+  "fileCount": 14,
+  "lineCount": 3738
+}
