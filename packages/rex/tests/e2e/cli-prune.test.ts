@@ -41,7 +41,7 @@ describe("rex prune", () => {
 
   it("reports nothing to prune on pending items", () => {
     run(["add", "epic", "--title=Active Epic", tmpDir]);
-    const output = run(["prune", tmpDir]);
+    const output = run(["prune", "--no-consolidate", tmpDir]);
     expect(output).toContain("Nothing to prune.");
   });
 
@@ -78,7 +78,7 @@ describe("rex prune", () => {
     run(["update", epicId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", epicId!, "--status=completed", "--force", tmpDir]);
 
-    const dryOutput = run(["prune", "--dry-run", tmpDir]);
+    const dryOutput = run(["prune", "--dry-run", "--no-consolidate", tmpDir]);
     expect(dryOutput).toContain("Would prune:");
     expect(dryOutput).toContain("Preview Epic");
 
@@ -94,7 +94,7 @@ describe("rex prune", () => {
     run(["update", epicId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", epicId!, "--status=completed", "--force", tmpDir]);
 
-    const output = run(["prune", "--dry-run", "--format=json", tmpDir]);
+    const output = run(["prune", "--dry-run", "--format=json", "--no-consolidate", tmpDir]);
     const parsed = JSON.parse(output);
     expect(parsed.dryRun).toBe(true);
     expect(parsed.items).toHaveLength(1);
@@ -126,7 +126,7 @@ describe("rex prune", () => {
     run(["update", taskId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=completed", "--force", tmpDir]);
 
-    const output = run(["prune", tmpDir]);
+    const output = run(["prune", "--no-consolidate", tmpDir]);
     // The completed task should be pruned from under the epic
     expect(output).toContain("Pruned 1 completed item");
     expect(output).toContain("Done Task");

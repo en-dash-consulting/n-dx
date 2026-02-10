@@ -59,25 +59,83 @@ export async function cmdPrune(
   const doc = await store.loadDocument();
 
   const dryRun = flags["dry-run"] === "true";
+  const skipConsolidate = flags["no-consolidate"] === "true";
+  const accept = flags.accept === "true";
 
   if (dryRun) {
     // Preview mode — show what would be pruned without mutating.
     const prunable = findPrunableItems(doc.items);
-    if (prunable.length === 0) {
-      result("Nothing to prune.");
-      return;
+    const hasPrunable = prunable.length > 0;
+
+    if (hasPrunable) {
+      if (flags.format !== "json") {
+        result("Would prune:");
+        for (const item of prunable) {
+          result(`  ${icon(item.level)} ${item.title} (${item.id.slice(0, 8)})`);
+        }
+      }
+    } else {
+      if (flags.format !== "json") {
+        result("Nothing to prune.");
+      }
+    }
+
+    // Also preview consolidation proposals in dry-run
+    let consolidationProposals: ReshapeProposal[] = [];
+    let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
+    if (!skipConsolidate && doc.items.length > 0) {
+      try {
+        const { setClaudeConfig } = await import("../../analyze/reason.js");
+        const { loadClaudeConfig } = await import("../../store/project-config.js");
+        const claudeConfig = await loadClaudeConfig(rexDir);
+        setClaudeConfig(claudeConfig);
+
+        const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
+
+        if (flags.format !== "json") {
+          info("\nAnalyzing for consolidation opportunities...");
+        }
+
+        const consolidateResult = await reasonForReshape(doc.items, {
+          dir,
+          model: flags.model,
+          consolidateMode: true,
+        });
+        consolidationProposals = consolidateResult.proposals;
+        consolidationTokenUsage = consolidateResult.tokenUsage;
+
+        if (flags.format !== "json") {
+          const usageLine = formatTokenUsage(consolidateResult.tokenUsage);
+          if (usageLine) info(`Token usage: ${usageLine}`);
+
+          if (consolidationProposals.length > 0) {
+            info(`\nWould propose ${consolidationProposals.length} consolidation action${consolidationProposals.length === 1 ? "" : "s"}:\n`);
+            for (let i = 0; i < consolidationProposals.length; i++) {
+              info(`${i + 1}. ${fmtProposal(consolidationProposals[i], doc.items)}`);
+              info("");
+            }
+          } else {
+            info("\nNo consolidation needed.");
+          }
+        }
+      } catch (err) {
+        if (flags.format !== "json") {
+          info(`\nConsolidation preview skipped: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
 
     if (flags.format === "json") {
       result(JSON.stringify({
         dryRun: true,
-        items: prunable.map(summarize),
+        items: hasPrunable ? prunable.map(summarize) : [],
+        ...(consolidationProposals.length > 0 ? {
+          consolidation: {
+            proposals: consolidationProposals.map((p) => ({ id: p.id, ...p.action })),
+            ...(consolidationTokenUsage ? { tokenUsage: consolidationTokenUsage } : {}),
+          },
+        } : {}),
       }, null, 2));
-    } else {
-      result("Would prune:");
-      for (const item of prunable) {
-        result(`  ${icon(item.level)} ${item.title} (${item.id.slice(0, 8)})`);
-      }
     }
     return;
   }
@@ -87,6 +145,11 @@ export async function cmdPrune(
 
   if (pruneResult.prunedCount === 0) {
     result("Nothing to prune.");
+    // Still run consolidation even if nothing was pruned — the PRD may
+    // benefit from regrouping regardless.
+    if (!skipConsolidate && doc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    }
     return;
   }
 
@@ -114,17 +177,148 @@ export async function cmdPrune(
 
   // Output results
   if (flags.format === "json") {
-    result(JSON.stringify({
+    const jsonResult: Record<string, unknown> = {
       pruned: pruneResult.pruned.map(summarize),
       prunedCount: pruneResult.prunedCount,
       archivePath,
-    }, null, 2));
+    };
+
+    // Run consolidation and include in JSON output
+    if (!skipConsolidate && doc.items.length > 0) {
+      const consolidation = await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+      if (consolidation) {
+        jsonResult.consolidation = consolidation;
+      }
+    }
+
+    result(JSON.stringify(jsonResult, null, 2));
   } else {
     result(`Pruned ${pruneResult.prunedCount} completed item${pruneResult.prunedCount === 1 ? "" : "s"}:`);
     for (const item of pruneResult.pruned) {
       result(`  ${icon(item.level)} ${item.title}`);
     }
     info(`Archived to ${ARCHIVE_FILE}`);
+
+    // Chain consolidation after prune
+    if (!skipConsolidate && doc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    }
+  }
+}
+
+/**
+ * Post-prune consolidation: LLM-assisted regrouping of remaining items.
+ * Analyzes the current PRD state and proposes restructuring to create
+ * clean, logical groupings after completed items have been removed.
+ *
+ * Returns consolidation summary for JSON output, or undefined if skipped.
+ */
+async function consolidateAfterPrune(
+  dir: string,
+  rexDir: string,
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  doc: Awaited<ReturnType<Awaited<ReturnType<typeof resolveStore>>["loadDocument"]>>,
+  flags: Record<string, string>,
+): Promise<{ applied: number; archivedCount: number } | undefined> {
+  const accept = flags.accept === "true";
+
+  try {
+    // Load Claude config
+    const { setClaudeConfig } = await import("../../analyze/reason.js");
+    const { loadClaudeConfig } = await import("../../store/project-config.js");
+    const claudeConfig = await loadClaudeConfig(rexDir);
+    setClaudeConfig(claudeConfig);
+
+    const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
+
+    info("\nAnalyzing remaining items for consolidation...");
+    const { proposals, tokenUsage } = await reasonForReshape(doc.items, {
+      dir,
+      model: flags.model,
+      consolidateMode: true,
+    });
+
+    const usageLine = formatTokenUsage(tokenUsage);
+    if (usageLine) info(`Token usage: ${usageLine}`);
+
+    if (proposals.length === 0) {
+      info("No consolidation needed.");
+      return undefined;
+    }
+
+    info(`\nFound ${proposals.length} consolidation proposal${proposals.length === 1 ? "" : "s"}:\n`);
+    for (let i = 0; i < proposals.length; i++) {
+      info(`${i + 1}. ${formatReshapeProposal(proposals[i], doc.items)}`);
+      info("");
+    }
+
+    // Determine which to apply
+    let accepted: ReshapeProposal[];
+    if (accept) {
+      accepted = proposals;
+    } else if (process.stdin.isTTY) {
+      accepted = await interactiveAcceptProposals(proposals, doc.items, "Consolidate");
+    } else {
+      info("Run with --accept to apply consolidation, or use interactively in a TTY.");
+      return undefined;
+    }
+
+    if (accepted.length === 0) {
+      info("No consolidation proposals accepted.");
+      return undefined;
+    }
+
+    // Apply via reshape
+    const reshapeResult = applyReshape(doc.items, accepted);
+
+    for (const err of reshapeResult.errors) {
+      info(`  Warning: ${err.error}`);
+    }
+
+    // Archive any items removed during consolidation
+    if (reshapeResult.archivedItems.length > 0) {
+      const archivePath = join(rexDir, ARCHIVE_FILE);
+      const archive = await loadArchive(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "reshape",
+        items: reshapeResult.archivedItems,
+        count: reshapeResult.archivedItems.length,
+        reason: "Post-prune consolidation: LLM-proposed restructuring",
+        actions: accepted,
+      });
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+    }
+
+    // Save document
+    await store.saveDocument(doc);
+
+    // Log the consolidation
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "post_prune_consolidation",
+      detail: JSON.stringify({
+        applied: reshapeResult.applied.length,
+        deleted: reshapeResult.deletedIds.length,
+        archived: reshapeResult.archivedItems.length,
+        actions: reshapeResult.applied.map((p) => p.action.action),
+      }),
+    });
+
+    if (flags.format !== "json") {
+      result(`Consolidated ${reshapeResult.applied.length} item${reshapeResult.applied.length === 1 ? "" : "s"}.`);
+      if (reshapeResult.archivedItems.length > 0) {
+        info(`  ${reshapeResult.archivedItems.length} item${reshapeResult.archivedItems.length === 1 ? "" : "s"} archived.`);
+      }
+    }
+
+    return {
+      applied: reshapeResult.applied.length,
+      archivedCount: reshapeResult.archivedItems.length,
+    };
+  } catch (err) {
+    info(`\nConsolidation skipped: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
   }
 }
 
@@ -201,7 +395,7 @@ async function smartPrune(
   if (accept) {
     accepted = proposals;
   } else if (process.stdin.isTTY) {
-    accepted = await interactiveSmartPrune(proposals, doc.items);
+    accepted = await interactiveAcceptProposals(proposals, doc.items, "Prune");
   } else {
     info("Run with --accept to apply, or use interactively in a TTY.");
     return;
@@ -260,9 +454,10 @@ async function smartPrune(
   }
 }
 
-async function interactiveSmartPrune(
+async function interactiveAcceptProposals(
   proposals: ReshapeProposal[],
   items: PRDItem[],
+  promptLabel = "Accept",
 ): Promise<ReshapeProposal[]> {
   const { formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
   const readline = await import("node:readline");
@@ -280,7 +475,7 @@ async function interactiveSmartPrune(
     for (let i = 0; i < proposals.length; i++) {
       const p = proposals[i];
       info(`\n[${i + 1}/${proposals.length}] ${formatReshapeProposal(p, items)}`);
-      const answer = await ask("  Prune? (y/n/a=all/q=quit) ");
+      const answer = await ask(`  ${promptLabel}? (y/n/a=all/q=quit) `);
       const choice = answer.trim().toLowerCase();
 
       if (choice === "q") break;

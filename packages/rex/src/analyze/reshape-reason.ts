@@ -165,11 +165,35 @@ Do NOT suggest:
 
 Only propose "obsolete" and "merge" actions.`;
 
+const POST_PRUNE_CONSOLIDATION_PROMPT = `You are a PRD architect reviewing a Product Requirements Document (PRD) that was just pruned — completed items have been archived and removed. Your job is to analyze the REMAINING (non-completed) items and propose restructuring to create clean, logical groupings.
+
+Focus on these consolidation opportunities:
+
+1. **reparent** — Move orphaned or misplaced items under a more logical parent epic/feature. After pruning, some items may be stranded under parents that no longer make sense.
+2. **merge** — Combine similar items that are scattered across different parts of the tree. Look for items that describe overlapping work in different words.
+3. **split** — Break overly broad items into focused children at the appropriate hierarchy level. Items that try to cover too much scope should become multiple specific items.
+4. **update** — Revise stale titles/descriptions that no longer accurately reflect the work. After pruning, context may have shifted.
+5. **obsolete** — Mark items that are no longer relevant given what was just completed (they may have been implicitly addressed by the pruned work).
+
+Guidelines:
+- Reference items by their exact IDs from the PRD.
+- Prioritize creating clean logical groupings over cosmetic changes.
+- Only propose changes that materially improve the PRD structure — skip trivial rewording.
+- Do NOT propose changes to items that are already completed or in_progress.
+- Ensure reparenting maintains proper hierarchy (epics > features > tasks > subtasks).
+- For merges: pick the most descriptive/complete item as the survivor.
+- For splits: ensure child items are at the appropriate hierarchy level below the source.
+- Provide a clear "reason" for every action explaining how it improves post-prune organization.
+
+Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON. Return an empty array [] if no consolidation is needed.`;
+
 export interface ReshapeReasonOptions {
   dir?: string;
   model?: string;
   /** When true, use prune-focused prompt instead of full reshape. */
   pruneMode?: boolean;
+  /** When true, use post-prune consolidation prompt for regrouping remaining items. */
+  consolidateMode?: boolean;
 }
 
 export interface ReshapeReasonResult {
@@ -195,7 +219,11 @@ export async function reasonForReshape(
     projectContext = await readProjectContext(options.dir);
   }
 
-  const systemPrompt = options.pruneMode ? SMART_PRUNE_PROMPT : RESHAPE_SYSTEM_PROMPT;
+  const systemPrompt = options.consolidateMode
+    ? POST_PRUNE_CONSOLIDATION_PROMPT
+    : options.pruneMode
+      ? SMART_PRUNE_PROMPT
+      : RESHAPE_SYSTEM_PROMPT;
 
   const prompt = [
     systemPrompt,

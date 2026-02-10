@@ -17,7 +17,7 @@ Commands:
   update <id> [dir]       Update item status/priority
   move <id> [dir]         Move item to new parent (reparent)
   reshape [dir]           LLM-powered PRD restructuring (merge, update, reparent, split)
-  prune [dir]             Remove completed subtrees (archive to .rex/archive.json)
+  prune [dir]             Remove completed subtrees and consolidate remaining items
   usage [dir]             Detailed token usage analytics and cost estimation
   validate [dir]          Check PRD integrity (DAG, schema)
   fix [dir]               Auto-fix common validation issues (timestamps, refs, status)
@@ -41,6 +41,7 @@ Options:
   --task=<id>             Target a specific task (for verify)
   --dry-run               Preview without making changes (for fix, prune, reshape, verify)
   --smart                 LLM-assisted prune (for prune)
+  --no-consolidate        Skip post-prune consolidation pass (for prune)
   --coverage              Show test coverage per task (for status)
   --tokens=false          Hide token usage summary (shown by default, for status)
   --since=<ISO>           Filter token usage after timestamp (for status, usage)
@@ -48,7 +49,7 @@ Options:
   --group=day|week|month  Group usage by time period (for usage)
   --format=tree|json      Output format (default: tree)
   --lite                  File-name-only scan (for analyze)
-  --accept                Accept LLM proposals into PRD (for smart add, analyze)
+  --accept                Accept LLM proposals into PRD (for smart add, analyze, prune)
   --file=<path>           Import from a document (repeatable, for add/analyze)
   --guided              Interactive spec builder (for analyze/plan)
   --no-llm                Force algorithmic pipeline, skip LLM (for analyze)
