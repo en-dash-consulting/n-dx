@@ -5870,7 +5870,7 @@
             {
               "id": "ae7d3e36-b63f-43e9-9e81-9211ba0a83f8",
               "title": "Create `packages/web` and move server + viewer code",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a new `packages/web` package. Move the HTTP server (start.ts, routes-*.ts, websocket.ts), viewer assets, and web.js orchestration into it. Update imports, build config, and pnpm workspace. The sourcevision package should no longer contain web server or viewer code — only analysis logic and the `sourcevision serve` command which delegates to `packages/web`.",
               "acceptanceCriteria": [
@@ -5880,7 +5880,9 @@
                 "`ndx web` / `ndx start` still works via the new package",
                 "pnpm build succeeds"
               ],
-              "priority": "high"
+              "priority": "high",
+              "startedAt": "2026-02-10T03:40:05.005Z",
+              "completedAt": "2026-02-10T03:50:30.698Z"
             },
             {
               "id": "317a6971-1a95-4ec0-9ee0-24829df8e812",
@@ -5921,7 +5923,7 @@
             {
               "id": "87c852ac-1348-4fe2-a109-a72312289b8e",
               "title": "Design composable viewer architecture for independent packages",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Design how each package (sourcevision, rex, hench) can expose its own minimal viewer. Options: (A) each package exports route handlers + a small HTML template that packages/web can compose, (B) each package ships a standalone single-file viewer and packages/web assembles them via iframes or tabs, (C) packages only export data APIs and all UI lives in packages/web. Decide on approach and document the contract.",
               "acceptanceCriteria": [
@@ -5929,7 +5931,9 @@
                 "Contract defined for how packages expose viewer capabilities",
                 "Approach validated against the independently-installable requirement"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-10T03:51:06.027Z",
+              "completedAt": "2026-02-10T03:55:36.555Z"
             },
             {
               "id": "fca6ae59-b5af-4b83-adb6-d0f863e18951",
