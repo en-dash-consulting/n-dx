@@ -1,5 +1,39 @@
 #!/usr/bin/env node
 
+/**
+ * n-dx CLI orchestrator — top-level entry point for all commands.
+ *
+ * ## Architectural layering
+ *
+ * The monorepo follows a strict four-tier dependency hierarchy:
+ *
+ * ```
+ *   Orchestration  cli.js, web.js, ci.js
+ *        ↓
+ *   Execution      hench (autonomous agent)
+ *        ↓
+ *   Domain         rex (PRD management) · sourcevision (static analysis)
+ *        ↓
+ *   Foundation     @n-dx/claude-client (shared types, API abstraction)
+ * ```
+ *
+ * Each layer only imports from the layer directly below it:
+ * - **Orchestration** spawns tool CLIs as child processes (no library imports).
+ * - **Execution** (hench) imports rex for task management via a single
+ *   gateway module (`hench/src/prd/ops.ts`), keeping the cross-package
+ *   surface explicit.
+ * - **Domain** packages (rex, sourcevision) are fully independent —
+ *   they never import each other and share data only through the
+ *   orchestration or web layer.
+ * - **Foundation** (`@n-dx/claude-client`) provides the shared type
+ *   contracts and API client that prevent circular dependencies.
+ *
+ * This layering ensures the import graph remains a DAG with zero
+ * circular dependencies, enabling independent builds and testing.
+ *
+ * @module n-dx/cli
+ */
+
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { dirname, join, resolve } from "path";

@@ -5,6 +5,13 @@
   "bin": {
     "hench": "./dist/cli/index.js"
   },
+  "exports": {
+    ".": {
+      "import": "./dist/public.js",
+      "types": "./dist/public.d.ts"
+    },
+    "./dist/*": "./dist/*"
+  },
   "files": [
     "dist"
   ],

@@ -15,11 +15,38 @@ packages/
   sourcevision/    # analysis engine
   rex/             # PRD + task tracker
   hench/           # autonomous agent
+  claude-client/   # shared foundation (types, API abstraction)
+  web/             # dashboard + MCP HTTP server
 ci.js              # CI pipeline (analysis + PRD health validation)
 cli.js             # n-dx entry point (orchestration + delegation)
 config.js          # unified config command (view/edit all package settings)
 web.js             # server orchestration: dashboard + MCP (start/stop/status)
 ```
+
+### Architecture
+
+Four-tier dependency hierarchy (each layer imports only from the layer below):
+
+```
+  Orchestration   cli.js, web.js, ci.js        (spawns CLIs, no library imports)
+       ↓
+  Execution       hench                         (agent loops, tool dispatch)
+       ↓
+  Domain          rex · sourcevision            (independent, never import each other)
+       ↓
+  Foundation      @n-dx/claude-client           (shared types, API client)
+```
+
+Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
+
+### Package conventions
+
+| Convention | Pattern | Notes |
+|-----------|---------|-------|
+| Public API | `src/public.ts` → `exports["."]` in `package.json` | All 5 packages follow this |
+| Test structure | `tests/{unit,integration,e2e}/**/*.test.ts` | Standardized across all packages |
+| Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/claude-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
+| Subpath exports | `"./dist/*": "./dist/*"` | Allows direct imports from `dist/` for advanced consumers |
 
 Build and test:
 
