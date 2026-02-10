@@ -13,6 +13,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute } from "./routes-hench.js";
+import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleMcpRoute } from "./routes-mcp.js";
 import { createWebSocketManager } from "./websocket.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
@@ -176,6 +177,16 @@ export function startServer(
       if (henchResult instanceof Promise) {
         if (await henchResult) return;
       } else if (henchResult) {
+        return;
+      }
+    }
+
+    // 3b. Hench Workflow Optimization API
+    if (inScope("hench")) {
+      const workflowResult = handleWorkflowRoute(req, res, ctx);
+      if (workflowResult instanceof Promise) {
+        if (await workflowResult) return;
+      } else if (workflowResult) {
         return;
       }
     }

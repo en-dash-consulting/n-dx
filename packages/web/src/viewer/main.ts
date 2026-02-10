@@ -27,6 +27,7 @@ import { AnalysisView } from "./views/analysis.js";
 import { HenchRunsView } from "./views/hench-runs.js";
 import { HenchConfigView } from "./views/hench-config.js";
 import { HenchTemplatesView } from "./views/hench-templates.js";
+import { WorkflowOptimizationView } from "./views/workflow-optimization.js";
 
 initTheme();
 
@@ -34,7 +35,7 @@ initTheme();
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
   sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
   rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation"],
-  hench: ["hench-runs", "hench-config", "hench-templates"],
+  hench: ["hench-runs", "hench-config", "hench-templates", "hench-optimization"],
 };
 
 const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
@@ -286,6 +287,8 @@ function App({ scope }: { scope: string | null }) {
         return h(HenchConfigView, null);
       case "hench-templates":
         return h(HenchTemplatesView, null);
+      case "hench-optimization":
+        return h(WorkflowOptimizationView, null);
       default:
         return null;
     }
