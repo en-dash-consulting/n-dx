@@ -125,9 +125,10 @@ interface TreeStats {
   pending: number;
   deferred: number;
   blocked: number;
+  deleted: number;
 }
 
-/** Compute stats counting only task and subtask levels. */
+/** Compute stats counting only task and subtask levels. Deleted items are excluded from total. */
 function computeStats(items: PRDItemRecord[]): TreeStats {
   const stats: TreeStats = {
     total: 0,
@@ -136,18 +137,24 @@ function computeStats(items: PRDItemRecord[]): TreeStats {
     pending: 0,
     deferred: 0,
     blocked: 0,
+    deleted: 0,
   };
 
   function walk(list: PRDItemRecord[]): void {
     for (const item of list) {
       if (item.level === "task" || item.level === "subtask") {
-        stats.total++;
-        switch (item.status) {
-          case "completed": stats.completed++; break;
-          case "in_progress": stats.inProgress++; break;
-          case "pending": stats.pending++; break;
-          case "deferred": stats.deferred++; break;
-          case "blocked": stats.blocked++; break;
+        // Deleted items are tracked separately and excluded from total
+        if (item.status === "deleted") {
+          stats.deleted++;
+        } else {
+          stats.total++;
+          switch (item.status) {
+            case "completed": stats.completed++; break;
+            case "in_progress": stats.inProgress++; break;
+            case "pending": stats.pending++; break;
+            case "deferred": stats.deferred++; break;
+            case "blocked": stats.blocked++; break;
+          }
         }
       }
       if (Array.isArray(item.children)) walk(item.children);

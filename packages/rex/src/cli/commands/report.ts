@@ -25,6 +25,7 @@ interface LevelBreakdown {
   pending: number;
   deferred: number;
   blocked: number;
+  deleted: number;
 }
 
 export interface HealthReport {
@@ -173,15 +174,21 @@ async function runChecks(dir: string): Promise<{
 /** Count items by level, returning a per-level breakdown. */
 function computeBreakdown(items: PRDItem[]): Partial<Record<ItemLevel, LevelBreakdown>> {
   const counts: Record<ItemLevel, LevelBreakdown> = {
-    epic: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 },
-    feature: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 },
-    task: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 },
-    subtask: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 },
+    epic: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 },
+    feature: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 },
+    task: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 },
+    subtask: { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 },
   };
 
   for (const { item } of walkTree(items)) {
     const level = counts[item.level];
     if (!level) continue;
+
+    // Deleted items are tracked separately and excluded from total
+    if (item.status === "deleted") {
+      level.deleted++;
+      continue;
+    }
 
     level.total++;
     switch (item.status) {

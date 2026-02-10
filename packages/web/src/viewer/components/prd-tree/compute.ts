@@ -23,26 +23,28 @@ export function computeBranchStats(items: PRDItemData[]): BranchStats {
   function walk(nodes: PRDItemData[]): void {
     for (const item of nodes) {
       if (item.level === "task" || item.level === "subtask") {
-        stats.total++;
-        switch (item.status) {
-          case "completed":
-            stats.completed++;
-            break;
-          case "in_progress":
-            stats.inProgress++;
-            break;
-          case "pending":
-            stats.pending++;
-            break;
-          case "deferred":
-            stats.deferred++;
-            break;
-          case "blocked":
-            stats.blocked++;
-            break;
-          case "deleted":
-            stats.deleted++;
-            break;
+        // Deleted items are tracked separately and excluded from total
+        if (item.status === "deleted") {
+          stats.deleted++;
+        } else {
+          stats.total++;
+          switch (item.status) {
+            case "completed":
+              stats.completed++;
+              break;
+            case "in_progress":
+              stats.inProgress++;
+              break;
+            case "pending":
+              stats.pending++;
+              break;
+            case "deferred":
+              stats.deferred++;
+              break;
+            case "blocked":
+              stats.blocked++;
+              break;
+          }
         }
       }
       if (item.children && item.children.length > 0) {
@@ -55,7 +57,11 @@ export function computeBranchStats(items: PRDItemData[]): BranchStats {
   return stats;
 }
 
-/** Compute completion ratio (0–1) from branch stats. */
+/**
+ * Compute completion ratio (0–1) from branch stats.
+ * Deleted items are already excluded from total, so the ratio
+ * accurately reflects progress of active items only.
+ */
 export function completionRatio(stats: BranchStats): number {
   return stats.total > 0 ? stats.completed / stats.total : 0;
 }

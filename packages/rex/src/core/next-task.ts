@@ -24,10 +24,13 @@ function bestAncestorPriority(parents: PRDItem[]): number {
 export function siblingCompletionRatio(entry: TreeEntry): number {
   const parent = entry.parents[entry.parents.length - 1];
   if (!parent?.children || parent.children.length <= 1) return 0;
-  const done = parent.children.filter(
+  // Exclude deleted siblings from both numerator and denominator
+  const activeSiblings = parent.children.filter((c) => c.status !== "deleted");
+  if (activeSiblings.length <= 1) return 0;
+  const done = activeSiblings.filter(
     (c) => c.status === "completed" || c.status === "deferred",
   ).length;
-  return done / parent.children.length;
+  return done / activeSiblings.length;
 }
 
 /**

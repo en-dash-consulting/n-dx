@@ -189,6 +189,7 @@ describe("computeStats", () => {
       completed: 1,
       deferred: 1,
       blocked: 1,
+      deleted: 0,
     });
   });
 

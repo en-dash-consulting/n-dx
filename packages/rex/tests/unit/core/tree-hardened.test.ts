@@ -404,7 +404,7 @@ describe("removeFromTree — hardened", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeStats — hardened", () => {
-  it("total equals sum of all status counts", () => {
+  it("total equals sum of all active status counts (excludes deleted)", () => {
     const items: PRDItem[] = [
       makeItem({ id: "1", title: "A", status: "pending" }),
       makeItem({ id: "2", title: "B", status: "in_progress" }),
@@ -416,6 +416,7 @@ describe("computeStats — hardened", () => {
     expect(stats.total).toBe(
       stats.pending + stats.inProgress + stats.completed + stats.deferred + stats.blocked,
     );
+    expect(stats.deleted).toBe(0);
   });
 
   it("counts deeply nested subtasks", () => {
@@ -642,5 +643,98 @@ describe("tree operations — performance", () => {
     const elapsed = performance.now() - start;
     expect(ids.size).toBe(1110);
     expect(elapsed).toBeLessThan(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeStats — deleted item exclusion
+// ---------------------------------------------------------------------------
+
+describe("computeStats — deleted items excluded from total", () => {
+  it("excludes deleted tasks from total count", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "1", title: "Active", status: "pending" }),
+      makeItem({ id: "2", title: "Done", status: "completed" }),
+      makeItem({ id: "3", title: "Deleted", status: "deleted" }),
+    ];
+    const stats = computeStats(items);
+    expect(stats.total).toBe(2); // only pending + completed
+    expect(stats.deleted).toBe(1);
+    expect(stats.pending).toBe(1);
+    expect(stats.completed).toBe(1);
+  });
+
+  it("deleted items don't deflate completion percentage", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "1", title: "Done", status: "completed" }),
+      makeItem({ id: "2", title: "Deleted", status: "deleted" }),
+    ];
+    const stats = computeStats(items);
+    // Without the fix, total would be 2, giving 50%
+    // With the fix, total is 1, giving 100%
+    expect(stats.total).toBe(1);
+    expect(stats.completed).toBe(1);
+    expect(stats.deleted).toBe(1);
+    const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+    expect(pct).toBe(100);
+  });
+
+  it("handles all deleted items gracefully (total = 0)", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "1", title: "Del 1", status: "deleted" }),
+      makeItem({ id: "2", title: "Del 2", status: "deleted" }),
+    ];
+    const stats = computeStats(items);
+    expect(stats.total).toBe(0);
+    expect(stats.deleted).toBe(2);
+    const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+    expect(pct).toBe(0);
+  });
+
+  it("excludes deleted subtasks nested in tree", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Feature",
+            level: "feature",
+            children: [
+              makeItem({ id: "t1", title: "Active Task", status: "completed" }),
+              makeItem({ id: "t2", title: "Deleted Task", status: "deleted" }),
+              makeItem({
+                id: "t3",
+                title: "Task with deleted subtask",
+                status: "in_progress",
+                children: [
+                  makeItem({ id: "s1", title: "Deleted subtask", level: "subtask", status: "deleted" }),
+                  makeItem({ id: "s2", title: "Active subtask", level: "subtask", status: "pending" }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ];
+    const stats = computeStats(items);
+    expect(stats.total).toBe(3); // t1, t3, s2
+    expect(stats.deleted).toBe(2); // t2, s1
+    expect(stats.completed).toBe(1); // t1
+    expect(stats.inProgress).toBe(1); // t3
+    expect(stats.pending).toBe(1); // s2
+  });
+
+  it("deleted epics and features are not counted in stats (only tasks/subtasks)", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "e1", title: "Deleted Epic", level: "epic", status: "deleted" }),
+      makeItem({ id: "f1", title: "Deleted Feature", level: "feature", status: "deleted" }),
+      makeItem({ id: "t1", title: "Deleted Task", level: "task", status: "deleted" }),
+    ];
+    const stats = computeStats(items);
+    expect(stats.total).toBe(0);
+    expect(stats.deleted).toBe(1); // only the task-level deleted item
   });
 });

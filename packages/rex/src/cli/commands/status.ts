@@ -164,6 +164,7 @@ export function formatStats(
   if (stats.pending > 0) parts.push(`${stats.pending} pending`);
   if (stats.deferred > 0) parts.push(`${stats.deferred} deferred`);
   if (stats.blocked > 0) parts.push(`${stats.blocked} blocked`);
+  if (stats.deleted > 0) parts.push(`${stats.deleted} deleted`);
   const pct =
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
   const suffix =

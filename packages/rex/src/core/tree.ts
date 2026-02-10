@@ -94,6 +94,7 @@ export interface TreeStats {
   pending: number;
   deferred: number;
   blocked: number;
+  deleted: number;
 }
 
 export function computeStats(items: PRDItem[]): TreeStats {
@@ -104,10 +105,17 @@ export function computeStats(items: PRDItem[]): TreeStats {
     pending: 0,
     deferred: 0,
     blocked: 0,
+    deleted: 0,
   };
   for (const { item } of walkTree(items)) {
     // Only count tasks and subtasks (not epics/features) for accurate work metrics
     if (item.level !== "task" && item.level !== "subtask") continue;
+
+    // Deleted items are tracked separately and excluded from total
+    if (item.status === "deleted") {
+      stats.deleted++;
+      continue;
+    }
 
     stats.total++;
     switch (item.status) {

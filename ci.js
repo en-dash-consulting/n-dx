@@ -228,9 +228,15 @@ export async function runCI(dir, flags, { run, tools }) {
 
 /** Walk a PRD item tree and compute aggregate stats. */
 function computeStats(items) {
-  const stats = { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0 };
+  const stats = { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 };
   function walk(list) {
     for (const item of list) {
+      // Deleted items are tracked separately and excluded from total
+      if (item.status === "deleted") {
+        stats.deleted++;
+        if (item.children) walk(item.children);
+        continue;
+      }
       stats.total++;
       switch (item.status) {
         case "completed": stats.completed++; break;

@@ -81,6 +81,57 @@ describe("computeBranchStats", () => {
     expect(stats.deferred).toBe(1);
     expect(stats.total).toBe(1);
   });
+
+  it("excludes deleted items from total", () => {
+    const items: PRDItemData[] = [
+      makeItem({ id: "t1", level: "task", status: "completed" }),
+      makeItem({ id: "t2", level: "task", status: "deleted" }),
+      makeItem({ id: "t3", level: "task", status: "pending" }),
+    ];
+    const stats = computeBranchStats(items);
+    expect(stats.total).toBe(2); // only completed + pending
+    expect(stats.deleted).toBe(1);
+    expect(stats.completed).toBe(1);
+    expect(stats.pending).toBe(1);
+  });
+
+  it("deleted items don't deflate completion ratio", () => {
+    const items: PRDItemData[] = [
+      makeItem({ id: "t1", level: "task", status: "completed" }),
+      makeItem({ id: "t2", level: "task", status: "deleted" }),
+    ];
+    const stats = computeBranchStats(items);
+    const ratio = completionRatio(stats);
+    // Without the fix, ratio would be 0.5 (1/2)
+    // With the fix, ratio is 1.0 (1/1)
+    expect(ratio).toBe(1);
+  });
+
+  it("excludes deleted subtasks from nested tree stats", () => {
+    const items: PRDItemData[] = [
+      makeItem({
+        id: "e1",
+        level: "epic",
+        status: "pending",
+        children: [
+          makeItem({
+            id: "f1",
+            level: "feature",
+            status: "pending",
+            children: [
+              makeItem({ id: "t1", level: "task", status: "completed" }),
+              makeItem({ id: "t2", level: "task", status: "deleted" }),
+              makeItem({ id: "s1", level: "subtask", status: "deleted" }),
+            ],
+          }),
+        ],
+      }),
+    ];
+    const stats = computeBranchStats(items);
+    expect(stats.total).toBe(1); // only t1
+    expect(stats.deleted).toBe(2); // t2 + s1
+    expect(stats.completed).toBe(1);
+  });
 });
 
 describe("completionRatio", () => {

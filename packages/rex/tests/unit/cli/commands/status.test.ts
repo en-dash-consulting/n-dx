@@ -1078,19 +1078,19 @@ describe("filterCompleted", () => {
 
 describe("formatStats with hidingCompleted option", () => {
   it("appends hint when hidingCompleted is true", () => {
-    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0, deleted: 0 };
     const line = formatStats(stats, { hidingCompleted: true });
     expect(line).toContain("showing active items, use --all for full tree");
   });
 
   it("does not append hint when hidingCompleted is false", () => {
-    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0, deleted: 0 };
     const line = formatStats(stats, { hidingCompleted: false });
     expect(line).not.toContain("--all");
   });
 
   it("does not append hint when options are omitted", () => {
-    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0, deleted: 0 };
     const line = formatStats(stats);
     expect(line).not.toContain("--all");
   });

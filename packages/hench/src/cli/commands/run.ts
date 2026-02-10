@@ -120,6 +120,8 @@ export async function getEpicScopeInfo(
       parents.some((p) => p.id === epicId);
 
     if (isInEpic && (item.level === "task" || item.level === "subtask")) {
+      // Deleted items are excluded from all counts
+      if (item.status === "deleted") continue;
       totalTasks++;
       if (item.status === "completed") {
         completedTasks++;
