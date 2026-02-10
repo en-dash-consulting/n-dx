@@ -4,6 +4,7 @@ import {
   collectCompletedIds,
   findItem,
   walkTree,
+  collectRequirements,
 } from "../../prd/ops.js";
 import type { PRDStore, PRDItem, TreeEntry } from "rex";
 import type {
@@ -13,6 +14,7 @@ import type {
   TaskBriefSibling,
   TaskBriefProject,
   TaskBriefLogEntry,
+  TaskBriefRequirement,
 } from "../../schema/index.js";
 
 export interface AssembleBriefOptions {
@@ -203,10 +205,22 @@ export async function assembleTaskBrief(
     testCommand: config.test,
   };
 
+  // Collect requirements (own + inherited from parent chain)
+  const tracedReqs = collectRequirements(doc.items, entry.item.id);
+  const requirements: TaskBriefRequirement[] = tracedReqs.map((tr) => ({
+    id: tr.requirement.id,
+    title: tr.requirement.title,
+    category: tr.requirement.category,
+    validationType: tr.requirement.validationType,
+    acceptanceCriteria: tr.requirement.acceptanceCriteria,
+    source: tr.sourceItemTitle,
+  }));
+
   const brief: TaskBrief = {
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
+    requirements,
     project,
     workflow,
     recentLog: recentLog.map((e) => ({
@@ -273,6 +287,17 @@ export function formatTaskBrief(brief: TaskBrief): string {
     for (const p of brief.parentChain) {
       sections.push(`- **${p.title}** (${p.level})`);
       if (p.description) sections.push(`  ${p.description}`);
+    }
+  }
+
+  // Requirements
+  if (brief.requirements.length > 0) {
+    sections.push("\n## Requirements");
+    for (const req of brief.requirements) {
+      sections.push(`- **${req.title}** [${req.category}/${req.validationType}] (from: ${req.source})`);
+      for (const ac of req.acceptanceCriteria) {
+        sections.push(`  - ${ac}`);
+      }
     }
   }
 

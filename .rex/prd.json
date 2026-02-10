@@ -6838,7 +6838,7 @@
             {
               "id": "a7771ed2-5231-4181-a13d-79325681ab51",
               "title": "Build comprehensive workflow configuration interfaces",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Create both CLI and web UI interfaces for configuring hench workflow parameters, including interactive menus, visual form controls, and real-time preview of configuration changes",
               "acceptanceCriteria": [
@@ -6859,6 +6859,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-10T21:36:18.342Z",
+              "completedAt": "2026-02-10T21:55:08.070Z",
               "children": [
                 {
                   "id": "4665728f-a7cc-4f9d-83f2-66d88188433a",
@@ -7008,7 +7009,7 @@
             {
               "id": "21b15807-0af4-452c-abc9-468690970bc1",
               "title": "Extend rex schema and implement requirements validation system",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enhance rex PRD schema to support technical and non-functional requirements, and build validation logic that ensures hench task execution compliance with associated requirements",
               "acceptanceCriteria": [
@@ -7029,7 +7030,9 @@
                 "hench",
                 "validation"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T21:55:32.312Z",
+              "completedAt": "2026-02-10T22:09:23.819Z"
             },
             {
               "id": "cf02498f-248c-406a-a227-31124ad0f467",

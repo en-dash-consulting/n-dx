@@ -17,6 +17,35 @@ const ItemLevelSchema = z.enum(["epic", "feature", "task", "subtask"]);
 
 const PrioritySchema = z.enum(["critical", "high", "medium", "low"]);
 
+const RequirementCategorySchema = z.enum([
+  "technical",
+  "performance",
+  "security",
+  "accessibility",
+  "compatibility",
+  "quality",
+]);
+
+const RequirementValidationTypeSchema = z.enum([
+  "automated",
+  "manual",
+  "metric",
+]);
+
+export const RequirementSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    category: RequirementCategorySchema,
+    validationType: RequirementValidationTypeSchema,
+    acceptanceCriteria: z.array(z.string()),
+    validationCommand: z.string().optional(),
+    threshold: z.number().optional(),
+    priority: PrioritySchema.optional(),
+  })
+  .strict();
+
 export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
   z
     .object({
@@ -30,6 +59,7 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       tags: z.array(z.string()).optional(),
       source: z.string().optional(),
       blockedBy: z.array(z.string()).optional(),
+      requirements: z.array(RequirementSchema).optional(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       children: z.array(PRDItemSchema).optional(),

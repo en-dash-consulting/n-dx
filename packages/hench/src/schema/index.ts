@@ -24,6 +24,7 @@ export type {
   TaskBriefSibling,
   TaskBriefProject,
   TaskBriefLogEntry,
+  TaskBriefRequirement,
 } from "./v1.js";
 
 export {

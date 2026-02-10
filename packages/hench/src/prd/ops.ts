@@ -46,3 +46,10 @@ export { computeTimestampUpdates } from "rex";
 
 // ---- Parent auto-completion -------------------------------------------------
 export { findAutoCompletions } from "rex";
+
+// ---- Requirements validation ------------------------------------------------
+export {
+  collectRequirements,
+  validateAutomatedRequirements,
+  formatRequirementsValidation,
+} from "rex";

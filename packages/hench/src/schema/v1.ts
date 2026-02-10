@@ -189,10 +189,25 @@ export interface TaskBriefLogEntry {
   detail?: string;
 }
 
+/**
+ * A requirement included in the task brief for agent awareness.
+ */
+export interface TaskBriefRequirement {
+  id: string;
+  title: string;
+  category: string;
+  validationType: string;
+  acceptanceCriteria: string[];
+  /** Where this requirement was defined (item title). */
+  source: string;
+}
+
 export interface TaskBrief {
   task: TaskBriefTask;
   parentChain: TaskBriefParent[];
   siblings: TaskBriefSibling[];
+  /** Requirements that apply to this task (own + inherited). */
+  requirements: TaskBriefRequirement[];
   project: TaskBriefProject;
   workflow: string;
   recentLog: TaskBriefLogEntry[];

@@ -53,17 +53,24 @@ export type { PRDStore } from "./store/types.js";
 
 // ---- Schema types & constants -----------------------------------------------
 
-export type { PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig } from "./schema/v1.js";
+export type {
+  PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig,
+  RequirementCategory, RequirementValidationType, Requirement,
+} from "./schema/v1.js";
 export {
   PRIORITY_ORDER,
   LEVEL_HIERARCHY,
   VALID_LEVELS,
   VALID_STATUSES,
   VALID_PRIORITIES,
+  VALID_REQUIREMENT_CATEGORIES,
+  VALID_VALIDATION_TYPES,
   CHILD_LEVEL,
   isPriority,
   isItemLevel,
   isItemStatus,
+  isRequirementCategory,
+  isValidationType,
   DEFAULT_CONFIG,
 } from "./schema/v1.js";
 
@@ -99,6 +106,24 @@ export { findAutoCompletions } from "./core/parent-completion.js";
 
 export { findParentResets } from "./core/parent-reset.js";
 export { cascadeParentReset } from "./core/cascade-reset.js";
+
+// ---- Core: requirements -----------------------------------------------------
+
+export {
+  collectRequirements,
+  collectRequirementsByCategory,
+  collectRequirementsByValidationType,
+  validateRequirements,
+  validateAutomatedRequirements,
+  formatRequirementsValidation,
+  buildTraceabilityMatrix,
+} from "./core/requirements.js";
+export type {
+  TracedRequirement,
+  RequirementValidationResult,
+  RequirementsValidationSummary,
+  CommandExecutor,
+} from "./core/requirements.js";
 
 // ---- Core: merge/consolidation ----------------------------------------------
 

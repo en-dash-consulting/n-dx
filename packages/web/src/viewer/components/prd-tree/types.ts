@@ -25,6 +25,37 @@ export type ItemStatus =
 
 export type Priority = "critical" | "high" | "medium" | "low";
 
+/**
+ * @see packages/rex/src/schema/v1.ts — RequirementCategory
+ */
+export type RequirementCategory =
+  | "technical"
+  | "performance"
+  | "security"
+  | "accessibility"
+  | "compatibility"
+  | "quality";
+
+/**
+ * @see packages/rex/src/schema/v1.ts — RequirementValidationType
+ */
+export type RequirementValidationType = "automated" | "manual" | "metric";
+
+/**
+ * @see packages/rex/src/schema/v1.ts — Requirement
+ */
+export interface RequirementData {
+  id: string;
+  title: string;
+  description?: string;
+  category: RequirementCategory;
+  validationType: RequirementValidationType;
+  acceptanceCriteria: string[];
+  validationCommand?: string;
+  threshold?: number;
+  priority?: Priority;
+}
+
 export interface PRDItemData {
   id: string;
   title: string;
@@ -35,6 +66,8 @@ export interface PRDItemData {
   priority?: Priority;
   tags?: string[];
   blockedBy?: string[];
+  /** @see packages/rex/src/schema/v1.ts — PRDItem.requirements */
+  requirements?: RequirementData[];
   startedAt?: string;
   completedAt?: string;
   children?: PRDItemData[];

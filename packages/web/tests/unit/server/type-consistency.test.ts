@@ -21,13 +21,19 @@ import {
   VALID_LEVELS as CANONICAL_VALID_LEVELS,
   VALID_STATUSES as CANONICAL_VALID_STATUSES,
   VALID_PRIORITIES as CANONICAL_VALID_PRIORITIES,
+  VALID_REQUIREMENT_CATEGORIES as CANONICAL_VALID_REQ_CATEGORIES,
+  VALID_VALIDATION_TYPES as CANONICAL_VALID_VALIDATION_TYPES,
   CHILD_LEVEL as CANONICAL_CHILD_LEVEL,
   isPriority as canonicalIsPriority,
   isItemLevel as canonicalIsItemLevel,
   isItemStatus as canonicalIsItemStatus,
+  isRequirementCategory as canonicalIsReqCategory,
+  isValidationType as canonicalIsValidationType,
   type Priority,
   type ItemLevel,
   type ItemStatus,
+  type RequirementCategory,
+  type RequirementValidationType,
 } from "../../../../rex/src/schema/v1.js";
 
 // Web server duplicates from the shared rex-domain module
@@ -131,6 +137,39 @@ describe("Rex domain constant consistency", () => {
     expect(CANONICAL_CHILD_LEVEL.feature).toBe("task");
     expect(CANONICAL_CHILD_LEVEL.task).toBe("subtask");
     expect(CANONICAL_CHILD_LEVEL.subtask).toBeNull();
+  });
+
+  it("RequirementCategory covers exactly 6 values", () => {
+    const categories: RequirementCategory[] = [
+      "technical", "performance", "security", "accessibility", "compatibility", "quality",
+    ];
+    expect(CANONICAL_VALID_REQ_CATEGORIES.size).toBe(6);
+    for (const cat of categories) {
+      expect(CANONICAL_VALID_REQ_CATEGORIES.has(cat)).toBe(true);
+    }
+  });
+
+  it("RequirementValidationType covers exactly 3 values", () => {
+    const types: RequirementValidationType[] = ["automated", "manual", "metric"];
+    expect(CANONICAL_VALID_VALIDATION_TYPES.size).toBe(3);
+    for (const t of types) {
+      expect(CANONICAL_VALID_VALIDATION_TYPES.has(t)).toBe(true);
+    }
+  });
+
+  it("isRequirementCategory type guard works correctly", () => {
+    expect(canonicalIsReqCategory("technical")).toBe(true);
+    expect(canonicalIsReqCategory("performance")).toBe(true);
+    expect(canonicalIsReqCategory("invalid")).toBe(false);
+    expect(canonicalIsReqCategory(undefined)).toBe(false);
+  });
+
+  it("isValidationType type guard works correctly", () => {
+    expect(canonicalIsValidationType("automated")).toBe(true);
+    expect(canonicalIsValidationType("manual")).toBe(true);
+    expect(canonicalIsValidationType("metric")).toBe(true);
+    expect(canonicalIsValidationType("invalid")).toBe(false);
+    expect(canonicalIsValidationType(undefined)).toBe(false);
   });
 
   it("viewer type mirrors have expected shape", () => {

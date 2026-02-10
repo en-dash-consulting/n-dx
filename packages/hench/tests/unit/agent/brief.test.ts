@@ -19,6 +19,7 @@ describe("formatTaskBrief", () => {
     },
     parentChain: [],
     siblings: [],
+    requirements: [],
     project: { name: "my-app" },
     workflow: "",
     recentLog: [],
@@ -1337,5 +1338,175 @@ describe("getActionableTasks", () => {
 
     const tasks = await getActionableTasks(store);
     expect(tasks[0].priority).toBe("medium");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assembleTaskBrief — requirements in brief
+// ---------------------------------------------------------------------------
+
+describe("assembleTaskBrief — requirements", () => {
+  it("includes own requirements in brief", async () => {
+    const items: PRDItem[] = [
+      {
+        id: "task-1",
+        title: "Task with requirements",
+        status: "pending",
+        level: "task",
+        requirements: [
+          {
+            id: "req-1",
+            title: "Test coverage > 80%",
+            category: "quality",
+            validationType: "metric",
+            acceptanceCriteria: ["Statement coverage >= 80%"],
+            validationCommand: "echo 85",
+            threshold: 80,
+          },
+        ],
+      },
+    ];
+    const store = mockStore(items);
+
+    const { brief } = await assembleTaskBrief(store, "task-1");
+    expect(brief.requirements).toHaveLength(1);
+    expect(brief.requirements[0].id).toBe("req-1");
+    expect(brief.requirements[0].title).toBe("Test coverage > 80%");
+    expect(brief.requirements[0].category).toBe("quality");
+    expect(brief.requirements[0].validationType).toBe("metric");
+    expect(brief.requirements[0].acceptanceCriteria).toEqual(["Statement coverage >= 80%"]);
+    expect(brief.requirements[0].source).toBe("Task with requirements");
+  });
+
+  it("inherits requirements from parent chain", async () => {
+    const items: PRDItem[] = [
+      {
+        id: "epic-1",
+        title: "Epic One",
+        level: "epic",
+        status: "in_progress",
+        requirements: [
+          {
+            id: "req-epic",
+            title: "Security audit",
+            category: "security",
+            validationType: "manual",
+            acceptanceCriteria: ["All endpoints reviewed"],
+          },
+        ],
+        children: [
+          {
+            id: "feat-1",
+            title: "Feature One",
+            level: "feature",
+            status: "in_progress",
+            requirements: [
+              {
+                id: "req-feat",
+                title: "Browser support",
+                category: "compatibility",
+                validationType: "automated",
+                acceptanceCriteria: ["Chrome 120+", "Firefox 120+"],
+                validationCommand: "echo ok",
+              },
+            ],
+            children: [
+              {
+                id: "task-1",
+                title: "Task One",
+                level: "task",
+                status: "pending",
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    const store = mockStore(items);
+
+    const { brief } = await assembleTaskBrief(store, "task-1");
+    expect(brief.requirements).toHaveLength(2);
+
+    // Feature requirement comes first (closer parent)
+    const featReq = brief.requirements.find(r => r.id === "req-feat");
+    expect(featReq).toBeDefined();
+    expect(featReq!.source).toBe("Feature One");
+
+    // Epic requirement comes after
+    const epicReq = brief.requirements.find(r => r.id === "req-epic");
+    expect(epicReq).toBeDefined();
+    expect(epicReq!.source).toBe("Epic One");
+  });
+
+  it("returns empty requirements when none exist", async () => {
+    const items: PRDItem[] = [
+      {
+        id: "task-1",
+        title: "Plain task",
+        status: "pending",
+        level: "task",
+      },
+    ];
+    const store = mockStore(items);
+
+    const { brief } = await assembleTaskBrief(store, "task-1");
+    expect(brief.requirements).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatTaskBrief — requirements rendering
+// ---------------------------------------------------------------------------
+
+describe("formatTaskBrief — requirements", () => {
+  const minimalBriefForReqs: TaskBrief = {
+    task: {
+      id: "task-1",
+      title: "Task",
+      level: "task",
+      status: "pending",
+    },
+    parentChain: [],
+    siblings: [],
+    requirements: [],
+    project: { name: "test" },
+    workflow: "",
+    recentLog: [],
+  };
+
+  it("omits requirements section when empty", () => {
+    const output = formatTaskBrief(minimalBriefForReqs);
+    expect(output).not.toContain("## Requirements");
+  });
+
+  it("renders requirements section when present", () => {
+    const brief: TaskBrief = {
+      ...minimalBriefForReqs,
+      requirements: [
+        {
+          id: "req-1",
+          title: "Test coverage",
+          category: "quality",
+          validationType: "metric",
+          acceptanceCriteria: ["Coverage >= 80%"],
+          source: "Epic One",
+        },
+        {
+          id: "req-2",
+          title: "Auth required",
+          category: "security",
+          validationType: "manual",
+          acceptanceCriteria: ["All endpoints require auth", "RBAC enforced"],
+          source: "Feature One",
+        },
+      ],
+    };
+    const output = formatTaskBrief(brief);
+    expect(output).toContain("## Requirements");
+    expect(output).toContain("**Test coverage** [quality/metric] (from: Epic One)");
+    expect(output).toContain("Coverage >= 80%");
+    expect(output).toContain("**Auth required** [security/manual] (from: Feature One)");
+    expect(output).toContain("All endpoints require auth");
+    expect(output).toContain("RBAC enforced");
   });
 });

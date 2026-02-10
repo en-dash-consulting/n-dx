@@ -38,6 +38,97 @@ export type ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | 
 
 export type Priority = "critical" | "high" | "medium" | "low";
 
+// ── Requirements ─────────────────────────────────────────────────
+
+/**
+ * Category of a requirement.
+ *
+ * - `technical`: implementation constraints (language, framework, API compatibility)
+ * - `performance`: latency, throughput, resource usage targets
+ * - `security`: authentication, authorization, data protection
+ * - `accessibility`: WCAG compliance, screen reader support
+ * - `compatibility`: browser, OS, device support matrix
+ * - `quality`: code coverage, lint rules, documentation standards
+ */
+export type RequirementCategory =
+  | "technical"
+  | "performance"
+  | "security"
+  | "accessibility"
+  | "compatibility"
+  | "quality";
+
+/**
+ * How a requirement should be validated.
+ *
+ * - `automated`: a command/script can verify it (exit 0 = pass)
+ * - `manual`: requires human inspection and sign-off
+ * - `metric`: a numeric threshold must be met (parsed from output)
+ */
+export type RequirementValidationType = "automated" | "manual" | "metric";
+
+/**
+ * A structured requirement that can be attached to any PRD item.
+ *
+ * Requirements are first-class objects within the PRD tree.
+ * They carry their own acceptance criteria, validation strategy,
+ * and optional automation command so hench can verify compliance
+ * before marking a task complete.
+ */
+export interface Requirement {
+  /** Unique identifier (UUID). */
+  id: string;
+  /** Human-readable title. */
+  title: string;
+  /** Detailed description of the requirement. */
+  description?: string;
+  /** Requirement category. */
+  category: RequirementCategory;
+  /** How this requirement is validated. */
+  validationType: RequirementValidationType;
+  /** Measurable acceptance criteria for this requirement. */
+  acceptanceCriteria: string[];
+  /**
+   * Shell command that validates this requirement (for `automated` or `metric` types).
+   * Exit code 0 = pass. For `metric` type, stdout should contain the measured value.
+   */
+  validationCommand?: string;
+  /**
+   * Numeric threshold for `metric` validation type.
+   * The measured value (from validationCommand stdout) must be >= this threshold.
+   */
+  threshold?: number;
+  /** Priority of this requirement. */
+  priority?: Priority;
+}
+
+/** All valid requirement categories as a Set. */
+export const VALID_REQUIREMENT_CATEGORIES = new Set<RequirementCategory>([
+  "technical",
+  "performance",
+  "security",
+  "accessibility",
+  "compatibility",
+  "quality",
+]);
+
+/** All valid validation types as a Set. */
+export const VALID_VALIDATION_TYPES = new Set<RequirementValidationType>([
+  "automated",
+  "manual",
+  "metric",
+]);
+
+/** Type guard: narrows a string to RequirementCategory. */
+export function isRequirementCategory(value: string | undefined): value is RequirementCategory {
+  return value !== undefined && VALID_REQUIREMENT_CATEGORIES.has(value as RequirementCategory);
+}
+
+/** Type guard: narrows a string to RequirementValidationType. */
+export function isValidationType(value: string | undefined): value is RequirementValidationType {
+  return value !== undefined && VALID_VALIDATION_TYPES.has(value as RequirementValidationType);
+}
+
 export interface PRDItem {
   id: string;
   title: string;
@@ -49,6 +140,8 @@ export interface PRDItem {
   tags?: string[];
   source?: string;
   blockedBy?: string[];
+  /** Structured requirements associated with this item. */
+  requirements?: Requirement[];
   startedAt?: string;
   completedAt?: string;
   children?: PRDItem[];

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import type { PRDStore, ItemStatus } from "rex";
-import { computeTimestampUpdates, findAutoCompletions } from "../prd/ops.js";
+import type { CommandExecutor } from "rex";
+import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation } from "../prd/ops.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 
 export interface UpdateStatusOptions {
@@ -43,6 +45,42 @@ export async function toolRexUpdateStatus(
       return `[COMPLETION_REJECTED] Cannot mark task as completed: ${validation.reason}\n` +
         `The task must produce meaningful changes (non-empty git diff) to be marked complete. ` +
         `If you believe the task is done, review your changes and ensure they are committed or staged.`;
+    }
+
+    // Validate automated/metric requirements (manual requirements are logged but don't block)
+    const doc = await store.loadDocument();
+    const reqSummary = await validateAutomatedRequirements(
+      doc.items,
+      taskId,
+      createCommandExecutor(options.projectDir),
+    );
+
+    if (reqSummary.total > 0 && !reqSummary.allPassed) {
+      const detail = formatRequirementsValidation(reqSummary);
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "requirements_validation_failed",
+        itemId: taskId,
+        detail,
+      });
+      const failedReqs = reqSummary.results
+        .filter((r) => !r.passed)
+        .map((r) => `  - ${r.requirementTitle}: ${r.reason}`)
+        .join("\n");
+      return `[REQUIREMENTS_FAILED] Cannot mark task as completed. ` +
+        `${reqSummary.failed} of ${reqSummary.total} automated requirements failed:\n` +
+        `${failedReqs}\n` +
+        `Fix the failing requirements and try again.`;
+    }
+
+    // Log successful requirements validation (if any requirements existed)
+    if (reqSummary.total > 0) {
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "requirements_validated",
+        itemId: taskId,
+        detail: `All ${reqSummary.total} automated requirements passed`,
+      });
     }
   }
 
@@ -142,4 +180,33 @@ export async function toolRexAddSubtask(
   });
 
   return `Created subtask ${id}: ${params.title}`;
+}
+
+// ── Requirements command executor ─────────────────────────────────
+
+const REQ_CMD_TIMEOUT = 30_000;
+
+/**
+ * Create a CommandExecutor that runs shell commands in the project directory.
+ * Used by requirements validation to execute validation commands.
+ */
+export function createCommandExecutor(projectDir: string): CommandExecutor {
+  return (command: string) => {
+    return new Promise((resolve) => {
+      const child = execFile(
+        "sh",
+        ["-c", command],
+        { cwd: projectDir, timeout: REQ_CMD_TIMEOUT, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => {
+          // child.exitCode is null if error, use the error's code property
+          const exitCode = error ? (child.exitCode ?? 1) : 0;
+          resolve({
+            exitCode,
+            stdout: (stdout ?? "").toString(),
+            stderr: (stderr ?? "").toString(),
+          });
+        },
+      );
+    });
+  };
 }
