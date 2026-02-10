@@ -10,6 +10,7 @@
  * compile-time consistency tests in tests/unit/server/type-consistency.test.ts.
  *
  * @see packages/rex/src/schema/v1.ts — canonical source: ItemLevel, ItemStatus, Priority, PRDItem, PRDDocument
+ * @see packages/web/src/server/rex-domain.ts — server-side duplicates (shared module for web routes)
  */
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";

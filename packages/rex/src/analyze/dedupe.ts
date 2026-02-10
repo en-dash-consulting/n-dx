@@ -1,11 +1,5 @@
 import type { ScanResult } from "./scanners.js";
-
-const PRIORITY_RANK: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
+import { PRIORITY_ORDER } from "../schema/v1.js";
 
 /** Default similarity threshold for merging near-duplicates */
 const DEFAULT_THRESHOLD = 0.7;
@@ -214,7 +208,10 @@ export function similarity(a: string, b: string): number {
 // ── Merge strategy: pick the "best" representative from a cluster ──
 
 function priorityRank(p?: string): number {
-  return PRIORITY_RANK[p ?? "medium"] ?? 2;
+  const key = p ?? "medium";
+  return key in PRIORITY_ORDER
+    ? PRIORITY_ORDER[key as keyof typeof PRIORITY_ORDER]
+    : 2;
 }
 
 /**

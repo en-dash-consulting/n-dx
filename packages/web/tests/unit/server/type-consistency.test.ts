@@ -1,61 +1,56 @@
 /**
- * Type consistency tests — verify duplicated Rex domain constants in the web
- * server match the canonical definitions in packages/rex/src/schema/v1.ts.
+ * Type consistency tests — verify the web package's Rex domain constants
+ * (rex-domain.ts) match the canonical definitions in packages/rex/src/schema/v1.ts.
  *
- * The web server intentionally duplicates Rex types and constants to avoid a
- * compile-time dependency, but the duplicates must stay in sync with the
- * canonical definitions. These tests catch drift early.
- *
- * The server-side duplicates in routes-rex.ts and routes-validation.ts use
- * local `Priority` and `ItemLevel` type aliases with type guards at the
- * JSON boundary, ensuring type-safe lookups into PRIORITY_ORDER and
- * LEVEL_HIERARCHY while handling unvalidated input.
+ * The web server intentionally duplicates Rex types and constants in a single
+ * shared module (rex-domain.ts) to avoid a compile-time dependency on the Rex
+ * package. The duplicates must stay in sync with the canonical definitions.
+ * These tests catch drift early.
  *
  * @see packages/rex/src/schema/v1.ts — canonical definitions
- * @see packages/web/src/server/routes-rex.ts — server-side duplicates (with local type aliases)
- * @see packages/web/src/server/routes-validation.ts — validation duplicates (with local type alias)
+ * @see packages/web/src/server/rex-domain.ts — web server duplicates (single source for web)
+ * @see packages/web/src/viewer/components/prd-tree/types.ts — viewer type mirrors
  */
 
 import { describe, it, expect } from "vitest";
+
+// Canonical definitions from Rex
 import {
-  PRIORITY_ORDER,
-  LEVEL_HIERARCHY,
+  PRIORITY_ORDER as CANONICAL_PRIORITY_ORDER,
+  LEVEL_HIERARCHY as CANONICAL_LEVEL_HIERARCHY,
   type Priority,
   type ItemLevel,
   type ItemStatus,
 } from "../../../../rex/src/schema/v1.js";
 
+// Web server duplicates from the shared rex-domain module
+import {
+  PRIORITY_ORDER as LOCAL_PRIORITY_ORDER,
+  LEVEL_HIERARCHY as LOCAL_LEVEL_HIERARCHY,
+  VALID_LEVELS,
+  VALID_STATUSES,
+  VALID_PRIORITIES,
+  isPriority,
+  isItemLevel,
+} from "../../../src/server/rex-domain.js";
+
 describe("Rex domain constant consistency", () => {
   /**
-   * We import the canonical Rex values and compare against hardcoded
-   * expectations that mirror what routes-rex.ts and routes-validation.ts use.
-   * If these tests fail, both the canonical source AND the duplicates in
-   * routes-rex.ts / routes-validation.ts need to be updated together.
+   * These tests compare the canonical Rex values against the web package's
+   * rex-domain.ts duplicates. If any test fails, both the canonical source
+   * AND the web duplicates need to be updated together.
    */
 
-  it("PRIORITY_ORDER has expected keys and ordering", () => {
-    // These are the values duplicated in routes-rex.ts:170
-    expect(PRIORITY_ORDER).toEqual({
-      critical: 0,
-      high: 1,
-      medium: 2,
-      low: 3,
-    });
+  it("PRIORITY_ORDER matches canonical", () => {
+    expect(LOCAL_PRIORITY_ORDER).toEqual(CANONICAL_PRIORITY_ORDER);
   });
 
-  it("LEVEL_HIERARCHY has expected parent-child relationships", () => {
-    // These are the values duplicated in routes-rex.ts:43 and routes-validation.ts:76
-    expect(LEVEL_HIERARCHY).toEqual({
-      epic: [null],
-      feature: ["epic"],
-      task: ["feature", "epic"],
-      subtask: ["task"],
-    });
+  it("LEVEL_HIERARCHY matches canonical", () => {
+    expect(LOCAL_LEVEL_HIERARCHY).toEqual(CANONICAL_LEVEL_HIERARCHY);
   });
 
   it("Priority type covers exactly 4 values", () => {
-    // Validate the keys of PRIORITY_ORDER match the Priority type
-    const priorities = Object.keys(PRIORITY_ORDER);
+    const priorities = Object.keys(CANONICAL_PRIORITY_ORDER);
     expect(priorities).toHaveLength(4);
     expect(priorities).toContain("critical");
     expect(priorities).toContain("high");
@@ -64,16 +59,13 @@ describe("Rex domain constant consistency", () => {
   });
 
   it("VALID_LEVELS matches LEVEL_HIERARCHY keys", () => {
-    // routes-rex.ts:37 defines VALID_LEVELS = new Set(["epic", "feature", "task", "subtask"])
-    const canonicalLevels = new Set(Object.keys(LEVEL_HIERARCHY));
-    const expectedLevels = new Set(["epic", "feature", "task", "subtask"]);
-    expect(canonicalLevels).toEqual(expectedLevels);
+    const canonicalLevels = new Set(Object.keys(CANONICAL_LEVEL_HIERARCHY));
+    expect(VALID_LEVELS).toEqual(canonicalLevels);
   });
 
-  it("VALID_STATUSES matches canonical ItemStatus", () => {
-    // routes-rex.ts:38 defines VALID_STATUSES
-    // The canonical statuses include "deleted" which routes-rex omits for good reason
-    // (deleted items shouldn't be settable via API). This test documents the canonical set.
+  it("VALID_STATUSES covers API-settable statuses", () => {
+    // The canonical statuses include "deleted" which VALID_STATUSES omits
+    // because deleted items shouldn't be settable via API.
     const canonicalStatuses: ItemStatus[] = [
       "pending",
       "in_progress",
@@ -83,35 +75,52 @@ describe("Rex domain constant consistency", () => {
       "deleted",
     ];
     expect(canonicalStatuses).toHaveLength(6);
+    // VALID_STATUSES should be a subset (minus "deleted")
+    for (const status of VALID_STATUSES) {
+      expect(canonicalStatuses).toContain(status);
+    }
+    expect(VALID_STATUSES.has("deleted" as never)).toBe(false);
   });
 
   it("VALID_PRIORITIES matches canonical Priority", () => {
-    // routes-rex.ts:39 defines VALID_PRIORITIES
     const canonicalPriorities: Priority[] = ["critical", "high", "medium", "low"];
-    expect(new Set(canonicalPriorities)).toEqual(new Set(Object.keys(PRIORITY_ORDER)));
+    expect(VALID_PRIORITIES).toEqual(new Set(canonicalPriorities));
   });
 
   it("PRIORITY_ORDER keys exactly match the Priority type members", () => {
-    // routes-rex.ts duplicates Priority as a local type alias.
-    // This test ensures that if a priority value is added or removed
-    // in Rex, the duplicate type and PRIORITY_ORDER stay in sync.
-    const keys = Object.keys(PRIORITY_ORDER);
+    const keys = Object.keys(LOCAL_PRIORITY_ORDER);
     const expected: Priority[] = ["critical", "high", "medium", "low"];
     expect(new Set(keys)).toEqual(new Set(expected));
     expect(keys).toHaveLength(expected.length);
   });
 
   it("LEVEL_HIERARCHY keys exactly match the ItemLevel type members", () => {
-    // routes-rex.ts and routes-validation.ts duplicate ItemLevel.
-    // This verifies the local aliases won't miss new levels.
-    const keys = Object.keys(LEVEL_HIERARCHY);
+    const keys = Object.keys(LOCAL_LEVEL_HIERARCHY);
     const expected: ItemLevel[] = ["epic", "feature", "task", "subtask"];
     expect(new Set(keys)).toEqual(new Set(expected));
     expect(keys).toHaveLength(expected.length);
   });
 
+  it("isPriority type guard works correctly", () => {
+    expect(isPriority("critical")).toBe(true);
+    expect(isPriority("high")).toBe(true);
+    expect(isPriority("medium")).toBe(true);
+    expect(isPriority("low")).toBe(true);
+    expect(isPriority("invalid")).toBe(false);
+    expect(isPriority(undefined)).toBe(false);
+  });
+
+  it("isItemLevel type guard works correctly", () => {
+    expect(isItemLevel("epic")).toBe(true);
+    expect(isItemLevel("feature")).toBe(true);
+    expect(isItemLevel("task")).toBe(true);
+    expect(isItemLevel("subtask")).toBe(true);
+    expect(isItemLevel("invalid")).toBe(false);
+    expect(isItemLevel(undefined)).toBe(false);
+  });
+
   it("viewer type mirrors have expected shape", () => {
-    // packages/sourcevision/src/viewer/components/prd-tree/types.ts mirrors:
+    // packages/web/src/viewer/components/prd-tree/types.ts mirrors:
     //   ItemLevel = "epic" | "feature" | "task" | "subtask"
     //   ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked" | "deleted"
     //   Priority = "critical" | "high" | "medium" | "low"

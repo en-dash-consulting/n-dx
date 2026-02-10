@@ -11,13 +11,13 @@
  *   contracts. These are erased at runtime, so the packages remain
  *   independently deployable while sharing type safety.
  *
- * - **Sourcevision** intentionally duplicates core types (ItemLevel,
- *   ItemStatus, Priority) because its viewer is bundled as standalone
+ * - **Web viewer** intentionally duplicates core types (ItemLevel,
+ *   ItemStatus, Priority) because the viewer is bundled as standalone
  *   browser code via esbuild and cannot import from Node.js packages.
  *   The duplicates are documented with `@see` back-references and
  *   verified by compile-time consistency tests.
  *
- * - **Sourcevision server routes** duplicate domain constants (PRIORITY_ORDER,
+ * - **Web server routes** duplicate domain constants (PRIORITY_ORDER,
  *   LEVEL_HIERARCHY) and type aliases (Priority, ItemLevel) to avoid a
  *   package dependency. Each duplicate uses local type aliases with type
  *   guards at the JSON boundary, ensuring type-safe constant lookups while
@@ -25,10 +25,10 @@
  *   references to this file.
  *
  * When modifying types or constants here, also update:
- *   - packages/sourcevision/src/viewer/components/prd-tree/types.ts
- *   - packages/sourcevision/src/cli/server/routes-rex.ts
- *   - packages/sourcevision/src/cli/server/routes-validation.ts
- *   - packages/sourcevision/tests/unit/server/type-consistency.test.ts
+ *   - packages/web/src/viewer/components/prd-tree/types.ts
+ *   - packages/web/src/server/routes-rex.ts
+ *   - packages/web/src/server/routes-validation.ts
+ *   - packages/web/tests/unit/server/type-consistency.test.ts
  *
  * @module rex/schema/v1
  */

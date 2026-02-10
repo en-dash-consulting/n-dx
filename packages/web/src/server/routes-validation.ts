@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
+import { type ItemLevel, LEVEL_HIERARCHY } from "./rex-domain.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
@@ -68,22 +69,9 @@ function findItemById(items: PRDItemRecord[], id: string): PRDItemRecord | null 
   return null;
 }
 
-// ── Rex domain types (mirrors routes-rex.ts local types) ────────────
-
-/** @see packages/rex/src/schema/v1.ts — ItemLevel */
-type ItemLevel = "epic" | "feature" | "task" | "subtask";
+// Rex domain types and constants imported from ./rex-domain.js
 
 // ── Validation checks ────────────────────────────────────────────────
-
-/** Valid parent levels for each item level. null = root allowed.
- *  Duplicated from packages/rex/src/schema/v1.ts — LEVEL_HIERARCHY.
- *  @see routes-rex.ts header comment for rationale. */
-const LEVEL_HIERARCHY: Record<ItemLevel, Array<ItemLevel | null>> = {
-  epic: [null],
-  feature: ["epic"],
-  task: ["feature", "epic"],
-  subtask: ["task"],
-};
 
 const DEFAULT_STUCK_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 

@@ -5709,11 +5709,13 @@
     {
       "id": "cbc09cb4-d975-4c17-8254-0c97f11c8da2",
       "title": "Address pattern issues (2 findings)",
-      "status": "deleted",
+      "status": "completed",
       "level": "feature",
       "description": "- Zone architecture achieves perfect runtime decoupling (no cross-zone imports) but creates maintenance burden through systematic type and constant duplication - suggests need for shared foundation package or reconsideration of zone boundaries for common business logic\n- Zone architecture creates artificial boundaries that fragment natural business domain concepts - Priority and PRIORITY_ORDER are core domain concepts that transcend individual packages and should be centrally managed rather than duplicated",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T05:07:03.240Z",
+      "completedAt": "2026-02-10T05:15:37.947Z"
     },
     {
       "id": "e96db771-5ed0-4ba8-a70b-74a30f462f65",
@@ -6062,11 +6064,13 @@
     {
       "id": "7d194bf1-472f-4680-81e2-6ee15f1c2033",
       "title": "Address observation issues (1 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T05:02:21.023Z",
+      "completedAt": "2026-02-10T05:06:37.050Z"
     }
   ]
 }
