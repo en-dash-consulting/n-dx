@@ -1,7 +1,7 @@
 {
   "id": "claude-integration-layer",
   "name": "Claude Integration Layer",
-  "description": "Unified Claude API client abstraction supporting dual provider architecture (API and CLI modes) with automatic failover.",
+  "description": "Shared foundation providing transport-agnostic Claude API access with automatic provider selection, authentication detection, and token usage tracking.",
   "files": [
     "packages/claude-client/src/api-provider.ts",
     "packages/claude-client/src/auth.ts",
@@ -23,5 +23,5 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 15,
-  "lineCount": 2335
+  "lineCount": 2371
 }

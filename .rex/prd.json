@@ -6398,10 +6398,106 @@
     {
       "id": "73089778-e778-4c7d-acb8-01ceadc24e3e",
       "title": "Address suggestion issues (3 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Execute standardization in dependency order: first complete hench public.ts exports (packages/hench/src/public.ts), then migrate test directories (packages/hench/__tests__ → packages/hench/tests/, packages/web/src/__tests__ → packages/web/tests/), finally establish monorepo naming convention\n- Create packages/hench/src/public.ts exporting AgentConfig, RunConfig, RunResult, ExecutionEngine and update packages/hench/package.json exports field to include './public': './dist/public.js'\n- Move packages/web/src/__tests__ to packages/web/tests/ with domain subdirectories (dashboard/, mcp/, server/) to align with rex and sourcevision patterns",
       "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T16:50:03.717Z",
+      "completedAt": "2026-02-10T16:52:27.663Z"
+    },
+    {
+      "id": "e3aa5235-b63b-4298-bbcf-b78c72638387",
+      "title": "SourceVision Pass Reset UX Improvements",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "f8963f11-6f0f-464a-a5e4-a7df16cfc992",
+          "title": "Pass Reset Status Indication",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve user feedback when SourceVision detects changes and resets to lower analysis passes",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "e1aba2dc-31e7-470b-954b-8f107012dc92",
+              "title": "Add pass reset notification during analysis",
+              "status": "pending",
+              "level": "task",
+              "description": "Display a clear message when SourceVision detects changes and resets from a higher pass (e.g., Pass 5) to a lower pass (e.g., Pass 2) during the same analyze command execution",
+              "acceptanceCriteria": [
+                "Shows 'Detected changes, resetting from Pass X to Pass Y' message when reset occurs",
+                "Message appears before continuing with the lower pass analysis",
+                "Reset notification is visible in both CLI and web UI contexts"
+              ],
+              "priority": "medium",
+              "tags": [
+                "sourcevision",
+                "ux",
+                "feedback"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "cf8aecd3-da57-4085-8d40-c4b0d55dbfb9",
+              "title": "Fix pass status display inconsistency after reset",
+              "status": "pending",
+              "level": "task",
+              "description": "Ensure the pass status output reflects the actual current pass immediately after a reset, rather than showing the previous higher pass number",
+              "acceptanceCriteria": [
+                "Pass status output shows correct current pass number after reset",
+                "No need to run sv analyze twice to see accurate pass status",
+                "Status remains consistent between analyze runs and status queries"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "status",
+                "consistency"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "de38ce2a-58b9-456b-95ac-1b73a8433528",
+      "title": "Address observation issues (2 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Size distribution reflects natural complexity: foundation (15 files), domain (~65 files each), orchestration (114 files)\n- Standardization debt exists across package exports, naming conventions, and test directory structures",
+      "priority": "critical",
+      "source": "sourcevision"
+    },
+    {
+      "id": "163cb3aa-a35c-4987-ae70-1af57c393a4a",
+      "title": "Address pattern issues (2 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Gateway pattern standardization — hench (ops.ts) and web (mcp-deps.ts) implement identical controlled coupling architecture\n- Systematic standardization gaps across public APIs create integration friction despite sound architectural isolation - suggests need for package development guidelines",
+      "priority": "critical",
+      "source": "sourcevision"
+    },
+    {
+      "id": "1327aba8-a350-469a-bd16-23fbebbbf845",
+      "title": "Address anti-pattern issues (2 findings)",
+      "status": "in_progress",
+      "level": "feature",
+      "description": "- Inconsistent public API standardization — hench exports only schema types while rex and sourcevision provide comprehensive runtime function exports\n- Configuration export inconsistency breaks consumer expectations - hench exports DEFAULT_CONFIG while rex/sourcevision hide defaults internally, forcing consumers to use different integration patterns per package",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T17:58:52.381Z"
+    },
+    {
+      "id": "b9b5f52c-51c5-44b4-b2a1-6b6df5444969",
+      "title": "Address suggestion issues (4 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Directory constants (REX_DIR, HENCH_DIR, SV_DIR) hardcoded with string literals instead of shared constants — creates silent drift risk when CLI and MCP implementations diverge\n- Standardize hench public API exports to match rex/sourcevision pattern by exporting runtime functions alongside schema types in src/public.ts\n- Extract hardcoded directory constants (REX_DIR, HENCH_DIR, SV_DIR) into claude-client foundation package as shared PROJECT_CONSTANTS export\n- Standardize DEFAULT_CONFIG export pattern by adding to rex and sourcevision public APIs to match hench implementation",
+      "priority": "critical",
       "source": "sourcevision"
     }
   ]

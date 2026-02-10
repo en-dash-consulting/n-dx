@@ -7,7 +7,7 @@
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 9725
+Lines: 9817
 
 </zone>
 
@@ -17,23 +17,23 @@ packages/rex/src/analyze/index.ts (TypeScript, 62 lines, source)
 packages/rex/src/analyze/propose.ts (TypeScript, 307 lines, source)
 packages/rex/src/analyze/reconcile.ts (TypeScript, 124 lines, source)
 packages/rex/src/analyze/scanners.ts (TypeScript, 935 lines, source)
-packages/rex/src/cli/commands/add.ts (TypeScript, 159 lines, source)
+packages/rex/src/cli/commands/add.ts (TypeScript, 150 lines, source)
 packages/rex/src/cli/commands/analyze.ts (TypeScript, 525 lines, source)
-packages/rex/src/cli/commands/constants.ts (TypeScript, 64 lines, source)
+packages/rex/src/cli/commands/constants.ts (TypeScript, 66 lines, source)
 packages/rex/src/cli/commands/init.ts (TypeScript, 71 lines, source)
 packages/rex/src/cli/commands/next.ts (TypeScript, 69 lines, source)
 packages/rex/src/cli/commands/recommend.ts (TypeScript, 145 lines, source)
-packages/rex/src/cli/commands/status.ts (TypeScript, 280 lines, source)
-packages/rex/src/cli/commands/update.ts (TypeScript, 200 lines, source)
+packages/rex/src/cli/commands/status.ts (TypeScript, 315 lines, source)
+packages/rex/src/cli/commands/update.ts (TypeScript, 191 lines, source)
 packages/rex/src/cli/commands/validate.ts (TypeScript, 200 lines, source)
 packages/rex/src/cli/index.ts (TypeScript, 298 lines, source)
 packages/rex/src/cli/mcp.ts (TypeScript, 803 lines, source)
 packages/rex/src/core/canonical.ts (TypeScript, 21 lines, source)
 packages/rex/src/core/dag.ts (TypeScript, 84 lines, source)
-packages/rex/src/core/next-task.ts (TypeScript, 446 lines, source)
-packages/rex/src/core/tree.ts (TypeScript, 185 lines, source)
-packages/rex/src/schema/index.ts (TypeScript, 31 lines, source)
-packages/rex/src/schema/v1.ts (TypeScript, 159 lines, source)
+packages/rex/src/core/next-task.ts (TypeScript, 449 lines, source)
+packages/rex/src/core/tree.ts (TypeScript, 193 lines, source)
+packages/rex/src/schema/index.ts (TypeScript, 38 lines, source)
+packages/rex/src/schema/v1.ts (TypeScript, 213 lines, source)
 packages/rex/src/schema/validate.ts (TypeScript, 121 lines, source)
 packages/rex/src/store/file-adapter.ts (TypeScript, 152 lines, source)
 packages/rex/src/store/index.ts (TypeScript, 105 lines, source)
@@ -46,7 +46,7 @@ packages/rex/tests/unit/analyze/scanners.test.ts (TypeScript, 1199 lines, test)
 packages/rex/tests/unit/core/canonical.test.ts (TypeScript, 89 lines, test)
 packages/rex/tests/unit/core/dag.test.ts (TypeScript, 120 lines, test)
 packages/rex/tests/unit/core/next-task.test.ts (TypeScript, 762 lines, test)
-packages/rex/tests/unit/core/tree.test.ts (TypeScript, 233 lines, test)
+packages/rex/tests/unit/core/tree.test.ts (TypeScript, 234 lines, test)
 packages/rex/tests/unit/schema/validate.test.ts (TypeScript, 533 lines, test)
 packages/rex/tests/unit/store/file-adapter.test.ts (TypeScript, 265 lines, test)
 
@@ -71,7 +71,7 @@ Internal:
   packages/rex/src/cli/commands/add.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
   packages/rex/src/cli/commands/add.ts → packages/rex/src/core/dag.ts {validateDAG}
   packages/rex/src/cli/commands/add.ts → packages/rex/src/core/tree.ts {findItem}
-  packages/rex/src/cli/commands/add.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY}
+  packages/rex/src/cli/commands/add.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel}
   packages/rex/src/cli/commands/add.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel, ItemStatus, Priority}
   packages/rex/src/cli/commands/add.ts → packages/rex/src/store/index.ts {resolveStore}
   packages/rex/src/cli/commands/analyze.ts → packages/rex/src/analyze/index.ts {*}
@@ -100,6 +100,7 @@ Internal:
   packages/rex/src/cli/commands/update.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
   packages/rex/src/cli/commands/update.ts → packages/rex/src/core/dag.ts {validateDAG}
   packages/rex/src/cli/commands/update.ts → packages/rex/src/core/tree.ts {findItem, deleteItem, cleanBlockedByRefs}
+  packages/rex/src/cli/commands/update.ts → packages/rex/src/schema/index.ts {VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority}
   packages/rex/src/cli/commands/update.ts → packages/rex/src/schema/index.ts {PRDItem, ItemStatus, Priority}
   packages/rex/src/cli/commands/update.ts → packages/rex/src/store/index.ts {resolveStore}
   packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
@@ -135,7 +136,7 @@ Internal:
   packages/rex/src/core/next-task.ts → packages/rex/src/schema/index.ts {PRDItem, Priority}
   packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY}
   packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel}
-  packages/rex/src/schema/index.ts → packages/rex/src/schema/v1.ts {SCHEMA_VERSION, LEVEL_HIERARCHY, PRIORITY_ORDER, DEFAULT_CONFIG}
+  packages/rex/src/schema/index.ts → packages/rex/src/schema/v1.ts {SCHEMA_VERSION, LEVEL_HIERARCHY, PRIORITY_ORDER, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES, CHILD_LEVEL, isPriority, isItemLevel, isItemStatus, DEFAULT_CONFIG}
   packages/rex/src/schema/index.ts → packages/rex/src/schema/v1.ts {ItemLevel, ItemStatus, Priority, PRDItem, PRDDocument, RexConfig, BudgetThresholds, LogEntry, TokenUsage, AnalyzeTokenUsage}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/core/canonical.ts {toCanonicalJSON}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/core/tree.ts {findItem, insertChild, updateInTree, removeFromTree}
@@ -172,7 +173,7 @@ Internal:
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
 
 Incoming (other zones → this zone):
-  ← integrated-web-dashboard: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
+  ← web: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
 
 </imports>
 

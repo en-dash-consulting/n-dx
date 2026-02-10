@@ -1,7 +1,7 @@
 {
   "id": "orchestration-layer",
   "name": "Orchestration Layer",
-  "description": "Top-level command router and tool coordination that delegates workflow commands to specialized packages.",
+  "description": "Top-level command orchestration that delegates to individual package CLIs via process spawning to coordinate multi-tool workflows without import coupling.",
   "files": [
     "ci.js",
     "cli.js",
@@ -12,5 +12,5 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 4,
-  "lineCount": 1614
+  "lineCount": 1696
 }

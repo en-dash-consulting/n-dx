@@ -1,7 +1,7 @@
 {
   "id": "integrated-web-dashboard",
   "name": "Integrated Web Dashboard",
-  "description": "Multi-package web interface providing unified visualization and control for sourcevision analysis, rex PRD management, and hench execution monitoring.",
+  "description": "Comprehensive web-based dashboard providing visualization, controls, and MCP server endpoints for all toolkit packages with real-time updates and WebSocket communication.",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/public.ts",
@@ -9,8 +9,11 @@
     "packages/web/src/schema/v1.ts",
     "packages/web/src/schema/validate.ts",
     "packages/web/src/server/index.ts",
+    "packages/web/src/server/mcp-deps.ts",
+    "packages/web/src/server/rex-domain.ts",
     "packages/web/src/server/routes-data.ts",
     "packages/web/src/server/routes-hench.ts",
+    "packages/web/src/server/routes-mcp.ts",
     "packages/web/src/server/routes-rex.ts",
     "packages/web/src/server/routes-sourcevision.ts",
     "packages/web/src/server/routes-static.ts",
@@ -96,6 +99,7 @@
     "packages/web/src/viewer/views/zones.ts",
     "packages/web/tests/unit/server/dev-reload.test.ts",
     "packages/web/tests/unit/server/routes-data.test.ts",
+    "packages/web/tests/unit/server/routes-mcp.test.ts",
     "packages/web/tests/unit/server/routes-rex.test.ts",
     "packages/web/tests/unit/server/routes-sourcevision.test.ts",
     "packages/web/tests/unit/server/routes-token-usage.test.ts",
@@ -118,6 +122,6 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 111,
-  "lineCount": 27216
+  "fileCount": 115,
+  "lineCount": 28221
 }

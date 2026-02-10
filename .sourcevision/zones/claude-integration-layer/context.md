@@ -6,8 +6,8 @@
 
 Zone: Claude Integration Layer (`claude-integration-layer`)
 Files: 15, Cohesion: 1.00, Coupling: 0.00
-Description: Unified Claude API client abstraction supporting dual provider architecture (API and CLI modes) with automatic failover.
-Lines: 2335
+Description: Shared foundation providing transport-agnostic Claude API access with automatic provider selection, authentication detection, and token usage tracking.
+Lines: 2371
 
 </zone>
 
@@ -18,9 +18,9 @@ packages/claude-client/src/auth.ts (TypeScript, 238 lines, source)
 packages/claude-client/src/cli-provider.ts (TypeScript, 230 lines, source)
 packages/claude-client/src/config.ts (TypeScript, 94 lines, source)
 packages/claude-client/src/create-client.ts (TypeScript, 86 lines, source)
-packages/claude-client/src/index.ts (TypeScript, 95 lines, source)
+packages/claude-client/src/index.ts (TypeScript, 119 lines, source)
 packages/claude-client/src/token-usage.ts (TypeScript, 131 lines, source)
-packages/claude-client/src/types.ts (TypeScript, 105 lines, source)
+packages/claude-client/src/types.ts (TypeScript, 117 lines, source)
 packages/claude-client/tests/unit/api-provider.test.ts (TypeScript, 66 lines, test)
 packages/claude-client/tests/unit/auth.test.ts (TypeScript, 511 lines, test)
 packages/claude-client/tests/unit/cli-provider.test.ts (TypeScript, 68 lines, test)
@@ -84,20 +84,18 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Excellent architectural isolation with 15 focused files providing complete Claude API abstraction
-[observation] [info] Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, hench, sourcevision use unscoped names
-[observation] [info] Serves as clean dependency foundation for rex and hench, eliminating Claude API concerns from domain packages
+[suggestion] [info] DEFAULT_MODEL constants duplicated across rex and sourcevision packages with identical values — should be centralized in claude-client foundation
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Provides transport-agnostic Claude access with automatic provider selection based on credential availability
-- Encapsulates all Claude API concerns behind a single interface achieving zero coupling with other packages
-- Implements comprehensive authentication detection, token usage tracking, and error classification
-- Excellent architectural isolation with 15 focused files providing complete Claude API abstraction
-- Serves as clean dependency foundation for rex and hench, eliminating Claude API concerns from domain packages
-- Inconsistent package naming: @n-dx/claude-client uses scoped naming while rex, hench, sourcevision use unscoped names
+- Serves as dependency inversion foundation preventing circular dependencies between domain packages
+- Comprehensive authentication abstraction supports both API keys and CLI providers automatically
+- Perfect architectural isolation with zero coupling to domain-specific logic
+- Perfect cohesion (1.0) and zero coupling confirm this acts as a pure foundation layer
+- Model version standardization exists but inconsistently applied — DEFAULT_MODEL constants are duplicated across rex and sourcevision with identical values
+- DEFAULT_MODEL constants duplicated across rex and sourcevision packages with identical values — should be centralized in claude-client foundation
 
 </insights>

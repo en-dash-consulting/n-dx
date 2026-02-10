@@ -912,6 +912,18 @@
     },
     {
       "from": "packages/hench/src/agent/planning/brief.ts",
+      "to": "packages/hench/src/prd/ops.ts",
+      "type": "static",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "findItem",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/planning/brief.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -1051,6 +1063,22 @@
       "symbols": [
         "info",
         "output"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/prd/ops.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/prd/ops.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
       ]
     },
     {
@@ -1286,6 +1314,77 @@
       "type": "type",
       "symbols": [
         "GuardConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/agent/lifecycle/cli-loop.ts",
+      "type": "type",
+      "symbols": [
+        "CliLoopOptions",
+        "CliLoopResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/agent/lifecycle/loop.ts",
+      "type": "type",
+      "symbols": [
+        "AgentLoopOptions",
+        "AgentLoopResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/agent/lifecycle/token-budget.ts",
+      "type": "type",
+      "symbols": [
+        "TokenBudgetResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "type": "reexport",
+      "symbols": [
+        "HENCH_SCHEMA_VERSION",
+        "DEFAULT_HENCH_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "HenchConfig",
+        "GuardConfig",
+        "RetryConfig",
+        "Provider",
+        "RunRecord",
+        "RunStatus",
+        "ToolCallRecord",
+        "TokenUsage",
+        "TurnTokenUsage",
+        "CommandRecord",
+        "TestRecord",
+        "SummaryCounts",
+        "PostRunTestRecord",
+        "RunSummaryData",
+        "TaskBrief",
+        "TaskBriefTask",
+        "TaskBriefParent",
+        "TaskBriefSibling",
+        "TaskBriefProject",
+        "TaskBriefLogEntry"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/validation/completion.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionValidationResult",
+        "CompletionValidationOptions"
       ]
     },
     {
@@ -1575,6 +1674,15 @@
       "symbols": [
         "PostRunTestResult",
         "TestRunnerOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/prd/ops.ts",
+      "type": "static",
+      "symbols": [
+        "computeTimestampUpdates",
+        "findAutoCompletions"
       ]
     },
     {
@@ -2362,6 +2470,14 @@
       ]
     },
     {
+      "from": "packages/rex/src/analyze/dedupe.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER"
+      ]
+    },
+    {
       "from": "packages/rex/src/analyze/diff.ts",
       "to": "packages/rex/src/analyze/propose.ts",
       "type": "type",
@@ -2841,7 +2957,9 @@
       "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "LEVEL_HIERARCHY"
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL",
+        "isItemLevel"
       ]
     },
     {
@@ -3578,6 +3696,14 @@
     {
       "from": "packages/rex/src/cli/commands/smart-add.ts",
       "to": "packages/rex/src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "CHILD_LEVEL"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/smart-add.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
@@ -3626,6 +3752,14 @@
         "warn",
         "result",
         "isQuiet"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status.ts",
+      "to": "packages/rex/src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "isFullyCompleted"
       ]
     },
     {
@@ -3805,6 +3939,17 @@
         "findItem",
         "deleteItem",
         "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/update.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "isItemStatus",
+        "isPriority"
       ]
     },
     {
@@ -4327,7 +4472,9 @@
       "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "LEVEL_HIERARCHY"
+        "LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "isItemLevel"
       ]
     },
     {
@@ -4896,7 +5043,14 @@
       "type": "reexport",
       "symbols": [
         "PRIORITY_ORDER",
-        "LEVEL_HIERARCHY"
+        "LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "CHILD_LEVEL",
+        "isPriority",
+        "isItemLevel",
+        "isItemStatus"
       ]
     },
     {
@@ -4935,6 +5089,13 @@
         "SCHEMA_VERSION",
         "LEVEL_HIERARCHY",
         "PRIORITY_ORDER",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "CHILD_LEVEL",
+        "isPriority",
+        "isItemLevel",
+        "isItemStatus",
         "DEFAULT_CONFIG"
       ]
     },
@@ -5807,7 +5968,9 @@
         "cmdStatus",
         "renderProgressBar",
         "formatTimestamp",
-        "renderTree"
+        "renderTree",
+        "filterCompleted",
+        "formatStats"
       ]
     },
     {
@@ -7883,7 +8046,9 @@
         "Inventory",
         "Imports",
         "Zones",
-        "Components"
+        "Zone",
+        "Components",
+        "ImportType"
       ]
     },
     {
@@ -8521,7 +8686,8 @@
       "to": "packages/sourcevision/src/export/pdf-report.ts",
       "type": "static",
       "symbols": [
-        "generatePdfReport"
+        "generatePdfReport",
+        "computeImportHealthScore"
       ]
     },
     {
@@ -8742,6 +8908,46 @@
       ]
     },
     {
+      "from": "packages/web/src/server/routes-mcp.ts",
+      "to": "packages/web/src/server/mcp-deps.ts",
+      "type": "static",
+      "symbols": [
+        "createRexMcpServer",
+        "createSourcevisionMcpServer"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-mcp.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/rex-domain.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER",
+        "LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "isPriority",
+        "isItemLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/rex-domain.ts",
+      "type": "type",
+      "symbols": [
+        "Priority",
+        "ItemLevel"
+      ]
+    },
+    {
       "from": "packages/web/src/server/routes-rex.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
@@ -8819,6 +9025,23 @@
     },
     {
       "from": "packages/web/src/server/routes-validation.ts",
+      "to": "packages/web/src/server/rex-domain.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "isItemLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-validation.ts",
+      "to": "packages/web/src/server/rex-domain.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-validation.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
       "symbols": [
@@ -8857,6 +9080,14 @@
       "type": "static",
       "symbols": [
         "handleHenchRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-mcp.ts",
+      "type": "static",
+      "symbols": [
+        "handleMcpRoute"
       ]
     },
     {
@@ -9963,14 +10194,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -10236,6 +10459,23 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/routes-mcp.test.ts",
+      "to": "packages/web/src/server/routes-mcp.ts",
+      "type": "static",
+      "symbols": [
+        "handleMcpRoute",
+        "closeAllMcpSessions"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-mcp.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/routes-rex.test.ts",
       "to": "packages/web/src/server/routes-rex.ts",
       "type": "static",
@@ -10345,8 +10585,15 @@
       "to": "packages/rex/src/schema/v1.ts",
       "type": "static",
       "symbols": [
-        "PRIORITY_ORDER",
-        "LEVEL_HIERARCHY"
+        "CANONICAL_PRIORITY_ORDER",
+        "CANONICAL_LEVEL_HIERARCHY",
+        "CANONICAL_VALID_LEVELS",
+        "CANONICAL_VALID_STATUSES",
+        "CANONICAL_VALID_PRIORITIES",
+        "CANONICAL_CHILD_LEVEL",
+        "canonicalIsPriority",
+        "canonicalIsItemLevel",
+        "canonicalIsItemStatus"
       ]
     },
     {
@@ -10357,6 +10604,20 @@
         "Priority",
         "ItemLevel",
         "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/web/src/server/rex-domain.ts",
+      "type": "static",
+      "symbols": [
+        "LOCAL_PRIORITY_ORDER",
+        "LOCAL_LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "isPriority",
+        "isItemLevel"
       ]
     },
     {
@@ -10440,10 +10701,8 @@
       "symbols": [
         "updateFavicon",
         "resetFavicon",
-        "FAVICON_URIS",
-        "VIEW_TO_PRODUCT",
-        "svgToDataUri",
-        "FAVICON_SVGS"
+        "FAVICON_PNGS",
+        "VIEW_TO_PRODUCT"
       ]
     },
     {
@@ -10567,13 +10826,17 @@
         "packages/rex/src/cli/mcp.ts",
         "packages/rex/tests/unit/cli/mcp.test.ts",
         "packages/sourcevision/src/cli/mcp.ts",
-        "packages/sourcevision/tests/unit/cli/mcp.test.ts"
+        "packages/sourcevision/tests/unit/cli/mcp.test.ts",
+        "packages/web/src/server/routes-mcp.ts",
+        "packages/web/tests/unit/server/routes-mcp.test.ts"
       ],
       "symbols": [
         "Client",
         "InMemoryTransport",
         "McpServer",
-        "StdioServerTransport"
+        "StdioServerTransport",
+        "StreamableHTTPClientTransport",
+        "StreamableHTTPServerTransport"
       ]
     },
     {
@@ -10641,6 +10904,7 @@
         "access",
         "existsSync",
         "readFile",
+        "readFileSync",
         "unlink",
         "writeFile"
       ]
@@ -10746,6 +11010,7 @@
         "packages/hench/src/agent/planning/brief.ts",
         "packages/hench/src/cli/commands/run.ts",
         "packages/hench/src/cli/commands/task-lookup.ts",
+        "packages/hench/src/prd/ops.ts",
         "packages/hench/src/tools/rex.ts",
         "packages/hench/src/types/index.ts",
         "packages/hench/tests/unit/agent/api-auth.test.ts",
@@ -10753,7 +11018,8 @@
         "packages/hench/tests/unit/agent/brief.test.ts",
         "packages/hench/tests/unit/agent/loop.test.ts",
         "packages/hench/tests/unit/agent/task-failure.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic.test.ts"
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+        "packages/web/src/server/mcp-deps.ts"
       ],
       "symbols": [
         "*",
@@ -10763,12 +11029,22 @@
         "TreeEntry",
         "collectCompletedIds",
         "computeTimestampUpdates",
+        "createRexMcpServer",
         "findActionableTasks",
         "findAutoCompletions",
         "findItem",
         "findNextTask",
         "resolveStore",
         "walkTree"
+      ]
+    },
+    {
+      "package": "sourcevision",
+      "importedBy": [
+        "packages/web/src/server/mcp-deps.ts"
+      ],
+      "symbols": [
+        "createSourcevisionMcpServer"
       ]
     },
     {
@@ -10940,6 +11216,7 @@
         "packages/sourcevision/vitest.config.ts",
         "packages/web/tests/unit/server/dev-reload.test.ts",
         "packages/web/tests/unit/server/routes-data.test.ts",
+        "packages/web/tests/unit/server/routes-mcp.test.ts",
         "packages/web/tests/unit/server/routes-rex.test.ts",
         "packages/web/tests/unit/server/routes-sourcevision.test.ts",
         "packages/web/tests/unit/server/routes-token-usage.test.ts",
@@ -10964,6 +11241,8 @@
         "tests/e2e/cli-delegation.test.js",
         "tests/e2e/cli-dev.test.js",
         "tests/e2e/cli-errors.test.js",
+        "tests/e2e/cli-start.test.js",
+        "tests/e2e/cli-tool-resolution.test.js",
         "tests/e2e/cli-web.test.js",
         "vitest.config.js"
       ],
@@ -10997,8 +11276,8 @@
     }
   ],
   "summary": {
-    "totalEdges": 1173,
-    "totalExternal": 15,
+    "totalEdges": 1196,
+    "totalExternal": 16,
     "circularCount": 0,
     "circulars": [],
     "mostImported": [
@@ -11011,6 +11290,10 @@
         "count": 23
       },
       {
+        "path": "packages/rex/src/schema/index.ts",
+        "count": 23
+      },
+      {
         "path": "packages/rex/src/store/index.ts",
         "count": 23
       },
@@ -11020,10 +11303,6 @@
       },
       {
         "path": "packages/rex/src/cli/commands/constants.ts",
-        "count": 21
-      },
-      {
-        "path": "packages/rex/src/schema/index.ts",
         "count": 21
       },
       {
@@ -11055,11 +11334,11 @@
         "count": 10
       },
       {
-        "path": "packages/hench/src/agent/planning/brief.ts",
-        "count": 8
+        "path": "packages/hench/src/schema/v1.ts",
+        "count": 9
       },
       {
-        "path": "packages/hench/src/schema/v1.ts",
+        "path": "packages/hench/src/agent/planning/brief.ts",
         "count": 8
       },
       {
@@ -11083,6 +11362,6 @@
         "count": 7
       }
     ],
-    "avgImportsPerFile": 3.49
+    "avgImportsPerFile": 3.53
   }
 }

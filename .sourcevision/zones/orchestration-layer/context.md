@@ -6,17 +6,17 @@
 
 Zone: Orchestration Layer (`orchestration-layer`)
 Files: 4, Cohesion: 1.00, Coupling: 0.00
-Description: Top-level command router and tool coordination that delegates workflow commands to specialized packages.
-Lines: 1614
+Description: Top-level command orchestration that delegates to individual package CLIs via process spawning to coordinate multi-tool workflows without import coupling.
+Lines: 1696
 
 </zone>
 
 <files>
 
-ci.js (JavaScript, 263 lines, source)
-cli.js (JavaScript, 251 lines, source)
+ci.js (JavaScript, 269 lines, source)
+cli.js (JavaScript, 320 lines, source)
 config.js (JavaScript, 799 lines, source)
-web.js (JavaScript, 301 lines, source)
+web.js (JavaScript, 308 lines, source)
 
 </files>
 
@@ -32,20 +32,23 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling
-[observation] [warning] Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution
-[observation] [info] Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations
+[suggestion] [info] Config keys are hardcoded in config.js rather than imported from package constants — creates silent drift risk when packages rename config fields
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Acts as the unified entry point handling initialization, planning, and execution workflows
-- Provides error handling with user-friendly hints and suggestions for common failure scenarios
-- Coordinates sequential tool execution (sourcevision → rex → hench) for end-to-end workflows
-- Perfect cohesion (1.0) and zero coupling indicate clean separation between orchestration logic and tool implementations
-- Command dispatch architecture delegates to pre-built CLIs via child_process.spawn, avoiding import-time coupling
-- Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution
+- Pure coordination layer with zero imports maintains strict architectural boundaries
+- Process-level delegation enables tool independence while providing unified CLI interface
+- Command aliases (sv for sourcevision) implemented but missing from help documentation
+- High cohesion (1.0) and zero coupling demonstrate clean separation between orchestration and implementation
+- Process-only design explicitly avoids library imports — zero runtime coupling with domain packages
+- Sophisticated error handling system with pattern-based hints guides users toward resolution
+- Pure process orchestration pattern — spawns child processes instead of library imports to maintain architectural isolation
+- Comprehensive error handling with pattern-based suggestions (ENOENT, permissions, JSON corruption) provides user guidance
+- Constants hardcoding pattern observed — config.js duplicates config keys rather than importing from package constants files
+- Missing alias documentation pattern — 'sv' shorthand for sourcevision is implemented but not documented in help text or README
+- Config keys are hardcoded in config.js rather than imported from package constants — creates silent drift risk when packages rename config fields
 
 </insights>
