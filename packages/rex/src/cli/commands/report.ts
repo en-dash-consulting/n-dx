@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { SCHEMA_VERSION, validateDocument, validateConfig } from "../../schema/index.js";
+import { SCHEMA_VERSION } from "../../schema/index.js";
+import { validateDocument, validateConfig } from "../../schema/validate.js";
 import { validateDAG } from "../../core/dag.js";
 import { validateStructure } from "../../core/structural.js";
 import { computeStats } from "../../core/tree.js";

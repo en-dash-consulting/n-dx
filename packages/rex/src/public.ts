@@ -5,6 +5,19 @@
  * downstream packages (hench, cli.js, etc.). All other modules are
  * implementation details and should not be imported directly.
  *
+ * ## Cross-package imports
+ *
+ * Hench uses `import type { PRDStore, PRDItem, ... } from "rex"` for
+ * compile-time type safety. These `import type` statements are erased
+ * during compilation and create zero runtime coupling — the packages
+ * remain independently deployable. This is the correct pattern for
+ * sharing domain contracts across Node.js packages.
+ *
+ * Validation functions (Zod schemas) are NOT exported here. Consumers
+ * that need runtime validation should import directly from
+ * `rex/src/schema/validate.js` to avoid forcing Zod as a transitive
+ * dependency on type-only consumers.
+ *
  * @module rex/public
  */
 

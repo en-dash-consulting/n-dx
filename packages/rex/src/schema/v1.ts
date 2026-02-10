@@ -1,3 +1,35 @@
+/**
+ * Rex schema v1 — canonical type definitions and domain constants.
+ *
+ * This is the single source of truth for Rex's data model. All types
+ * and constants defined here are re-exported via the schema barrel
+ * (`./index.ts`) and the public API (`../public.ts`).
+ *
+ * ## Cross-package type strategy
+ *
+ * - **Hench** depends on Rex and uses `import type` for compile-time
+ *   contracts. These are erased at runtime, so the packages remain
+ *   independently deployable while sharing type safety.
+ *
+ * - **Sourcevision** intentionally duplicates core types (ItemLevel,
+ *   ItemStatus, Priority) because its viewer is bundled as standalone
+ *   browser code via esbuild and cannot import from Node.js packages.
+ *   The duplicates are documented with `@see` back-references and
+ *   verified by compile-time consistency tests.
+ *
+ * - **Sourcevision server routes** duplicate domain constants (PRIORITY_ORDER,
+ *   LEVEL_HIERARCHY) to avoid a package dependency. Each duplicate is
+ *   annotated with `@see` references to this file.
+ *
+ * When modifying types or constants here, also update:
+ *   - packages/sourcevision/src/viewer/components/prd-tree/types.ts
+ *   - packages/sourcevision/src/cli/server/routes-rex.ts
+ *   - packages/sourcevision/src/cli/server/routes-validation.ts
+ *   - packages/sourcevision/tests/unit/server/type-consistency.test.ts
+ *
+ * @module rex/schema/v1
+ */
+
 export const SCHEMA_VERSION = "rex/v1";
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";

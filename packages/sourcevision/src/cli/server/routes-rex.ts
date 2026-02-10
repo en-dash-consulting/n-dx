@@ -30,9 +30,20 @@ const REX_PREFIX = "/api/rex/";
 
 // --------------------------------------------------------------------------
 // Rex domain constants — intentionally duplicated from packages/rex/src/schema/v1.ts.
-// Sourcevision does not depend on Rex as a package to keep the two independent
-// at both compile-time and runtime.  If the canonical definitions in Rex change,
-// these must be updated to match.
+//
+// Sourcevision does not depend on Rex as a package to keep the two
+// independent at both compile-time and runtime. This is a deliberate
+// architectural choice: the sourcevision web server must be deployable
+// without Rex installed, and the viewer bundle must work as standalone
+// browser code.
+//
+// Trade-off: duplication creates drift risk, but it's mitigated by:
+//   1. @see annotations pointing back to the canonical source
+//   2. Compile-time consistency tests in tests/unit/server/type-consistency.test.ts
+//   3. The values are stable domain constants that rarely change
+//
+// If the canonical definitions in Rex change, update these to match.
+// @see packages/rex/src/schema/v1.ts — canonical source of truth
 // --------------------------------------------------------------------------
 const VALID_LEVELS = new Set(["epic", "feature", "task", "subtask"]);
 const VALID_STATUSES = new Set(["pending", "in_progress", "completed", "deferred", "blocked"]);
@@ -164,15 +175,21 @@ function computeStats(items: PRDItemRecord[]): TreeStats {
   return stats;
 }
 
+/**
+ * Canonical priority ordering — lower number = higher priority.
+ * Intentionally duplicated from packages/rex/src/schema/v1.ts — PRIORITY_ORDER.
+ * @see packages/rex/src/schema/v1.ts — PRIORITY_ORDER
+ * @see routes-rex.ts header comment for rationale.
+ */
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
 /** Find the next actionable task (pending/in_progress leaf with resolved deps). */
 function findNextTask(items: PRDItemRecord[], completedIds: Set<string>): PRDItemRecord | null {
-  /** @see packages/rex/src/schema/v1.ts — PRIORITY_ORDER */
-  const PRIORITY_ORDER: Record<string, number> = {
-    critical: 0,
-    high: 1,
-    medium: 2,
-    low: 3,
-  };
 
   interface Candidate {
     item: PRDItemRecord;

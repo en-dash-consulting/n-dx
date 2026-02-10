@@ -1,3 +1,15 @@
+/**
+ * Schema barrel — re-exports types and constants from v1.ts.
+ *
+ * Validation schemas (Zod) are intentionally NOT re-exported here.
+ * Import directly from `./validate.js` when validation is needed.
+ * This avoids forcing a transitive Zod dependency on every consumer
+ * that only needs type definitions and domain constants.
+ *
+ * @see ./v1.ts       — canonical type definitions and domain constants
+ * @see ./validate.ts — Zod schemas and validation functions (import directly)
+ */
+
 export {
   SCHEMA_VERSION,
   LEVEL_HIERARCHY,
@@ -17,16 +29,3 @@ export type {
   TokenUsage,
   AnalyzeTokenUsage,
 } from "./v1.js";
-
-export {
-  PRDItemSchema,
-  PRDDocumentSchema,
-  RexConfigSchema,
-  LogEntrySchema,
-  validateDocument,
-  validateConfig,
-  validateLogEntry,
-  formatValidationErrors,
-} from "./validate.js";
-
-export type { ValidationResult } from "./validate.js";
