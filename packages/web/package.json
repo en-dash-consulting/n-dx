@@ -27,9 +27,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "preact": "^10.19.0",
+    "rex": "workspace:*",
+    "sourcevision": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

@@ -105,6 +105,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.25.3
+        version: 1.25.3(hono@4.11.7)(zod@3.25.76)
       d3-force:
         specifier: ^3.0.0
         version: 3.0.0
@@ -114,6 +117,12 @@ importers:
       preact:
         specifier: ^10.19.0
         version: 10.28.3
+      rex:
+        specifier: workspace:*
+        version: link:../rex
+      sourcevision:
+        specifier: workspace:*
+        version: link:../sourcevision
       zod:
         specifier: ^3.22.0
         version: 3.25.76

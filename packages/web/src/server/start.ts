@@ -13,6 +13,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute } from "./routes-hench.js";
+import { handleMcpRoute } from "./routes-mcp.js";
 import { createWebSocketManager } from "./websocket.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
 
@@ -132,10 +133,11 @@ export function startServer(
 
   // Create HTTP server
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // CORS headers for local dev
+    // CORS headers for local dev (also required for cross-origin MCP clients)
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
+    res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
     // Handle CORS preflight
     if ((req.method || "GET") === "OPTIONS") {
@@ -152,6 +154,9 @@ export function startServer(
     }
 
     // Try each route handler in order
+    // 0. MCP endpoints (/mcp/rex, /mcp/sourcevision)
+    if (await handleMcpRoute(req, res, ctx)) return;
+
     // 1. Sourcevision API
     if (inScope("sourcevision") && handleSourcevisionRoute(req, res, ctx)) return;
 
@@ -202,6 +207,8 @@ export function startServer(
     if (inScope("hench") && existsSync(henchRunsDir)) {
       console.log(`Hench runs from: ${henchRunsDir}`);
     }
+    console.log(`MCP (rex):          http://localhost:${port}/mcp/rex`);
+    console.log(`MCP (sourcevision): http://localhost:${port}/mcp/sourcevision`);
     console.log(`WebSocket available at ws://localhost:${port}`);
     if (scope) console.log(`Scope: ${scope} (standalone mode)`);
     if (dev) console.log("Dev mode: live reload enabled");
