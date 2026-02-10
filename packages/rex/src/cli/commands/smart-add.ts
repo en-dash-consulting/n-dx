@@ -7,7 +7,7 @@ import { findItem } from "../../core/tree.js";
 import { cascadeParentReset } from "../../core/cascade-reset.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { info, warn, result } from "../output.js";
+import { info, warn, result, startSpinner } from "../output.js";
 import {
   reasonFromDescriptions,
   reasonFromIdeasFile,
@@ -85,20 +85,29 @@ export function formatProposalTree(
       // Default: full epic → feature → task tree
       const prefix = numbered ? `${i + 1}. ` : "  ";
       if (!parentLevel) {
-        lines.push(`${prefix}[epic] ${p.epic.title}`);
+        lines.push(`${prefix}📦 ${p.epic.title}`);
       }
 
-      for (const f of p.features) {
-        lines.push(`    [feature] ${f.title}`);
+      for (let fi = 0; fi < p.features.length; fi++) {
+        const f = p.features[fi];
+        const isLastFeature = fi === p.features.length - 1;
+        const branch = isLastFeature ? "└─" : "├─";
+        lines.push(`    ${branch} 📋 ${f.title}`);
         if (f.description) {
-          lines.push(`      ${f.description}`);
+          const cont = isLastFeature ? "  " : "│ ";
+          lines.push(`    ${cont}   ${f.description}`);
         }
-        for (const t of f.tasks) {
+        for (let ti = 0; ti < f.tasks.length; ti++) {
+          const t = f.tasks[ti];
+          const isLastTask = ti === f.tasks.length - 1;
+          const cont = isLastFeature ? "  " : "│ ";
+          const taskBranch = isLastTask ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`      [task] ${t.title}${pri}`);
+          lines.push(`    ${cont}   ${taskBranch} ○ ${t.title}${pri}`);
           if (t.acceptanceCriteria?.length) {
+            const taskCont = isLastTask ? "  " : "│ ";
             for (const ac of t.acceptanceCriteria) {
-              lines.push(`        - ${ac}`);
+              lines.push(`    ${cont}   ${taskCont}   ✓ ${ac}`);
             }
           }
         }
@@ -106,15 +115,20 @@ export function formatProposalTree(
     } else if (parentLevel === "feature") {
       // Parent is a feature — show tasks directly
       for (const f of p.features) {
-        for (const t of f.tasks) {
+        for (let ti = 0; ti < f.tasks.length; ti++) {
+          const t = f.tasks[ti];
+          const isLast = ti === f.tasks.length - 1;
+          const branch = isLast ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`    [task] ${t.title}${pri}`);
+          lines.push(`    ${branch} ○ ${t.title}${pri}`);
           if (t.description) {
-            lines.push(`      ${t.description}`);
+            const cont = isLast ? "  " : "│ ";
+            lines.push(`    ${cont}   ${t.description}`);
           }
           if (t.acceptanceCriteria?.length) {
+            const cont = isLast ? "  " : "│ ";
             for (const ac of t.acceptanceCriteria) {
-              lines.push(`      - ${ac}`);
+              lines.push(`    ${cont}   ✓ ${ac}`);
             }
           }
         }
@@ -122,15 +136,20 @@ export function formatProposalTree(
     } else if (parentLevel === "task") {
       // Parent is a task — show subtasks
       for (const f of p.features) {
-        for (const t of f.tasks) {
+        for (let ti = 0; ti < f.tasks.length; ti++) {
+          const t = f.tasks[ti];
+          const isLast = ti === f.tasks.length - 1;
+          const branch = isLast ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`    [subtask] ${t.title}${pri}`);
+          lines.push(`    ${branch} ○ ${t.title}${pri}`);
           if (t.description) {
-            lines.push(`      ${t.description}`);
+            const cont = isLast ? "  " : "│ ";
+            lines.push(`    ${cont}   ${t.description}`);
           }
           if (t.acceptanceCriteria?.length) {
+            const cont = isLast ? "  " : "│ ";
             for (const ac of t.acceptanceCriteria) {
-              lines.push(`      - ${ac}`);
+              lines.push(`    ${cont}   ✓ ${ac}`);
             }
           }
         }
@@ -144,6 +163,36 @@ export function formatProposalTree(
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Build a summary line showing the breakdown of items by level.
+ * Example: "1 epic, 2 features, 5 tasks"
+ */
+export function formatProposalSummary(
+  proposals: Proposal[],
+  parentLevel?: ItemLevel,
+): string {
+  let epics = 0;
+  let features = 0;
+  let tasks = 0;
+
+  for (const p of proposals) {
+    if (!parentLevel) epics++;
+    if (!parentLevel || parentLevel === "epic") {
+      features += p.features.length;
+    }
+    for (const f of p.features) {
+      tasks += f.tasks.length;
+    }
+  }
+
+  const parts: string[] = [];
+  if (epics > 0) parts.push(`${epics} ${epics === 1 ? "epic" : "epics"}`);
+  if (features > 0) parts.push(`${features} ${features === 1 ? "feature" : "features"}`);
+  if (tasks > 0) parts.push(`${tasks} ${tasks === 1 ? "task" : "tasks"}`);
+
+  return parts.join(", ");
 }
 
 /** Filter proposals by their 0-based indices. Out-of-range indices are ignored. */
@@ -244,6 +293,73 @@ function parseNumericList(input: string, total: number): number[] {
       .filter((n) => !isNaN(n) && n >= 1 && n <= total)
       .map((n) => n - 1),
   )].sort((a, b) => a - b);
+}
+
+/**
+ * Classify an LLM error and return a user-friendly message + suggestion.
+ * Covers auth failures, network issues, rate limits, response parsing, and
+ * model/API availability problems.
+ */
+export function classifySmartAddError(
+  err: Error,
+  mode: "description" | "file",
+): { message: string; suggestion: string } {
+  const msg = err.message.toLowerCase();
+
+  // Authentication issues
+  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid.*api.*key") || msg.includes("authentication")) {
+    return {
+      message: "Authentication failed — your API key was rejected.",
+      suggestion: "Check your API key with: n-dx config claude.apiKey, or switch to CLI mode.",
+    };
+  }
+
+  // Rate limiting
+  if (msg.includes("429") || msg.includes("rate limit") || msg.includes("too many requests")) {
+    return {
+      message: "Rate limit exceeded — the API is temporarily throttling requests.",
+      suggestion: "Wait a few minutes and try again, or use a different model with --model.",
+    };
+  }
+
+  // Network / connectivity
+  if (msg.includes("enotfound") || msg.includes("econnrefused") || msg.includes("etimedout") || msg.includes("network") || msg.includes("fetch failed")) {
+    return {
+      message: "Network error — could not reach the API.",
+      suggestion: "Check your internet connection and try again.",
+    };
+  }
+
+  // Claude CLI not found
+  if (msg.includes("claude cli not found") || msg.includes("enoent") && msg.includes("claude")) {
+    return {
+      message: "Claude CLI not found on your system.",
+      suggestion: "Install it (npm install -g @anthropic-ai/claude-cli) or set an API key: n-dx config claude.apiKey <key>",
+    };
+  }
+
+  // Response parsing / truncation
+  if (msg.includes("invalid json") || msg.includes("schema validation") || msg.includes("truncated")) {
+    return {
+      message: "LLM returned an unparseable response.",
+      suggestion: "Try again — LLM outputs can vary. If this persists, try a different model with --model.",
+    };
+  }
+
+  // Overloaded / server errors
+  if (msg.includes("529") || msg.includes("503") || msg.includes("overloaded") || msg.includes("server error") || msg.includes("500")) {
+    return {
+      message: "The API is temporarily overloaded or experiencing errors.",
+      suggestion: "Wait a moment and retry. Consider using a different model with --model.",
+    };
+  }
+
+  // Generic fallback with mode-specific context
+  const modeLabel = mode === "file" ? "process ideas file" : "analyze description";
+  return {
+    message: `Failed to ${modeLabel}: ${err.message}`,
+    suggestion: "Check your API key and network connection, then try again.",
+  };
 }
 
 async function savePending(
@@ -547,38 +663,40 @@ export async function cmdSmartAdd(
 
   let proposals: Proposal[];
 
+  const isJson = flags.format === "json";
+  const isPiped = !process.stdin.isTTY;
+
   if (filePaths.length > 0) {
     // File-based idea import mode
     const resolved = filePaths.map((fp) => resolve(dir, fp));
 
-    if (flags.format !== "json") {
-      const label = resolved.length === 1
-        ? `ideas file: ${resolved[0]}`
-        : `${resolved.length} ideas files`;
-      info(`Reading ${label}...`);
-    }
+    const label = resolved.length === 1
+      ? `Reading ideas file: ${resolved[0]}`
+      : `Reading ${resolved.length} ideas files`;
+    const spinner = !isJson ? startSpinner(`${label}...`) : null;
 
     try {
+      spinner?.update(`Processing ideas with LLM (${model ?? DEFAULT_MODEL})...`);
       const reasonResult = await reasonFromIdeasFile(resolved, existing, {
         model,
         dir,
         parentId,
       });
       proposals = reasonResult.proposals;
+      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
     } catch (err) {
-      throw new CLIError(
-        `Failed to process ideas file: ${(err as Error).message}`,
-        "Check the file path and try again.",
-      );
+      spinner?.stop();
+      const classified = classifySmartAddError(err as Error, "file");
+      throw new CLIError(classified.message, classified.suggestion);
     }
   } else {
     // Description-based mode (single or multiple descriptions)
-    if (flags.format !== "json") {
-      const label = descList.length > 1
-        ? `Analyzing ${descList.length} descriptions with LLM...`
-        : "Analyzing description with LLM...";
-      info(label);
-    }
+    const descLabel = descList.length > 1
+      ? `Analyzing ${descList.length} descriptions`
+      : "Analyzing description";
+    const stdinLabel = isPiped ? " (from piped input)" : "";
+    const spinnerMsg = `${descLabel} with LLM (${model ?? DEFAULT_MODEL})${stdinLabel}...`;
+    const spinner = !isJson ? startSpinner(spinnerMsg) : null;
 
     try {
       const reasonResult = await reasonFromDescriptions(descList, existing, {
@@ -587,11 +705,11 @@ export async function cmdSmartAdd(
         parentId,
       });
       proposals = reasonResult.proposals;
+      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
     } catch (err) {
-      throw new CLIError(
-        `LLM analysis failed: ${(err as Error).message}`,
-        "Check your API key and network connection, then try again.",
-      );
+      spinner?.stop();
+      const classified = classifySmartAddError(err as Error, "description");
+      throw new CLIError(classified.message, classified.suggestion);
     }
   }
 
@@ -615,11 +733,12 @@ export async function cmdSmartAdd(
 
   // Display proposed structure
   const itemCount = countProposalItems(proposals, parentLevel);
-  if (flags.format !== "json") {
+  const summary = formatProposalSummary(proposals, parentLevel);
+  if (!isJson) {
     if (parentId && parentLevel) {
-      info(`\nProposed additions under parent ${parentId} (${itemCount} items):`);
+      info(`\nProposed additions under parent ${parentId} (${summary}):`);
     } else {
-      info(`\nProposed structure (${itemCount} items):`);
+      info(`\nProposed structure (${summary}):`);
     }
     info(formatProposalTree(proposals, parentLevel));
 
@@ -673,7 +792,9 @@ export async function cmdSmartAdd(
         const label = granularityResult.direction === "break_down"
           ? "Breaking down"
           : "Consolidating";
-        info(`${label} proposal(s) ${granularityResult.indices.map((i) => i + 1).join(", ")}...`);
+        const adjSpinner = startSpinner(
+          `${label} proposal(s) ${granularityResult.indices.map((i) => i + 1).join(", ")}...`,
+        );
 
         try {
           const adjusted = await adjustGranularity(
@@ -696,13 +817,13 @@ export async function cmdSmartAdd(
             const actionLabel = granularityResult.direction === "break_down"
               ? "broken down"
               : "consolidated";
-            info(
+            adjSpinner.stop(
               `Replaced ${targetProposals.length} proposal(s) with ${adjusted.proposals.length} ${actionLabel} proposal(s).`,
             );
 
             // Re-display the proposal tree
-            const itemCount = countProposalItems(currentProposals, parentLevel);
-            info(`\nUpdated structure (${itemCount} items):`);
+            const updatedSummary = formatProposalSummary(currentProposals, parentLevel);
+            info(`\nUpdated structure (${updatedSummary}):`);
             info(formatProposalTree(currentProposals, parentLevel));
             info("");
 
@@ -711,10 +832,12 @@ export async function cmdSmartAdd(
               await savePending(dir, currentProposals, parentId);
             }
           } else {
-            info("LLM returned no proposals. Original proposals unchanged.");
+            adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
           }
         } catch (err) {
-          info(`Granularity adjustment failed: ${(err as Error).message}`);
+          adjSpinner.stop();
+          const classified = classifySmartAddError(err as Error, "description");
+          info(`Granularity adjustment failed: ${classified.message}`);
           info("Original proposals unchanged.");
         }
         continue; // Re-prompt

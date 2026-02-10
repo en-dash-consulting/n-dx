@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   formatProposalTree,
+  formatProposalSummary,
   countProposalItems,
   filterProposalsByIndex,
   parseApprovalInput,
   parseGranularityInput,
   formatQualityWarnings,
+  classifySmartAddError,
 } from "../../../../src/cli/commands/smart-add.js";
 import type { Proposal, QualityIssue } from "../../../../src/analyze/index.js";
 
@@ -71,11 +73,11 @@ const multiProposals: Proposal[] = [
 ];
 
 describe("formatProposalTree", () => {
-  it("renders a single proposal with numbered header", () => {
+  it("renders a single proposal with epic icon", () => {
     const output = formatProposalTree([singleProposal]);
-    expect(output).toContain("[epic] User Authentication");
-    expect(output).toContain("[feature] OAuth Integration");
-    expect(output).toContain("[task] Implement Google OAuth");
+    expect(output).toContain("📦 User Authentication");
+    expect(output).toContain("📋 OAuth Integration");
+    expect(output).toContain("○ Implement Google OAuth");
     expect(output).toContain("[high]");
   });
 
@@ -84,16 +86,16 @@ describe("formatProposalTree", () => {
     expect(output).toContain("Integrate with OAuth providers");
   });
 
-  it("shows acceptance criteria when present", () => {
+  it("shows acceptance criteria with check marks", () => {
     const output = formatProposalTree([singleProposal]);
-    expect(output).toContain("- Login via Google works");
-    expect(output).toContain("- Token refresh handled");
+    expect(output).toContain("✓ Login via Google works");
+    expect(output).toContain("✓ Token refresh handled");
   });
 
   it("renders numbered headers when multiple proposals", () => {
     const output = formatProposalTree(multiProposals);
-    expect(output).toContain("1. [epic] User Authentication");
-    expect(output).toContain("2. [epic] Admin Dashboard");
+    expect(output).toContain("1. 📦 User Authentication");
+    expect(output).toContain("2. 📦 Admin Dashboard");
   });
 
   it("does not number when only one proposal", () => {
@@ -101,44 +103,49 @@ describe("formatProposalTree", () => {
     expect(output).not.toMatch(/^\s*1\.\s/m);
   });
 
-  it("indents features and tasks correctly", () => {
+  it("uses box-drawing characters for tree branches", () => {
     const output = formatProposalTree([singleProposal]);
-    const lines = output.split("\n");
-    const epicLine = lines.find((l) => l.includes("[epic]"))!;
-    const featureLine = lines.find((l) => l.includes("[feature]"))!;
-    const taskLine = lines.find((l) => l.includes("[task]"))!;
-
-    // Features are indented more than epics, tasks more than features
-    const epicIndent = epicLine.search(/\S/);
-    const featureIndent = featureLine.search(/\S/);
-    const taskIndent = taskLine.search(/\S/);
-    expect(featureIndent).toBeGreaterThan(epicIndent);
-    expect(taskIndent).toBeGreaterThan(featureIndent);
+    expect(output).toContain("├─");
+    expect(output).toContain("└─");
   });
 
-  it("hides epic label when parentLevel is 'epic'", () => {
+  it("indents features deeper than epics, tasks deeper than features", () => {
+    const output = formatProposalTree([singleProposal]);
+    const lines = output.split("\n");
+    const epicLine = lines.find((l) => l.includes("📦"))!;
+    const featureLine = lines.find((l) => l.includes("📋"))!;
+    const taskLine = lines.find((l) => l.includes("○ Implement"))!;
+
+    // Feature icons are indented deeper than epic icons
+    const epicIconPos = epicLine.indexOf("📦");
+    const featureIconPos = featureLine.indexOf("📋");
+    const taskIconPos = taskLine.indexOf("○");
+    expect(featureIconPos).toBeGreaterThan(epicIconPos);
+    expect(taskIconPos).toBeGreaterThan(featureIconPos);
+  });
+
+  it("hides epic when parentLevel is 'epic'", () => {
     const output = formatProposalTree([singleProposal], "epic");
-    expect(output).not.toContain("[epic]");
-    expect(output).toContain("[feature] OAuth Integration");
-    expect(output).toContain("[task] Implement Google OAuth");
+    expect(output).not.toContain("📦");
+    expect(output).toContain("📋 OAuth Integration");
+    expect(output).toContain("○ Implement Google OAuth");
   });
 
   it("shows only tasks when parentLevel is 'feature'", () => {
     const output = formatProposalTree([singleProposal], "feature");
-    expect(output).not.toContain("[epic]");
-    expect(output).not.toContain("[feature]");
-    expect(output).toContain("[task] Implement Google OAuth");
-    expect(output).toContain("[task] Implement GitHub OAuth");
-    expect(output).toContain("[task] Implement JWT tokens");
+    expect(output).not.toContain("📦");
+    expect(output).not.toContain("📋");
+    expect(output).toContain("○ Implement Google OAuth");
+    expect(output).toContain("○ Implement GitHub OAuth");
+    expect(output).toContain("○ Implement JWT tokens");
   });
 
   it("shows subtasks when parentLevel is 'task'", () => {
     const output = formatProposalTree([singleProposal], "task");
-    expect(output).not.toContain("[epic]");
-    expect(output).not.toContain("[feature]");
-    expect(output).not.toContain("[task]");
-    expect(output).toContain("[subtask] Implement Google OAuth");
-    expect(output).toContain("[subtask] Implement JWT tokens");
+    expect(output).not.toContain("📦");
+    expect(output).not.toContain("📋");
+    expect(output).toContain("○ Implement Google OAuth");
+    expect(output).toContain("○ Implement JWT tokens");
   });
 
   it("shows task descriptions when parentLevel is 'feature'", () => {
@@ -162,6 +169,17 @@ describe("formatProposalTree", () => {
     };
     const output = formatProposalTree([proposalWithTaskDesc], "feature");
     expect(output).toContain("Task description here");
+  });
+
+  it("uses └─ for last feature and ├─ for non-last", () => {
+    const output = formatProposalTree([singleProposal]);
+    const lines = output.split("\n");
+    // OAuth Integration is first feature → ├─
+    const oauthLine = lines.find((l) => l.includes("OAuth Integration"))!;
+    expect(oauthLine).toContain("├─");
+    // Session Management is last feature → └─
+    const sessionLine = lines.find((l) => l.includes("Session Management"))!;
+    expect(sessionLine).toContain("└─");
   });
 });
 
@@ -475,5 +493,104 @@ describe("parseGranularityInput", () => {
     expect(parseGranularityInput("C1", 5)).toEqual({ direction: "consolidate", indices: [0] });
     expect(parseGranularityInput("Break Down 1", 5)).toEqual({ direction: "break_down", indices: [0] });
     expect(parseGranularityInput("Consolidate 1", 5)).toEqual({ direction: "consolidate", indices: [0] });
+  });
+});
+
+// ─── formatProposalSummary ──────────────────────────────────────────
+
+describe("formatProposalSummary", () => {
+  it("summarizes a single proposal with all levels", () => {
+    const summary = formatProposalSummary([singleProposal]);
+    expect(summary).toBe("1 epic, 2 features, 3 tasks");
+  });
+
+  it("summarizes multiple proposals", () => {
+    const summary = formatProposalSummary(multiProposals);
+    expect(summary).toBe("2 epics, 3 features, 4 tasks");
+  });
+
+  it("returns empty string for empty array", () => {
+    expect(formatProposalSummary([])).toBe("");
+  });
+
+  it("excludes epics when parentLevel is 'epic'", () => {
+    const summary = formatProposalSummary([singleProposal], "epic");
+    expect(summary).toBe("2 features, 3 tasks");
+    expect(summary).not.toContain("epic");
+  });
+
+  it("shows only tasks when parentLevel is 'feature'", () => {
+    const summary = formatProposalSummary([singleProposal], "feature");
+    expect(summary).toBe("3 tasks");
+    expect(summary).not.toContain("epic");
+    expect(summary).not.toContain("feature");
+  });
+
+  it("uses singular form for single items", () => {
+    const proposal: Proposal = {
+      epic: { title: "Solo", source: "smart-add" },
+      features: [
+        {
+          title: "One Feature",
+          source: "smart-add",
+          tasks: [{ title: "One Task", source: "smart-add", sourceFile: "" }],
+        },
+      ],
+    };
+    const summary = formatProposalSummary([proposal]);
+    expect(summary).toBe("1 epic, 1 feature, 1 task");
+  });
+});
+
+// ─── classifySmartAddError ──────────────────────────────────────────
+
+describe("classifySmartAddError", () => {
+  it("classifies 401/unauthorized errors as authentication failures", () => {
+    const result = classifySmartAddError(new Error("401 Unauthorized"), "description");
+    expect(result.message).toContain("Authentication failed");
+    expect(result.suggestion).toContain("API key");
+  });
+
+  it("classifies rate limit errors", () => {
+    const result = classifySmartAddError(new Error("429 Too Many Requests"), "description");
+    expect(result.message).toContain("Rate limit");
+    expect(result.suggestion).toContain("Wait");
+  });
+
+  it("classifies network errors", () => {
+    const result = classifySmartAddError(new Error("fetch failed: ENOTFOUND"), "description");
+    expect(result.message).toContain("Network error");
+    expect(result.suggestion).toContain("internet connection");
+  });
+
+  it("classifies claude CLI not found errors", () => {
+    const result = classifySmartAddError(new Error("claude CLI not found"), "description");
+    expect(result.message).toContain("Claude CLI not found");
+    expect(result.suggestion).toContain("install");
+  });
+
+  it("classifies JSON parsing errors", () => {
+    const result = classifySmartAddError(new Error("Invalid JSON in LLM response: {broken"), "description");
+    expect(result.message).toContain("unparseable response");
+    expect(result.suggestion).toContain("Try again");
+  });
+
+  it("classifies server overload errors", () => {
+    const result = classifySmartAddError(new Error("529 Overloaded"), "description");
+    expect(result.message).toContain("overloaded");
+    expect(result.suggestion).toContain("retry");
+  });
+
+  it("uses mode-specific label for generic errors", () => {
+    const descResult = classifySmartAddError(new Error("something unexpected"), "description");
+    expect(descResult.message).toContain("analyze description");
+
+    const fileResult = classifySmartAddError(new Error("something unexpected"), "file");
+    expect(fileResult.message).toContain("process ideas file");
+  });
+
+  it("preserves original error message in generic fallback", () => {
+    const result = classifySmartAddError(new Error("specific error detail"), "description");
+    expect(result.message).toContain("specific error detail");
   });
 });

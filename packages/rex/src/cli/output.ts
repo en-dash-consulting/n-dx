@@ -44,3 +44,70 @@ export function warn(...args: unknown[]): void {
 export function result(...args: unknown[]): void {
   console.log(...args);
 }
+
+// ── Progress spinner ──────────────────────────────────────────────────
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_INTERVAL = 80;
+
+export interface Spinner {
+  /** Update the spinner message while it's running. */
+  update(message: string): void;
+  /** Stop the spinner and print a final message. */
+  stop(finalMessage?: string): void;
+}
+
+/**
+ * Start an animated progress spinner in the terminal.
+ * Suppressed in quiet mode or non-TTY environments (falls back to a single info line).
+ *
+ * Usage:
+ *   const spin = startSpinner("Analyzing...");
+ *   await doWork();
+ *   spin.stop("Done!");
+ */
+export function startSpinner(message: string): Spinner {
+  // Non-interactive or quiet: print once and return a lightweight spinner
+  if (_quiet || !process.stderr.isTTY) {
+    info(message);
+    let stopped = false;
+    return {
+      update(_msg: string) { /* noop */ },
+      stop(final?: string) {
+        if (stopped) return;
+        stopped = true;
+        if (final) info(final);
+      },
+    };
+  }
+
+  let frame = 0;
+  let currentMessage = message;
+  let stopped = false;
+
+  const timer = setInterval(() => {
+    if (stopped) return;
+    const spinner = SPINNER_FRAMES[frame % SPINNER_FRAMES.length];
+    process.stderr.write(`\r${spinner} ${currentMessage}`);
+    frame++;
+  }, SPINNER_INTERVAL);
+
+  // Prevent the timer from keeping the process alive
+  if (timer.unref) timer.unref();
+
+  return {
+    update(msg: string) {
+      currentMessage = msg;
+    },
+    stop(finalMessage?: string) {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(timer);
+      // Clear the spinner line
+      process.stderr.write("\r" + " ".repeat(currentMessage.length + 4) + "\r");
+      if (finalMessage) {
+        info(finalMessage);
+      }
+    },
+  };
+}

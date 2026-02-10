@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setQuiet, isQuiet, info, warn, result } from "../../../src/cli/output.js";
+import { setQuiet, isQuiet, info, warn, result, startSpinner } from "../../../src/cli/output.js";
 
 describe("CLI output", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -85,6 +85,56 @@ describe("CLI output", () => {
       setQuiet(true);
       result("data");
       expect(logSpy).toHaveBeenCalledWith("data");
+    });
+  });
+
+  describe("startSpinner()", () => {
+    it("returns a spinner with update and stop methods", () => {
+      const spinner = startSpinner("Loading...");
+      expect(spinner).toHaveProperty("update");
+      expect(spinner).toHaveProperty("stop");
+      expect(typeof spinner.update).toBe("function");
+      expect(typeof spinner.stop).toBe("function");
+      spinner.stop();
+    });
+
+    it("prints initial message via info() when non-TTY", () => {
+      // In test environment, stderr is not a TTY, so it falls back to info()
+      const spinner = startSpinner("Processing...");
+      expect(logSpy).toHaveBeenCalledWith("Processing...");
+      spinner.stop();
+    });
+
+    it("prints final message on stop when non-TTY", () => {
+      const spinner = startSpinner("Working...");
+      logSpy.mockClear();
+      spinner.stop("Done!");
+      expect(logSpy).toHaveBeenCalledWith("Done!");
+    });
+
+    it("does not print final message if not provided on stop", () => {
+      const spinner = startSpinner("Working...");
+      logSpy.mockClear();
+      spinner.stop();
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("suppresses all output in quiet mode", () => {
+      setQuiet(true);
+      const spinner = startSpinner("Silent...");
+      expect(logSpy).not.toHaveBeenCalled();
+      spinner.stop("Also silent");
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("stop is idempotent", () => {
+      const spinner = startSpinner("Work...");
+      logSpy.mockClear();
+      spinner.stop("First stop");
+      spinner.stop("Second stop");
+      // Only the first stop should print
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith("First stop");
     });
   });
 });
