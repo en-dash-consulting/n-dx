@@ -14,6 +14,7 @@ import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
+import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { BrandedHeader } from "../components/logos.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
 import type { DetailItem } from "../types.js";
@@ -29,7 +30,7 @@ export interface PRDViewProps {
 }
 
 /** Active tab in the command bar. */
-type CommandTab = null | "add" | "merge";
+type CommandTab = null | "add" | "merge" | "prune";
 
 /** Walk the tree to find an item by ID. */
 function findItemById(items: PRDItemData[], id: string): PRDItemData | null {
@@ -227,6 +228,14 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
     fetchPRDData();
   }, [fetchPRDData]);
 
+  // Handle prune completion
+  const handlePruneComplete = useCallback(() => {
+    setActiveTab(null);
+    setToast("Completed items pruned and archived");
+    setTimeout(() => setToast(null), 3000);
+    fetchPRDData();
+  }, [fetchPRDData]);
+
   // Open merge preview
   const handleOpenMerge = useCallback(() => {
     setActiveTab("merge");
@@ -268,6 +277,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
         },
         title: "Add a new item to the PRD",
       }, "+ Add Item"),
+      h("button", {
+        class: `rex-command-btn${activeTab === "prune" ? " active" : ""}`,
+        onClick: () => {
+          setActiveTab(activeTab === "prune" ? null : "prune");
+        },
+        title: "Remove completed subtrees from the PRD",
+      }, "\u2702 Prune"),
     ),
 
     // Active panel
@@ -285,6 +301,14 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
       ? h(MergePreview, {
           selectedItems,
           onMergeComplete: handleMergeComplete,
+          onCancel: () => setActiveTab(null),
+        })
+      : null,
+
+    // Prune confirmation panel
+    activeTab === "prune"
+      ? h(PruneConfirmation, {
+          onPruneComplete: handlePruneComplete,
           onCancel: () => setActiveTab(null),
         })
       : null,

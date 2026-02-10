@@ -1711,3 +1711,339 @@
   color: var(--text-dim);
   font-size: 12px;
 }
+
+/* ── Prune Confirmation Panel ────────────────────────────────────── */
+
+.prune-confirmation {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  animation: rex-toast-in 0.2s ease;
+}
+
+.prune-confirmation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.prune-confirmation-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.prune-confirmation-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.prune-confirmation-close:hover {
+  color: var(--text);
+}
+
+.prune-confirmation-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.prune-confirmation-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  justify-content: center;
+}
+
+.prune-confirmation-error {
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  color: var(--red);
+  font-size: 12px;
+}
+
+.prune-confirmation-success {
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  border: 1px solid var(--green);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.prune-confirmation-empty {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-dim);
+}
+
+.prune-confirmation-empty p {
+  margin: 0 0 6px;
+}
+
+.prune-confirmation-hint {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.prune-confirmation-warning {
+  display: flex;
+  gap: 10px;
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--orange);
+  line-height: 1.4;
+}
+
+.prune-confirmation-warning strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.prune-confirmation-warning p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.prune-confirmation-warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.prune-confirmation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+.prune-confirmation-summary-stat {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.prune-confirmation-summary-num {
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 2px;
+}
+
+.prune-confirmation-breakdown {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.prune-confirmation-level-chip {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.prune-confirmation-level-chip.prd-level-epic {
+  background: color-mix(in srgb, var(--purple) 20%, transparent);
+  color: var(--purple);
+}
+
+.prune-confirmation-level-chip.prd-level-feature {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+}
+
+.prune-confirmation-items {
+  margin-bottom: 14px;
+}
+
+.prune-confirmation-items h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prune-confirmation-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.prune-confirmation-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.prune-confirmation-item-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+  color: var(--green);
+}
+
+.prune-confirmation-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.prune-confirmation-item-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.prune-confirmation-option {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+}
+
+.prune-confirmation-option-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.prune-confirmation-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.prune-confirmation-option-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  padding-left: 23px;
+}
+
+.prune-confirmation-result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+}
+
+.prune-confirmation-field {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.prune-confirmation-field-label {
+  font-weight: 500;
+}
+
+.prune-confirmation-field code {
+  font-size: 11px;
+  background: var(--bg-surface);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.prune-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.prune-confirmation-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.prune-confirmation-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.prune-confirmation-btn-cancel {
+  background: var(--bg);
+  color: var(--text-dim);
+}
+
+.prune-confirmation-btn-cancel:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.prune-confirmation-btn-next {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+
+.prune-confirmation-btn-next:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.prune-confirmation-btn-prune {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+  font-weight: 500;
+}
+
+.prune-confirmation-btn-prune:hover:not(:disabled) {
+  filter: brightness(1.1);
+}

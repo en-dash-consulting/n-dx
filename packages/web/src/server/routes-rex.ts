@@ -12,6 +12,8 @@
  * PATCH /api/rex/items/:id        — update item fields
  * PATCH /api/rex/items/bulk       — bulk update multiple items
  * POST  /api/rex/items/merge     — consolidate/merge sibling items
+ * GET   /api/rex/prune/preview    — preview items that would be pruned
+ * POST  /api/rex/prune            — execute prune (removes completed subtrees)
  * POST  /api/rex/analyze          — trigger analysis (scan project)
  * GET   /api/rex/proposals        — get pending proposals
  * POST  /api/rex/proposals/accept — accept pending proposals
@@ -466,6 +468,16 @@ export function handleRexRoute(
     if (method === "PATCH") {
       return handleItemPatch(req, res, ctx, itemId, broadcast);
     }
+  }
+
+  // GET /api/rex/prune/preview — preview prunable items
+  if (path === "prune/preview" && method === "GET") {
+    return handlePrunePreview(res, ctx);
+  }
+
+  // POST /api/rex/prune — execute prune with optional backup
+  if (path === "prune" && method === "POST") {
+    return handlePruneExecute(req, res, ctx, broadcast);
   }
 
   // POST /api/rex/analyze — trigger analysis
@@ -1059,6 +1071,222 @@ async function handleItemMerge(
     }
 
     jsonResponse(res, 200, { ok: true, ...result });
+  } catch (err) {
+    errorResponse(res, 400, String(err));
+  }
+  return true;
+}
+
+// --------------------------------------------------------------------------
+// Prune helpers — duplicated from packages/rex/src/core/prune.ts to keep
+// the web package independent of Rex at compile time.
+// @see packages/rex/src/core/prune.ts — canonical source
+// --------------------------------------------------------------------------
+
+/** Check whether an item and all its descendants are completed. */
+function isFullyCompletedLocal(item: PRDItemRecord): boolean {
+  if (item.status !== "completed") return false;
+  if (Array.isArray(item.children) && item.children.length > 0) {
+    return item.children.every(isFullyCompletedLocal);
+  }
+  return true;
+}
+
+/** Count items in a subtree (item + all descendants). */
+function countSubtreeLocal(item: PRDItemRecord): number {
+  let count = 1;
+  if (Array.isArray(item.children)) {
+    for (const child of item.children) {
+      count += countSubtreeLocal(child);
+    }
+  }
+  return count;
+}
+
+/** Identify top-level fully-completed subtrees eligible for pruning (read-only). */
+function findPrunableItemsLocal(items: PRDItemRecord[]): PRDItemRecord[] {
+  const prunable: PRDItemRecord[] = [];
+  for (const entry of walkTreeLocal(items)) {
+    if (!isFullyCompletedLocal(entry.item)) continue;
+    // Skip items whose parent is also fully completed (they'd be pruned as part of parent)
+    const parent = entry.parentId ? findItemById(items, entry.parentId) : null;
+    if (parent && isFullyCompletedLocal(parent)) continue;
+    prunable.push(entry.item);
+  }
+  return prunable;
+}
+
+/** Remove all fully-completed subtrees from the item tree. Returns pruned items. */
+function pruneItemsLocal(items: PRDItemRecord[]): { pruned: PRDItemRecord[]; prunedCount: number } {
+  const pruned: PRDItemRecord[] = [];
+  let prunedCount = 0;
+
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (isFullyCompletedLocal(item)) {
+      pruned.unshift(item);
+      prunedCount += countSubtreeLocal(item);
+      items.splice(i, 1);
+    } else if (Array.isArray(item.children) && item.children.length > 0) {
+      const childResult = pruneItemsLocal(item.children);
+      pruned.push(...childResult.pruned);
+      prunedCount += childResult.prunedCount;
+    }
+  }
+
+  return { pruned, prunedCount };
+}
+
+/** Summarize a prunable item for API response. */
+function summarizeItem(item: PRDItemRecord): {
+  id: string;
+  title: string;
+  level: string;
+  status: string;
+  childCount: number;
+  totalCount: number;
+} {
+  return {
+    id: item.id,
+    title: item.title,
+    level: item.level,
+    status: item.status,
+    childCount: Array.isArray(item.children) ? item.children.length : 0,
+    totalCount: countSubtreeLocal(item),
+  };
+}
+
+// --------------------------------------------------------------------------
+// Archive helpers — matching structure from packages/rex/src/cli/commands/prune.ts
+// --------------------------------------------------------------------------
+
+interface PruneArchiveRecord {
+  schema: "rex/archive/v1";
+  batches: Array<{
+    timestamp: string;
+    source?: string;
+    items: PRDItemRecord[];
+    count: number;
+    reason?: string;
+  }>;
+}
+
+function loadArchiveSync(archivePath: string): PruneArchiveRecord {
+  try {
+    if (existsSync(archivePath)) {
+      return JSON.parse(readFileSync(archivePath, "utf-8")) as PruneArchiveRecord;
+    }
+  } catch { /* ignore parse errors */ }
+  return { schema: "rex/archive/v1", batches: [] };
+}
+
+/** Handle GET /api/rex/prune/preview — preview prunable items */
+function handlePrunePreview(
+  res: ServerResponse,
+  ctx: ServerContext,
+): boolean {
+  const doc = loadPRD(ctx);
+  if (!doc) {
+    errorResponse(res, 404, "No PRD data found");
+    return true;
+  }
+
+  const prunable = findPrunableItemsLocal(doc.items);
+  const totalCount = prunable.reduce((sum, item) => sum + countSubtreeLocal(item), 0);
+
+  jsonResponse(res, 200, {
+    ok: true,
+    items: prunable.map(summarizeItem),
+    totalItemCount: totalCount,
+    hasPrunableItems: prunable.length > 0,
+  });
+  return true;
+}
+
+/** Handle POST /api/rex/prune — execute prune with optional backup */
+async function handlePruneExecute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const doc = loadPRD(ctx);
+  if (!doc) {
+    errorResponse(res, 404, "No PRD data found");
+    return true;
+  }
+
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as {
+      /** Create a backup of the PRD before pruning. */
+      backup?: boolean;
+      /** Confirmation token — must match the expected count to prevent stale operations. */
+      confirmCount?: number;
+    };
+
+    // Preview first to validate
+    const prunable = findPrunableItemsLocal(doc.items);
+    if (prunable.length === 0) {
+      jsonResponse(res, 200, { ok: true, prunedCount: 0, message: "Nothing to prune" });
+      return true;
+    }
+
+    const expectedCount = prunable.reduce((sum, item) => sum + countSubtreeLocal(item), 0);
+
+    // Confirm count must match to prevent operating on stale data
+    if (input.confirmCount !== undefined && input.confirmCount !== expectedCount) {
+      errorResponse(res, 409, `Stale prune request: expected ${input.confirmCount} items but found ${expectedCount}. Refresh the preview.`);
+      return true;
+    }
+
+    // Create backup if requested
+    let backupPath: string | undefined;
+    if (input.backup) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      backupPath = join(ctx.rexDir, `prd-backup-${timestamp}.json`);
+      writeFileSync(backupPath, JSON.stringify(doc, null, 2) + "\n");
+    }
+
+    // Execute prune
+    const result = pruneItemsLocal(doc.items);
+
+    // Archive pruned items
+    const archivePath = join(ctx.rexDir, "archive.json");
+    const archive = loadArchiveSync(archivePath);
+    archive.batches.push({
+      timestamp: new Date().toISOString(),
+      source: "prune",
+      items: result.pruned,
+      count: result.prunedCount,
+    });
+    writeFileSync(archivePath, JSON.stringify(archive, null, 2) + "\n");
+
+    // Save pruned document
+    savePRD(ctx, doc);
+
+    // Log the prune action
+    const titles = result.pruned.map((i) => i.title).join(", ");
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "items_pruned",
+      detail: `Pruned ${result.prunedCount} completed items: ${titles} (via web)`,
+    });
+
+    if (broadcast) {
+      broadcast({
+        type: "rex:prd-changed",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    jsonResponse(res, 200, {
+      ok: true,
+      prunedCount: result.prunedCount,
+      prunedItems: result.pruned.map(summarizeItem),
+      archivedTo: "archive.json",
+      ...(backupPath ? { backupPath } : {}),
+    });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }

@@ -350,4 +350,174 @@ describe("Rex API routes", () => {
       expect(lastEntry.itemId).toBe("task-1");
     });
   });
+
+  // ── Prune endpoint tests ──────────────────────────────────────────
+
+  describe("GET /api/rex/prune/preview", () => {
+    it("returns empty items when nothing is prunable", async () => {
+      // Rewrite PRD with no completed items
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      for (const child of prd.items[0].children) {
+        if (child.status === "completed") child.status = "pending";
+      }
+      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.hasPrunableItems).toBe(false);
+      expect(data.items).toEqual([]);
+      expect(data.totalItemCount).toBe(0);
+    });
+
+    it("identifies a completed leaf task as prunable", async () => {
+      // Set all children of epic-1 to completed, then the epic itself
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      for (const child of prd.items[0].children) {
+        child.status = "completed";
+      }
+      prd.items[0].status = "completed";
+      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.hasPrunableItems).toBe(true);
+      expect(data.items).toHaveLength(1);
+      expect(data.items[0].id).toBe("epic-1");
+      expect(data.items[0].totalCount).toBe(4); // epic + 3 tasks
+      expect(data.totalItemCount).toBe(4);
+    });
+
+    it("finds prunable subtree within active parent", async () => {
+      // Only set task-3 (already completed) as the only completed subtree
+      // task-3 is a leaf node that is already completed in the fixture
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      // task-3 is completed and a leaf, so it's prunable
+      expect(data.hasPrunableItems).toBe(true);
+      expect(data.items).toHaveLength(1);
+      expect(data.items[0].id).toBe("task-3");
+      expect(data.items[0].totalCount).toBe(1);
+    });
+
+    it("returns 404 when no PRD exists", async () => {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(join(rexDir, "prd.json"));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST /api/rex/prune", () => {
+    it("prunes completed items and archives them", async () => {
+      // task-3 is already completed and a leaf
+      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmCount: 1 }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.prunedCount).toBe(1);
+      expect(data.prunedItems).toHaveLength(1);
+      expect(data.prunedItems[0].id).toBe("task-3");
+      expect(data.archivedTo).toBe("archive.json");
+
+      // Verify task-3 is gone from PRD
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
+      expect(taskIds).not.toContain("task-3");
+      expect(taskIds).toContain("task-1");
+      expect(taskIds).toContain("task-2");
+
+      // Verify archive was created
+      const archive = JSON.parse(readFileSync(join(rexDir, "archive.json"), "utf-8"));
+      expect(archive.schema).toBe("rex/archive/v1");
+      expect(archive.batches).toHaveLength(1);
+      expect(archive.batches[0].source).toBe("prune");
+      expect(archive.batches[0].count).toBe(1);
+    });
+
+    it("creates a backup when requested", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backup: true, confirmCount: 1 }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.backupPath).toBeDefined();
+
+      // Verify backup file was created and contains original data
+      const backupContent = readFileSync(data.backupPath, "utf-8");
+      const backup = JSON.parse(backupContent);
+      expect(backup.items[0].children).toHaveLength(3); // All 3 tasks in backup
+    });
+
+    it("returns nothing to prune when all items are active", async () => {
+      // Remove the completed task-3
+      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      prd.items[0].children = prd.items[0].children.filter(
+        (t: { id: string }) => t.id !== "task-3",
+      );
+      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.prunedCount).toBe(0);
+      expect(data.message).toBe("Nothing to prune");
+    });
+
+    it("rejects stale prune when confirmCount does not match", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmCount: 999 }),
+      });
+      expect(res.status).toBe(409);
+      const data = await res.json();
+      expect(data.error).toContain("Stale prune request");
+    });
+
+    it("logs the prune in execution log", async () => {
+      await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmCount: 1 }),
+      });
+
+      const logPath = join(rexDir, "execution-log.jsonl");
+      const logContent = readFileSync(logPath, "utf-8");
+      const lines = logContent.trim().split("\n").filter(Boolean);
+      const lastEntry = JSON.parse(lines[lines.length - 1]);
+      expect(lastEntry.event).toBe("items_pruned");
+      expect(lastEntry.detail).toContain("Completed Task");
+    });
+
+    it("returns 404 when no PRD exists", async () => {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(join(rexDir, "prd.json"));
+
+      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
 });
