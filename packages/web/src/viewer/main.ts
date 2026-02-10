@@ -8,6 +8,7 @@ import { Sidebar } from "./components/sidebar.js";
 import { DetailPanel } from "./components/detail-panel.js";
 import { Guide } from "./components/guide.js";
 import { initTheme } from "./components/theme-toggle.js";
+import { updateFavicon } from "./components/favicon.js";
 import { Overview } from "./views/overview.js";
 import { Graph } from "./views/graph.js";
 import { ZonesView } from "./views/zones.js";
@@ -115,6 +116,11 @@ function App({ scope }: { scope: string | null }) {
   // Scroll to top on view change
   useEffect(() => {
     document.getElementById("main-content")?.scrollTo(0, 0);
+  }, [view]);
+
+  // Update browser favicon to match the active product section
+  useEffect(() => {
+    updateFavicon(view);
   }, [view]);
 
   useEffect(() => {
