@@ -14,6 +14,8 @@ export { PruneConfirmation } from "./prune-confirmation.js";
 export type { PruneConfirmationProps } from "./prune-confirmation.js";
 export { ProposalEditor } from "./proposal-editor.js";
 export type { ProposalEditorProps, RawProposal } from "./proposal-editor.js";
+export { ExecutionPanel } from "./execution-panel.js";
+export type { ExecutionPanelProps } from "./execution-panel.js";
 export { PruneDiffTree } from "./prune-diff-tree.js";
 export type { PruneDiffTreeProps, EpicImpact } from "./prune-diff-tree.js";
 export { StatusFilter, defaultStatusFilter, ALL_STATUSES, FILTER_PRESETS, activePresetKey } from "./status-filter.js";

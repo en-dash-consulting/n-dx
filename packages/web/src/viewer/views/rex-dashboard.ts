@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
+import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -430,6 +431,11 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
               )
             : h("div", { class: "rex-dash-empty-hint" }, "No epics defined yet."),
         ),
+
+        // Execution controls
+        epics.length > 0
+          ? h(ExecutionPanel, { onPrdChanged: fetchDashboard })
+          : null,
       ),
 
       // ── Right sidebar ─────────────────────────────────────────────
