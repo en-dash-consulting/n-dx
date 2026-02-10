@@ -18,6 +18,7 @@
  * GET   /api/rex/proposals        — get pending proposals
  * POST  /api/rex/proposals/accept — accept pending proposals
  * POST  /api/rex/proposals/accept-edited — accept edited proposals (inline-edited data)
+ * POST  /api/rex/smart-add-preview — generate proposals from natural language (real-time preview)
  * GET   /api/rex/log              — execution log (?limit=N)
  * POST  /api/rex/execute/epic-by-epic — start epic-by-epic execution
  * GET   /api/rex/execute/status       — current execution state
@@ -503,6 +504,11 @@ export function handleRexRoute(
   // POST /api/rex/proposals/accept-edited — accept edited proposals (inline-edited data)
   if (path === "proposals/accept-edited" && method === "POST") {
     return handleAcceptEditedProposals(req, res, ctx, broadcast);
+  }
+
+  // POST /api/rex/smart-add-preview — generate proposals from natural language (real-time preview)
+  if (path === "smart-add-preview" && method === "POST") {
+    return handleSmartAddPreview(req, res, ctx);
   }
 
   // POST /api/rex/execute/epic-by-epic — start epic-by-epic execution
@@ -2004,6 +2010,119 @@ async function handleAcceptEditedProposals(
     errorResponse(res, 400, String(err));
   }
   return true;
+}
+
+/** Handle POST /api/rex/smart-add-preview — generate proposals from natural language */
+async function handleSmartAddPreview(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as {
+      text: string;
+      parentId?: string;
+    };
+
+    if (!input.text || typeof input.text !== "string" || input.text.trim().length === 0) {
+      errorResponse(res, 400, "Text is required");
+      return true;
+    }
+
+    // Minimum length to avoid wasteful LLM calls
+    if (input.text.trim().length < 5) {
+      jsonResponse(res, 200, { proposals: [], confidence: 0, qualityIssues: [] });
+      return true;
+    }
+
+    // Use rex CLI smart-add with --format=json (no --accept = preview mode)
+    const args = ["smart-add", "--format=json"];
+    if (input.parentId) args.push("--parent", input.parentId);
+    args.push(input.text.trim());
+    args.push(ctx.projectDir);
+
+    const rexBin = join(ctx.projectDir, "node_modules", ".bin", "rex");
+    const rexFallback = join(ctx.projectDir, "packages", "rex", "dist", "cli", "index.js");
+
+    const binPath = existsSync(rexBin) ? rexBin : "node";
+    const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
+
+    const cliResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      execFile(binPath, binArgs, {
+        cwd: ctx.projectDir,
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env },
+      }, (error, stdout, stderr) => {
+        if (error) {
+          // Try to parse JSON from stdout even on error
+          if (stdout && stdout.trim()) {
+            resolve({ stdout, stderr });
+          } else {
+            reject(new Error(stderr || error.message));
+          }
+          return;
+        }
+        resolve({ stdout, stderr });
+      });
+    });
+
+    try {
+      const parsed = JSON.parse(cliResult.stdout);
+      const proposals = parsed.proposals ?? [];
+
+      // Compute a confidence score based on proposal quality
+      const confidence = computeConfidence(Array.isArray(proposals) ? proposals : []);
+
+      jsonResponse(res, 200, {
+        proposals: Array.isArray(proposals) ? proposals : [],
+        confidence,
+        qualityIssues: parsed.qualityIssues ?? [],
+      });
+    } catch {
+      // Non-JSON output — return empty
+      jsonResponse(res, 200, { proposals: [], confidence: 0, qualityIssues: [] });
+    }
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/**
+ * Compute a confidence score (0-100) for a set of proposals based on quality heuristics.
+ * Higher scores indicate more complete, well-structured proposals.
+ */
+function computeConfidence(proposals: Record<string, unknown>[]): number {
+  if (proposals.length === 0) return 0;
+
+  let score = 50; // Base score for having any proposals
+
+  for (const p of proposals) {
+    const epic = p.epic as Record<string, unknown> | undefined;
+    const features = (p.features ?? []) as Record<string, unknown>[];
+
+    // Epic quality
+    if (epic?.title && typeof epic.title === "string" && epic.title.length > 5) score += 5;
+    if (epic?.description) score += 3;
+
+    // Feature quality
+    for (const f of features) {
+      if (f.title && typeof f.title === "string" && f.title.length > 5) score += 2;
+      if (f.description) score += 2;
+
+      const tasks = (f.tasks ?? []) as Record<string, unknown>[];
+      for (const t of tasks) {
+        if (t.title && typeof t.title === "string" && t.title.length > 5) score += 1;
+        if (t.description) score += 1;
+        if (t.acceptanceCriteria && Array.isArray(t.acceptanceCriteria) && t.acceptanceCriteria.length > 0) score += 2;
+        if (t.priority) score += 1;
+      }
+    }
+  }
+
+  return Math.min(100, score);
 }
 
 // --------------------------------------------------------------------------

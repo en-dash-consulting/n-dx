@@ -20,6 +20,44 @@
   line-height: 1.5;
 }
 
+/* ── Analysis Tabs ────────────────────────────────────────────────── */
+
+.rex-analysis-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.rex-analysis-tab {
+  flex: 1;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  border: none;
+  background: var(--bg-surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.rex-analysis-tab:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.rex-analysis-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.rex-analysis-tab.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
 /* ── Analysis History ──────────────────────────────────────────────── */
 
 .rex-analysis-history {

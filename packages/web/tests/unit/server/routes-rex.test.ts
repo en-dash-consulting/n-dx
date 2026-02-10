@@ -880,4 +880,40 @@ describe("Rex API routes", () => {
       expect(lastEntry.detail).toContain("proposal editor");
     });
   });
+
+  describe("POST /api/rex/smart-add-preview", () => {
+    it("returns 400 when text is empty", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Text is required");
+    });
+
+    it("returns 400 when text field is missing", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Text is required");
+    });
+
+    it("returns empty proposals for text shorter than 5 characters", async () => {
+      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "abc" }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.proposals).toEqual([]);
+      expect(data.confidence).toBe(0);
+    });
+  });
 });

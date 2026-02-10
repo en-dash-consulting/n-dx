@@ -1,14 +1,15 @@
 /**
- * Analysis view — dedicated Rex view for triggering analysis and
- * reviewing proposals.
+ * Analysis view — dedicated Rex view for triggering analysis, smart add,
+ * and reviewing proposals.
  *
- * Shows: trigger analysis button, pending proposals list with
- * accept/reject, and recent analysis history from the execution log.
+ * Shows: smart add (natural language → proposals), project analysis,
+ * pending proposals list with accept/reject, and recent analysis history.
  */
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { AnalyzePanel } from "../components/prd-tree/analyze-panel.js";
+import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
 import { BrandedHeader } from "../components/logos.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -20,9 +21,12 @@ interface LogEntry {
   detail?: string;
 }
 
+type AnalysisTab = "smart-add" | "scan";
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function AnalysisView() {
+  const [activeTab, setActiveTab] = useState<AnalysisTab>("smart-add");
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(true);
 
@@ -37,7 +41,8 @@ export function AnalysisView() {
             e.event.includes("analysis") ||
             e.event.includes("analyze") ||
             e.event.includes("proposal") ||
-            e.event.includes("plan"),
+            e.event.includes("plan") ||
+            e.event.includes("smart_add"),
         );
         setLogEntries(analysisEvents.reverse());
       }
@@ -66,12 +71,28 @@ export function AnalysisView() {
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", null, "Analysis"),
       h("p", { class: "rex-analysis-view-subtitle" },
-        "Scan the project to discover new work items and review proposals before adding them to the PRD.",
+        "Add items with natural language or scan the project to discover new work items.",
       ),
     ),
 
-    // Analyze panel (reused component)
-    h(AnalyzePanel, { onPrdChanged: handlePrdChanged }),
+    // Tab bar
+    h("div", { class: "rex-analysis-tabs" },
+      h("button", {
+        class: `rex-analysis-tab${activeTab === "smart-add" ? " active" : ""}`,
+        onClick: () => setActiveTab("smart-add"),
+        type: "button",
+      }, "Smart Add"),
+      h("button", {
+        class: `rex-analysis-tab${activeTab === "scan" ? " active" : ""}`,
+        onClick: () => setActiveTab("scan"),
+        type: "button",
+      }, "Project Scan"),
+    ),
+
+    // Tab content
+    activeTab === "smart-add"
+      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged })
+      : h(AnalyzePanel, { onPrdChanged: handlePrdChanged }),
 
     // Analysis history
     h("div", { class: "rex-analysis-history" },

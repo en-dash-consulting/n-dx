@@ -14,6 +14,8 @@ export { PruneConfirmation } from "./prune-confirmation.js";
 export type { PruneConfirmationProps } from "./prune-confirmation.js";
 export { ProposalEditor } from "./proposal-editor.js";
 export type { ProposalEditorProps, RawProposal } from "./proposal-editor.js";
+export { SmartAddInput } from "./smart-add-input.js";
+export type { SmartAddInputProps } from "./smart-add-input.js";
 export { ExecutionPanel } from "./execution-panel.js";
 export type { ExecutionPanelProps } from "./execution-panel.js";
 export { PruneDiffTree } from "./prune-diff-tree.js";
