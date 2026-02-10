@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { runConfig } from "./config.js";
@@ -9,6 +9,28 @@ import { runCI } from "./ci.js";
 import { runWeb } from "./web.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Resolve a package's CLI entry point from its package.json bin field.
+ * Falls back to the conventional dist/cli/index.js path if bin is missing.
+ */
+function resolveToolPath(pkgDir) {
+  const pkgPath = join(__dir, pkgDir, "package.json");
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    if (typeof pkg.bin === "string") {
+      return join(pkgDir, pkg.bin);
+    }
+    if (pkg.bin && typeof pkg.bin === "object") {
+      // Use the first bin entry
+      const first = Object.values(pkg.bin)[0];
+      if (first) return join(pkgDir, first);
+    }
+  } catch {
+    // package.json unreadable — fall through
+  }
+  return join(pkgDir, "dist/cli/index.js");
+}
 
 /**
  * Known error patterns mapped to user-friendly suggestions.
@@ -52,11 +74,11 @@ process.on("unhandledRejection", (err) => {
 });
 
 const tools = {
-  rex: "packages/rex/dist/cli/index.js",
-  hench: "packages/hench/dist/cli/index.js",
-  sourcevision: "packages/sourcevision/dist/cli/index.js",
-  sv: "packages/sourcevision/dist/cli/index.js",
-  web: "packages/web/dist/cli/index.js",
+  rex: resolveToolPath("packages/rex"),
+  hench: resolveToolPath("packages/hench"),
+  sourcevision: resolveToolPath("packages/sourcevision"),
+  sv: resolveToolPath("packages/sourcevision"),
+  web: resolveToolPath("packages/web"),
 };
 
 function run(script, args) {
