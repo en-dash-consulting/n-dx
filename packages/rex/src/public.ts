@@ -63,3 +63,7 @@ export { findAutoCompletions } from "./core/parent-completion.js";
 
 export { findParentResets } from "./core/parent-reset.js";
 export { cascadeParentReset } from "./core/cascade-reset.js";
+
+// ---- MCP server factory -----------------------------------------------------
+
+export { createRexMcpServer } from "./cli/mcp.js";

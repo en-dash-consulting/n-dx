@@ -20,7 +20,24 @@ import type { PRDStore } from "../store/index.js";
 
 const REX_DIR = ".rex";
 
-export async function startMcpServer(dir: string): Promise<void> {
+/**
+ * Create a configured Rex MCP server without connecting a transport.
+ *
+ * Returns the McpServer instance with all tools and resources registered.
+ * The caller is responsible for connecting a transport (stdio, HTTP, etc.):
+ *
+ * ```ts
+ * // Stdio (CLI usage)
+ * const server = await createRexMcpServer(dir);
+ * await server.connect(new StdioServerTransport());
+ *
+ * // HTTP (web server usage)
+ * const server = await createRexMcpServer(dir);
+ * const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
+ * await server.connect(transport);
+ * ```
+ */
+export async function createRexMcpServer(dir: string): Promise<McpServer> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
 
@@ -687,8 +704,17 @@ export async function startMcpServer(dir: string): Promise<void> {
     ],
   }));
 
-  // --- Connect ---
+  return server;
+}
 
+/**
+ * Start the Rex MCP server over stdio (for `rex mcp <dir>` CLI command).
+ *
+ * This is the original entry point preserved for backward compatibility.
+ * For HTTP or other transports, use {@link createRexMcpServer} instead.
+ */
+export async function startMcpServer(dir: string): Promise<void> {
+  const server = await createRexMcpServer(dir);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
