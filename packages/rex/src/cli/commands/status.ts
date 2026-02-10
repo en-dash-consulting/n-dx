@@ -8,6 +8,7 @@ import {
   checkBudget,
   formatBudgetWarnings,
 } from "../../core/token-usage.js";
+import { isFullyCompleted } from "../../core/prune.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, warn, result, isQuiet } from "../output.js";
@@ -92,6 +93,28 @@ function coverageSuffix(itemId: string, coverage?: CoverageMap): string {
   return ` [${covered}/${total} covered]`;
 }
 
+/**
+ * Filter out fully-completed subtrees from items for display.
+ *
+ * An item is removed when it and all its descendants are completed.
+ * Items that are completed but have non-completed children are kept,
+ * with their children recursively filtered.
+ *
+ * Returns a new array — does not mutate the input.
+ */
+export function filterCompleted(items: PRDItem[]): PRDItem[] {
+  const result: PRDItem[] = [];
+  for (const item of items) {
+    if (isFullyCompleted(item)) continue;
+    if (item.children && item.children.length > 0) {
+      result.push({ ...item, children: filterCompleted(item.children) });
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 /** Render a PRD tree to lines with status icons and indentation. */
 export function renderTree(
   items: PRDItem[],
@@ -131,7 +154,10 @@ export function renderTree(
   return lines;
 }
 
-export function formatStats(stats: TreeStats): string {
+export function formatStats(
+  stats: TreeStats,
+  options?: { hidingCompleted?: boolean },
+): string {
   const parts = [];
   if (stats.completed > 0) parts.push(`${stats.completed} completed`);
   if (stats.inProgress > 0) parts.push(`${stats.inProgress} in progress`);
@@ -140,7 +166,11 @@ export function formatStats(stats: TreeStats): string {
   if (stats.blocked > 0) parts.push(`${stats.blocked} blocked`);
   const pct =
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-  return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})`;
+  const suffix =
+    options?.hidingCompleted
+      ? " (showing active items, use --all for full tree)"
+      : "";
+  return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})${suffix}`;
 }
 
 /** Build a CoverageMap from verify results. */
@@ -168,6 +198,7 @@ export async function cmdStatus(
   const format = flags.format;
   const showCoverage = flags.coverage === "true";
   const showTokens = flags.tokens !== "false";
+  const showAll = flags.all === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -230,14 +261,17 @@ export async function cmdStatus(
     return;
   }
 
+  const displayItems = showAll ? doc.items : filterCompleted(doc.items);
+  const stats = computeStats(doc.items);
+  const hidingCompleted = !showAll && stats.completed > 0;
+
   const coverageMap = verifyResult ? buildCoverageMap(verifyResult) : undefined;
-  for (const line of renderTree(doc.items, 0, coverageMap)) {
+  for (const line of renderTree(displayItems, 0, coverageMap)) {
     result(line);
   }
 
-  const stats = computeStats(doc.items);
   info("");
-  info(formatStats(stats));
+  info(formatStats(stats, { hidingCompleted }));
 
   // Coverage summary
   if (verifyResult && verifyResult.summary.totalCriteria > 0) {

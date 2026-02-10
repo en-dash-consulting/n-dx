@@ -84,8 +84,8 @@ describe("rex CLI workflow", () => {
     ]);
     expect(updateOut).toContain("status: completed");
 
-    // Status should show the tree
-    const statusOut = run(["status", tmpDir]);
+    // Status should show the tree (--all to include completed items)
+    const statusOut = run(["status", tmpDir, "--all"]);
     expect(statusOut).toContain("Auth System");
     expect(statusOut).toContain("OAuth Flow");
     expect(statusOut).toContain("●"); // completed icon

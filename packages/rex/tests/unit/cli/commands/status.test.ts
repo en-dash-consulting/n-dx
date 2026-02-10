@@ -7,6 +7,8 @@ import {
   renderProgressBar,
   formatTimestamp,
   renderTree,
+  filterCompleted,
+  formatStats,
 } from "../../../../src/cli/commands/status.js";
 import { CLIError } from "../../../../src/cli/errors.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
@@ -151,10 +153,10 @@ describe("cmdStatus", () => {
   describe("--format=tree", () => {
     it("shows full hierarchy with status icons", async () => {
       writePRD(tmp, POPULATED_PRD);
-      await cmdStatus(tmp, { format: "tree" });
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const out = output();
 
-      // All items visible
+      // All items visible with --all
       expect(out).toContain("Auth System");
       expect(out).toContain("OAuth Flow");
       expect(out).toContain("Token Exchange");
@@ -163,9 +165,23 @@ describe("cmdStatus", () => {
       expect(out).toContain("Dashboard");
     });
 
-    it("shows status icons for each state", async () => {
+    it("hides fully-completed items by default", async () => {
       writePRD(tmp, POPULATED_PRD);
       await cmdStatus(tmp, { format: "tree" });
+      const out = output();
+
+      // Completed leaf "Token Exchange" is filtered but parent subtree
+      // remains because "Refresh Logic" is pending
+      expect(out).toContain("Auth System");
+      expect(out).toContain("OAuth Flow");
+      expect(out).not.toContain("Token Exchange");
+      expect(out).toContain("Refresh Logic");
+      expect(out).toContain("Dashboard");
+    });
+
+    it("shows status icons for each state", async () => {
+      writePRD(tmp, POPULATED_PRD);
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const out = output();
 
       // completed icon
@@ -201,7 +217,7 @@ describe("cmdStatus", () => {
 
     it("indents children under parents", async () => {
       writePRD(tmp, POPULATED_PRD);
-      await cmdStatus(tmp, { format: "tree" });
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const lines = output().split("\n");
 
       // Epic-level items have no indentation
@@ -224,7 +240,7 @@ describe("cmdStatus", () => {
 
     it("shows child completion counts for parents", async () => {
       writePRD(tmp, POPULATED_PRD);
-      await cmdStatus(tmp, { format: "tree" });
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const lines = output().split("\n");
 
       // OAuth Flow has 2 children, 1 completed
@@ -234,7 +250,7 @@ describe("cmdStatus", () => {
 
     it("shows priority when present", async () => {
       writePRD(tmp, POPULATED_PRD);
-      await cmdStatus(tmp, { format: "tree" });
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const out = output();
 
       expect(out).toContain("[high]");
@@ -292,7 +308,7 @@ describe("cmdStatus", () => {
 
     it("shows accurate percentage for each epic", async () => {
       writePRD(tmp, POPULATED_PRD);
-      await cmdStatus(tmp, { format: "tree" });
+      await cmdStatus(tmp, { format: "tree", all: "true" });
       const lines = output().split("\n");
 
       // Auth System: 1 completed out of 2 tasks (t1, t2) = 50%
@@ -329,7 +345,7 @@ describe("cmdStatus", () => {
         ],
       };
       writePRD(tmp, fullPrd);
-      await cmdStatus(tmp, {});
+      await cmdStatus(tmp, { all: "true" });
       const lines = output().split("\n");
 
       const epicLine = lines.find((l) => l.includes("Finished Epic"));
@@ -408,7 +424,7 @@ describe("cmdStatus", () => {
         ],
       };
       writePRD(tmp, prd);
-      await cmdStatus(tmp, {});
+      await cmdStatus(tmp, { all: "true" });
       const out = output();
 
       expect(out).toContain("Done Task");
@@ -708,7 +724,7 @@ describe("cmdStatus", () => {
       writePRD(tmp, PRD_WITH_CRITERIA);
       writeConfig(tmp, { schema: "rex/v1", project: "test", adapter: "file" });
 
-      await cmdStatus(tmp, { coverage: "true" });
+      await cmdStatus(tmp, { coverage: "true", all: "true" });
       const out = output();
 
       // Session store (no acceptance criteria) should not have coverage indicator
@@ -983,5 +999,99 @@ describe("renderTree with coverage", () => {
     const lines = renderTree(items);
     expect(lines[0]).toContain("Simple task");
     expect(lines[0]).not.toContain("covered");
+  });
+});
+
+describe("filterCompleted", () => {
+  it("removes fully-completed leaf items", () => {
+    const items: PRDItem[] = [
+      { id: "t1", title: "Done", level: "task", status: "completed" },
+      { id: "t2", title: "Pending", level: "task", status: "pending" },
+    ];
+    const filtered = filterCompleted(items);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].title).toBe("Pending");
+  });
+
+  it("removes fully-completed subtrees", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Done Epic",
+        level: "epic",
+        status: "completed",
+        children: [
+          { id: "t1", title: "Done Task", level: "task", status: "completed" },
+        ],
+      },
+    ];
+    const filtered = filterCompleted(items);
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("keeps items with mixed children but filters completed children", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Mixed Epic",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "t1", title: "Done Task", level: "task", status: "completed" },
+          { id: "t2", title: "Active Task", level: "task", status: "pending" },
+        ],
+      },
+    ];
+    const filtered = filterCompleted(items);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].title).toBe("Mixed Epic");
+    expect(filtered[0].children).toHaveLength(1);
+    expect(filtered[0].children![0].title).toBe("Active Task");
+  });
+
+  it("does not mutate the original items", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "t1", title: "Done", level: "task", status: "completed" },
+          { id: "t2", title: "Active", level: "task", status: "pending" },
+        ],
+      },
+    ];
+    filterCompleted(items);
+    expect(items[0].children).toHaveLength(2);
+  });
+
+  it("returns all items when nothing is completed", () => {
+    const items: PRDItem[] = [
+      { id: "t1", title: "A", level: "task", status: "pending" },
+      { id: "t2", title: "B", level: "task", status: "in_progress" },
+    ];
+    const filtered = filterCompleted(items);
+    expect(filtered).toHaveLength(2);
+  });
+});
+
+describe("formatStats with hidingCompleted option", () => {
+  it("appends hint when hidingCompleted is true", () => {
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const line = formatStats(stats, { hidingCompleted: true });
+    expect(line).toContain("showing active items, use --all for full tree");
+  });
+
+  it("does not append hint when hidingCompleted is false", () => {
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const line = formatStats(stats, { hidingCompleted: false });
+    expect(line).not.toContain("--all");
+  });
+
+  it("does not append hint when options are omitted", () => {
+    const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0 };
+    const line = formatStats(stats);
+    expect(line).not.toContain("--all");
   });
 });

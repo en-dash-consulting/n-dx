@@ -8,7 +8,7 @@ Usage: rex <command> [options] [dir]
 
 Commands:
   init [dir]              Initialize .rex/ in directory (default: .)
-  status [dir]            Show PRD tree with completion stats
+  status [dir]            Show PRD tree (hides completed items by default)
   next [dir]              Print next actionable task
   add <level> [dir]       Add item manually (epic|feature|task|subtask)
   add "<desc>" ["<d2>"]   Smart add: LLM creates PRD structure from description(s)
@@ -42,6 +42,7 @@ Options:
   --dry-run               Preview without making changes (for fix, prune, reshape, verify)
   --smart                 LLM-assisted prune (for prune)
   --no-consolidate        Skip post-prune consolidation pass (for prune)
+  --all                   Show all items including completed (for status)
   --coverage              Show test coverage per task (for status)
   --tokens=false          Hide token usage summary (shown by default, for status)
   --since=<ISO>           Filter token usage after timestamp (for status, usage)

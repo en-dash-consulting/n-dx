@@ -62,6 +62,7 @@ const sampleDoc: PRDDocumentData = {
               title: "Error handling",
               status: "pending",
               level: "task",
+              tags: ["frontend"],
             },
           ],
         },
@@ -100,13 +101,14 @@ describe("PRDTree", () => {
   it("renders nested items within default expand depth", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
     expect(root.textContent).toContain("Login Flow");
-    expect(root.textContent).toContain("Build login form");
+    // "Build login form" is completed and hidden by default Active Work filter
+    // Check a visible nested item instead
+    expect(root.textContent).toContain("Add OAuth support");
   });
 
   it("renders status indicators", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
-    // Status icons: ● for completed, ◐ for in_progress, ○ for pending, ⊘ for blocked
-    expect(root.textContent).toContain("●"); // completed
+    // Default filter is Active Work (pending, in_progress, blocked) so completed icon won't show
     expect(root.textContent).toContain("◐"); // in_progress
     expect(root.textContent).toContain("○"); // pending
   });
@@ -119,8 +121,9 @@ describe("PRDTree", () => {
 
   it("renders priority badges", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
+    // "critical" is on the epic (in_progress, visible)
     expect(root.textContent).toContain("critical");
-    expect(root.textContent).toContain("high");
+    // "high" is on a completed task, hidden by default Active Work filter
   });
 
   it("renders level badges", () => {
@@ -233,12 +236,12 @@ describe("PRDTree", () => {
     };
     const root = renderToDiv(h(PRDTree, { document: docWithDeleted }));
     expect(root.textContent).toContain("Active Task");
-    // Deleted items should be hidden by default (defaultStatusFilter excludes deleted)
+    // Deleted items should be hidden by default (defaultStatusFilter is Active Work set)
     expect(root.textContent).not.toContain("Deleted Task");
   });
 
   it("shows parent epic when it has visible children even if epic status is filtered", () => {
-    // Default filter includes pending, in_progress, completed, blocked, deferred (not deleted)
+    // Default filter is Active Work: pending, in_progress, blocked
     // Epic with deferred status should show because it has a pending child
     const docWithMixed: PRDDocumentData = {
       schema: "rex/v1",
