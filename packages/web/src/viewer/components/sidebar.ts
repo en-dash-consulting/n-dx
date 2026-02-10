@@ -47,6 +47,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
+  { type: "item", id: "hench-config", icon: "\u2699", label: "Config", minPass: 0 },
 ];
 
 /** Group flat NAV_ENTRIES into sections with their items */

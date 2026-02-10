@@ -8,7 +8,7 @@ export interface LoadedData {
   components: Components | null;
 }
 
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs";
+export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs" | "hench-config";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string }) => void;
 

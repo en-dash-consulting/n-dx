@@ -171,7 +171,14 @@ export function startServer(
     }
 
     // 3. Hench API
-    if (inScope("hench") && handleHenchRoute(req, res, ctx)) return;
+    if (inScope("hench")) {
+      const henchResult = handleHenchRoute(req, res, ctx);
+      if (henchResult instanceof Promise) {
+        if (await henchResult) return;
+      } else if (henchResult) {
+        return;
+      }
+    }
 
     // 4. Validation & dependency graph API (rex-related)
     if (inScope("rex") && handleValidationRoute(req, res, ctx)) return;

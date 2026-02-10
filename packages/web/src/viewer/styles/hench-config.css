@@ -1,0 +1,312 @@
+/* Hench Config view — workflow configuration editor */
+
+.hench-config-container {
+  max-width: 900px;
+}
+
+/* Header */
+.hench-config-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.hench-config-modified-count {
+  font-size: 12px;
+  color: var(--brand-teal);
+}
+
+/* Error state */
+.hench-config-error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+}
+
+.hench-config-error-hint {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.hench-config-error-hint code {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* Category sections */
+.hench-config-category {
+  margin-bottom: 28px;
+}
+
+.hench-config-category-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hench-config-category-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.hench-config-category-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.hench-config-category-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 2px 0 0;
+}
+
+/* Fields container */
+.hench-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Individual field */
+.hench-config-field {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: border-color 0.15s;
+}
+
+.hench-config-field.modified {
+  border-left: 3px solid var(--brand-teal);
+}
+
+.hench-config-field-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.hench-config-field-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hench-config-field-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hench-config-modified-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.hench-config-field-path {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.hench-config-field-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+
+/* Value display row */
+.hench-config-value-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hench-config-value {
+  flex: 1;
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--text);
+  background: var(--bg-hover);
+  padding: 5px 10px;
+  border-radius: 4px;
+  min-height: 20px;
+  word-break: break-all;
+}
+
+.hench-config-edit-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.hench-config-edit-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Edit row */
+.hench-config-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hench-config-input,
+.hench-config-select {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: monospace;
+  outline: none;
+}
+
+.hench-config-input:focus,
+.hench-config-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.hench-config-save-btn {
+  background: var(--accent);
+  border: none;
+  color: var(--bg);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.hench-config-save-btn:hover {
+  opacity: 0.9;
+}
+
+.hench-config-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hench-config-cancel-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hench-config-cancel-btn:hover {
+  border-color: var(--text-dim);
+}
+
+/* Impact preview */
+.hench-config-impact {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  opacity: 0.8;
+}
+
+.hench-config-preview {
+  font-size: 11px;
+  color: var(--brand-teal);
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--brand-teal) 8%, transparent);
+  border-radius: 4px;
+}
+
+.hench-config-preview-label {
+  font-weight: 600;
+}
+
+/* Error message */
+.hench-config-error {
+  font-size: 12px;
+  color: var(--red);
+  margin-top: 6px;
+}
+
+/* Save toast */
+.hench-config-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--green);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: toast-in 0.2s ease-out;
+  z-index: 1000;
+}
+
+.hench-config-toast-icon {
+  font-size: 16px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+  .hench-config-edit-row {
+    flex-wrap: wrap;
+  }
+
+  .hench-config-input,
+  .hench-config-select {
+    flex-basis: 100%;
+  }
+
+  .hench-config-field-header {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

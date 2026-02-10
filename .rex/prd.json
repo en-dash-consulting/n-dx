@@ -6521,6 +6521,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-10T20:40:13.499Z",
+      "completedAt": "2026-02-10T20:40:13.499Z",
       "children": [
         {
           "id": "9cf29710-2ab4-4a76-981b-c7dc729c6202",
@@ -6584,24 +6586,26 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-10T20:40:13.499Z",
-      "completedAt": "2026-02-10T20:40:13.499Z"
+      ]
     },
     {
       "id": "aab3e41d-5c6e-4d79-b7c0-04c01ad9e4c8",
       "title": "Rex Smart Operations UI Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-10T21:35:57.045Z",
+      "completedAt": "2026-02-10T21:35:57.045Z",
       "children": [
         {
           "id": "07c19b0f-f2f0-40d7-a6e5-3da7354e9bbd",
           "title": "Smart Pruning UI Integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Expose Rex's smart pruning and restructuring capabilities in the web UI with visual diff and confirmation flow",
           "source": "smart-add",
+          "startedAt": "2026-02-10T21:05:30.855Z",
+          "completedAt": "2026-02-10T21:05:30.855Z",
           "children": [
             {
               "id": "377d0c69-c006-4324-b462-bed82d698739",
@@ -6672,7 +6676,7 @@
             {
               "id": "61c178cc-d07e-4f59-8f2b-7ae496a4e5e6",
               "title": "Enhance CLI pruning with interactive mode",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add interactive confirmation and preview capabilities to the CLI prune command",
               "acceptanceCriteria": [
@@ -6687,17 +6691,21 @@
                 "cli",
                 "pruning"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T20:57:14.790Z",
+              "completedAt": "2026-02-10T21:05:30.779Z"
             }
           ]
         },
         {
           "id": "6efaf2cb-7ad8-454f-8cf7-14ff7eea6119",
           "title": "Smart Add UI Integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Integrate Rex's intelligent add functionality into the web UI with natural language input and real-time proposal generation",
           "source": "smart-add",
+          "startedAt": "2026-02-10T21:35:57.018Z",
+          "completedAt": "2026-02-10T21:35:57.018Z",
           "children": [
             {
               "id": "63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
@@ -6723,7 +6731,7 @@
             {
               "id": "7e6f03b5-dcf9-4f4e-a9bb-7a69a12cb058",
               "title": "Implement real-time proposal generation and preview",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Generate and display LLM proposals as users type with debounced API calls and progressive enhancement",
               "acceptanceCriteria": [
@@ -6738,7 +6746,9 @@
                 "ui",
                 "llm"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T20:41:02.379Z",
+              "completedAt": "2026-02-10T20:56:53.545Z"
             },
             {
               "id": "e158fc9c-8367-452b-839e-f41d7aa176ff",
@@ -6765,7 +6775,7 @@
             {
               "id": "7316018e-0db5-460e-9554-68ec66314c62",
               "title": "Integrate batch import functionality for multiple ideas",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Support importing multiple ideas from various sources with unified smart processing",
               "acceptanceCriteria": [
@@ -6780,12 +6790,14 @@
                 "ui",
                 "import"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T21:19:24.292Z",
+              "completedAt": "2026-02-10T21:35:56.948Z"
             },
             {
               "id": "58d8cb47-1df8-4387-8251-02f222021212",
               "title": "Enhance CLI smart add with improved feedback",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Improve the CLI smart add experience with better progress indication and proposal formatting",
               "acceptanceCriteria": [
@@ -6800,7 +6812,9 @@
                 "cli",
                 "smart-add"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T21:06:14.933Z",
+              "completedAt": "2026-02-10T21:18:56.940Z"
             }
           ]
         }
@@ -6824,7 +6838,7 @@
             {
               "id": "a7771ed2-5231-4181-a13d-79325681ab51",
               "title": "Build comprehensive workflow configuration interfaces",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Create both CLI and web UI interfaces for configuring hench workflow parameters, including interactive menus, visual form controls, and real-time preview of configuration changes",
               "acceptanceCriteria": [
@@ -6843,7 +6857,68 @@
                 "hench",
                 "configuration"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T21:36:18.342Z",
+              "children": [
+                {
+                  "id": "4665728f-a7cc-4f9d-83f2-66d88188433a",
+                  "title": "CLI interactive workflow configuration command",
+                  "status": "in_progress",
+                  "level": "subtask",
+                  "description": "Add `hench config` CLI command with interactive menu for configuring workflow parameters (execution strategy, retry policy, guard settings, task selection). Uses readline-based menus following existing patterns.",
+                  "acceptanceCriteria": [
+                    "CLI presents configurable workflow options in interactive menu format",
+                    "Users can modify execution strategies, retry policies, and task selection criteria",
+                    "Changes are validated and applied immediately to workflow configuration",
+                    "Configuration changes persist across hench runs"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "cli",
+                    "hench",
+                    "configuration"
+                  ],
+                  "startedAt": "2026-02-10T21:38:22.825Z"
+                },
+                {
+                  "id": "3755a5ee-a832-4635-8c99-bd79da3d5b41",
+                  "title": "Web UI workflow configuration API endpoints",
+                  "status": "pending",
+                  "level": "subtask",
+                  "description": "Add REST API endpoints for reading and updating hench workflow configuration: GET /api/hench/config (read), PUT /api/hench/config (update with validation). Include preview of impact on workflow behavior.",
+                  "acceptanceCriteria": [
+                    "GET /api/hench/config returns current workflow configuration",
+                    "PUT /api/hench/config validates and persists changes",
+                    "API returns preview of configuration impact on workflow behavior"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "web",
+                    "api",
+                    "hench",
+                    "configuration"
+                  ]
+                },
+                {
+                  "id": "903901a4-0c94-4719-88d9-84df8480753e",
+                  "title": "Web UI workflow configuration form component",
+                  "status": "pending",
+                  "level": "subtask",
+                  "description": "Create Preact component for editing hench workflow configuration with form controls (dropdowns, number inputs, toggles, tag lists). Shows current config in editable form and previews impact of changes.",
+                  "acceptanceCriteria": [
+                    "Web UI displays current workflow configuration in editable form with form controls",
+                    "Configuration changes show preview of impact on workflow behavior",
+                    "Changes are validated client-side before submission"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "web",
+                    "ui",
+                    "hench",
+                    "configuration"
+                  ]
+                }
+              ]
             },
             {
               "id": "d8730c3d-f5f7-4262-920a-9c7292bf1871",

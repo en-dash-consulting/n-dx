@@ -34,6 +34,7 @@ Usage: hench <command> [options] [dir]
 Commands:
   init [dir]              Create .hench/ with config.json and runs/
   run [dir]               Execute one task from Rex PRD
+  config [key] [value]    View or edit workflow configuration
   status [dir]            Show recent run history
   show <run-id> [dir]     Show full details of a specific run
 
@@ -51,7 +52,8 @@ Options:
   --max-turns=<n>         Override max turns (for run)
   --token-budget=<n>      Cap total tokens (input+output) per run; 0 = unlimited (for run)
   --model=<m>             Override model (for run)
-  --format=json           Output as JSON (for status/show)
+  --interactive           Interactive configuration menu (for config)
+  --format=json           Output as JSON (for status/show/config)
   --last=<n>              Number of recent runs to show (for status)
   --quiet, -q             Suppress informational output (for scripting)
 `);

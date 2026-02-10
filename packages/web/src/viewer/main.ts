@@ -25,6 +25,7 @@ import { TokenUsageView } from "./views/token-usage.js";
 import { ValidationView } from "./views/validation.js";
 import { AnalysisView } from "./views/analysis.js";
 import { HenchRunsView } from "./views/hench-runs.js";
+import { HenchConfigView } from "./views/hench-config.js";
 
 initTheme();
 
@@ -32,7 +33,7 @@ initTheme();
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
   sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
   rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation"],
-  hench: ["hench-runs"],
+  hench: ["hench-runs", "hench-config"],
 };
 
 const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
@@ -280,6 +281,8 @@ function App({ scope }: { scope: string | null }) {
         return h(ValidationView, null);
       case "hench-runs":
         return h(HenchRunsView, { navigateTo });
+      case "hench-config":
+        return h(HenchConfigView, null);
       default:
         return null;
     }

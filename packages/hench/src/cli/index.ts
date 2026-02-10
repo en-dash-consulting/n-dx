@@ -110,6 +110,11 @@ async function main(): Promise<void> {
         await cmdShow(dir, runId, flags);
         break;
       }
+      case "config": {
+        const { cmdConfig } = await import("./commands/config.js");
+        await cmdConfig(resolveDir(), positional, flags);
+        break;
+      }
       default:
         throw new CLIError(
           `Unknown command: ${command}`,
