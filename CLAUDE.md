@@ -39,6 +39,23 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
 
+### Gateway modules
+
+Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
+
+| Package | Gateway file | Imports from | Re-exports |
+|---------|-------------|--------------|------------|
+| hench | `src/prd/ops.ts` | rex | 8 functions (store, tree, task selection) |
+| web | `src/server/mcp-deps.ts` | rex, sourcevision | 2 MCP server factories |
+
+Rules:
+- **One gateway per package** — all runtime cross-package imports pass through it.
+- **Re-export only** — gateways re-export; they contain no logic.
+- **Type imports excluded** — `import type` is erased at compile time and stays at the call-site.
+- **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
+
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
+
 ### Package conventions
 
 | Convention | Pattern | Notes |

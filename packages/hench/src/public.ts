@@ -14,15 +14,10 @@
  * enough for consumers to validate JSON file shapes at compile time without
  * creating runtime coupling.
  *
- * This is intentionally different from rex, which exports runtime functions
- * because hench consumes it as a library (via `prd/ops.ts` gateway).
- * Each package's public surface reflects its actual consumption pattern:
- *
- * | Package       | Consumed as       | Public API style               |
- * |---------------|-------------------|--------------------------------|
- * | rex           | Library (by hench)| Runtime functions + types       |
- * | sourcevision  | MCP server + CLI  | MCP factory + types             |
- * | hench         | CLI + JSON files  | Types + schema constants only   |
+ * This is intentionally different from rex (which exports runtime functions)
+ * and sourcevision (which exports its MCP factory). Each package's public
+ * surface reflects its actual consumption pattern — see PACKAGE_GUIDELINES.md
+ * for the full decision tree.
  *
  * Runtime functions (agent loops, tool dispatch, guard rails, default
  * configuration) are intentionally kept internal. Consumers should use

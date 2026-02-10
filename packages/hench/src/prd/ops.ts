@@ -29,6 +29,7 @@
  * they provide local type-safety.
  *
  * @module hench/prd/ops
+ * @see packages/web/src/server/mcp-deps.ts — web's equivalent gateway (MCP factories)
  */
 
 // ---- Store factory ----------------------------------------------------------

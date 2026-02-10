@@ -14,13 +14,8 @@
  * letting consumers validate JSON file shapes at compile time without
  * creating unnecessary runtime coupling to the analysis engine.
  *
- * Each package's public surface reflects its actual consumption pattern:
- *
- * | Package       | Consumed as       | Public API style               |
- * |---------------|-------------------|--------------------------------|
- * | rex           | Library (by hench)| Runtime functions + types       |
- * | sourcevision  | MCP server + CLI  | MCP factory + types             |
- * | hench         | CLI + JSON files  | Types + schema constants only   |
+ * Each package's public surface reflects its actual consumption pattern —
+ * see PACKAGE_GUIDELINES.md for the full decision tree and comparison table.
  *
  * ## Configuration
  *
