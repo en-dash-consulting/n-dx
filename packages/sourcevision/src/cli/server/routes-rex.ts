@@ -28,11 +28,18 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 
 const REX_PREFIX = "/api/rex/";
 
+// --------------------------------------------------------------------------
+// Rex domain constants — intentionally duplicated from packages/rex/src/schema/v1.ts.
+// Sourcevision does not depend on Rex as a package to keep the two independent
+// at both compile-time and runtime.  If the canonical definitions in Rex change,
+// these must be updated to match.
+// --------------------------------------------------------------------------
 const VALID_LEVELS = new Set(["epic", "feature", "task", "subtask"]);
 const VALID_STATUSES = new Set(["pending", "in_progress", "completed", "deferred", "blocked"]);
 const VALID_PRIORITIES = new Set(["critical", "high", "medium", "low"]);
 
-/** Valid parent levels for each item level. null = root allowed. */
+/** Valid parent levels for each item level. null = root allowed.
+ *  @see packages/rex/src/schema/v1.ts — LEVEL_HIERARCHY */
 const LEVEL_HIERARCHY: Record<string, Array<string | null>> = {
   epic: [null],
   feature: ["epic"],
@@ -159,6 +166,7 @@ function computeStats(items: PRDItemRecord[]): TreeStats {
 
 /** Find the next actionable task (pending/in_progress leaf with resolved deps). */
 function findNextTask(items: PRDItemRecord[], completedIds: Set<string>): PRDItemRecord | null {
+  /** @see packages/rex/src/schema/v1.ts — PRIORITY_ORDER */
   const PRIORITY_ORDER: Record<string, number> = {
     critical: 0,
     high: 1,

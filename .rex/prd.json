@@ -4708,7 +4708,7 @@
     {
       "id": "e8da8d04-1016-42ae-96f4-5d94e2eb0391",
       "title": "Report Generation and Export",
-      "status": "in_progress",
+      "status": "pending",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-02-09T21:19:49.255Z",
@@ -4717,7 +4717,7 @@
         {
           "id": "7474c596-ce78-4e71-9628-c2d004a8c5c1",
           "title": "PDF Export Functionality",
-          "status": "in_progress",
+          "status": "pending",
           "level": "feature",
           "description": "Generate comprehensive PDF reports from sourcevision analysis data for sharing and documentation purposes",
           "source": "smart-add",
@@ -4737,7 +4737,7 @@
                 "Shows import graph health indicators and dependency insights",
                 "PDF is properly formatted with sections, headers, and readable layout"
               ],
-              "priority": "medium",
+              "priority": "low",
               "tags": [
                 "sourcevision",
                 "export",
@@ -5587,11 +5587,64 @@
     {
       "id": "bed84e5c-7906-4788-86bc-4d7a9955c4c2",
       "title": "Address anti-pattern issues (10 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Type imports from Rex (PRDStore, PRDItem, ItemStatus) create compile-time coupling despite dynamic runtime imports - the zone boundary is violated at the type level even though runtime coupling is avoided\n- Cross-zone type imports create compile-time coupling that defeats runtime decoupling strategies - zones appear independent at runtime but are tightly coupled during TypeScript compilation\n- PRIORITY_ORDER constants duplicated across multiple zones with inconsistent typing - shared constants should be extracted to a common location to prevent type drift and maintenance burden\n- PRIORITY_ORDER constant duplicated with different type signatures (Record<Priority,number> vs Record<string,number>) across core/canonical.ts, core/next-task.ts, and analyze/propose.ts creating type safety gaps and maintenance burden\n- Schema index.ts barrel export creates hidden bidirectional coupling by re-exporting from both viewer zone (v1.ts) and test-suite zone (validate.ts) - every analyzer importing schema creates transitive dependencies across three zones\n- Direct import of schema/validate.ts from test-suite zone violates zone boundaries and forces Zod bundling into browser code where validation could be optional\n- schema/validate.ts is misplaced in test-suite zone despite being imported by production CLI and viewer code - this file should be in analysis-engine zone based on its actual usage patterns\n- Architecture forces choice between runtime coupling and maintenance burden - current solution chooses duplication over dependency, creating divergence risk that outweighs benefits of runtime independence for core domain types\n- Systematic duplication of business logic constants (PRIORITY_ORDER) across 4 locations with inconsistent typing creates multiple sources of truth that risk diverging during maintenance - refactor to single shared constant in packages/rex/src/schema/v1.ts and import consistently\n- Type system fragmentation where identical Priority union is defined in both packages/rex/src/schema/v1.ts:7 and packages/sourcevision/src/viewer/components/prd-tree/types.ts:17 - consolidate to single exported type to prevent drift and ensure consistency",
       "priority": "critical",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-10T01:41:04.875Z",
+      "children": [
+        {
+          "id": "68a4a2f3-5b87-4a72-bbcb-67c3ecbe19c0",
+          "title": "Extract PRIORITY_ORDER to shared constant in rex schema/v1.ts and consolidate all consumers",
+          "status": "completed",
+          "level": "task",
+          "description": "Export PRIORITY_ORDER from packages/rex/src/schema/v1.ts with type Record<Priority, number>. Update all consumers in rex (core/canonical.ts, core/next-task.ts, analyze/propose.ts) to import from schema. Remove all local definitions. This consolidates 3 identical constants into 1 canonical source.",
+          "acceptanceCriteria": [
+            "PRIORITY_ORDER exported from packages/rex/src/schema/v1.ts with type Record<Priority, number>",
+            "core/canonical.ts imports PRIORITY_ORDER from schema instead of defining locally",
+            "core/next-task.ts imports PRIORITY_ORDER from schema instead of defining locally",
+            "analyze/propose.ts imports PRIORITY_ORDER from schema instead of defining locally (with correct Record<Priority, number> type)",
+            "schema/index.ts re-exports PRIORITY_ORDER",
+            "All tests pass",
+            "Build succeeds"
+          ],
+          "priority": "critical",
+          "startedAt": "2026-02-10T01:44:03.535Z",
+          "completedAt": "2026-02-10T01:45:44.739Z"
+        },
+        {
+          "id": "d258eafb-a303-4804-93b9-4be57a0bc48f",
+          "title": "Fix sourcevision routes-rex.ts PRIORITY_ORDER duplication",
+          "status": "completed",
+          "level": "task",
+          "description": "The sourcevision routes-rex.ts has its own PRIORITY_ORDER, LEVEL_HIERARCHY, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES constants that duplicate Rex domain logic. Since sourcevision intentionally avoids depending on Rex as a package (to maintain package independence), the best approach is to add a clear comment documenting the duplication and marking it as intentional, plus ensuring the type signature is consistent.",
+          "acceptanceCriteria": [
+            "PRIORITY_ORDER in routes-rex.ts has clear comment explaining it's intentionally duplicated from Rex schema/v1.ts",
+            "Type consistency maintained (values match Rex canonical source)",
+            "No runtime regression"
+          ],
+          "priority": "high",
+          "startedAt": "2026-02-10T01:45:46.055Z",
+          "completedAt": "2026-02-10T01:46:14.899Z"
+        },
+        {
+          "id": "2fad84a1-7b9f-4b0e-8065-3d8ce1810e15",
+          "title": "Document intentional type duplication in sourcevision viewer types.ts",
+          "status": "completed",
+          "level": "task",
+          "description": "The viewer types.ts already has a comment explaining why types are mirrored from Rex. Enhance the documentation to reference the canonical source (packages/rex/src/schema/v1.ts) and add a note about keeping in sync. The Priority type duplication is intentional because the viewer is bundled as standalone browser code via esbuild and cannot import from Rex at runtime.",
+          "acceptanceCriteria": [
+            "types.ts has clear reference to canonical source (rex/schema/v1.ts)",
+            "Comment explains why duplication is necessary (browser bundle, no Rex dependency)",
+            "No functional changes"
+          ],
+          "priority": "medium",
+          "startedAt": "2026-02-10T01:46:16.430Z",
+          "completedAt": "2026-02-10T01:47:29.478Z"
+        }
+      ],
+      "completedAt": "2026-02-10T01:47:29.521Z"
     },
     {
       "id": "52f27390-9318-451e-b6c4-4e74896875e2",
@@ -5605,8 +5658,8 @@
     {
       "id": "cbc09cb4-d975-4c17-8254-0c97f11c8da2",
       "title": "Address pattern issues (2 findings)",
-      "level": "feature",
       "status": "pending",
+      "level": "feature",
       "description": "- Zone architecture achieves perfect runtime decoupling (no cross-zone imports) but creates maintenance burden through systematic type and constant duplication - suggests need for shared foundation package or reconsideration of zone boundaries for common business logic\n- Zone architecture creates artificial boundaries that fragment natural business domain concepts - Priority and PRIORITY_ORDER are core domain concepts that transcend individual packages and should be centrally managed rather than duplicated",
       "priority": "high",
       "source": "sourcevision"

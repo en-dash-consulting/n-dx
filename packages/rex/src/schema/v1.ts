@@ -90,6 +90,17 @@ export interface AnalyzeTokenUsage {
 }
 
 /**
+ * Canonical priority ordering — lower number = higher priority.
+ * This is the single source of truth for priority sort order.
+ */
+export const PRIORITY_ORDER: Record<Priority, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+/**
  * Valid parent levels for each item level.
  *
  * - `null` entries mean the level can be a root (no parent required).

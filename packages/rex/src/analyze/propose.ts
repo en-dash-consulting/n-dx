@@ -1,3 +1,5 @@
+import type { Priority } from "../schema/index.js";
+import { PRIORITY_ORDER } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
 import { deduplicateScanResults } from "./dedupe.js";
 
@@ -23,12 +25,10 @@ export interface Proposal {
   features: ProposalFeature[];
 }
 
-const PRIORITY_ORDER: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
+/** Look up priority rank from an untyped string, defaulting to medium (2). */
+function priorityRank(p: string | undefined): number {
+  return PRIORITY_ORDER[(p ?? "medium") as Priority] ?? 2;
+}
 
 function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, " ");
@@ -103,12 +103,10 @@ function featurePriority(
   feat: ProposalFeature,
   scanPriority?: string,
 ): number {
-  const taskPris = feat.tasks.map(
-    (t) => PRIORITY_ORDER[t.priority ?? "medium"] ?? 2,
-  );
+  const taskPris = feat.tasks.map((t) => priorityRank(t.priority));
   // Include the feature-level priority from the scan result if available
   if (scanPriority) {
-    taskPris.push(PRIORITY_ORDER[scanPriority] ?? 2);
+    taskPris.push(priorityRank(scanPriority));
   }
   return Math.min(...taskPris, 2);
 }
@@ -246,9 +244,7 @@ export function buildProposals(results: ScanResult[]): Proposal[] {
     for (const [, feat] of epicData.features) {
       // Sort tasks by priority
       const sortedTasks = feat.tasks.sort(
-        (a, b) =>
-          (PRIORITY_ORDER[a.priority ?? "medium"] ?? 2) -
-          (PRIORITY_ORDER[b.priority ?? "medium"] ?? 2),
+        (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
       );
 
       featureList.push({

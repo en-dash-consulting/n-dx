@@ -1,7 +1,12 @@
 /**
  * Types for PRD hierarchy visualization.
- * Mirrors the Rex PRDItem/PRDDocument types needed for the viewer,
- * without depending on the Rex package directly.
+ *
+ * These mirror the canonical types in packages/rex/src/schema/v1.ts.
+ * Duplication is intentional: the viewer is bundled as standalone browser
+ * code via esbuild and cannot import from the Rex Node.js package at
+ * runtime.  If the canonical Rex types change, update these to match.
+ *
+ * @see packages/rex/src/schema/v1.ts — ItemLevel, ItemStatus, Priority, PRDItem, PRDDocument
  */
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";

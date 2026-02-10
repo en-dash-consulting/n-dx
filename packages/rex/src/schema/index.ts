@@ -1,6 +1,7 @@
 export {
   SCHEMA_VERSION,
   LEVEL_HIERARCHY,
+  PRIORITY_ORDER,
   DEFAULT_CONFIG,
 } from "./v1.js";
 

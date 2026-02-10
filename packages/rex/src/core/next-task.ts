@@ -1,14 +1,8 @@
 import type { PRDItem, Priority } from "../schema/index.js";
+import { PRIORITY_ORDER } from "../schema/index.js";
 import type { TreeEntry } from "./tree.js";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
-
-const PRIORITY_ORDER: Record<Priority, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
 
 /** Safe ancestor priority: returns medium (2) when no parents exist. */
 function bestAncestorPriority(parents: PRDItem[]): number {

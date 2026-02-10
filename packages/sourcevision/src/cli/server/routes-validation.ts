@@ -70,7 +70,9 @@ function findItemById(items: PRDItemRecord[], id: string): PRDItemRecord | null 
 
 // ── Validation checks ────────────────────────────────────────────────
 
-/** Valid parent levels for each item level. null = root allowed. */
+/** Valid parent levels for each item level. null = root allowed.
+ *  Duplicated from packages/rex/src/schema/v1.ts — LEVEL_HIERARCHY.
+ *  @see routes-rex.ts header comment for rationale. */
 const LEVEL_HIERARCHY: Record<string, Array<string | null>> = {
   epic: [null],
   feature: ["epic"],
