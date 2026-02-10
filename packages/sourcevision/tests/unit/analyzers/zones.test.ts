@@ -15,6 +15,8 @@ import {
   analyzeZones,
   assignByProximity,
   computeStructureHash,
+  computeZoneContentHash,
+  computeGlobalContentHash,
   generateStructuralInsights,
   subdivideZone,
   SUBDIVISION_THRESHOLD,
@@ -26,6 +28,7 @@ import type {
   ImportEdge,
   FileEntry,
   Zone,
+  Zones,
   ZoneCrossing,
   Finding,
   FindingType,
@@ -1638,5 +1641,246 @@ describe("MAX_SUBDIVISION_DEPTH", () => {
   it("is set to prevent infinite recursion", () => {
     expect(MAX_SUBDIVISION_DEPTH).toBeGreaterThanOrEqual(1);
     expect(MAX_SUBDIVISION_DEPTH).toBeLessThanOrEqual(5);
+  });
+});
+
+// ── computeZoneContentHash / computeGlobalContentHash ───────────────────────
+
+describe("computeZoneContentHash", () => {
+  it("produces the same hash for the same files and content", () => {
+    const zone = makeZone("core", ["a.ts", "b.ts"]);
+    const hashes = new Map([["a.ts", "hash1"], ["b.ts", "hash2"]]);
+    expect(computeZoneContentHash(zone, hashes)).toBe(computeZoneContentHash(zone, hashes));
+  });
+
+  it("produces a different hash when file content changes", () => {
+    const zone = makeZone("core", ["a.ts", "b.ts"]);
+    const before = new Map([["a.ts", "hash1"], ["b.ts", "hash2"]]);
+    const after = new Map([["a.ts", "hash1-changed"], ["b.ts", "hash2"]]);
+    expect(computeZoneContentHash(zone, before)).not.toBe(computeZoneContentHash(zone, after));
+  });
+
+  it("is independent of file order", () => {
+    const zone1 = makeZone("core", ["b.ts", "a.ts"]);
+    const zone2 = makeZone("core", ["a.ts", "b.ts"]);
+    const hashes = new Map([["a.ts", "h1"], ["b.ts", "h2"]]);
+    expect(computeZoneContentHash(zone1, hashes)).toBe(computeZoneContentHash(zone2, hashes));
+  });
+
+  it("is independent of zone ID/name (only files and their hashes matter)", () => {
+    const zone1 = makeZone("core", ["a.ts"]);
+    const zone2 = makeZone("renamed", ["a.ts"]);
+    const hashes = new Map([["a.ts", "h1"]]);
+    expect(computeZoneContentHash(zone1, hashes)).toBe(computeZoneContentHash(zone2, hashes));
+  });
+});
+
+describe("computeGlobalContentHash", () => {
+  it("produces the same hash for the same inputs", () => {
+    const hashes = { core: "abc", util: "def" };
+    expect(computeGlobalContentHash(hashes)).toBe(computeGlobalContentHash(hashes));
+  });
+
+  it("changes when any zone content hash changes", () => {
+    const before = { core: "abc", util: "def" };
+    const after = { core: "abc", util: "changed" };
+    expect(computeGlobalContentHash(before)).not.toBe(computeGlobalContentHash(after));
+  });
+
+  it("is independent of key order", () => {
+    const a = { core: "abc", util: "def" };
+    const b = { util: "def", core: "abc" };
+    expect(computeGlobalContentHash(a)).toBe(computeGlobalContentHash(b));
+  });
+});
+
+// ── Stale finding filtering ─────────────────────────────────────────────────
+
+describe("analyzeZones stale content hash filtering", () => {
+  it("drops AI findings for zones whose content changed", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "new-hash-x" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    // First run to get the zone structure and content hashes
+    const { zones: firstRun } = await analyzeZones(inventory, imports, { enrich: false });
+    const zoneId = firstRun.zones[0].id;
+
+    // Construct previousZones with an AI finding and original content hashes
+    const previousZones: Zones = {
+      ...firstRun,
+      findings: [
+        ...(firstRun.findings ?? []),
+        { type: "pattern", pass: 1, scope: zoneId, text: "AI finding that should be dropped", severity: "warning" },
+      ],
+      enrichmentPass: 1,
+    };
+
+    // Second run with changed file content (different hash for x.ts)
+    const changedInventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "CHANGED-hash-x" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+
+    const { zones: secondRun } = await analyzeZones(changedInventory, imports, {
+      enrich: false,
+      previousZones,
+    });
+
+    // The AI finding should be dropped because zone content changed
+    const aiFinding = secondRun.findings?.find((f) => f.pass > 0 && f.text === "AI finding that should be dropped");
+    expect(aiFinding).toBeUndefined();
+    // Structural findings (pass 0) should still be present
+    expect(secondRun.findings?.some((f) => f.pass === 0)).toBe(true);
+  });
+
+  it("preserves AI findings when content has not changed", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "hash-x" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    // First run
+    const { zones: firstRun } = await analyzeZones(inventory, imports, { enrich: false });
+    const zoneId = firstRun.zones[0].id;
+
+    const previousZones: Zones = {
+      ...firstRun,
+      findings: [
+        ...(firstRun.findings ?? []),
+        { type: "pattern", pass: 1, scope: zoneId, text: "AI finding preserved", severity: "info" },
+      ],
+      enrichmentPass: 1,
+    };
+
+    // Second run with same content
+    const { zones: secondRun } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      previousZones,
+    });
+
+    const aiFinding = secondRun.findings?.find((f) => f.text === "AI finding preserved");
+    expect(aiFinding).toBeDefined();
+  });
+
+  it("preserves all AI findings when previousZones lacks zoneContentHashes (backward compat)", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "hash-x" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    // First run to get structure hash
+    const { zones: firstRun } = await analyzeZones(inventory, imports, { enrich: false });
+    const zoneId = firstRun.zones[0].id;
+
+    // Construct previousZones WITHOUT zoneContentHashes (old format)
+    const previousZones: Zones = {
+      zones: firstRun.zones,
+      crossings: firstRun.crossings,
+      unzoned: firstRun.unzoned,
+      structureHash: firstRun.structureHash,
+      findings: [
+        ...(firstRun.findings ?? []),
+        { type: "anti-pattern", pass: 2, scope: zoneId, text: "Legacy AI finding", severity: "warning" },
+      ],
+      enrichmentPass: 2,
+      // No zoneContentHashes — old format
+    };
+
+    // Run with different content but same structure
+    const changedInventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "CHANGED" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+
+    const { zones: secondRun } = await analyzeZones(changedInventory, imports, {
+      enrich: false,
+      previousZones,
+    });
+
+    // Should preserve the finding because there are no previous content hashes to compare
+    const legacyFinding = secondRun.findings?.find((f) => f.text === "Legacy AI finding");
+    expect(legacyFinding).toBeDefined();
+  });
+
+  it("includes zoneContentHashes in output", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "h1" }),
+      makeFileEntry("src/a/y.ts", { hash: "h2" }),
+      makeFileEntry("src/a/z.ts", { hash: "h3" }),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    expect(result.zoneContentHashes).toBeDefined();
+    expect(Object.keys(result.zoneContentHashes!)).toHaveLength(1);
+    // Value should be a 16-char hex string
+    const hash = Object.values(result.zoneContentHashes!)[0];
+    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("drops global AI findings when global content changes", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "hash-x" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    const { zones: firstRun } = await analyzeZones(inventory, imports, { enrich: false });
+
+    const previousZones: Zones = {
+      ...firstRun,
+      findings: [
+        ...(firstRun.findings ?? []),
+        { type: "pattern", pass: 1, scope: "global", text: "Global AI finding", severity: "info" },
+      ],
+      enrichmentPass: 1,
+    };
+
+    // Change content
+    const changedInventory = makeInventory([
+      makeFileEntry("src/a/x.ts", { hash: "CHANGED" }),
+      makeFileEntry("src/a/y.ts", { hash: "hash-y" }),
+      makeFileEntry("src/a/z.ts", { hash: "hash-z" }),
+    ]);
+
+    const { zones: secondRun } = await analyzeZones(changedInventory, imports, {
+      enrich: false,
+      previousZones,
+    });
+
+    const globalAiFinding = secondRun.findings?.find((f) => f.text === "Global AI finding");
+    expect(globalAiFinding).toBeUndefined();
   });
 });

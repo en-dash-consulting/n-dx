@@ -155,6 +155,7 @@ export const ZonesSchema = z.object({
   enrichmentPass: z.number().int().nonnegative().optional(),
   metaEvaluationCount: z.number().int().nonnegative().optional(),
   structureHash: z.string().optional(),
+  zoneContentHashes: z.record(z.string()).optional(),
 });
 
 // ── Components ──────────────────────────────────────────────────────────────

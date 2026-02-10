@@ -202,6 +202,8 @@ export interface Zones {
   metaEvaluationCount?: number;
   /** Hash of structural zone groupings for change detection */
   structureHash?: string;
+  /** Per-zone content hashes for detecting code changes within stable zones */
+  zoneContentHashes?: Record<string, string>;
 }
 
 // ── Token Usage ─────────────────────────────────────────────────────────────

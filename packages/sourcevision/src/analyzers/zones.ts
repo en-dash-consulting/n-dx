@@ -386,6 +386,36 @@ export function computeStructureHash(zones: Zone[]): string {
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
 }
 
+/**
+ * Hash a zone's file contents for change detection between runs.
+ * Uses inventory content hashes (already computed) so we detect code changes
+ * even when the zone structure (file membership) stays the same.
+ */
+export function computeZoneContentHash(
+  zone: Zone,
+  fileHashes: Map<string, string>
+): string {
+  const data = [...zone.files]
+    .sort()
+    .map((f) => `${f}\0${fileHashes.get(f) ?? ""}`)
+    .join("\n");
+  return createHash("sha256").update(data).digest("hex").slice(0, 16);
+}
+
+/**
+ * Hash all zone content hashes into a single global content hash.
+ * Changes when any zone's content changes.
+ */
+export function computeGlobalContentHash(
+  zoneContentHashes: Record<string, string>
+): string {
+  const data = Object.keys(zoneContentHashes)
+    .sort()
+    .map((id) => `${id}\0${zoneContentHashes[id]}`)
+    .join("\n");
+  return createHash("sha256").update(data).digest("hex").slice(0, 16);
+}
+
 // ── Structural insights ─────────────────────────────────────────────────────
 
 /**
@@ -743,6 +773,19 @@ export async function analyzeZones(
   const structureChanged = previousZones?.structureHash !== structureHash;
   const validPrevious = structureChanged ? undefined : previousZones;
 
+  // ── Content hashes for stale-finding detection ──
+  // Build file → content hash map from inventory (hashes already computed during inventory phase)
+  const fileHashes = new Map<string, string>();
+  for (const f of inventory.files) {
+    fileHashes.set(f.path, f.hash);
+  }
+  // Compute per-zone content hashes
+  const zoneContentHashes: Record<string, string> = {};
+  for (const zone of expandedZones) {
+    zoneContentHashes[zone.id] = computeZoneContentHash(zone, fileHashes);
+  }
+  const globalContentHash = computeGlobalContentHash(zoneContentHashes);
+
   // ── AI enrichment or preserve previous ──
 
   let finalZones = expandedZones;
@@ -988,19 +1031,35 @@ export async function analyzeZones(
     });
   }
 
-  // Preserved previous AI findings (from prior runs, excluding structural which are recomputed)
-  // If meta-evaluation returned updated findings, use those instead (they have reassessed severities)
+  // Preserved previous AI findings (from prior runs, excluding structural which are recomputed).
+  // Drop findings scoped to zones whose content changed — the underlying code may have fixed the issue.
+  // If meta-evaluation returned updated findings, use those instead (they have reassessed severities).
+  const prevContentHashes = previousZones?.zoneContentHashes;
+  function isContentStale(finding: Finding): boolean {
+    // Backward compat: if previous run didn't have content hashes, preserve everything
+    if (!prevContentHashes) return false;
+    if (finding.scope === "global") {
+      const prevGlobal = computeGlobalContentHash(prevContentHashes);
+      return prevGlobal !== globalContentHash;
+    }
+    const prevHash = prevContentHashes[finding.scope];
+    const currHash = zoneContentHashes[finding.scope];
+    // If zone didn't exist before or doesn't exist now, it's stale
+    if (!prevHash || !currHash) return true;
+    return prevHash !== currHash;
+  }
+
   const prevAiFindings: Finding[] = [];
   if (metaUpdatedFindings) {
     // Meta-evaluation updated the full findings array — use only AI findings (pass > 0)
     for (const f of metaUpdatedFindings) {
-      if (f.pass > 0) {
+      if (f.pass > 0 && !isContentStale(f)) {
         prevAiFindings.push(f);
       }
     }
   } else if (validPrevious?.findings) {
     for (const f of validPrevious.findings) {
-      if (f.pass > 0) {
+      if (f.pass > 0 && !isContentStale(f)) {
         prevAiFindings.push(f);
       }
     }
@@ -1054,6 +1113,7 @@ export async function analyzeZones(
       enrichmentPass: allFindings.length > 0 ? displayPass : undefined,
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
+      zoneContentHashes,
     }),
     tokenUsage: enrichTokenUsage,
   };
