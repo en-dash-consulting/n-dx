@@ -137,29 +137,20 @@ describe("Sidebar", () => {
   });
 
   describe("sidebar toggle (hide/show)", () => {
-    it("renders a toggle button", () => {
-      renderSidebar();
-      const toggleBtn = root.querySelector(".sidebar-toggle-btn");
-      expect(toggleBtn).not.toBeNull();
-    });
+    // Note: The sidebar toggle button has moved to the header control bar (main.ts).
+    // The sidebar itself only has the collapsed-rail expand button.
 
-    it("toggle button has accessible label", () => {
-      renderSidebar({ sidebarCollapsed: false });
-      const toggleBtn = root.querySelector(".sidebar-toggle-btn");
-      expect(toggleBtn?.getAttribute("aria-label")).toBe("Collapse sidebar");
-    });
-
-    it("toggle button shows expand label when sidebar is collapsed", () => {
+    it("collapsed rail has expand button", () => {
       renderSidebar({ sidebarCollapsed: true });
-      // When collapsed, the rail toggle replaces the main toggle button
-      const railToggle = root.querySelector(".sidebar-rail-toggle");
-      expect(railToggle?.getAttribute("aria-label")).toBe("Expand sidebar");
+      const expandBtn = root.querySelector(".sidebar-rail-expand");
+      expect(expandBtn).not.toBeNull();
+      expect(expandBtn?.getAttribute("aria-label")).toBe("Expand sidebar");
     });
 
-    it("calls onToggleSidebar when toggle button is clicked", () => {
-      renderSidebar({ onToggleSidebar });
-      const toggleBtn = root.querySelector<HTMLElement>(".sidebar-toggle-btn");
-      toggleBtn?.click();
+    it("expand button calls onToggleSidebar when clicked", () => {
+      renderSidebar({ sidebarCollapsed: true, onToggleSidebar });
+      const expandBtn = root.querySelector<HTMLElement>(".sidebar-rail-expand");
+      expandBtn?.click();
       expect(onToggleSidebar).toHaveBeenCalledTimes(1);
     });
 

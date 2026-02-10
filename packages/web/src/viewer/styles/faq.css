@@ -1,39 +1,3 @@
-/* ── Sidebar global controls row ── */
-.sidebar-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-control-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--text-dim);
-  font-size: var(--font-md);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color var(--transition-normal), color var(--transition-normal), background var(--transition-normal);
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.sidebar-control-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.sidebar-control-btn:active {
-  background: var(--bg-active);
-}
-
 /* ── FAQ modal ── */
 .faq-overlay {
   position: fixed;
@@ -191,10 +155,4 @@
   color: var(--accent);
 }
 
-/* Hide sidebar controls when collapsed (desktop) — rail replaces them */
-.sidebar.sidebar-collapsed .sidebar-controls {
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  visibility: hidden;
-}
+/* Sidebar controls moved to header control bar — see utils.css */

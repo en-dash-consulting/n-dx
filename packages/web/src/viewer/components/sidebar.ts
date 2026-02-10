@@ -4,8 +4,7 @@ import type { Manifest, Zones } from "../../schema/v1.js";
 import type { ViewId } from "../types.js";
 import { ENRICHMENT_THRESHOLDS } from "./constants.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
-import { SidebarThemeToggle } from "./theme-toggle.js";
-import { FAQ } from "./faq.js";
+// Theme toggle and FAQ moved to unified header control bar in main.ts
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -244,20 +243,6 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
         )
       : null,
 
-    // ── Expanded sidebar collapse button ──
-    !sidebarCollapsed
-      ? h("button", {
-          class: "sidebar-toggle-btn",
-          onClick: onToggleSidebar,
-          "aria-label": "Collapse sidebar",
-          title: "Collapse sidebar (\u2318B)",
-        },
-          h("svg", { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", stroke: "currentColor", "stroke-width": "1.5", "stroke-linecap": "round" },
-            h("path", { d: "M9 2L4 7l5 5" }),
-          ),
-        )
-      : null,
-
     h("div", { class: "sidebar-header" },
       h("div", { class: "sidebar-brand" },
         scope
@@ -378,10 +363,6 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           )
         );
       })
-    ),
-    h("div", { class: "sidebar-controls", role: "group", "aria-label": "Global controls" },
-      h(SidebarThemeToggle, null),
-      h(FAQ, null),
     ),
     // Mobile backdrop
     mobileOpen

@@ -8,8 +8,9 @@ import { Sidebar } from "./components/sidebar.js";
 import { DetailPanel } from "./components/detail-panel.js";
 import { Guide } from "./components/guide.js";
 import { HeaderFAQ } from "./components/faq.js";
-import { initTheme } from "./components/theme-toggle.js";
+import { initTheme, ThemeToggle } from "./components/theme-toggle.js";
 import { updateFavicon } from "./components/favicon.js";
+import { ProductLogoPng } from "./components/logos.js";
 import { Overview } from "./views/overview.js";
 import { Graph } from "./views/graph.js";
 import { ZonesView } from "./views/zones.js";
@@ -35,6 +36,21 @@ const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
 };
 
 const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
+
+/** Determine which product scope owns a given view */
+function productForView(view: ViewId): "sourcevision" | "rex" | "hench" | null {
+  for (const [product, views] of Object.entries(VIEWS_BY_SCOPE)) {
+    if ((views as ViewId[]).includes(view)) return product as "sourcevision" | "rex" | "hench";
+  }
+  return null;
+}
+
+/** Product display names */
+const PRODUCT_LABELS: Record<string, string> = {
+  sourcevision: "SourceVision",
+  rex: "Rex",
+  hench: "Hench",
+};
 
 /** Build the valid view set based on an optional scope. */
 function buildValidViews(scope: string | null): Set<ViewId> {
@@ -269,6 +285,8 @@ function App({ scope }: { scope: string | null }) {
     }
   };
 
+  const activeProduct = productForView(view);
+
   return h(Fragment, null,
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
@@ -278,10 +296,33 @@ function App({ scope }: { scope: string | null }) {
       role: "main",
       "aria-label": "Main content",
     },
-      h("div", { class: "header-buttons-wrapper" },
-        h("div", { class: "header-buttons" },
-          h(HeaderFAQ, { view }),
-          h(Guide, { view }),
+      h("div", { class: "header-controls-wrapper" },
+        h("div", { class: "header-controls" },
+          // Left group: sidebar toggle + theme toggle
+          h("div", { class: "header-controls-left", role: "group", "aria-label": "Global controls" },
+            h("button", {
+              class: "header-control-btn header-sidebar-toggle",
+              onClick: handleToggleSidebar,
+              title: sidebarCollapsed ? "Expand sidebar (\u2318B)" : "Collapse sidebar (\u2318B)",
+              "aria-label": sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar",
+            },
+              h("svg", { width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", "stroke-width": "1.5", "stroke-linecap": "round" },
+                h("path", { d: "M2 3h12M2 8h12M2 13h12" }),
+              ),
+            ),
+            h(ThemeToggle, null),
+          ),
+          // Right group: branding + FAQ + Guide
+          h("div", { class: "header-controls-right", role: "group", "aria-label": "Page context" },
+            activeProduct
+              ? h("div", { class: "header-branding" },
+                  h(ProductLogoPng, { product: activeProduct, size: 18, class: "header-branding-logo" }),
+                  h("span", { class: "header-branding-name" }, PRODUCT_LABELS[activeProduct] ?? activeProduct),
+                )
+              : null,
+            h(HeaderFAQ, { view }),
+            h(Guide, { view }),
+          ),
         ),
       ),
       renderView()

@@ -6518,22 +6518,24 @@
     {
       "id": "2c763628-bbea-40a1-91e4-65f66e5ddaf4",
       "title": "Web UI Navigation and Branding Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "9cf29710-2ab4-4a76-981b-c7dc729c6202",
           "title": "Redesign header layout with integrated controls and repositioned branding",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Consolidate all header controls into a unified navigation experience and reposition branding elements for improved visual hierarchy",
           "source": "smart-add",
+          "startedAt": "2026-02-10T20:40:13.472Z",
+          "completedAt": "2026-02-10T20:40:13.472Z",
           "children": [
             {
               "id": "8e0b1f26-b8f1-40fc-808c-b06b2fe5aa39",
               "title": "Integrate header controls and reposition branding elements",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a unified header control bar with sidebar toggle, theme toggle, and FAQ button, while moving package logo and name to right-aligned position next to page-specific FAQ button for better visual hierarchy",
               "acceptanceCriteria": [
@@ -6554,7 +6556,9 @@
                 "branding",
                 "layout"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-10T20:34:45.791Z",
+              "completedAt": "2026-02-10T20:40:13.406Z"
             },
             {
               "id": "a6dd7b7c-9e74-4626-8e27-e4aa11e771ea",
@@ -6580,7 +6584,9 @@
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-10T20:40:13.499Z",
+      "completedAt": "2026-02-10T20:40:13.499Z"
     },
     {
       "id": "aab3e41d-5c6e-4d79-b7c0-04c01ad9e4c8",
