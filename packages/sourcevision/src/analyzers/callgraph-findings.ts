@@ -217,6 +217,12 @@ function detectDeadExports(
     // Skip <module> and <default> pseudo-functions
     if (fn.name.startsWith("<")) continue;
 
+    // Skip class/object methods — they inherit isExported from their parent
+    // but are accessed via instance.method(), not as direct module exports.
+    // A qualified name like "ClassName.method" indicates a member, not a
+    // top-level export.
+    if (fn.qualifiedName !== fn.name) continue;
+
     // Check if this function is called anywhere
     const key = `${fn.file}:${fn.qualifiedName}`;
     const keyByName = `${fn.file}:${fn.name}`;

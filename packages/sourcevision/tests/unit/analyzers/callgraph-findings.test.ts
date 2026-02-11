@@ -255,6 +255,80 @@ describe("dead code detection", () => {
     expect(deadCodeFindings).toHaveLength(0);
   });
 
+  it("does not flag class instance methods as dead exports", () => {
+    // Class methods have qualifiedName "ClassName.method" but are called via
+    // instance.method() — these are not individual module exports.
+    const functions = [
+      makeFn({
+        file: "src/renderer.ts",
+        name: "constructor",
+        qualifiedName: "GraphRenderer.constructor",
+        isExported: true,
+      }),
+      makeFn({
+        file: "src/renderer.ts",
+        name: "highlightNode",
+        qualifiedName: "GraphRenderer.highlightNode",
+        isExported: true,
+      }),
+      makeFn({
+        file: "src/renderer.ts",
+        name: "centerOnNode",
+        qualifiedName: "GraphRenderer.centerOnNode",
+        isExported: true,
+      }),
+      makeFn({
+        file: "src/renderer.ts",
+        name: "destroy",
+        qualifiedName: "GraphRenderer.destroy",
+        isExported: true,
+      }),
+      // A real top-level unused export should still be flagged
+      makeFn({ file: "src/utils.ts", name: "unusedHelper", isExported: true }),
+    ];
+
+    const cg = makeCallGraph(functions, []);
+    const inventory = makeInventory(["src/renderer.ts", "src/utils.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory });
+
+    // Class methods should NOT be flagged
+    const rendererFindings = findings.filter(
+      (f) => f.text.includes("src/renderer.ts") && f.text.includes("unused")
+    );
+    expect(rendererFindings).toHaveLength(0);
+
+    // Top-level export should still be flagged
+    const utilFindings = findings.filter((f) => f.text.includes("unusedHelper"));
+    expect(utilFindings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not flag object literal methods as dead exports", () => {
+    // Object literal methods have qualifiedName "objectName.method"
+    const functions = [
+      makeFn({
+        file: "src/config.ts",
+        name: "getValue",
+        qualifiedName: "configStore.getValue",
+        isExported: true,
+      }),
+      makeFn({
+        file: "src/config.ts",
+        name: "setValue",
+        qualifiedName: "configStore.setValue",
+        isExported: true,
+      }),
+    ];
+
+    const cg = makeCallGraph(functions, []);
+    const inventory = makeInventory(["src/config.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory });
+
+    const configFindings = findings.filter(
+      (f) => f.text.includes("src/config.ts") && f.text.includes("unused")
+    );
+    expect(configFindings).toHaveLength(0);
+  });
+
   it("groups dead exports by file", () => {
     const functions = [
       makeFn({ file: "src/legacy.ts", name: "oldA", isExported: true }),

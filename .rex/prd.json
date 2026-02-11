@@ -7960,14 +7960,16 @@
             {
               "id": "bcce9423-06c0-4773-a067-65e47b998d13",
               "title": "Fix false-positive detection for class instance methods",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "SourceVision flags class instance methods as \"unused exports\" because they're called via instance.method() not import { method }. Affected files: renderer.ts (39 false positives), notion-adapter.ts (19 false positives). Either improve the call-graph analyzer to recognize class method usage, or add suppression annotations (@public JSDoc or sourcevision-ignore comments).",
               "acceptanceCriteria": [
                 "renderer.ts and notion-adapter.ts no longer produce false-positive unused-export findings",
                 "Fix applies generally to all classes, not just these two"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-11T16:43:58.216Z",
+              "completedAt": "2026-02-11T16:48:26.552Z"
             },
             {
               "id": "36efadb8-1dbe-43e1-96a7-323878c30474",
