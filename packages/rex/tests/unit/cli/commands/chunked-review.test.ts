@@ -13,7 +13,7 @@ import {
   replaceProposals,
   buildBatchRecord,
   formatBatchSummary,
-} from "../../../../src/cli/commands/chunked-review.js";
+} from "../../../../src/cli/commands/chunked-review-state.js";
 import type {
   ChunkReviewState,
   ChunkAction,
@@ -21,7 +21,7 @@ import type {
   GranularityRequest,
   GranularityAdjustmentRecord,
   ProposalAssessment,
-} from "../../../../src/cli/commands/chunked-review.js";
+} from "../../../../src/cli/commands/chunked-review-state.js";
 import type { Proposal } from "../../../../src/analyze/index.js";
 
 // ─── Test fixtures ───────────────────────────────────────────────────
