@@ -11,8 +11,8 @@ export default defineConfig({
       { find: /^rex$/, replacement: `${rexRoot}/src/public.ts` },
       // Map rex subpath imports to source .ts files for vitest
       { find: /^rex\/dist\/(.+)\.js$/, replacement: `${rexRoot}/src/$1.ts` },
-      // Map @n-dx/claude-client to source index.ts for vitest
-      { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/index.ts` },
+      // Map @n-dx/claude-client to source public.ts for vitest
+      { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map local .js imports to .ts files
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],

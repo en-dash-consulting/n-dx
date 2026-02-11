@@ -6,8 +6,8 @@ const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 export default defineConfig({
   resolve: {
     alias: [
-      // Map @n-dx/claude-client to source index.ts for vitest
-      { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/index.ts` },
+      // Map @n-dx/claude-client to source public.ts for vitest
+      { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map local .js imports to .ts files (only relative paths)
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],

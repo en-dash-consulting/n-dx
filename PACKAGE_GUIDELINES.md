@@ -18,8 +18,6 @@ Every package exposes its public surface through `src/public.ts`, mapped to `exp
 }
 ```
 
-> **Exception:** `@n-dx/claude-client` uses `src/index.ts` (historical; it predates the convention).
-
 ### What to export
 
 Each package's public API reflects how it is **consumed**, not what it contains:
