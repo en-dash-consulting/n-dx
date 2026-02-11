@@ -16,6 +16,7 @@ import type {
   TaskBriefLogEntry,
   TaskBriefRequirement,
 } from "../../schema/index.js";
+import { CLIError } from "@n-dx/claude-client";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
@@ -56,19 +57,24 @@ export function collectEpicTaskIds(items: PRDItem[], epicId: string): Set<string
 /** Statuses that cannot be worked on. */
 const NON_ACTIONABLE_STATUSES = new Set(["completed", "deferred", "blocked"]);
 
-/** Thrown when an explicitly-selected task cannot be worked on. */
-export class TaskNotActionableError extends Error {
+/**
+ * Thrown when an explicitly-selected task cannot be worked on.
+ *
+ * Extends the foundation {@link CLIError} (which extends ClaudeClientError),
+ * bringing it into the unified error hierarchy. The `suggestion` field from
+ * CLIError is used directly, and additional task-specific metadata (`taskId`,
+ * `status`) is available for programmatic handling.
+ */
+export class TaskNotActionableError extends CLIError {
   readonly taskId: string;
   readonly status: string;
-  readonly suggestion: string;
 
   constructor(taskId: string, status: string, suggestion: string, title?: string) {
     const label = title ? `"${title}" (${taskId})` : taskId;
-    super(`Task ${label} is ${status} and cannot be worked on.`);
+    super(`Task ${label} is ${status} and cannot be worked on.`, suggestion);
     this.name = "TaskNotActionableError";
     this.taskId = taskId;
     this.status = status;
-    this.suggestion = suggestion;
   }
 }
 

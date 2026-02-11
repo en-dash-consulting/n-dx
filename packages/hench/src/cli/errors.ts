@@ -5,11 +5,9 @@
  * providing a consistent error hierarchy across all n-dx packages.
  */
 
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError, PROJECT_DIRS } from "@n-dx/claude-client";
-import { TaskNotActionableError } from "../agent/planning/brief.js";
+import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/claude-client";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
@@ -112,18 +110,14 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
  * Never includes stack traces in the output.
  */
 export function formatCLIError(err: unknown): string {
-  // CLIError — already user-friendly
-  if (err instanceof CLIError) {
+  // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
+  // (which extends foundation CLIError from @n-dx/claude-client)
+  if (err instanceof BaseCLIError) {
     let msg = `Error: ${err.message}`;
     if (err.suggestion) {
       msg += `\nHint: ${err.suggestion}`;
     }
     return msg;
-  }
-
-  // TaskNotActionableError — explicit task selection with invalid status
-  if (err instanceof TaskNotActionableError) {
-    return `Error: ${err.message}\nHint: ${err.suggestion}`;
   }
 
   const message = err instanceof Error ? err.message : String(err);
@@ -168,9 +162,7 @@ export function requireClaudeCLI(customPath?: string): void {
     return;
   }
 
-  try {
-    execFileSync("which", ["claude"], { stdio: "pipe" });
-  } catch {
+  if (!isExecutableOnPath("claude")) {
     throw new CLIError(
       "Claude CLI not found.",
       "Install it with: npm install -g @anthropic-ai/claude-code\n" +

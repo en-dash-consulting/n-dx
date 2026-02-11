@@ -124,6 +124,8 @@ export {
   execStdout,
   execShellCmd,
   getCurrentHead,
+  getCurrentBranch,
+  isExecutableOnPath,
 } from "./exec.js";
 
 export type {

@@ -1,6 +1,6 @@
 import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { execSync } from "node:child_process";
+import { getCurrentHead, getCurrentBranch } from "@n-dx/claude-client";
 import { SCHEMA_VERSION } from "../../schema/v1.js";
 import { TOOL_VERSION, SV_DIR } from "./constants.js";
 import { info } from "../output.js";
@@ -17,15 +17,9 @@ export function cmdInit(dir: string): void {
 
   mkdirSync(svDir, { recursive: true });
 
-  // Git info
-  let gitSha: string | undefined;
-  let gitBranch: string | undefined;
-  try {
-    gitSha = execSync("git rev-parse HEAD", { cwd: absDir, encoding: "utf-8" }).trim();
-    gitBranch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: absDir, encoding: "utf-8" }).trim();
-  } catch {
-    // not a git repo, that's fine
-  }
+  // Git info (returns undefined if not a git repo)
+  const gitSha = getCurrentHead(absDir);
+  const gitBranch = getCurrentBranch(absDir);
 
   const manifest = {
     schemaVersion: SCHEMA_VERSION,

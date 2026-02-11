@@ -4,18 +4,15 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { execSync } from "node:child_process";
+import { getCurrentHead, getCurrentBranch } from "@n-dx/claude-client";
 import type { Manifest, ModuleStatus } from "../schema/index.js";
 import { SV_DIR, TOOL_VERSION } from "../cli/commands/constants.js";
 
 function getGitInfo(dir: string): { sha?: string; branch?: string } {
-  try {
-    const sha = execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf-8" }).trim();
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: dir, encoding: "utf-8" }).trim();
-    return { sha: sha || undefined, branch: branch || undefined };
-  } catch {
-    return {};
-  }
+  return {
+    sha: getCurrentHead(dir),
+    branch: getCurrentBranch(dir),
+  };
 }
 
 export function readManifest(dir: string): Manifest {

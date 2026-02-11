@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { exec } from "../process/index.js";
 
 export interface ExecShellOptions {
   /** Shell command string to execute. */
@@ -17,10 +17,13 @@ export interface ExecShellOptions {
  * Execute a shell command and return a formatted result string.
  *
  * Shared by `toolRunCommand` (run_command tool) and `toolGit` (git tool)
- * to avoid duplicating the execFile / output-formatting / timeout-guard
+ * to avoid duplicating the exec / output-formatting / timeout-guard
  * boilerplate.
+ *
+ * Uses the foundation exec abstraction from @n-dx/claude-client under
+ * the hood, adding hench-specific output formatting on top.
  */
-export function execShell(opts: ExecShellOptions): Promise<string> {
+export async function execShell(opts: ExecShellOptions): Promise<string> {
   const {
     command,
     cwd,
@@ -29,33 +32,19 @@ export function execShell(opts: ExecShellOptions): Promise<string> {
     env = { ...process.env },
   } = opts;
 
-  return new Promise((resolve) => {
-    const child = execFile(
-      "sh",
-      ["-c", command],
-      { cwd, timeout, maxBuffer, env },
-      (error, stdout, stderr) => {
-        if (error && error.killed) {
-          resolve(`Command timed out after ${timeout}ms`);
-          return;
-        }
+  const result = await exec("sh", ["-c", command], { cwd, timeout, maxBuffer, env });
 
-        const output: string[] = [];
-        if (stdout) output.push(stdout);
-        if (stderr) output.push(`[stderr]\n${stderr}`);
-        if (error && !stdout && !stderr) {
-          output.push(`Exit code: ${error.code ?? 1}`);
-        }
+  // Timeout — exitCode is null when the process was killed
+  if (result.exitCode === null) {
+    return `Command timed out after ${timeout}ms`;
+  }
 
-        resolve(output.join("\n").trim() || "(no output)");
-      },
-    );
+  const output: string[] = [];
+  if (result.stdout) output.push(result.stdout);
+  if (result.stderr) output.push(`[stderr]\n${result.stderr}`);
+  if (result.error && !result.stdout && !result.stderr) {
+    output.push(`Exit code: ${result.exitCode ?? 1}`);
+  }
 
-    // Safety: kill on timeout if execFile doesn't
-    setTimeout(() => {
-      if (!child.killed) {
-        child.kill("SIGTERM");
-      }
-    }, timeout + 1000);
-  });
+  return output.join("\n").trim() || "(no output)";
 }

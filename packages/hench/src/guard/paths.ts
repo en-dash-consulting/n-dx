@@ -20,10 +20,18 @@
  */
 
 import { resolve, relative } from "node:path";
+import { ClaudeClientError } from "@n-dx/claude-client";
 
-export class GuardError extends Error {
+/**
+ * Security guard error — thrown when path validation detects a violation.
+ *
+ * Extends {@link ClaudeClientError} to integrate with the unified error
+ * hierarchy. Uses reason "cli" (agent operation error) and is never
+ * retryable (security violations are deterministic).
+ */
+export class GuardError extends ClaudeClientError {
   constructor(message: string) {
-    super(message);
+    super(message, "cli", false);
     this.name = "GuardError";
   }
 }

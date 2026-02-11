@@ -14,6 +14,8 @@ export {
   execStdout,
   execShellCmd,
   getCurrentHead,
+  getCurrentBranch,
+  isExecutableOnPath,
 } from "@n-dx/claude-client";
 
 export type {

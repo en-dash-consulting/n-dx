@@ -42,6 +42,8 @@ export interface ExecOptions {
   timeout: number;
   /** Maximum output buffer in bytes. Defaults to 1 MiB. */
   maxBuffer?: number;
+  /** Environment variables for the child process. Defaults to inheriting parent env. */
+  env?: NodeJS.ProcessEnv;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,16 +67,21 @@ export function exec(
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
 
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer }, (error, stdout, stderr) => {
+    execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (error, stdout, stderr) => {
+      const isTimeout = error
+        ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
+          (error as { killed?: boolean }).killed === true
+        : false;
+
       resolve({
         stdout: (stdout ?? "").toString(),
         stderr: (stderr ?? "").toString(),
         exitCode:
           error
-            ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT"
+            ? (isTimeout
               ? null
               : typeof (error as { code?: number }).code === "number"
                 ? ((error as { code?: number }).code ?? 1)
@@ -96,10 +103,10 @@ export function execStdout(
   args: string[],
   opts: ExecOptions,
 ): Promise<string> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
 
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer }, (_error, stdout) => {
+    execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (_error, stdout) => {
       resolve((stdout ?? "").toString());
     });
   });
@@ -130,5 +137,36 @@ export function getCurrentHead(cwd: string): string | undefined {
     }).trim();
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Synchronous git helper — get the current branch name.
+ *
+ * Returns undefined if git fails (e.g. not a git repo or detached HEAD).
+ */
+export function getCurrentBranch(cwd: string): string | undefined {
+  try {
+    const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd,
+      encoding: "utf-8",
+    }).trim();
+    return branch || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Synchronous helper — check whether an executable is on PATH.
+ *
+ * Uses `which` to locate the binary. Returns true if found, false otherwise.
+ */
+export function isExecutableOnPath(name: string): boolean {
+  try {
+    execFileSync("which", [name], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
   }
 }

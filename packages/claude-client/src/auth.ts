@@ -6,11 +6,11 @@
  * authentication is misconfigured.
  */
 
-import { execFile } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
 import type { AuthMode, ClaudeClientOptions } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import { resolveApiKey, resolveCliPath } from "./config.js";
+import { exec } from "./exec.js";
 
 // ── CLI availability ─────────────────────────────────────────────────────────
 
@@ -21,20 +21,12 @@ import { resolveApiKey, resolveCliPath } from "./config.js";
  * successfully (exit code 0), `false` otherwise (not found, permission
  * error, crash, etc.).
  */
-export function detectCliAvailability(
+export async function detectCliAvailability(
   options: ClaudeClientOptions,
 ): Promise<boolean> {
   const binary = resolveCliPath(options.claudeConfig);
-
-  return new Promise((resolve) => {
-    execFile(binary, ["--version"], { timeout: 5000 }, (err) => {
-      if (err) {
-        resolve(false);
-        return;
-      }
-      resolve(true);
-    });
-  });
+  const result = await exec(binary, ["--version"], { cwd: process.cwd(), timeout: 5000 });
+  return result.exitCode === 0;
 }
 
 // ── API key validation ───────────────────────────────────────────────────────
