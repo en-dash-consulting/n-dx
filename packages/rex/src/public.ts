@@ -76,7 +76,10 @@ export {
 
 // ---- Core: tree utilities ---------------------------------------------------
 
-export { findItem, walkTree, computeStats, collectAllIds } from "./core/tree.js";
+export {
+  findItem, walkTree, computeStats, collectAllIds,
+  insertChild, updateInTree, removeFromTree,
+} from "./core/tree.js";
 export type { TreeEntry, TreeStats } from "./core/tree.js";
 
 // ---- Core: task selection ---------------------------------------------------

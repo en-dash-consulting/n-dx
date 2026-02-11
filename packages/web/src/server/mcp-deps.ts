@@ -4,7 +4,8 @@
  * The web package reads most domain data from the filesystem (`.rex/prd.json`,
  * `.sourcevision/` data files, `.hench/runs/`) to stay loosely coupled.
  * Runtime imports from domain packages are concentrated here: MCP server
- * factories plus rex domain types/constants used by server routes.
+ * factories plus rex domain types, constants, and tree utilities used by
+ * server routes.
  *
  * This mirrors the pattern established in `packages/hench/src/prd/ops.ts`:
  * a single gateway module that makes the cross-package dependency surface
@@ -12,12 +13,13 @@
  *
  * ## Coupling budget
  *
- * | Coupling type              | Count | Where                         |
- * |---------------------------|-------|-------------------------------|
- * | Runtime imports (this file)| 2     | MCP server factories          |
- * | Rex domain re-exports      | 13    | Types, constants, type guards |
+ * | Coupling type              | Count | Where                             |
+ * |---------------------------|-------|-----------------------------------|
+ * | Runtime imports (this file)| 2     | MCP server factories              |
+ * | Rex domain re-exports      | 13    | Types, constants, type guards     |
+ * | Rex tree re-exports        | 8     | Tree utilities + timestamp helper |
  * | Filesystem reads           | many  | routes-rex, routes-sv, routes-hench |
- * | Subprocess calls           | 1     | rex CLI for `analyze`         |
+ * | Subprocess calls           | 1     | rex CLI for `analyze`             |
  *
  * By concentrating runtime imports here, we ensure:
  * - Adding a new cross-package import requires a **deliberate** edit to
@@ -45,6 +47,7 @@ export { createSourcevisionMcpServer } from "sourcevision";
 
 export type { Priority, ItemLevel, ItemStatus } from "rex";
 export type { RequirementCategory, RequirementValidationType } from "rex";
+export type { PRDItem, PRDDocument, Requirement } from "rex";
 export {
   PRIORITY_ORDER,
   LEVEL_HIERARCHY,
@@ -59,3 +62,25 @@ export {
   isRequirementCategory,
   isValidationType,
 } from "rex";
+
+// ---- Rex tree utilities -----------------------------------------------------
+// Previously duplicated in routes-rex.ts; now imported from the canonical source.
+// This eliminates 6+ function copies that were maintained separately.
+
+export {
+  findItem,
+  walkTree,
+  insertChild,
+  updateInTree,
+  removeFromTree,
+  computeStats,
+} from "rex";
+export type { TreeEntry, TreeStats } from "rex";
+
+// ---- Rex task selection -----------------------------------------------------
+
+export { findNextTask, collectCompletedIds } from "rex";
+
+// ---- Rex timestamps ---------------------------------------------------------
+
+export { computeTimestampUpdates } from "rex";

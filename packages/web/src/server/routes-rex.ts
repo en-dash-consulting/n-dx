@@ -46,6 +46,11 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import {
   type Priority,
   type ItemLevel,
+  type ItemStatus,
+  type PRDItem,
+  type PRDDocument,
+  type TreeEntry,
+  type TreeStats,
   PRIORITY_ORDER,
   LEVEL_HIERARCHY,
   VALID_LEVELS,
@@ -58,6 +63,15 @@ import {
   isItemLevel,
   isRequirementCategory,
   isValidationType,
+  findItem,
+  walkTree,
+  insertChild as rexInsertChild,
+  updateInTree as rexUpdateInTree,
+  removeFromTree,
+  computeStats,
+  findNextTask as rexFindNextTask,
+  collectCompletedIds,
+  computeTimestampUpdates,
 } from "./mcp-deps.js";
 
 const REX_PREFIX = "/api/rex/";
@@ -70,206 +84,70 @@ const API_SETTABLE_STATUSES = new Set<string>(
   [...VALID_STATUSES].filter((s) => s !== "deleted"),
 );
 
-interface PRDItemRecord {
-  id: string;
-  status: string;
-  level: string;
-  title: string;
-  children?: PRDItemRecord[];
-  [key: string]: unknown;
+// ---------------------------------------------------------------------------
+// Thin wrappers over canonical rex functions
+// ---------------------------------------------------------------------------
+// These adapt the rex API to the patterns used throughout this file.
+// The underlying logic lives in rex — no duplication.
+
+/** Find an item by ID, returning just the item (or null). */
+function findItemById(items: PRDItem[], id: string): PRDItem | null {
+  const entry = findItem(items, id);
+  return entry ? entry.item : null;
 }
 
-interface PRDDocRecord {
-  schema: string;
-  title: string;
-  items: PRDItemRecord[];
-  [key: string]: unknown;
+/**
+ * Insert a child under a parent. Skips rex's hierarchy validation since the
+ * web API validates level separately and some batch-import paths construct
+ * items with the correct level pre-set.
+ */
+function insertChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
+  return rexInsertChild(items, parentId, child);
 }
 
-/** Walk the tree to find an item by ID. */
-function findItemById(items: PRDItemRecord[], id: string): PRDItemRecord | null {
-  for (const item of items) {
-    if (item.id === id) return item;
-    if (Array.isArray(item.children)) {
-      const found = findItemById(item.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-/** Insert a child item under the specified parent. */
-function insertChild(items: PRDItemRecord[], parentId: string, child: PRDItemRecord): boolean {
-  for (const item of items) {
-    if (item.id === parentId) {
-      if (!Array.isArray(item.children)) {
-        item.children = [];
-      }
-      item.children.push(child);
-      return true;
-    }
-    if (Array.isArray(item.children) && insertChild(item.children, parentId, child)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Walk the tree to update an item in place. */
+/**
+ * Update an item in the tree, automatically applying timestamp transitions
+ * (startedAt / completedAt) via the canonical `computeTimestampUpdates`.
+ */
 function updateInTree(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   id: string,
-  updates: Record<string, unknown>,
+  updates: Partial<PRDItem>,
 ): boolean {
-  for (const item of items) {
-    if (item.id === id) {
-      // Apply auto-timestamps for status changes
-      if (updates.status === "in_progress" && item.status !== "in_progress") {
-        updates.startedAt = updates.startedAt || new Date().toISOString();
-      }
-      if (updates.status === "completed" && item.status !== "completed") {
-        updates.completedAt = updates.completedAt || new Date().toISOString();
-      }
-      Object.assign(item, updates);
-      return true;
-    }
-    if (Array.isArray(item.children) && updateInTree(item.children, id, updates)) {
-      return true;
+  // Auto-apply timestamps when status changes
+  if (updates.status) {
+    const existing = findItemById(items, id);
+    if (existing && existing.status !== updates.status) {
+      const tsUpdates = computeTimestampUpdates(
+        existing.status,
+        updates.status as ItemStatus,
+        existing,
+      );
+      Object.assign(updates, tsUpdates);
     }
   }
-  return false;
+  return rexUpdateInTree(items, id, updates);
 }
 
-interface TreeStats {
-  total: number;
-  completed: number;
-  inProgress: number;
-  pending: number;
-  failing: number;
-  deferred: number;
-  blocked: number;
-  deleted: number;
-}
-
-/** Compute stats counting only task and subtask levels. Deleted items are excluded from total. */
-function computeStats(items: PRDItemRecord[]): TreeStats {
-  const stats: TreeStats = {
-    total: 0,
-    completed: 0,
-    inProgress: 0,
-    pending: 0,
-    failing: 0,
-    deferred: 0,
-    blocked: 0,
-    deleted: 0,
-  };
-
-  function walk(list: PRDItemRecord[]): void {
-    for (const item of list) {
-      if (item.level === "task" || item.level === "subtask") {
-        // Deleted items are tracked separately and excluded from total
-        if (item.status === "deleted") {
-          stats.deleted++;
-        } else {
-          stats.total++;
-          switch (item.status) {
-            case "completed": stats.completed++; break;
-            case "in_progress": stats.inProgress++; break;
-            case "pending": stats.pending++; break;
-            case "failing": stats.failing++; break;
-            case "deferred": stats.deferred++; break;
-            case "blocked": stats.blocked++; break;
-          }
-        }
-      }
-      if (Array.isArray(item.children)) walk(item.children);
-    }
-  }
-
-  walk(items);
-  return stats;
-}
-
-/** Find the next actionable task (pending/in_progress leaf with resolved deps). */
-function findNextTask(items: PRDItemRecord[], completedIds: Set<string>): PRDItemRecord | null {
-
-  interface Candidate {
-    item: PRDItemRecord;
-    priority: number;
-  }
-
-  const candidates: Candidate[] = [];
-
-  function collect(list: PRDItemRecord[]): void {
-    for (const item of list) {
-      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked" || item.status === "deleted") continue;
-
-      // Check unresolved dependencies
-      if (Array.isArray(item.blockedBy) && item.blockedBy.length > 0) {
-        if (!(item.blockedBy as string[]).every((dep) => completedIds.has(dep))) continue;
-      }
-
-      if (Array.isArray(item.children) && item.children.length > 0) {
-        collect(item.children);
-        const allChildrenDone = item.children.every(
-          (c) => c.status === "completed" || c.status === "deferred",
-        );
-        if (allChildrenDone) {
-          candidates.push({
-            item,
-            priority: PRIORITY_ORDER[isPriority(item.priority as string | undefined) ? item.priority as Priority : "medium"],
-          });
-        }
-      } else {
-        candidates.push({
-          item,
-          priority: PRIORITY_ORDER[isPriority(item.priority as string | undefined) ? item.priority as Priority : "medium"],
-        });
-      }
-    }
-  }
-
-  collect(items);
-
-  if (candidates.length === 0) return null;
-
-  // Sort: failing first (retry), then in_progress, then by priority
-  candidates.sort((a, b) => {
-    const aUrgent = a.item.status === "failing" ? 0 : a.item.status === "in_progress" ? 1 : 2;
-    const bUrgent = b.item.status === "failing" ? 0 : b.item.status === "in_progress" ? 1 : 2;
-    if (aUrgent !== bUrgent) return aUrgent - bUrgent;
-    return a.priority - b.priority;
-  });
-
-  return candidates[0].item;
-}
-
-/** Collect IDs of all completed items. */
-function collectCompletedIds(items: PRDItemRecord[]): Set<string> {
-  const ids = new Set<string>();
-  function walk(list: PRDItemRecord[]): void {
-    for (const item of list) {
-      if (item.status === "completed") ids.add(item.id);
-      if (Array.isArray(item.children)) walk(item.children);
-    }
-  }
-  walk(items);
-  return ids;
+/** Find the next actionable task, returning just the item (or null). */
+function findNextTask(items: PRDItem[], completedIds: Set<string>): PRDItem | null {
+  const entry = rexFindNextTask(items, completedIds);
+  return entry ? entry.item : null;
 }
 
 /** Load and parse prd.json. Returns null if not found. */
-function loadPRD(ctx: ServerContext): PRDDocRecord | null {
+function loadPRD(ctx: ServerContext): PRDDocument | null {
   const prdPath = join(ctx.rexDir, "prd.json");
   if (!existsSync(prdPath)) return null;
   try {
-    return JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocRecord;
+    return JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
   } catch {
     return null;
   }
 }
 
 /** Save prd.json. */
-function savePRD(ctx: ServerContext, doc: PRDDocRecord): void {
+function savePRD(ctx: ServerContext, doc: PRDDocument): void {
   const prdPath = join(ctx.rexDir, "prd.json");
   writeFileSync(prdPath, JSON.stringify(doc, null, 2) + "\n");
 }
@@ -277,14 +155,14 @@ function savePRD(ctx: ServerContext, doc: PRDDocRecord): void {
 interface EpicStats {
   id: string;
   title: string;
-  status: string;
-  priority?: string;
+  status: ItemStatus;
+  priority?: Priority;
   stats: TreeStats;
   percentComplete: number;
 }
 
 /** Compute per-epic stats. Each epic's descendants (tasks/subtasks) are counted. */
-function computeEpicStats(items: PRDItemRecord[]): EpicStats[] {
+function computeEpicStats(items: PRDItem[]): EpicStats[] {
   return items
     .filter((item) => item.level === "epic")
     .map((epic) => {
@@ -293,7 +171,7 @@ function computeEpicStats(items: PRDItemRecord[]): EpicStats[] {
         id: epic.id,
         title: epic.title,
         status: epic.status,
-        priority: epic.priority as string | undefined,
+        priority: epic.priority,
         stats,
         percentComplete: stats.total > 0
           ? Math.round((stats.completed / stats.total) * 100)
@@ -318,7 +196,7 @@ interface RequirementsSummary {
 }
 
 /** Quick requirements overview for dashboard. */
-function computeRequirementsSummary(items: PRDItemRecord[]): RequirementsSummary {
+function computeRequirementsSummary(items: PRDItem[]): RequirementsSummary {
   const summary: RequirementsSummary = {
     totalRequirements: 0,
     itemsWithRequirements: 0,
@@ -328,7 +206,7 @@ function computeRequirementsSummary(items: PRDItemRecord[]): RequirementsSummary
 
   const seenIds = new Set<string>();
 
-  function walk(list: PRDItemRecord[]): void {
+  function walk(list: PRDItem[]): void {
     for (const item of list) {
       if (item.status === "deleted") continue;
       const reqs = (item.requirements ?? []) as RequirementRecord[];
@@ -352,13 +230,13 @@ function computeRequirementsSummary(items: PRDItemRecord[]): RequirementsSummary
 }
 
 /** Count tasks/subtasks by priority. */
-function computePriorityDistribution(items: PRDItemRecord[]): PriorityDistribution {
+function computePriorityDistribution(items: PRDItem[]): PriorityDistribution {
   const dist: PriorityDistribution = { critical: 0, high: 0, medium: 0, low: 0, unset: 0 };
 
-  function walk(list: PRDItemRecord[]): void {
+  function walk(list: PRDItem[]): void {
     for (const item of list) {
       if (item.level === "task" || item.level === "subtask") {
-        const p = (item.priority as string) ?? "";
+        const p = item.priority ?? "";
         if (p === "critical") dist.critical++;
         else if (p === "high") dist.high++;
         else if (p === "medium") dist.medium++;
@@ -709,7 +587,7 @@ async function handleItemAdd(
     const parentId = input.parentId;
 
     // Resolve level: explicit > inferred from parent > default to epic
-    let level: string;
+    let level: ItemLevel;
     if (input.level && isItemLevel(input.level)) {
       level = input.level;
     } else if (parentId) {
@@ -750,14 +628,14 @@ async function handleItemAdd(
         return true;
       }
       const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
-      if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parent.level as ItemLevel)) {
+      if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parent.level)) {
         errorResponse(res, 400, `A ${level} must be a child of a ${allowedParentLevels.join(" or ")}, not a ${parent.level}`);
         return true;
       }
     }
 
     const id = randomUUID();
-    const item: PRDItemRecord = {
+    const item: PRDItem = {
       id,
       title: input.title.trim(),
       status: "pending",
@@ -882,47 +760,26 @@ interface MergeValidationResult {
   error?: string;
 }
 
-interface TreeEntryLocal {
-  item: PRDItemRecord;
-  parentId: string | null;
-}
-
-/** Walk tree and yield items with their parent ID. */
-function* walkTreeLocal(
-  items: PRDItemRecord[],
-  parentId: string | null = null,
-): Generator<TreeEntryLocal> {
-  for (const item of items) {
-    yield { item, parentId };
-    if (Array.isArray(item.children) && item.children.length > 0) {
-      yield* walkTreeLocal(item.children, item.id);
-    }
-  }
+/** Extract the parent ID from a TreeEntry's parent chain. */
+function parentIdOf(entry: TreeEntry): string | null {
+  return entry.parents.length > 0 ? entry.parents[entry.parents.length - 1].id : null;
 }
 
 /** Find an item by ID, returning it with its parent ID. */
-function findWithParent(items: PRDItemRecord[], id: string): TreeEntryLocal | null {
-  for (const entry of walkTreeLocal(items)) {
-    if (entry.item.id === id) return entry;
-  }
-  return null;
+function findWithParent(items: PRDItem[], id: string): { item: PRDItem; parentId: string | null } | null {
+  const entry = findItem(items, id);
+  if (!entry) return null;
+  return { item: entry.item, parentId: parentIdOf(entry) };
 }
 
-/** Remove an item from the tree by ID. */
-function removeItem(items: PRDItemRecord[], id: string): PRDItemRecord | null {
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].id === id) return items.splice(i, 1)[0];
-    if (Array.isArray(items[i].children)) {
-      const removed = removeItem(items[i].children!, id);
-      if (removed) return removed;
-    }
-  }
-  return null;
+/** Remove an item from the tree by ID. Delegates to rex's removeFromTree. */
+function removeItem(items: PRDItem[], id: string): PRDItem | null {
+  return removeFromTree(items, id);
 }
 
 /** Validate a merge is structurally valid. */
 function validateMergeLocal(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   sourceIds: string[],
   targetId: string,
 ): MergeValidationResult {
@@ -955,7 +812,7 @@ function validateMergeLocal(
 
 /** Build a merge preview (non-destructive). */
 function buildMergePreview(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   sourceIds: string[],
   targetId: string,
   options?: { title?: string; description?: string },
@@ -984,7 +841,7 @@ function buildMergePreview(
   const allBlockedBy = new Set<string>();
   for (const id of sourceIds) {
     const item = findItemById(items, id)!;
-    for (const dep of (item.blockedBy as string[] | undefined) ?? []) {
+    for (const dep of item.blockedBy ?? []) {
       if (!sourceIds.includes(dep)) allBlockedBy.add(dep);
     }
   }
@@ -999,10 +856,10 @@ function buildMergePreview(
   // Count blockedBy references to absorbed items across the tree
   const absorbedSet = new Set(absorbedIds);
   let rewrittenDependencyCount = 0;
-  for (const { item } of walkTreeLocal(items)) {
+  for (const { item } of walkTree(items)) {
     if (sourceIds.includes(item.id)) continue;
     if (Array.isArray(item.blockedBy)) {
-      for (const dep of item.blockedBy as string[]) {
+      for (const dep of item.blockedBy) {
         if (absorbedSet.has(dep)) rewrittenDependencyCount++;
       }
     }
@@ -1014,7 +871,7 @@ function buildMergePreview(
     const descriptions: string[] = [];
     for (const id of [targetId, ...absorbedIds]) {
       const item = findItemById(items, id)!;
-      if (item.description) descriptions.push(item.description as string);
+      if (item.description) descriptions.push(item.description);
     }
     combinedDescription = descriptions.length > 0
       ? descriptions.join("\n\n---\n\n")
@@ -1047,7 +904,7 @@ function buildMergePreview(
 
 /** Execute a merge in place. */
 function executeMerge(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   sourceIds: string[],
   targetId: string,
   options?: { title?: string; description?: string },
@@ -1066,7 +923,7 @@ function executeMerge(
     const descriptions: string[] = [];
     for (const id of [targetId, ...absorbedIds]) {
       const item = findItemById(items, id)!;
-      if (item.description) descriptions.push(item.description as string);
+      if (item.description) descriptions.push(item.description);
     }
     if (descriptions.length > 0) target.description = descriptions.join("\n\n---\n\n");
   }
@@ -1094,7 +951,7 @@ function executeMerge(
   const allBlockedBy = new Set<string>();
   for (const id of sourceIds) {
     const item = findItemById(items, id)!;
-    for (const dep of (item.blockedBy as string[] | undefined) ?? []) {
+    for (const dep of item.blockedBy ?? []) {
       if (!sourceIds.includes(dep)) allBlockedBy.add(dep);
     }
   }
@@ -1117,12 +974,12 @@ function executeMerge(
 
   // Rewrite blockedBy references
   let rewrittenDependencyCount = 0;
-  for (const { item } of walkTreeLocal(items)) {
-    if (Array.isArray(item.blockedBy) && (item.blockedBy as string[]).length > 0) {
+  for (const { item } of walkTree(items)) {
+    if (Array.isArray(item.blockedBy) && (item.blockedBy).length > 0) {
       let changed = false;
       const newBlockedBy: string[] = [];
       const seen = new Set<string>();
-      for (const dep of item.blockedBy as string[]) {
+      for (const dep of item.blockedBy) {
         const resolved = absorbedSet.has(dep) ? targetId : dep;
         if (dep !== resolved) { changed = true; rewrittenDependencyCount++; }
         if (!seen.has(resolved)) { seen.add(resolved); newBlockedBy.push(resolved); }
@@ -1220,7 +1077,7 @@ async function handleItemMerge(
 // --------------------------------------------------------------------------
 
 /** Check whether an item and all its descendants are completed. */
-function isFullyCompletedLocal(item: PRDItemRecord): boolean {
+function isFullyCompletedLocal(item: PRDItem): boolean {
   if (item.status !== "completed") return false;
   if (Array.isArray(item.children) && item.children.length > 0) {
     return item.children.every(isFullyCompletedLocal);
@@ -1229,7 +1086,7 @@ function isFullyCompletedLocal(item: PRDItemRecord): boolean {
 }
 
 /** Count items in a subtree (item + all descendants). */
-function countSubtreeLocal(item: PRDItemRecord): number {
+function countSubtreeLocal(item: PRDItem): number {
   let count = 1;
   if (Array.isArray(item.children)) {
     for (const child of item.children) {
@@ -1240,12 +1097,13 @@ function countSubtreeLocal(item: PRDItemRecord): number {
 }
 
 /** Identify top-level fully-completed subtrees eligible for pruning (read-only). */
-function findPrunableItemsLocal(items: PRDItemRecord[]): PRDItemRecord[] {
-  const prunable: PRDItemRecord[] = [];
-  for (const entry of walkTreeLocal(items)) {
+function findPrunableItemsLocal(items: PRDItem[]): PRDItem[] {
+  const prunable: PRDItem[] = [];
+  for (const entry of walkTree(items)) {
     if (!isFullyCompletedLocal(entry.item)) continue;
     // Skip items whose parent is also fully completed (they'd be pruned as part of parent)
-    const parent = entry.parentId ? findItemById(items, entry.parentId) : null;
+    const pid = parentIdOf(entry);
+    const parent = pid ? findItemById(items, pid) : null;
     if (parent && isFullyCompletedLocal(parent)) continue;
     prunable.push(entry.item);
   }
@@ -1253,8 +1111,8 @@ function findPrunableItemsLocal(items: PRDItemRecord[]): PRDItemRecord[] {
 }
 
 /** Remove all fully-completed subtrees from the item tree. Returns pruned items. */
-function pruneItemsLocal(items: PRDItemRecord[]): { pruned: PRDItemRecord[]; prunedCount: number } {
-  const pruned: PRDItemRecord[] = [];
+function pruneItemsLocal(items: PRDItem[]): { pruned: PRDItem[]; prunedCount: number } {
+  const pruned: PRDItem[] = [];
   let prunedCount = 0;
 
   for (let i = items.length - 1; i >= 0; i--) {
@@ -1278,10 +1136,10 @@ function pruneItemsLocal(items: PRDItemRecord[]): { pruned: PRDItemRecord[]; pru
  * Used by criteria-based pruning where we've pre-identified which items to remove.
  */
 function pruneItemsByIds(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   ids: Set<string>,
-): { pruned: PRDItemRecord[]; prunedCount: number } {
-  const pruned: PRDItemRecord[] = [];
+): { pruned: PRDItem[]; prunedCount: number } {
+  const pruned: PRDItem[] = [];
   let prunedCount = 0;
 
   for (let i = items.length - 1; i >= 0; i--) {
@@ -1301,7 +1159,7 @@ function pruneItemsByIds(
 }
 
 /** Summarize a prunable item for API response. */
-function summarizeItem(item: PRDItemRecord): {
+function summarizeItem(item: PRDItem): {
   id: string;
   title: string;
   level: string;
@@ -1343,7 +1201,7 @@ const DEFAULT_PRUNE_CRITERIA: PruneCriteria = {
  * - Its status (and all descendants') is in the criteria statuses
  * - It was completed at least `minAgeDays` ago (if completedAt is set)
  */
-function matchesPruneCriteria(item: PRDItemRecord, criteria: PruneCriteria, now: Date): boolean {
+function matchesPruneCriteria(item: PRDItem, criteria: PruneCriteria, now: Date): boolean {
   // Status check
   if (!criteria.statuses.includes(item.status)) return false;
 
@@ -1367,15 +1225,16 @@ function matchesPruneCriteria(item: PRDItemRecord, criteria: PruneCriteria, now:
  * Like findPrunableItemsLocal but uses criteria matching instead of isFullyCompleted.
  */
 function findPrunableWithCriteria(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   criteria: PruneCriteria,
   now: Date,
-): PRDItemRecord[] {
-  const prunable: PRDItemRecord[] = [];
-  for (const entry of walkTreeLocal(items)) {
+): PRDItem[] {
+  const prunable: PRDItem[] = [];
+  for (const entry of walkTree(items)) {
     if (!matchesPruneCriteria(entry.item, criteria, now)) continue;
     // Skip items whose parent also matches (they'd be pruned as part of parent)
-    const parent = entry.parentId ? findItemById(items, entry.parentId) : null;
+    const pid = parentIdOf(entry);
+    const parent = pid ? findItemById(items, pid) : null;
     if (parent && matchesPruneCriteria(parent, criteria, now)) continue;
     prunable.push(entry.item);
   }
@@ -1383,7 +1242,7 @@ function findPrunableWithCriteria(
 }
 
 /** Estimate the JSON byte size of a PRD item subtree. */
-function estimateSubtreeBytes(item: PRDItemRecord): number {
+function estimateSubtreeBytes(item: PRDItem): number {
   return JSON.stringify(item).length;
 }
 
@@ -1392,9 +1251,9 @@ function estimateSubtreeBytes(item: PRDItemRecord): number {
 // --------------------------------------------------------------------------
 
 /** Collect all IDs from a list of subtree roots (item + all descendants). */
-function collectSubtreeIds(items: PRDItemRecord[]): Set<string> {
+function collectSubtreeIds(items: PRDItem[]): Set<string> {
   const ids = new Set<string>();
-  function walk(node: PRDItemRecord): void {
+  function walk(node: PRDItem): void {
     ids.add(node.id);
     if (Array.isArray(node.children)) {
       for (const child of node.children) walk(child);
@@ -1420,7 +1279,7 @@ interface EpicImpactEntry {
  * counts. Epics not affected by pruning are omitted.
  */
 function computeEpicImpact(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   prunableIds: Set<string>,
 ): EpicImpactEntry[] {
   const impact: EpicImpactEntry[] = [];
@@ -1433,7 +1292,7 @@ function computeEpicImpact(
     let beforeCompleted = 0;
     let removedCount = 0;
 
-    function countBefore(node: PRDItemRecord): void {
+    function countBefore(node: PRDItem): void {
       if (node.level === "task" || node.level === "subtask") {
         if (node.status !== "deleted") {
           beforeTotal++;
@@ -1445,10 +1304,10 @@ function computeEpicImpact(
       }
     }
 
-    function countRemoved(node: PRDItemRecord): void {
+    function countRemoved(node: PRDItem): void {
       if (prunableIds.has(node.id)) {
         // Count all tasks/subtasks in this subtree as removed
-        function countAll(n: PRDItemRecord): void {
+        function countAll(n: PRDItem): void {
           if (n.level === "task" || n.level === "subtask") {
             if (n.status !== "deleted") removedCount++;
           }
@@ -1470,9 +1329,9 @@ function computeEpicImpact(
     const afterTotal = beforeTotal - removedCount;
     // After pruning, completed count drops by however many completed tasks/subtasks were removed
     let removedCompleted = 0;
-    function countRemovedCompleted(node: PRDItemRecord): void {
+    function countRemovedCompleted(node: PRDItem): void {
       if (prunableIds.has(node.id)) {
-        function countComp(n: PRDItemRecord): void {
+        function countComp(n: PRDItem): void {
           if ((n.level === "task" || n.level === "subtask") && n.status === "completed") {
             removedCompleted++;
           }
@@ -1518,7 +1377,7 @@ interface PruneArchiveRecord {
   batches: Array<{
     timestamp: string;
     source?: string;
-    items: PRDItemRecord[];
+    items: PRDItem[];
     count: number;
     reason?: string;
   }>;
@@ -1855,7 +1714,7 @@ async function handleAcceptProposals(
 
     for (const p of toAccept) {
       const epicId = randomUUID();
-      const epicItem: PRDItemRecord = {
+      const epicItem: PRDItem = {
         id: epicId,
         title: p.epic.title,
         level: "epic",
@@ -1868,7 +1727,7 @@ async function handleAcceptProposals(
 
       for (const f of p.features) {
         const featureId = randomUUID();
-        const featureItem: PRDItemRecord = {
+        const featureItem: PRDItem = {
           id: featureId,
           title: f.title,
           level: "feature",
@@ -1881,7 +1740,7 @@ async function handleAcceptProposals(
 
         for (const t of f.tasks) {
           const taskId = randomUUID();
-          const taskItem: PRDItemRecord = {
+          const taskItem: PRDItem = {
             id: taskId,
             title: t.title,
             level: "task",
@@ -1890,7 +1749,7 @@ async function handleAcceptProposals(
           };
           if (t.description) taskItem.description = t.description;
           if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
-          if (t.priority) taskItem.priority = t.priority;
+          if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags) taskItem.tags = t.tags;
           insertChild(doc.items, featureId, taskItem);
           addedCount++;
@@ -2025,7 +1884,7 @@ async function handleAcceptEditedProposals(
 
     for (const p of selectedProposals) {
       const epicId = randomUUID();
-      const epicItem: PRDItemRecord = {
+      const epicItem: PRDItem = {
         id: epicId,
         title: p.epic.title.trim(),
         level: "epic",
@@ -2039,7 +1898,7 @@ async function handleAcceptEditedProposals(
       for (const f of p.features) {
         if (!f.selected) continue;
         const featureId = randomUUID();
-        const featureItem: PRDItemRecord = {
+        const featureItem: PRDItem = {
           id: featureId,
           title: f.title.trim(),
           level: "feature",
@@ -2053,7 +1912,7 @@ async function handleAcceptEditedProposals(
         for (const t of f.tasks) {
           if (!t.selected) continue;
           const taskId = randomUUID();
-          const taskItem: PRDItemRecord = {
+          const taskItem: PRDItem = {
             id: taskId,
             title: t.title.trim(),
             level: "task",
@@ -2573,11 +2432,11 @@ async function handleStartEpicByEpic(
     // Build the list of epics to execute
     const allEpics = doc.items.filter((item) => item.level === "epic");
 
-    let epicsToRun: PRDItemRecord[];
+    let epicsToRun: PRDItem[];
     if (input.epicIds && input.epicIds.length > 0) {
       epicsToRun = input.epicIds
         .map((id) => allEpics.find((e) => e.id === id))
-        .filter((e): e is PRDItemRecord => e != null);
+        .filter((e): e is PRDItem => e != null);
     } else {
       // All epics that aren't fully completed
       epicsToRun = allEpics.filter((epic) => {
@@ -2705,31 +2564,23 @@ function handleExecutionResume(
 // Requirements CRUD handlers
 // ---------------------------------------------------------------------------
 
-interface RequirementRecord {
-  id: string;
-  title: string;
-  category: string;
-  validationType: string;
-  acceptanceCriteria: string[];
-  description?: string;
-  validationCommand?: string;
-  threshold?: number;
-  priority?: string;
-}
+// RequirementRecord is now the canonical Requirement type from rex,
+// imported via the gateway (mcp-deps.ts).
+type RequirementRecord = import("./mcp-deps.js").Requirement;
 
 /** Walk the item tree collecting requirements with inheritance. */
 function collectInheritedRequirements(
-  items: PRDItemRecord[],
+  items: PRDItem[],
   targetId: string,
 ): Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemLevel: string }> {
   const result: Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemLevel: string }> = [];
 
   // Find the item and its parent chain
   function findWithParents(
-    list: PRDItemRecord[],
+    list: PRDItem[],
     id: string,
-    parents: PRDItemRecord[],
-  ): { item: PRDItemRecord; parents: PRDItemRecord[] } | null {
+    parents: PRDItem[],
+  ): { item: PRDItem; parents: PRDItem[] } | null {
     for (const item of list) {
       if (item.id === id) return { item, parents };
       if (Array.isArray(item.children)) {
@@ -3065,7 +2916,7 @@ function handleRequirementsCoverage(
   const seenReqIds = new Set<string>();
 
   // Walk tree counting requirements
-  function walkForCoverage(list: PRDItemRecord[], parentHasReqs: boolean): void {
+  function walkForCoverage(list: PRDItem[], parentHasReqs: boolean): void {
     for (const item of list) {
       if (item.status === "deleted") continue;
       stats.totalItems++;
@@ -3141,7 +2992,7 @@ function handleRequirementsTraceability(
     childIds: string[];
   }>();
 
-  function walkForReqs(list: PRDItemRecord[]): void {
+  function walkForReqs(list: PRDItem[]): void {
     for (const item of list) {
       const reqs = (item.requirements ?? []) as RequirementRecord[];
       for (const req of reqs) {
@@ -3162,7 +3013,7 @@ function handleRequirementsTraceability(
   }
 
   // Collect descendant items for each requirement-bearing item
-  function collectDescendants(items: PRDItemRecord[]): Array<{ id: string; title: string; level: string; status: string }> {
+  function collectDescendants(items: PRDItem[]): Array<{ id: string; title: string; level: string; status: string }> {
     const result: Array<{ id: string; title: string; level: string; status: string }> = [];
     for (const item of items) {
       if (item.status !== "deleted") {
