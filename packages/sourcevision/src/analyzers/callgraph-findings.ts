@@ -29,6 +29,44 @@ const HOTSPOT_FILE_THRESHOLD = 5;
 /** Maximum number of dead-export findings to emit. */
 const MAX_DEAD_EXPORT_FINDINGS = 10;
 
+/**
+ * Built-in / standard-library method names excluded from god function detection.
+ * Only excluded when the call type is "method" — a user-defined function named
+ * "filter" called directly (type: "direct") is still counted.
+ */
+const BUILTIN_METHOD_NAMES = new Set([
+  // Array
+  "at", "concat", "copyWithin", "entries", "every", "fill", "filter", "find",
+  "findIndex", "findLast", "findLastIndex", "flat", "flatMap", "forEach",
+  "includes", "indexOf", "join", "keys", "lastIndexOf", "map", "pop", "push",
+  "reduce", "reduceRight", "reverse", "shift", "slice", "some", "sort",
+  "splice", "toReversed", "toSorted", "toSpliced", "unshift", "values", "with",
+  // String
+  "charAt", "charCodeAt", "codePointAt", "endsWith", "localeCompare", "match",
+  "matchAll", "normalize", "padEnd", "padStart", "repeat", "replace",
+  "replaceAll", "search", "split", "startsWith", "substring", "toLocaleLowerCase",
+  "toLocaleUpperCase", "toLowerCase", "toUpperCase", "trim", "trimEnd", "trimStart",
+  // Object / generic
+  "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "toLocaleString",
+  "toString", "valueOf",
+  // Number
+  "toExponential", "toFixed", "toPrecision",
+  // Map / Set
+  "clear", "delete", "get", "has", "set",
+  // Promise
+  "then", "catch", "finally",
+  // RegExp
+  "exec", "test",
+  // Iterable/Iterator
+  "next", "return", "throw",
+  // Console/logging (commonly chained)
+  "log", "warn", "error", "info", "debug",
+  // DOM (commonly seen in UI code)
+  "addEventListener", "removeEventListener", "appendChild", "removeChild",
+  "querySelector", "querySelectorAll", "getAttribute", "setAttribute",
+  "createElement", "getElementById", "preventDefault", "stopPropagation",
+]);
+
 /** Files where uncalled exports are expected (entry points, configs, etc.). */
 const ENTRY_POINT_PATTERNS = [
   /(?:^|\/)index\.[tj]sx?$/,
@@ -93,10 +131,15 @@ export function generateCallGraphFindings(
  * Test files are excluded — tests naturally call many functions.
  */
 function detectGodFunctions(edges: CallEdge[], testFiles: Set<string>): Finding[] {
-  // Count unique callees per caller (file:qualifiedName)
+  // Count unique callees per caller (file:qualifiedName), excluding built-in
+  // method calls that inflate counts without indicating real complexity.
   const callerCallees = new Map<string, { file: string; name: string; callees: Set<string> }>();
 
   for (const e of edges) {
+    // Skip built-in method calls — only when call type is "method", so a
+    // user-defined function named "filter" called directly is still counted.
+    if (e.type === "method" && BUILTIN_METHOD_NAMES.has(e.callee)) continue;
+
     const key = `${e.callerFile}:${e.caller}`;
     if (!callerCallees.has(key)) {
       callerCallees.set(key, {

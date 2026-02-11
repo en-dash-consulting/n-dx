@@ -150,6 +150,161 @@ describe("god functions", () => {
     expect(godFindings[0].type).toBe("anti-pattern");
   });
 
+  it("excludes built-in method calls from unique callee count", () => {
+    // A function that calls 15 user-defined functions + 50 built-in methods
+    // should NOT be flagged (15 < threshold of 30), even though total is 65.
+    const fn = makeFn({ file: "src/view.ts", name: "CallGraphView" });
+    const functions = [fn];
+    const edges: CallEdge[] = [];
+
+    // 15 user-defined calls (direct)
+    for (let i = 0; i < 15; i++) {
+      functions.push(makeFn({ file: "src/helpers.ts", name: `helper${i}` }));
+      edges.push(makeEdge({
+        callerFile: "src/view.ts",
+        caller: "CallGraphView",
+        callee: `helper${i}`,
+        calleeFile: "src/helpers.ts",
+        type: "direct",
+      }));
+    }
+
+    // 50 built-in method calls
+    const builtins = ["map", "filter", "forEach", "reduce", "find", "includes",
+      "split", "join", "has", "set", "get", "delete", "push", "pop", "shift",
+      "slice", "splice", "concat", "indexOf", "toString", "toFixed", "keys",
+      "values", "entries", "sort", "reverse", "fill", "flat", "flatMap",
+      "some", "every", "findIndex", "startsWith", "endsWith", "trim",
+      "replace", "match", "search", "padStart", "padEnd", "charAt",
+      "charCodeAt", "substring", "toLowerCase", "toUpperCase", "repeat",
+      "normalize", "localeCompare", "trimStart", "trimEnd"];
+    for (const name of builtins.slice(0, 50)) {
+      edges.push(makeEdge({
+        callerFile: "src/view.ts",
+        caller: "CallGraphView",
+        callee: name,
+        calleeFile: null,
+        type: "method",
+      }));
+    }
+
+    const cg = makeCallGraph(functions, edges);
+    const findings = generateCallGraphFindings(cg);
+
+    const godFindings = findings.filter((f) => f.text.includes("God function") && f.text.includes("CallGraphView"));
+    expect(godFindings).toHaveLength(0);
+  });
+
+  it("flags function with many user-defined calls even when built-ins are excluded", () => {
+    // A function that calls 35 user-defined functions should be flagged
+    // regardless of whether it also calls built-in methods.
+    const fn = makeFn({ file: "src/main.ts", name: "doEverything" });
+    const functions = [fn];
+    const edges: CallEdge[] = [];
+
+    // 35 user-defined calls (direct)
+    for (let i = 0; i < 35; i++) {
+      functions.push(makeFn({ file: "src/helpers.ts", name: `helper${i}` }));
+      edges.push(makeEdge({
+        callerFile: "src/main.ts",
+        caller: "doEverything",
+        callee: `helper${i}`,
+        calleeFile: "src/helpers.ts",
+        type: "direct",
+      }));
+    }
+
+    // Also add some built-in method calls (should be ignored)
+    for (const name of ["map", "filter", "forEach", "reduce", "find"]) {
+      edges.push(makeEdge({
+        callerFile: "src/main.ts",
+        caller: "doEverything",
+        callee: name,
+        calleeFile: null,
+        type: "method",
+      }));
+    }
+
+    const cg = makeCallGraph(functions, edges);
+    const findings = generateCallGraphFindings(cg);
+
+    const godFindings = findings.filter((f) => f.text.includes("God function") && f.text.includes("doEverything"));
+    expect(godFindings.length).toBeGreaterThanOrEqual(1);
+    // Should report 35, not 40 (built-ins excluded)
+    expect(godFindings[0].text).toMatch(/35/);
+  });
+
+  it("counts direct calls to functions named like built-ins", () => {
+    // A user-defined function named "filter" called directly should still count.
+    const fn = makeFn({ file: "src/main.ts", name: "process" });
+    const functions = [fn];
+    const edges: CallEdge[] = [];
+
+    // 30 user-defined direct calls
+    for (let i = 0; i < 30; i++) {
+      functions.push(makeFn({ file: "src/helpers.ts", name: `helper${i}` }));
+      edges.push(makeEdge({
+        callerFile: "src/main.ts",
+        caller: "process",
+        callee: `helper${i}`,
+        calleeFile: "src/helpers.ts",
+        type: "direct",
+      }));
+    }
+
+    // Direct call to a user-defined function named "filter" — should count (pushes over threshold)
+    functions.push(makeFn({ file: "src/helpers.ts", name: "filter" }));
+    edges.push(makeEdge({
+      callerFile: "src/main.ts",
+      caller: "process",
+      callee: "filter",
+      calleeFile: "src/helpers.ts",
+      type: "direct",
+    }));
+
+    const cg = makeCallGraph(functions, edges);
+    const findings = generateCallGraphFindings(cg);
+
+    const godFindings = findings.filter((f) => f.text.includes("God function") && f.text.includes("process"));
+    expect(godFindings.length).toBeGreaterThanOrEqual(1);
+    expect(godFindings[0].text).toMatch(/31/);
+  });
+
+  it("handles threshold boundary — exactly at threshold is not flagged", () => {
+    const fn = makeFn({ file: "src/main.ts", name: "borderline" });
+    const functions = [fn];
+    const edges: CallEdge[] = [];
+
+    // Exactly 30 user-defined calls — at the threshold (> 30 needed to flag)
+    for (let i = 0; i < 30; i++) {
+      functions.push(makeFn({ file: "src/helpers.ts", name: `helper${i}` }));
+      edges.push(makeEdge({
+        callerFile: "src/main.ts",
+        caller: "borderline",
+        callee: `helper${i}`,
+        calleeFile: "src/helpers.ts",
+        type: "direct",
+      }));
+    }
+
+    // Add built-in methods that would push over threshold if counted
+    for (const name of ["map", "filter", "forEach", "reduce", "find"]) {
+      edges.push(makeEdge({
+        callerFile: "src/main.ts",
+        caller: "borderline",
+        callee: name,
+        calleeFile: null,
+        type: "method",
+      }));
+    }
+
+    const cg = makeCallGraph(functions, edges);
+    const findings = generateCallGraphFindings(cg);
+
+    const godFindings = findings.filter((f) => f.text.includes("God function") && f.text.includes("borderline"));
+    expect(godFindings).toHaveLength(0);
+  });
+
   it("does not flag functions with moderate call counts", () => {
     const fn = makeFn({ file: "src/main.ts", name: "init" });
     const functions = [fn];
