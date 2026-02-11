@@ -7894,14 +7894,16 @@
             {
               "id": "9ee0e1d6-8343-43f5-9fd0-65c799dfb230",
               "title": "Audit health-gauge.ts — confirm components are rendered or remove",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "packages/web/src/viewer/components/data-display/health-gauge.ts exports 4 components (HealthGauge, HealthBadge, PatternBadge, MetricCard) flagged as unused. Check if they are rendered in any viewer page. Remove if dead, or document the dynamic usage pattern if alive.",
               "acceptanceCriteria": [
                 "Each component is either confirmed rendered (with usage site) or removed",
                 "pnpm typecheck passes"
               ],
-              "priority": "low"
+              "priority": "low",
+              "startedAt": "2026-02-11T17:00:06.108Z",
+              "completedAt": "2026-02-11T17:01:12.533Z"
             },
             {
               "id": "8974f0a6-cba3-4ecc-a513-01df0cd8497f",
@@ -7929,6 +7931,8 @@
             "All existing tests still pass after the split"
           ],
           "priority": "medium",
+          "startedAt": "2026-02-11T16:59:31.143Z",
+          "completedAt": "2026-02-11T16:59:31.143Z",
           "children": [
             {
               "id": "2ec4de61-7d1e-4b89-940e-266ff403c3e4",
@@ -7946,9 +7950,7 @@
               "startedAt": "2026-02-11T16:49:13.579Z",
               "completedAt": "2026-02-11T16:59:31.062Z"
             }
-          ],
-          "startedAt": "2026-02-11T16:59:31.143Z",
-          "completedAt": "2026-02-11T16:59:31.143Z"
+          ]
         },
         {
           "id": "149e7d72-8c46-4a5a-a290-9e9a9e30870b",

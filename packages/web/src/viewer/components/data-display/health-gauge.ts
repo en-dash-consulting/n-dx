@@ -73,27 +73,6 @@ export function HealthGauge({ value, label, size = 80, inverted = false }: Healt
 }
 
 /**
- * Health Badge - A compact inline indicator for health status.
- */
-interface HealthBadgeProps {
-  value: number;
-  inverted?: boolean;
-}
-
-export function HealthBadge({ value, inverted = false }: HealthBadgeProps) {
-  const normalized = Math.max(0, Math.min(1, value));
-  const displayValue = inverted ? 1 - normalized : normalized;
-
-  const level = displayValue >= 0.7 ? "good"
-    : displayValue >= 0.4 ? "mid"
-    : "bad";
-
-  return h("span", { class: `health-badge health-${level}` },
-    normalized.toFixed(2)
-  );
-}
-
-/**
  * Pattern Badge - Shows a pattern or antipattern indicator.
  */
 interface PatternBadgeProps {

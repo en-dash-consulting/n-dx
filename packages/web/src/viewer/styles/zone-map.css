@@ -234,30 +234,6 @@
   text-align: center;
 }
 
-/* Health Badge */
-.health-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.health-badge.health-good {
-  background: color-mix(in srgb, var(--green) 20%, transparent);
-  color: var(--green);
-}
-
-.health-badge.health-mid {
-  background: color-mix(in srgb, var(--orange) 20%, transparent);
-  color: var(--orange);
-}
-
-.health-badge.health-bad {
-  background: color-mix(in srgb, var(--red) 20%, transparent);
-  color: var(--red);
-}
-
 /* Pattern Badge */
 .pattern-badge {
   display: inline-flex;
