@@ -20,6 +20,7 @@ import { useState, useCallback } from "preact/hooks";
 import type { ItemLevel } from "./types.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
+import { basename } from "../../utils.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -289,7 +290,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
         result.backupPath
           ? h("div", { class: "prune-confirmation-field" },
               h("span", { class: "prune-confirmation-field-label" }, "Backup saved: "),
-              h("code", null, result.backupPath.split("/").pop()),
+              h("code", null, basename(result.backupPath)),
             )
           : null,
       ),

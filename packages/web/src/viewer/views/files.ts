@@ -2,8 +2,7 @@ import { h } from "preact";
 import { useState, useMemo, useEffect } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../../schema/v1.js";
-import { ZONE_COLORS } from "../components/constants.js";
-import { buildFileToZoneMap } from "../utils.js";
+import { buildFileToZoneMap, getZoneColorByIndex, basename } from "../utils.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface FilesViewProps {
@@ -58,7 +57,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
     return zones.zones.map((z, i) => ({
       id: z.id,
       name: z.name,
-      color: ZONE_COLORS[i % ZONE_COLORS.length],
+      color: getZoneColorByIndex(i),
     }));
   }, [zones]);
 
@@ -134,7 +133,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
     if (setSelectedFile) setSelectedFile(file.path);
     onSelect({
       type: "file",
-      title: file.path.split("/").pop() || file.path,
+      title: basename(file.path),
       path: file.path,
       language: file.language,
       size: formatSize(file.size),

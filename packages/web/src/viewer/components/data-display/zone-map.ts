@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type { Zone, ZoneCrossing } from "../../../schema/v1.js";
-import { ZONE_COLORS } from "../constants.js";
+import { getZoneColorByIndex, basename } from "../../utils.js";
 
 /**
  * Zone Map - A hierarchical visualization of zones and their connections.
@@ -112,7 +112,7 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
       style: `grid-template-columns: repeat(${cols}, 1fr)`,
     },
       zones.map((zone, i) => {
-        const color = ZONE_COLORS[i % ZONE_COLORS.length];
+        const color = getZoneColorByIndex(i);
         const metrics = zoneMetrics.get(zone.id);
         const isSelected = selectedZone === zone.id;
         const isHovered = hoveredZone === zone.id;
@@ -195,7 +195,7 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
               },
                 h("span", {
                   class: "connection-zone",
-                  style: `--zone-color: ${ZONE_COLORS[fromIdx % ZONE_COLORS.length]}`,
+                  style: `--zone-color: ${getZoneColorByIndex(fromIdx)}`,
                 },
                   fromZone.name
                 ),
@@ -204,7 +204,7 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
                 ),
                 h("span", {
                   class: "connection-zone",
-                  style: `--zone-color: ${ZONE_COLORS[toIdx % ZONE_COLORS.length]}`,
+                  style: `--zone-color: ${getZoneColorByIndex(toIdx)}`,
                 },
                   toZone.name
                 ),
@@ -245,7 +245,7 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
   const outgoingByZone = groupBy(outgoing, c => c.toZone);
 
   const zoneIdx = allZones.indexOf(zone);
-  const color = ZONE_COLORS[zoneIdx % ZONE_COLORS.length];
+  const color = getZoneColorByIndex(zoneIdx);
 
   return h("div", { class: "zone-detail-overlay" },
     h("div", { class: "zone-detail-panel", style: `--zone-color: ${color}` },
@@ -284,7 +284,7 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
             h("h4", null, "Entry Points"),
             h("ul", { class: "entry-point-list" },
               zone.entryPoints.slice(0, 5).map(ep =>
-                h("li", { key: ep, class: "mono-sm" }, ep.split("/").pop())
+                h("li", { key: ep, class: "mono-sm" }, basename(ep))
               ),
               zone.entryPoints.length > 5
                 ? h("li", { class: "more" }, `+${zone.entryPoints.length - 5} more`)

@@ -2,11 +2,10 @@ import { h } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Zone, Finding } from "../../schema/v1.js";
-import { ZONE_COLORS } from "../components/constants.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import { SearchFilter } from "../components/search-filter.js";
 import { FlowDiagram } from "../components/data-display/mini-charts.js";
-import { meterClass, buildFlowNodes, buildFlowEdges } from "../utils.js";
+import { meterClass, buildFlowNodes, buildFlowEdges, getZoneColorByIndex } from "../utils.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface ZonesViewProps {
@@ -105,7 +104,7 @@ export function ZonesView({ data, onSelect }: ZonesViewProps) {
       filteredZones.map((zone, i) => {
         const globalIdx = zones.zones.indexOf(zone);
         const traffic = zoneTraffic.get(zone.id);
-        const color = ZONE_COLORS[globalIdx % ZONE_COLORS.length];
+        const color = getZoneColorByIndex(globalIdx);
 
         return h("div", {
           key: zone.id,

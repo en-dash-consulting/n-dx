@@ -12,6 +12,7 @@ import {
   initZoneClusteredPositions,
   tick,
 } from "./physics.js";
+import { basename } from "../utils.js";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ export class GraphRenderer {
       label.setAttribute("class", "graph-label");
       label.setAttribute("dy", String(-radius - 3));
       label.setAttribute("text-anchor", "middle");
-      label.textContent = n.id.split("/").pop() || n.id;
+      label.textContent = basename(n.id);
       group.appendChild(label);
 
       this.g.appendChild(group);
@@ -437,7 +438,7 @@ export class GraphRenderer {
       if (dragNode) {
         if (!isDragging && dragNodeIdx >= 0) {
           const n = this.nodes[dragNodeIdx];
-          const fileName = n.id.split("/").pop() || n.id;
+          const fileName = basename(n.id);
           onNodeSelect({
             title: fileName,
             path: n.id,

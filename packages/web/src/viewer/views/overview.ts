@@ -6,7 +6,7 @@ import { BarChart } from "../components/data-display/mini-charts.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import { HealthGauge, PatternBadge, MetricCard } from "../components/data-display/health-gauge.js";
 import { ZoneMap, ZoneDetail } from "../components/data-display/zone-map.js";
-import { ZONE_COLORS } from "../components/constants.js";
+import { getZoneColorByIndex, basename } from "../utils.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface OverviewProps {
@@ -133,7 +133,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
     manifest
       ? h("div", { class: "overview-header view-header" },
           h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
-          h("h2", { class: "view-title" }, manifest.targetPath.split("/").pop()),
+          h("h2", { class: "view-title" }, basename(manifest.targetPath)),
           h("p", { class: "overview-meta" },
             manifest.gitBranch ? `${manifest.gitBranch} ` : "",
             manifest.gitSha ? `(${manifest.gitSha.slice(0, 7)}) \u2022 ` : "",
@@ -260,7 +260,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
             h("div", { class: "top-zones-list" },
               topZones.map((zone, i) => {
                 const globalIdx = zones!.zones.indexOf(zone);
-                const color = ZONE_COLORS[globalIdx % ZONE_COLORS.length];
+                const color = getZoneColorByIndex(globalIdx);
 
                 return h("div", {
                   key: zone.id,

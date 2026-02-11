@@ -1,8 +1,7 @@
 import { h, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
-import { ZONE_COLORS } from "./constants.js";
-import { meterClass } from "../utils.js";
+import { meterClass, getZoneColorByIndex, basename } from "../utils.js";
 import type { VNode } from "preact";
 
 interface DetailPanelProps {
@@ -83,7 +82,7 @@ function renderFileDetail(
     for (let i = 0; i < zones.zones.length; i++) {
       const z = zones.zones[i];
       if (z.files.includes(path)) {
-        fileZone = { id: z.id, name: z.name, color: ZONE_COLORS[i % ZONE_COLORS.length] };
+        fileZone = { id: z.id, name: z.name, color: getZoneColorByIndex(i) };
         break;
       }
     }
@@ -135,7 +134,7 @@ function renderFileDetail(
           h("div", { class: "label mb-6" }, `Imported by (${incoming.length})`),
           h("div", { class: "detail-import-list" },
             incoming.slice(0, 10).map((f) =>
-              h("div", { key: f, class: "detail-import-item", title: f }, f.split("/").pop() || f)
+              h("div", { key: f, class: "detail-import-item", title: f }, basename(f))
             ),
             incoming.length > 10
               ? h("div", { class: "detail-import-item text-dim" },
@@ -152,7 +151,7 @@ function renderFileDetail(
           h("div", { class: "label mb-6" }, `Imports (${outgoing.length})`),
           h("div", { class: "detail-import-list" },
             outgoing.slice(0, 10).map((f) =>
-              h("div", { key: f, class: "detail-import-item", title: f }, f.split("/").pop() || f)
+              h("div", { key: f, class: "detail-import-item", title: f }, basename(f))
             ),
             outgoing.length > 10
               ? h("div", { class: "detail-import-item text-dim" },
@@ -205,7 +204,7 @@ function renderZoneDetail(
           h("div", { class: "label" }, "Entry Points"),
           h("div", { class: "detail-import-list" },
             zone.entryPoints.map((ep) =>
-              h("div", { key: ep, class: "detail-import-item", title: ep }, ep.split("/").pop() || ep)
+              h("div", { key: ep, class: "detail-import-item", title: ep }, basename(ep))
             )
           )
         )

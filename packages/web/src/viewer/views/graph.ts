@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useEffect, useRef, useState, useMemo } from "preact/hooks";
 import type { LoadedData, DetailItem } from "../types.js";
-import { ZONE_COLORS } from "../components/constants.js";
+import { buildZoneColorMap, getZoneColorByIndex } from "../utils.js";
 import { GraphRenderer, type GraphNode, type GraphLink } from "../graph/renderer.js";
 import { BrandedHeader } from "../components/logos.js";
 
@@ -20,8 +20,8 @@ export function Graph({ data, onSelect, selectedFile, selectedZone }: GraphProps
 
   const { imports, zones } = data;
 
-  // Build zone lookup
-  const fileToZone = useMemo(() => {
+  // Build zone lookups using shared utilities
+  const fileToZoneMap = useMemo(() => {
     const map = new Map<string, string>();
     if (zones) {
       zones.zones.forEach((z) => {
@@ -31,15 +31,7 @@ export function Graph({ data, onSelect, selectedFile, selectedZone }: GraphProps
     return map;
   }, [zones]);
 
-  const zoneColorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (zones) {
-      zones.zones.forEach((z, i) => {
-        map.set(z.id, ZONE_COLORS[i % ZONE_COLORS.length]);
-      });
-    }
-    return map;
-  }, [zones]);
+  const zoneColorMap = useMemo(() => buildZoneColorMap(zones), [zones]);
 
   // Build cross-zone set
   const crossZoneSet = useMemo(() => {
@@ -78,8 +70,8 @@ export function Graph({ data, onSelect, selectedFile, selectedZone }: GraphProps
 
     const nodes: GraphNode[] = Array.from(nodeSet).map((id) => ({
       id,
-      zone: fileToZone.get(id),
-      zoneColor: fileToZone.has(id) ? zoneColorMap.get(fileToZone.get(id)!) : "var(--text-dim)",
+      zone: fileToZoneMap.get(id),
+      zoneColor: fileToZoneMap.has(id) ? zoneColorMap.get(fileToZoneMap.get(id)!) : "var(--text-dim)",
       importCount: importCounts.get(id) || 0,
     }));
 
@@ -133,7 +125,7 @@ export function Graph({ data, onSelect, selectedFile, selectedZone }: GraphProps
     if (!zones) return [];
     return zones.zones.map((z, i) => ({
       name: z.name,
-      color: ZONE_COLORS[i % ZONE_COLORS.length],
+      color: getZoneColorByIndex(i),
     }));
   }, [zones]);
 

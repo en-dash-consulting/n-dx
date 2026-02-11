@@ -6591,11 +6591,11 @@
     {
       "id": "aab3e41d-5c6e-4d79-b7c0-04c01ad9e4c8",
       "title": "Rex Smart Operations UI Integration",
-      "status": "in_progress",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-02-11T02:16:59.280Z",
-      "completedAt": "2026-02-10T21:35:57.045Z",
+      "completedAt": "2026-02-11T02:29:18.230Z",
       "children": [
         {
           "id": "07c19b0f-f2f0-40d7-a6e5-3da7354e9bbd",
@@ -6700,17 +6700,17 @@
         {
           "id": "6efaf2cb-7ad8-454f-8cf7-14ff7eea6119",
           "title": "Smart Add UI Integration",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "description": "Integrate Rex's intelligent add functionality into the web UI with natural language input and real-time proposal generation",
           "source": "smart-add",
           "startedAt": "2026-02-11T02:16:56.460Z",
-          "completedAt": "2026-02-10T21:35:57.018Z",
+          "completedAt": "2026-02-11T02:29:18.203Z",
           "children": [
             {
               "id": "63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
               "title": "Create smart add interface in Rex dashboard",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a prominent smart add section to the Rex dashboard with natural language input field and context selection",
               "acceptanceCriteria": [
@@ -6726,7 +6726,8 @@
                 "smart-add"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-10T19:11:59.701Z"
+              "startedAt": "2026-02-10T19:11:59.701Z",
+              "completedAt": "2026-02-11T02:29:18.134Z"
             },
             {
               "id": "7e6f03b5-dcf9-4f4e-a9bb-7a69a12cb058",
@@ -7267,20 +7268,24 @@
     {
       "id": "01f4fa8a-cc11-4543-80d8-11a5e12b3d01",
       "title": "Address observation issues (2 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Error hierarchy should be standardized: domain CLIError classes should extend foundation ClaudeClientError for consistent error handling patterns\n- Process execution abstraction missing: scattered execFile imports across multiple zones should use centralized process management layer",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T02:29:58.537Z",
+      "completedAt": "2026-02-11T02:43:37.070Z"
     },
     {
       "id": "ded6c910-4c30-4936-9154-0189c390afb7",
       "title": "Address pattern issues (1 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Process execution scattered across 40+ files indicates missing centralized process management abstraction",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T02:44:13.586Z",
+      "completedAt": "2026-02-11T02:52:12.099Z"
     },
     {
       "id": "03b44f3b-01af-41a0-bc72-2ec5897cdf1f",
@@ -7296,11 +7301,178 @@
     {
       "id": "ca370309-a69e-412b-8c12-4125364025c0",
       "title": "Address suggestion issues (3 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Promote process/exec.ts abstraction to claude-client foundation layer to eliminate process execution duplication across zones\n- Process execution should be promoted from hench zone to foundation layer — exec patterns scattered across 40+ files indicate this belongs in claude-client for system-wide standardization\n- Standardize process execution by promoting hench/src/process/exec.ts to claude-client foundation layer — currently scattered across 40+ files",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T03:05:21.527Z",
+      "completedAt": "2026-02-11T03:16:08.981Z"
+    },
+    {
+      "id": "93ff80c9-6e29-471e-a38b-8596d1033e8b",
+      "title": "Address suggestion issues (3 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Multiple viewer sub-zones across the codebase suggest need for UI component lifecycle and consolidation governance\n- Direct child_process imports in routes-rex.ts should be refactored to use foundation layer spawnTool abstraction for architectural consistency\n- Multiple viewer sub-zones suggest need for viewer consolidation strategy to prevent UI component fragmentation and maintenance burden",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T03:16:49.180Z",
+      "completedAt": "2026-02-11T03:23:59.292Z"
+    },
+    {
+      "id": "f5284d6e-06f9-4011-926f-9dd62de38194",
+      "title": "SourceVision Import Graph Visualization Enhancement",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "9e57dd9f-9e44-4068-b5a2-84d29cdbb3e9",
+          "title": "Interactive Graph Controls",
+          "status": "pending",
+          "level": "feature",
+          "description": "Make the import graph interactive with draggable nodes, clickable elements, and navigation controls for better user exploration",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "39144f79-e12e-46ff-979b-2a95359091bc",
+              "title": "Implement interactive node manipulation",
+              "status": "pending",
+              "level": "task",
+              "description": "Enable users to drag nodes to new positions and click on nodes to show file details and highlight connections",
+              "acceptanceCriteria": [
+                "Nodes can be dragged to new positions with mouse or touch",
+                "Node positions persist during the current session",
+                "Dragging updates connected edge positions in real-time",
+                "Clicking a node highlights its direct imports and dependencies",
+                "Node click shows file metadata in a sidebar or popup",
+                "Double-click opens file content view or navigates to file location"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "interaction",
+                "sourcevision",
+                "navigation"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a50b5e5d-7ef9-4a45-b847-114977184230",
+              "title": "Implement zoom and pan controls",
+              "status": "pending",
+              "level": "task",
+              "description": "Add zoom in/out and pan functionality to navigate large import graphs that don't fit on screen",
+              "acceptanceCriteria": [
+                "Mouse wheel or pinch gestures zoom in and out",
+                "Click and drag on empty space pans the view",
+                "Zoom controls maintain node readability at different scales"
+              ],
+              "priority": "low",
+              "tags": [
+                "ui",
+                "navigation",
+                "accessibility"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "7de8dfa9-5bb7-4a79-a617-91b2bbd71c9c",
+          "title": "Label Management and Visual Clarity",
+          "status": "pending",
+          "level": "feature",
+          "description": "Fix overlapping filename labels and implement smart visibility management to make the graph readable at all scales",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "ca6091ab-d5d8-4f62-93be-0194efff210e",
+              "title": "Implement smart label positioning and visibility",
+              "status": "pending",
+              "level": "task",
+              "description": "Prevent label overlaps through dynamic positioning and manage label visibility based on zoom level and density\n\n---\n\nTruncate long filenames with ellipsis and show full names on hover to balance readability with information access",
+              "acceptanceCriteria": [
+                "Labels never overlap with other labels or nodes",
+                "Labels remain clearly associated with their corresponding nodes",
+                "Algorithm performs efficiently on graphs with 100+ nodes",
+                "Labels fade out when zoom level makes them unreadable",
+                "High-density areas show only key file labels",
+                "User can toggle label visibility on demand",
+                "Long filenames are truncated with ellipsis after reasonable length",
+                "Hover shows full filename in tooltip",
+                "Truncation preserves important parts of filename (extension, meaningful segments)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "accessibility",
+                "algorithm",
+                "layout",
+                "performance",
+                "tooltips",
+                "ui",
+                "usability"
+              ],
+              "source": "smart-add",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "fe904ed1-7e5d-4f9b-b893-72520a24b807",
+          "title": "Graph Organization and Layout",
+          "status": "pending",
+          "level": "feature",
+          "description": "Group related files and apply intelligent layout algorithms to make complex import relationships easier to understand",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5bf87a91-de47-425a-a736-2a54827150e1",
+              "title": "Implement zone-based and hierarchical grouping",
+              "status": "pending",
+              "level": "task",
+              "description": "Group nodes by SourceVision zones and package structure to create visual clusters that reflect architectural and modular boundaries",
+              "acceptanceCriteria": [
+                "Nodes are visually grouped by their assigned zones",
+                "Zone groups have distinct visual styling (colors, backgrounds, borders)",
+                "Users can expand/collapse zone groups to manage complexity",
+                "Files from same package/directory are visually clustered",
+                "Hierarchical grouping reflects folder structure",
+                "Cross-package dependencies are clearly highlighted"
+              ],
+              "priority": "medium",
+              "tags": [
+                "grouping",
+                "architecture",
+                "zones",
+                "hierarchy",
+                "packages"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "07be560d-e209-4b1b-968c-dfe5f5028787",
+              "title": "Implement intelligent layout algorithms",
+              "status": "pending",
+              "level": "task",
+              "description": "Apply force-directed or hierarchical layout algorithms that respect grouping constraints for cleaner organization",
+              "acceptanceCriteria": [
+                "Groups are spatially separated with clear boundaries",
+                "Inter-group connections are minimized and clearly visible",
+                "Layout algorithm maintains group cohesion while optimizing readability"
+              ],
+              "priority": "low",
+              "tags": [
+                "algorithm",
+                "layout",
+                "performance"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -1,10 +1,47 @@
+/**
+ * Shared viewer utilities.
+ *
+ * All new UI helpers should be added here rather than inlined in individual
+ * view/component files. This consolidation reduces sub-zone fragmentation
+ * by keeping cross-cutting logic in one place.
+ *
+ * Key patterns consolidated here:
+ *  - Zone color lookup (getZoneColor, getZoneColorByIndex, buildZoneColorMap)
+ *  - File-to-zone mapping (buildFileToZoneMap)
+ *  - Metric classification (meterClass)
+ *  - Flow diagram data (buildFlowNodes, buildFlowEdges)
+ *  - Path display (basename)
+ */
 import type { Zones } from "../schema/v1.js";
 import { ZONE_COLORS } from "./components/constants.js";
+
+/** Get the zone color by array index (wraps around). */
+export function getZoneColorByIndex(index: number): string {
+  return ZONE_COLORS[index % ZONE_COLORS.length];
+}
 
 /** Get the display color for a zone by its index in the zones array. */
 export function getZoneColor(zones: Zones, zoneId: string): string {
   const idx = zones.zones.findIndex((z) => z.id === zoneId);
-  return idx >= 0 ? ZONE_COLORS[idx % ZONE_COLORS.length] : "#555";
+  return idx >= 0 ? getZoneColorByIndex(idx) : "#555";
+}
+
+/** Build a map from zone id to its display color. */
+export function buildZoneColorMap(
+  zones: Zones | null
+): Map<string, string> {
+  const map = new Map<string, string>();
+  if (zones) {
+    zones.zones.forEach((z, i) => {
+      map.set(z.id, getZoneColorByIndex(i));
+    });
+  }
+  return map;
+}
+
+/** Extract the filename from a path (last segment after '/'). */
+export function basename(path: string): string {
+  return path.split("/").pop() || path;
 }
 
 /** Build a map from file path to zone info (id, name, color). */
@@ -14,7 +51,7 @@ export function buildFileToZoneMap(
   const map = new Map<string, { id: string; name: string; color: string }>();
   if (zones) {
     zones.zones.forEach((z, i) => {
-      const color = ZONE_COLORS[i % ZONE_COLORS.length];
+      const color = getZoneColorByIndex(i);
       for (const f of z.files) {
         map.set(f, { id: z.id, name: z.name, color });
       }
@@ -53,6 +90,6 @@ export function buildFlowNodes(
   return zones.zones.map((z, i) => ({
     id: z.id,
     label: z.name,
-    color: ZONE_COLORS[i % ZONE_COLORS.length],
+    color: getZoneColorByIndex(i),
   }));
 }
