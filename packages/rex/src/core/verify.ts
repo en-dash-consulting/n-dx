@@ -8,10 +8,10 @@
  * 4. Report results per-task, per-criterion.
  */
 
-import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname, relative } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS, exec as foundationExec } from "@n-dx/claude-client";
+import type { ExecResult } from "@n-dx/claude-client";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch, STOP_WORDS } from "./keywords.js";
 import type { PRDItem } from "../schema/index.js";
@@ -187,7 +187,7 @@ export function collectVerifiableTasks(
 }
 
 // ---------------------------------------------------------------------------
-// Shell execution
+// Shell execution (delegates to foundation layer)
 // ---------------------------------------------------------------------------
 
 function exec(
@@ -196,26 +196,7 @@ function exec(
   cwd: string,
   timeout: number,
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-  return new Promise((resolve) => {
-    execFile(
-      cmd,
-      args,
-      { cwd, timeout, maxBuffer: 2 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        const exitCode = error
-          ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT"
-            ? null
-            : (error as { code?: number }).code ?? 1
-          : 0;
-
-        resolve({
-          stdout: (stdout ?? "").toString(),
-          stderr: (stderr ?? "").toString(),
-          exitCode: typeof exitCode === "number" ? exitCode : null,
-        });
-      },
-    );
-  });
+  return foundationExec(cmd, args, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
 }
 
 // ---------------------------------------------------------------------------

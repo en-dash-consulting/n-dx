@@ -6591,10 +6591,10 @@
     {
       "id": "aab3e41d-5c6e-4d79-b7c0-04c01ad9e4c8",
       "title": "Rex Smart Operations UI Integration",
-      "status": "completed",
+      "status": "in_progress",
       "level": "epic",
       "source": "smart-add",
-      "startedAt": "2026-02-10T21:35:57.045Z",
+      "startedAt": "2026-02-11T02:16:59.280Z",
       "completedAt": "2026-02-10T21:35:57.045Z",
       "children": [
         {
@@ -6700,17 +6700,17 @@
         {
           "id": "6efaf2cb-7ad8-454f-8cf7-14ff7eea6119",
           "title": "Smart Add UI Integration",
-          "status": "completed",
+          "status": "in_progress",
           "level": "feature",
           "description": "Integrate Rex's intelligent add functionality into the web UI with natural language input and real-time proposal generation",
           "source": "smart-add",
-          "startedAt": "2026-02-10T21:35:57.018Z",
+          "startedAt": "2026-02-11T02:16:56.460Z",
           "completedAt": "2026-02-10T21:35:57.018Z",
           "children": [
             {
               "id": "63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
               "title": "Create smart add interface in Rex dashboard",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Add a prominent smart add section to the Rex dashboard with natural language input field and context selection",
               "acceptanceCriteria": [
@@ -7263,6 +7263,44 @@
       "source": "sourcevision",
       "startedAt": "2026-02-11T00:16:52.495Z",
       "completedAt": "2026-02-11T00:26:25.251Z"
+    },
+    {
+      "id": "01f4fa8a-cc11-4543-80d8-11a5e12b3d01",
+      "title": "Address observation issues (2 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Error hierarchy should be standardized: domain CLIError classes should extend foundation ClaudeClientError for consistent error handling patterns\n- Process execution abstraction missing: scattered execFile imports across multiple zones should use centralized process management layer",
+      "priority": "high",
+      "source": "sourcevision"
+    },
+    {
+      "id": "ded6c910-4c30-4936-9154-0189c390afb7",
+      "title": "Address pattern issues (1 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Process execution scattered across 40+ files indicates missing centralized process management abstraction",
+      "priority": "high",
+      "source": "sourcevision"
+    },
+    {
+      "id": "03b44f3b-01af-41a0-bc72-2ec5897cdf1f",
+      "title": "Address anti-pattern issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Process execution scattered across 40+ files despite centralized abstraction existing in hench zone — exec.ts should be promoted to foundation layer",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T02:13:22.937Z",
+      "completedAt": "2026-02-11T02:19:46.200Z"
+    },
+    {
+      "id": "ca370309-a69e-412b-8c12-4125364025c0",
+      "title": "Address suggestion issues (3 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Promote process/exec.ts abstraction to claude-client foundation layer to eliminate process execution duplication across zones\n- Process execution should be promoted from hench zone to foundation layer — exec patterns scattered across 40+ files indicate this belongs in claude-client for system-wide standardization\n- Standardize process execution by promoting hench/src/process/exec.ts to claude-client foundation layer — currently scattered across 40+ files",
+      "priority": "high",
+      "source": "sourcevision"
     }
   ]
 }

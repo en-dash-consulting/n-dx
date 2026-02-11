@@ -118,6 +118,19 @@ export {
 } from "./auth.js";
 export type { AuthDetectionResult, AuthDiagnostics } from "./auth.js";
 
+// Process execution
+export {
+  exec,
+  execStdout,
+  execShellCmd,
+  getCurrentHead,
+} from "./exec.js";
+
+export type {
+  ExecResult,
+  ExecOptions,
+} from "./exec.js";
+
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";

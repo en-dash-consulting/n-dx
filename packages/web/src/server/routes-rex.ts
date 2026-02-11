@@ -39,6 +39,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile, type ChildProcess } from "node:child_process";
+import { exec as foundationExec } from "@n-dx/claude-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -1738,44 +1739,35 @@ async function handleAnalyze(
     const binPath = existsSync(rexBin) ? rexBin : "node";
     const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
 
-    await new Promise<void>((resolve, reject) => {
-      execFile(binPath, binArgs, {
-        cwd: ctx.projectDir,
-        timeout: 120_000,
-        maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env },
-      }, (error, stdout, stderr) => {
-        if (error) {
-          // Try to parse JSON from stdout even on error (CLI may exit non-zero but still output)
-          try {
-            const parsed = JSON.parse(stdout);
-            jsonResponse(res, 200, { ok: true, ...parsed });
-            resolve();
-            return;
-          } catch {
-            // Fall through to error response
-          }
-          errorResponse(res, 500, `Analysis failed: ${stderr || error.message}`);
-          resolve();
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          if (broadcast) {
-            broadcast({
-              type: "rex:prd-changed",
-              timestamp: new Date().toISOString(),
-            });
-          }
-          jsonResponse(res, 200, { ok: true, ...result });
-        } catch {
-          // Non-JSON output — return as plain result
-          jsonResponse(res, 200, { ok: true, output: stdout.trim() });
-        }
-        resolve();
-      });
+    const result = await foundationExec(binPath, binArgs, {
+      cwd: ctx.projectDir,
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
     });
+
+    if (result.error) {
+      // Try to parse JSON from stdout even on error (CLI may exit non-zero but still output)
+      try {
+        const parsed = JSON.parse(result.stdout);
+        jsonResponse(res, 200, { ok: true, ...parsed });
+      } catch {
+        errorResponse(res, 500, `Analysis failed: ${result.stderr || result.error.message}`);
+      }
+    } else {
+      try {
+        const parsed = JSON.parse(result.stdout);
+        if (broadcast) {
+          broadcast({
+            type: "rex:prd-changed",
+            timestamp: new Date().toISOString(),
+          });
+        }
+        jsonResponse(res, 200, { ok: true, ...parsed });
+      } catch {
+        // Non-JSON output — return as plain result
+        jsonResponse(res, 200, { ok: true, output: result.stdout.trim() });
+      }
+    }
   } catch (err) {
     errorResponse(res, 400, String(err));
   }
@@ -2145,25 +2137,15 @@ async function handleSmartAddPreview(
     const binPath = existsSync(rexBin) ? rexBin : "node";
     const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
 
-    const cliResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      execFile(binPath, binArgs, {
-        cwd: ctx.projectDir,
-        timeout: 60_000,
-        maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env },
-      }, (error, stdout, stderr) => {
-        if (error) {
-          // Try to parse JSON from stdout even on error
-          if (stdout && stdout.trim()) {
-            resolve({ stdout, stderr });
-          } else {
-            reject(new Error(stderr || error.message));
-          }
-          return;
-        }
-        resolve({ stdout, stderr });
-      });
+    const cliResult = await foundationExec(binPath, binArgs, {
+      cwd: ctx.projectDir,
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
     });
+
+    if (cliResult.error && !cliResult.stdout.trim()) {
+      throw new Error(cliResult.stderr || cliResult.error.message);
+    }
 
     try {
       const parsed = JSON.parse(cliResult.stdout);
@@ -2305,24 +2287,15 @@ async function handleBatchImport(
       const binPath = existsSync(rexBin) ? rexBin : "node";
       const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
 
-      const cliResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-        execFile(binPath, binArgs, {
-          cwd: ctx.projectDir,
-          timeout: 120_000, // 2 minutes — batch may take longer
-          maxBuffer: 10 * 1024 * 1024,
-          env: { ...process.env },
-        }, (error, stdout, stderr) => {
-          if (error) {
-            if (stdout && stdout.trim()) {
-              resolve({ stdout, stderr });
-            } else {
-              reject(new Error(stderr || error.message));
-            }
-            return;
-          }
-          resolve({ stdout, stderr });
-        });
+      const cliResult = await foundationExec(binPath, binArgs, {
+        cwd: ctx.projectDir,
+        timeout: 120_000, // 2 minutes — batch may take longer
+        maxBuffer: 10 * 1024 * 1024,
       });
+
+      if (cliResult.error && !cliResult.stdout.trim()) {
+        throw new Error(cliResult.stderr || cliResult.error.message);
+      }
 
       // Parse the JSON output from rex CLI
       let parsed: Record<string, unknown>;
