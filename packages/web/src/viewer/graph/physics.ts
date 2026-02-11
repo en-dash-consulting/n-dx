@@ -46,6 +46,8 @@ export interface SimState {
   /** Current scale factor (viewW / width). */
   scale: number;
   nodeRadii: number[];
+  /** Zone centroid positions, updated each frame for zone-clustering force. */
+  zoneCentroids?: Map<string, { x: number; y: number; count: number }>;
 }
 
 // ── Force parameters ────────────────────────────────────────────────────────
@@ -119,6 +121,28 @@ export function initZoneClusteredPositions(
     n.vx = 0;
     n.vy = 0;
   }
+}
+
+// ── Zone centroid computation ────────────────────────────────────────────────
+
+/** Compute the average (centroid) position of nodes in each zone. */
+export function computeZoneCentroids(
+  nodes: PhysicsNode[],
+): Map<string, { x: number; y: number; count: number }> {
+  const centroids = new Map<string, { x: number; y: number; count: number }>();
+  for (const n of nodes) {
+    if (!n.zone) continue;
+    let c = centroids.get(n.zone);
+    if (!c) { c = { x: 0, y: 0, count: 0 }; centroids.set(n.zone, c); }
+    c.x += n.x!;
+    c.y += n.y!;
+    c.count++;
+  }
+  for (const c of centroids.values()) {
+    c.x /= c.count;
+    c.y /= c.count;
+  }
+  return centroids;
 }
 
 // ── Barnes-Hut quad-tree ────────────────────────────────────────────────────
@@ -232,6 +256,9 @@ export function tick(sim: SimState, callbacks: TickCallbacks): void {
 
   const a = sim.alpha.value;
 
+  // Recompute zone centroids for clustering force
+  sim.zoneCentroids = computeZoneCentroids(nodes);
+
   // Center gravity (stronger than before)
   for (const n of nodes) {
     n.vx! += (width / 2 - n.x!) * centerGravityStrength * a;
@@ -275,6 +302,19 @@ export function tick(sim: SimState, callbacks: TickCallbacks): void {
     source.vy! += fy;
     target.vx! -= fx;
     target.vy! -= fy;
+  }
+
+  // Zone-clustering force: pull nodes toward their zone centroid
+  if (sim.zoneCentroids) {
+    const zoneCohesion = 0.02;
+    const centroids = sim.zoneCentroids;
+    for (const n of nodes) {
+      if (!n.zone) continue;
+      const c = centroids.get(n.zone);
+      if (!c) continue;
+      n.vx! += (c.x - n.x!) * zoneCohesion * a;
+      n.vy! += (c.y - n.y!) * zoneCohesion * a;
+    }
   }
 
   // Soft boundary force — pull back nodes that drift too far from center

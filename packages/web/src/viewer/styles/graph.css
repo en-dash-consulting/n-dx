@@ -143,6 +143,92 @@
   100% { opacity: 0; }
 }
 
+/* ── Zone hull grouping ─────────────────────────────────────────────────── */
+
+.zone-hulls { pointer-events: all; }
+
+.zone-hull {
+  fill-opacity: 0.06;
+  stroke-opacity: 0.25;
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 3;
+  cursor: pointer;
+  transition: fill-opacity 0.2s, stroke-opacity 0.2s;
+}
+
+.zone-hull-group:hover .zone-hull {
+  fill-opacity: 0.12;
+  stroke-opacity: 0.45;
+}
+
+.zone-hull-label {
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Collapsed zone — show summary badge */
+.zone-hull-group.collapsed .zone-hull { display: none; }
+.zone-hull-group.collapsed .zone-hull-label { display: none; }
+
+.zone-collapse-circle {
+  opacity: 0.35;
+  stroke: var(--border);
+  stroke-width: 2px;
+  cursor: pointer;
+}
+.zone-hull-group.collapsed:hover .zone-collapse-circle {
+  opacity: 0.5;
+}
+
+.zone-collapse-count {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Zone toggle button */
+.graph-zone-toggle {
+  position: absolute;
+  top: 8px;
+  left: 90px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s, color 0.15s;
+}
+.graph-zone-toggle:hover {
+  background: var(--bg-hover, var(--border));
+  color: var(--text);
+}
+
+/* Interactive legend items for zone collapse toggle */
+.graph-legend-item {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.graph-legend-item:hover {
+  color: var(--text);
+}
+.graph-legend-item.collapsed {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Cross-zone edges — enhanced highlight for architectural clarity */
+.graph-link.cross-zone {
+  stroke-dasharray: 4 2;
+}
+
 /* Touch interaction — prevent default browser behaviours */
 .graph-container svg { touch-action: none; }
 

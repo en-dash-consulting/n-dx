@@ -2,7 +2,7 @@ import { h } from "preact";
 import { useEffect, useRef, useState, useMemo, useCallback } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import { buildZoneColorMap, getZoneColorByIndex } from "../utils.js";
-import { GraphRenderer, type GraphNode, type GraphLink } from "../graph/renderer.js";
+import { GraphRenderer, type GraphNode, type GraphLink, type ZoneInfo } from "../graph/renderer.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface GraphProps {
@@ -19,6 +19,8 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
   const [initialized, setInitialized] = useState(false);
   const [graphSearch, setGraphSearch] = useState("");
   const [labelsVisible, setLabelsVisible] = useState(true);
+  const [zonesVisible, setZonesVisible] = useState(true);
+  const [collapsedZones, setCollapsedZones] = useState<Set<string>>(new Set());
 
   const { imports, zones, inventory } = data;
 
@@ -63,6 +65,17 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
     return map;
   }, [inventory]);
 
+  // Build ZoneInfo array for renderer
+  const zoneInfos = useMemo<ZoneInfo[]>(() => {
+    if (!zones) return [];
+    return zones.zones.map((z, i) => ({
+      id: z.id,
+      name: z.name,
+      color: getZoneColorByIndex(i),
+      files: z.files,
+    }));
+  }, [zones]);
+
   // Double-click navigates to file in Files view
   const handleNodeDblClick = useCallback((path: string) => {
     if (navigateTo) {
@@ -77,6 +90,44 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
       setLabelsVisible(visible);
     }
   }, []);
+
+  // Toggle zone hull visibility
+  const handleToggleZones = useCallback(() => {
+    if (graphRef.current) {
+      const visible = graphRef.current.toggleZones();
+      setZonesVisible(visible);
+    }
+  }, []);
+
+  // Toggle collapse on a specific zone (from legend click)
+  const handleZoneLegendClick = useCallback((zoneId: string) => {
+    if (!graphRef.current) return;
+    const nowCollapsed = graphRef.current.toggleZoneCollapse(zoneId);
+    setCollapsedZones((prev) => {
+      const next = new Set(prev);
+      if (nowCollapsed) next.add(zoneId);
+      else next.delete(zoneId);
+      return next;
+    });
+  }, []);
+
+  // Zone select callback (click on hull)
+  const handleZoneSelect = useCallback((zoneId: string) => {
+    if (!zones) return;
+    const zone = zones.zones.find((z) => z.id === zoneId);
+    if (!zone) return;
+    onSelect({
+      type: "zone",
+      title: zone.name,
+      id: zone.id,
+      zoneId: zone.id,
+      description: zone.description,
+      files: zone.files.length,
+      entryPoints: zone.entryPoints,
+      cohesion: zone.cohesion.toFixed(2),
+      coupling: zone.coupling.toFixed(2),
+    });
+  }, [zones, onSelect]);
 
   if (!imports) {
     return h("div", { class: "loading" }, "No import data available.");
@@ -134,7 +185,8 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
         onSelect(enriched);
       },
       onNodeDblClick: handleNodeDblClick,
-      zones,
+      onZoneSelect: handleZoneSelect,
+      zoneInfos,
     });
     graphRef.current = renderer;
     setInitialized(true);
@@ -206,11 +258,25 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
         onClick: handleToggleLabels,
         title: labelsVisible ? "Hide labels" : "Show labels",
       }, labelsVisible ? "Labels" : "Labels off"),
-      // Legend overlay
+      // Zone toggle button
+      h("button", {
+        class: "graph-zone-toggle",
+        onClick: handleToggleZones,
+        title: zonesVisible ? "Hide zone groups" : "Show zone groups",
+      }, zonesVisible ? "Zones" : "Zones off"),
+      // Legend overlay — click items to collapse/expand zones
       legendItems.length > 0
         ? h("div", { class: "graph-legend" },
+            h("div", { class: "graph-legend-title", style: "font-size: 10px; color: var(--text-dim); margin-bottom: 4px; opacity: 0.7;" }, "Click to toggle zone"),
             legendItems.map((item) =>
-              h("div", { key: item.name, class: "graph-legend-item" },
+              h("div", {
+                key: item.name,
+                class: `graph-legend-item${collapsedZones.has(zones?.zones.find(z => z.name === item.name)?.id ?? "") ? " collapsed" : ""}`,
+                onClick: () => {
+                  const zone = zones?.zones.find(z => z.name === item.name);
+                  if (zone) handleZoneLegendClick(zone.id);
+                },
+              },
                 h("span", { class: "graph-legend-dot", style: `background: ${item.color};` }),
                 item.name
               )

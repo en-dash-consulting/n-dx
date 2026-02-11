@@ -35,6 +35,14 @@ export interface GraphLink {
   crossZone: boolean;
 }
 
+/** Minimal zone info the renderer needs for grouping. */
+export interface ZoneInfo {
+  id: string;
+  name: string;
+  color: string;
+  files: string[];
+}
+
 export interface GraphRendererOptions {
   svg: SVGSVGElement;
   nodes: GraphNode[];
@@ -43,7 +51,8 @@ export interface GraphRendererOptions {
   height: number;
   onNodeSelect: (detail: { title: string; path: string; zone: string; incomingImports: number }) => void;
   onNodeDblClick?: (path: string) => void;
-  zones: unknown; // opaque — only needed for future use
+  onZoneSelect?: (zoneId: string) => void;
+  zoneInfos: ZoneInfo[];
 }
 
 // ── Label positioning types ─────────────────────────────────────────────────
@@ -88,8 +97,18 @@ export class GraphRenderer {
   private labelRects: LabelRect[];    // reused per frame to avoid GC
   private tooltip: SVGGElement;       // shared tooltip element
 
+  // Zone grouping state
+  private readonly zoneInfos: ZoneInfo[];
+  private readonly zoneHullGroup: SVGGElement;            // container for zone hulls
+  private readonly zoneHullElements: Map<string, SVGPathElement> = new Map();
+  private readonly zoneLabelElements: Map<string, SVGTextElement> = new Map();
+  private readonly collapsedZones: Set<string> = new Set();
+  private readonly zoneNodeIndices: Map<string, number[]> = new Map();
+  private zonesVisible = true;
+  private readonly onZoneSelect?: (zoneId: string) => void;
+
   constructor(opts: GraphRendererOptions) {
-    const { svg, nodes, links, width, height, onNodeSelect, onNodeDblClick } = opts;
+    const { svg, nodes, links, width, height, onNodeSelect, onNodeDblClick, onZoneSelect, zoneInfos } = opts;
 
     this.svg = svg;
     this.nodes = nodes;
@@ -101,6 +120,8 @@ export class GraphRenderer {
     this.linkElements = [];
     this.nodeRadii = [];
     this.ac = new AbortController();
+    this.zoneInfos = zoneInfos;
+    this.onZoneSelect = onZoneSelect;
 
     // Clear existing SVG content
     svg.innerHTML = "";
@@ -128,6 +149,21 @@ export class GraphRenderer {
 
     this.g = document.createElementNS(ns, "g");
     svg.appendChild(this.g);
+
+    // Build zone → node index map
+    for (let i = 0; i < nodes.length; i++) {
+      const z = nodes[i].zone;
+      if (!z) continue;
+      let indices = this.zoneNodeIndices.get(z);
+      if (!indices) { indices = []; this.zoneNodeIndices.set(z, indices); }
+      indices.push(i);
+    }
+
+    // Create zone hull group (rendered behind links/nodes)
+    this.zoneHullGroup = document.createElementNS(ns, "g");
+    this.zoneHullGroup.setAttribute("class", "zone-hulls");
+    this.g.appendChild(this.zoneHullGroup);
+    this.createZoneHulls(ns);
 
     // Node map for link resolution
     const nodeMap = new Map<string, GraphNode>();
@@ -316,6 +352,48 @@ export class GraphRenderer {
     return !this.labelsHidden;
   }
 
+  /** Toggle zone hull visibility on/off. Returns the new state. */
+  toggleZones(): boolean {
+    this.zonesVisible = !this.zonesVisible;
+    this.zoneHullGroup.style.display = this.zonesVisible ? "" : "none";
+    return this.zonesVisible;
+  }
+
+  /** Get current zone visibility state. */
+  get zonesGroupsVisible(): boolean {
+    return this.zonesVisible;
+  }
+
+  /** Collapse a zone group — hides member nodes/edges and shows a summary node. */
+  collapseZone(zoneId: string): void {
+    if (this.collapsedZones.has(zoneId)) return;
+    this.collapsedZones.add(zoneId);
+    this.applyZoneCollapse(zoneId);
+  }
+
+  /** Expand a previously collapsed zone group. */
+  expandZone(zoneId: string): void {
+    if (!this.collapsedZones.has(zoneId)) return;
+    this.collapsedZones.delete(zoneId);
+    this.applyZoneExpand(zoneId);
+  }
+
+  /** Toggle a zone between collapsed and expanded. Returns true if now collapsed. */
+  toggleZoneCollapse(zoneId: string): boolean {
+    if (this.collapsedZones.has(zoneId)) {
+      this.expandZone(zoneId);
+      return false;
+    } else {
+      this.collapseZone(zoneId);
+      return true;
+    }
+  }
+
+  /** Check if a zone is currently collapsed. */
+  isZoneCollapsed(zoneId: string): boolean {
+    return this.collapsedZones.has(zoneId);
+  }
+
   destroy(): void {
     this.ac.abort();
   }
@@ -350,6 +428,215 @@ export class GraphRenderer {
       } else {
         this.linkElements[j].style.strokeOpacity = "0.05";
       }
+    }
+  }
+
+  // ── Private: Zone hull management ─────────────────────────────────────────
+
+  /** Create SVG elements for each zone hull (background + label). */
+  private createZoneHulls(ns: string): void {
+    const signal = this.ac.signal;
+
+    for (const zi of this.zoneInfos) {
+      const indices = this.zoneNodeIndices.get(zi.id);
+      if (!indices || indices.length < 2) continue;
+
+      // Zone hull group
+      const zoneG = document.createElementNS(ns, "g");
+      zoneG.setAttribute("class", "zone-hull-group");
+      zoneG.setAttribute("data-zone", zi.id);
+
+      // Hull path (filled background)
+      const path = document.createElementNS(ns, "path") as SVGPathElement;
+      path.setAttribute("class", "zone-hull");
+      path.setAttribute("fill", zi.color);
+      path.setAttribute("stroke", zi.color);
+      zoneG.appendChild(path);
+      this.zoneHullElements.set(zi.id, path);
+
+      // Zone label at centroid
+      const label = document.createElementNS(ns, "text") as SVGTextElement;
+      label.setAttribute("class", "zone-hull-label");
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("fill", zi.color);
+      label.textContent = zi.name;
+      zoneG.appendChild(label);
+      this.zoneLabelElements.set(zi.id, label);
+
+      this.zoneHullGroup.appendChild(zoneG);
+
+      // Click on zone hull to select/toggle collapse
+      (zoneG as unknown as HTMLElement).addEventListener("click", (e: MouseEvent) => {
+        // Don't trigger if clicking a node inside the hull
+        const target = e.target as Element;
+        if (target.tagName === "circle") return;
+
+        e.stopPropagation();
+        if (this.onZoneSelect) {
+          this.onZoneSelect(zi.id);
+        }
+      }, { signal });
+
+      // Double-click to toggle collapse
+      (zoneG as unknown as HTMLElement).addEventListener("dblclick", (e: MouseEvent) => {
+        const target = e.target as Element;
+        if (target.tagName === "circle") return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleZoneCollapse(zi.id);
+      }, { signal });
+    }
+  }
+
+  /** Update hull paths and labels to match current node positions. */
+  private updateZoneHulls(): void {
+    if (!this.zonesVisible) return;
+
+    for (const zi of this.zoneInfos) {
+      const indices = this.zoneNodeIndices.get(zi.id);
+      if (!indices || indices.length < 2) continue;
+
+      const path = this.zoneHullElements.get(zi.id);
+      const label = this.zoneLabelElements.get(zi.id);
+      if (!path || !label) continue;
+
+      // Skip collapsed zones — hull is hidden
+      if (this.collapsedZones.has(zi.id)) {
+        path.parentElement?.style.setProperty("display", "none");
+        continue;
+      }
+      path.parentElement?.style.removeProperty("display");
+
+      // Collect visible node positions with padding
+      const points: [number, number][] = [];
+      let cx = 0, cy = 0;
+      for (const idx of indices) {
+        const n = this.nodes[idx];
+        if (n.x != null && n.y != null) {
+          points.push([n.x, n.y]);
+          cx += n.x;
+          cy += n.y;
+        }
+      }
+      if (points.length < 2) continue;
+      cx /= points.length;
+      cy /= points.length;
+
+      // Compute convex hull with padding
+      const padding = 25;
+      const hull = convexHull(points);
+      const paddedHull = padHull(hull, padding);
+      const d = hullToSmoothPath(paddedHull);
+      path.setAttribute("d", d);
+
+      // Position zone label above the centroid
+      label.setAttribute("x", String(cx));
+      label.setAttribute("y", String(cy - this.getZoneRadius(indices) - 10));
+    }
+  }
+
+  /** Get approximate radius of a zone cluster for label positioning. */
+  private getZoneRadius(indices: number[]): number {
+    if (indices.length === 0) return 0;
+    let cx = 0, cy = 0;
+    for (const i of indices) { cx += this.nodes[i].x ?? 0; cy += this.nodes[i].y ?? 0; }
+    cx /= indices.length;
+    cy /= indices.length;
+    let maxDist = 0;
+    for (const i of indices) {
+      const dx = (this.nodes[i].x ?? 0) - cx;
+      const dy = (this.nodes[i].y ?? 0) - cy;
+      maxDist = Math.max(maxDist, Math.sqrt(dx * dx + dy * dy));
+    }
+    return maxDist;
+  }
+
+  /** Hide member nodes/edges when a zone is collapsed, show summary. */
+  private applyZoneCollapse(zoneId: string): void {
+    const indices = this.zoneNodeIndices.get(zoneId);
+    if (!indices) return;
+
+    // Compute centroid for summary position
+    let cx = 0, cy = 0;
+    for (const i of indices) { cx += this.nodes[i].x ?? 0; cy += this.nodes[i].y ?? 0; }
+    cx /= indices.length;
+    cy /= indices.length;
+
+    // Hide individual nodes
+    for (const i of indices) {
+      this.nodeGroups[i].style.display = "none";
+    }
+
+    // Dim edges connected only to hidden nodes
+    const hiddenIds = new Set(indices.map(i => this.nodes[i].id));
+    for (let i = 0; i < this.resolvedLinks.length; i++) {
+      const l = this.resolvedLinks[i];
+      const srcHidden = hiddenIds.has(l.source.id);
+      const tgtHidden = hiddenIds.has(l.target.id);
+      if (srcHidden && tgtHidden) {
+        this.linkElements[i].style.display = "none";
+      } else if (srcHidden || tgtHidden) {
+        this.linkElements[i].style.opacity = "0.3";
+      }
+    }
+
+    // Show collapsed summary hull
+    const hullGroup = this.zoneHullGroup.querySelector(`[data-zone="${zoneId}"]`);
+    if (hullGroup) {
+      hullGroup.classList.add("collapsed");
+      // Position a summary badge at the centroid
+      const ns = "http://www.w3.org/2000/svg";
+      let badge = hullGroup.querySelector(".zone-collapse-badge") as SVGGElement | null;
+      if (!badge) {
+        badge = document.createElementNS(ns, "g");
+        badge.setAttribute("class", "zone-collapse-badge");
+        const circle = document.createElementNS(ns, "circle");
+        circle.setAttribute("r", "18");
+        circle.setAttribute("class", "zone-collapse-circle");
+        const info = this.zoneInfos.find(z => z.id === zoneId);
+        if (info) circle.setAttribute("fill", info.color);
+        badge.appendChild(circle);
+        const text = document.createElementNS(ns, "text");
+        text.setAttribute("class", "zone-collapse-count");
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dy", "0.35em");
+        text.textContent = String(indices.length);
+        badge.appendChild(text);
+        hullGroup.appendChild(badge);
+      }
+      badge.setAttribute("transform", `translate(${cx},${cy})`);
+      badge.style.display = "";
+    }
+  }
+
+  /** Show member nodes/edges when a zone is expanded. */
+  private applyZoneExpand(zoneId: string): void {
+    const indices = this.zoneNodeIndices.get(zoneId);
+    if (!indices) return;
+
+    // Show individual nodes
+    for (const i of indices) {
+      this.nodeGroups[i].style.display = "";
+    }
+
+    // Restore edges
+    const hiddenIds = new Set(indices.map(i => this.nodes[i].id));
+    for (let i = 0; i < this.resolvedLinks.length; i++) {
+      const l = this.resolvedLinks[i];
+      const srcWas = hiddenIds.has(l.source.id);
+      const tgtWas = hiddenIds.has(l.target.id);
+      if (srcWas || tgtWas) {
+        this.linkElements[i].style.display = "";
+        this.linkElements[i].style.opacity = "";
+      }
+    }
+
+    // Hide collapsed summary
+    const hullGroup = this.zoneHullGroup.querySelector(`[data-zone="${zoneId}"]`);
+    if (hullGroup) {
+      hullGroup.classList.remove("collapsed");
+      const badge = hullGroup.querySelector(".zone-collapse-badge") as SVGGElement | null;
+      if (badge) badge.style.display = "none";
     }
   }
 
@@ -531,6 +818,9 @@ export class GraphRenderer {
       this.nodeGroups[i].setAttribute("transform", `translate(${this.nodes[i].x},${this.nodes[i].y})`);
     }
     this.updateLOD();
+
+    // Update zone hull boundaries
+    this.updateZoneHulls();
   }
 
   // ── Private: Simulation ────────────────────────────────────────────────────
@@ -1022,4 +1312,102 @@ export class GraphRenderer {
       }, { signal });
     }
   }
+}
+
+// ── Geometry helpers (module-level, no DOM) ──────────────────────────────────
+
+/**
+ * Compute convex hull of a set of 2D points using Andrew's monotone chain.
+ * Returns points in counter-clockwise order. O(n log n).
+ */
+function convexHull(points: [number, number][]): [number, number][] {
+  if (points.length <= 2) return [...points];
+
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower: [number, number][] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
+      lower.pop();
+    lower.push(p);
+  }
+
+  const upper: [number, number][] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
+      upper.pop();
+    upper.push(p);
+  }
+
+  // Remove last point of each half (duplicate of first point of other half)
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+/** Expand a convex hull outward by a padding distance. */
+function padHull(hull: [number, number][], padding: number): [number, number][] {
+  if (hull.length < 3) {
+    // For degenerate cases, expand bounding box
+    const xs = hull.map(p => p[0]);
+    const ys = hull.map(p => p[1]);
+    const minX = Math.min(...xs) - padding;
+    const maxX = Math.max(...xs) + padding;
+    const minY = Math.min(...ys) - padding;
+    const maxY = Math.max(...ys) + padding;
+    return [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]];
+  }
+
+  const result: [number, number][] = [];
+  const n = hull.length;
+
+  // Compute centroid
+  let cx = 0, cy = 0;
+  for (const [x, y] of hull) { cx += x; cy += y; }
+  cx /= n; cy /= n;
+
+  // Push each vertex outward from centroid
+  for (const [x, y] of hull) {
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    result.push([x + (dx / dist) * padding, y + (dy / dist) * padding]);
+  }
+  return result;
+}
+
+/** Convert a hull (polygon) to a smooth SVG path with rounded corners. */
+function hullToSmoothPath(hull: [number, number][]): string {
+  if (hull.length < 3) return "";
+  const n = hull.length;
+
+  // Use cardinal spline approach: cubic Bézier through hull vertices
+  const tension = 0.3;
+  const parts: string[] = [];
+
+  // Start at midpoint between last and first vertex
+  const mx = (hull[n - 1][0] + hull[0][0]) / 2;
+  const my = (hull[n - 1][1] + hull[0][1]) / 2;
+  parts.push(`M ${mx} ${my}`);
+
+  for (let i = 0; i < n; i++) {
+    const p0 = hull[(i - 1 + n) % n];
+    const p1 = hull[i];
+    const p2 = hull[(i + 1) % n];
+    const p3 = hull[(i + 2) % n];
+
+    // Control points using Catmull-Rom to Bézier conversion
+    const cp1x = p1[0] + (p2[0] - p0[0]) * tension;
+    const cp1y = p1[1] + (p2[1] - p0[1]) * tension;
+    const cp2x = p2[0] - (p3[0] - p1[0]) * tension;
+    const cp2y = p2[1] - (p3[1] - p1[1]) * tension;
+
+    parts.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+  }
+
+  parts.push("Z");
+  return parts.join(" ");
 }
