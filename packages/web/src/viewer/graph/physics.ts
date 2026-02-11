@@ -23,6 +23,7 @@ export interface PhysicsNode {
 export interface PhysicsLink {
   source: PhysicsNode;
   target: PhysicsNode;
+  crossZone?: boolean;
 }
 
 /** Barnes-Hut quad-tree node. */
@@ -60,7 +61,17 @@ export function computeForceParams(nodeCount: number) {
   const linkRestLength = Math.max(40, 80 / Math.sqrt(Math.max(nodeCount / 20, 1)));
   const useBH = nodeCount > 200;
   const bhTheta = 0.9;
-  return { alphaDecay, velocityDecay, repulsionStrength, centerGravityStrength, linkRestLength, useBH, bhTheta };
+  // Cross-zone links use a longer rest length to push groups apart
+  const crossZoneLinkMultiplier = 2.5;
+  // Intra-zone cohesion: pull zone members toward their centroid
+  const zoneCohesionStrength = 0.03;
+  // Inter-zone centroid repulsion: push zone centroids apart for clear separation
+  const zoneRepulsionStrength = -800 / Math.sqrt(Math.max(nodeCount, 1));
+  return {
+    alphaDecay, velocityDecay, repulsionStrength, centerGravityStrength,
+    linkRestLength, useBH, bhTheta,
+    crossZoneLinkMultiplier, zoneCohesionStrength, zoneRepulsionStrength,
+  };
 }
 
 // ── Deterministic hash for stable initial positions ─────────────────────────
@@ -93,15 +104,18 @@ export function initZoneClusteredPositions(
   }
 
   const zoneIds = [...zoneGroups.keys()].sort();
-  const clusterRadius = Math.min(width, height) * 0.3;
+  // Wider cluster radius for more separation between zones
+  const clusterRadius = Math.min(width, height) * 0.38;
 
   for (let zi = 0; zi < zoneIds.length; zi++) {
     const zoneId = zoneIds[zi];
     const members = zoneGroups.get(zoneId)!;
-    const angle = (2 * Math.PI * zi) / Math.max(zoneIds.length, 1);
+    // Offset angle by PI/6 to avoid axis-aligned clusters
+    const angle = (2 * Math.PI * zi) / Math.max(zoneIds.length, 1) + Math.PI / 6;
     const cx = width / 2 + clusterRadius * Math.cos(angle);
     const cy = height / 2 + clusterRadius * Math.sin(angle);
-    const scatter = Math.min(30 * Math.sqrt(members.length), 200);
+    // Tighter scatter to keep groups compact initially
+    const scatter = Math.min(25 * Math.sqrt(members.length), 150);
     for (const n of members) {
       const hx = hashPosition(n.id + ":x");
       const hy = hashPosition(n.id + ":y");
@@ -143,6 +157,61 @@ export function computeZoneCentroids(
     c.y /= c.count;
   }
   return centroids;
+}
+
+// ── Inter-zone centroid repulsion ───────────────────────────────────────────
+
+/**
+ * Push zone centroids apart so groups maintain clear spatial separation.
+ * Each zone centroid repels every other via inverse-square force, propagated
+ * equally to all zone members.
+ */
+export function applyZoneCentroidRepulsion(
+  nodes: PhysicsNode[],
+  centroids: Map<string, { x: number; y: number; count: number }>,
+  strength: number,
+  alpha: number,
+): void {
+  const zoneIds = [...centroids.keys()];
+  const zoneCount = zoneIds.length;
+  if (zoneCount < 2) return;
+
+  // Accumulate forces on centroids first
+  const forces = new Map<string, { fx: number; fy: number }>();
+  for (const id of zoneIds) forces.set(id, { fx: 0, fy: 0 });
+
+  for (let i = 0; i < zoneCount; i++) {
+    const ci = centroids.get(zoneIds[i])!;
+    for (let j = i + 1; j < zoneCount; j++) {
+      const cj = centroids.get(zoneIds[j])!;
+      const dx = cj.x - ci.x;
+      const dy = cj.y - ci.y;
+      const dist2 = dx * dx + dy * dy;
+      if (dist2 < 1) continue;
+      const dist = Math.sqrt(dist2);
+      // Scale force by product of zone sizes for proportional push
+      const sizeFactor = Math.sqrt(ci.count * cj.count);
+      const force = strength * alpha * sizeFactor / dist2;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      // Negative strength produces negative force along dx.
+      // i should be pushed opposite to dx (away from j), j pushed along dx (away from i).
+      forces.get(zoneIds[i])!.fx += fx;
+      forces.get(zoneIds[i])!.fy += fy;
+      forces.get(zoneIds[j])!.fx -= fx;
+      forces.get(zoneIds[j])!.fy -= fy;
+    }
+  }
+
+  // Distribute centroid forces equally to zone members
+  for (const n of nodes) {
+    if (!n.zone) continue;
+    const f = forces.get(n.zone);
+    const c = centroids.get(n.zone);
+    if (!f || !c) continue;
+    n.vx! += f.fx / c.count;
+    n.vy! += f.fy / c.count;
+  }
 }
 
 // ── Barnes-Hut quad-tree ────────────────────────────────────────────────────
@@ -242,8 +311,11 @@ export interface TickCallbacks {
 export function tick(sim: SimState, callbacks: TickCallbacks): void {
   const { nodes, resolvedLinks, width, height } = sim;
   const nodeCount = nodes.length;
-  const { alphaDecay, velocityDecay, repulsionStrength, centerGravityStrength, linkRestLength, useBH, bhTheta } =
-    computeForceParams(nodeCount);
+  const {
+    alphaDecay, velocityDecay, repulsionStrength, centerGravityStrength,
+    linkRestLength, useBH, bhTheta,
+    crossZoneLinkMultiplier, zoneCohesionStrength, zoneRepulsionStrength,
+  } = computeForceParams(nodeCount);
 
   sim.alpha.value *= (1 - alphaDecay);
   sim.frameCount++;
@@ -289,13 +361,17 @@ export function tick(sim: SimState, callbacks: TickCallbacks): void {
   }
 
   // Link attraction with scaled rest length
+  // Cross-zone links use a longer rest length to keep groups separated
   for (const l of resolvedLinks) {
     const source = l.source;
     const target = l.target;
     const dx = target.x! - source.x!;
     const dy = target.y! - source.y!;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const force = (dist - linkRestLength) * 0.005 * a;
+    const restLen = l.crossZone
+      ? linkRestLength * crossZoneLinkMultiplier
+      : linkRestLength;
+    const force = (dist - restLen) * 0.005 * a;
     const fx = (dx / dist) * force;
     const fy = (dy / dist) * force;
     source.vx! += fx;
@@ -306,15 +382,17 @@ export function tick(sim: SimState, callbacks: TickCallbacks): void {
 
   // Zone-clustering force: pull nodes toward their zone centroid
   if (sim.zoneCentroids) {
-    const zoneCohesion = 0.02;
     const centroids = sim.zoneCentroids;
     for (const n of nodes) {
       if (!n.zone) continue;
       const c = centroids.get(n.zone);
       if (!c) continue;
-      n.vx! += (c.x - n.x!) * zoneCohesion * a;
-      n.vy! += (c.y - n.y!) * zoneCohesion * a;
+      n.vx! += (c.x - n.x!) * zoneCohesionStrength * a;
+      n.vy! += (c.y - n.y!) * zoneCohesionStrength * a;
     }
+
+    // Inter-zone centroid repulsion: push zone groups apart
+    applyZoneCentroidRepulsion(nodes, centroids, zoneRepulsionStrength, a);
   }
 
   // Soft boundary force — pull back nodes that drift too far from center
