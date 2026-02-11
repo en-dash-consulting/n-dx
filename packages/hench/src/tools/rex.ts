@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
 import type { PRDStore, ItemStatus } from "rex";
 import type { CommandExecutor } from "rex";
+import { execShellCmd } from "../process/index.js";
 import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation } from "../prd/ops.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 
@@ -191,22 +191,15 @@ const REQ_CMD_TIMEOUT = 30_000;
  * Used by requirements validation to execute validation commands.
  */
 export function createCommandExecutor(projectDir: string): CommandExecutor {
-  return (command: string) => {
-    return new Promise((resolve) => {
-      const child = execFile(
-        "sh",
-        ["-c", command],
-        { cwd: projectDir, timeout: REQ_CMD_TIMEOUT, maxBuffer: 1024 * 1024 },
-        (error, stdout, stderr) => {
-          // child.exitCode is null if error, use the error's code property
-          const exitCode = error ? (child.exitCode ?? 1) : 0;
-          resolve({
-            exitCode,
-            stdout: (stdout ?? "").toString(),
-            stderr: (stderr ?? "").toString(),
-          });
-        },
-      );
+  return async (command: string) => {
+    const result = await execShellCmd(command, {
+      cwd: projectDir,
+      timeout: REQ_CMD_TIMEOUT,
     });
+    return {
+      exitCode: result.exitCode ?? 1,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
   };
 }

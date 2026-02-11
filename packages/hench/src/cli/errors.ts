@@ -1,23 +1,28 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
+ *
+ * Hench's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { CLIError as BaseCLIError, PROJECT_DIRS } from "@n-dx/claude-client";
 import { TaskNotActionableError } from "../agent/planning/brief.js";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
-/** An error with an optional actionable suggestion for the user. */
-export class CLIError extends Error {
-  suggestion?: string;
-
+/**
+ * Hench CLI error — extends the foundation CLIError.
+ *
+ * Inherits from {@link BaseCLIError} (which extends ClaudeClientError),
+ * so `instanceof ClaudeClientError` checks work across the entire error hierarchy.
+ */
+export class CLIError extends BaseCLIError {
   constructor(message: string, suggestion?: string) {
-    super(message);
+    super(message, suggestion);
     this.name = "CLIError";
-    this.suggestion = suggestion;
   }
 }
 

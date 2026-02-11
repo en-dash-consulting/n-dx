@@ -1,7 +1,8 @@
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
 import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
+import { getCurrentHead } from "../../process/index.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import { buildSystemPrompt } from "../planning/prompt.js";
 import { saveRun } from "../../store/index.js";
@@ -80,18 +81,6 @@ export function buildRetryNotice(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Get the current HEAD commit hash.
- * Used to diff against after agent runs (in case agent commits changes).
- */
-function getCurrentHead(cwd: string): string | undefined {
-  try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf-8" }).trim();
-  } catch {
-    return undefined;
-  }
 }
 
 /** @internal Exported for testing. */

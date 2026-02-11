@@ -1,19 +1,25 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
+ *
+ * Sourcevision's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { CLIError as BaseCLIError } from "@n-dx/claude-client";
 import { SV_DIR } from "./commands/constants.js";
 
-/** An error with an optional actionable suggestion for the user. */
-export class CLIError extends Error {
-  suggestion?: string;
-
+/**
+ * Sourcevision CLI error — extends the foundation CLIError.
+ *
+ * Inherits from {@link BaseCLIError} (which extends ClaudeClientError),
+ * so `instanceof ClaudeClientError` checks work across the entire error hierarchy.
+ */
+export class CLIError extends BaseCLIError {
   constructor(message: string, suggestion?: string) {
-    super(message);
+    super(message, suggestion);
     this.name = "CLIError";
-    this.suggestion = suggestion;
   }
 }
 

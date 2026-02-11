@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { exec, execShellCmd } from "../process/index.js";
 
 /**
  * Result of completion validation.
@@ -28,26 +28,6 @@ export interface CompletionValidationOptions {
 const DEFAULT_TIMEOUT = 30_000;
 
 /**
- * Run a shell command and return stdout/stderr.
- */
-function exec(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  timeout: number,
-): Promise<{ stdout: string; stderr: string; error: Error | null }> {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      resolve({
-        stdout: (stdout ?? "").toString(),
-        stderr: (stderr ?? "").toString(),
-        error: error as Error | null,
-      });
-    });
-  });
-}
-
-/**
  * Validate that a task produced meaningful changes before completion.
  *
  * Checks:
@@ -65,8 +45,7 @@ export async function validateCompletion(
   const { stdout: diffOutput } = await exec(
     "git",
     ["diff", "--stat", diffRef],
-    projectDir,
-    timeout,
+    { cwd: projectDir, timeout },
   );
 
   const hasChanges = diffOutput.trim().length > 0;
@@ -82,11 +61,9 @@ export async function validateCompletion(
 
   // Run tests if configured
   if (options?.testCommand) {
-    const { error: testError, stderr: testStderr } = await exec(
-      "sh",
-      ["-c", options.testCommand],
-      projectDir,
-      timeout,
+    const { error: testError, stderr: testStderr } = await execShellCmd(
+      options.testCommand,
+      { cwd: projectDir, timeout },
     );
 
     if (testError) {

@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { dirname, join, basename, extname, normalize } from "node:path";
 
@@ -230,36 +229,10 @@ export function buildScopedCommand(
 }
 
 // ---------------------------------------------------------------------------
-// Shell execution
+// Shell execution (via centralized process module)
 // ---------------------------------------------------------------------------
 
-function exec(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  timeout: number,
-): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-  return new Promise((resolve) => {
-    execFile(
-      cmd,
-      args,
-      { cwd, timeout, maxBuffer: 2 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        const exitCode = error
-          ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT"
-            ? null
-            : (error as { code?: number }).code ?? 1
-          : 0;
-
-        resolve({
-          stdout: (stdout ?? "").toString(),
-          stderr: (stderr ?? "").toString(),
-          exitCode: typeof exitCode === "number" ? exitCode : null,
-        });
-      },
-    );
-  });
-}
+import { execShellCmd } from "../process/index.js";
 
 // ---------------------------------------------------------------------------
 // Main entry point
@@ -311,11 +284,9 @@ export async function runPostTaskTests(
   }
 
   const startMs = Date.now();
-  const { stdout, stderr, exitCode } = await exec(
-    "sh",
-    ["-c", command],
-    projectDir,
-    timeout,
+  const { stdout, stderr, exitCode } = await execShellCmd(
+    command,
+    { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024 },
   );
   const durationMs = Date.now() - startMs;
 

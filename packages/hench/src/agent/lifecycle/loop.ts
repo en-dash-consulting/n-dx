@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
+import { getCurrentHead } from "../../process/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -147,11 +147,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // Capture the starting HEAD so completion validation can diff against it
   // even if the agent commits changes during the run.
-  const startingHead = await new Promise<string | undefined>((resolve) => {
-    execFile("git", ["rev-parse", "HEAD"], { cwd: projectDir }, (err, stdout) => {
-      resolve(err ? undefined : stdout.toString().trim());
-    });
-  });
+  const startingHead = getCurrentHead(projectDir);
 
   // Build Anthropic client options — use custom endpoint from .n-dx.json if configured
   const anthropicOpts: Record<string, unknown> = { apiKey };

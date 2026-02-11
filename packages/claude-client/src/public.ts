@@ -78,7 +78,7 @@ export type {
   ClaudeClient,
 } from "./types.js";
 
-export { ClaudeClientError } from "./types.js";
+export { ClaudeClientError, CLIError } from "./types.js";
 
 // Config
 export {

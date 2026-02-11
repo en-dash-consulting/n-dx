@@ -81,9 +81,9 @@ export interface CompletionResult {
 }
 
 /** Error classification for structured error handling. */
-export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "unknown";
+export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "cli" | "unknown";
 
-/** A classified error from a Claude call. */
+/** A classified error from a Claude call or CLI operation. */
 export class ClaudeClientError extends Error {
   readonly reason: ErrorReason;
   /** Whether this error is transient and the call could be retried. */
@@ -94,6 +94,25 @@ export class ClaudeClientError extends Error {
     this.name = "ClaudeClientError";
     this.reason = reason;
     this.retryable = retryable;
+  }
+}
+
+/**
+ * Base CLI error class for domain packages.
+ *
+ * Extends {@link ClaudeClientError} with an optional user-facing suggestion,
+ * providing a consistent error hierarchy across all n-dx packages. Domain
+ * packages (rex, hench, sourcevision) extend this class for their CLI errors
+ * instead of plain `Error`, enabling unified `instanceof` checks up the chain.
+ */
+export class CLIError extends ClaudeClientError {
+  /** Actionable hint shown to the user (e.g. "Run 'n-dx init' ..."). */
+  readonly suggestion?: string;
+
+  constructor(message: string, suggestion?: string) {
+    super(message, "cli", false);
+    this.name = "CLIError";
+    this.suggestion = suggestion;
   }
 }
 

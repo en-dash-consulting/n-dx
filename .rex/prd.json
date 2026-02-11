@@ -6826,6 +6826,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-10T23:01:55.180Z",
+      "completedAt": "2026-02-10T23:01:55.180Z",
       "children": [
         {
           "id": "26afc8aa-e8bd-4e94-b0d7-cc82aef6589d",
@@ -7130,9 +7132,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-10T23:01:55.180Z",
-      "completedAt": "2026-02-10T23:01:55.180Z"
+      ]
     },
     {
       "id": "be267023-2d02-452c-8248-b8eef65a2f2c",
@@ -7230,6 +7230,39 @@
           ]
         }
       ]
+    },
+    {
+      "id": "8c9bcad7-2447-4ca9-af30-1309c4724b75",
+      "title": "Address observation issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Standardization debt exists across package exports, naming conventions, and test directory structures",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T00:09:37.004Z",
+      "completedAt": "2026-02-11T00:16:31.082Z"
+    },
+    {
+      "id": "b7bd67c3-10c7-46e2-93f7-8e25c024c16c",
+      "title": "Address anti-pattern issues (2 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Test architecture inconsistency: packages implement different test directory structures (unit|integration|e2e vs unit-only) despite documented standardization requirements\n- Type duplication anti-pattern: web package manually duplicates rex types instead of shared interface abstraction, violating DRY and creating maintenance burden",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T00:00:36.676Z",
+      "completedAt": "2026-02-11T00:09:11.719Z"
+    },
+    {
+      "id": "bd59ccbd-d85b-4b5f-8cdc-02d44b6249c6",
+      "title": "Address suggestion issues (3 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Process execution anti-pattern: scattered execFile imports across multiple modules instead of centralized process abstraction\n- Error hierarchy should be standardized: domain CLIError classes should extend foundation ClaudeClientError for consistent error handling patterns\n- Process execution abstraction missing: scattered execFile imports across multiple zones should use centralized process management layer",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-02-11T00:16:52.495Z",
+      "completedAt": "2026-02-11T00:26:25.251Z"
     }
   ]
 }

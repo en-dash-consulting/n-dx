@@ -1,5 +1,5 @@
-import { execFile } from "node:child_process";
 import { createInterface } from "node:readline";
+import { execStdout } from "../../process/index.js";
 import { section, subsection, info } from "../../types/output.js";
 
 /**
@@ -28,22 +28,6 @@ export interface ReviewDiff {
 const DEFAULT_TIMEOUT = 30_000;
 
 /**
- * Run a shell command and return stdout.
- */
-function exec(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  timeout: number,
-): Promise<string> {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer: 1024 * 1024 }, (_error, stdout) => {
-      resolve((stdout ?? "").toString());
-    });
-  });
-}
-
-/**
  * Collect the current diff for review.
  */
 export async function collectReviewDiff(
@@ -51,8 +35,8 @@ export async function collectReviewDiff(
   timeout = DEFAULT_TIMEOUT,
 ): Promise<ReviewDiff> {
   const [diff, stat] = await Promise.all([
-    exec("git", ["diff", "HEAD"], projectDir, timeout),
-    exec("git", ["diff", "--stat", "HEAD"], projectDir, timeout),
+    execStdout("git", ["diff", "HEAD"], { cwd: projectDir, timeout }),
+    execStdout("git", ["diff", "--stat", "HEAD"], { cwd: projectDir, timeout }),
   ]);
 
   return {
@@ -120,7 +104,7 @@ export async function revertChanges(
   timeout = DEFAULT_TIMEOUT,
 ): Promise<void> {
   // Unstage everything, then discard working tree changes + untracked files
-  await exec("git", ["reset", "HEAD", "."], projectDir, timeout);
-  await exec("git", ["checkout", "."], projectDir, timeout);
-  await exec("git", ["clean", "-fd"], projectDir, timeout);
+  await execStdout("git", ["reset", "HEAD", "."], { cwd: projectDir, timeout });
+  await execStdout("git", ["checkout", "."], { cwd: projectDir, timeout });
+  await execStdout("git", ["clean", "-fd"], { cwd: projectDir, timeout });
 }
