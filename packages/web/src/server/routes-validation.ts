@@ -10,66 +10,34 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
-import { type ItemLevel, LEVEL_HIERARCHY, isItemLevel } from "./mcp-deps.js";
+import {
+  type ItemLevel,
+  type PRDItem,
+  type PRDDocument,
+  LEVEL_HIERARCHY,
+  isItemLevel,
+  walkTree,
+  findItem,
+  collectAllIds,
+} from "./mcp-deps.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
 
-// ── PRD types (mirrors routes-rex.ts) ────────────────────────────────
+// ── Thin wrappers over canonical rex functions ───────────────────────
+// The rex walkTree yields { item, parents[] }. Validation checks need
+// parentLevel, so we derive it from the parents array.
 
-interface PRDItemRecord {
-  id: string;
-  status: string;
-  level: string;
-  title: string;
-  blockedBy?: string[];
-  startedAt?: string;
-  children?: PRDItemRecord[];
-  [key: string]: unknown;
+/** Get the parent's level from a parents array (null for root items). */
+function parentLevel(parents: PRDItem[]): ItemLevel | null {
+  return parents.length > 0 ? parents[parents.length - 1].level : null;
 }
 
-interface PRDDocRecord {
-  schema: string;
-  title: string;
-  items: PRDItemRecord[];
-  [key: string]: unknown;
+/** Find an item by ID, returning just the item (or null). */
+function findItemById(items: PRDItem[], id: string): PRDItem | null {
+  const entry = findItem(items, id);
+  return entry ? entry.item : null;
 }
-
-// ── Tree walking ─────────────────────────────────────────────────────
-
-interface TreeEntry {
-  item: PRDItemRecord;
-  parentLevel: string | null;
-}
-
-function* walkTree(
-  items: PRDItemRecord[],
-  parentLevel: string | null = null,
-): Generator<TreeEntry> {
-  for (const item of items) {
-    yield { item, parentLevel };
-    if (item.children && item.children.length > 0) {
-      yield* walkTree(item.children, item.level);
-    }
-  }
-}
-
-function collectAllIds(items: PRDItemRecord[]): Set<string> {
-  const ids = new Set<string>();
-  for (const { item } of walkTree(items)) {
-    ids.add(item.id);
-  }
-  return ids;
-}
-
-function findItemById(items: PRDItemRecord[], id: string): PRDItemRecord | null {
-  for (const { item } of walkTree(items)) {
-    if (item.id === id) return item;
-  }
-  return null;
-}
-
-// Rex domain types and constants imported via gateway (./mcp-deps.js)
 
 // ── Validation checks ────────────────────────────────────────────────
 
@@ -100,14 +68,15 @@ interface StuckResult {
   reason: string;
 }
 
-function findOrphanedItems(items: PRDItemRecord[]): OrphanResult[] {
+function findOrphanedItems(items: PRDItem[]): OrphanResult[] {
   const orphans: OrphanResult[] = [];
-  for (const { item, parentLevel } of walkTree(items)) {
+  for (const { item, parents } of walkTree(items)) {
     if (!isItemLevel(item.level)) continue;
     const allowedParents = LEVEL_HIERARCHY[item.level];
     if (!allowedParents) continue;
-    if (!allowedParents.includes(parentLevel as ItemLevel | null)) {
-      const placement = parentLevel === null ? "root" : `under ${parentLevel}`;
+    const pLevel = parentLevel(parents);
+    if (!allowedParents.includes(pLevel)) {
+      const placement = pLevel === null ? "root" : `under ${pLevel}`;
       const expected = allowedParents
         .map((l: ItemLevel | null) => (l === null ? "root" : l))
         .join(" or ");
@@ -122,7 +91,7 @@ function findOrphanedItems(items: PRDItemRecord[]): OrphanResult[] {
   return orphans;
 }
 
-function findCycles(items: PRDItemRecord[]): string[][] {
+function findCycles(items: PRDItem[]): string[][] {
   const allIds = collectAllIds(items);
   const cycles: string[][] = [];
 
@@ -166,7 +135,7 @@ function findCycles(items: PRDItemRecord[]): string[][] {
   return cycles;
 }
 
-function findStuckItems(items: PRDItemRecord[], now?: number): StuckResult[] {
+function findStuckItems(items: PRDItem[], now?: number): StuckResult[] {
   const threshold = DEFAULT_STUCK_THRESHOLD_MS;
   const currentTime = now ?? Date.now();
   const stuck: StuckResult[] = [];
@@ -201,7 +170,7 @@ function findStuckItems(items: PRDItemRecord[], now?: number): StuckResult[] {
   return stuck;
 }
 
-function validateDAG(items: PRDItemRecord[]): { valid: boolean; errors: Array<{ message: string; itemId?: string }> } {
+function validateDAG(items: PRDItem[]): { valid: boolean; errors: Array<{ message: string; itemId?: string }> } {
   const errors: Array<{ message: string; itemId?: string }> = [];
   const allIds = collectAllIds(items);
 
@@ -233,7 +202,7 @@ function validateDAG(items: PRDItemRecord[]): { valid: boolean; errors: Array<{ 
   return { valid: errors.length === 0, errors };
 }
 
-function runValidation(items: PRDItemRecord[]): {
+function runValidation(items: PRDItem[]): {
   ok: boolean;
   checks: CheckResult[];
   summary: { total: number; passed: number; failed: number; warnings: number };
@@ -362,7 +331,7 @@ interface DependencyGraph {
   criticalBlockers: Array<{ id: string; title: string; blockingCount: number }>;
 }
 
-function buildDependencyGraph(items: PRDItemRecord[]): DependencyGraph {
+function buildDependencyGraph(items: PRDItem[]): DependencyGraph {
   const allIds = collectAllIds(items);
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -488,11 +457,11 @@ function buildDependencyGraph(items: PRDItemRecord[]): DependencyGraph {
 
 // ── Load PRD ─────────────────────────────────────────────────────────
 
-function loadPRD(ctx: ServerContext): PRDDocRecord | null {
+function loadPRD(ctx: ServerContext): PRDDocument | null {
   const prdPath = join(ctx.rexDir, "prd.json");
   if (!existsSync(prdPath)) return null;
   try {
-    return JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocRecord;
+    return JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
   } catch {
     return null;
   }

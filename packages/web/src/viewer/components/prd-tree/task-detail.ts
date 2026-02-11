@@ -10,6 +10,7 @@ import { h, Fragment } from "preact";
 import { useState, useCallback } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCategory, RequirementValidationType } from "./types.js";
 import { formatTimestamp } from "./compute.js";
+import { findItemById } from "./tree-utils.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -48,19 +49,6 @@ const LEVEL_LABELS: Record<string, string> = {
   task: "Task",
   subtask: "Subtask",
 };
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function findItemById(items: PRDItemData[], id: string): PRDItemData | null {
-  for (const item of items) {
-    if (item.id === id) return item;
-    if (item.children) {
-      const found = findItemById(item.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 // ── Sub-components ───────────────────────────────────────────────────
 

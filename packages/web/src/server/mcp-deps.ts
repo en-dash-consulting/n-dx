@@ -17,7 +17,7 @@
  * |---------------------------|-------|-----------------------------------|
  * | Runtime imports (this file)| 2     | MCP server factories              |
  * | Rex domain re-exports      | 13    | Types, constants, type guards     |
- * | Rex tree re-exports        | 8     | Tree utilities + timestamp helper |
+ * | Rex tree re-exports        | 9     | Tree utilities + timestamp helper |
  * | Filesystem reads           | many  | routes-rex, routes-sv, routes-hench |
  * | Subprocess calls           | 1     | rex CLI for `analyze`             |
  *
@@ -74,6 +74,7 @@ export {
   updateInTree,
   removeFromTree,
   computeStats,
+  collectAllIds,
 } from "rex";
 export type { TreeEntry, TreeStats } from "rex";
 

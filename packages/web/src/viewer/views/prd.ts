@@ -17,6 +17,7 @@ import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { BrandedHeader } from "../components/logos.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
+import { findItemById } from "../components/prd-tree/tree-utils.js";
 import type { DetailItem } from "../types.js";
 
 export interface PRDViewProps {
@@ -31,18 +32,6 @@ export interface PRDViewProps {
 
 /** Active tab in the command bar. */
 type CommandTab = null | "add" | "merge" | "prune";
-
-/** Walk the tree to find an item by ID. */
-function findItemById(items: PRDItemData[], id: string): PRDItemData | null {
-  for (const item of items) {
-    if (item.id === id) return item;
-    if (item.children) {
-      const found = findItemById(item.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps) {
   const [data, setData] = useState<PRDDocumentData | null>(prdData ?? null);

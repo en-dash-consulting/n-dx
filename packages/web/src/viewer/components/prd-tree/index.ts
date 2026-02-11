@@ -40,3 +40,4 @@ export {
   itemMatchesFilter,
   filterTree,
 } from "./compute.js";
+export { findItemById } from "./tree-utils.js";
