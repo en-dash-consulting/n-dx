@@ -766,6 +766,24 @@ describe("buildMetaPrompt", () => {
     expect(prompt).toContain("preserve the exact numeric values as written");
   });
 
+  it("includes guardrail: positive findings must have info severity", () => {
+    const findings: Finding[] = [
+      { type: "observation", pass: 0, scope: "global", text: "Some finding", severity: "info" },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("Positive findings describing good architecture, clean patterns, or successful design choices must have severity \"info\"");
+  });
+
+  it("includes guardrail: test-to-implementation coupling is expected", () => {
+    const findings: Finding[] = [
+      { type: "observation", pass: 0, scope: "global", text: "Some finding", severity: "info" },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("Test files coupling to implementation internals is expected by design");
+  });
+
   it("annotates findings for unknown high pass numbers", () => {
     const findings: Finding[] = [
       {

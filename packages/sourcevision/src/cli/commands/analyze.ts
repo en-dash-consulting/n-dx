@@ -72,6 +72,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
   const filter = parsePhaseFilter(extraArgs);
+  const fullMode = extraArgs.includes("--full");
 
   const tokenUsage = emptyAnalyzeTokenUsage();
 
@@ -97,7 +98,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         }
       }
 
-      inventoryResult = await analyzeInventory(absDir, previousInventory ? { previousInventory } : undefined);
+      inventoryResult = await analyzeInventory(absDir, !fullMode && previousInventory ? { previousInventory } : undefined);
 
       // Serialize only { files, summary } (strip stats/changedFiles)
       const outPath = join(svDir, DATA_FILES.inventory);
@@ -149,7 +150,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const stats = inventoryResult?.stats;
         const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-        const imports = await analyzeImports(absDir, inventory, previousImports ? {
+        const imports = await analyzeImports(absDir, inventory, !fullMode && previousImports ? {
           previousImports,
           changedFiles: inventoryResult?.changedFiles,
           fileSetChanged,
@@ -229,7 +230,6 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         writeFileSync(outPath, toCanonicalJSON(zones));
 
         // --full: run remaining enrichment passes up to 4
-        const fullMode = extraArgs.includes("--full");
         if (fullMode && enrich) {
           const targetPass = 4;
           const currentPass = zones.enrichmentPass ?? 0;
@@ -329,7 +329,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const stats = inventoryResult?.stats;
         const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-        const components = await analyzeComponents(absDir, inventory, importsData, previousComponents ? {
+        const components = await analyzeComponents(absDir, inventory, importsData, !fullMode && previousComponents ? {
           previousComponents,
           changedFiles: inventoryResult?.changedFiles,
           fileSetChanged,
@@ -379,7 +379,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const stats = inventoryResult?.stats;
         const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-        const callGraph = await analyzeCallGraph(absDir, inventory, importsData, previousCallGraph ? {
+        const callGraph = await analyzeCallGraph(absDir, inventory, importsData, !fullMode && previousCallGraph ? {
           previousCallGraph,
           changedFiles: inventoryResult?.changedFiles,
           fileSetChanged,
