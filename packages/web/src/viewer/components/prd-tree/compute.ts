@@ -15,6 +15,7 @@ export function computeBranchStats(items: PRDItemData[]): BranchStats {
     completed: 0,
     inProgress: 0,
     pending: 0,
+    failing: 0,
     deferred: 0,
     blocked: 0,
     deleted: 0,
@@ -37,6 +38,9 @@ export function computeBranchStats(items: PRDItemData[]): BranchStats {
               break;
             case "pending":
               stats.pending++;
+              break;
+            case "failing":
+              stats.failing++;
               break;
             case "deferred":
               stats.deferred++;
@@ -74,6 +78,7 @@ export function countChildStatuses(
     pending: 0,
     in_progress: 0,
     completed: 0,
+    failing: 0,
     deferred: 0,
     blocked: 0,
     deleted: 0,

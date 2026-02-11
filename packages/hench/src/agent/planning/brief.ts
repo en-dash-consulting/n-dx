@@ -112,6 +112,7 @@ function itemToTaskBrief(item: PRDItem): TaskBriefTask {
     priority: item.priority,
     tags: item.tags,
     blockedBy: item.blockedBy,
+    failureReason: item.failureReason,
   };
 }
 
@@ -285,6 +286,10 @@ export function formatTaskBrief(brief: TaskBrief): string {
   }
   if (brief.task.tags?.length) {
     sections.push(`Tags: ${brief.task.tags.join(", ")}`);
+  }
+  if (brief.task.failureReason) {
+    sections.push("\n## PREVIOUS FAILURE");
+    sections.push(brief.task.failureReason);
   }
 
   // Parent chain

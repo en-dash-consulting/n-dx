@@ -15,6 +15,7 @@ export const ALL_STATUSES: ItemStatus[] = [
   "pending",
   "in_progress",
   "completed",
+  "failing",
   "blocked",
   "deferred",
   "deleted",
@@ -25,6 +26,7 @@ const STATUS_DISPLAY: Record<ItemStatus, { icon: string; label: string; cssClass
   pending:     { icon: "\u25CB", label: "Pending",     cssClass: "prd-status-pending" },
   in_progress: { icon: "\u25D0", label: "In Progress", cssClass: "prd-status-in-progress" },
   completed:   { icon: "\u25CF", label: "Completed",   cssClass: "prd-status-completed" },
+  failing:     { icon: "\u26A0", label: "Failing",     cssClass: "prd-status-failing" },
   blocked:     { icon: "\u2298", label: "Blocked",     cssClass: "prd-status-blocked" },
   deferred:    { icon: "\u25CC", label: "Deferred",    cssClass: "prd-status-deferred" },
   deleted:     { icon: "\u2715", label: "Deleted",     cssClass: "prd-status-deleted" },
@@ -54,8 +56,8 @@ export const FILTER_PRESETS: readonly FilterPreset[] = [
   {
     key: "active",
     label: "Active Work",
-    title: "Show pending, in progress, and blocked items",
-    statuses: new Set<ItemStatus>(["pending", "in_progress", "blocked"]),
+    title: "Show pending, in progress, failing, and blocked items",
+    statuses: new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"]),
   },
   {
     key: "completed",
@@ -186,7 +188,7 @@ export function StatusFilter({ activeStatuses, onChange }: StatusFilterProps) {
   );
 }
 
-/** Default set of visible statuses (active work: pending, in progress, blocked). */
+/** Default set of visible statuses (active work: pending, in progress, failing, blocked). */
 export function defaultStatusFilter(): Set<ItemStatus> {
-  return new Set<ItemStatus>(["pending", "in_progress", "blocked"]);
+  return new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"]);
 }

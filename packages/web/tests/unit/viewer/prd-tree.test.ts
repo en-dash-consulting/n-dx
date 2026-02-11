@@ -205,8 +205,8 @@ describe("PRDTree", () => {
   it("renders status filter chips for all statuses", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
     const chips = root.querySelectorAll(".prd-status-chip");
-    // Should have chips for all 6 statuses
-    expect(chips.length).toBe(6);
+    // Should have chips for all 7 statuses
+    expect(chips.length).toBe(7);
   });
 
   it("renders filter preset buttons", () => {

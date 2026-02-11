@@ -162,6 +162,7 @@ export interface TaskBriefTask {
   priority?: string;
   tags?: string[];
   blockedBy?: string[];
+  failureReason?: string;
 }
 
 export interface TaskBriefParent {

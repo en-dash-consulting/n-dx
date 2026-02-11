@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PRDStore, ItemStatus } from "rex";
+import type { PRDStore, PRDItem, ItemStatus } from "rex";
 import type { CommandExecutor } from "rex";
 import { execShellCmd } from "../process/index.js";
 import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation } from "../prd/ops.js";
@@ -17,10 +17,10 @@ export interface UpdateStatusOptions {
 export async function toolRexUpdateStatus(
   store: PRDStore,
   taskId: string,
-  params: { status: string },
+  params: { status: string; reason?: string },
   options?: UpdateStatusOptions,
 ): Promise<string> {
-  const validStatuses = ["pending", "in_progress", "completed", "deferred", "blocked"];
+  const validStatuses = ["pending", "in_progress", "completed", "failing", "deferred", "blocked"];
   if (!validStatuses.includes(params.status)) {
     throw new Error(
       `Invalid status "${params.status}". Valid: ${validStatuses.join(", ")}`,
@@ -90,7 +90,11 @@ export async function toolRexUpdateStatus(
     params.status as ItemStatus,
     existing ?? undefined,
   );
-  await store.updateItem(taskId, { status: params.status as ItemStatus, ...tsUpdates });
+  const statusUpdates: Partial<PRDItem> = { status: params.status as ItemStatus, ...tsUpdates };
+  if (params.status === "failing" && params.reason) {
+    statusUpdates.failureReason = params.reason;
+  }
+  await store.updateItem(taskId, statusUpdates);
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "status_updated",

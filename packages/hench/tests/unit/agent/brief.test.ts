@@ -159,6 +159,25 @@ describe("formatTaskBrief", () => {
     const output = formatTaskBrief(minimalBrief);
     expect(output).not.toContain("Blocked by:");
   });
+
+  it("includes PREVIOUS FAILURE section when failureReason is present", () => {
+    const brief: TaskBrief = {
+      ...minimalBrief,
+      task: {
+        ...minimalBrief.task,
+        status: "failing",
+        failureReason: "Tests broken: login form validation fails",
+      },
+    };
+    const output = formatTaskBrief(brief);
+    expect(output).toContain("## PREVIOUS FAILURE");
+    expect(output).toContain("Tests broken: login form validation fails");
+  });
+
+  it("omits PREVIOUS FAILURE when failureReason is not present", () => {
+    const output = formatTaskBrief(minimalBrief);
+    expect(output).not.toContain("PREVIOUS FAILURE");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ const ItemStatusSchema = z.enum([
   "pending",
   "in_progress",
   "completed",
+  "failing",
   "deferred",
   "blocked",
   "deleted",
@@ -62,6 +63,7 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       requirements: z.array(RequirementSchema).optional(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
+      failureReason: z.string().optional(),
       children: z.array(PRDItemSchema).optional(),
     })
     .passthrough(),

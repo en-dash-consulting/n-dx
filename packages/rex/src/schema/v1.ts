@@ -32,7 +32,7 @@ export const SCHEMA_VERSION = "rex/v1";
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";
 
-export type ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked" | "deleted";
+export type ItemStatus = "pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "deleted";
 
 export type Priority = "critical" | "high" | "medium" | "low";
 
@@ -142,6 +142,7 @@ export interface PRDItem {
   requirements?: Requirement[];
   startedAt?: string;
   completedAt?: string;
+  failureReason?: string;
   children?: PRDItem[];
   [key: string]: unknown;
 }
@@ -253,6 +254,7 @@ export const VALID_STATUSES = new Set<ItemStatus>([
   "pending",
   "in_progress",
   "completed",
+  "failing",
   "deferred",
   "blocked",
   "deleted",

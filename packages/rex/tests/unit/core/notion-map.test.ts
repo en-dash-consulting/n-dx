@@ -1367,17 +1367,19 @@ describe("DATABASE_SCHEMA", () => {
     expect(todoGroup!.option_names).toContain("Not started");
     expect(todoGroup!.option_names).toContain("Deferred");
     expect(inProgressGroup!.option_names).toContain("In progress");
+    expect(inProgressGroup!.option_names).toContain("Failing");
     expect(inProgressGroup!.option_names).toContain("Blocked");
     expect(completeGroup!.option_names).toContain("Done");
   });
 
   it("includes all status options", () => {
     const options = DATABASE_SCHEMA.Status.options!;
-    expect(options).toHaveLength(6);
+    expect(options).toHaveLength(7);
     const names = options.map((o) => o.name);
     expect(names).toContain("Not started");
     expect(names).toContain("In progress");
     expect(names).toContain("Done");
+    expect(names).toContain("Failing");
     expect(names).toContain("Deferred");
     expect(names).toContain("Blocked");
     expect(names).toContain("Deleted");

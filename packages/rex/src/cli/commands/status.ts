@@ -23,6 +23,7 @@ const STATUS_ICONS: Record<string, string> = {
   pending: "○",
   in_progress: "◐",
   completed: "●",
+  failing: "✗",
   deferred: "◌",
   blocked: "⊘",
   deleted: "✕",
@@ -65,6 +66,9 @@ function timestampSuffix(item: PRDItem): string {
   if (item.status === "in_progress" && typeof item.startedAt === "string") {
     const ts = formatTimestamp(item.startedAt);
     return ts ? ` (started ${ts})` : "";
+  }
+  if (item.status === "failing" && typeof item.failureReason === "string") {
+    return ` (reason: ${item.failureReason})`;
   }
   return "";
 }
@@ -162,6 +166,7 @@ export function formatStats(
   if (stats.completed > 0) parts.push(`${stats.completed} completed`);
   if (stats.inProgress > 0) parts.push(`${stats.inProgress} in progress`);
   if (stats.pending > 0) parts.push(`${stats.pending} pending`);
+  if (stats.failing > 0) parts.push(`${stats.failing} failing`);
   if (stats.deferred > 0) parts.push(`${stats.deferred} deferred`);
   if (stats.blocked > 0) parts.push(`${stats.blocked} blocked`);
   if (stats.deleted > 0) parts.push(`${stats.deleted} deleted`);

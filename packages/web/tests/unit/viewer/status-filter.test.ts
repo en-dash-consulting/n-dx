@@ -33,12 +33,12 @@ describe("FILTER_PRESETS", () => {
     }
   });
 
-  it("includes 'Active Work' preset with pending, in_progress, blocked", () => {
+  it("includes 'Active Work' preset with pending, in_progress, failing, blocked", () => {
     const activePreset = FILTER_PRESETS.find((p) => p.key === "active");
     expect(activePreset).toBeDefined();
     expect(activePreset!.label).toBe("Active Work");
     expect(activePreset!.statuses).toEqual(
-      new Set<ItemStatus>(["pending", "in_progress", "blocked"]),
+      new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"]),
     );
   });
 
@@ -85,9 +85,9 @@ describe("activePresetKey", () => {
     expect(activePresetKey(new Set(ALL_STATUSES))).toBe("all");
   });
 
-  it("returns 'active' for pending + in_progress + blocked", () => {
+  it("returns 'active' for pending + in_progress + failing + blocked", () => {
     expect(
-      activePresetKey(new Set<ItemStatus>(["pending", "in_progress", "blocked"])),
+      activePresetKey(new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"])),
     ).toBe("active");
   });
 
@@ -165,7 +165,7 @@ describe("StatusFilter component", () => {
   it("marks 'Active Work' preset when active filter matches", () => {
     const root = renderToDiv(
       h(StatusFilter, {
-        activeStatuses: new Set<ItemStatus>(["pending", "in_progress", "blocked"]),
+        activeStatuses: new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"]),
         onChange: () => {},
       }),
     );
@@ -228,7 +228,7 @@ describe("StatusFilter component", () => {
     expect(arg.size).toBe(ALL_STATUSES.length);
   });
 
-  it("renders 6 status chips", () => {
+  it("renders 7 status chips", () => {
     const root = renderToDiv(
       h(StatusFilter, {
         activeStatuses: defaultStatusFilter(),
@@ -236,7 +236,7 @@ describe("StatusFilter component", () => {
       }),
     );
     const chips = root.querySelectorAll(".prd-status-chip");
-    expect(chips.length).toBe(6);
+    expect(chips.length).toBe(7);
   });
 
   it("sets aria-pressed on preset buttons", () => {

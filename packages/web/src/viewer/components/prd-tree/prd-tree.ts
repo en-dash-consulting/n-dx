@@ -21,6 +21,7 @@ const STATUS_CONFIG: Record<
   completed: { icon: "●", cssClass: "prd-status-completed", label: "Completed" },
   in_progress: { icon: "◐", cssClass: "prd-status-in-progress", label: "In Progress" },
   pending: { icon: "○", cssClass: "prd-status-pending", label: "Pending" },
+  failing: { icon: "⚠", cssClass: "prd-status-failing", label: "Failing" },
   deferred: { icon: "◌", cssClass: "prd-status-deferred", label: "Deferred" },
   blocked: { icon: "⊘", cssClass: "prd-status-blocked", label: "Blocked" },
   deleted: { icon: "✕", cssClass: "prd-status-deleted", label: "Deleted" },
@@ -128,6 +129,9 @@ function TimestampSuffix({ item }: { item: PRDItemData }) {
   if (item.status === "in_progress" && item.startedAt) {
     const ts = formatTimestamp(item.startedAt);
     if (ts) return h("span", { class: "prd-timestamp" }, `started ${ts}`);
+  }
+  if (item.status === "failing" && item.failureReason) {
+    return h("span", { class: "prd-timestamp prd-failure-reason" }, item.failureReason);
   }
   return null;
 }
@@ -351,6 +355,7 @@ function SummaryBar({ items }: { items: PRDItemData[] }) {
     { status: "completed", count: stats.completed, label: "Completed" },
     { status: "in_progress", count: stats.inProgress, label: "In Progress" },
     { status: "pending", count: stats.pending, label: "Pending" },
+    { status: "failing", count: stats.failing, label: "Failing" },
     { status: "blocked", count: stats.blocked, label: "Blocked" },
     { status: "deferred", count: stats.deferred, label: "Deferred" },
     { status: "deleted", count: stats.deleted, label: "Deleted" },

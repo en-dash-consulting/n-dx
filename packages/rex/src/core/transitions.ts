@@ -23,8 +23,9 @@ import type { ItemStatus } from "../schema/index.js";
  */
 const ALLOWED_TRANSITIONS: Record<ItemStatus, Set<ItemStatus>> = {
   pending: new Set(["in_progress", "deferred", "blocked", "completed", "deleted"]),
-  in_progress: new Set(["completed", "blocked", "deferred", "pending", "deleted"]),
-  completed: new Set(["deleted"]),
+  in_progress: new Set(["completed", "failing", "blocked", "deferred", "pending", "deleted"]),
+  completed: new Set(["failing", "deleted"]),
+  failing: new Set(["in_progress", "pending", "deferred", "deleted"]),
   deferred: new Set(["pending", "in_progress", "blocked", "deleted"]),
   blocked: new Set(["pending", "in_progress", "deferred", "deleted"]),
   deleted: new Set([]),
@@ -75,7 +76,7 @@ function transitionErrorMessage(from: ItemStatus, to: ItemStatus): string {
   const allowedList = [...allowed].join(", ");
 
   if (from === "completed") {
-    return `Cannot move from "completed" to "${to}" — completed items are locked. Use --force to override.`;
+    return `Cannot move from "completed" to "${to}" — completed items can only transition to "failing". Use --force to override.`;
   }
 
   if (allowedList) {

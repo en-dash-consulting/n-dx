@@ -4,7 +4,7 @@ import type { ItemStatus } from "../../../src/schema/index.js";
 
 describe("validateTransition", () => {
   // --- No-op (same status) always allowed ---
-  it.each<ItemStatus>(["pending", "in_progress", "completed", "deferred", "blocked", "deleted"])(
+  it.each<ItemStatus>(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"])(
     "allows no-op transition: %s → %s",
     (status) => {
       const result = validateTransition(status, status);
@@ -23,20 +23,42 @@ describe("validateTransition", () => {
   );
 
   // --- Forward progress from in_progress ---
-  it.each<ItemStatus>(["completed", "blocked", "deferred", "pending"])(
+  it.each<ItemStatus>(["completed", "failing", "blocked", "deferred", "pending"])(
     "allows in_progress → %s",
     (to) => {
       expect(validateTransition("in_progress", to).allowed).toBe(true);
     },
   );
 
-  // --- Completed is locked ---
+  // --- Completed allows failing (revert broken work) ---
+  it("allows completed → failing", () => {
+    expect(validateTransition("completed", "failing").allowed).toBe(true);
+  });
+
+  // --- Completed is locked for other transitions ---
   it.each<ItemStatus>(["pending", "in_progress", "deferred", "blocked"])(
     "blocks completed → %s",
     (to) => {
       const result = validateTransition("completed", to);
       expect(result.allowed).toBe(false);
       expect(result.message).toContain("completed");
+      expect(result.message).toContain("--force");
+    },
+  );
+
+  // --- Failing can retry or reset ---
+  it.each<ItemStatus>(["in_progress", "pending", "deferred"])(
+    "allows failing → %s",
+    (to) => {
+      expect(validateTransition("failing", to).allowed).toBe(true);
+    },
+  );
+
+  it.each<ItemStatus>(["completed", "blocked"])(
+    "blocks failing → %s",
+    (to) => {
+      const result = validateTransition("failing", to);
+      expect(result.allowed).toBe(false);
       expect(result.message).toContain("--force");
     },
   );
@@ -70,7 +92,7 @@ describe("validateTransition", () => {
   });
 
   // --- Deletion from any status ---
-  it.each<ItemStatus>(["pending", "in_progress", "completed", "deferred", "blocked"])(
+  it.each<ItemStatus>(["pending", "in_progress", "completed", "failing", "deferred", "blocked"])(
     "allows %s → deleted",
     (from) => {
       expect(validateTransition(from, "deleted").allowed).toBe(true);
@@ -78,7 +100,7 @@ describe("validateTransition", () => {
   );
 
   // --- Deleted is terminal ---
-  it.each<ItemStatus>(["pending", "in_progress", "completed", "deferred", "blocked"])(
+  it.each<ItemStatus>(["pending", "in_progress", "completed", "failing", "deferred", "blocked"])(
     "blocks deleted → %s",
     (to) => {
       const result = validateTransition("deleted", to);
@@ -96,7 +118,8 @@ describe("validateTransition", () => {
 
   it("has a specific message for completed items", () => {
     const result = validateTransition("completed", "pending");
-    expect(result.message).toContain("completed items are locked");
+    expect(result.message).toContain("completed");
+    expect(result.message).toContain("failing");
   });
 });
 
@@ -108,8 +131,8 @@ describe("allowedTargets", () => {
     expect(targets).not.toContain("pending");
   });
 
-  it("returns only deleted for completed", () => {
-    expect(allowedTargets("completed")).toEqual(["deleted"]);
+  it("returns failing and deleted for completed", () => {
+    expect(allowedTargets("completed")).toEqual(["failing", "deleted"]);
   });
 
   it("returns empty array for deleted", () => {

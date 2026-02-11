@@ -234,6 +234,25 @@ describe("findNextTask", () => {
     expect(result!.item.id).toBe("t2");
   });
 
+  it("prefers failing tasks over in_progress tasks", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "In progress", status: "in_progress", priority: "critical" }),
+      makeItem({ id: "t2", title: "Failing task", status: "failing", priority: "medium" }),
+    ];
+    const result = findNextTask(items, new Set());
+    expect(result!.item.id).toBe("t2");
+  });
+
+  it("includes failing tasks as actionable", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Done", status: "completed" }),
+      makeItem({ id: "t2", title: "Failing", status: "failing" }),
+    ];
+    const result = findNextTask(items, new Set(["t1"]));
+    expect(result).not.toBeNull();
+    expect(result!.item.id).toBe("t2");
+  });
+
   it("uses ancestor priority as tiebreaker for same-priority tasks", () => {
     const items: PRDItem[] = [
       makeItem({

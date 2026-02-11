@@ -168,6 +168,23 @@ describe("findAutoCompletions", () => {
     expect(result.completedIds).toEqual([]);
   });
 
+  it("does not auto-complete when some children are failing", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "f1",
+        title: "Feature 1",
+        level: "feature",
+        status: "in_progress",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "failing" }),
+        ],
+      }),
+    ];
+    const result = findAutoCompletions(items, "t1");
+    expect(result.completedIds).toEqual([]);
+  });
+
   it("propagates up multiple levels", () => {
     const items: PRDItem[] = [
       makeItem({

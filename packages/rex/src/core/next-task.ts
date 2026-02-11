@@ -174,10 +174,10 @@ function makeComparator(
   precomputeReqScores(items, []);
 
   return (a: TreeEntry, b: TreeEntry): number => {
-    // 1. in_progress always wins — finish what you started
-    const aInProgress = a.item.status === "in_progress" ? 0 : 1;
-    const bInProgress = b.item.status === "in_progress" ? 0 : 1;
-    if (aInProgress !== bInProgress) return aInProgress - bInProgress;
+    // 1. failing/in_progress always win — retry failures and finish what you started
+    const aUrgent = a.item.status === "failing" ? 0 : a.item.status === "in_progress" ? 1 : 2;
+    const bUrgent = b.item.status === "failing" ? 0 : b.item.status === "in_progress" ? 1 : 2;
+    if (aUrgent !== bUrgent) return aUrgent - bUrgent;
 
     // 2. Then by own priority
     const pa = PRIORITY_ORDER[a.item.priority ?? "medium"];
@@ -268,7 +268,7 @@ function collectActionable(
 
   function collect(list: PRDItem[], parentChain: PRDItem[]): void {
     for (const item of list) {
-      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked") continue;
+      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked" || item.status === "deleted") continue;
 
       if (item.blockedBy && item.blockedBy.length > 0) {
         if (!item.blockedBy.every((dep) => completedIds.has(dep))) continue;

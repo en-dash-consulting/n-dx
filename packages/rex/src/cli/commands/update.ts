@@ -83,6 +83,11 @@ export async function cmdUpdate(
 
     updates.status = flags.status as ItemStatus;
 
+    // Set failureReason when transitioning to failing
+    if (flags.status === "failing" && flags.reason) {
+      updates.failureReason = flags.reason;
+    }
+
     // Compute automatic timestamp updates for the status change
     const tsUpdates = computeTimestampUpdates(existing.status, updates.status, existing);
     Object.assign(updates, tsUpdates);
@@ -114,7 +119,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --description, or --blockedBy.",
+      "Use --status, --priority, --title, --description, --blockedBy, or --reason (with --status=failing).",
     );
   }
 

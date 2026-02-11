@@ -130,9 +130,9 @@ describe("Viewer type mirrors match canonical definitions", () => {
     }
   });
 
-  it("ItemStatus covers exactly 6 values", () => {
-    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "deferred", "blocked", "deleted"];
-    expect(CANONICAL_VALID_STATUSES.size).toBe(6);
+  it("ItemStatus covers exactly 7 values", () => {
+    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"];
+    expect(CANONICAL_VALID_STATUSES.size).toBe(7);
     for (const status of statuses) {
       expect(CANONICAL_VALID_STATUSES.has(status)).toBe(true);
     }
@@ -222,13 +222,13 @@ describe("Viewer type mirrors match canonical definitions", () => {
     // This test serves as a reminder: if canonical definitions change,
     // update the viewer mirrors in types.ts.
     const levels: ItemLevel[] = ["epic", "feature", "task", "subtask"];
-    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "deferred", "blocked", "deleted"];
+    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"];
     const priorities: Priority[] = ["critical", "high", "medium", "low"];
     const categories: RequirementCategory[] = ["technical", "performance", "security", "accessibility", "compatibility", "quality"];
     const validationTypes: RequirementValidationType[] = ["automated", "manual", "metric"];
 
     expect(levels).toHaveLength(4);
-    expect(statuses).toHaveLength(6);
+    expect(statuses).toHaveLength(7);
     expect(priorities).toHaveLength(4);
     expect(categories).toHaveLength(6);
     expect(validationTypes).toHaveLength(3);

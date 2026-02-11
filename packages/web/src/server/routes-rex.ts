@@ -145,6 +145,7 @@ interface TreeStats {
   completed: number;
   inProgress: number;
   pending: number;
+  failing: number;
   deferred: number;
   blocked: number;
   deleted: number;
@@ -157,6 +158,7 @@ function computeStats(items: PRDItemRecord[]): TreeStats {
     completed: 0,
     inProgress: 0,
     pending: 0,
+    failing: 0,
     deferred: 0,
     blocked: 0,
     deleted: 0,
@@ -174,6 +176,7 @@ function computeStats(items: PRDItemRecord[]): TreeStats {
             case "completed": stats.completed++; break;
             case "in_progress": stats.inProgress++; break;
             case "pending": stats.pending++; break;
+            case "failing": stats.failing++; break;
             case "deferred": stats.deferred++; break;
             case "blocked": stats.blocked++; break;
           }
@@ -199,7 +202,7 @@ function findNextTask(items: PRDItemRecord[], completedIds: Set<string>): PRDIte
 
   function collect(list: PRDItemRecord[]): void {
     for (const item of list) {
-      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked") continue;
+      if (item.status === "completed" || item.status === "deferred" || item.status === "blocked" || item.status === "deleted") continue;
 
       // Check unresolved dependencies
       if (Array.isArray(item.blockedBy) && item.blockedBy.length > 0) {
@@ -230,11 +233,11 @@ function findNextTask(items: PRDItemRecord[], completedIds: Set<string>): PRDIte
 
   if (candidates.length === 0) return null;
 
-  // Sort: in_progress first, then by priority
+  // Sort: failing first (retry), then in_progress, then by priority
   candidates.sort((a, b) => {
-    const aInProg = a.item.status === "in_progress" ? 0 : 1;
-    const bInProg = b.item.status === "in_progress" ? 0 : 1;
-    if (aInProg !== bInProg) return aInProg - bInProg;
+    const aUrgent = a.item.status === "failing" ? 0 : a.item.status === "in_progress" ? 1 : 2;
+    const bUrgent = b.item.status === "failing" ? 0 : b.item.status === "in_progress" ? 1 : 2;
+    if (aUrgent !== bUrgent) return aUrgent - bUrgent;
     return a.priority - b.priority;
   });
 

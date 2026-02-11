@@ -92,6 +92,7 @@ export interface TreeStats {
   completed: number;
   inProgress: number;
   pending: number;
+  failing: number;
   deferred: number;
   blocked: number;
   deleted: number;
@@ -103,6 +104,7 @@ export function computeStats(items: PRDItem[]): TreeStats {
     completed: 0,
     inProgress: 0,
     pending: 0,
+    failing: 0,
     deferred: 0,
     blocked: 0,
     deleted: 0,
@@ -127,6 +129,9 @@ export function computeStats(items: PRDItem[]): TreeStats {
         break;
       case "pending":
         stats.pending++;
+        break;
+      case "failing":
+        stats.failing++;
         break;
       case "deferred":
         stats.deferred++;

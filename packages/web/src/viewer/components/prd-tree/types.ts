@@ -19,6 +19,7 @@ export type ItemStatus =
   | "pending"
   | "in_progress"
   | "completed"
+  | "failing"
   | "deferred"
   | "blocked"
   | "deleted";
@@ -70,6 +71,7 @@ export interface PRDItemData {
   requirements?: RequirementData[];
   startedAt?: string;
   completedAt?: string;
+  failureReason?: string;
   children?: PRDItemData[];
 }
 
@@ -85,6 +87,7 @@ export interface BranchStats {
   completed: number;
   inProgress: number;
   pending: number;
+  failing: number;
   deferred: number;
   blocked: number;
   deleted: number;

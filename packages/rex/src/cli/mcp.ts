@@ -132,10 +132,11 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     "Update the status of a PRD item",
     {
       id: z.string().describe("Item ID"),
-      status: z.enum(["pending", "in_progress", "completed", "deferred", "blocked", "deleted"]).describe("New status"),
+      status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"]).describe("New status"),
       force: z.boolean().optional().describe("Force the transition even if it violates transition rules (e.g. completed → pending)"),
+      reason: z.string().optional().describe("Failure reason (used when status is 'failing')"),
     },
-    async ({ id, status, force }) => {
+    async ({ id, status, force, reason }) => {
       try {
         const existing = await store.getItem(id);
         if (!existing) {
@@ -197,7 +198,11 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
         }
 
         const tsUpdates = computeTimestampUpdates(existing.status, status as ItemStatus, existing);
-        await store.updateItem(id, { status: status as ItemStatus, ...tsUpdates });
+        const statusUpdates: Partial<PRDItem> = { status: status as ItemStatus, ...tsUpdates };
+        if (status === "failing" && reason) {
+          statusUpdates.failureReason = reason;
+        }
+        await store.updateItem(id, statusUpdates);
         await store.appendLog({
           timestamp: new Date().toISOString(),
           event: "status_changed",
