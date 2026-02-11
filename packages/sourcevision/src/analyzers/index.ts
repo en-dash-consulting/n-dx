@@ -22,4 +22,5 @@ export {
   parseRoutesConfig,
   findRoutesDir,
 } from "./route-detection.js";
-export { analyzeCallGraph, extractFunctions, extractCalls } from "./callgraph.js";
+export { analyzeCallGraph, extractFunctions, extractCalls, computeZoneCallStats } from "./callgraph.js";
+export type { ZoneCallStats, CrossZoneCallPattern } from "./callgraph.js";

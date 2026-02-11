@@ -1,4 +1,4 @@
-import type { Manifest, Inventory, Imports, Zones, Components } from "../schema/v1.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../schema/v1.js";
 
 export interface LoadedData {
   manifest: Manifest | null;
@@ -6,9 +6,10 @@ export interface LoadedData {
   imports: Imports | null;
   zones: Zones | null;
   components: Components | null;
+  callGraph: CallGraph | null;
 }
 
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs" | "hench-config" | "hench-templates" | "hench-optimization";
+export type ViewId = "overview" | "graph" | "call-graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs" | "hench-config" | "hench-templates" | "hench-optimization";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string }) => void;
 

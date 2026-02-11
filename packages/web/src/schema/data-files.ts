@@ -4,6 +4,7 @@ export const DATA_FILES = {
   imports: "imports.json",
   zones: "zones.json",
   components: "components.json",
+  callGraph: "callgraph.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);

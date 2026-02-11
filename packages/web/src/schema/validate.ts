@@ -232,6 +232,56 @@ export const ComponentsSchema = z.object({
   summary: ComponentsSummarySchema,
 });
 
+// ── Call Graph ──────────────────────────────────────────────────────────────
+
+const CallTypeSchema = z.enum(["direct", "method", "property-chain", "computed"]);
+
+const FunctionNodeSchema = z.object({
+  file: z.string(),
+  name: z.string(),
+  line: z.number().int().positive(),
+  column: z.number().int().nonnegative(),
+  qualifiedName: z.string(),
+  isExported: z.boolean(),
+});
+
+const CallEdgeSchema = z.object({
+  callerFile: z.string(),
+  caller: z.string(),
+  calleeFile: z.string().nullable(),
+  callee: z.string(),
+  type: CallTypeSchema,
+  line: z.number().int().positive(),
+  column: z.number().int().nonnegative(),
+});
+
+const CallGraphSummarySchema = z.object({
+  totalFunctions: z.number().int().nonnegative(),
+  totalCalls: z.number().int().nonnegative(),
+  filesWithCalls: z.number().int().nonnegative(),
+  mostCalled: z.array(
+    z.object({
+      qualifiedName: z.string(),
+      file: z.string(),
+      callerCount: z.number().int().positive(),
+    })
+  ),
+  mostCalling: z.array(
+    z.object({
+      qualifiedName: z.string(),
+      file: z.string(),
+      calleeCount: z.number().int().positive(),
+    })
+  ),
+  cycleCount: z.number().int().nonnegative(),
+});
+
+export const CallGraphSchema = z.object({
+  functions: z.array(FunctionNodeSchema),
+  edges: z.array(CallEdgeSchema),
+  summary: CallGraphSummarySchema,
+});
+
 // ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
@@ -273,6 +323,12 @@ export function validateComponents(
   return validate(ComponentsSchema, data);
 }
 
+export function validateCallGraph(
+  data: unknown
+): ValidationResult<V1.CallGraph> {
+  return validate(CallGraphSchema, data);
+}
+
 /** Validate any module output by name */
 export function validateModule(
   name: string,
@@ -289,6 +345,8 @@ export function validateModule(
       return validate(ZonesSchema, data);
     case "components":
       return validate(ComponentsSchema, data);
+    case "callGraph":
+      return validate(CallGraphSchema, data);
     default:
       return {
         ok: false,

@@ -4,13 +4,14 @@
  * Supports both server mode (fetch from /data/) and file drop mode.
  */
 
-import type { Manifest, Inventory, Imports, Zones, Components } from "../schema/v1.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../schema/v1.js";
 import {
   validateManifest,
   validateInventory,
   validateImports,
   validateZones,
   validateComponents,
+  validateCallGraph,
 } from "../schema/validate.js";
 import { DATA_FILES } from "../schema/data-files.js";
 import { migrateData } from "./schema-compat.js";
@@ -24,6 +25,7 @@ let currentData: LoadedData = {
   imports: null,
   zones: null,
   components: null,
+  callGraph: null,
 };
 
 let onChange: DataChangeHandler | null = null;
@@ -54,6 +56,7 @@ export async function loadFromServer(): Promise<LoadedData> {
     { key: "imports", file: DATA_FILES.imports, validate: validateImports },
     { key: "zones", file: DATA_FILES.zones, validate: validateZones },
     { key: "components", file: DATA_FILES.components, validate: validateComponents },
+    { key: "callGraph", file: DATA_FILES.callGraph, validate: validateCallGraph },
   ];
 
   const results = await Promise.allSettled(
@@ -98,6 +101,7 @@ export async function loadFromFiles(files: FileList): Promise<LoadedData> {
     { key: "imports", file: DATA_FILES.imports, validate: validateImports },
     { key: "zones", file: DATA_FILES.zones, validate: validateZones },
     { key: "components", file: DATA_FILES.components, validate: validateComponents },
+    { key: "callGraph", file: DATA_FILES.callGraph, validate: validateCallGraph },
   ];
 
   for (const mod of modules) {

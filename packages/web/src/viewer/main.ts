@@ -12,6 +12,7 @@ import { initTheme } from "./components/theme-toggle.js";
 import { updateFavicon } from "./components/favicon.js";
 import { Overview } from "./views/overview.js";
 import { Graph } from "./views/graph.js";
+import { CallGraphView } from "./views/call-graph.js";
 import { ZonesView } from "./views/zones.js";
 import { FilesView } from "./views/files.js";
 import { ArchitectureView } from "./views/architecture.js";
@@ -32,7 +33,7 @@ initTheme();
 
 /** All known views grouped by product scope. */
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
-  sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
+  sourcevision: ["overview", "graph", "call-graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
   rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation"],
   hench: ["hench-runs", "hench-config", "hench-templates", "hench-optimization"],
 };
@@ -81,6 +82,7 @@ function App({ scope }: { scope: string | null }) {
     imports: null,
     zones: null,
     components: null,
+    callGraph: null,
   });
   const [detail, setDetail] = useState<DetailItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,6 +245,8 @@ function App({ scope }: { scope: string | null }) {
         return h(Overview, { data });
       case "graph":
         return h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
+      case "call-graph":
+        return h(CallGraphView, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
       case "zones":
         return h(ZonesView, { data, onSelect: setDetail, setSelectedZone, navigateTo });
       case "files":

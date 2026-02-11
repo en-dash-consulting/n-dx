@@ -446,7 +446,8 @@ export function generateStructuralInsights(
   zones: Zone[],
   crossings: ZoneCrossing[],
   imports: Imports,
-  totalFiles: number
+  totalFiles: number,
+  callGraphStats?: { zoneStats: Array<{ zoneId: string; internalCalls: number; outgoingCalls: number; incomingCalls: number; callCohesion: number; callCoupling: number }>; crossZonePatterns: Array<{ fromZone: string; toZone: string; callCount: number }> },
 ): { zoneInsights: Map<string, string[]>; globalInsights: string[] } {
   const zoneInsights = new Map<string, string[]>();
   const globalInsights: string[] = [];
@@ -574,6 +575,63 @@ export function generateStructuralInsights(
     globalInsights.push(
       `${imports.summary.circularCount} circular dependency chain${imports.summary.circularCount > 1 ? "s" : ""} detected — see imports.json for details`
     );
+  }
+
+  // ── Call graph insights (when available) ──
+
+  if (callGraphStats) {
+    const { zoneStats, crossZonePatterns } = callGraphStats;
+    const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
+
+    // Per-zone call graph insights
+    for (const zone of zones) {
+      const stats = zoneStatsMap.get(zone.id);
+      if (!stats) continue;
+      const insights = zoneInsights.get(zone.id)!;
+
+      // Call cohesion divergence from import cohesion
+      const cohesionDiff = Math.abs(stats.callCohesion - zone.cohesion);
+      if (cohesionDiff > 0.3) {
+        if (stats.callCohesion < zone.cohesion) {
+          insights.push(
+            `Call cohesion (${stats.callCohesion}) much lower than import cohesion (${zone.cohesion}) — functions call across zone boundaries more than imports suggest`
+          );
+        } else {
+          insights.push(
+            `Call cohesion (${stats.callCohesion}) much higher than import cohesion (${zone.cohesion}) — tighter runtime coupling within zone than import structure suggests`
+          );
+        }
+      }
+
+      // High incoming call traffic
+      if (stats.incomingCalls > 20) {
+        insights.push(
+          `${stats.incomingCalls} incoming calls from other zones — heavily depended-on runtime API`
+        );
+      }
+    }
+
+    // Global cross-zone call patterns
+    const topCrossZone = crossZonePatterns.slice(0, 3);
+    for (const pattern of topCrossZone) {
+      if (pattern.callCount >= 10) {
+        globalInsights.push(
+          `Heavy cross-zone calls: "${pattern.fromZone}" → "${pattern.toZone}" (${pattern.callCount} calls) — tight runtime coupling`
+        );
+      }
+    }
+
+    // Total cross-zone call percentage
+    const totalCalls = zoneStats.reduce((s, z) => s + z.internalCalls + z.outgoingCalls, 0);
+    const totalCrossZone = zoneStats.reduce((s, z) => s + z.outgoingCalls, 0);
+    if (totalCalls > 0) {
+      const pct = Math.round((totalCrossZone / totalCalls) * 100);
+      if (pct > 40) {
+        globalInsights.push(
+          `${pct}% of function calls cross zone boundaries — high runtime inter-zone dependency`
+        );
+      }
+    }
   }
 
   return { zoneInsights, globalInsights };

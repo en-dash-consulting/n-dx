@@ -715,3 +715,94 @@ function detectCallCycles(edges: CallEdge[]): number {
 
   return cycleCount;
 }
+
+// ── Zone call graph statistics ────────────────────────────────────────────
+
+export interface ZoneCallStats {
+  /** Zone ID */
+  zoneId: string;
+  /** Total call edges within this zone */
+  internalCalls: number;
+  /** Total call edges from this zone to other zones */
+  outgoingCalls: number;
+  /** Total call edges from other zones to this zone */
+  incomingCalls: number;
+  /** Call-based cohesion: internalCalls / totalCalls */
+  callCohesion: number;
+  /** Call-based coupling: externalCalls / totalCalls */
+  callCoupling: number;
+}
+
+export interface CrossZoneCallPattern {
+  /** Source zone ID */
+  fromZone: string;
+  /** Target zone ID */
+  toZone: string;
+  /** Number of call edges in this direction */
+  callCount: number;
+}
+
+/**
+ * Compute zone-level call graph statistics.
+ * Returns per-zone call cohesion/coupling metrics and cross-zone call patterns.
+ */
+export function computeZoneCallStats(
+  edges: CallEdge[],
+  fileToZone: Map<string, string>,
+): { zoneStats: ZoneCallStats[]; crossZonePatterns: CrossZoneCallPattern[] } {
+  const zoneCalls = new Map<string, { internal: number; outgoing: number; incoming: number }>();
+  const crossZoneCounts = new Map<string, number>();
+
+  for (const edge of edges) {
+    if (!edge.calleeFile) continue;
+
+    const callerZone = fileToZone.get(edge.callerFile);
+    const calleeZone = fileToZone.get(edge.calleeFile);
+
+    if (!callerZone && !calleeZone) continue;
+
+    // Ensure zone entries exist
+    if (callerZone && !zoneCalls.has(callerZone)) {
+      zoneCalls.set(callerZone, { internal: 0, outgoing: 0, incoming: 0 });
+    }
+    if (calleeZone && !zoneCalls.has(calleeZone)) {
+      zoneCalls.set(calleeZone, { internal: 0, outgoing: 0, incoming: 0 });
+    }
+
+    if (callerZone && calleeZone && callerZone === calleeZone) {
+      // Internal call
+      zoneCalls.get(callerZone)!.internal++;
+    } else if (callerZone && calleeZone) {
+      // Cross-zone call
+      zoneCalls.get(callerZone)!.outgoing++;
+      zoneCalls.get(calleeZone)!.incoming++;
+      const key = `${callerZone}\0${calleeZone}`;
+      crossZoneCounts.set(key, (crossZoneCounts.get(key) ?? 0) + 1);
+    } else if (callerZone) {
+      zoneCalls.get(callerZone)!.outgoing++;
+    } else if (calleeZone) {
+      zoneCalls.get(calleeZone)!.incoming++;
+    }
+  }
+
+  const zoneStats: ZoneCallStats[] = [];
+  for (const [zoneId, counts] of [...zoneCalls.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const total = counts.internal + counts.outgoing;
+    zoneStats.push({
+      zoneId,
+      internalCalls: counts.internal,
+      outgoingCalls: counts.outgoing,
+      incomingCalls: counts.incoming,
+      callCohesion: total > 0 ? Math.round((counts.internal / total) * 100) / 100 : 1,
+      callCoupling: total > 0 ? Math.round((counts.outgoing / total) * 100) / 100 : 0,
+    });
+  }
+
+  const crossZonePatterns: CrossZoneCallPattern[] = [];
+  for (const [key, count] of [...crossZoneCounts.entries()].sort((a, b) => b[1] - a[1])) {
+    const [fromZone, toZone] = key.split("\0");
+    crossZonePatterns.push({ fromZone, toZone, callCount: count });
+  }
+
+  return { zoneStats, crossZonePatterns };
+}

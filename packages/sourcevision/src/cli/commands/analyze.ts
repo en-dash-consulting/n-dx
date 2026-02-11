@@ -9,6 +9,8 @@ import type { InventoryResult } from "../../analyzers/inventory.js";
 import { analyzeImports } from "../../analyzers/imports.js";
 import { analyzeZones } from "../../analyzers/zones.js";
 import { analyzeComponents } from "../../analyzers/components.js";
+import { analyzeCallGraph, computeZoneCallStats } from "../../analyzers/callgraph.js";
+import type { CallGraph } from "../../schema/index.js";
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
@@ -343,6 +345,63 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     }
   }
 
+  // ── Phase 5: Call Graph (deterministic) ──────────────────────────────────
+  if (shouldRunPhase(filter, 5, "callgraph")) {
+    // Phase 5 requires inventory + imports
+    const inventoryPath = join(svDir, DATA_FILES.inventory);
+    const importsPath = join(svDir, DATA_FILES.imports);
+    if (!existsSync(inventoryPath) || !existsSync(importsPath)) {
+      console.error("  Phase 5 requires inventory.json and imports.json — run phases 1-2 first.");
+      if (filter.type === "all") process.exit(1);
+    } else {
+      info("[phase 5] Call graph...");
+      updateManifestModule(absDir, "callgraph", "running");
+
+      try {
+        const inventoryRaw = readFileSync(inventoryPath, "utf-8");
+        const importsRaw = readFileSync(importsPath, "utf-8");
+        const inventory = JSON.parse(inventoryRaw);
+        const importsData = JSON.parse(importsRaw);
+
+        // Load previous call graph for incremental analysis
+        let previousCallGraph: any;
+        const prevCallGraphPath = join(svDir, DATA_FILES.callGraph);
+        if (existsSync(prevCallGraphPath)) {
+          try {
+            previousCallGraph = JSON.parse(readFileSync(prevCallGraphPath, "utf-8"));
+          } catch {
+            // Corrupted — start fresh
+          }
+        }
+
+        const stats = inventoryResult?.stats;
+        const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
+
+        const callGraph = await analyzeCallGraph(absDir, inventory, importsData, previousCallGraph ? {
+          previousCallGraph,
+          changedFiles: inventoryResult?.changedFiles,
+          fileSetChanged,
+        } : undefined);
+        const outPath = join(svDir, DATA_FILES.callGraph);
+        writeFileSync(outPath, toCanonicalJSON(callGraph));
+        updateManifestModule(absDir, "callgraph", "complete");
+        info(`  ${callGraph.summary.totalFunctions} functions, ${callGraph.summary.totalCalls} calls, ${callGraph.summary.filesWithCalls} files → ${outPath}`);
+
+        // Enrich zones.json with call graph cross-zone statistics
+        enrichZonesWithCallGraph(svDir, callGraph);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        updateManifestError(absDir, "callgraph", msg);
+        console.error(`  Phase 5 failed: ${msg}`);
+        // Non-critical — don't exit on failure, just report
+        if (filter.type !== "all") {
+          // Only exit if user specifically requested this phase
+          process.exit(1);
+        }
+      }
+    }
+  }
+
   // ── Generate llms.txt + CONTEXT.md ──────────────────────────────────────
   if (filter.type === "all") {
     try {
@@ -403,6 +462,70 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
  * Merge one AnalyzeTokenUsage aggregate into another.
  * Used to combine token usage from multiple analyzeZones calls (e.g. --full mode).
  */
+/**
+ * Enrich zones.json with call graph cross-zone statistics.
+ * Adds call graph insights to existing zone insights without overwriting AI-generated content.
+ */
+function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph): void {
+  const zonesPath = join(svDir, DATA_FILES.zones);
+  if (!existsSync(zonesPath)) return;
+
+  try {
+    const zonesData = JSON.parse(readFileSync(zonesPath, "utf-8"));
+    if (!zonesData.zones || !Array.isArray(zonesData.zones)) return;
+
+    // Build file-to-zone mapping
+    const fileToZone = new Map<string, string>();
+    for (const zone of zonesData.zones) {
+      for (const file of zone.files) {
+        fileToZone.set(file, zone.id);
+      }
+    }
+
+    const { zoneStats, crossZonePatterns } = computeZoneCallStats(callGraph.edges, fileToZone);
+    const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
+
+    // Add call graph connectivity stats to each zone's insights
+    const CALL_GRAPH_PREFIX = "[call graph]";
+    for (const zone of zonesData.zones) {
+      const stats = zoneStatsMap.get(zone.id);
+      if (!stats) continue;
+
+      // Remove previous call graph insights
+      if (zone.insights) {
+        zone.insights = zone.insights.filter((i: string) => !i.startsWith(CALL_GRAPH_PREFIX));
+      } else {
+        zone.insights = [];
+      }
+
+      // Add call graph summary
+      const total = stats.internalCalls + stats.outgoingCalls;
+      if (total > 0) {
+        zone.insights.push(
+          `${CALL_GRAPH_PREFIX} ${stats.internalCalls} internal calls, ${stats.outgoingCalls} outgoing, ${stats.incomingCalls} incoming (cohesion: ${stats.callCohesion}, coupling: ${stats.callCoupling})`
+        );
+      }
+    }
+
+    // Add global call graph insights
+    if (!zonesData.insights) zonesData.insights = [];
+    zonesData.insights = zonesData.insights.filter((i: string) => !i.startsWith(CALL_GRAPH_PREFIX));
+
+    for (const pattern of crossZonePatterns.slice(0, 5)) {
+      if (pattern.callCount >= 5) {
+        zonesData.insights.push(
+          `${CALL_GRAPH_PREFIX} ${pattern.callCount} calls: "${pattern.fromZone}" → "${pattern.toZone}"`
+        );
+      }
+    }
+
+    writeFileSync(zonesPath, toCanonicalJSON(zonesData));
+    info("  Enriched zones.json with call graph statistics");
+  } catch {
+    // Non-critical — don't fail if zone enrichment doesn't work
+  }
+}
+
 function accumulateFromAggregate(target: AnalyzeTokenUsage, source: AnalyzeTokenUsage): void {
   target.calls += source.calls;
   target.inputTokens += source.inputTokens;

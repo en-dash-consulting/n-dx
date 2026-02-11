@@ -477,7 +477,7 @@ describe("Sidebar", () => {
     it("shows correct progress count", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const label = root.querySelector(".progress-label");
-      expect(label?.textContent).toBe("Analysis: 2/4");
+      expect(label?.textContent).toBe("Analysis: 2/5");
     });
 
     it("navigates to overview when progress indicator is clicked", () => {
@@ -498,19 +498,20 @@ describe("Sidebar", () => {
     it("renders module status icons", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const modules = root.querySelectorAll(".progress-module");
-      expect(modules.length).toBe(4);
+      expect(modules.length).toBe(5);
       // First two should be done (✓)
       expect(modules[0].classList.contains("done")).toBe(true);
       expect(modules[1].classList.contains("done")).toBe(true);
-      // Last two should not be done
+      // Last three should not be done
       expect(modules[2].classList.contains("done")).toBe(false);
       expect(modules[3].classList.contains("done")).toBe(false);
+      expect(modules[4].classList.contains("done")).toBe(false);
     });
 
     it("progress bar reflects completion percentage", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const fill = root.querySelector<HTMLElement>(".progress-fill");
-      expect(fill?.style.width).toBe("50%");
+      expect(fill?.style.width).toBe("40%");
     });
 
     it("progress indicator collapses with the SourceVision section", async () => {
@@ -561,8 +562,8 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 8 sourcevision items: overview, graph, zones, files, routes, architecture, problems, suggestions
-      expect(navItems.length).toBe(8);
+      // 9 sourcevision items: overview, graph, zones, call-graph, files, routes, architecture, problems, suggestions
+      expect(navItems.length).toBe(9);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

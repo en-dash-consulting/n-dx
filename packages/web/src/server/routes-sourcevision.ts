@@ -111,6 +111,17 @@ export function handleSourcevisionRoute(
     return true;
   }
 
+  // GET /api/sv/callgraph
+  if (path === "callgraph") {
+    const data = loadDataFile(ctx, DATA_FILES.callGraph);
+    if (!data) {
+      errorResponse(res, 404, "No call graph data. Run 'sourcevision analyze' first.");
+      return true;
+    }
+    jsonResponse(res, 200, data);
+    return true;
+  }
+
   // GET /api/sv/context
   if (path === "context") {
     const text = loadTextFile(ctx, "CONTEXT.md");
@@ -129,12 +140,14 @@ export function handleSourcevisionRoute(
     const inventory = loadDataFile(ctx, DATA_FILES.inventory) as Record<string, unknown> | null;
     const zones = loadDataFile(ctx, DATA_FILES.zones) as Record<string, unknown> | null;
     const components = loadDataFile(ctx, DATA_FILES.components) as Record<string, unknown> | null;
+    const callGraph = loadDataFile(ctx, DATA_FILES.callGraph) as Record<string, unknown> | null;
 
     const summary: Record<string, unknown> = {
       hasManifest: !!manifest,
       hasInventory: !!inventory,
       hasZones: !!zones,
       hasComponents: !!components,
+      hasCallGraph: !!callGraph,
     };
 
     if (manifest) {
@@ -156,6 +169,11 @@ export function handleSourcevisionRoute(
     if (components) {
       const c = components as Record<string, unknown>;
       summary.componentCount = Array.isArray(c.components) ? c.components.length : 0;
+    }
+
+    if (callGraph) {
+      const cg = callGraph as Record<string, unknown>;
+      summary.callGraphSummary = cg.summary;
     }
 
     jsonResponse(res, 200, summary);
