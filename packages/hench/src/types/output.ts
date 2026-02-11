@@ -2,6 +2,10 @@
  * CLI output control — supports --quiet mode for scripting
  * and structured section headers for streaming agent output.
  *
+ * Core primitives (setQuiet, isQuiet, info, result) are shared from
+ * @n-dx/claude-client. Hench-specific extensions (section, subsection,
+ * stream, detail) are defined here and use the shared isQuiet() state.
+ *
  * This module is placed in types/ to avoid circular dependencies
  * between CLI and agent modules (both need output formatting).
  *
@@ -13,33 +17,10 @@
  * Informational messages (progress, hints, summaries) are suppressed.
  */
 
-let _quiet = false;
+// Re-export shared foundation primitives.
+export { setQuiet, isQuiet, info, result } from "@n-dx/claude-client";
 
-/** Enable or disable quiet mode. Call once at CLI entry. */
-export function setQuiet(quiet: boolean): void {
-  _quiet = quiet;
-}
-
-/** Returns true when quiet mode is active. */
-export function isQuiet(): boolean {
-  return _quiet;
-}
-
-/**
- * Print informational output. Suppressed in quiet mode.
- * Use for progress messages, hints, decorative output.
- */
-export function info(...args: unknown[]): void {
-  if (!_quiet) console.log(...args);
-}
-
-/**
- * Print result output. Always shown, even in quiet mode.
- * Use for the primary data the user asked for: JSON, IDs, structured results.
- */
-export function result(...args: unknown[]): void {
-  console.log(...args);
-}
+import { isQuiet } from "@n-dx/claude-client";
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs
@@ -55,7 +36,7 @@ const SECTION_WIDTH = 60;
  *   ══════════════════════════════════════════════════════════════
  */
 export function section(title: string): void {
-  if (_quiet) return;
+  if (isQuiet()) return;
   const rule = "═".repeat(SECTION_WIDTH);
   console.log(`\n${rule}\n❯ ${title}\n${rule}`);
 }
@@ -66,7 +47,7 @@ export function section(title: string): void {
  *   ── Subsection Title ──────────────────────────────────────────
  */
 export function subsection(title: string): void {
-  if (_quiet) return;
+  if (isQuiet()) return;
   const prefix = `── ${title} `;
   const pad = Math.max(0, SECTION_WIDTH - prefix.length);
   console.log(`\n${prefix}${"─".repeat(pad)}`);
@@ -81,7 +62,7 @@ export function subsection(title: string): void {
  *   [Result]  contents of file…
  */
 export function stream(label: string, text: string): void {
-  if (_quiet) return;
+  if (isQuiet()) return;
   const tag = `[${label}]`.padEnd(10);
   console.log(`  ${tag} ${text}`);
 }
@@ -91,6 +72,6 @@ export function stream(label: string, text: string): void {
  * Useful for metadata like timing, token counts, retry info.
  */
 export function detail(text: string): void {
-  if (_quiet) return;
+  if (isQuiet()) return;
   console.log(`           ${text}`);
 }

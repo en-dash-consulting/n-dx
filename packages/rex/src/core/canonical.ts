@@ -1,9 +1,10 @@
 import type { PRDItem } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/index.js";
 
-export function toCanonicalJSON(data: unknown): string {
-  return JSON.stringify(data, null, 2) + "\n";
-}
+// Re-export from the shared foundation to eliminate duplication.
+// All existing consumers import from this file — the re-export preserves
+// their import paths while consolidating the implementation.
+export { toCanonicalJSON } from "@n-dx/claude-client";
 
 export function sortItems(items: PRDItem[]): PRDItem[] {
   const sorted = [...items].sort((a, b) => {

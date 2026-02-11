@@ -1,3 +1,2 @@
-export function toCanonicalJSON(data: unknown): string {
-  return JSON.stringify(data, null, 2) + "\n";
-}
+// Re-export from the shared foundation to eliminate duplication.
+export { toCanonicalJSON } from "@n-dx/claude-client";

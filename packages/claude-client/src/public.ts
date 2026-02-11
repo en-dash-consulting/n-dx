@@ -141,3 +141,21 @@ export type {
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";
+
+// Canonical JSON serialization
+export { toCanonicalJSON } from "./json.js";
+
+// Project-level config utilities (.n-dx.json overrides)
+export {
+  deepMerge,
+  loadProjectOverrides,
+  mergeWithOverrides,
+} from "./project-config.js";
+
+// CLI output control (quiet mode)
+export {
+  setQuiet,
+  isQuiet,
+  info,
+  result,
+} from "./output.js";
