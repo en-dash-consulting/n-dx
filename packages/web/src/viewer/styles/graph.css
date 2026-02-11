@@ -181,18 +181,27 @@
   stroke-opacity: 0.45;
 }
 
+/* Zone label layer — rendered above nodes so labels are always readable */
+.zone-label-layer { pointer-events: none; }
+
+.zone-hull-label-group { pointer-events: none; }
+
+.zone-hull-label-bg {
+  fill: var(--bg-surface);
+  opacity: 0.88;
+}
+
 .zone-hull-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   pointer-events: none;
-  opacity: 0.7;
+  fill: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 /* Collapsed zone — show summary badge */
 .zone-hull-group.collapsed .zone-hull { display: none; }
-.zone-hull-group.collapsed .zone-hull-label { display: none; }
 
 .zone-collapse-circle {
   opacity: 0.35;

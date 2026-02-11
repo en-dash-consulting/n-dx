@@ -66,6 +66,25 @@ describe("truncateFilename", () => {
   });
 });
 
+describe("truncateFilename edge cases for graph labels", () => {
+  it("preserves directory-like separators in filenames", () => {
+    // Some filenames might have dots that look like extensions
+    const result = truncateFilename("my.component.test.tsx", 18);
+    // Should preserve the final .tsx extension
+    expect(result).toMatch(/\.tsx$/);
+  });
+
+  it("handles single-char names", () => {
+    expect(truncateFilename("a", 18)).toBe("a");
+    expect(truncateFilename("a.ts", 18)).toBe("a.ts");
+  });
+
+  it("handles exactly maxLen with extension", () => {
+    // "exactly-max.ts" is 14 chars
+    expect(truncateFilename("exactly-max.ts", 14)).toBe("exactly-max.ts");
+  });
+});
+
 describe("basename", () => {
   it("extracts filename from path", () => {
     expect(basename("src/components/App.tsx")).toBe("App.tsx");

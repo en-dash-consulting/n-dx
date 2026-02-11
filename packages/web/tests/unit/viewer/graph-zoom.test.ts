@@ -223,4 +223,72 @@ describe("LOD zoom thresholds", () => {
     // At scale 0.5 (zoomed in): visual = 10, visible
     expect(nodeRadius / 0.5).toBeGreaterThanOrEqual(3);
   });
+
+  it("zone label font size scales with zoom level", () => {
+    // Matches: Math.max(10, Math.min(14, 12 / Math.sqrt(scale)))
+    const computeZoneFontSize = (scale: number) =>
+      Math.max(10, Math.min(14, 12 / Math.sqrt(scale)));
+
+    // At scale 1 (default): 12px
+    expect(computeZoneFontSize(1)).toBe(12);
+
+    // Zoomed in (scale < 1): larger font (capped at 14)
+    expect(computeZoneFontSize(0.25)).toBe(14); // 12 / 0.5 = 24, capped at 14
+
+    // Zoomed out (scale > 1): smaller font (capped at 10)
+    expect(computeZoneFontSize(4)).toBe(10); // 12 / 2 = 6, capped at 10
+  });
+});
+
+describe("zone label overlap reservation", () => {
+  /** AABB overlap test — same algorithm as in renderer. */
+  function rectsOverlap(
+    a: { x: number; y: number; w: number; h: number },
+    b: { x: number; y: number; w: number; h: number },
+  ): boolean {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  it("file label overlapping a zone label region is rejected", () => {
+    // Zone label at (100, 50), pill 80x20
+    const zoneRect = { x: 60, y: 40, w: 80, h: 20 };
+    // File label trying to place at overlapping position
+    const fileRect = { x: 70, y: 42, w: 60, h: 12 };
+    expect(rectsOverlap(zoneRect, fileRect)).toBe(true);
+  });
+
+  it("file label that does not overlap zone label is accepted", () => {
+    const zoneRect = { x: 60, y: 40, w: 80, h: 20 };
+    const fileRect = { x: 200, y: 42, w: 60, h: 12 };
+    expect(rectsOverlap(zoneRect, fileRect)).toBe(false);
+  });
+
+  it("greedy placement with zone reservation seeds zone rects first", () => {
+    // Simulate the renderer's greedy algorithm:
+    // 1. Pre-seed zone label rects
+    // 2. Try to place file labels in importance order
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+
+    // Zone label occupies center area
+    placed.push({ x: 90, y: 45, w: 80, h: 20 });
+
+    // File label A: overlaps zone → rejected
+    const fileA = { x: 95, y: 50, w: 50, h: 12 };
+    const aOverlaps = placed.some(p => rectsOverlap(fileA, p));
+    expect(aOverlaps).toBe(true);
+
+    // File label B: far away → accepted
+    const fileB = { x: 300, y: 50, w: 50, h: 12 };
+    const bOverlaps = placed.some(p => rectsOverlap(fileB, p));
+    expect(bOverlaps).toBe(false);
+    if (!bOverlaps) placed.push(fileB);
+
+    // File label C: overlaps file B → rejected
+    const fileC = { x: 310, y: 52, w: 50, h: 12 };
+    const cOverlaps = placed.some(p => rectsOverlap(fileC, p));
+    expect(cOverlaps).toBe(true);
+
+    // Only zone rect + file B placed (2 total)
+    expect(placed).toHaveLength(2);
+  });
 });

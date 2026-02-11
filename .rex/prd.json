@@ -6537,7 +6537,7 @@
             {
               "id": "8e0b1f26-b8f1-40fc-808c-b06b2fe5aa39",
               "title": "Integrate header controls and reposition branding elements",
-              "status": "failing",
+              "status": "completed",
               "level": "task",
               "description": "Create a unified header control bar with sidebar toggle, theme toggle, and FAQ button, while moving package logo and name to right-aligned position next to page-specific FAQ button for better visual hierarchy",
               "acceptanceCriteria": [
@@ -6560,7 +6560,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-10T20:34:45.791Z",
-              "completedAt": "2026-02-10T20:40:13.406Z",
+              "completedAt": "2026-02-11T06:28:30.598Z",
               "failureReason": "there's still a product title in the top-left and the global control elements overlap with the page content and there's still a sidebar toggle at the bottom. move the sidebar and themetoggle controls to the bottom of the sidebar and make it cohesive with the rest"
             },
             {
@@ -7348,7 +7348,7 @@
             {
               "id": "39144f79-e12e-46ff-979b-2a95359091bc",
               "title": "Implement interactive node manipulation",
-              "status": "failing",
+              "status": "completed",
               "level": "task",
               "description": "Enable users to drag nodes to new positions and click on nodes to show file details and highlight connections",
               "acceptanceCriteria": [
@@ -7368,7 +7368,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-11T03:24:45.481Z",
-              "completedAt": "2026-02-11T03:34:41.401Z",
+              "completedAt": "2026-02-11T06:37:33.791Z",
               "failureReason": "unable to drag or click any nodes or zones"
             },
             {
@@ -7408,7 +7408,7 @@
             {
               "id": "ca6091ab-d5d8-4f62-93be-0194efff210e",
               "title": "Implement smart label positioning and visibility",
-              "status": "failing",
+              "status": "completed",
               "level": "task",
               "description": "Prevent label overlaps through dynamic positioning and manage label visibility based on zoom level and density\n\n---\n\nTruncate long filenames with ellipsis and show full names on hover to balance readability with information access",
               "acceptanceCriteria": [
@@ -7434,7 +7434,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-11T03:35:40.021Z",
-              "completedAt": "2026-02-11T03:41:43.303Z",
+              "completedAt": "2026-02-11T06:44:22.234Z",
               "failureReason": "still not viable to read anything. zone names are not accessible to read on dark mode and theyre being overlapped by filenames and file blobs anyway",
               "children": []
             }

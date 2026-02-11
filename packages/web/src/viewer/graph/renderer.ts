@@ -101,11 +101,12 @@ export class GraphRenderer {
   private readonly zoneInfos: ZoneInfo[];
   private readonly zoneHullGroup: SVGGElement;            // container for zone hulls
   private readonly zoneHullElements: Map<string, SVGPathElement> = new Map();
-  private readonly zoneLabelElements: Map<string, SVGTextElement> = new Map();
+  private readonly zoneLabelElements: Map<string, SVGGElement> = new Map();  // zone label groups (bg + text)
   private readonly collapsedZones: Set<string> = new Set();
   private readonly zoneNodeIndices: Map<string, number[]> = new Map();
   private zonesVisible = true;
   private readonly onZoneSelect?: (zoneId: string) => void;
+  private readonly zoneLabelLayer: SVGGElement;           // separate layer above nodes for zone labels
 
   constructor(opts: GraphRendererOptions) {
     const { svg, nodes, links, width, height, onNodeSelect, onNodeDblClick, onZoneSelect, zoneInfos } = opts;
@@ -163,6 +164,11 @@ export class GraphRenderer {
     this.zoneHullGroup = document.createElementNS(ns, "g");
     this.zoneHullGroup.setAttribute("class", "zone-hulls");
     this.g.appendChild(this.zoneHullGroup);
+
+    // Zone label layer — created here but appended after nodeLayer below
+    this.zoneLabelLayer = document.createElementNS(ns, "g");
+    this.zoneLabelLayer.setAttribute("class", "zone-label-layer");
+
     this.createZoneHulls(ns);
 
     // Node map for link resolution
@@ -258,8 +264,11 @@ export class GraphRenderer {
     tooltipText.setAttribute("class", "graph-tooltip-text");
     tooltipText.setAttribute("dy", "0.35em");
     this.tooltip.appendChild(tooltipText);
-    // Tooltip must be added last so it renders on top of all nodes
-    nodeLayer.appendChild(this.tooltip);
+    // Zone label layer sits above nodes for readability
+    this.g.appendChild(this.zoneLabelLayer);
+
+    // Tooltip must be added last so it renders on top of all nodes and zone labels
+    this.g.appendChild(this.tooltip);
 
     // Initialize physics simulation
     this.sim = {
@@ -367,6 +376,7 @@ export class GraphRenderer {
   toggleZones(): boolean {
     this.zonesVisible = !this.zonesVisible;
     this.zoneHullGroup.style.display = this.zonesVisible ? "" : "none";
+    this.zoneLabelLayer.style.display = this.zonesVisible ? "" : "none";
     return this.zonesVisible;
   }
 
@@ -481,14 +491,23 @@ export class GraphRenderer {
       zoneG.appendChild(path);
       this.zoneHullElements.set(zi.id, path);
 
-      // Zone label at centroid
-      const label = document.createElementNS(ns, "text") as SVGTextElement;
-      label.setAttribute("class", "zone-hull-label");
-      label.setAttribute("text-anchor", "middle");
-      label.setAttribute("fill", zi.color);
-      label.textContent = zi.name;
-      zoneG.appendChild(label);
-      this.zoneLabelElements.set(zi.id, label);
+      // Zone label group — rendered in a separate layer above nodes for readability
+      const labelGroup = document.createElementNS(ns, "g") as SVGGElement;
+      labelGroup.setAttribute("class", "zone-hull-label-group");
+      labelGroup.setAttribute("data-zone", zi.id);
+      const labelBg = document.createElementNS(ns, "rect");
+      labelBg.setAttribute("class", "zone-hull-label-bg");
+      labelBg.setAttribute("rx", "4");
+      labelBg.setAttribute("ry", "4");
+      labelGroup.appendChild(labelBg);
+      const labelText = document.createElementNS(ns, "text") as SVGTextElement;
+      labelText.setAttribute("class", "zone-hull-label");
+      labelText.setAttribute("text-anchor", "middle");
+      labelText.setAttribute("dy", "0.35em");
+      labelText.textContent = zi.name;
+      labelGroup.appendChild(labelText);
+      this.zoneLabelLayer.appendChild(labelGroup);
+      this.zoneLabelElements.set(zi.id, labelGroup);
 
       this.zoneHullGroup.appendChild(zoneG);
 
@@ -519,20 +538,25 @@ export class GraphRenderer {
   private updateZoneHulls(): void {
     if (!this.zonesVisible) return;
 
+    // Zone label font size scales with zoom (stays readable at all levels)
+    const zoneFontSize = Math.max(10, Math.min(14, 12 / Math.sqrt(this.scale)));
+
     for (const zi of this.zoneInfos) {
       const indices = this.zoneNodeIndices.get(zi.id);
       if (!indices || indices.length < 2) continue;
 
       const path = this.zoneHullElements.get(zi.id);
-      const label = this.zoneLabelElements.get(zi.id);
-      if (!path || !label) continue;
+      const labelGroup = this.zoneLabelElements.get(zi.id);
+      if (!path || !labelGroup) continue;
 
-      // Skip collapsed zones — hull is hidden
+      // Skip collapsed zones — hull and label are hidden
       if (this.collapsedZones.has(zi.id)) {
         path.parentElement?.style.setProperty("display", "none");
+        labelGroup.style.display = "none";
         continue;
       }
       path.parentElement?.style.removeProperty("display");
+      labelGroup.style.display = "";
 
       // Collect visible node positions with padding
       const points: [number, number][] = [];
@@ -556,9 +580,24 @@ export class GraphRenderer {
       const d = hullToSmoothPath(paddedHull);
       path.setAttribute("d", d);
 
-      // Position zone label above the centroid
-      label.setAttribute("x", String(cx));
-      label.setAttribute("y", String(cy - this.getZoneRadius(indices) - 10));
+      // Position zone label above the zone cluster
+      const labelY = cy - this.getZoneRadius(indices) - 15;
+      const labelText = labelGroup.querySelector("text") as SVGTextElement | null;
+      const labelBg = labelGroup.querySelector("rect") as SVGRectElement | null;
+      if (labelText && labelBg) {
+        labelText.style.fontSize = `${zoneFontSize}px`;
+        // Position the group at the label center
+        labelGroup.setAttribute("transform", `translate(${cx},${labelY})`);
+        // Size the background pill around the text
+        const textLen = (labelText.textContent || "").length;
+        const charWidth = zoneFontSize * 0.55;
+        const pillW = textLen * charWidth + 12; // 6px padding each side
+        const pillH = zoneFontSize + 8;         // 4px padding top/bottom
+        labelBg.setAttribute("x", String(-pillW / 2));
+        labelBg.setAttribute("y", String(-pillH / 2));
+        labelBg.setAttribute("width", String(pillW));
+        labelBg.setAttribute("height", String(pillH));
+      }
     }
   }
 
@@ -761,9 +800,36 @@ export class GraphRenderer {
     const order = this.getSortedLabelOrder();
 
     // Phase 3: greedy overlap removal
-    // We track placed label bounding boxes and skip labels that overlap
+    // We track placed label bounding boxes and skip labels that overlap.
+    // Zone labels are pre-seeded as reserved regions so file labels never cover them.
     const placed: LabelRect[] = [];
     const showLabel: boolean[] = new Array(n).fill(false);
+
+    // Pre-seed zone label bounding boxes as reserved regions
+    if (this.zonesVisible) {
+      const zoneFontSize = Math.max(10, Math.min(14, 12 / Math.sqrt(this.scale)));
+      const zoneCharWidth = zoneFontSize * 0.55;
+      for (const zi of this.zoneInfos) {
+        const indices = this.zoneNodeIndices.get(zi.id);
+        if (!indices || indices.length < 2) continue;
+        if (this.collapsedZones.has(zi.id)) continue;
+        const labelGroup = this.zoneLabelElements.get(zi.id);
+        if (!labelGroup || labelGroup.style.display === "none") continue;
+        const labelText = labelGroup.querySelector("text");
+        if (!labelText) continue;
+        const textLen = (labelText.textContent || "").length;
+        const pillW = textLen * zoneCharWidth + 12;
+        const pillH = zoneFontSize + 8;
+        // Extract position from transform attribute
+        const transform = labelGroup.getAttribute("transform");
+        const match = transform?.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+        if (match) {
+          const zx = parseFloat(match[1]);
+          const zy = parseFloat(match[2]);
+          placed.push({ x: zx - pillW / 2, y: zy - pillH / 2, w: pillW, h: pillH });
+        }
+      }
+    }
 
     for (let oi = 0; oi < n; oi++) {
       const i = order[oi];
@@ -779,7 +845,7 @@ export class GraphRenderer {
       const lx = (node.x ?? 0) - lw / 2;
       const ly = (node.y ?? 0) - this.nodeRadii[i] - 3 - lh;
 
-      // Check overlap against already-placed labels
+      // Check overlap against already-placed labels and reserved zone labels
       let overlaps = false;
       for (let j = 0; j < placed.length; j++) {
         const p = placed[j];
