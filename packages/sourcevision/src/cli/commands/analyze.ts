@@ -12,7 +12,7 @@ import { analyzeComponents } from "../../analyzers/components.js";
 import { analyzeCallGraph, computeZoneCallStats } from "../../analyzers/callgraph.js";
 import { generateCallGraphFindings } from "../../analyzers/callgraph-findings.js";
 import { deduplicateFindings } from "../../analyzers/enrich-parsing.js";
-import type { CallGraph, Inventory } from "../../schema/index.js";
+import type { CallGraph, ImportEdge, Inventory } from "../../schema/index.js";
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
@@ -390,7 +390,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         info(`  ${callGraph.summary.totalFunctions} functions, ${callGraph.summary.totalCalls} calls, ${callGraph.summary.filesWithCalls} files → ${outPath}`);
 
         // Enrich zones.json with call graph cross-zone statistics and findings
-        enrichZonesWithCallGraph(svDir, callGraph, inventory);
+        enrichZonesWithCallGraph(svDir, callGraph, inventory, importsData.edges);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         updateManifestError(absDir, "callgraph", msg);
@@ -468,7 +468,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
  * Enrich zones.json with call graph cross-zone statistics.
  * Adds call graph insights to existing zone insights without overwriting AI-generated content.
  */
-function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph, inventory?: Inventory): void {
+function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph, inventory?: Inventory, importEdges?: ImportEdge[]): void {
   const zonesPath = join(svDir, DATA_FILES.zones);
   if (!existsSync(zonesPath)) return;
 
@@ -522,7 +522,7 @@ function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph, inventory
     }
 
     // Generate architectural findings from call graph patterns
-    const callGraphFindings = generateCallGraphFindings(callGraph, { inventory });
+    const callGraphFindings = generateCallGraphFindings(callGraph, { inventory, importEdges });
     if (callGraphFindings.length > 0) {
       // Remove previous call graph findings (pass 0, identifiable by text patterns)
       const existingFindings = (zonesData.findings ?? []).filter(

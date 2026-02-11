@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateCallGraphFindings } from "../../../src/analyzers/callgraph-findings.js";
-import type { CallGraph, FunctionNode, CallEdge, Inventory } from "../../../src/schema/v1.js";
+import type { CallGraph, FunctionNode, CallEdge, Inventory, ImportEdge } from "../../../src/schema/v1.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -346,6 +346,95 @@ describe("dead code detection", () => {
       (f) => f.text.includes("src/legacy.ts") && f.text.includes("3")
     );
     expect(fileLevelFindings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not flag exports that are re-exported by another file", () => {
+    // Simulates: src/schema/v1.ts exports isPriority, isItemLevel
+    // src/schema/index.ts re-exports them via `export { isPriority, isItemLevel } from "./v1.js"`
+    // Even though no call edges target v1.ts directly, the re-export means they are consumed.
+    const functions = [
+      makeFn({ file: "src/schema/v1.ts", name: "isPriority", isExported: true }),
+      makeFn({ file: "src/schema/v1.ts", name: "isItemLevel", isExported: true }),
+      makeFn({ file: "src/schema/v1.ts", name: "isItemStatus", isExported: true }),
+      // A genuinely unused export in the same file — should still be flagged
+      makeFn({ file: "src/schema/v1.ts", name: "deprecatedHelper", isExported: true }),
+      makeFn({ file: "src/consumer.ts", name: "validate", isExported: true }),
+    ];
+
+    const importEdges: ImportEdge[] = [
+      // schema/index.ts re-exports isPriority and isItemLevel from v1.ts
+      { from: "src/schema/index.ts", to: "src/schema/v1.ts", type: "reexport", symbols: ["isPriority", "isItemLevel", "isItemStatus"] },
+      // consumer.ts imports isPriority from schema/index.ts
+      { from: "src/consumer.ts", to: "src/schema/index.ts", type: "static", symbols: ["isPriority"] },
+    ];
+
+    // Call edge: consumer.ts calls isPriority (resolved to schema/index.ts, not v1.ts)
+    const edges = [
+      makeEdge({
+        callerFile: "src/consumer.ts",
+        caller: "validate",
+        callee: "isPriority",
+        calleeFile: "src/schema/index.ts",
+      }),
+    ];
+
+    const cg = makeCallGraph(functions, edges);
+    const inventory = makeInventory(["src/schema/v1.ts", "src/schema/index.ts", "src/consumer.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    // Re-exported symbols should NOT be flagged as dead
+    const v1Findings = findings.filter(
+      (f) => f.text.includes("src/schema/v1.ts") && f.text.includes("unused")
+    );
+    // Only deprecatedHelper should appear, not the 3 re-exported guards
+    expect(v1Findings.length).toBe(1);
+    expect(v1Findings[0].text).toContain("deprecatedHelper");
+    expect(v1Findings[0].text).not.toContain("isPriority");
+    expect(v1Findings[0].text).not.toContain("isItemLevel");
+    expect(v1Findings[0].text).not.toContain("isItemStatus");
+  });
+
+  it("does not flag exports re-exported through a chain of barrel files", () => {
+    // Simulates: v1.ts → schema/index.ts → public.ts (multi-hop re-export chain)
+    const functions = [
+      makeFn({ file: "src/schema/v1.ts", name: "isPriority", isExported: true }),
+    ];
+
+    const importEdges: ImportEdge[] = [
+      { from: "src/schema/index.ts", to: "src/schema/v1.ts", type: "reexport", symbols: ["isPriority"] },
+      { from: "src/public.ts", to: "src/schema/index.ts", type: "reexport", symbols: ["isPriority"] },
+    ];
+
+    const cg = makeCallGraph(functions, []);
+    const inventory = makeInventory(["src/schema/v1.ts", "src/schema/index.ts", "src/public.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    const v1Findings = findings.filter(
+      (f) => f.text.includes("src/schema/v1.ts") && f.text.includes("unused")
+    );
+    expect(v1Findings).toHaveLength(0);
+  });
+
+  it("still flags exports not covered by any re-export", () => {
+    const functions = [
+      makeFn({ file: "src/utils.ts", name: "usedViaReexport", isExported: true }),
+      makeFn({ file: "src/utils.ts", name: "trulyUnused", isExported: true }),
+    ];
+
+    const importEdges: ImportEdge[] = [
+      { from: "src/index.ts", to: "src/utils.ts", type: "reexport", symbols: ["usedViaReexport"] },
+    ];
+
+    const cg = makeCallGraph(functions, []);
+    const inventory = makeInventory(["src/utils.ts", "src/index.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    const utilFindings = findings.filter(
+      (f) => f.text.includes("src/utils.ts") && f.text.includes("unused")
+    );
+    expect(utilFindings.length).toBe(1);
+    expect(utilFindings[0].text).toContain("trulyUnused");
+    expect(utilFindings[0].text).not.toContain("usedViaReexport");
   });
 });
 

@@ -7855,13 +7855,15 @@
         {
           "id": "b6af7300-9330-4523-97fc-119ea106a002",
           "title": "Audit and clean dead/unused exports",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Audit modules flagged for unused exports. For each, either remove genuinely dead code, internalize module-private helpers, or confirm the export is needed and document why.",
           "acceptanceCriteria": [
             "Re-analysis shows no legitimate unused-export findings (excluding class methods and dynamically-used components)"
           ],
           "priority": "high",
+          "startedAt": "2026-02-11T17:04:34.658Z",
+          "completedAt": "2026-02-11T17:04:34.658Z",
           "children": [
             {
               "id": "76e50481-6fc8-4147-9729-1477971267d7",
@@ -7908,7 +7910,7 @@
             {
               "id": "8974f0a6-cba3-4ecc-a513-01df0cd8497f",
               "title": "Internalize module-private helpers in reason.ts",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "packages/rex/src/analyze/reason.ts has 54 exports across 2005 lines. 4 exports are flagged as unused (reasonFromScanResults, adjustGranularity, assessGranularity, reasonFromBatch). Audit: if these are only used within the module or by tests, remove the export keyword. If used cross-module, keep.",
               "acceptanceCriteria": [
@@ -7916,7 +7918,9 @@
                 "pnpm typecheck passes",
                 "pnpm test passes"
               ],
-              "priority": "low"
+              "priority": "low",
+              "startedAt": "2026-02-11T17:01:39.340Z",
+              "completedAt": "2026-02-11T17:04:34.580Z"
             }
           ]
         },
@@ -7955,7 +7959,7 @@
         {
           "id": "149e7d72-8c46-4a5a-a290-9e9a9e30870b",
           "title": "Suppress false positives in SourceVision analysis",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Address false-positive unused-export findings for class instance methods and confirmed-used type guards so they stop appearing in future analyses.",
           "acceptanceCriteria": [
@@ -7980,15 +7984,19 @@
             {
               "id": "36efadb8-1dbe-43e1-96a7-323878c30474",
               "title": "Fix false-positive detection for type guards used via re-exports",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "packages/rex/src/schema/v1.ts exports 5 type guards (isRequirementCategory, isValidationType, isPriority, isItemLevel, isItemStatus) confirmed used in web/src/server/routes-rex.ts and routes-validation.ts. SourceVision flags them as unused because it may not follow the import chain. Either fix the import-graph traversal or add suppression.",
               "acceptanceCriteria": [
                 "v1.ts type guards no longer flagged as unused exports"
               ],
-              "priority": "low"
+              "priority": "low",
+              "startedAt": "2026-02-11T17:04:52.659Z",
+              "completedAt": "2026-02-11T17:13:15.554Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-11T17:13:15.631Z",
+          "completedAt": "2026-02-11T17:13:15.631Z"
         },
         {
           "id": "cb4f4c95-5b7e-4035-b0fc-e1fce0824d66",

@@ -10,7 +10,7 @@
  * All findings are deterministic (pass 0) — no AI invocation.
  */
 
-import type { CallGraph, CallEdge, FunctionNode, Finding, Inventory } from "../schema/index.js";
+import type { CallGraph, CallEdge, FunctionNode, Finding, Inventory, ImportEdge } from "../schema/index.js";
 
 // ── Thresholds ──────────────────────────────────────────────────────────────
 
@@ -45,6 +45,8 @@ const ENTRY_POINT_PATTERNS = [
 export interface CallGraphFindingsOptions {
   /** Inventory for file role detection (skip test files, identify entry points). */
   inventory?: Inventory;
+  /** Import edges for re-export detection (skip exports consumed by re-export chains). */
+  importEdges?: ImportEdge[];
 }
 
 // ── Main entry point ────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ export function generateCallGraphFindings(
   }
 
   // Dead export detection works with or without edges
-  findings.push(...detectDeadExports(functions, edges, options?.inventory));
+  findings.push(...detectDeadExports(functions, edges, options?.inventory, options?.importEdges));
 
   return findings;
 }
@@ -183,6 +185,7 @@ function detectDeadExports(
   functions: FunctionNode[],
   edges: CallEdge[],
   inventory?: Inventory,
+  importEdges?: ImportEdge[],
 ): Finding[] {
   // Build set of functions that are called
   const calledFunctions = new Set<string>();
@@ -193,6 +196,11 @@ function detectDeadExports(
     // Also match by callee name alone for same-file calls
     calledFunctions.add(`${e.callerFile}:${e.callee}`);
   }
+
+  // Build set of re-exported symbols per file.
+  // If file B has `export { foo } from "./A"`, then foo in A is consumed via re-export
+  // and should not be flagged as dead code.
+  const reexportedSymbols = buildReexportedSymbolSet(importEdges);
 
   // Build set of test files from inventory
   const testFiles = new Set<string>();
@@ -222,6 +230,10 @@ function detectDeadExports(
     // A qualified name like "ClassName.method" indicates a member, not a
     // top-level export.
     if (fn.qualifiedName !== fn.name) continue;
+
+    // Skip exports consumed by re-export chains — another file re-exports this
+    // symbol, so it is reachable even without direct call edges to this file.
+    if (reexportedSymbols.has(`${fn.file}:${fn.name}`)) continue;
 
     // Check if this function is called anywhere
     const key = `${fn.file}:${fn.qualifiedName}`;
@@ -275,6 +287,25 @@ function detectDeadExports(
   }
 
   return findings;
+}
+
+/**
+ * Build a set of "file:symbol" keys for exports consumed by re-export chains.
+ * If file B has `export { foo } from "./A"`, then "A:foo" is in the set.
+ */
+function buildReexportedSymbolSet(importEdges?: ImportEdge[]): Set<string> {
+  const result = new Set<string>();
+  if (!importEdges) return result;
+
+  for (const edge of importEdges) {
+    if (edge.type !== "reexport") continue;
+    for (const sym of edge.symbols) {
+      if (sym === "*") continue; // Can't resolve individual symbols from star re-exports
+      result.add(`${edge.to}:${sym}`);
+    }
+  }
+
+  return result;
 }
 
 function isEntryPointFile(filePath: string): boolean {
