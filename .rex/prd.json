@@ -7866,14 +7866,16 @@
             {
               "id": "76e50481-6fc8-4147-9729-1477971267d7",
               "title": "Decide on adjustments.ts: integrate or remove",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "packages/hench/src/store/adjustments.ts has 9 unused exports and is documented as \"infrastructure for a planned adaptive workflow feature — not yet integrated into the agent loop.\" Decide: if the feature is still planned, keep but mark with a tracking issue; if abandoned, delete the module entirely.",
               "acceptanceCriteria": [
                 "Module is either deleted or has a documented plan for integration",
                 "No unused exports remain if kept"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-02-11T16:41:14.952Z",
+              "completedAt": "2026-02-11T16:43:36.956Z"
             },
             {
               "id": "ab1b81d0-ed74-49f6-9a7a-c835e8016de4",
