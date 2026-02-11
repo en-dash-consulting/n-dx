@@ -260,6 +260,14 @@ function detectDeadExports(
   // and should not be flagged as dead code.
   const reexportedSymbols = buildReexportedSymbolSet(importEdges);
 
+  // Build set of symbols consumed via import edges (static, dynamic, require).
+  // Exports that appear in any import edge's symbols array are in use even if
+  // the call graph has no corresponding CallExpression edge — this covers:
+  //   - dynamic imports:  `const { cmdConfig } = await import("./config.js")`
+  //   - JSX usage:        `<HealthGauge />` (no call edge produced)
+  //   - validators/guards imported but called inline rather than via function call
+  const importedSymbols = buildImportedSymbolSet(importEdges);
+
   // Build set of test files from inventory
   const testFiles = buildTestFileSet(inventory);
 
@@ -287,6 +295,10 @@ function detectDeadExports(
     // Skip exports consumed by re-export chains — another file re-exports this
     // symbol, so it is reachable even without direct call edges to this file.
     if (reexportedSymbols.has(`${fn.file}:${fn.name}`)) continue;
+
+    // Skip exports consumed by import edges (static, dynamic, or require).
+    // These are in use even without a call graph edge.
+    if (importedSymbols.has(`${fn.file}:${fn.name}`)) continue;
 
     // Check if this function is called anywhere
     const key = `${fn.file}:${fn.qualifiedName}`;
@@ -354,6 +366,29 @@ function buildReexportedSymbolSet(importEdges?: ImportEdge[]): Set<string> {
     if (edge.type !== "reexport") continue;
     for (const sym of edge.symbols) {
       if (sym === "*") continue; // Can't resolve individual symbols from star re-exports
+      result.add(`${edge.to}:${sym}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Build a set of "file:symbol" keys for exports consumed via import edges.
+ * An export is considered used if any import edge (static, dynamic, or require)
+ * targets the file and includes the symbol name. This catches usages that don't
+ * produce CallExpression nodes in the call graph (e.g., JSX components, dynamic
+ * imports, validators used inline).
+ */
+function buildImportedSymbolSet(importEdges?: ImportEdge[]): Set<string> {
+  const result = new Set<string>();
+  if (!importEdges) return result;
+
+  for (const edge of importEdges) {
+    // Only consider consumption edges — reexports are handled separately
+    if (edge.type === "reexport" || edge.type === "type") continue;
+    for (const sym of edge.symbols) {
+      if (sym === "*") continue; // Can't resolve individual symbols from namespace imports
       result.add(`${edge.to}:${sym}`);
     }
   }

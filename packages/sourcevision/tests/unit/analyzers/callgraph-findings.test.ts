@@ -709,6 +709,110 @@ describe("dead code detection", () => {
     expect(v1Findings).toHaveLength(0);
   });
 
+  it("does not flag exports consumed via dynamic import edges", () => {
+    // Simulates: CLI router does `const { cmdConfig } = await import("./config.js")`
+    // The call graph has no CallExpression edge for cmdConfig, but the import graph does.
+    const functions = [
+      makeFn({ file: "src/config.ts", name: "cmdConfig", isExported: true }),
+      makeFn({ file: "src/router.ts", name: "dispatch", isExported: true }),
+    ];
+
+    // No call edges — cmdConfig is accessed via dynamic import, not called directly
+    const edges: CallEdge[] = [];
+
+    const importEdges: ImportEdge[] = [
+      { from: "src/router.ts", to: "src/config.ts", type: "dynamic", symbols: ["cmdConfig"] },
+    ];
+
+    const cg = makeCallGraph(functions, edges);
+    const inventory = makeInventory(["src/config.ts", "src/router.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    const configFindings = findings.filter(
+      (f) => f.text.includes("cmdConfig") && f.text.includes("unused"),
+    );
+    expect(configFindings).toHaveLength(0);
+  });
+
+  it("does not flag exports consumed via static import without call edges", () => {
+    // Simulates: JSX component or validator imported but no CallExpression in call graph
+    // e.g., `import { HealthGauge } from "./health-gauge"` used as `<HealthGauge />`
+    const functions = [
+      makeFn({ file: "src/health-gauge.ts", name: "HealthGauge", isExported: true }),
+      makeFn({ file: "src/health-gauge.ts", name: "formatHealth", isExported: true }),
+      makeFn({ file: "src/dashboard.ts", name: "Dashboard", isExported: true }),
+    ];
+
+    // No call edges for HealthGauge — JSX doesn't produce CallExpression nodes
+    const edges: CallEdge[] = [];
+
+    const importEdges: ImportEdge[] = [
+      { from: "src/dashboard.ts", to: "src/health-gauge.ts", type: "static", symbols: ["HealthGauge"] },
+    ];
+
+    const cg = makeCallGraph(functions, edges);
+    const inventory = makeInventory(["src/health-gauge.ts", "src/dashboard.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    // HealthGauge (imported) should NOT be flagged
+    const gaugeFindings = findings.filter((f) => f.text.includes("HealthGauge"));
+    expect(gaugeFindings).toHaveLength(0);
+
+    // formatHealth (not imported, no call edge) should still be flagged
+    const formatFindings = findings.filter((f) => f.text.includes("formatHealth"));
+    expect(formatFindings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not flag exports consumed via require import edges", () => {
+    // Simulates: CommonJS require usage `const { validate } = require("./validators")`
+    const functions = [
+      makeFn({ file: "src/validators.ts", name: "validate", isExported: true }),
+      makeFn({ file: "src/validators.ts", name: "unusedValidator", isExported: true }),
+      makeFn({ file: "src/handler.ts", name: "handle", isExported: true }),
+    ];
+
+    const edges: CallEdge[] = [];
+
+    const importEdges: ImportEdge[] = [
+      { from: "src/handler.ts", to: "src/validators.ts", type: "require", symbols: ["validate"] },
+    ];
+
+    const cg = makeCallGraph(functions, edges);
+    const inventory = makeInventory(["src/validators.ts", "src/handler.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    // validate (required) should NOT be flagged
+    const validateFindings = findings.filter((f) => f.text.includes("validate") && f.text.includes("unused"));
+    expect(validateFindings).toHaveLength(0);
+
+    // unusedValidator should still be flagged
+    const unusedFindings = findings.filter((f) => f.text.includes("unusedValidator"));
+    expect(unusedFindings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not flag exports consumed by type imports (type imports are excluded)", () => {
+    // Type imports are erased at compile time and handled separately —
+    // they should NOT prevent dead export detection.
+    const functions = [
+      makeFn({ file: "src/types.ts", name: "createConfig", isExported: true }),
+    ];
+
+    const edges: CallEdge[] = [];
+
+    const importEdges: ImportEdge[] = [
+      // Only a type import edge — not a real runtime usage
+      { from: "src/consumer.ts", to: "src/types.ts", type: "type", symbols: ["createConfig"] },
+    ];
+
+    const cg = makeCallGraph(functions, edges);
+    const inventory = makeInventory(["src/types.ts", "src/consumer.ts"]);
+    const findings = generateCallGraphFindings(cg, { inventory, importEdges });
+
+    // createConfig should still be flagged — type imports don't count as usage
+    const findings2 = findings.filter((f) => f.text.includes("createConfig"));
+    expect(findings2.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("still flags exports not covered by any re-export", () => {
     const functions = [
       makeFn({ file: "src/utils.ts", name: "usedViaReexport", isExported: true }),

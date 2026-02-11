@@ -6,7 +6,6 @@
  */
 
 import { join } from "node:path";
-import { readFile, writeFile } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
 export type SuggestionDecision = "accepted" | "rejected" | "deferred";
@@ -52,33 +51,9 @@ export function loadSuggestionHistory(henchDir: string): SuggestionHistory {
   }
 }
 
-/** Load suggestion history asynchronously. */
-export async function loadSuggestionHistoryAsync(henchDir: string): Promise<SuggestionHistory> {
-  const path = filePath(henchDir);
-  try {
-    if (!existsSync(path)) return { records: [] };
-    const raw = await readFile(path, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.records)) {
-      return parsed as SuggestionHistory;
-    }
-    return { records: [] };
-  } catch {
-    return { records: [] };
-  }
-}
-
 /** Save suggestion history to disk (sync). */
 export function saveSuggestionHistory(henchDir: string, history: SuggestionHistory): void {
   writeFileSync(filePath(henchDir), JSON.stringify(history, null, 2) + "\n", "utf-8");
-}
-
-/** Save suggestion history to disk (async). */
-export async function saveSuggestionHistoryAsync(
-  henchDir: string,
-  history: SuggestionHistory,
-): Promise<void> {
-  await writeFile(filePath(henchDir), JSON.stringify(history, null, 2) + "\n", "utf-8");
 }
 
 /** Record a user's decision on a suggestion. */
