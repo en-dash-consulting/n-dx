@@ -10,7 +10,9 @@ import { analyzeImports } from "../../analyzers/imports.js";
 import { analyzeZones } from "../../analyzers/zones.js";
 import { analyzeComponents } from "../../analyzers/components.js";
 import { analyzeCallGraph, computeZoneCallStats } from "../../analyzers/callgraph.js";
-import type { CallGraph } from "../../schema/index.js";
+import { generateCallGraphFindings } from "../../analyzers/callgraph-findings.js";
+import { deduplicateFindings } from "../../analyzers/enrich-parsing.js";
+import type { CallGraph, Inventory } from "../../schema/index.js";
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
@@ -387,8 +389,8 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         updateManifestModule(absDir, "callgraph", "complete");
         info(`  ${callGraph.summary.totalFunctions} functions, ${callGraph.summary.totalCalls} calls, ${callGraph.summary.filesWithCalls} files → ${outPath}`);
 
-        // Enrich zones.json with call graph cross-zone statistics
-        enrichZonesWithCallGraph(svDir, callGraph);
+        // Enrich zones.json with call graph cross-zone statistics and findings
+        enrichZonesWithCallGraph(svDir, callGraph, inventory);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         updateManifestError(absDir, "callgraph", msg);
@@ -466,7 +468,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
  * Enrich zones.json with call graph cross-zone statistics.
  * Adds call graph insights to existing zone insights without overwriting AI-generated content.
  */
-function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph): void {
+function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph, inventory?: Inventory): void {
   const zonesPath = join(svDir, DATA_FILES.zones);
   if (!existsSync(zonesPath)) return;
 
@@ -519,8 +521,27 @@ function enrichZonesWithCallGraph(svDir: string, callGraph: CallGraph): void {
       }
     }
 
+    // Generate architectural findings from call graph patterns
+    const callGraphFindings = generateCallGraphFindings(callGraph, { inventory });
+    if (callGraphFindings.length > 0) {
+      // Remove previous call graph findings (pass 0, identifiable by text patterns)
+      const existingFindings = (zonesData.findings ?? []).filter(
+        (f: { pass: number; text: string }) =>
+          !(f.pass === 0 && (
+            f.text.startsWith("God function:") ||
+            f.text.startsWith("Tightly coupled modules:") ||
+            f.text.startsWith("Hub function:") ||
+            f.text.startsWith("Fan-in hotspot:") ||
+            f.text.includes("potentially unused export") ||
+            f.text.includes("no incoming calls")
+          ))
+      );
+      zonesData.findings = deduplicateFindings([...existingFindings, ...callGraphFindings]);
+    }
+
     writeFileSync(zonesPath, toCanonicalJSON(zonesData));
-    info("  Enriched zones.json with call graph statistics");
+    const findingCount = callGraphFindings.length;
+    info(`  Enriched zones.json with call graph statistics${findingCount > 0 ? ` and ${findingCount} finding${findingCount !== 1 ? "s" : ""}` : ""}`);
   } catch {
     // Non-critical — don't fail if zone enrichment doesn't work
   }

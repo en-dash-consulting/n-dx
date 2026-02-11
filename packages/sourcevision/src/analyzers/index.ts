@@ -24,3 +24,5 @@ export {
 } from "./route-detection.js";
 export { analyzeCallGraph, extractFunctions, extractCalls, computeZoneCallStats } from "./callgraph.js";
 export type { ZoneCallStats, CrossZoneCallPattern } from "./callgraph.js";
+export { generateCallGraphFindings } from "./callgraph-findings.js";
+export type { CallGraphFindingsOptions } from "./callgraph-findings.js";
