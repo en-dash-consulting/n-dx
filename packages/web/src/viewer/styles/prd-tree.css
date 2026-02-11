@@ -3369,6 +3369,111 @@
   opacity: 0.9;
 }
 
+/* Compact variant (dashboard embedding) */
+.smart-add-panel-compact {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.smart-add-panel-compact .smart-add-header {
+  margin-bottom: var(--space-3);
+}
+
+/* Context scope selector */
+.smart-add-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.smart-add-scope-label {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.smart-add-scope-select {
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-sm);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-normal);
+}
+
+.smart-add-scope-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.smart-add-scope-active {
+  font-size: var(--font-xs);
+  color: var(--accent);
+  font-style: italic;
+}
+
+/* Example prompts */
+.smart-add-examples {
+  margin-bottom: var(--space-3);
+}
+
+.smart-add-examples-label {
+  display: block;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.smart-add-examples-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.smart-add-example-chip {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.smart-add-example-chip:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Character count */
+.smart-add-char-count {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.smart-add-char-count-warn {
+  color: var(--orange);
+}
+
 /* ── Batch Import Panel ─────────────────────────────────────────── */
 
 .batch-import-panel {

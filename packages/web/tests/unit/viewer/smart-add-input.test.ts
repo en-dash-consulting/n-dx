@@ -100,7 +100,7 @@ describe("SmartAddInput", () => {
     typeInTextarea(textarea, "abc");
     await flush();
 
-    expect(root.textContent).toContain("at least 10 characters");
+    expect(root.textContent).toContain("more to generate proposals");
   });
 
   it("does not trigger API call for input shorter than minimum length", () => {
@@ -422,6 +422,113 @@ describe("SmartAddInput", () => {
     expect(root.querySelector(".prd-level-epic")).toBeTruthy();
     expect(root.querySelector(".prd-level-feature")).toBeTruthy();
     expect(root.querySelector(".prd-level-task")).toBeTruthy();
+  });
+
+  it("shows character count while typing", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+
+    typeInTextarea(textarea, "hello");
+    await flush();
+
+    expect(root.textContent).toContain("5 chars");
+    expect(root.querySelector(".smart-add-char-count")).toBeTruthy();
+  });
+
+  it("shows warning style on character count when below minimum", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+
+    typeInTextarea(textarea, "short");
+    await flush();
+
+    const charCount = root.querySelector(".smart-add-char-count");
+    expect(charCount).toBeTruthy();
+    expect(charCount!.classList.contains("smart-add-char-count-warn")).toBe(true);
+  });
+
+  it("shows example prompts when idle with no input", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await flush();
+
+    expect(root.textContent).toContain("Try something like:");
+    expect(root.querySelector(".smart-add-examples")).toBeTruthy();
+    expect(root.querySelectorAll(".smart-add-example-chip").length).toBeGreaterThan(0);
+  });
+
+  it("hides example prompts after typing", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+
+    typeInTextarea(textarea, "hello");
+    await flush();
+
+    expect(root.querySelector(".smart-add-examples")).toBeFalsy();
+  });
+
+  it("clicking an example chip fills the textarea", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await flush();
+
+    const chip = root.querySelector<HTMLButtonElement>(".smart-add-example-chip")!;
+    expect(chip).toBeTruthy();
+
+    chip.click();
+    await flush();
+
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+    expect(textarea.value.length).toBeGreaterThan(0);
+  });
+
+  it("renders compact variant when compact prop is true", () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), compact: true }));
+    expect(root.querySelector(".smart-add-panel-compact")).toBeTruthy();
+  });
+
+  it("shows scope dropdown when PRD has epics", async () => {
+    // Use real timers for this test since we need useEffect + async fetch to complete
+    vi.useRealTimers();
+
+    const localFetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/rex/prd")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            items: [
+              { id: "e1", title: "Auth Epic", level: "epic", children: [
+                { id: "f1", title: "Login Feature", level: "feature", children: [] },
+              ]},
+            ],
+          }),
+        });
+      }
+      return Promise.resolve(mockSuccessResponse());
+    });
+    globalThis.fetch = localFetch as unknown as typeof fetch;
+
+    const root = document.createElement("div");
+
+    // Use act() to properly handle async effects (useEffect + setState)
+    const { act } = await import("preact/test-utils");
+
+    await act(async () => {
+      render(h(SmartAddInput, { onPrdChanged: vi.fn() }), root);
+    });
+
+    // Let the fetch promise chain fully resolve
+    await new Promise<void>((r) => setTimeout(r, 0));
+    await new Promise<void>((r) => queueMicrotask(r));
+
+    // Flush the re-render triggered by setState
+    await act(async () => {});
+
+    expect(root.querySelector(".smart-add-scope-select")).toBeTruthy();
+    const options = root.querySelectorAll(".smart-add-scope-select option");
+    // "Entire project" + 1 epic + 1 feature = 3 options
+    expect(options.length).toBe(3);
+
+    // Restore fake timers for consistency with other tests
+    vi.useFakeTimers();
   });
 });
 

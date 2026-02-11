@@ -4,11 +4,13 @@
  * Provides a text input field that sends debounced requests to the
  * smart-add-preview API endpoint. Displays loading states, structured
  * proposal previews with hierarchy, and confidence indicators.
+ * Includes context selection (scope proposals under an epic/feature),
+ * real-time character count, and example prompts for better input.
  * Proposals can be sent to the ProposalEditor for review or accepted directly.
  */
 
 import { h, Fragment } from "preact";
-import { useState, useCallback, useRef, useEffect } from "preact/hooks";
+import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 
@@ -17,6 +19,8 @@ import type { RawProposal } from "./proposal-editor.js";
 export interface SmartAddInputProps {
   /** Called when proposals are accepted and PRD should be refreshed. */
   onPrdChanged: () => void;
+  /** When true, renders in a compact layout suitable for dashboard embedding. */
+  compact?: boolean;
 }
 
 interface QualityIssue {
@@ -27,6 +31,14 @@ interface QualityIssue {
 
 type PreviewState = "idle" | "loading" | "done" | "error";
 
+/** Flattened scope option for the context dropdown. */
+interface ScopeOption {
+  id: string;
+  title: string;
+  level: string;
+  depth: number;
+}
+
 // ── Constants ────────────────────────────────────────────────────────
 
 /** Debounce delay in ms before triggering LLM preview. */
@@ -35,9 +47,17 @@ const DEBOUNCE_MS = 500;
 /** Minimum input length before triggering preview. */
 const MIN_INPUT_LENGTH = 10;
 
+/** Example prompts to guide user input. */
+const EXAMPLE_PROMPTS = [
+  "Add user authentication with OAuth2 and JWT tokens",
+  "Create a settings page with profile editing and notification preferences",
+  "Add dark mode support with system preference detection",
+  "Implement real-time search with debounced filtering and result highlights",
+];
+
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
@@ -47,6 +67,11 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
   const [editing, setEditing] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
+  // Context selection state
+  const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
+  const [selectedScope, setSelectedScope] = useState("");
+  const [scopeLoaded, setScopeLoaded] = useState(false);
+
   // Track the latest request to ignore stale responses
   const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,9 +79,55 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
   // Abort controller for cancelling in-flight requests
   const abortRef = useRef<AbortController | null>(null);
 
+  // ── Load scope options (epics & features) ─────────────────────────
+
+  useEffect(() => {
+    if (scopeLoaded) return;
+    let cancelled = false;
+
+    async function loadScopes() {
+      try {
+        const res = await fetch("/api/rex/prd");
+        if (!res.ok) return;
+        const doc = await res.json();
+        if (cancelled) return;
+
+        const options: ScopeOption[] = [];
+        function walk(items: Array<{ id: string; title: string; level: string; children?: unknown[] }>, depth: number) {
+          for (const item of items) {
+            if (item.level === "epic" || item.level === "feature") {
+              options.push({ id: item.id, title: item.title, level: item.level, depth });
+              if (item.level === "epic" && Array.isArray(item.children)) {
+                walk(item.children as typeof items, depth + 1);
+              }
+            }
+          }
+        }
+        if (Array.isArray(doc.items)) walk(doc.items, 0);
+        setScopeOptions(options);
+      } catch {
+        // Non-critical — scope selection simply stays empty
+      } finally {
+        if (!cancelled) setScopeLoaded(true);
+      }
+    }
+
+    loadScopes();
+    return () => { cancelled = true; };
+  }, [scopeLoaded]);
+
+  // Refresh scope options when PRD changes
+  const refreshScopes = useCallback(() => {
+    setScopeLoaded(false);
+  }, []);
+
+  // Character count derived state
+  const charCount = input.length;
+  const trimmedLength = input.trim().length;
+
   // ── Debounced preview ────────────────────────────────────────────
 
-  const triggerPreview = useCallback(async (text: string, reqId: number) => {
+  const triggerPreview = useCallback(async (text: string, reqId: number, parentId?: string) => {
     // Abort any in-flight request
     if (abortRef.current) {
       abortRef.current.abort();
@@ -69,10 +140,13 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
     setError(null);
 
     try {
+      const body: Record<string, string> = { text };
+      if (parentId) body.parentId = parentId;
+
       const res = await fetch("/api/rex/smart-add-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -130,9 +204,9 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
     // Debounce the preview request
     const reqId = ++requestIdRef.current;
     debounceRef.current = setTimeout(() => {
-      triggerPreview(text, reqId);
+      triggerPreview(text, reqId, selectedScope || undefined);
     }, DEBOUNCE_MS);
-  }, [triggerPreview]);
+  }, [triggerPreview, selectedScope]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -183,13 +257,14 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
       setProposals([]);
       setConfidence(0);
       setState("idle");
+      refreshScopes();
       onPrdChanged();
     } catch (err) {
       setError(String(err));
     } finally {
       setAccepting(false);
     }
-  }, [proposals, onPrdChanged]);
+  }, [proposals, onPrdChanged, refreshScopes]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -199,8 +274,9 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
     setProposals([]);
     setConfidence(0);
     setState("idle");
+    refreshScopes();
     onPrdChanged();
-  }, [onPrdChanged]);
+  }, [onPrdChanged, refreshScopes]);
 
   // ── Render: Proposal editor mode ─────────────────────────────────
 
@@ -224,9 +300,18 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
   );
   const featureCount = proposals.reduce((sum, p) => sum + p.features.length, 0);
 
+  // Scope label for display
+  const scopeLabel = useMemo(() => {
+    if (!selectedScope) return null;
+    const opt = scopeOptions.find((o) => o.id === selectedScope);
+    return opt ? `${opt.level}: ${opt.title}` : null;
+  }, [selectedScope, scopeOptions]);
+
+  const panelClass = compact ? "smart-add-panel smart-add-panel-compact" : "smart-add-panel";
+
   return h(
     "div",
-    { class: "smart-add-panel" },
+    { class: panelClass },
 
     // Header
     h("div", { class: "smart-add-header" },
@@ -236,23 +321,87 @@ export function SmartAddInput({ onPrdChanged }: SmartAddInputProps) {
       ),
     ),
 
+    // Context selection dropdown
+    scopeOptions.length > 0
+      ? h("div", { class: "smart-add-scope" },
+          h("label", { class: "smart-add-scope-label" }, "Scope"),
+          h("select", {
+            class: "smart-add-scope-select",
+            value: selectedScope,
+            onChange: (e: Event) => {
+              const val = (e.target as HTMLSelectElement).value;
+              setSelectedScope(val);
+              // Re-trigger preview if there's existing input
+              if (input.trim().length >= MIN_INPUT_LENGTH) {
+                if (debounceRef.current) {
+                  clearTimeout(debounceRef.current);
+                }
+                const reqId = ++requestIdRef.current;
+                debounceRef.current = setTimeout(() => {
+                  triggerPreview(input, reqId, val || undefined);
+                }, DEBOUNCE_MS);
+              }
+            },
+            "aria-label": "Scope proposals under an existing epic or feature",
+          },
+            h("option", { value: "" }, "Entire project (new epics)"),
+            scopeOptions.map((opt) =>
+              h("option", { key: opt.id, value: opt.id },
+                `${"  ".repeat(opt.depth)}${opt.level === "epic" ? "Epic" : "Feature"}: ${opt.title}`,
+              ),
+            ),
+          ),
+          selectedScope
+            ? h("span", { class: "smart-add-scope-active" },
+                `Adding under ${scopeLabel}`,
+              )
+            : null,
+        )
+      : null,
+
+    // Example prompts (shown when idle and no input)
+    state === "idle" && trimmedLength === 0
+      ? h("div", { class: "smart-add-examples" },
+          h("span", { class: "smart-add-examples-label" }, "Try something like:"),
+          h("div", { class: "smart-add-examples-list" },
+            EXAMPLE_PROMPTS.map((example, i) =>
+              h("button", {
+                key: i,
+                type: "button",
+                class: "smart-add-example-chip",
+                onClick: () => handleInput(example),
+                "aria-label": `Use example: ${example}`,
+              }, example),
+            ),
+          ),
+        )
+      : null,
+
     // Input area
     h("div", { class: "smart-add-input-area" },
       h("textarea", {
         class: "smart-add-textarea",
         value: input,
-        placeholder: "Describe a feature, improvement, or idea...\ne.g. \"Add user authentication with OAuth2 and JWT tokens\"",
+        placeholder: "Describe a feature, improvement, or idea...",
         onInput: (e: Event) => handleInput((e.target as HTMLTextAreaElement).value),
-        rows: 3,
+        rows: compact ? 3 : 4,
         "aria-label": "Smart add description",
       }),
       // Character count + status indicator
       h("div", { class: "smart-add-input-status" },
-        input.trim().length > 0 && input.trim().length < MIN_INPUT_LENGTH
+        // Character count (always visible when typing)
+        charCount > 0
+          ? h("span", {
+              class: `smart-add-char-count${trimmedLength < MIN_INPUT_LENGTH ? " smart-add-char-count-warn" : ""}`,
+            }, `${charCount} chars`)
+          : null,
+        // Min length hint
+        trimmedLength > 0 && trimmedLength < MIN_INPUT_LENGTH
           ? h("span", { class: "smart-add-hint" },
-              `Type at least ${MIN_INPUT_LENGTH} characters to generate proposals`,
+              `${MIN_INPUT_LENGTH - trimmedLength} more to generate proposals`,
             )
           : null,
+        // Loading badge
         state === "loading"
           ? h("span", { class: "smart-add-loading-badge" },
               h("span", { class: "smart-add-spinner", "aria-hidden": "true" }),

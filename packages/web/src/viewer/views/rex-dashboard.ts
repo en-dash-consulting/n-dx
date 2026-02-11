@@ -12,6 +12,7 @@ import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
+import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -413,6 +414,14 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                 h("span", { class: "rex-dash-next-empty-icon" }, "✓"),
                 h("span", null, "All tasks completed or blocked"),
               ),
+        ),
+
+        // Smart Add — prominent section for adding new items
+        h("div", { class: "rex-dash-smart-add" },
+          h("div", { class: "rex-dash-section-header" },
+            h("h3", null, "Quick Add"),
+          ),
+          h(SmartAddInput, { onPrdChanged: fetchDashboard, compact: true }),
         ),
 
         // Epic progress list
