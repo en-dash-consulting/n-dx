@@ -200,17 +200,28 @@ export class GraphRenderer {
       this.linkElements.push(line);
     }
 
-    // Draw nodes
+    // Draw nodes — separate group above links/hulls for guaranteed z-order
+    const nodeLayer = document.createElementNS(ns, "g");
+    nodeLayer.setAttribute("class", "graph-node-layer");
+    this.g.appendChild(nodeLayer);
+
     for (const n of nodes) {
       const group = document.createElementNS(ns, "g");
       group.setAttribute("class", "graph-node");
 
       const radius = Math.min(3 + Math.sqrt(n.importCount) * 2, 16);
       this.nodeRadii.push(radius);
+
+      // Invisible hit target — larger than the visible circle for easy clicking
+      const hitTarget = document.createElementNS(ns, "circle");
+      hitTarget.setAttribute("r", String(Math.max(radius + 4, 10)));
+      hitTarget.setAttribute("fill", "transparent");
+      hitTarget.setAttribute("class", "graph-node-hit");
+      group.appendChild(hitTarget);
+
       const circle = document.createElementNS(ns, "circle");
       circle.setAttribute("r", String(radius));
       circle.setAttribute("fill", n.zoneColor || "#555");
-
       group.appendChild(circle);
 
       // Always create labels — LOD + overlap detection controls visibility
@@ -223,7 +234,7 @@ export class GraphRenderer {
       label.textContent = truncateFilename(fullName);
       group.appendChild(label);
 
-      this.g.appendChild(group);
+      nodeLayer.appendChild(group);
       this.nodeGroups.push(group);
     }
 
@@ -248,7 +259,7 @@ export class GraphRenderer {
     tooltipText.setAttribute("dy", "0.35em");
     this.tooltip.appendChild(tooltipText);
     // Tooltip must be added last so it renders on top of all nodes
-    this.g.appendChild(this.tooltip);
+    nodeLayer.appendChild(this.tooltip);
 
     // Initialize physics simulation
     this.sim = {
@@ -725,13 +736,21 @@ export class GraphRenderer {
 
     for (let i = 0; i < n; i++) {
       const visualRadius = this.nodeRadii[i] / this.scale;
-      const circle = this.nodeGroups[i].querySelector("circle");
+      // Select visible circle (skip the hit target which has class .graph-node-hit)
+      const circle = this.nodeGroups[i].querySelector("circle:not(.graph-node-hit)");
 
       this.nodeGroups[i].style.display = "";
       if (circle && visualRadius < 1) {
         circle.setAttribute("r", String(this.scale));
       } else if (circle) {
         circle.setAttribute("r", String(this.nodeRadii[i]));
+      }
+
+      // Also update hit target radius to stay proportional
+      const hitTarget = this.nodeGroups[i].querySelector(".graph-node-hit");
+      if (hitTarget) {
+        const hitRadius = Math.max(this.nodeRadii[i] + 4, 10);
+        hitTarget.setAttribute("r", String(visualRadius < 1 ? this.scale + 4 : hitRadius));
       }
 
       zoomVisible[i] = !this.labelsHidden && visualRadius >= 3;
@@ -875,11 +894,19 @@ export class GraphRenderer {
     };
   }
 
-  /** Find the node index under a given SVG element (circle or its parent group). */
+  /** Find the node index under a given SVG element by walking up the DOM tree. */
   private findNodeIndex(target: Element): number {
-    if (target.tagName === "circle") {
-      const group = target.parentElement as unknown as SVGGElement;
-      return this.nodeGroups.indexOf(group);
+    let el: Element | null = target;
+    // Walk up until we find a .graph-node group or leave the SVG
+    while (el && el !== this.svg) {
+      if (el.classList?.contains("graph-node")) {
+        return this.nodeGroups.indexOf(el as unknown as SVGGElement);
+      }
+      // Direct circle/text child of a node group (fast path)
+      if ((el.tagName === "circle" || el.tagName === "text") && el.parentElement?.classList?.contains("graph-node")) {
+        return this.nodeGroups.indexOf(el.parentElement as unknown as SVGGElement);
+      }
+      el = el.parentElement;
     }
     return -1;
   }
@@ -987,6 +1014,9 @@ export class GraphRenderer {
             isDragging = true;
             dragNode.fx = dragNode.x;
             dragNode.fy = dragNode.y;
+            // Visual feedback for dragging
+            this.svg.classList.add("node-dragging");
+            if (dragNodeIdx >= 0) this.nodeGroups[dragNodeIdx].classList.add("dragging");
             this.reheat();
           }
           return;
@@ -1031,6 +1061,9 @@ export class GraphRenderer {
           dragNode.vx = 0;
           dragNode.vy = 0;
         }
+        // Clear drag visual feedback
+        this.svg.classList.remove("node-dragging");
+        if (dragNodeIdx >= 0) this.nodeGroups[dragNodeIdx].classList.remove("dragging");
         dragNode.fx = null;
         dragNode.fy = null;
         dragNode = null;
@@ -1151,6 +1184,9 @@ export class GraphRenderer {
             isTouchDragging = true;
             touchDragNode.fx = touchDragNode.x;
             touchDragNode.fy = touchDragNode.y;
+            // Visual feedback for touch dragging
+            this.svg.classList.add("node-dragging");
+            if (touchDragIdx >= 0) this.nodeGroups[touchDragIdx].classList.add("dragging");
             this.reheat();
           }
           return;
@@ -1205,6 +1241,9 @@ export class GraphRenderer {
           touchDragNode.vx = 0;
           touchDragNode.vy = 0;
         }
+        // Clear drag visual feedback
+        this.svg.classList.remove("node-dragging");
+        if (touchDragIdx >= 0) this.nodeGroups[touchDragIdx].classList.remove("dragging");
         if (touchDragNode) {
           touchDragNode.fx = null;
           touchDragNode.fy = null;
@@ -1222,6 +1261,8 @@ export class GraphRenderer {
     }, { signal });
 
     this.svg.addEventListener("touchcancel", () => {
+      this.svg.classList.remove("node-dragging");
+      if (touchDragIdx >= 0) this.nodeGroups[touchDragIdx].classList.remove("dragging");
       if (touchDragNode) {
         touchDragNode.fx = null;
         touchDragNode.fy = null;

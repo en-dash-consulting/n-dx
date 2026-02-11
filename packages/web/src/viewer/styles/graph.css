@@ -11,17 +11,35 @@
 
 .graph-container svg { width: 100%; height: 100%; cursor: grab; }
 .graph-container svg.grabbing { cursor: grabbing; }
+.graph-container svg.node-dragging { cursor: grabbing; }
 
-.graph-node circle {
+/* Node being dragged — visual feedback */
+.graph-node.dragging { cursor: grabbing; }
+.graph-node.dragging circle:not(.graph-node-hit) {
+  stroke: var(--accent);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+/* Node layer sits above zone hulls and links for guaranteed event priority */
+.graph-node-layer { pointer-events: all; }
+
+.graph-node { cursor: pointer; pointer-events: all; }
+
+/* Invisible hit target — larger than the visible circle for easy clicking/dragging */
+.graph-node-hit { pointer-events: all; cursor: pointer; }
+
+.graph-node circle:not(.graph-node-hit) {
   stroke: var(--border);
   stroke-width: 1.5px;
   cursor: pointer;
+  pointer-events: all;
 }
 
-.graph-node circle:hover { stroke: var(--accent); stroke-width: 2px; }
+.graph-node circle:not(.graph-node-hit):hover { stroke: var(--accent); stroke-width: 2px; }
 
 /* Selected node — persistent highlight on click */
-.graph-node.selected circle {
+.graph-node.selected circle:not(.graph-node-hit) {
   stroke: var(--accent);
   stroke-width: 2.5px;
   filter: drop-shadow(0 0 4px var(--accent));
@@ -145,7 +163,8 @@
 
 /* ── Zone hull grouping ─────────────────────────────────────────────────── */
 
-.zone-hulls { pointer-events: all; }
+/* Zone hulls use visibleFill so nodes above them always receive events first */
+.zone-hulls { pointer-events: visibleFill; }
 
 .zone-hull {
   fill-opacity: 0.06;
@@ -153,6 +172,7 @@
   stroke-width: 1.5px;
   stroke-dasharray: 6 3;
   cursor: pointer;
+  pointer-events: visibleFill;
   transition: fill-opacity 0.2s, stroke-opacity 0.2s;
 }
 
