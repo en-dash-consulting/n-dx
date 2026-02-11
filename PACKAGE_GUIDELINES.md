@@ -61,7 +61,7 @@ When a package imports from another package at runtime, those imports are concen
 | Package | Gateway | Source packages | Purpose |
 |---|---|---|---|
 | hench | `src/prd/ops.ts` | rex | Store access, tree traversal, task selection |
-| web | `src/server/mcp-deps.ts` | rex, sourcevision | MCP server factories |
+| web | `src/server/mcp-deps.ts` | rex, sourcevision | MCP server factories, rex domain types & constants |
 
 ### Gateway rules
 
@@ -97,12 +97,17 @@ Sometimes a package needs types from another package but importing them would cr
 
 | Consumer | Source | Duplicated types | Consistency test |
 |---|---|---|---|
-| web (`rex-domain.ts`) | rex | `PRDItem`, `PRDDocument`, etc. | `tests/unit/server/type-consistency.test.ts` |
+| web viewer (`prd-tree/types.ts`) | rex | `ItemLevel`, `ItemStatus`, `Priority`, `PRDItemData`, etc. | `tests/unit/server/type-consistency.test.ts` |
+| web viewer (`views/analysis.ts`) | rex | `LogEntry` (local interface) | — |
+
+Server-side rex types were previously duplicated in `rex-domain.ts` but are now
+imported from rex through the gateway (`mcp-deps.ts`). Only viewer types remain
+as intentional duplicates because browser-bundled code cannot import Node.js packages.
 
 ### When to duplicate vs. import
 
-- **Import** when the packages already have a runtime dependency (hench → rex).
-- **Duplicate** when the consumer reads JSON from disk and only needs compile-time shape checking (web reading `.rex/prd.json`).
+- **Import** when the packages already have a runtime dependency (hench → rex, web → rex).
+- **Duplicate** only when the consumer runs in the browser and cannot import Node.js packages (web viewer).
 - **Always** add a compile-time test that verifies the duplicate stays in sync.
 
 ## Package.json Standards

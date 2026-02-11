@@ -46,7 +46,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
 | hench | `src/prd/ops.ts` | rex | 8 functions (store, tree, task selection) |
-| web | `src/server/mcp-deps.ts` | rex, sourcevision | 2 MCP server factories |
+| web | `src/server/mcp-deps.ts` | rex, sourcevision | 2 MCP server factories + rex domain types/constants |
 
 Rules:
 - **One gateway per package** — all runtime cross-package imports pass through it.

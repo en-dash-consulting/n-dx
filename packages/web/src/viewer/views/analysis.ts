@@ -15,6 +15,7 @@ import { BrandedHeader } from "../components/logos.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
+/** @see packages/rex/src/schema/v1.ts — LogEntry (viewer duplicate for browser bundling) */
 interface LogEntry {
   timestamp: string;
   event: string;

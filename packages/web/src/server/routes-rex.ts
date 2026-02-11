@@ -53,20 +53,22 @@ import {
   VALID_PRIORITIES,
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
+  CHILD_LEVEL,
   isPriority,
   isItemLevel,
   isRequirementCategory,
   isValidationType,
-} from "./rex-domain.js";
+} from "./mcp-deps.js";
 
 const REX_PREFIX = "/api/rex/";
 
-/** Infer child level from parent level. */
-const CHILD_LEVEL: Partial<Record<ItemLevel, ItemLevel>> = {
-  epic: "feature",
-  feature: "task",
-  task: "subtask",
-};
+/**
+ * API-settable statuses — excludes "deleted" from the canonical set.
+ * Deleted items shouldn't be settable via the API.
+ */
+const API_SETTABLE_STATUSES = new Set<string>(
+  [...VALID_STATUSES].filter((s) => s !== "deleted"),
+);
 
 interface PRDItemRecord {
   id: string;
@@ -826,7 +828,7 @@ async function handleBulkUpdate(
     }
 
     // Validate status if provided
-    if (input.updates.status && !VALID_STATUSES.has(input.updates.status as string)) {
+    if (input.updates.status && !API_SETTABLE_STATUSES.has(input.updates.status as string)) {
       errorResponse(res, 400, `Invalid status: ${input.updates.status}`);
       return true;
     }

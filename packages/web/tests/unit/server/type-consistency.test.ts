@@ -1,14 +1,21 @@
 /**
- * Type consistency tests — verify the web package's Rex domain constants
- * (rex-domain.ts) match the canonical definitions in packages/rex/src/schema/v1.ts.
+ * Type consistency tests — verify the web package's duplicated types
+ * stay in sync with the canonical Rex definitions.
  *
- * The web server intentionally duplicates Rex types and constants in a single
- * shared module (rex-domain.ts) to avoid a compile-time dependency on the Rex
- * package. The duplicates must stay in sync with the canonical definitions.
- * These tests catch drift early.
+ * After the rex-domain.ts deduplication, server routes now import Rex
+ * types and constants directly through the gateway (mcp-deps.ts).
+ * The only remaining intentional duplications are:
+ *
+ *   1. Viewer types (packages/web/src/viewer/components/prd-tree/types.ts)
+ *      — browser-bundled code that cannot import Node.js packages.
+ *   2. Viewer LogEntry (packages/web/src/viewer/views/analysis.ts)
+ *      — local interface for log display.
+ *
+ * These tests verify those viewer mirrors stay in sync with canonical
+ * Rex definitions, and that the gateway re-exports are correct.
  *
  * @see packages/rex/src/schema/v1.ts — canonical definitions
- * @see packages/web/src/server/rex-domain.ts — web server duplicates (single source for web)
+ * @see packages/web/src/server/mcp-deps.ts — gateway (re-exports from rex)
  * @see packages/web/src/viewer/components/prd-tree/types.ts — viewer type mirrors
  */
 
@@ -36,37 +43,110 @@ import {
   type RequirementValidationType,
 } from "../../../../rex/src/schema/v1.js";
 
-// Web server duplicates from the shared rex-domain module
+// Gateway re-exports (should be identical references)
 import {
-  PRIORITY_ORDER as LOCAL_PRIORITY_ORDER,
-  LEVEL_HIERARCHY as LOCAL_LEVEL_HIERARCHY,
-  VALID_LEVELS,
-  VALID_STATUSES,
-  VALID_PRIORITIES,
-  VALID_REQUIREMENT_CATEGORIES as LOCAL_VALID_REQ_CATEGORIES,
-  VALID_VALIDATION_TYPES as LOCAL_VALID_VALIDATION_TYPES,
-  isPriority,
-  isItemLevel,
-  isRequirementCategory,
-  isValidationType,
-} from "../../../src/server/rex-domain.js";
+  PRIORITY_ORDER as GATEWAY_PRIORITY_ORDER,
+  LEVEL_HIERARCHY as GATEWAY_LEVEL_HIERARCHY,
+  VALID_LEVELS as GATEWAY_VALID_LEVELS,
+  VALID_STATUSES as GATEWAY_VALID_STATUSES,
+  VALID_PRIORITIES as GATEWAY_VALID_PRIORITIES,
+  VALID_REQUIREMENT_CATEGORIES as GATEWAY_VALID_REQ_CATEGORIES,
+  VALID_VALIDATION_TYPES as GATEWAY_VALID_VALIDATION_TYPES,
+  CHILD_LEVEL as GATEWAY_CHILD_LEVEL,
+  isPriority as gatewayIsPriority,
+  isItemLevel as gatewayIsItemLevel,
+  isRequirementCategory as gatewayIsReqCategory,
+  isValidationType as gatewayIsValidationType,
+} from "../../../src/server/mcp-deps.js";
 
-describe("Rex domain constant consistency", () => {
+describe("Gateway re-exports are identical to canonical", () => {
   /**
-   * These tests compare the canonical Rex values against the web package's
-   * rex-domain.ts duplicates. If any test fails, both the canonical source
-   * AND the web duplicates need to be updated together.
+   * Since the gateway re-exports directly from rex, these should be
+   * the exact same references. This test guards against accidental
+   * re-introduction of local duplicates in the gateway.
    */
 
-  it("PRIORITY_ORDER matches canonical", () => {
-    expect(LOCAL_PRIORITY_ORDER).toEqual(CANONICAL_PRIORITY_ORDER);
+  it("PRIORITY_ORDER is same reference", () => {
+    expect(GATEWAY_PRIORITY_ORDER).toBe(CANONICAL_PRIORITY_ORDER);
   });
 
-  it("LEVEL_HIERARCHY matches canonical", () => {
-    expect(LOCAL_LEVEL_HIERARCHY).toEqual(CANONICAL_LEVEL_HIERARCHY);
+  it("LEVEL_HIERARCHY is same reference", () => {
+    expect(GATEWAY_LEVEL_HIERARCHY).toBe(CANONICAL_LEVEL_HIERARCHY);
   });
 
-  it("Priority type covers exactly 4 values", () => {
+  it("VALID_LEVELS is same reference", () => {
+    expect(GATEWAY_VALID_LEVELS).toBe(CANONICAL_VALID_LEVELS);
+  });
+
+  it("VALID_STATUSES is same reference", () => {
+    expect(GATEWAY_VALID_STATUSES).toBe(CANONICAL_VALID_STATUSES);
+  });
+
+  it("VALID_PRIORITIES is same reference", () => {
+    expect(GATEWAY_VALID_PRIORITIES).toBe(CANONICAL_VALID_PRIORITIES);
+  });
+
+  it("VALID_REQUIREMENT_CATEGORIES is same reference", () => {
+    expect(GATEWAY_VALID_REQ_CATEGORIES).toBe(CANONICAL_VALID_REQ_CATEGORIES);
+  });
+
+  it("VALID_VALIDATION_TYPES is same reference", () => {
+    expect(GATEWAY_VALID_VALIDATION_TYPES).toBe(CANONICAL_VALID_VALIDATION_TYPES);
+  });
+
+  it("CHILD_LEVEL is same reference", () => {
+    expect(GATEWAY_CHILD_LEVEL).toBe(CANONICAL_CHILD_LEVEL);
+  });
+
+  it("isPriority is same reference", () => {
+    expect(gatewayIsPriority).toBe(canonicalIsPriority);
+  });
+
+  it("isItemLevel is same reference", () => {
+    expect(gatewayIsItemLevel).toBe(canonicalIsItemLevel);
+  });
+
+  it("isRequirementCategory is same reference", () => {
+    expect(gatewayIsReqCategory).toBe(canonicalIsReqCategory);
+  });
+
+  it("isValidationType is same reference", () => {
+    expect(gatewayIsValidationType).toBe(canonicalIsValidationType);
+  });
+});
+
+describe("Viewer type mirrors match canonical definitions", () => {
+  /**
+   * The viewer types in packages/web/src/viewer/components/prd-tree/types.ts
+   * are intentionally duplicated because browser-bundled code cannot import
+   * Node.js packages. These tests verify the canonical shapes haven't drifted.
+   */
+
+  it("ItemLevel covers exactly 4 values", () => {
+    const levels: ItemLevel[] = ["epic", "feature", "task", "subtask"];
+    expect(CANONICAL_VALID_LEVELS.size).toBe(4);
+    for (const level of levels) {
+      expect(CANONICAL_VALID_LEVELS.has(level)).toBe(true);
+    }
+  });
+
+  it("ItemStatus covers exactly 6 values", () => {
+    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "deferred", "blocked", "deleted"];
+    expect(CANONICAL_VALID_STATUSES.size).toBe(6);
+    for (const status of statuses) {
+      expect(CANONICAL_VALID_STATUSES.has(status)).toBe(true);
+    }
+  });
+
+  it("Priority covers exactly 4 values", () => {
+    const priorities: Priority[] = ["critical", "high", "medium", "low"];
+    expect(CANONICAL_VALID_PRIORITIES.size).toBe(4);
+    for (const p of priorities) {
+      expect(CANONICAL_VALID_PRIORITIES.has(p)).toBe(true);
+    }
+  });
+
+  it("PRIORITY_ORDER maps all priority values", () => {
     const priorities = Object.keys(CANONICAL_PRIORITY_ORDER);
     expect(priorities).toHaveLength(4);
     expect(priorities).toContain("critical");
@@ -75,68 +155,14 @@ describe("Rex domain constant consistency", () => {
     expect(priorities).toContain("low");
   });
 
-  it("VALID_LEVELS matches canonical VALID_LEVELS", () => {
-    expect(VALID_LEVELS).toEqual(CANONICAL_VALID_LEVELS);
-  });
-
-  it("VALID_STATUSES covers API-settable statuses", () => {
-    // The canonical VALID_STATUSES includes "deleted", but the web
-    // VALID_STATUSES omits it because deleted items shouldn't be
-    // settable via the API.
-    for (const status of VALID_STATUSES) {
-      expect(CANONICAL_VALID_STATUSES.has(status as ItemStatus)).toBe(true);
-    }
-    expect(VALID_STATUSES.has("deleted" as never)).toBe(false);
-    // The web set should be exactly canonical minus "deleted"
-    expect(VALID_STATUSES.size).toBe(CANONICAL_VALID_STATUSES.size - 1);
-  });
-
-  it("VALID_PRIORITIES matches canonical VALID_PRIORITIES", () => {
-    expect(VALID_PRIORITIES).toEqual(CANONICAL_VALID_PRIORITIES);
-  });
-
-  it("PRIORITY_ORDER keys exactly match the Priority type members", () => {
-    const keys = Object.keys(LOCAL_PRIORITY_ORDER);
-    const expected: Priority[] = ["critical", "high", "medium", "low"];
-    expect(new Set(keys)).toEqual(new Set(expected));
-    expect(keys).toHaveLength(expected.length);
-  });
-
-  it("LEVEL_HIERARCHY keys exactly match the ItemLevel type members", () => {
-    const keys = Object.keys(LOCAL_LEVEL_HIERARCHY);
+  it("LEVEL_HIERARCHY keys match ItemLevel values", () => {
+    const keys = Object.keys(CANONICAL_LEVEL_HIERARCHY);
     const expected: ItemLevel[] = ["epic", "feature", "task", "subtask"];
     expect(new Set(keys)).toEqual(new Set(expected));
     expect(keys).toHaveLength(expected.length);
   });
 
-  it("isPriority type guard matches canonical behaviour", () => {
-    const testValues = ["critical", "high", "medium", "low", "invalid", "", "CRITICAL"];
-    for (const v of testValues) {
-      expect(isPriority(v)).toBe(canonicalIsPriority(v));
-    }
-    expect(isPriority(undefined)).toBe(canonicalIsPriority(undefined));
-  });
-
-  it("isItemLevel type guard matches canonical behaviour", () => {
-    const testValues = ["epic", "feature", "task", "subtask", "invalid", "", "EPIC"];
-    for (const v of testValues) {
-      expect(isItemLevel(v)).toBe(canonicalIsItemLevel(v));
-    }
-    expect(isItemLevel(undefined)).toBe(canonicalIsItemLevel(undefined));
-  });
-
-  it("canonical isItemStatus type guard works correctly", () => {
-    expect(canonicalIsItemStatus("pending")).toBe(true);
-    expect(canonicalIsItemStatus("in_progress")).toBe(true);
-    expect(canonicalIsItemStatus("completed")).toBe(true);
-    expect(canonicalIsItemStatus("deferred")).toBe(true);
-    expect(canonicalIsItemStatus("blocked")).toBe(true);
-    expect(canonicalIsItemStatus("deleted")).toBe(true);
-    expect(canonicalIsItemStatus("invalid")).toBe(false);
-    expect(canonicalIsItemStatus(undefined)).toBe(false);
-  });
-
-  it("canonical CHILD_LEVEL maps every level correctly", () => {
+  it("CHILD_LEVEL maps every level correctly", () => {
     expect(CANONICAL_CHILD_LEVEL.epic).toBe("feature");
     expect(CANONICAL_CHILD_LEVEL.feature).toBe("task");
     expect(CANONICAL_CHILD_LEVEL.task).toBe("subtask");
@@ -161,50 +187,36 @@ describe("Rex domain constant consistency", () => {
     }
   });
 
-  it("isRequirementCategory type guard works correctly", () => {
+  it("type guards work correctly", () => {
+    expect(canonicalIsPriority("critical")).toBe(true);
+    expect(canonicalIsPriority("invalid")).toBe(false);
+    expect(canonicalIsPriority(undefined)).toBe(false);
+
+    expect(canonicalIsItemLevel("epic")).toBe(true);
+    expect(canonicalIsItemLevel("invalid")).toBe(false);
+    expect(canonicalIsItemLevel(undefined)).toBe(false);
+
+    expect(canonicalIsItemStatus("pending")).toBe(true);
+    expect(canonicalIsItemStatus("deleted")).toBe(true);
+    expect(canonicalIsItemStatus("invalid")).toBe(false);
+    expect(canonicalIsItemStatus(undefined)).toBe(false);
+
     expect(canonicalIsReqCategory("technical")).toBe(true);
-    expect(canonicalIsReqCategory("performance")).toBe(true);
     expect(canonicalIsReqCategory("invalid")).toBe(false);
     expect(canonicalIsReqCategory(undefined)).toBe(false);
-  });
 
-  it("isValidationType type guard works correctly", () => {
     expect(canonicalIsValidationType("automated")).toBe(true);
-    expect(canonicalIsValidationType("manual")).toBe(true);
-    expect(canonicalIsValidationType("metric")).toBe(true);
     expect(canonicalIsValidationType("invalid")).toBe(false);
     expect(canonicalIsValidationType(undefined)).toBe(false);
   });
 
-  it("VALID_REQUIREMENT_CATEGORIES matches canonical", () => {
-    expect(LOCAL_VALID_REQ_CATEGORIES).toEqual(CANONICAL_VALID_REQ_CATEGORIES);
-  });
-
-  it("VALID_VALIDATION_TYPES matches canonical", () => {
-    expect(LOCAL_VALID_VALIDATION_TYPES).toEqual(CANONICAL_VALID_VALIDATION_TYPES);
-  });
-
-  it("isRequirementCategory type guard matches canonical behaviour", () => {
-    const testValues = ["technical", "performance", "security", "accessibility", "compatibility", "quality", "invalid", ""];
-    for (const v of testValues) {
-      expect(isRequirementCategory(v)).toBe(canonicalIsReqCategory(v));
-    }
-    expect(isRequirementCategory(undefined)).toBe(canonicalIsReqCategory(undefined));
-  });
-
-  it("isValidationType type guard matches canonical behaviour", () => {
-    const testValues = ["automated", "manual", "metric", "invalid", ""];
-    for (const v of testValues) {
-      expect(isValidationType(v)).toBe(canonicalIsValidationType(v));
-    }
-    expect(isValidationType(undefined)).toBe(canonicalIsValidationType(undefined));
-  });
-
-  it("viewer type mirrors have expected shape", () => {
+  it("viewer type mirrors have expected shape (compile-time reminder)", () => {
     // packages/web/src/viewer/components/prd-tree/types.ts mirrors:
     //   ItemLevel = "epic" | "feature" | "task" | "subtask"
     //   ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked" | "deleted"
     //   Priority = "critical" | "high" | "medium" | "low"
+    //   RequirementCategory = "technical" | "performance" | "security" | "accessibility" | "compatibility" | "quality"
+    //   RequirementValidationType = "automated" | "manual" | "metric"
     //
     // These are compile-time types and can't be tested at runtime.
     // This test serves as a reminder: if canonical definitions change,
@@ -212,11 +224,13 @@ describe("Rex domain constant consistency", () => {
     const levels: ItemLevel[] = ["epic", "feature", "task", "subtask"];
     const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "deferred", "blocked", "deleted"];
     const priorities: Priority[] = ["critical", "high", "medium", "low"];
+    const categories: RequirementCategory[] = ["technical", "performance", "security", "accessibility", "compatibility", "quality"];
+    const validationTypes: RequirementValidationType[] = ["automated", "manual", "metric"];
 
-    // If Rex changes these types, this test will fail at compile time,
-    // signaling that the viewer mirrors need updating too.
     expect(levels).toHaveLength(4);
     expect(statuses).toHaveLength(6);
     expect(priorities).toHaveLength(4);
+    expect(categories).toHaveLength(6);
+    expect(validationTypes).toHaveLength(3);
   });
 });

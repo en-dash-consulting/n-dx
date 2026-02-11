@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
-import { type ItemLevel, LEVEL_HIERARCHY, isItemLevel } from "./rex-domain.js";
+import { type ItemLevel, LEVEL_HIERARCHY, isItemLevel } from "./mcp-deps.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
@@ -69,7 +69,7 @@ function findItemById(items: PRDItemRecord[], id: string): PRDItemRecord | null 
   return null;
 }
 
-// Rex domain types and constants imported from ./rex-domain.js
+// Rex domain types and constants imported via gateway (./mcp-deps.js)
 
 // ── Validation checks ────────────────────────────────────────────────
 

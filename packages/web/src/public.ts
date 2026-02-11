@@ -33,17 +33,15 @@
  * | Analysis data     | `readFileSync`     | routes-sourcevision.ts |
  * | Agent run history | `readFileSync`     | routes-hench.ts      |
  * | Rex CLI commands  | `execFile`         | routes-rex.ts        |
- * | Rex domain types  | Duplication        | rex-domain.ts        |
- * | MCP servers       | Runtime import ⚠️  | mcp-deps.ts (gateway) |
+ * | Rex domain types  | Gateway re-export  | mcp-deps.ts (gateway) |
+ * | MCP servers       | Gateway re-export  | mcp-deps.ts (gateway) |
  *
- * The **only** runtime imports — `createRexMcpServer` and
- * `createSourcevisionMcpServer` — are funnelled through a single
- * gateway module (`server/mcp-deps.ts`) to keep the coupling surface
- * explicit and auditable.
+ * Runtime imports — MCP server factories and rex domain types/constants —
+ * are funnelled through a single gateway module (`server/mcp-deps.ts`)
+ * to keep the coupling surface explicit and auditable.
  *
  * @module @n-dx/web
  * @see packages/web/src/server/mcp-deps.ts — runtime import gateway
- * @see packages/web/src/server/rex-domain.ts — duplicated types (avoids import)
  * @see packages/hench/src/prd/ops.ts — hench's equivalent gateway pattern
  */
 

@@ -11,19 +11,17 @@
  *   contracts. These are erased at runtime, so the packages remain
  *   independently deployable while sharing type safety.
  *
+ * - **Web server routes** import types and constants from Rex through
+ *   the gateway module (`packages/web/src/server/mcp-deps.ts`), which
+ *   re-exports from this file. No duplication needed.
+ *
  * - **Web viewer** intentionally duplicates core types (ItemLevel,
  *   ItemStatus, Priority) because the viewer is bundled as standalone
  *   browser code via esbuild and cannot import from Node.js packages.
  *   The duplicates are documented with `@see` back-references and
  *   verified by compile-time consistency tests.
  *
- * - **Web server routes** consolidate domain constants and type guards
- *   into a single shared module (rex-domain.ts) to avoid a package
- *   dependency on Rex. Each duplicate is annotated with `@see` references
- *   to this file and verified by type-consistency tests.
- *
  * When modifying types or constants here, also update:
- *   - packages/web/src/server/rex-domain.ts (server-side shared module)
  *   - packages/web/src/viewer/components/prd-tree/types.ts (viewer types)
  *   - packages/web/tests/unit/server/type-consistency.test.ts
  *

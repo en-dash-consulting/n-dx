@@ -21,17 +21,15 @@
  * ## Coupling strategy
  *
  * REST/API routes access domain data through **filesystem reads** and
- * **subprocess calls** — zero runtime imports from rex, sourcevision, or
- * hench.  Domain types are intentionally duplicated in `rex-domain.ts`
- * to avoid compile-time coupling.
+ * **subprocess calls**.  Rex domain types and constants are imported from
+ * the canonical source through the gateway (`mcp-deps.ts`), eliminating
+ * the previous duplication in `rex-domain.ts`.
  *
- * MCP routes are the sole exception: they need the actual MCP server
- * factory functions at runtime.  These two imports are isolated in
+ * MCP server factories and rex domain constants are funnelled through
  * `mcp-deps.ts` — a single gateway module that mirrors the pattern
  * in `packages/hench/src/prd/ops.ts`.
  *
- * @see ./mcp-deps.ts — runtime import gateway (the only cross-package imports)
- * @see ./rex-domain.ts — duplicated domain types (avoids rex import)
+ * @see ./mcp-deps.ts — runtime import gateway (all cross-package imports)
  */
 
 export { startServer } from "./start.js";
