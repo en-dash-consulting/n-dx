@@ -3,10 +3,12 @@ import {
   enrichZonesWithAI,
   computeAttemptConfigs,
   extractFindings,
+  buildMetaPrompt,
 } from "../../../src/analyzers/enrich.js";
 import type {
   Zone,
   ZoneCrossing,
+  Finding,
 } from "../../../src/schema/index.js";
 import { ClaudeClientError } from "@n-dx/claude-client";
 import {
@@ -578,5 +580,189 @@ describe("extractFindings", () => {
 
     const findings = extractFindings(parsed, 1, ["pattern"]);
     expect(findings[0].related).toEqual(["a.ts", "b.ts"]);
+  });
+});
+
+// ── buildMetaPrompt ────────────────────────────────────────────────────────
+
+describe("buildMetaPrompt", () => {
+  const sampleZones: Zone[] = [
+    {
+      id: "core",
+      name: "Core",
+      description: "Core module",
+      files: ["src/core/a.ts", "src/core/b.ts"],
+      entryPoints: ["src/core/a.ts"],
+      cohesion: 0.8,
+      coupling: 0.2,
+    },
+  ];
+
+  const sampleCrossings: ZoneCrossing[] = [];
+
+  it("annotates pass 0 findings with source pass and detection method", () => {
+    const findings: Finding[] = [
+      {
+        type: "anti-pattern",
+        pass: 0,
+        scope: "global",
+        text: "God function: render in src/ui/app.ts calls 45 unique functions",
+        severity: "warning",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: call-graph: outgoing-call count]");
+  });
+
+  it("annotates tightly coupled module findings with cross-file edge count method", () => {
+    const findings: Finding[] = [
+      {
+        type: "relationship",
+        pass: 0,
+        scope: "global",
+        text: "Tightly coupled modules: a.ts and b.ts — 50 cross-file calls",
+        severity: "warning",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: call-graph: cross-file edge count]");
+  });
+
+  it("annotates dead export findings with dead-export scan method", () => {
+    const findings: Finding[] = [
+      {
+        type: "suggestion",
+        pass: 0,
+        scope: "global",
+        text: "Potentially unused export: foo in src/bar.ts has no incoming calls",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: call-graph: dead-export scan]");
+  });
+
+  it("annotates hub function findings with fan-in method", () => {
+    const findings: Finding[] = [
+      {
+        type: "suggestion",
+        pass: 0,
+        scope: "global",
+        text: "Hub function: walkTree in src/core/tree.ts is called from 8 files",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: call-graph: fan-in (caller file count)]");
+  });
+
+  it("annotates fan-in hotspot findings with fan-in method", () => {
+    const findings: Finding[] = [
+      {
+        type: "observation",
+        pass: 0,
+        scope: "global",
+        text: "Fan-in hotspot: src/core/tree.ts receives calls from 10 files",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: call-graph: fan-in (caller file count)]");
+  });
+
+  it("annotates zone-scoped cohesion/coupling findings with zone metrics method", () => {
+    const findings: Finding[] = [
+      {
+        type: "observation",
+        pass: 0,
+        scope: "core",
+        text: "Low cohesion (0.3) — zone may be too broad",
+        severity: "warning",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 0: automated heuristic; method: zone metrics: cohesion/coupling]");
+  });
+
+  it("annotates LLM-pass findings with LLM analysis method", () => {
+    const findings: Finding[] = [
+      {
+        type: "pattern",
+        pass: 2,
+        scope: "global",
+        text: "Clean layered architecture between zones",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 2: LLM cross-zone relationships; method: LLM analysis]");
+  });
+
+  it("annotates pass 1 findings with LLM zone naming label", () => {
+    const findings: Finding[] = [
+      {
+        type: "observation",
+        pass: 1,
+        scope: "core",
+        text: "Well-isolated module",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 1: LLM zone naming + initial observations; method: LLM analysis]");
+  });
+
+  it("includes guardrail: do not escalate heuristic findings without corroboration", () => {
+    const findings: Finding[] = [
+      {
+        type: "observation",
+        pass: 0,
+        scope: "global",
+        text: "Some finding",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("Do NOT escalate their severity unless corroborated by MULTIPLE independent findings");
+  });
+
+  it("includes guardrail: do not suggest decomposition unless metric exceeds 2x threshold", () => {
+    const findings: Finding[] = [
+      {
+        type: "observation",
+        pass: 0,
+        scope: "global",
+        text: "Some finding",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("Do NOT generate specific file decomposition suggestions");
+    expect(prompt).toContain("2x its detection threshold");
+  });
+
+  it("annotates findings for unknown high pass numbers", () => {
+    const findings: Finding[] = [
+      {
+        type: "suggestion",
+        pass: 7,
+        scope: "global",
+        text: "Some late-pass finding",
+        severity: "info",
+      },
+    ];
+
+    const prompt = buildMetaPrompt(sampleZones, findings, sampleCrossings);
+    expect(prompt).toContain("[source: pass 7: LLM analysis; method: LLM analysis]");
   });
 });
