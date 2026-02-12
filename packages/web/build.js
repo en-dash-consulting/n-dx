@@ -11,6 +11,12 @@ const cssEntryPoint = resolve(__dirname, "src/viewer/styles/index.css");
 const htmlTemplatePath = resolve(__dirname, "src/viewer/index.html");
 const outDir = resolve(__dirname, "dist/viewer");
 
+// Landing page entry points
+const landingJsEntryPoint = resolve(__dirname, "src/landing/landing.ts");
+const landingCssEntryPoint = resolve(__dirname, "src/landing/landing.css");
+const landingHtmlTemplatePath = resolve(__dirname, "src/landing/index.html");
+const landingOutDir = resolve(__dirname, "dist/landing");
+
 const commonJsOptions = {
   entryPoints: [jsEntryPoint],
   bundle: true,
@@ -66,7 +72,44 @@ async function bundleCss() {
   return result.outputFiles[0].text;
 }
 
+// ── Landing page build helpers ──
+
+function buildLandingHtml(jsCode, cssCode) {
+  const htmlTemplate = readFileSync(landingHtmlTemplatePath, "utf-8");
+
+  let inlinedHtml = htmlTemplate.replace(
+    '<link rel="stylesheet" href="./landing.css">',
+    () => `<style>${cssCode}</style>`
+  );
+
+  inlinedHtml = inlinedHtml.replace(
+    '<script type="module" src="./landing.ts"></script>',
+    () => `<script type="module">${jsCode}</script>`
+  );
+
+  mkdirSync(landingOutDir, { recursive: true });
+  writeFileSync(resolve(landingOutDir, "index.html"), inlinedHtml);
+}
+
+async function bundleLandingCss() {
+  const result = await esbuild.build({
+    entryPoints: [landingCssEntryPoint],
+    bundle: true,
+    write: false,
+    minify: !watchMode,
+  });
+  return result.outputFiles[0].text;
+}
+
+const landingJsOptions = {
+  entryPoints: [landingJsEntryPoint],
+  bundle: true,
+  format: "esm",
+  target: "es2022",
+};
+
 async function buildProduction() {
+  // Build dashboard viewer
   const jsResult = await esbuild.build({
     ...commonJsOptions,
     write: false,
@@ -78,6 +121,19 @@ async function buildProduction() {
 
   buildHtml(jsCode, cssCode);
   console.log("Built viewer: dist/viewer/index.html");
+
+  // Build landing page
+  const landingJsResult = await esbuild.build({
+    ...landingJsOptions,
+    write: false,
+    minify: true,
+  });
+
+  const landingJsCode = landingJsResult.outputFiles[0].text;
+  const landingCssCode = await bundleLandingCss();
+
+  buildLandingHtml(landingJsCode, landingCssCode);
+  console.log("Built landing: dist/landing/index.html");
 }
 
 async function buildWatch() {
@@ -112,16 +168,47 @@ async function buildWatch() {
     }],
   });
 
-  // Initial build
+  // Landing page JS context for watching
+  const landingJsCtx = await esbuild.context({
+    ...landingJsOptions,
+    write: false,
+    plugins: [{
+      name: "rebuild-landing-html",
+      setup(build) {
+        build.onEnd(async (result) => {
+          if (result.errors.length > 0) return;
+
+          try {
+            const jsCode = result.outputFiles?.[0]?.text ?? "";
+            const cssCode = await bundleLandingCss();
+            buildLandingHtml(jsCode, cssCode);
+            console.log(`[esbuild] Rebuilt landing: dist/landing/index.html`);
+          } catch (err) {
+            console.error("[esbuild] Landing rebuild failed:", err.message);
+          }
+        });
+      },
+    }],
+  });
+
+  // Initial build — viewer
   const jsResult = await jsCtx.rebuild();
   const jsCode = jsResult.outputFiles?.[0]?.text ?? "";
   const cssCode = await bundleCss();
   buildHtml(jsCode, cssCode);
   console.log("[esbuild] Initial build complete: dist/viewer/index.html");
 
-  // Start watching both
+  // Initial build — landing
+  const landingJsResult = await landingJsCtx.rebuild();
+  const landingJsCode = landingJsResult.outputFiles?.[0]?.text ?? "";
+  const landingCssCode = await bundleLandingCss();
+  buildLandingHtml(landingJsCode, landingCssCode);
+  console.log("[esbuild] Initial build complete: dist/landing/index.html");
+
+  // Start watching all
   await cssCtx.watch();
   await jsCtx.watch();
+  await landingJsCtx.watch();
   console.log("[esbuild] Watching for changes...");
 }
 

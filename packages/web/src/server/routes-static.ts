@@ -35,6 +35,7 @@ export interface StaticAssets {
   resolvedViewerDir: string;
   resolvedPackageRoot: string;
   getViewerHtml: () => string;
+  getLandingHtml: () => string | null;
   findAssetPath: (filename: string) => string | null;
 }
 
@@ -82,6 +83,32 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     return cachedViewerHtml!;
   }
 
+  // Resolve landing page HTML (parallel to viewer)
+  const landingCandidates = [
+    resolve(thisDir, "../landing/index.html"),
+    resolve(thisDir, "../../src/landing/index.html"),
+  ];
+  let landingPath: string | null = null;
+  for (const p of landingCandidates) {
+    if (existsSync(p)) {
+      landingPath = p;
+      break;
+    }
+  }
+
+  let cachedLandingHtml: string | null = landingPath && !dev ? readFileSync(landingPath, "utf-8") : null;
+
+  const lp = landingPath;
+  function getLandingHtml(): string | null {
+    if (!lp) return null;
+    if (dev) {
+      let html = readFileSync(lp, "utf-8");
+      html = html.replace("</body>", `${LIVE_RELOAD_SNIPPET}</body>`);
+      return html;
+    }
+    return cachedLandingHtml;
+  }
+
   function findAssetPath(filename: string): string | null {
     const inViewer = resolve(resolvedViewerDir, filename);
     const inRoot = resolve(resolvedPackageRoot, filename);
@@ -94,6 +121,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     resolvedViewerDir,
     resolvedPackageRoot,
     getViewerHtml,
+    getLandingHtml,
     findAssetPath,
   };
 }
@@ -107,7 +135,17 @@ export function handleStaticRoute(
 ): boolean {
   const url = req.url || "/";
 
-  // Index page
+  // Landing page
+  if (url === "/landing" || url === "/landing/") {
+    const landingHtml = assets.getLandingHtml();
+    if (landingHtml) {
+      res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+      res.end(landingHtml);
+      return true;
+    }
+  }
+
+  // Index page (dashboard)
   if (url === "/" || url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
     res.end(assets.getViewerHtml());

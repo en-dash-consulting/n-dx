@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="n-dx: AI-powered development toolkit. Analyze codebases, plan work, execute tasks autonomously." />
+  <title>n-dx — AI-powered development toolkit</title>
+  <link rel="icon" type="image/png" href="/n-dx.png">
+  <script>
+    (function(){
+      var s = localStorage.getItem("sv-theme");
+      var t = s || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="./landing.css">
+</head>
+<body>
+  <!-- Skip link for accessibility -->
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <!-- Navigation -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="/landing" class="nav-brand" aria-label="n-dx home">
+        <img src="/n-dx.png" width="28" height="28" alt="" aria-hidden="true" class="nav-logo" />
+        <span class="nav-brand-text">n-dx</span>
+      </a>
+      <div class="nav-links">
+        <a href="#packages" class="nav-link">Packages</a>
+        <a href="#workflow" class="nav-link">Workflow</a>
+        <a href="#get-started" class="nav-link">Get Started</a>
+        <a href="/" class="nav-link nav-link-dashboard">Dashboard</a>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light theme">
+        <span class="theme-icon" aria-hidden="true"></span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- Hero Section -->
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="hero-inner">
+        <div class="hero-badge">AI-powered development toolkit</div>
+        <h1 id="hero-heading" class="hero-title">
+          Analyze. Plan. Execute.
+        </h1>
+        <p class="hero-subtitle">
+          Three tools that chain together to understand your codebase, build a roadmap, and ship autonomously.
+        </p>
+        <div class="hero-actions">
+          <a href="#get-started" class="btn btn-primary">Get Started</a>
+          <a href="https://github.com/endash/n-dx" class="btn btn-ghost" target="_blank" rel="noopener noreferrer">
+            GitHub
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 11.5L11.5 4.5M11.5 4.5H5.5M11.5 4.5V10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+
+        <!-- Pipeline preview -->
+        <div class="hero-pipeline" aria-label="The n-dx pipeline: sourcevision to rex to hench">
+          <div class="pipeline-step" data-product="sourcevision">
+            <div class="pipeline-icon">
+              <img src="/SourceVision-F.png" width="32" height="32" alt="" aria-hidden="true" />
+            </div>
+            <span class="pipeline-label">sourcevision</span>
+          </div>
+          <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="pipeline-step" data-product="rex">
+            <div class="pipeline-icon">
+              <img src="/Rex-F.png" width="32" height="32" alt="" aria-hidden="true" />
+            </div>
+            <span class="pipeline-label">rex</span>
+          </div>
+          <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="pipeline-step" data-product="hench">
+            <div class="pipeline-icon">
+              <img src="/Hench-F.png" width="32" height="32" alt="" aria-hidden="true" />
+            </div>
+            <span class="pipeline-label">hench</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Packages Section -->
+    <section class="packages" id="packages" aria-labelledby="packages-heading">
+      <div class="section-inner">
+        <h2 id="packages-heading" class="section-heading">Three packages, one pipeline</h2>
+        <p class="section-subtitle">Each package solves a distinct problem. Together, they form a complete AI development workflow.</p>
+
+        <div class="package-grid">
+          <!-- sourcevision -->
+          <article class="package-card" data-product="sourcevision">
+            <div class="package-header">
+              <img src="/SourceVision-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
+              <div>
+                <h3 class="package-name">sourcevision</h3>
+                <span class="package-phase">Analyze</span>
+              </div>
+            </div>
+            <p class="package-desc">
+              Static analysis engine that maps your codebase. File inventory, import graph, architectural zone detection, and React component catalog.
+            </p>
+            <ul class="package-features" role="list">
+              <li>File inventory with roles &amp; metadata</li>
+              <li>Import dependency graph</li>
+              <li>Louvain community detection for zones</li>
+              <li>AI-readable <code>CONTEXT.md</code> output</li>
+            </ul>
+            <div class="package-cmd">
+              <code>ndx plan .</code>
+            </div>
+          </article>
+
+          <!-- rex -->
+          <article class="package-card" data-product="rex">
+            <div class="package-header">
+              <img src="/Rex-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
+              <div>
+                <h3 class="package-name">rex</h3>
+                <span class="package-phase">Plan</span>
+              </div>
+            </div>
+            <p class="package-desc">
+              PRD management with hierarchical epics, features, tasks, and subtasks. Scan your project to generate proposals, track progress, and validate dependencies.
+            </p>
+            <ul class="package-features" role="list">
+              <li>Hierarchical task tree (epic &rarr; subtask)</li>
+              <li>AI-driven proposal generation</li>
+              <li>Dependency tracking &amp; validation</li>
+              <li>MCP server for Claude integration</li>
+            </ul>
+            <div class="package-cmd">
+              <code>ndx plan --accept .</code>
+            </div>
+          </article>
+
+          <!-- hench -->
+          <article class="package-card" data-product="hench">
+            <div class="package-header">
+              <img src="/Hench-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
+              <div>
+                <h3 class="package-name">hench</h3>
+                <span class="package-phase">Execute</span>
+              </div>
+            </div>
+            <p class="package-desc">
+              Autonomous agent that picks the next task, builds a brief, and drives Claude in a tool-use loop. Records runs with full transcripts.
+            </p>
+            <ul class="package-features" role="list">
+              <li>Autonomous task execution</li>
+              <li>Tool-use loop with Claude API</li>
+              <li>Run history &amp; transcripts</li>
+              <li>Configurable model &amp; turn limits</li>
+            </ul>
+            <div class="package-cmd">
+              <code>ndx work .</code>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Workflow Section (placeholder anchor for sibling task) -->
+    <section class="workflow" id="workflow" aria-labelledby="workflow-heading">
+      <div class="section-inner">
+        <h2 id="workflow-heading" class="section-heading">How it works</h2>
+        <p class="section-subtitle">A streamlined loop from analysis to execution.</p>
+        <div class="workflow-steps">
+          <div class="workflow-step">
+            <div class="workflow-number" aria-hidden="true">1</div>
+            <h3 class="workflow-step-title">Analyze</h3>
+            <p class="workflow-step-desc">sourcevision scans your codebase&mdash;files, imports, zones, components&mdash;and produces a machine-readable context.</p>
+          </div>
+          <div class="workflow-connector" aria-hidden="true"></div>
+          <div class="workflow-step">
+            <div class="workflow-number" aria-hidden="true">2</div>
+            <h3 class="workflow-step-title">Plan</h3>
+            <p class="workflow-step-desc">rex reads the analysis and generates a structured PRD. Review proposals, accept them, and track progress in a task tree.</p>
+          </div>
+          <div class="workflow-connector" aria-hidden="true"></div>
+          <div class="workflow-step">
+            <div class="workflow-number" aria-hidden="true">3</div>
+            <h3 class="workflow-step-title">Execute</h3>
+            <p class="workflow-step-desc">hench picks the next task, builds a brief with full context, and ships it&mdash;writing code, running tests, committing results.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Get Started Section (placeholder anchor for sibling task) -->
+    <section class="get-started" id="get-started" aria-labelledby="get-started-heading">
+      <div class="section-inner">
+        <h2 id="get-started-heading" class="section-heading">Get started in seconds</h2>
+        <div class="install-block">
+          <div class="install-cmd" role="group" aria-label="Installation command">
+            <code id="install-code">npx n-dx init .</code>
+            <button class="copy-btn" id="copy-btn" aria-label="Copy install command">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 10V3.5C3 2.67 3.67 2 4.5 2H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <p class="install-note">Then run <code>ndx plan .</code> to analyze and <code>ndx work .</code> to start executing.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="footer-inner">
+      <span class="footer-brand">n-dx</span>
+      <span class="footer-sep" aria-hidden="true">&middot;</span>
+      <span class="footer-text">AI-powered development toolkit</span>
+    </div>
+  </footer>
+
+  <script type="module" src="./landing.ts"></script>
+</body>
+</html>
