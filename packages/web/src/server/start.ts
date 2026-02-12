@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, watch } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
-import { resolveStaticAssets, handleStaticRoute } from "./routes-static.js";
+import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
@@ -40,9 +40,8 @@ export function startServer(
   const inScope = (pkg: ViewerScope): boolean => !scope || scope === pkg;
 
   if (inScope("sourcevision") && !existsSync(svDir)) {
-    console.error(`No .sourcevision/ directory found in: ${absDir}`);
-    console.error("Run 'sourcevision analyze' first.");
-    process.exit(1);
+    console.log("No .sourcevision/ directory found — landing page will be shown at /");
+    console.log("Run 'ndx init .' to initialize, then 'ndx plan .' to analyze.");
   }
 
   // Resolve static assets
@@ -148,10 +147,10 @@ export function startServer(
       return;
     }
 
-    // Viewer config endpoint — exposes scope to the client
+    // Viewer config endpoint — exposes scope and init status to the client
     if ((req.url === "/api/config") && (req.method || "GET") === "GET") {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
-      res.end(JSON.stringify({ scope: scope ?? null }));
+      res.end(JSON.stringify({ scope: scope ?? null, initialized: isProjectInitialized(ctx) }));
       return;
     }
 

@@ -243,7 +243,6 @@ if (command === "dev") {
 
 if (command === "start") {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
   try {
     const code = await runWeb(dir, rest, { run, tools, __dir, commandName: "start" });
     process.exit(code);
@@ -255,7 +254,6 @@ if (command === "start") {
 
 if (command === "web") {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
   try {
     const code = await runWeb(dir, rest, { run, tools, __dir });
     process.exit(code);

@@ -9,6 +9,7 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { BrandedHeader } from "../components/logos.js";
+import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -629,7 +630,7 @@ function BlockingChains({
 
 // ── Main View Component ──────────────────────────────────────────────
 
-export function ValidationView() {
+export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
   const [report, setReport] = useState<ValidationReport | null>(null);
   const [graphData, setGraphData] = useState<DependencyGraphData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -685,13 +686,16 @@ export function ValidationView() {
 
   // Navigate to item in PRD view
   const navigateToItem = useCallback((id: string) => {
-    // Navigate to PRD view with the item selected
-    window.location.hash = "#prd";
+    if (navigateTo) {
+      navigateTo("prd");
+    } else {
+      history.pushState({ view: "prd", file: null, zone: null }, "", "/prd");
+    }
     // Dispatch custom event so PRD view can pick up the selection
     window.dispatchEvent(
       new CustomEvent("prd-navigate", { detail: { itemId: id } }),
     );
-  }, []);
+  }, [navigateTo]);
 
   return h(Fragment, null,
     h("div", { class: "val-container" },

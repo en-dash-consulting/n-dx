@@ -4,7 +4,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync, realpathSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
 
@@ -126,33 +126,55 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
   };
 }
 
+// Known SPA view paths — keep in sync with ViewId in types.ts
+const SPA_VIEWS = new Set([
+  "overview", "graph", "zones", "files", "routes", "architecture",
+  "problems", "suggestions", "rex-dashboard", "prd", "rex-analysis",
+  "token-usage", "validation", "hench-runs", "hench-config",
+  "hench-templates", "hench-optimization",
+]);
+
+/** Check if the project has been initialized (any tool directory exists). */
+export function isProjectInitialized(ctx: ServerContext): boolean {
+  return existsSync(join(ctx.svDir, "manifest.json")) || existsSync(join(ctx.rexDir, "prd.json"));
+}
+
 /** Handle static asset requests. Returns true if the request was handled. */
 export function handleStaticRoute(
   req: IncomingMessage,
   res: ServerResponse,
-  _ctx: ServerContext,
+  ctx: ServerContext,
   assets: StaticAssets,
 ): boolean {
   const url = req.url || "/";
 
-  // Landing page
-  if (url === "/landing" || url === "/landing/") {
+  // Root: dashboard if initialized, landing page otherwise
+  if (url === "/" || url === "/index.html") {
+    if (isProjectInitialized(ctx)) {
+      res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+      res.end(assets.getViewerHtml());
+      return true;
+    }
     const landingHtml = assets.getLandingHtml();
     if (landingHtml) {
       res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
       res.end(landingHtml);
       return true;
     }
-  }
-
-  // Index page (dashboard)
-  if (url === "/" || url === "/index.html") {
+    // No landing page available — serve viewer anyway
     res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
     res.end(assets.getViewerHtml());
     return true;
   }
 
-  // PNG assets
+  // Backward compat: /landing → redirect to /
+  if (url === "/landing" || url === "/landing/") {
+    res.writeHead(301, { Location: "/" });
+    res.end();
+    return true;
+  }
+
+  // PNG assets (must come before SPA catch-all)
   if (url.endsWith(".png") && /^\/[\w-]+\.png$/.test(url)) {
     const filename = url.slice(1);
     const pngPath = assets.findAssetPath(filename);
@@ -164,6 +186,14 @@ export function handleStaticRoute(
       res.writeHead(404);
       res.end("Not found");
     }
+    return true;
+  }
+
+  // SPA catch-all: known view paths serve the viewer HTML
+  const segment = url.slice(1).split("?")[0];
+  if (SPA_VIEWS.has(segment)) {
+    res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
+    res.end(assets.getViewerHtml());
     return true;
   }
 

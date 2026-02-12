@@ -12,7 +12,6 @@ import { initTheme } from "./components/theme-toggle.js";
 import { updateFavicon } from "./components/favicon.js";
 import { Overview } from "./views/overview.js";
 import { Graph } from "./views/graph.js";
-import { CallGraphView } from "./views/call-graph.js";
 import { ZonesView } from "./views/zones.js";
 import { FilesView } from "./views/files.js";
 import { ArchitectureView } from "./views/architecture.js";
@@ -33,7 +32,7 @@ initTheme();
 
 /** All known views grouped by product scope. */
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
-  sourcevision: ["overview", "graph", "call-graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
+  sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
   rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation"],
   hench: ["hench-runs", "hench-config", "hench-templates", "hench-optimization"],
 };
@@ -59,8 +58,8 @@ async function fetchScope(): Promise<string | null> {
 }
 
 function getInitialView(validViews: Set<ViewId>): ViewId {
-  const hash = location.hash.replace("#", "") as ViewId;
-  return validViews.has(hash) ? hash : validViews.values().next().value as ViewId;
+  const path = location.pathname.slice(1) as ViewId;
+  return validViews.has(path) ? path : validViews.values().next().value as ViewId;
 }
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
@@ -109,14 +108,14 @@ function App({ scope }: { scope: string | null }) {
     setSelectedFile(file);
     setSelectedZone(zone);
     setView(targetView);
-    history.pushState({ view: targetView, file, zone }, "", `#${targetView}`);
+    history.pushState({ view: targetView, file, zone }, "", `/${targetView}`);
   }, []);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
     setSelectedFile(null);
     setSelectedZone(null);
     setView(id);
-    history.pushState({ view: id, file: null, zone: null }, "", `#${id}`);
+    history.pushState({ view: id, file: null, zone: null }, "", `/${id}`);
   }, []);
 
   // Scroll to top on view change
@@ -130,8 +129,17 @@ function App({ scope }: { scope: string | null }) {
   }, [view]);
 
   useEffect(() => {
-    // Seed the initial history entry
-    history.replaceState({ view, file: selectedFile, zone: selectedZone }, "", `#${view}`);
+    // Backward compat: migrate old hash URLs to path URLs
+    if (location.hash) {
+      const hashView = location.hash.replace("#", "") as ViewId;
+      if (validViews.has(hashView)) {
+        setView(hashView);
+        history.replaceState({ view: hashView, file: null, zone: null }, "", `/${hashView}`);
+      }
+    } else {
+      // Seed the initial history entry
+      history.replaceState({ view, file: selectedFile, zone: selectedZone }, "", `/${view}`);
+    }
 
     const handlePopState = (e: PopStateEvent) => {
       if (e.state) {
@@ -142,33 +150,17 @@ function App({ scope }: { scope: string | null }) {
           setSelectedZone(s.zone ?? null);
         }
       } else {
-        // Handle history entries created by direct hash assignment (e.g. window.location.hash = "#prd")
-        // These entries have no state object, so parse the hash from the URL
-        const hash = location.hash.replace("#", "") as ViewId;
-        if (validViews.has(hash)) {
-          setView(hash);
+        // Fallback: parse from pathname
+        const path = location.pathname.slice(1) as ViewId;
+        if (validViews.has(path)) {
+          setView(path);
           setSelectedFile(null);
           setSelectedZone(null);
-          // Backfill the state so future back/forward through this entry works fully
-          history.replaceState({ view: hash, file: null, zone: null }, "", `#${hash}`);
+          history.replaceState({ view: path, file: null, zone: null }, "", `/${path}`);
         }
       }
     };
     window.addEventListener("popstate", handlePopState);
-
-    // Handle direct hash changes (e.g. window.location.hash = "#prd" from validation view).
-    // hashchange fires when the hash is set directly but popstate does not.
-    const handleHashChange = () => {
-      const hash = location.hash.replace("#", "") as ViewId;
-      if (validViews.has(hash)) {
-        setView(hash);
-        setSelectedFile(null);
-        setSelectedZone(null);
-        // Backfill state so future back/forward through this entry works
-        history.replaceState({ view: hash, file: null, zone: null }, "", `#${hash}`);
-      }
-    };
-    window.addEventListener("hashchange", handleHashChange);
 
     let initialLoad = true;
     onDataChange((newData) => {
@@ -195,7 +187,6 @@ function App({ scope }: { scope: string | null }) {
     return () => {
       stopPolling();
       window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("hashchange", handleHashChange);
     };
   }, []);
 
@@ -245,10 +236,8 @@ function App({ scope }: { scope: string | null }) {
         return h(Overview, { data });
       case "graph":
         return h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
-      case "call-graph":
-        return h(CallGraphView, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
       case "zones":
-        return h(ZonesView, { data, onSelect: setDetail, setSelectedZone, navigateTo });
+        return h(ZonesView, { data, onSelect: setDetail, navigateTo });
       case "files":
         return h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo });
       case "routes":
@@ -268,7 +257,7 @@ function App({ scope }: { scope: string | null }) {
       case "token-usage":
         return h(TokenUsageView, null);
       case "validation":
-        return h(ValidationView, null);
+        return h(ValidationView, { navigateTo });
       case "hench-runs":
         return h(HenchRunsView, { navigateTo });
       case "hench-config":
