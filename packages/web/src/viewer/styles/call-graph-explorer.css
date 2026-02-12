@@ -1,0 +1,207 @@
+/* Call Graph — SVG box-and-line zone diagram */
+
+/* ── Diagram container ───────────────────────────────────────────── */
+
+.cg-diagram-container {
+  position: relative;
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.cg-diagram {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 340px);
+  min-height: 400px;
+  cursor: grab;
+  user-select: none;
+}
+
+.cg-diagram.dragging {
+  cursor: grabbing;
+}
+
+/* ── Zone boxes ──────────────────────────────────────────────────── */
+
+.cg-zone-rect {
+  fill: var(--bg-surface);
+  stroke: var(--border);
+  stroke-width: 1.5;
+  transition: stroke 0.15s ease, fill 0.15s ease;
+}
+
+.cg-zone-box:hover .cg-zone-rect {
+  stroke: var(--zone-color, var(--border-strong));
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--zone-color, var(--accent)) 5%, var(--bg-surface));
+}
+
+.cg-zone-box.expanded .cg-zone-rect {
+  stroke: var(--zone-color, var(--border-strong));
+  stroke-width: 2;
+}
+
+.cg-zone-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.cg-zone-stats {
+  font-size: 10px;
+  fill: var(--text-dim);
+  pointer-events: none;
+}
+
+.cg-zone-expand-icon {
+  font-size: 10px;
+  fill: var(--text-muted);
+  pointer-events: none;
+}
+
+.cg-zone-divider {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  stroke-dasharray: 3 2;
+}
+
+/* ── Search dimming ──────────────────────────────────────────────── */
+
+.cg-zone-box.search-dim {
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+
+.cg-zone-box.search-dim:hover {
+  opacity: 0.6;
+}
+
+/* ── File rows inside expanded zones ─────────────────────────────── */
+
+.cg-file-bg {
+  fill: transparent;
+  transition: fill 0.1s ease;
+  cursor: pointer;
+}
+
+.cg-file-row:hover .cg-file-bg {
+  fill: var(--bg-hover);
+}
+
+.cg-file-row.search-match .cg-file-bg {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.cg-file-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.cg-file-stats {
+  font-size: 9px;
+  fill: var(--text-muted);
+  pointer-events: none;
+}
+
+.cg-file-overflow {
+  font-size: 9px;
+  fill: var(--text-muted);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Cross-zone file indicator bar */
+.cg-file-xzone-bar {
+  fill: var(--zone-color, var(--accent));
+}
+
+.cg-file-row.cross-zone .cg-file-name {
+  fill: var(--text);
+  font-weight: 500;
+}
+
+/* ── File-level edges (expanded zone → target zones) ─────────────── */
+
+.cg-file-edge {
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* ── Edges (connection lines) ────────────────────────────────────── */
+
+.cg-edge {
+  stroke: var(--border-strong);
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.cg-edge.heavy {
+  stroke: var(--orange);
+}
+
+.cg-edge.hovered {
+  stroke: var(--accent);
+}
+
+.cg-arrow-marker {
+  fill: var(--border-strong);
+}
+
+/* ── Edge labels ─────────────────────────────────────────────────── */
+
+.cg-edge-label {
+  font-size: 9px;
+  fill: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.cg-edge-label.visible {
+  opacity: 1;
+  fill: var(--text);
+}
+
+/* ── Zoom controls ───────────────────────────────────────────────── */
+
+.cg-zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+
+.cg-zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.cg-zoom-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.cg-zoom-btn:active {
+  background: var(--bg-active);
+}
