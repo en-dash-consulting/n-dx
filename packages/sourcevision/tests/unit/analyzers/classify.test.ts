@@ -1,6 +1,20 @@
-import { describe, it, expect } from "vitest";
-import { analyzeClassifications, buildClassificationMap } from "../../../src/analyzers/classify.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { analyzeClassifications, buildClassificationMap, enrichClassificationsWithLLM, mergeClassificationResults } from "../../../src/analyzers/classify.js";
+import { callClaude } from "../../../src/analyzers/claude-client.js";
 import type { Inventory, Imports, Classifications, ArchetypeDefinition } from "../../../src/schema/index.js";
+
+vi.mock("../../../src/analyzers/claude-client.js", async () => {
+  const actual = await import("@n-dx/claude-client");
+  return {
+    callClaude: vi.fn(),
+    ClaudeClientError: actual.ClaudeClientError,
+    setClaudeConfig: vi.fn(),
+    setClaudeClient: vi.fn(),
+    getAuthMode: vi.fn(() => "cli"),
+  };
+});
+
+const mockedCallClaude = vi.mocked(callClaude);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -371,7 +385,222 @@ describe("output structure", () => {
 
   it("includes all built-in archetypes in output", () => {
     const result = analyzeClassifications(makeInventory(["src/a.ts"]), emptyImports);
-    expect(result.archetypes.length).toBe(12);
+    expect(result.archetypes.length).toBe(17);
+  });
+});
+
+// ── LLM enrichment ──────────────────────────────────────────────────────────
+
+describe("enrichClassificationsWithLLM", () => {
+  beforeEach(() => {
+    mockedCallClaude.mockReset();
+  });
+
+  function makeBaseClassifications(unclassifiedPaths: string[]): Classifications {
+    const inv = makeInventory([...unclassifiedPaths, "src/index.ts"]);
+    return analyzeClassifications(inv, emptyImports);
+  }
+
+  it("classifies unclassified files via LLM", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts", "src/processor.ts"]);
+    // Sanity: these files are unclassified
+    expect(base.files.find((f) => f.path === "src/analyzer.ts")!.archetype).toBeNull();
+    expect(base.files.find((f) => f.path === "src/processor.ts")!.archetype).toBeNull();
+
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([
+        { path: "src/analyzer.ts", archetype: "service", reason: "Analysis engine module" },
+        { path: "src/processor.ts", archetype: "utility", reason: "Data processing utility" },
+      ]),
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/processor.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(2);
+    expect(result.updatedFiles.find((f) => f.path === "src/analyzer.ts")!.archetype).toBe("service");
+    expect(result.updatedFiles.find((f) => f.path === "src/analyzer.ts")!.source).toBe("llm");
+    expect(result.updatedFiles.find((f) => f.path === "src/processor.ts")!.archetype).toBe("utility");
+    expect(result.tokenUsage.calls).toBe(1);
+  });
+
+  it("skips when no unclassified files", async () => {
+    const inv = makeInventory(["src/index.ts", "src/utils/a.ts"]);
+    const base = analyzeClassifications(inv, emptyImports);
+    // Both should be classified
+    expect(base.summary.totalUnclassified).toBe(0);
+
+    const result = await enrichClassificationsWithLLM(base, inv, emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(0);
+    expect(result.tokenUsage.calls).toBe(0);
+    expect(mockedCallClaude).not.toHaveBeenCalled();
+  });
+
+  it("handles LLM returning invalid archetype IDs", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([
+        { path: "src/analyzer.ts", archetype: "nonexistent-type", reason: "Made up" },
+      ]),
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    // Invalid archetype IDs should be filtered out
+    expect(result.updatedFiles).toHaveLength(0);
+  });
+
+  it("handles LLM returning JSON in markdown fences", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    mockedCallClaude.mockResolvedValueOnce({
+      text: '```json\n[{"path":"src/analyzer.ts","archetype":"service","reason":"Analysis module"}]\n```',
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(1);
+    expect(result.updatedFiles[0].archetype).toBe("service");
+  });
+
+  it("retries on invalid JSON then succeeds", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    // First call: garbage
+    mockedCallClaude.mockResolvedValueOnce({ text: "not json at all" });
+    // Second call: valid
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([
+        { path: "src/analyzer.ts", archetype: "service", reason: "Analysis module" },
+      ]),
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(1);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops on auth error", async () => {
+    const { ClaudeClientError } = await import("@n-dx/claude-client");
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    mockedCallClaude.mockRejectedValueOnce(
+      new ClaudeClientError("Auth failed", "auth", false),
+    );
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles).toHaveLength(0);
+    expect(mockedCallClaude).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes evidence with LLM reason", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([
+        { path: "src/analyzer.ts", archetype: "service", reason: "Core analysis engine" },
+      ]),
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.updatedFiles[0].evidence).toBeDefined();
+    expect(result.updatedFiles[0].evidence![0].detail).toBe("Core analysis engine");
+    expect(result.updatedFiles[0].evidence![0].archetypeId).toBe("service");
+  });
+
+  it("accumulates token usage across retries", async () => {
+    const base = makeBaseClassifications(["src/analyzer.ts"]);
+
+    // First call: garbage response with token usage
+    mockedCallClaude.mockResolvedValueOnce({
+      text: "not json",
+      tokenUsage: { input: 100, output: 50 },
+    });
+    // Second call: valid response with token usage
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify([
+        { path: "src/analyzer.ts", archetype: "service", reason: "Analysis module" },
+      ]),
+      tokenUsage: { input: 200, output: 80 },
+    });
+
+    const result = await enrichClassificationsWithLLM(base, makeInventory(["src/analyzer.ts", "src/index.ts"]), emptyImports);
+
+    expect(result.tokenUsage.calls).toBe(2);
+    expect(result.tokenUsage.inputTokens).toBe(300);
+    expect(result.tokenUsage.outputTokens).toBe(130);
+  });
+});
+
+// ── mergeClassificationResults ──────────────────────────────────────────────
+
+describe("mergeClassificationResults", () => {
+  it("replaces null-archetype entries with LLM results", () => {
+    const base: Classifications = {
+      archetypes: [{ id: "service", name: "Service", description: "Service layer", signals: [] }],
+      files: [
+        { path: "src/index.ts", archetype: "entrypoint", confidence: 0.8, source: "algorithmic" },
+        { path: "src/analyzer.ts", archetype: null, confidence: 0, source: "algorithmic" },
+      ],
+      summary: { totalClassified: 1, totalUnclassified: 1, byArchetype: { entrypoint: 1 }, bySource: { algorithmic: 2 } },
+    };
+
+    const llmFiles = [
+      { path: "src/analyzer.ts", archetype: "service" as string | null, confidence: 0.7, source: "llm" as const },
+    ];
+
+    const merged = mergeClassificationResults(base, llmFiles);
+
+    expect(merged.files.find((f) => f.path === "src/analyzer.ts")!.archetype).toBe("service");
+    expect(merged.files.find((f) => f.path === "src/analyzer.ts")!.source).toBe("llm");
+    expect(merged.summary.totalClassified).toBe(2);
+    expect(merged.summary.totalUnclassified).toBe(0);
+    expect(merged.summary.bySource.llm).toBe(1);
+    expect(merged.summary.bySource.algorithmic).toBe(1);
+  });
+
+  it("does not modify already-classified files", () => {
+    const base: Classifications = {
+      archetypes: [],
+      files: [
+        { path: "src/index.ts", archetype: "entrypoint", confidence: 0.8, source: "algorithmic" },
+      ],
+      summary: { totalClassified: 1, totalUnclassified: 0, byArchetype: { entrypoint: 1 }, bySource: { algorithmic: 1 } },
+    };
+
+    const merged = mergeClassificationResults(base, []);
+
+    expect(merged.files[0].archetype).toBe("entrypoint");
+    expect(merged.files[0].source).toBe("algorithmic");
+  });
+
+  it("recomputes summary after merge", () => {
+    const base: Classifications = {
+      archetypes: [],
+      files: [
+        { path: "src/a.ts", archetype: null, confidence: 0, source: "algorithmic" },
+        { path: "src/b.ts", archetype: null, confidence: 0, source: "algorithmic" },
+        { path: "src/c.ts", archetype: "utility", confidence: 0.8, source: "algorithmic" },
+      ],
+      summary: { totalClassified: 1, totalUnclassified: 2, byArchetype: { utility: 1 }, bySource: { algorithmic: 3 } },
+    };
+
+    const llmFiles = [
+      { path: "src/a.ts", archetype: "service" as string | null, confidence: 0.7, source: "llm" as const },
+    ];
+
+    const merged = mergeClassificationResults(base, llmFiles);
+
+    expect(merged.summary.totalClassified).toBe(2);
+    expect(merged.summary.totalUnclassified).toBe(1);
+    expect(merged.summary.byArchetype.service).toBe(1);
+    expect(merged.summary.byArchetype.utility).toBe(1);
+    expect(merged.summary.bySource.algorithmic).toBe(2);
+    expect(merged.summary.bySource.llm).toBe(1);
   });
 });
 

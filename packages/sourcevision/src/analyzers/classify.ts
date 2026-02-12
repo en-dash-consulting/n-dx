@@ -21,9 +21,12 @@ import type {
   ClassificationEvidence,
   Classifications,
   ClassificationsSummary,
+  AnalyzeTokenUsage,
 } from "../schema/index.js";
 import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
+import { callClaude, ClaudeClientError } from "./claude-client.js";
+import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -289,6 +292,266 @@ function computeSummary(files: FileClassification[]): ClassificationsSummary {
   }
 
   return { totalClassified, totalUnclassified, byArchetype, bySource };
+}
+
+// ── LLM-assisted classification ─────────────────────────────────────────────
+
+export interface LLMClassifyResult {
+  updatedFiles: FileClassification[];
+  tokenUsage: AnalyzeTokenUsage;
+}
+
+/** Maximum files per LLM batch. */
+const LLM_BATCH_SIZE = 30;
+
+/**
+ * Enrich unclassified files by asking the LLM to assign archetypes.
+ * Runs after the algorithmic pass. Files the LLM can't classify stay null.
+ */
+export async function enrichClassificationsWithLLM(
+  classifications: Classifications,
+  inventory: Inventory,
+  imports: Imports,
+): Promise<LLMClassifyResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+  const updatedFiles: FileClassification[] = [];
+
+  // Collect unclassified files (null archetype, algorithmic source)
+  const unclassified = classifications.files.filter(
+    (f) => f.archetype === null && f.source === "algorithmic",
+  );
+
+  if (unclassified.length === 0) {
+    return { updatedFiles, tokenUsage };
+  }
+
+  // Build archetype catalog for the prompt
+  const archetypeCatalog = classifications.archetypes.map((a) => ({
+    id: a.id,
+    name: a.name,
+    description: a.description,
+  }));
+
+  // Batch unclassified files
+  const batches: FileClassification[][] = [];
+  for (let i = 0; i < unclassified.length; i += LLM_BATCH_SIZE) {
+    batches.push(unclassified.slice(i, i + LLM_BATCH_SIZE));
+  }
+
+  // Valid archetype IDs for validation
+  const validIds = new Set(classifications.archetypes.map((a) => a.id));
+
+  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+    const batch = batches[batchIdx];
+    const batchLabel = batches.length > 1 ? ` batch ${batchIdx + 1}/${batches.length}` : "";
+
+    const result = await classifyBatchWithLLM(
+      batch,
+      archetypeCatalog,
+      validIds,
+      batchLabel,
+      tokenUsage,
+    );
+
+    if (result === "auth-error") {
+      // Stop all batches on auth/not-found error
+      break;
+    }
+
+    if (result) {
+      updatedFiles.push(...result);
+    }
+  }
+
+  return { updatedFiles, tokenUsage };
+}
+
+/** Attempt configs for retry degradation. */
+interface LLMClassifyAttemptConfig {
+  includeDescriptions: boolean;
+  maxFiles: number;
+}
+
+function computeLLMClassifyAttempts(batchSize: number): LLMClassifyAttemptConfig[] {
+  return [
+    { includeDescriptions: true, maxFiles: batchSize },
+    { includeDescriptions: false, maxFiles: batchSize },
+    { includeDescriptions: false, maxFiles: Math.min(15, batchSize) },
+  ];
+}
+
+/**
+ * Classify a single batch of files via Claude with retry.
+ * Returns classified files, null on total failure, or "auth-error" to signal stop.
+ */
+async function classifyBatchWithLLM(
+  batch: FileClassification[],
+  archetypeCatalog: { id: string; name: string; description: string }[],
+  validIds: Set<string>,
+  batchLabel: string,
+  tokenUsage: AnalyzeTokenUsage,
+): Promise<FileClassification[] | null | "auth-error"> {
+  const attempts = computeLLMClassifyAttempts(batch.length);
+
+  for (let attempt = 0; attempt < attempts.length; attempt++) {
+    const config = attempts[attempt];
+    const filesToClassify = batch.slice(0, config.maxFiles);
+
+    const prompt = buildLLMClassifyPrompt(filesToClassify, archetypeCatalog, config.includeDescriptions);
+    const promptLevel = config.includeDescriptions ? "full" : "compact";
+    console.log(`  [classify]${batchLabel} Calling Claude (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`);
+
+    let callText: string;
+    try {
+      const callResult = await callClaude(prompt);
+      accumulateTokenUsage(tokenUsage, callResult.tokenUsage);
+      callText = callResult.text;
+    } catch (err) {
+      if (err instanceof ClaudeClientError) {
+        if (err.reason === "auth" || err.reason === "not-found") {
+          console.warn(`  [classify] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
+          return "auth-error";
+        }
+        accumulateTokenUsage(tokenUsage, undefined);
+        const label = attempt < attempts.length - 1 ? "retrying with simpler prompt" : "giving up on this batch";
+        console.warn(`  [classify]${batchLabel} Attempt ${attempt + 1}/${attempts.length} failed (${err.reason}) — ${label}`);
+        continue;
+      }
+      throw err;
+    }
+
+    // Parse JSON array response
+    const parsed = tryParseClassifyResponse(callText);
+    if (!parsed || parsed.length === 0) {
+      const label = attempt < attempts.length - 1 ? "retrying with simpler prompt" : "giving up on this batch";
+      console.warn(`  [classify]${batchLabel} Attempt ${attempt + 1}/${attempts.length}: invalid response — ${label}`);
+      continue;
+    }
+
+    // Map results back to FileClassification objects
+    const pathSet = new Set(filesToClassify.map((f) => f.path));
+    const results: FileClassification[] = [];
+
+    for (const item of parsed) {
+      if (!item.path || !pathSet.has(item.path)) continue;
+      if (!item.archetype || !validIds.has(item.archetype)) continue;
+
+      results.push({
+        path: item.path,
+        archetype: item.archetype,
+        confidence: 0.7,
+        source: "llm" as const,
+        evidence: item.reason
+          ? [{ archetypeId: item.archetype, signalKind: "path" as const, detail: item.reason, weight: 0.7 }]
+          : undefined,
+      });
+    }
+
+    if (attempt > 0 && results.length > 0) {
+      console.log(`  [classify]${batchLabel} Succeeded on attempt ${attempt + 1}`);
+    }
+
+    return results;
+  }
+
+  console.warn(`  [classify]${batchLabel} All attempts exhausted — leaving files unclassified`);
+  return null;
+}
+
+/**
+ * Build the LLM prompt for file classification.
+ */
+function buildLLMClassifyPrompt(
+  files: FileClassification[],
+  archetypes: { id: string; name: string; description: string }[],
+  includeDescriptions: boolean,
+): string {
+  const archetypeLines = archetypes.map((a) =>
+    includeDescriptions
+      ? `- ${a.id}: ${a.name} — ${a.description}`
+      : `- ${a.id}: ${a.name}`,
+  ).join("\n");
+
+  const fileLines = files.map((f, i) => {
+    const parts = [`${i + 1}. ${f.path}`];
+    // Include partial evidence from algorithmic pass if available
+    if (f.evidence && f.evidence.length > 0) {
+      const hints = f.evidence
+        .slice(0, 3)
+        .map((e) => `${e.archetypeId}(${e.weight})`)
+        .join(", ");
+      parts.push(`  [partial signals: ${hints}]`);
+    }
+    return parts.join("");
+  }).join("\n");
+
+  return `Classify these source files into archetypes. Each archetype represents a structural role in the codebase.
+
+Available archetypes:
+${archetypeLines}
+
+Files to classify:
+${fileLines}
+
+For each file, determine the best-fit archetype based on its path, directory structure, and likely purpose. If no archetype fits well, omit the file from the response.
+
+Respond with ONLY a JSON array (no markdown fences, no explanation):
+[{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]`;
+}
+
+/**
+ * Parse the LLM response as a JSON array of classification results.
+ */
+function tryParseClassifyResponse(
+  response: string,
+): Array<{ path: string; archetype: string; reason?: string }> | null {
+  // Direct parse
+  try {
+    const parsed = JSON.parse(response);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+
+  // Extract from markdown fences
+  const fenceMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) {
+    try {
+      const parsed = JSON.parse(fenceMatch[1].trim());
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+
+  // Find JSON array in response
+  const arrayMatch = response.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try {
+      const parsed = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+
+  return null;
+}
+
+/**
+ * Merge LLM classification results into existing classifications.
+ * Replaces null-archetype entries with LLM results and recomputes summary.
+ */
+export function mergeClassificationResults(
+  base: Classifications,
+  llmFiles: FileClassification[],
+): Classifications {
+  if (llmFiles.length === 0) return base;
+
+  const llmMap = new Map(llmFiles.map((f) => [f.path, f]));
+  const mergedFiles = base.files.map((f) => llmMap.get(f.path) ?? f);
+  const summary = computeSummary(mergedFiles);
+
+  return sortClassifications({
+    archetypes: base.archetypes,
+    files: mergedFiles,
+    summary,
+  });
 }
 
 /**

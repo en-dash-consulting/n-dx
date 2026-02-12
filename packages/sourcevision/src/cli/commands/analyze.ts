@@ -7,7 +7,7 @@ import { toCanonicalJSON } from "../../util/sort.js";
 import { analyzeInventory } from "../../analyzers/inventory.js";
 import type { InventoryResult } from "../../analyzers/inventory.js";
 import { analyzeImports } from "../../analyzers/imports.js";
-import { analyzeClassifications } from "../../analyzers/classify.js";
+import { analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults } from "../../analyzers/classify.js";
 import { analyzeZones } from "../../analyzers/zones.js";
 import { analyzeComponents } from "../../analyzers/components.js";
 import { analyzeCallGraph, computeZoneCallStats } from "../../analyzers/callgraph.js";
@@ -203,12 +203,25 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
         const customArchetypes = (archetypeConfig?.custom ?? []) as import("../../schema/index.js").ArchetypeDefinition[];
         const fileOverrides = (archetypeConfig?.overrides ?? {}) as Record<string, string>;
 
-        const classifications = analyzeClassifications(inventory, importsData, {
+        let classifications = analyzeClassifications(inventory, importsData, {
           previousClassifications: !fullMode ? previousClassifications : undefined,
           changedFiles: inventoryResult?.changedFiles,
           customArchetypes: customArchetypes.length > 0 ? customArchetypes : undefined,
           overrides: Object.keys(fileOverrides).length > 0 ? fileOverrides : undefined,
         });
+
+        // LLM enrichment (skip in --fast mode)
+        const llmEnrich = !extraArgs.includes("--fast");
+        if (llmEnrich && classifications.summary.totalUnclassified > 0) {
+          info(`  ${classifications.summary.totalClassified} classified, ${classifications.summary.totalUnclassified} unclassified — enriching with LLM...`);
+          const llmResult = await enrichClassificationsWithLLM(classifications, inventory, importsData);
+          if (llmResult.updatedFiles.length > 0) {
+            classifications = mergeClassificationResults(classifications, llmResult.updatedFiles);
+            info(`  LLM classified ${llmResult.updatedFiles.length} additional files`);
+          }
+          accumulateFromAggregate(tokenUsage, llmResult.tokenUsage);
+        }
+
         const outPath = join(svDir, DATA_FILES.classifications);
         writeFileSync(outPath, toCanonicalJSON(classifications));
         updateManifestModule(absDir, "classifications", "complete");
