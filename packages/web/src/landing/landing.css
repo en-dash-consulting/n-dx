@@ -601,6 +601,246 @@ code { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Animated Terminal Demo
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.terminal-demo {
+  max-width: 620px;
+  margin: var(--space-12) auto 0;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow);
+  position: relative;
+}
+
+.terminal-chrome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.terminal-dot-red { background: #ff5f57; }
+.terminal-dot-yellow { background: #febc2e; }
+.terminal-dot-green { background: #28c840; }
+
+.terminal-title {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  flex: 1;
+  text-align: center;
+  margin-right: 46px; /* offset for dots to center */
+}
+
+.terminal-body {
+  background: var(--code-bg);
+  padding: var(--space-5) var(--space-6);
+  min-height: 220px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: var(--font-sm);
+  line-height: 1.7;
+  position: relative;
+}
+
+.terminal-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.terminal-line {
+  display: flex;
+  flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: terminalLineIn 0.3s ease forwards;
+}
+
+.terminal-prompt {
+  color: var(--accent);
+  margin-right: var(--space-2);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.terminal-command {
+  color: var(--text);
+}
+
+.terminal-output {
+  color: var(--text-dim);
+  width: 100%;
+  padding-left: 0;
+}
+
+.terminal-output.success {
+  color: var(--brand-green);
+}
+
+.terminal-output.info {
+  color: var(--brand-teal);
+}
+
+.terminal-output.muted {
+  color: var(--text-muted);
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--accent);
+  opacity: 0;
+  animation: blink 1s step-end infinite;
+  margin-top: var(--space-1);
+  border-radius: 1px;
+}
+
+.terminal-cursor.visible {
+  opacity: 1;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes terminalLineIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.terminal-replay {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--transition-normal), border-color var(--transition-normal), background var(--transition-normal);
+  z-index: 2;
+  font-family: inherit;
+}
+
+.terminal-replay:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--bg-surface-hover);
+}
+
+.terminal-replay svg {
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Scroll Animations (fade-in)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.fade-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children within grids */
+.package-grid .fade-in:nth-child(2) { transition-delay: 0.1s; }
+.package-grid .fade-in:nth-child(3) { transition-delay: 0.2s; }
+
+.workflow-steps .fade-in:nth-child(1) { transition-delay: 0s; }
+.workflow-steps .fade-in:nth-child(3) { transition-delay: 0.1s; }
+.workflow-steps .fade-in:nth-child(5) { transition-delay: 0.2s; }
+
+/* Hero animations — visible immediately since above fold */
+.hero .fade-in {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.hero .fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Enhanced Hover Animations
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Package card inner lift — icon and features animate on hover */
+.package-card .package-logo {
+  transition: transform var(--transition-slow);
+}
+.package-card:hover .package-logo {
+  transform: scale(1.08);
+}
+
+.package-card .package-features li {
+  transition: transform var(--transition-normal), color var(--transition-normal);
+}
+.package-card:hover .package-features li {
+  color: var(--text);
+}
+
+.package-card .package-cmd {
+  transition: border-color var(--transition-slow), background var(--transition-slow);
+}
+.package-card:hover .package-cmd {
+  border-color: var(--border-strong);
+}
+
+/* Pipeline step pulse on hover */
+.pipeline-step {
+  transition: transform var(--transition-slow);
+}
+.pipeline-step:hover {
+  transform: translateY(-2px);
+}
+
+/* Pipeline arrow subtle animation */
+.pipeline-arrow svg {
+  transition: transform var(--transition-slow);
+}
+.hero-pipeline:hover .pipeline-arrow svg {
+  transform: translateX(2px);
+}
+
+/* Workflow number pulse */
+.workflow-number {
+  transition: transform var(--transition-slow), box-shadow var(--transition-slow);
+}
+.workflow-step:hover .workflow-number {
+  transform: scale(1.1);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    Get Started Section
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -826,6 +1066,16 @@ code { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; }
     --nav-height: 48px;
   }
 
+  .terminal-body {
+    padding: var(--space-4);
+    min-height: 180px;
+    font-size: 11px;
+  }
+
+  .terminal-demo {
+    margin-top: var(--space-8);
+  }
+
   .hero-title {
     font-size: var(--font-3xl);
   }
@@ -900,6 +1150,15 @@ code { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; }
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .fade-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .terminal-line {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
   }
 }
 

@@ -8259,10 +8259,11 @@
         {
           "id": "7ff4f6b5-031e-45a8-8678-728f5caa7b8a",
           "title": "Add interactive workflow demo and animations",
-          "status": "pending",
+          "status": "in_progress",
           "level": "task",
           "description": "Add interactive elements: animated terminal showing the CLI workflow (ndx init → plan → work), hover/scroll animations on package cards, smooth section transitions. Make the page feel alive.",
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-02-13T17:07:10.264Z"
         },
         {
           "id": "28610126-7a2c-4f76-b375-d190d2cb166d",

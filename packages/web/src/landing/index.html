@@ -49,7 +49,7 @@
         <p class="hero-subtitle">
           Three tools that chain together to understand your codebase, build a roadmap, and ship autonomously.
         </p>
-        <div class="hero-actions">
+        <div class="hero-actions fade-in">
           <a href="#get-started" class="btn btn-primary">Get Started</a>
           <a href="https://github.com/endash/n-dx" class="btn btn-ghost" target="_blank" rel="noopener noreferrer">
             GitHub
@@ -58,7 +58,7 @@
         </div>
 
         <!-- Pipeline preview -->
-        <div class="hero-pipeline" aria-label="The n-dx pipeline: sourcevision to rex to hench">
+        <div class="hero-pipeline fade-in" aria-label="The n-dx pipeline: sourcevision to rex to hench">
           <div class="pipeline-step" data-product="sourcevision">
             <div class="pipeline-icon">
               <img src="/SourceVision-F.png" width="32" height="32" alt="" aria-hidden="true" />
@@ -95,7 +95,7 @@
 
         <div class="package-grid">
           <!-- sourcevision -->
-          <article class="package-card" data-product="sourcevision">
+          <article class="package-card fade-in" data-product="sourcevision">
             <div class="package-header">
               <img src="/SourceVision-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
               <div>
@@ -118,7 +118,7 @@
           </article>
 
           <!-- rex -->
-          <article class="package-card" data-product="rex">
+          <article class="package-card fade-in" data-product="rex">
             <div class="package-header">
               <img src="/Rex-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
               <div>
@@ -141,7 +141,7 @@
           </article>
 
           <!-- hench -->
-          <article class="package-card" data-product="hench">
+          <article class="package-card fade-in" data-product="hench">
             <div class="package-header">
               <img src="/Hench-F.png" width="40" height="40" alt="" aria-hidden="true" class="package-logo" />
               <div>
@@ -166,29 +166,49 @@
       </div>
     </section>
 
-    <!-- Workflow Section (placeholder anchor for sibling task) -->
+    <!-- Workflow Section -->
     <section class="workflow" id="workflow" aria-labelledby="workflow-heading">
       <div class="section-inner">
         <h2 id="workflow-heading" class="section-heading">How it works</h2>
         <p class="section-subtitle">A streamlined loop from analysis to execution.</p>
         <div class="workflow-steps">
-          <div class="workflow-step">
+          <div class="workflow-step fade-in">
             <div class="workflow-number" aria-hidden="true">1</div>
             <h3 class="workflow-step-title">Analyze</h3>
             <p class="workflow-step-desc">sourcevision scans your codebase&mdash;files, imports, zones, components&mdash;and produces a machine-readable context.</p>
           </div>
           <div class="workflow-connector" aria-hidden="true"></div>
-          <div class="workflow-step">
+          <div class="workflow-step fade-in">
             <div class="workflow-number" aria-hidden="true">2</div>
             <h3 class="workflow-step-title">Plan</h3>
             <p class="workflow-step-desc">rex reads the analysis and generates a structured PRD. Review proposals, accept them, and track progress in a task tree.</p>
           </div>
           <div class="workflow-connector" aria-hidden="true"></div>
-          <div class="workflow-step">
+          <div class="workflow-step fade-in">
             <div class="workflow-number" aria-hidden="true">3</div>
             <h3 class="workflow-step-title">Execute</h3>
             <p class="workflow-step-desc">hench picks the next task, builds a brief with full context, and ships it&mdash;writing code, running tests, committing results.</p>
           </div>
+        </div>
+
+        <!-- Animated Terminal Demo -->
+        <div class="terminal-demo fade-in" aria-label="Animated terminal showing the n-dx workflow">
+          <div class="terminal-chrome">
+            <div class="terminal-dots" aria-hidden="true">
+              <span class="terminal-dot terminal-dot-red"></span>
+              <span class="terminal-dot terminal-dot-yellow"></span>
+              <span class="terminal-dot terminal-dot-green"></span>
+            </div>
+            <span class="terminal-title">terminal</span>
+          </div>
+          <div class="terminal-body" role="log" aria-live="polite" aria-label="CLI workflow demonstration">
+            <div class="terminal-lines" id="terminal-lines"></div>
+            <div class="terminal-cursor" aria-hidden="true"></div>
+          </div>
+          <button class="terminal-replay" id="terminal-replay" aria-label="Replay terminal demo">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8C2 4.69 4.69 2 8 2C10.22 2 12.16 3.2 13.2 5M14 8C14 11.31 11.31 14 8 14C5.78 14 3.84 12.8 2.8 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2V5.5H9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14V10.5H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Replay</span>
+          </button>
         </div>
       </div>
     </section>
@@ -200,7 +220,7 @@
         <p class="section-subtitle">Three commands to go from zero to autonomous development.</p>
 
         <!-- Prerequisites -->
-        <div class="prereqs" role="list" aria-label="Prerequisites">
+        <div class="prereqs fade-in" role="list" aria-label="Prerequisites">
           <div class="prereq" role="listitem">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L2.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span>Node.js 18+</span>
@@ -212,7 +232,7 @@
         </div>
 
         <!-- Step-by-step commands -->
-        <div class="install-steps">
+        <div class="install-steps fade-in">
           <div class="install-step">
             <div class="install-step-header">
               <span class="install-step-number" aria-hidden="true">1</span>
@@ -254,7 +274,7 @@
         </div>
 
         <!-- Links -->
-        <div class="get-started-links">
+        <div class="get-started-links fade-in">
           <a href="https://github.com/endash/n-dx" class="gs-link" target="_blank" rel="noopener noreferrer">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
             <span>GitHub</span>
