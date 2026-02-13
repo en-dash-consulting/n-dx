@@ -8236,7 +8236,7 @@
     {
       "id": "4aa53ba2-b2da-4f6d-9f4a-6b2814f05362",
       "title": "Landing page for n-dx",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Build a beautiful, informative, and interactive landing page for n-dx. Should showcase the three-package toolkit (sourcevision, rex, hench), demonstrate the analyze → plan → execute workflow, and convey the value proposition of AI-powered development tooling. Needs strong visual design, smooth interactions, and clear messaging.",
       "priority": "medium",
@@ -8259,11 +8259,12 @@
         {
           "id": "7ff4f6b5-031e-45a8-8678-728f5caa7b8a",
           "title": "Add interactive workflow demo and animations",
-          "status": "in_progress",
+          "status": "completed",
           "level": "task",
           "description": "Add interactive elements: animated terminal showing the CLI workflow (ndx init → plan → work), hover/scroll animations on package cards, smooth section transitions. Make the page feel alive.",
           "priority": "medium",
-          "startedAt": "2026-02-13T17:07:10.264Z"
+          "startedAt": "2026-02-13T17:07:10.264Z",
+          "completedAt": "2026-02-13T18:28:14.367Z"
         },
         {
           "id": "28610126-7a2c-4f76-b375-d190d2cb166d",
@@ -8275,7 +8276,9 @@
           "startedAt": "2026-02-12T20:17:12.692Z",
           "completedAt": "2026-02-12T20:21:20.896Z"
         }
-      ]
+      ],
+      "startedAt": "2026-02-13T18:28:14.448Z",
+      "completedAt": "2026-02-13T18:28:14.448Z"
     },
     {
       "id": "4a49c3cc-36e2-4ef0-bc72-b8972f29eb38",

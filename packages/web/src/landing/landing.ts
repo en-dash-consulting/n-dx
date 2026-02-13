@@ -110,30 +110,51 @@ interface TerminalLine {
   text: string;
   cls?: string; // extra CSS class for output coloring
   delay?: number; // delay before showing this line (ms)
+  phase?: "sourcevision" | "rex" | "hench"; // pipeline phase for synced highlight
 }
 
 const terminalScript: TerminalLine[] = [
-  { type: "command", text: "npx n-dx init .", delay: 400 },
-  { type: "output", text: "  sourcevision initialized", cls: "success", delay: 300 },
-  { type: "output", text: "  rex initialized", cls: "success", delay: 200 },
-  { type: "output", text: "  hench initialized", cls: "success", delay: 200 },
+  { type: "command", text: "npx n-dx init .", delay: 400, phase: "sourcevision" },
+  { type: "output", text: "  sourcevision initialized", cls: "success", delay: 300, phase: "sourcevision" },
+  { type: "output", text: "  rex initialized", cls: "success", delay: 200, phase: "rex" },
+  { type: "output", text: "  hench initialized", cls: "success", delay: 200, phase: "hench" },
   { type: "output", text: "", delay: 400 },
 
-  { type: "command", text: "ndx plan --accept .", delay: 600 },
-  { type: "output", text: "  Analyzing codebase...", cls: "muted", delay: 400 },
-  { type: "output", text: "  142 files \u00b7 12 zones \u00b7 38 components", cls: "info", delay: 500 },
-  { type: "output", text: "  Generated 6 epics, 18 tasks", cls: "success", delay: 300 },
-  { type: "output", text: "  PRD saved to .rex/prd.json", cls: "success", delay: 200 },
+  { type: "command", text: "ndx plan --accept .", delay: 600, phase: "sourcevision" },
+  { type: "output", text: "  Analyzing codebase...", cls: "muted", delay: 400, phase: "sourcevision" },
+  { type: "output", text: "  142 files · 12 zones · 38 components", cls: "info", delay: 500, phase: "sourcevision" },
+  { type: "output", text: "  Generated 6 epics, 18 tasks", cls: "success", delay: 300, phase: "rex" },
+  { type: "output", text: "  PRD saved to .rex/prd.json", cls: "success", delay: 200, phase: "rex" },
   { type: "output", text: "", delay: 400 },
 
-  { type: "command", text: "ndx work .", delay: 600 },
-  { type: "output", text: "  Picking next task...", cls: "muted", delay: 400 },
-  { type: "output", text: '  \u25b6 "Add user authentication"', cls: "info", delay: 500 },
-  { type: "output", text: "  Writing code \u00b7 Running tests \u00b7 Committing", cls: "muted", delay: 600 },
-  { type: "output", text: "  Task completed \u2713", cls: "success", delay: 500 },
+  { type: "command", text: "ndx work .", delay: 600, phase: "hench" },
+  { type: "output", text: "  Picking next task...", cls: "muted", delay: 400, phase: "hench" },
+  { type: "output", text: '  ▶ "Add user authentication"', cls: "info", delay: 500, phase: "hench" },
+  { type: "output", text: "  Writing code · Running tests · Committing", cls: "muted", delay: 600, phase: "hench" },
+  { type: "output", text: "  Task completed ✓", cls: "success", delay: 500, phase: "hench" },
 ];
 
-function createTerminalLine(line: TerminalLine): HTMLElement {
+/**
+ * Typewriter effect: types out text character by character into a span.
+ * Returns a promise that resolves when typing is complete.
+ */
+function typeText(el: HTMLElement, text: string, speed = 32): Promise<void> {
+  return new Promise((resolve) => {
+    let i = 0;
+    const tick = () => {
+      if (i < text.length) {
+        el.textContent += text[i];
+        i++;
+        setTimeout(tick, speed);
+      } else {
+        resolve();
+      }
+    };
+    tick();
+  });
+}
+
+function createTerminalLine(line: TerminalLine, typed = false): HTMLElement {
   const el = document.createElement("div");
   el.className = "terminal-line";
 
@@ -145,7 +166,8 @@ function createTerminalLine(line: TerminalLine): HTMLElement {
 
     const cmd = document.createElement("span");
     cmd.className = "terminal-command";
-    cmd.textContent = line.text;
+    // If typed, leave text empty — typeText will fill it in
+    if (!typed) cmd.textContent = line.text;
     el.appendChild(cmd);
   } else {
     const output = document.createElement("span");
@@ -157,35 +179,83 @@ function createTerminalLine(line: TerminalLine): HTMLElement {
   return el;
 }
 
-function runTerminalDemo(): void {
+/** Highlight the matching pipeline step in the hero section */
+function setPipelinePhase(phase: string | undefined): void {
+  const steps = document.querySelectorAll<HTMLElement>(".pipeline-step");
+  steps.forEach((step) => {
+    if (phase && step.dataset.product === phase) {
+      step.classList.add("active");
+    } else {
+      step.classList.remove("active");
+    }
+  });
+
+  // Also pulse the connecting arrows when a phase is active
+  const arrows = document.querySelectorAll<HTMLElement>(".pipeline-arrow");
+  arrows.forEach((arrow) => {
+    if (phase) {
+      arrow.classList.add("flowing");
+    } else {
+      arrow.classList.remove("flowing");
+    }
+  });
+}
+
+/** Clear all pipeline highlights */
+function clearPipelinePhase(): void {
+  document.querySelectorAll<HTMLElement>(".pipeline-step").forEach((s) => s.classList.remove("active"));
+  document.querySelectorAll<HTMLElement>(".pipeline-arrow").forEach((a) => a.classList.remove("flowing"));
+}
+
+/** Schedule helper: returns a promise that resolves after `ms` milliseconds */
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Track whether a demo run has been cancelled */
+let demoAbort = false;
+
+async function runTerminalDemo(): Promise<void> {
   const container = document.getElementById("terminal-lines");
   const cursor = document.querySelector<HTMLElement>(".terminal-cursor");
   if (!container) return;
+
+  // Cancel any in-flight run
+  demoAbort = true;
+  await wait(50);
+  demoAbort = false;
 
   // Clear previous content
   container.innerHTML = "";
   if (cursor) cursor.classList.add("visible");
 
-  let totalDelay = 0;
+  for (const line of terminalScript) {
+    if (demoAbort) break;
 
-  terminalScript.forEach((line, _index) => {
-    totalDelay += line.delay || 300;
-    const lineDelay = totalDelay;
+    await wait(line.delay || 300);
+    if (demoAbort) break;
 
-    setTimeout(() => {
-      const el = createTerminalLine(line);
-      container.appendChild(el);
-      // Scroll to bottom of terminal
-      const body = container.parentElement;
-      if (body) body.scrollTop = body.scrollHeight;
-    }, lineDelay);
-  });
+    // Sync pipeline highlight with current phase
+    if (line.phase) setPipelinePhase(line.phase);
 
-  // Hide cursor after last line
-  totalDelay += 800;
-  setTimeout(() => {
-    if (cursor) cursor.classList.remove("visible");
-  }, totalDelay);
+    const el = createTerminalLine(line, line.type === "command");
+    container.appendChild(el);
+
+    // Scroll to bottom
+    const body = container.parentElement;
+    if (body) body.scrollTop = body.scrollHeight;
+
+    // Typewriter for commands
+    if (line.type === "command") {
+      const cmdSpan = el.querySelector<HTMLElement>(".terminal-command");
+      if (cmdSpan) {
+        await typeText(cmdSpan, line.text, 28);
+      }
+    }
+  }
+
+  // Finish: hide cursor and clear pipeline
+  await wait(800);
+  if (cursor) cursor.classList.remove("visible");
+  clearPipelinePhase();
 }
 
 // Start terminal when it scrolls into view
@@ -225,4 +295,21 @@ if (terminalDemo && !prefersReducedMotion) {
       container.appendChild(el);
     });
   }
+}
+
+// ── Scroll-synced section entrance tracking ──
+// Adds `in-view` class to sections for continuous scroll-synced effects
+if (!prefersReducedMotion) {
+  const sections = document.querySelectorAll<HTMLElement>("section");
+  const sectionObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in-view");
+        }
+      });
+    },
+    { threshold: 0.1 },
+  );
+  sections.forEach((s) => sectionObserver.observe(s));
 }
