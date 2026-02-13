@@ -83,6 +83,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** File tools that Claude CLI should auto-approve (scoped to cwd). */
+const CLI_FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"];
+
+/**
+ * Build the `--allowed-tools` list for the Claude CLI.
+ *
+ * Maps the guard's `allowedCommands` (e.g. `["npm", "git"]`) to Claude CLI's
+ * tool pattern format (e.g. `["Bash(npm:*)", "Bash(git:*)"]`), and includes
+ * file tools that are inherently scoped to `cwd` by Claude CLI.
+ *
+ * This replaces `--dangerously-skip-permissions` so that:
+ * - Listed tools are auto-approved (no interactive prompts → autonomous execution)
+ * - Claude CLI's directory scoping stays active (file access restricted to cwd)
+ * - Bash is restricted to the same commands the API provider's guard allows
+ */
+export function buildAllowedTools(allowedCommands: string[]): string[] {
+  const bashTools = allowedCommands.map((cmd) => `Bash(${cmd}:*)`);
+  return [...bashTools, ...CLI_FILE_TOOLS];
+}
+
 /** @internal Exported for testing. */
 export interface CliRunResult {
   turns: number;
@@ -367,6 +387,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     maxDelayMs: 30000,
   };
 
+  // Build --allowed-tools from guard config instead of --dangerously-skip-permissions.
+  // This keeps Claude CLI's directory scoping active (files scoped to cwd)
+  // while auto-approving the specific tools we want.
+  const allowedTools = buildAllowedTools(config.guard.allowedCommands);
+
   let accumulatedTurns = 0;
   let accumulatedToolCalls: ToolCallRecord[] = [];
   let accumulatedTurnTokenUsage: TurnTokenUsage[] = [];
@@ -383,7 +408,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         "--output-format", "stream-json",
         "--verbose",
         "--system-prompt", systemPrompt,
-        "--dangerously-skip-permissions",
+        "--allowed-tools", ...allowedTools,
       ];
 
       // Only pass --model if explicitly overridden; otherwise let claude CLI use its default
