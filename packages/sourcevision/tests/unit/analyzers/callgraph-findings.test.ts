@@ -1042,7 +1042,7 @@ describe("refactoring suggestions", () => {
     );
     expect(hotspotFindings.length).toBeGreaterThanOrEqual(1);
     expect(hotspotFindings[0].severity).toBe("info");
-    expect(hotspotFindings[0].text).toContain("utility module");
+    expect(hotspotFindings[0].text).toContain("high fan-in expected");
   });
 
   it("flags non-utility files at warning for the same fan-in count", () => {
@@ -1072,7 +1072,7 @@ describe("refactoring suggestions", () => {
     );
     expect(hotspotFindings.length).toBeGreaterThanOrEqual(1);
     expect(hotspotFindings[0].severity).toBe("warning");
-    expect(hotspotFindings[0].text).not.toContain("utility module");
+    expect(hotspotFindings[0].text).not.toContain("high fan-in expected");
   });
 
   it("downgrades hub function in utility module to info severity", () => {
@@ -1103,7 +1103,7 @@ describe("refactoring suggestions", () => {
     );
     expect(hubFindings.length).toBeGreaterThanOrEqual(1);
     expect(hubFindings[0].severity).toBe("info");
-    expect(hubFindings[0].text).toContain("utility module");
+    expect(hubFindings[0].text).toContain("high fan-in expected");
   });
 
   it("flags hub function in non-utility module at warning for same caller count", () => {
@@ -1133,7 +1133,7 @@ describe("refactoring suggestions", () => {
     );
     expect(hubFindings.length).toBeGreaterThanOrEqual(1);
     expect(hubFindings[0].severity).toBe("warning");
-    expect(hubFindings[0].text).not.toContain("utility module");
+    expect(hubFindings[0].text).not.toContain("high fan-in expected");
   });
 
   it("applies utility heuristic to /helpers/ and /lib/ paths", () => {
@@ -1164,7 +1164,7 @@ describe("refactoring suggestions", () => {
       );
       expect(hotspotFindings.length).toBeGreaterThanOrEqual(1);
       expect(hotspotFindings[0].severity).toBe("info");
-      expect(hotspotFindings[0].text).toContain("utility module");
+      expect(hotspotFindings[0].text).toContain("high fan-in expected");
     }
   });
 });

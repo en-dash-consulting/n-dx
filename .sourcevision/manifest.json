@@ -1,35 +1,40 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-12T01:00:16.296Z",
-  "gitSha": "2460aa6c4019319600f03f2b4f1b6d6a1f18f639",
+  "analyzedAt": "2026-02-12T03:24:57.203Z",
+  "gitSha": "536ec50ff193a0dc0578a424bb0af0803716d28b",
   "gitBranch": "feature/from-recommend",
   "targetPath": "/Users/nick/development/endash/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-12T00:57:10.450Z",
-      "completedAt": "2026-02-12T00:57:10.592Z"
+      "startedAt": "2026-02-12T03:23:34.153Z",
+      "completedAt": "2026-02-12T03:23:34.269Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-12T00:57:10.593Z",
-      "completedAt": "2026-02-12T00:57:10.991Z"
+      "startedAt": "2026-02-12T03:23:34.270Z",
+      "completedAt": "2026-02-12T03:23:34.676Z"
+    },
+    "classifications": {
+      "status": "complete",
+      "startedAt": "2026-02-12T03:23:34.676Z",
+      "completedAt": "2026-02-12T03:24:44.419Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-12T00:57:10.991Z",
-      "completedAt": "2026-02-12T01:00:15.210Z"
+      "startedAt": "2026-02-12T03:24:44.419Z",
+      "completedAt": "2026-02-12T03:24:56.077Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-12T01:00:15.210Z",
-      "completedAt": "2026-02-12T01:00:15.292Z"
+      "startedAt": "2026-02-12T03:24:56.078Z",
+      "completedAt": "2026-02-12T03:24:56.167Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-02-12T01:00:15.292Z",
-      "completedAt": "2026-02-12T01:00:16.296Z"
+      "startedAt": "2026-02-12T03:24:56.167Z",
+      "completedAt": "2026-02-12T03:24:57.203Z"
     }
   },
   "children": [

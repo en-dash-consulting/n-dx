@@ -3,9 +3,8 @@ import { useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Finding } from "../../schema/v1.js";
 import { FindingsList } from "../components/data-display/findings-list.js";
-import { BarChart, FlowDiagram } from "../components/data-display/mini-charts.js";
+import { BarChart } from "../components/data-display/mini-charts.js";
 import { ENRICHMENT_THRESHOLDS } from "../components/constants.js";
-import { buildFlowNodes, buildFlowEdges } from "../utils.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface ArchitectureProps {
@@ -52,28 +51,6 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
     }));
   }, [zones]);
 
-  // FlowDiagram data
-  const flowNodes = useMemo(() => zones ? buildFlowNodes(zones) : [], [zones]);
-  const flowEdges = useMemo(() => zones ? buildFlowEdges(zones.crossings) : [], [zones]);
-
-  const handleFlowNodeClick = (id: string) => {
-    if (!zones) return;
-    const zone = zones.zones.find((z) => z.id === id);
-    if (zone) {
-      onSelect({
-        type: "zone",
-        title: zone.name,
-        zoneId: zone.id,
-        id: zone.id,
-        description: zone.description,
-        files: zone.files.length,
-        entryPoints: zone.entryPoints,
-        cohesion: zone.cohesion.toFixed(2),
-        coupling: zone.coupling.toFixed(2),
-      });
-    }
-  };
-
   // Cross-zone traffic summary
   const crossingCount = zones?.crossings?.length ?? 0;
   const biDirectional = findings.filter((f) => /bidirectional/i.test(f.text)).length;
@@ -86,15 +63,6 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
     h("p", { class: "section-sub" },
       `${findings.length} findings from ${zones?.zones.length ?? 0} zones`
     ),
-
-    // Zone dependency flow diagram
-    flowNodes.length > 1 && flowEdges.length > 0
-      ? h(FlowDiagram, {
-          nodes: flowNodes,
-          edges: flowEdges,
-          onNodeClick: handleFlowNodeClick,
-        })
-      : null,
 
     // Summary stats
     h("div", { class: "stat-grid" },

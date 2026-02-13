@@ -1,7 +1,7 @@
 {
   "id": "orchestration-layer",
   "name": "Orchestration Layer",
-  "description": "Command delegation and multi-package coordination scripts that spawn CLIs without direct library imports.",
+  "description": "Top-level entry points that coordinate between packages without containing domain logic themselves.",
   "files": [
     "ci.js",
     "cli.js",

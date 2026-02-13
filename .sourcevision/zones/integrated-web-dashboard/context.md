@@ -6,7 +6,7 @@
 
 Zone: Integrated Web Dashboard (`integrated-web-dashboard`)
 Files: 144, Cohesion: 1.00, Coupling: 0.00
-Description: Unified coordination facade that hosts dashboard UI, MCP HTTP endpoints, and provides filesystem-first access to all domain package data.
+Description: Unified web interface and MCP server providing HTTP endpoints and dashboard views across all n-dx domain packages.
 Lines: 48971
 
 </zone>
@@ -481,6 +481,8 @@ Outgoing (this zone → other zones):
 
 [observation] [info] Contains 45% of project files (144/322) — subdivided into 3 sub-zones
 [observation] [info] High cohesion (1) — files are tightly interconnected
+[suggestion] [info] Coupling asymmetry: MCP imports concentrated in gateway while filesystem reads scattered across routes — consider filesystem gateway for consistency
+[suggestion] [warning] Type drift risk: duplicated rex types in viewer components require manual synchronization when upstream rex types evolve — consider codegen or shared type package
 
 </findings>
 
@@ -488,17 +490,20 @@ Outgoing (this zone → other zones):
 
 - High cohesion (1) — files are tightly interconnected
 - Contains 45% of project files (144/322) — subdivided into 3 sub-zones
-- Serves as the single integration point for all domain packages while minimizing runtime coupling
-- Implements filesystem-first strategy to avoid tight coupling with domain package internals
-- Gateway pattern isolates MCP server creation and domain type imports to single module
-- Perfect cohesion demonstrates well-structured coordination layer that unifies all domain packages
-- Filesystem-first data access strategy minimizes runtime coupling while providing comprehensive visibility
-- MCP HTTP transport implementation provides modern alternative to legacy stdio MCP servers
-- Filesystem-first strategy minimizes runtime coupling by reading JSON artifacts directly instead of importing domain packages
-- Dual-access pattern combines filesystem reads with gateway-isolated MCP server factories for different use cases
-- HTTP MCP transport replaces legacy stdio pattern with session management and unified server architecture
-- Filesystem-first coordination strategy achieves domain unification without tight runtime coupling
-- HTTP MCP transport modernization provides session management and eliminates per-tool process overhead
+- Largest zone reflects comprehensive integration responsibilities
+- Strong cohesion despite size indicates well-organized web architecture
+- Gateway pattern properly isolates cross-package dependencies
+- Well-structured integration layer maintaining strong cohesion despite large scope and complex cross-package coordination
+- Dual coupling strategy: filesystem reads for loose coupling, runtime imports via gateway for MCP services
+- Gateway module mcp-deps.ts concentrates all cross-package runtime imports (2 MCP factories + 32 rex utilities/types)
+- Hybrid coupling approach: filesystem reads for data access, controlled runtime imports for service factories
+- Intentional type duplication in viewer components maintains browser bundle isolation from Node.js packages
+- Server-side routes use filesystem reads and CLI subprocess calls to minimize runtime coupling
+- Type duplication between packages/web/src/viewer/components/prd-tree/types.ts and rex canonical types creates maintenance burden and drift risk despite intentional browser isolation
+- Type duplication strategy creates maintenance friction: rex types duplicated in viewer/components/prd-tree/types.ts to maintain browser bundle isolation, but changes require manual sync
+- MCP gateway concentrates 34 domain re-exports but filesystem coupling remains distributed across 20+ route files — asymmetric coupling architecture
+- Type drift risk: duplicated rex types in viewer components require manual synchronization when upstream rex types evolve — consider codegen or shared type package
+- Coupling asymmetry: MCP imports concentrated in gateway while filesystem reads scattered across routes — consider filesystem gateway for consistency
 - [call graph] 1706 internal calls, 21 outgoing, 0 incoming (cohesion: 0.99, coupling: 0.01)
 
 </insights>

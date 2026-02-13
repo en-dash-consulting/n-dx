@@ -1,7 +1,7 @@
 {
   "id": "foundation-layer",
   "name": "Foundation Layer",
-  "description": "Shared Claude API abstraction and utility foundation that serves as the dependency inversion root for all domain packages.",
+  "description": "Shared foundation providing Claude API abstraction, authentication, and common utilities used across all domain packages.",
   "files": [
     "packages/claude-client/src/api-provider.ts",
     "packages/claude-client/src/auth.ts",

@@ -11,6 +11,7 @@
  */
 
 import type { CallGraph, CallEdge, FunctionNode, Finding, Inventory, ImportEdge, Classifications } from "../schema/index.js";
+import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { buildClassificationMap } from "./classify.js";
 
 // ── Thresholds ──────────────────────────────────────────────────────────────
@@ -68,16 +69,37 @@ const BUILTIN_METHOD_NAMES = new Set([
   "createElement", "getElementById", "preventDefault", "stopPropagation",
 ]);
 
-/** Path segments that identify utility/infrastructure modules where high fan-in is expected. */
-const UTILITY_PATH_SEGMENTS = ["/core/", "/utils/", "/helpers/", "/lib/"];
+/** Path segments that identify modules where high fan-in is expected. */
+const HIGH_FANIN_PATH_SEGMENTS = ["/core/", "/utils/", "/helpers/", "/lib/", "/store/", "/stores/"];
 
-/** Basename patterns identifying CLI/infrastructure output modules where high fan-in is expected. */
-const INFRASTRUCTURE_BASENAMES = [
+/** Basename patterns identifying modules where high fan-in is expected. */
+const HIGH_FANIN_BASENAMES = [
   /(?:^|\/)output\.[tj]sx?$/,
   /(?:^|\/)logger\.[tj]sx?$/,
   /(?:^|\/)logging\.[tj]sx?$/,
   /(?:^|\/)errors\.[tj]sx?$/,
 ];
+
+/**
+ * Archetype IDs where high fan-in is expected, derived from analysisHints.
+ * Any archetype with hubThresholdMultiplier or hotspotThresholdMultiplier
+ * is included automatically — no hardcoded archetype names needed.
+ */
+const HIGH_FANIN_ARCHETYPES = new Set(
+  BUILTIN_ARCHETYPES
+    .filter(a => a.analysisHints?.hubThresholdMultiplier || a.analysisHints?.hotspotThresholdMultiplier)
+    .map(a => a.id)
+);
+
+/**
+ * Archetype IDs where elevated god function thresholds apply, derived from analysisHints.
+ * Components and pages have inflated call counts from hooks, state setters, and JSX.
+ */
+const HIGH_GOD_THRESHOLD_ARCHETYPES = new Set(
+  BUILTIN_ARCHETYPES
+    .filter(a => a.analysisHints?.godFunctionThresholdMultiplier)
+    .map(a => a.id)
+);
 
 /** Basename patterns that identify types/constants files where unidirectional coupling is expected. */
 const TYPES_FILE_PATTERNS = [
@@ -132,17 +154,24 @@ export function generateCallGraphFindings(
   // Build archetype lookup map from classifications
   const archetypeMap = buildClassificationMap(options?.classifications);
 
+  // Build set of files where high fan-in is expected, checking both primary
+  // and secondary archetypes against the hints-derived HIGH_FANIN_ARCHETYPES set.
+  const highFanInFiles = buildHighFanInFileSet(options?.classifications);
+
+  // Build set of files where god function thresholds are elevated (components, pages)
+  const highGodThresholdFiles = buildArchetypeFileSet(options?.classifications, HIGH_GOD_THRESHOLD_ARCHETYPES);
+
   // Build set of test files from inventory — test files are excluded from
-  // god-function and tight-coupling detection because tests inherently call
-  // many functions and are tightly coupled to their subjects by design.
+  // all architectural findings because tests inherently call many functions,
+  // are tightly coupled to their subjects, and inflate fan-in counts.
   const testFiles = buildTestFileSet(options?.inventory);
 
   // Edge-based findings require at least some call edges
   if (edges.length > 0) {
-    findings.push(...detectGodFunctions(edges, testFiles));
+    findings.push(...detectGodFunctions(edges, testFiles, highGodThresholdFiles));
     findings.push(...detectTightlyCoupledModules(edges, testFiles));
-    findings.push(...detectHubFunctions(edges, archetypeMap));
-    findings.push(...detectHotspotFiles(edges, archetypeMap));
+    findings.push(...detectHubFunctions(edges, testFiles, archetypeMap, highFanInFiles));
+    findings.push(...detectHotspotFiles(edges, testFiles, archetypeMap, highFanInFiles));
   }
 
   // Dead export detection works with or without edges
@@ -157,8 +186,10 @@ export function generateCallGraphFindings(
  * Identify functions with excessive outgoing calls (god functions).
  * These functions likely do too much and should be decomposed.
  * Test files are excluded — tests naturally call many functions.
+ * Components/pages get an elevated threshold — hooks, state setters, and JSX
+ * inflate call counts without indicating real complexity.
  */
-function detectGodFunctions(edges: CallEdge[], testFiles: Set<string>): Finding[] {
+function detectGodFunctions(edges: CallEdge[], testFiles: Set<string>, highGodThresholdFiles?: Set<string>): Finding[] {
   // Count unique callees per caller (file:qualifiedName), excluding built-in
   // method calls that inflate counts without indicating real complexity.
   const callerCallees = new Map<string, { file: string; name: string; callees: Set<string> }>();
@@ -182,7 +213,12 @@ function detectGodFunctions(edges: CallEdge[], testFiles: Set<string>): Finding[
   const findings: Finding[] = [];
 
   const sorted = [...callerCallees.values()]
-    .filter((v) => v.callees.size > GOD_FUNCTION_THRESHOLD)
+    .filter((v) => {
+      const threshold = highGodThresholdFiles?.has(v.file)
+        ? GOD_FUNCTION_THRESHOLD * 2
+        : GOD_FUNCTION_THRESHOLD;
+      return v.callees.size > threshold;
+    })
     .filter((v) => !testFiles.has(v.file))
     .sort((a, b) => b.callees.size - a.callees.size);
 
@@ -459,6 +495,28 @@ function buildTestFileSet(inventory?: Inventory): Set<string> {
   return result;
 }
 
+/**
+ * Build a set of file paths whose primary or secondary archetypes match
+ * the given archetype set. Used for fan-in, god function, and other
+ * archetype-driven threshold adjustments.
+ */
+function buildArchetypeFileSet(classifications: Classifications | undefined, archetypeSet: Set<string>): Set<string> {
+  const result = new Set<string>();
+  if (!classifications) return result;
+  for (const fc of classifications.files) {
+    const allArchetypes = [fc.archetype, ...(fc.secondaryArchetypes ?? [])].filter(Boolean) as string[];
+    if (allArchetypes.some(a => archetypeSet.has(a))) {
+      result.add(fc.path);
+    }
+  }
+  return result;
+}
+
+/** Convenience wrapper: files where high fan-in is expected. */
+function buildHighFanInFileSet(classifications?: Classifications): Set<string> {
+  return buildArchetypeFileSet(classifications, HIGH_FANIN_ARCHETYPES);
+}
+
 function isEntryPointFile(filePath: string, archetypeMap?: Map<string, string | null>): boolean {
   if (archetypeMap?.size) {
     const archetype = archetypeMap.get(filePath);
@@ -468,15 +526,21 @@ function isEntryPointFile(filePath: string, archetypeMap?: Map<string, string | 
   return ENTRY_POINT_PATTERNS.some((p) => p.test(filePath));
 }
 
-/** Check if a file lives in a utility/infrastructure directory or is an infrastructure file. */
-function isUtilityModule(filePath: string, archetypeMap?: Map<string, string | null>): boolean {
+/**
+ * Check if high fan-in is expected for this file based on archetype hints or path patterns.
+ * Checks the pre-built highFanInFiles set first (which includes secondary archetypes),
+ * then falls back to primary archetype, then path-based heuristics.
+ */
+function expectsHighFanIn(filePath: string, archetypeMap?: Map<string, string | null>, highFanInFiles?: Set<string>): boolean {
+  // Pre-built set checks both primary and secondary archetypes
+  if (highFanInFiles?.has(filePath)) return true;
   if (archetypeMap?.size) {
     const archetype = archetypeMap.get(filePath);
-    if (archetype === "utility") return true;
+    if (archetype && HIGH_FANIN_ARCHETYPES.has(archetype)) return true;
     if (archetype) return false; // classified as something else
   }
-  return UTILITY_PATH_SEGMENTS.some((seg) => filePath.includes(seg))
-    || INFRASTRUCTURE_BASENAMES.some((p) => p.test(filePath));
+  return HIGH_FANIN_PATH_SEGMENTS.some((seg) => filePath.includes(seg))
+    || HIGH_FANIN_BASENAMES.some((p) => p.test(filePath));
 }
 
 /** Check if a file is a types/constants module (companion helper, not logic). */
@@ -495,15 +559,17 @@ function isTypesFile(filePath: string, archetypeMap?: Map<string, string | null>
  * Identify functions called from many different files.
  * These are high-impact functions where changes ripple widely.
  *
- * Functions in utility modules (/core/, /utils/, /helpers/, /lib/) get a 2x
- * higher warning threshold — hub status is expected for foundational utilities.
+ * Modules where high fan-in is expected (utilities, stores, config, types)
+ * get downgraded to "info" — hub status is inherent to their architectural role.
+ * This is driven by archetype analysisHints, not hardcoded archetype names.
  */
-function detectHubFunctions(edges: CallEdge[], archetypeMap?: Map<string, string | null>): Finding[] {
-  // Count unique caller files per callee
+function detectHubFunctions(edges: CallEdge[], testFiles: Set<string>, archetypeMap?: Map<string, string | null>, highFanInFiles?: Set<string>): Finding[] {
+  // Count unique caller files per callee, excluding test file callers
   const calleeFiles = new Map<string, { name: string; file: string; callerFiles: Set<string> }>();
 
   for (const e of edges) {
     if (!e.calleeFile) continue;
+    if (testFiles.has(e.callerFile)) continue;
     const key = `${e.calleeFile}:${e.callee}`;
     if (!calleeFiles.has(key)) {
       calleeFiles.set(key, {
@@ -522,20 +588,20 @@ function detectHubFunctions(edges: CallEdge[], archetypeMap?: Map<string, string
     .sort((a, b) => b.callerFiles.size - a.callerFiles.size);
 
   for (const { name, file, callerFiles } of sorted.slice(0, 5)) {
-    const isUtility = isUtilityModule(file, archetypeMap);
-    // Utility/infrastructure modules always get "info" — being a hub is
-    // expected for foundational functions like walkTree, info(), resolve, etc.
-    // Non-utility modules get "warning" when above 2x threshold.
-    const severity: Finding["severity"] = isUtility
+    const highFanInExpected = expectsHighFanIn(file, archetypeMap, highFanInFiles);
+    // Modules where high fan-in is expected (utilities, stores, config, types)
+    // always get "info" — being a hub is inherent to their role.
+    // Other modules get "warning" when above 2x threshold.
+    const severity: Finding["severity"] = highFanInExpected
       ? "info"
       : callerFiles.size >= HUB_FUNCTION_FILE_THRESHOLD * 2 ? "warning" : "info";
-    const utilityNote = isUtility ? " (utility module — high fan-in expected)" : "";
+    const note = highFanInExpected ? " (high fan-in expected for this module type)" : "";
 
     findings.push({
       type: "suggestion",
       pass: 0,
       scope: "global",
-      text: `Hub function: ${name} in ${file} is called from ${callerFiles.size} files${utilityNote} — changes here have wide impact, consider if responsibilities can be narrowed`,
+      text: `Hub function: ${name} in ${file} is called from ${callerFiles.size} files${note} — changes here have wide impact, consider if responsibilities can be narrowed`,
       severity,
       related: [file, ...Array.from(callerFiles).sort().slice(0, 3)],
     });
@@ -550,15 +616,16 @@ function detectHubFunctions(edges: CallEdge[], archetypeMap?: Map<string, string
  * Identify files that receive calls from many different files (fan-in hotspots).
  * These are architectural bottlenecks where many modules depend on one file.
  *
- * Utility modules (files in /core/, /utils/, /helpers/, /lib/) get a 2x higher
- * warning threshold — high fan-in is expected and correct for foundational code.
+ * Modules where high fan-in is expected (utilities, stores, config, types)
+ * get downgraded to "info" — driven by archetype analysisHints.
  */
-function detectHotspotFiles(edges: CallEdge[], archetypeMap?: Map<string, string | null>): Finding[] {
-  // Count unique caller files per callee file
+function detectHotspotFiles(edges: CallEdge[], testFiles: Set<string>, archetypeMap?: Map<string, string | null>, highFanInFiles?: Set<string>): Finding[] {
+  // Count unique caller files per callee file, excluding test file callers
   const fileCallers = new Map<string, Set<string>>();
 
   for (const e of edges) {
     if (!e.calleeFile || e.callerFile === e.calleeFile) continue;
+    if (testFiles.has(e.callerFile)) continue;
     if (!fileCallers.has(e.calleeFile)) {
       fileCallers.set(e.calleeFile, new Set());
     }
@@ -572,20 +639,20 @@ function detectHotspotFiles(edges: CallEdge[], archetypeMap?: Map<string, string
     .sort((a, b) => b[1].size - a[1].size);
 
   for (const [file, callers] of sorted.slice(0, 5)) {
-    const isUtility = isUtilityModule(file, archetypeMap);
-    // Utility/infrastructure modules always get "info" — high fan-in is expected
-    // for foundational code like tree.ts, output.ts, etc.
-    // Non-utility modules get "warning" when above 2x threshold.
-    const severity: Finding["severity"] = isUtility
+    const highFanInExpected = expectsHighFanIn(file, archetypeMap, highFanInFiles);
+    // Modules where high fan-in is expected (utilities, stores, config, types)
+    // always get "info" — high fan-in is inherent to their role.
+    // Other modules get "warning" when above 2x threshold.
+    const severity: Finding["severity"] = highFanInExpected
       ? "info"
       : callers.size >= HOTSPOT_FILE_THRESHOLD * 2 ? "warning" : "info";
-    const utilityNote = isUtility ? " (utility module — high fan-in expected)" : "";
+    const note = highFanInExpected ? " (high fan-in expected for this module type)" : "";
 
     findings.push({
       type: "observation",
       pass: 0,
       scope: "global",
-      text: `Fan-in hotspot: ${file} receives calls from ${callers.size} files${utilityNote} — high-impact module, changes may have wide ripple effects`,
+      text: `Fan-in hotspot: ${file} receives calls from ${callers.size} files${note} — high-impact module, changes may have wide ripple effects`,
       severity,
       related: [file, ...Array.from(callers).sort().slice(0, 3)],
     });

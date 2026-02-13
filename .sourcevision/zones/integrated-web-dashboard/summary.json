@@ -1,7 +1,7 @@
 {
   "id": "integrated-web-dashboard",
   "name": "Integrated Web Dashboard",
-  "description": "Unified coordination facade that hosts dashboard UI, MCP HTTP endpoints, and provides filesystem-first access to all domain package data.",
+  "description": "Unified web interface and MCP server providing HTTP endpoints and dashboard views across all n-dx domain packages.",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/public.ts",

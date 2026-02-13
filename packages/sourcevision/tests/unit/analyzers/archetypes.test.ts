@@ -3,8 +3,8 @@ import { BUILTIN_ARCHETYPES, buildArchetypeMap } from "../../../src/analyzers/ar
 import type { ArchetypeDefinition } from "../../../src/schema/index.js";
 
 describe("BUILTIN_ARCHETYPES", () => {
-  it("contains 12 built-in archetypes", () => {
-    expect(BUILTIN_ARCHETYPES).toHaveLength(12);
+  it("contains 17 built-in archetypes", () => {
+    expect(BUILTIN_ARCHETYPES).toHaveLength(17);
   });
 
   it("has unique IDs", () => {
@@ -51,7 +51,8 @@ describe("BUILTIN_ARCHETYPES", () => {
     const ids = new Set(BUILTIN_ARCHETYPES.map((a) => a.id));
     const expected = [
       "entrypoint", "utility", "types", "route-handler", "route-module",
-      "component", "store", "middleware", "model", "gateway", "config", "test-helper",
+      "component", "store", "middleware", "model", "gateway", "config",
+      "hook", "service", "schema", "cli-command", "page", "test-helper",
     ];
     for (const id of expected) {
       expect(ids.has(id)).toBe(true);

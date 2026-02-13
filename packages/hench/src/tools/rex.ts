@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus } from "rex";
 import type { CommandExecutor } from "rex";
+import { PROJECT_DIRS } from "@n-dx/claude-client";
 import { execShellCmd } from "../process/index.js";
-import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation } from "../prd/ops.js";
+import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "../prd/ops.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 
 export interface UpdateStatusOptions {
@@ -101,6 +103,24 @@ export async function toolRexUpdateStatus(
     itemId: taskId,
     detail: `Status changed to ${params.status} by hench agent`,
   });
+
+  // Auto-acknowledge sourcevision findings when a task is deferred
+  if (params.status === "deferred" && existing?.tags && options?.projectDir) {
+    const findingTags = existing.tags.filter((t: string) => t.startsWith("finding:"));
+    if (findingTags.length > 0) {
+      try {
+        const rexDir = join(options.projectDir, PROJECT_DIRS.REX);
+        let ackStore = await loadAcknowledged(rexDir);
+        for (const tag of findingTags) {
+          const hash = tag.slice("finding:".length);
+          ackStore = acknowledgeFinding(ackStore, hash, existing.title, "deferred", "hench");
+        }
+        await saveAcknowledged(rexDir, ackStore);
+      } catch {
+        // Non-fatal: finding acknowledgment is best-effort
+      }
+    }
+  }
 
   // Auto-complete parent items when a child is completed or deferred
   const autoCompleted: string[] = [];

@@ -6,12 +6,20 @@ import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import { randomUUID } from "node:crypto";
+import {
+  computeFindingHash,
+  loadAcknowledged,
+  saveAcknowledged,
+  acknowledgeFinding,
+  isAcknowledged,
+} from "../../analyze/acknowledge.js";
 
 interface Finding {
   severity: string;
   category: string;
   message: string;
   file?: string;
+  hash: string;
 }
 
 interface Recommendation {
@@ -59,6 +67,11 @@ async function readFindings(
       category: f.category ?? f.type ?? "general",
       message: f.message ?? f.text ?? "",
       file: f.file,
+      hash: computeFindingHash({
+        type: f.type ?? "general",
+        scope: f.scope ?? "global",
+        text: f.message ?? f.text ?? "",
+      }),
     }));
 }
 
@@ -96,16 +109,63 @@ export async function cmdRecommend(
     return;
   }
 
-  let findings: Finding[];
+  let allFindings: Finding[];
   try {
-    findings = await readFindings(dir, ["warning", "critical"]);
+    allFindings = await readFindings(dir, ["warning", "critical"]);
   } catch (err) {
     console.error("Failed to read SourceVision findings:", (err as Error).message);
     return;
   }
 
+  const rexDir = join(dir, REX_DIR);
+  const ackStore = await loadAcknowledged(rexDir);
+
+  // Handle --acknowledge flag
+  if (flags.acknowledge) {
+    const showAll = flags["show-all"] !== undefined;
+    const findings = showAll
+      ? allFindings
+      : allFindings.filter((f) => !isAcknowledged(ackStore, f.hash));
+
+    if (flags.acknowledge === "all") {
+      let updated = ackStore;
+      for (const f of findings) {
+        updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user");
+      }
+      await saveAcknowledged(rexDir, updated);
+      result(`Acknowledged all ${findings.length} findings.`);
+      return;
+    }
+
+    const indices = flags.acknowledge.split(",").map((s) => parseInt(s.trim(), 10));
+    let updated = ackStore;
+    const acked: string[] = [];
+    for (const idx of indices) {
+      const f = findings[idx - 1]; // 1-based index
+      if (!f) {
+        console.error(`Finding index ${idx} out of range (1-${findings.length}).`);
+        continue;
+      }
+      updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user");
+      acked.push(`${idx}. ${f.message.slice(0, 60)}`);
+    }
+    await saveAcknowledged(rexDir, updated);
+    for (const a of acked) result(`Acknowledged: ${a}`);
+    return;
+  }
+
+  // Filter acknowledged findings unless --show-all
+  const showAll = flags["show-all"] !== undefined;
+  const findings = showAll
+    ? allFindings
+    : allFindings.filter((f) => !isAcknowledged(ackStore, f.hash));
+  const acknowledgedCount = allFindings.length - allFindings.filter((f) => !isAcknowledged(ackStore, f.hash)).length;
+
   if (findings.length === 0) {
     result("No findings to recommend.");
+    if (acknowledgedCount > 0) {
+      info(`(${acknowledgedCount} finding${acknowledgedCount === 1 ? "" : "s"} acknowledged, use --show-all to include)`);
+    }
     return;
   }
 
@@ -117,14 +177,23 @@ export async function cmdRecommend(
   }
 
   result(`\n${recommendations.length} recommended items:\n`);
+  let displayIdx = 0;
   for (const rec of recommendations) {
     result(`  [${rec.priority}] ${rec.title}`);
-    info(`    ${rec.description.split("\n")[0]}`);
+    for (const line of rec.description.split("\n")) {
+      displayIdx++;
+      const finding = findings.find((f) => line.includes(f.message));
+      const ackMarker = showAll && finding && isAcknowledged(ackStore, finding.hash) ? " (acknowledged)" : "";
+      info(`    ${displayIdx}. ${line.replace(/^- /, "")}${ackMarker}`);
+    }
     info("");
   }
 
+  if (acknowledgedCount > 0) {
+    info(`(${acknowledgedCount} finding${acknowledgedCount === 1 ? "" : "s"} acknowledged, use --show-all to include)`);
+  }
+
   if (flags.accept) {
-    const rexDir = join(dir, REX_DIR);
     const store = await resolveStore(rexDir);
 
     for (const rec of recommendations) {
@@ -142,5 +211,6 @@ export async function cmdRecommend(
     }
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
+    info("Run with --acknowledge=1,2 to acknowledge specific findings.");
   }
 }

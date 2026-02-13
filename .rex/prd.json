@@ -8232,6 +8232,121 @@
       "source": "sourcevision",
       "startedAt": "2026-02-11T23:24:45.119Z",
       "completedAt": "2026-02-11T23:24:45.119Z"
+    },
+    {
+      "id": "4aa53ba2-b2da-4f6d-9f4a-6b2814f05362",
+      "title": "Landing page for n-dx",
+      "status": "pending",
+      "level": "epic",
+      "description": "Build a beautiful, informative, and interactive landing page for n-dx. Should showcase the three-package toolkit (sourcevision, rex, hench), demonstrate the analyze → plan → execute workflow, and convey the value proposition of AI-powered development tooling. Needs strong visual design, smooth interactions, and clear messaging.",
+      "priority": "medium",
+      "tags": [
+        "marketing",
+        "web",
+        "design"
+      ],
+      "children": [
+        {
+          "id": "5afe5ef6-7961-4969-a843-aa346909b7f4",
+          "title": "Build landing page with hero and package showcase",
+          "status": "completed",
+          "level": "task",
+          "description": "Create the landing page HTML/CSS/JS with a hero section (tagline, CTA) and a three-package showcase showing sourcevision → rex → hench as a pipeline. Responsive, dark/light theme, accessible. This is the core of the page.",
+          "priority": "high",
+          "startedAt": "2026-02-12T18:00:54.148Z",
+          "completedAt": "2026-02-12T18:09:06.157Z"
+        },
+        {
+          "id": "7ff4f6b5-031e-45a8-8678-728f5caa7b8a",
+          "title": "Add interactive workflow demo and animations",
+          "status": "pending",
+          "level": "task",
+          "description": "Add interactive elements: animated terminal showing the CLI workflow (ndx init → plan → work), hover/scroll animations on package cards, smooth section transitions. Make the page feel alive.",
+          "priority": "medium"
+        },
+        {
+          "id": "28610126-7a2c-4f76-b375-d190d2cb166d",
+          "title": "Add getting started section and wire up routing",
+          "status": "completed",
+          "level": "task",
+          "description": "Add a getting started section with install commands (copy-to-clipboard), prerequisites, and links to docs/GitHub. Wire up the landing page route in the web server so it serves at the root when appropriate.",
+          "priority": "medium",
+          "startedAt": "2026-02-12T20:17:12.692Z",
+          "completedAt": "2026-02-12T20:21:20.896Z"
+        }
+      ]
+    },
+    {
+      "id": "4a49c3cc-36e2-4ef0-bc72-b8972f29eb38",
+      "title": "Auto-triggered Hench Execution",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "08ff884d-a41a-441d-94d7-7a8d08c2db75",
+          "title": "Task UI Auto-trigger Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enable automatic Hench execution directly from individual tasks in the Rex task UI view",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "7da1e0d9-ea81-48f4-96a8-51374db850bb",
+              "title": "Implement task-specific auto-trigger system",
+              "status": "completed",
+              "level": "task",
+              "description": "Create complete auto-trigger functionality including UI button, API endpoint, and task-scoped Hench execution for individual tasks in the Rex dashboard",
+              "acceptanceCriteria": [
+                "Task items display an auto-trigger action button",
+                "Button is only enabled for tasks in pending or blocked status",
+                "Button shows appropriate loading state during execution",
+                "Action is disabled for completed or in_progress tasks",
+                "POST endpoint accepts task ID and starts Hench run",
+                "Endpoint validates task exists and is actionable",
+                "Returns run ID and status for tracking",
+                "Handles concurrent execution requests gracefully",
+                "Hench run accepts --task=ID parameter",
+                "Skips task selection and works directly on specified task",
+                "Validates task is actionable before starting",
+                "Updates task status appropriately during execution"
+              ],
+              "priority": "high",
+              "tags": [
+                "web-ui",
+                "rex",
+                "hench",
+                "api",
+                "web-server",
+                "cli"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-12T20:22:01.795Z",
+              "completedAt": "2026-02-12T20:28:59.906Z"
+            },
+            {
+              "id": "3908405f-3a16-48a6-9de8-a284ef529e5f",
+              "title": "Add real-time execution status updates",
+              "status": "pending",
+              "level": "task",
+              "description": "Add WebSocket or polling mechanism to show live progress of auto-triggered Hench runs in the task UI",
+              "acceptanceCriteria": [
+                "UI shows real-time status updates during execution",
+                "Progress indicator reflects current Hench operation",
+                "Task status updates automatically when run completes",
+                "Error states are displayed clearly to user"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web-ui",
+                "real-time",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

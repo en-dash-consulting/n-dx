@@ -9,7 +9,7 @@ export interface LoadedData {
   callGraph: CallGraph | null;
 }
 
-export type ViewId = "overview" | "graph" | "call-graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs" | "hench-config" | "hench-templates" | "hench-optimization";
+export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "hench-runs" | "hench-config" | "hench-templates" | "hench-optimization";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string }) => void;
 

@@ -6,7 +6,7 @@
 
 Zone: Orchestration Layer (`orchestration-layer`)
 Files: 4, Cohesion: 1.00, Coupling: 0.00
-Description: Command delegation and multi-package coordination scripts that spawn CLIs without direct library imports.
+Description: Top-level entry points that coordinate between packages without containing domain logic themselves.
 Lines: 1711
 
 </zone>
@@ -32,30 +32,21 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Hard-coded trimOutput and formatting logic in ci.js should delegate to domain packages for consistent output formatting
-[suggestion] [warning] ci.js duplicates computeStats function that already exists in rex/core/stats.js, violating DRY principle and creating maintenance burden
+[suggestion] [info] Extension inconsistency: orchestration files use .js while all packages use .ts — consider .mjs or build step for consistency
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Maintains strict architectural isolation by delegating to CLI binaries rather than importing packages
-- Provides unified entry points across all domain packages through a single orchestrator
-- Implements clean separation between coordination logic and domain implementation
-- Perfect cohesion (1.0) with zero coupling demonstrates ideal architectural boundaries for orchestration scripts
-- Command delegation pattern prevents circular dependencies and maintains package independence
-- Subprocess delegation pattern prevents library imports through CLI binary spawning
-- Strict architectural isolation maintained by spawning child processes rather than using runtime imports
-- Error handling pattern provides user-friendly CLIError suggestions without exposing stack traces
-- Command preprocessing and flag extraction logic enables unified parameter handling across all domain CLIs
-- Clean subprocess delegation isolates orchestration from domain implementations
-- Unified CLI error handling with user-friendly hints demonstrates mature orchestration design
-- Duplicates core stats computation logic between ci.js and rex package, indicating missing abstraction layer
-- Hard-codes orchestration-specific JSON output format instead of delegating to domain package formatters
-- Uses inconsistent error handling between steps within same CI pipeline (exit codes vs structured validation)
-- ci.js duplicates computeStats function that already exists in rex/core/stats.js, violating DRY principle and creating maintenance burden
-- Hard-coded trimOutput and formatting logic in ci.js should delegate to domain packages for consistent output formatting
+- Clean separation of orchestration concerns with each file having a distinct role
+- Minimal file count indicates good architectural discipline
+- Perfect cohesion suggests well-bounded orchestration responsibilities
+- Excellent architectural separation with zero coupling to other zones, maintaining clean orchestration boundaries
+- Command delegation pattern centralizes all tool dispatch through cli.js hub
+- Hub-and-spoke orchestration pattern with cli.js as central dispatcher to ci.js, config.js, and web.js
+- All four orchestration files (cli.js, ci.js, config.js, web.js) use .js extension despite TypeScript codebase — intentional Node.js compatibility choice for direct execution
+- Extension inconsistency: orchestration files use .js while all packages use .ts — consider .mjs or build step for consistency
 - [call graph] 152 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

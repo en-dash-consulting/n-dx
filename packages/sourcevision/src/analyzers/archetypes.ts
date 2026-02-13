@@ -64,8 +64,10 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
     ],
     analysisHints: {
       couplingExpectation: "unidirectional",
+      hubThresholdMultiplier: "2",
+      hotspotThresholdMultiplier: "2",
       deadExports: "skip",
-      description: "Unidirectional coupling is expected for type files",
+      description: "Unidirectional coupling and high fan-in expected for type files",
     },
   },
   {
@@ -104,13 +106,14 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "directory", pattern: "/ui/", weight: 0.5 },
     ],
     analysisHints: {
-      description: "UI component files",
+      godFunctionThresholdMultiplier: "2",
+      description: "Components have inflated call counts from hooks, state setters, and JSX rendering",
     },
   },
   {
     id: "store",
     name: "Store",
-    description: "State management stores and slices.",
+    description: "State management stores and slices where high fan-in is expected.",
     signals: [
       { kind: "directory", pattern: "/store/", weight: 0.8 },
       { kind: "directory", pattern: "/stores/", weight: 0.8 },
@@ -118,7 +121,9 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "\\.slice\\.[tj]sx?$", weight: 0.9 },
     ],
     analysisHints: {
-      description: "State management modules",
+      hubThresholdMultiplier: "2",
+      hotspotThresholdMultiplier: "2",
+      description: "High fan-in is expected for state management modules",
     },
   },
   {
@@ -169,8 +174,78 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "directory", pattern: "/config/", weight: 0.6 },
     ],
     analysisHints: {
+      hubThresholdMultiplier: "2",
+      hotspotThresholdMultiplier: "2",
       deadExports: "skip",
-      description: "Config modules may have unused exports consumed at runtime",
+      description: "High fan-in expected — config modules are widely imported",
+    },
+  },
+  {
+    id: "hook",
+    name: "Hook",
+    description: "React hooks — custom hooks encapsulating reusable stateful logic.",
+    signals: [
+      { kind: "filename", pattern: "^use[A-Z].*\\.[tj]sx?$", weight: 0.9 },
+      { kind: "directory", pattern: "/hooks/", weight: 0.8 },
+    ],
+    analysisHints: {
+      description: "React hooks follow the use* naming convention",
+    },
+  },
+  {
+    id: "service",
+    name: "Service",
+    description: "Service layer modules — API clients, data fetching, and business logic orchestration.",
+    signals: [
+      { kind: "directory", pattern: "/services/", weight: 0.8 },
+      { kind: "directory", pattern: "/service/", weight: 0.8 },
+      { kind: "filename", pattern: "\\.service\\.[tj]sx?$", weight: 0.9 },
+      { kind: "directory", pattern: "/clients/", weight: 0.6 },
+      { kind: "filename", pattern: "\\.client\\.[tj]sx?$", weight: 0.7 },
+    ],
+    analysisHints: {
+      description: "Service modules orchestrate business logic and external calls",
+    },
+  },
+  {
+    id: "schema",
+    name: "Schema",
+    description: "Runtime validation schemas and data shape definitions (Zod, Yup, Joi, etc.).",
+    signals: [
+      { kind: "directory", pattern: "/schema/", weight: 0.7 },
+      { kind: "directory", pattern: "/schemas/", weight: 0.7 },
+      { kind: "filename", pattern: "^validate\\.[tj]sx?$", weight: 0.7 },
+      { kind: "filename", pattern: "^validation\\.[tj]sx?$", weight: 0.7 },
+    ],
+    analysisHints: {
+      deadExports: "skip",
+      description: "Schema modules define runtime data shapes for validation",
+    },
+  },
+  {
+    id: "cli-command",
+    name: "CLI Command",
+    description: "CLI command handlers and subcommand implementations.",
+    signals: [
+      { kind: "directory", pattern: "/commands/", weight: 0.8 },
+      { kind: "directory", pattern: "/cmd/", weight: 0.7 },
+    ],
+    analysisHints: {
+      description: "CLI command modules handle user-facing terminal commands",
+    },
+  },
+  {
+    id: "page",
+    name: "Page",
+    description: "Page-level components, views, or screens — top-level UI entry points for routes.",
+    signals: [
+      { kind: "directory", pattern: "/pages/", weight: 0.8 },
+      { kind: "directory", pattern: "/views/", weight: 0.7 },
+      { kind: "directory", pattern: "/screens/", weight: 0.7 },
+    ],
+    analysisHints: {
+      godFunctionThresholdMultiplier: "2",
+      description: "Page/view components orchestrate many sub-components and have inflated call counts",
     },
   },
   {

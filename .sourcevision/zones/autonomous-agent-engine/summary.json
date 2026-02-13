@@ -1,7 +1,7 @@
 {
   "id": "autonomous-agent-engine",
   "name": "Autonomous Agent Engine",
-  "description": "Task execution engine that autonomously picks PRD tasks, builds execution briefs, and manages Claude API tool-use loops.",
+  "description": "Complete autonomous agent system handling task execution loops, analysis, and workflow management for PRD automation.",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/review.ts",

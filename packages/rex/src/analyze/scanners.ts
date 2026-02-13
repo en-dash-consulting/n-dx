@@ -2,6 +2,8 @@ import { readFile, readdir, access } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
 import { PROJECT_DIRS } from "@n-dx/claude-client";
 import type { Priority } from "../schema/index.js";
+import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
+import type { AcknowledgedStore } from "./acknowledge.js";
 
 export interface ScanResult {
   name: string;
@@ -553,12 +555,24 @@ function generateFixSuggestion(finding: SVFinding, zone?: SVZone): string[] {
   return suggestions;
 }
 
-export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
+export async function scanSourceVision(
+  dir: string,
+  options?: { rexDir?: string },
+): Promise<ScanResult[]> {
   const svDir = join(dir, PROJECT_DIRS.SOURCEVISION);
   try {
     await access(svDir);
   } catch {
     return [];
+  }
+
+  // Load acknowledged findings to filter them out
+  const rexDir = options?.rexDir ?? join(dir, PROJECT_DIRS.REX);
+  let ackStore: AcknowledgedStore | undefined;
+  try {
+    ackStore = await loadAcknowledged(rexDir);
+  } catch {
+    // Graceful degradation — if we can't load, don't filter
   }
 
   const results: ScanResult[] = [];
@@ -609,6 +623,10 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
           // Only include warning/critical severity — info is too noisy for task generation
           if (finding.severity === "info") continue;
 
+          // Compute stable hash and skip acknowledged findings
+          const hash = computeFindingHash(finding);
+          if (ackStore && isAcknowledged(ackStore, hash)) continue;
+
           const priority: Priority =
             finding.severity === "critical"
               ? "critical"
@@ -654,13 +672,17 @@ export async function scanSourceVision(dir: string): Promise<ScanResult[]> {
             }
           }
 
+          // Build tags: zone name + finding hash for feedback loop
+          const tags: string[] = zone ? [zone.name] : finding.scope !== "global" ? [finding.scope] : [];
+          tags.push(`finding:${hash}`);
+
           results.push({
             name: `${prefix}: ${finding.text}`,
             source: "sourcevision",
             sourceFile,
             kind: "task",
             priority,
-            tags: zone ? [zone.name] : finding.scope !== "global" ? [finding.scope] : undefined,
+            tags: tags.length > 0 ? tags : undefined,
             acceptanceCriteria: criteria.length > 0 ? criteria : undefined,
           });
         }

@@ -6,37 +6,37 @@
 <architecture>
 
 Project: n-dx
-Git: feature/from-recommend @ 2460aa6
-Files: 583, Lines: 170461
-Languages: TypeScript(475) CSS(27) JSON(26) Other(20) JavaScript(17)
+Git: feature/from-recommend @ 536ec50
+Files: 587, Lines: 172802
+Languages: TypeScript(479) CSS(27) JSON(26) Other(20) JavaScript(17)
 Zones: 7, Described: 7
-Import edges: 1413, External packages: 16
+Import edges: 1430, External packages: 16
 
 </architecture>
 
 <zones>
 
-[autonomous-agent-engine] Autonomous Agent Engine (99 files, coh=1.00 coup=0.00)
-  Task execution engine that autonomously picks PRD tasks, builds execution briefs, and manages Claude API tool-use loops.
-  files: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/analysis/workflow.ts, packages/hench/src/agent/completion.ts, packages/hench/src/agent/index.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/task-display.ts +89
-[foundation-layer] Foundation Layer (24 files, coh=1.00 coup=0.00)
-  Shared Claude API abstraction and utility foundation that serves as the dependency inversion root for all domain packages.
-  files: packages/claude-client/src/api-provider.ts, packages/claude-client/src/auth.ts, packages/claude-client/src/cli-provider.ts, packages/claude-client/src/config.ts, packages/claude-client/src/create-client.ts, packages/claude-client/src/exec.ts, packages/claude-client/src/json.ts, packages/claude-client/src/output.ts, packages/claude-client/src/project-config.ts, packages/claude-client/src/project-dirs.ts +14
-[integrated-web-dashboard] Integrated Web Dashboard (144 files, coh=1.00 coup=0.00)
-  Unified coordination facade that hosts dashboard UI, MCP HTTP endpoints, and provides filesystem-first access to all domain package data.
-  files: packages/web/src/cli/index.ts, packages/web/src/public.ts, packages/web/src/schema/data-files.ts, packages/web/src/schema/v1.ts, packages/web/src/schema/validate.ts, packages/web/src/server/index.ts, packages/web/src/server/mcp-deps.ts, packages/web/src/server/routes-adaptive.ts, packages/web/src/server/routes-data.ts, packages/web/src/server/routes-hench.ts +134
-[orchestration-layer] Orchestration Layer (4 files, coh=1.00 coup=0.00)
-  Command delegation and multi-package coordination scripts that spawn CLIs without direct library imports.
-  files: ci.js, cli.js, config.js, web.js
+[claude-client] Claude Client (24 files, coh=1.00 coup=0.00)
+  24 files, primarily TypeScript
+  files: packages/claude-client/src/api-provider.ts [service], packages/claude-client/src/auth.ts [utility], packages/claude-client/src/cli-provider.ts [service], packages/claude-client/src/config.ts [config], packages/claude-client/src/create-client.ts [utility], packages/claude-client/src/exec.ts [utility], packages/claude-client/src/json.ts [utility], packages/claude-client/src/output.ts [utility], packages/claude-client/src/project-config.ts [config], packages/claude-client/src/project-dirs.ts [utility] +14
+[hench] Hench (99 files, coh=1.00 coup=0.00)
+  99 files, primarily TypeScript
+  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/completion.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service], packages/hench/src/agent/lifecycle/task-display.ts [utility] +89
 [packages-rex:rex-cli] Rex PRD Management CLI (36 files, coh=1.00 coup=0.00)
   A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-  files: packages/rex/src/analyze/index.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/next.ts, packages/rex/src/cli/commands/recommend.ts +26
+  files: packages/rex/src/analyze/index.ts [entrypoint], packages/rex/src/analyze/propose.ts [service], packages/rex/src/analyze/reconcile.ts [utility], packages/rex/src/analyze/scanners.ts [utility], packages/rex/src/cli/commands/add.ts [cli-command], packages/rex/src/cli/commands/analyze.ts [cli-command], packages/rex/src/cli/commands/constants.ts [types], packages/rex/src/cli/commands/init.ts [cli-command], packages/rex/src/cli/commands/next.ts [cli-command], packages/rex/src/cli/commands/recommend.ts [cli-command] +26
 [packages-sourcevision:cli] Cli (12 files, coh=0.74 coup=0.26)
   12 files, primarily TypeScript
-  files: packages/sourcevision/src/cli/commands/constants.ts, packages/sourcevision/src/cli/commands/export-pdf.ts, packages/sourcevision/src/cli/commands/init.ts, packages/sourcevision/src/cli/commands/reset.ts, packages/sourcevision/src/cli/commands/validate.ts, packages/sourcevision/src/cli/errors.ts, packages/sourcevision/src/cli/index.ts, packages/sourcevision/src/cli/output.ts, packages/sourcevision/src/cli/serve.ts, packages/sourcevision/tests/unit/cli/errors.test.ts +2
+  files: packages/sourcevision/src/cli/commands/constants.ts [types], packages/sourcevision/src/cli/commands/export-pdf.ts [cli-command], packages/sourcevision/src/cli/commands/init.ts [cli-command], packages/sourcevision/src/cli/commands/reset.ts [cli-command], packages/sourcevision/src/cli/commands/validate.ts [cli-command], packages/sourcevision/src/cli/errors.ts [utility], packages/sourcevision/src/cli/index.ts [entrypoint], packages/sourcevision/src/cli/output.ts [utility], packages/sourcevision/src/cli/serve.ts [cli-command], packages/sourcevision/tests/unit/cli/errors.test.ts +2
 [packages-sourcevision:tests] Tests (68 files, coh=0.94 coup=0.06)
   66 files, primarily TypeScript
-  files: packages/sourcevision/src/analyzers/callgraph-findings.ts, packages/sourcevision/src/analyzers/callgraph.ts, packages/sourcevision/src/analyzers/claude-client.ts, packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/context.ts, packages/sourcevision/src/analyzers/enrich-batch.ts, packages/sourcevision/src/analyzers/enrich-config.ts, packages/sourcevision/src/analyzers/enrich-parsing.ts, packages/sourcevision/src/analyzers/enrich-per-zone.ts, packages/sourcevision/src/analyzers/enrich.ts +58
+  files: packages/sourcevision/src/analyzers/callgraph-findings.ts [service], packages/sourcevision/src/analyzers/callgraph.ts [service], packages/sourcevision/src/analyzers/claude-client.ts [service], packages/sourcevision/src/analyzers/components.ts [service], packages/sourcevision/src/analyzers/context.ts [service], packages/sourcevision/src/analyzers/enrich-batch.ts [service], packages/sourcevision/src/analyzers/enrich-config.ts [service], packages/sourcevision/src/analyzers/enrich-parsing.ts [service], packages/sourcevision/src/analyzers/enrich-per-zone.ts [service], packages/sourcevision/src/analyzers/enrich.ts [service] +58
+[root] Root (4 files, coh=1.00 coup=0.00)
+  4 files, primarily JavaScript
+  files: ci.js [entrypoint], cli.js [entrypoint], config.js [config], web.js [entrypoint]
+[web] Web (144 files, coh=1.00 coup=0.00)
+  112 files, primarily TypeScript
+  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/routes-adaptive.ts [route-handler], packages/web/src/server/routes-data.ts [route-handler], packages/web/src/server/routes-hench.ts [route-handler] +134
 [unzoned] 51 files: .claude/settings.local.json, .gitignore, .hench/config.json, .npmrc, .rex/config.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
@@ -61,7 +61,7 @@ Most imported:
 
 <routes>
 
-Server routes: 71 endpoints in 7 handler(s)
+Server routes: 65 endpoints in 7 handler(s)
 
 /api/hench/adaptive/ (handleAdaptiveRoute) — packages/web/src/server/routes-adaptive.ts
   DELETE  /api/hench/adaptive/override/:key
@@ -81,7 +81,6 @@ Server routes: 71 endpoints in 7 handler(s)
   GET     /api/hench/runs/:id
   GET     /api/hench/templates
   GET     /api/hench/templates/:id
-  GET     /limit
   POST    /api/hench/templates
   POST    /api/hench/templates/:id/apply
   PUT     /api/hench/config
@@ -99,23 +98,21 @@ Server routes: 71 endpoints in 7 handler(s)
   GET     /api/rex/requirements/coverage
   GET     /api/rex/requirements/traceability
   GET     /api/rex/stats
-  GET     /limit
-  GET     /minAge
-  GET     /statuses
   PATCH   /api/rex/items/:id
   PATCH   /api/rex/items/:id/requirements/:rid
   PATCH   /api/rex/items/bulk
   POST    /api/rex/analyze
-  POST    /api/rex/batch
-  POST    /api/rex/execute/epic
+  POST    /api/rex/batch-import
+  POST    /api/rex/execute/epic-by-epic
   POST    /api/rex/execute/pause
   POST    /api/rex/execute/resume
   POST    /api/rex/items
   POST    /api/rex/items/:id/requirements
   POST    /api/rex/items/merge
   POST    /api/rex/proposals/accept
+  POST    /api/rex/proposals/accept-edited
   POST    /api/rex/prune
-  POST    /api/rex/smart
+  POST    /api/rex/smart-add-preview
 /api/sv/ (handleSourcevisionRoute) — packages/web/src/server/routes-sourcevision.ts
   GET     /api/sv/components
   GET     /api/sv/context
@@ -126,15 +123,12 @@ Server routes: 71 endpoints in 7 handler(s)
   GET     /api/sv/zones
 /api/token/ (handleTokenUsageRoute) — packages/web/src/server/routes-token-usage.ts
   GET     /api/token/budget
-  GET     /api/token/by
+  GET     /api/token/by-command
+  GET     /api/token/by-period
   GET     /api/token/events
   GET     /api/token/summary
-  GET     /package
-  GET     /period
-  GET     /since
-  GET     /until
 /api/rex/validate (handleValidationRoute) — packages/web/src/server/routes-validation.ts
-  GET     /api/rex/dependency
+  GET     /api/rex/dependency-graph
   GET     /api/rex/validate
 /api/hench/workflow/ (handleWorkflowRoute) — packages/web/src/server/routes-workflow.ts
   GET     /api/hench/workflow/analysis
@@ -146,29 +140,13 @@ Server routes: 71 endpoints in 7 handler(s)
 
 <findings>
 
-[warning] Fan-in hotspot: packages/rex/src/store/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
-[warning] Sourcevision package artificially split into CLI and tests zones when it should be unified as a single domain package with proper internal layering
-[warning] Web package test file directly imports rex schema types, creating tight coupling between coordination layer and domain implementation details
-[warning] God function: analyzeComponents in packages/sourcevision/src/analyzers/components.ts calls 53 unique functions — consider decomposing into smaller, focused functions
-[warning] God function: CallGraphView in packages/web/src/viewer/views/call-graph.ts calls 51 unique functions — consider decomposing into smaller, focused functions
-[warning] Analytics logic duplication between orchestration (ci.js computeStats) and domain (rex/core/analytics.ts) should be consolidated to prevent inconsistent calculations
-[warning] Hub function: resolveStore in packages/rex/src/store/index.ts is called from 17 files — changes here have wide impact, consider if responsibilities can be narrowed
-[warning] ci.js duplicates computeStats function that already exists in rex/core/stats.js, violating DRY principle and creating maintenance burden [orchestration-layer]
+[warning] God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions
 
 </findings>
 
 <next-steps>
 
-[high] Hub function: resolveStore in packages/rex/src/store/index.ts is called from 17…
-  category: refactor
-[high] Fan-in hotspot: packages/rex/src/store/index.ts receives calls from 22 files — …
-  category: refactor
-[medium] Sourcevision package artificially split into CLI and tests … (+3 related)
-  category: refactor
-[medium] Analytics logic duplication between orchestration (ci.js computeStats) and doma…
-  category: refactor
-[medium] ci.js duplicates computeStats function that already exists in rex/core/stats.js…
-  files: ci.js, cli.js, config.js
+[medium] God function: GraphRenderer.constructor in packages/web/src/viewer/graph/render…
   category: refactor
 
 </next-steps>

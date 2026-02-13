@@ -161,6 +161,14 @@ export type {
   EpicStats, PriorityDistribution, RequirementsSummary,
 } from "./core/analytics.js";
 
+// ---- Analyze: finding acknowledgment ----------------------------------------
+
+export {
+  computeFindingHash, loadAcknowledged, saveAcknowledged,
+  acknowledgeFinding, isAcknowledged,
+} from "./analyze/acknowledge.js";
+export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowledge.js";
+
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";

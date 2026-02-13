@@ -390,6 +390,262 @@ export function extractConventionExports(
   return exports;
 }
 
+// ── analyzeComponents helpers ────────────────────────────────────────────────
+
+function resolveUsageEdges(
+  allUsages: Array<{ file: string; componentName: string; count: number }>,
+  importMap: Map<string, Map<string, string>>,
+): ComponentUsageEdge[] {
+  const edgeMap = new Map<string, ComponentUsageEdge>();
+  for (const usage of allUsages) {
+    const fileImports = importMap.get(usage.file);
+    if (!fileImports) continue;
+
+    const sourceFile = fileImports.get(usage.componentName);
+    if (!sourceFile) continue;
+
+    const key = `${usage.file}\0${sourceFile}\0${usage.componentName}`;
+    const existing = edgeMap.get(key);
+    if (existing) {
+      edgeMap.set(key, {
+        ...existing,
+        usageCount: existing.usageCount + usage.count,
+      });
+    } else {
+      edgeMap.set(key, {
+        from: usage.file,
+        to: sourceFile,
+        componentName: usage.componentName,
+        usageCount: usage.count,
+      });
+    }
+  }
+  return Array.from(edgeMap.values());
+}
+
+interface RouteDetectionResult {
+  routeModules: RouteModule[];
+  routeTree: RouteTreeNode[];
+}
+
+async function detectRoutes(
+  targetDir: string,
+  inventory: Inventory,
+  allComponents: ComponentDefinition[],
+  canIncremental: boolean | "" | undefined,
+  changedFiles: Set<string> | undefined,
+  prevRouteModules: RouteModule[] | undefined,
+): Promise<RouteDetectionResult> {
+  const routeModules: RouteModule[] = [];
+
+  // Build a set of previous route files for incremental reuse
+  const prevRouteMap = new Map<string, RouteModule>();
+  if (canIncremental && prevRouteModules) {
+    for (const mod of prevRouteModules) {
+      prevRouteMap.set(mod.file, mod);
+    }
+  }
+
+  // Try config-based routing first (React Router v7 routes.ts)
+  let usedConfigRoutes = false;
+  const routesConfig = findRoutesConfig(targetDir);
+  if (routesConfig) {
+    const configFullPath = join(targetDir, routesConfig.file);
+    let configSource: string | null = null;
+    try {
+      configSource = await readFile(configFullPath, "utf-8");
+    } catch {
+      // Can't read config — fall through to file-based
+    }
+
+    if (configSource) {
+      const configRoutes = parseRoutesConfig(configSource, routesConfig.appDir);
+      if (configRoutes) {
+        usedConfigRoutes = true;
+
+        for (const mod of configRoutes) {
+          if (canIncremental && changedFiles && !changedFiles.has(mod.file) && prevRouteMap.has(mod.file)) {
+            const prevMod = prevRouteMap.get(mod.file)!;
+            routeModules.push(prevMod);
+            const conventionNames = prevMod.exports.filter((e) => e !== "default");
+            const compDefs = allComponents.filter((c) => c.file === mod.file);
+            for (const def of compDefs) {
+              def.conventionExports = conventionNames;
+            }
+            continue;
+          }
+
+          const routeFullPath = join(targetDir, mod.file);
+          let routeSource: string;
+          try {
+            routeSource = await readFile(routeFullPath, "utf-8");
+          } catch {
+            routeModules.push(mod);
+            continue;
+          }
+
+          const conventionExports = extractConventionExports(routeSource, mod.file);
+          routeModules.push({
+            ...mod,
+            exports: conventionExports,
+          });
+
+          const compDefs = allComponents.filter((c) => c.file === mod.file);
+          const conventionNames = conventionExports.filter((e) => e !== "default");
+          for (const def of compDefs) {
+            def.conventionExports = conventionNames;
+          }
+        }
+      }
+    }
+  }
+
+  // Fall back to file-based route detection
+  if (!usedConfigRoutes) {
+    const routesDir = findRoutesDir(
+      targetDir,
+      inventory.files.map((f) => f.path)
+    );
+
+    if (routesDir) {
+      const routeFiles = inventory.files.filter((f) =>
+        f.path.startsWith(routesDir + "/") && f.role !== "test"
+      );
+
+      for (const file of routeFiles) {
+        if (canIncremental && changedFiles && !changedFiles.has(file.path) && prevRouteMap.has(file.path)) {
+          const prevMod = prevRouteMap.get(file.path)!;
+          routeModules.push(prevMod);
+
+          const conventionNames = prevMod.exports.filter((e) => e !== "default");
+          const compDefs = allComponents.filter((c) => c.file === file.path);
+          for (const def of compDefs) {
+            def.conventionExports = conventionNames;
+          }
+          continue;
+        }
+
+        const fullPath = join(targetDir, file.path);
+        let sourceText: string;
+        try {
+          sourceText = await readFile(fullPath, "utf-8");
+        } catch {
+          continue;
+        }
+
+        const conventionExports = extractConventionExports(sourceText, file.path);
+        const routePattern = parseFileRoutePattern(file.path, routesDir);
+
+        const relToRoutes = relative(routesDir, file.path);
+        const dotSegments = relToRoutes.replace(extname(relToRoutes), "").split(".");
+        let parentLayout: string | null = null;
+        let isLayout = false;
+        const isIndex = basename(file.path, extname(file.path)).endsWith("_index") ||
+                        basename(file.path, extname(file.path)) === "index";
+
+        if (dotSegments.length > 1) {
+          const layoutPrefix = dotSegments[0];
+          if (layoutPrefix.startsWith("_")) {
+            const layoutFile = routeFiles.find((f) => {
+              const fRel = relative(routesDir, f.path);
+              const fBase = fRel.replace(extname(fRel), "");
+              return fBase === layoutPrefix;
+            });
+            if (layoutFile) {
+              parentLayout = layoutFile.path;
+            }
+          }
+        }
+
+        if (dotSegments[0].startsWith("_") && dotSegments.length === 1) {
+          isLayout = true;
+        }
+
+        const compDefs = allComponents.filter((c) => c.file === file.path);
+        const conventionNames = conventionExports.filter((e) => e !== "default");
+        for (const def of compDefs) {
+          def.conventionExports = conventionNames;
+        }
+
+        routeModules.push({
+          file: file.path,
+          routePattern,
+          exports: conventionExports,
+          parentLayout,
+          isLayout,
+          isIndex,
+        });
+      }
+
+      // Second pass: mark files as layouts if they are referenced as parentLayout
+      const parentFiles = new Set(
+        routeModules.filter((m) => m.parentLayout).map((m) => m.parentLayout!)
+      );
+      for (const mod of routeModules) {
+        if (parentFiles.has(mod.file)) {
+          mod.isLayout = true;
+        }
+      }
+    }
+  }
+
+  const routeTree = buildRouteTree(routeModules);
+  return { routeModules, routeTree };
+}
+
+function computeComponentsSummary(
+  allComponents: ComponentDefinition[],
+  usageEdges: ComponentUsageEdge[],
+  routeModules: RouteModule[],
+  routeTree: RouteTreeNode[],
+  serverRoutes: ServerRouteGroup[],
+): ComponentsSummary {
+  const usageCounts = new Map<string, { name: string; file: string; count: number }>();
+  for (const edge of usageEdges) {
+    const key = `${edge.to}\0${edge.componentName}`;
+    const existing = usageCounts.get(key);
+    if (existing) {
+      existing.count += edge.usageCount;
+    } else {
+      usageCounts.set(key, {
+        name: edge.componentName,
+        file: edge.to,
+        count: edge.usageCount,
+      });
+    }
+  }
+
+  const mostUsedComponents = Array.from(usageCounts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20)
+    .map((c) => ({ name: c.name, file: c.file, usageCount: c.count }));
+
+  const routeConventions: Partial<Record<RouteExportKind, number>> = {};
+  for (const mod of routeModules) {
+    for (const exp of mod.exports) {
+      routeConventions[exp] = (routeConventions[exp] || 0) + 1;
+    }
+  }
+
+  function measureDepth(nodes: RouteTreeNode[]): number {
+    if (nodes.length === 0) return 0;
+    return 1 + Math.max(...nodes.map((n) => measureDepth(n.children)));
+  }
+  const layoutDepth = measureDepth(routeTree);
+
+  const totalServerRoutes = serverRoutes.reduce((sum, g) => sum + g.routes.length, 0);
+
+  return {
+    totalComponents: allComponents.length,
+    totalRouteModules: routeModules.length,
+    totalUsageEdges: usageEdges.length,
+    totalServerRoutes,
+    routeConventions,
+    mostUsedComponents,
+    layoutDepth,
+  };
+}
+
 // ── analyzeComponents ───────────────────────────────────────────────────────
 
 // ── Incremental types ────────────────────────────────────────────────────────
@@ -497,262 +753,28 @@ export async function analyzeComponents(
     // and .tsx convention exports
   }
 
-  // Resolve usages to edges via import graph
-  const edgeMap = new Map<string, ComponentUsageEdge>();
-  for (const usage of allUsages) {
-    const fileImports = importMap.get(usage.file);
-    if (!fileImports) continue;
+  const usageEdges = resolveUsageEdges(allUsages, importMap);
 
-    // Look up the component's source file via imports
-    // Try exact name first, then "default" for default imports
-    let sourceFile = fileImports.get(usage.componentName);
-    if (!sourceFile) {
-      // For namespace imports or wildcard, skip
-      continue;
-    }
-
-    const key = `${usage.file}\0${sourceFile}\0${usage.componentName}`;
-    const existing = edgeMap.get(key);
-    if (existing) {
-      edgeMap.set(key, {
-        ...existing,
-        usageCount: existing.usageCount + usage.count,
-      });
-    } else {
-      edgeMap.set(key, {
-        from: usage.file,
-        to: sourceFile,
-        componentName: usage.componentName,
-        usageCount: usage.count,
-      });
-    }
-  }
-  const usageEdges = Array.from(edgeMap.values());
-
-  // ── Route detection ─────────────────────────────────────────────────────
-
-  const routeModules: RouteModule[] = [];
-
-  // Build a set of previous route files for incremental reuse
-  const prevRouteMap = new Map<string, RouteModule>();
-  if (canIncremental && prev.routeModules) {
-    for (const mod of prev.routeModules) {
-      prevRouteMap.set(mod.file, mod);
-    }
-  }
-
-  // Try config-based routing first (React Router v7 routes.ts)
-  let usedConfigRoutes = false;
-  const routesConfig = findRoutesConfig(targetDir);
-  if (routesConfig) {
-    const configFullPath = join(targetDir, routesConfig.file);
-    let configSource: string | null = null;
-    try {
-      configSource = await readFile(configFullPath, "utf-8");
-    } catch {
-      // Can't read config — fall through to file-based
-    }
-
-    if (configSource) {
-      const configRoutes = parseRoutesConfig(configSource, routesConfig.appDir);
-      if (configRoutes) {
-        usedConfigRoutes = true;
-
-        // Read each route file to extract convention exports
-        for (const mod of configRoutes) {
-          // Incremental: reuse from previous run if unchanged
-          if (canIncremental && !changedFiles.has(mod.file) && prevRouteMap.has(mod.file)) {
-            const prevMod = prevRouteMap.get(mod.file)!;
-            routeModules.push(prevMod);
-            const conventionNames = prevMod.exports.filter((e) => e !== "default");
-            const compDefs = allComponents.filter((c) => c.file === mod.file);
-            for (const def of compDefs) {
-              def.conventionExports = conventionNames;
-            }
-            continue;
-          }
-
-          const routeFullPath = join(targetDir, mod.file);
-          let routeSource: string;
-          try {
-            routeSource = await readFile(routeFullPath, "utf-8");
-          } catch {
-            // File listed in config but missing — add with empty exports
-            routeModules.push(mod);
-            continue;
-          }
-
-          const conventionExports = extractConventionExports(routeSource, mod.file);
-          routeModules.push({
-            ...mod,
-            exports: conventionExports,
-          });
-
-          // Add convention exports to component definitions for this file
-          const compDefs = allComponents.filter((c) => c.file === mod.file);
-          const conventionNames = conventionExports.filter((e) => e !== "default");
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
-        }
-      }
-    }
-  }
-
-  // Fall back to file-based route detection
-  if (!usedConfigRoutes) {
-    const routesDir = findRoutesDir(
-      targetDir,
-      inventory.files.map((f) => f.path)
-    );
-
-    if (routesDir) {
-      // Find files in the routes directory
-      const routeFiles = inventory.files.filter((f) =>
-        f.path.startsWith(routesDir + "/") && f.role !== "test"
-      );
-
-      for (const file of routeFiles) {
-        // Incremental: reuse route module from unchanged files
-        if (canIncremental && !changedFiles.has(file.path) && prevRouteMap.has(file.path)) {
-          const prevMod = prevRouteMap.get(file.path)!;
-          routeModules.push(prevMod);
-
-          // Also restore convention exports on component defs from this file
-          const conventionNames = prevMod.exports.filter((e) => e !== "default");
-          const compDefs = allComponents.filter((c) => c.file === file.path);
-          for (const def of compDefs) {
-            def.conventionExports = conventionNames;
-          }
-          continue;
-        }
-
-        const fullPath = join(targetDir, file.path);
-        let sourceText: string;
-        try {
-          sourceText = await readFile(fullPath, "utf-8");
-        } catch {
-          continue;
-        }
-
-        const conventionExports = extractConventionExports(sourceText, file.path);
-        const routePattern = parseFileRoutePattern(file.path, routesDir);
-
-        // Determine parent layout
-        const relToRoutes = relative(routesDir, file.path);
-        const dotSegments = relToRoutes.replace(extname(relToRoutes), "").split(".");
-        let parentLayout: string | null = null;
-        let isLayout = false;
-        const isIndex = basename(file.path, extname(file.path)).endsWith("_index") ||
-                        basename(file.path, extname(file.path)) === "index";
-
-        // Check if this file starts with a layout prefix
-        if (dotSegments.length > 1) {
-          const layoutPrefix = dotSegments[0];
-          if (layoutPrefix.startsWith("_")) {
-            // Nested under a pathless layout
-            const layoutFile = routeFiles.find((f) => {
-              const fRel = relative(routesDir, f.path);
-              const fBase = fRel.replace(extname(fRel), "");
-              return fBase === layoutPrefix;
-            });
-            if (layoutFile) {
-              parentLayout = layoutFile.path;
-            }
-          }
-        }
-
-        // A file is a layout if other files reference it as parent
-        // We'll set this after collecting all modules
-        if (dotSegments[0].startsWith("_") && dotSegments.length === 1) {
-          isLayout = true;
-        }
-
-        // Add convention exports to the component definitions for this file
-        const compDefs = allComponents.filter((c) => c.file === file.path);
-        const conventionNames = conventionExports.filter((e) => e !== "default");
-        for (const def of compDefs) {
-          def.conventionExports = conventionNames;
-        }
-
-        routeModules.push({
-          file: file.path,
-          routePattern,
-          exports: conventionExports,
-          parentLayout,
-          isLayout,
-          isIndex,
-        });
-      }
-
-      // Second pass: mark files as layouts if they are referenced as parentLayout
-      const parentFiles = new Set(
-        routeModules.filter((m) => m.parentLayout).map((m) => m.parentLayout!)
-      );
-      for (const mod of routeModules) {
-        if (parentFiles.has(mod.file)) {
-          mod.isLayout = true;
-        }
-      }
-    }
-  }
-
-  // Build route tree
-  const routeTree = buildRouteTree(routeModules);
+  const { routeModules, routeTree } = await detectRoutes(
+    targetDir,
+    inventory,
+    allComponents,
+    canIncremental,
+    changedFiles,
+    prev?.routeModules,
+  );
 
   // ── Server-side API route detection ────────────────────────────────────────
 
   const serverRoutes: ServerRouteGroup[] = await detectServerRoutes(targetDir, inventory);
 
-  // ── Compute summary ───────────────────────────────────────────────────────
-
-  // Usage counts per component
-  const usageCounts = new Map<string, { name: string; file: string; count: number }>();
-  for (const edge of usageEdges) {
-    const key = `${edge.to}\0${edge.componentName}`;
-    const existing = usageCounts.get(key);
-    if (existing) {
-      existing.count += edge.usageCount;
-    } else {
-      usageCounts.set(key, {
-        name: edge.componentName,
-        file: edge.to,
-        count: edge.usageCount,
-      });
-    }
-  }
-
-  const mostUsedComponents = Array.from(usageCounts.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 20)
-    .map((c) => ({ name: c.name, file: c.file, usageCount: c.count }));
-
-  // Route convention counts
-  const routeConventions: Partial<Record<RouteExportKind, number>> = {};
-  for (const mod of routeModules) {
-    for (const exp of mod.exports) {
-      routeConventions[exp] = (routeConventions[exp] || 0) + 1;
-    }
-  }
-
-  // Layout depth
-  function measureDepth(nodes: RouteTreeNode[]): number {
-    if (nodes.length === 0) return 0;
-    return 1 + Math.max(...nodes.map((n) => measureDepth(n.children)));
-  }
-  const layoutDepth = measureDepth(routeTree);
-
-  const totalServerRoutes = serverRoutes.reduce((sum, g) => sum + g.routes.length, 0);
-
-  const summary: ComponentsSummary = {
-    totalComponents: allComponents.length,
-    totalRouteModules: routeModules.length,
-    totalUsageEdges: usageEdges.length,
-    totalServerRoutes,
-    routeConventions,
-    mostUsedComponents,
-    layoutDepth,
-  };
+  const summary = computeComponentsSummary(
+    allComponents,
+    usageEdges,
+    routeModules,
+    routeTree,
+    serverRoutes,
+  );
 
   return sortComponents({
     components: allComponents,

@@ -8014,6 +8014,30 @@
       ]
     },
     {
+      "from": "packages/sourcevision/src/analyzers/archetypes.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ArchetypeDefinition"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+      "to": "packages/sourcevision/src/analyzers/archetypes.ts",
+      "type": "static",
+      "symbols": [
+        "BUILTIN_ARCHETYPES"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "buildClassificationMap"
+      ]
+    },
+    {
       "from": "packages/sourcevision/src/analyzers/callgraph-findings.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
@@ -8023,7 +8047,8 @@
         "FunctionNode",
         "Finding",
         "Inventory",
-        "ImportEdge"
+        "ImportEdge",
+        "Classifications"
       ]
     },
     {
@@ -8047,6 +8072,57 @@
       "type": "static",
       "symbols": [
         "sortCallGraph"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/classify.ts",
+      "to": "packages/sourcevision/src/analyzers/archetypes.ts",
+      "type": "static",
+      "symbols": [
+        "BUILTIN_ARCHETYPES"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/classify.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "static",
+      "symbols": [
+        "callClaude",
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/classify.ts",
+      "to": "packages/sourcevision/src/analyzers/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/classify.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "Inventory",
+        "Imports",
+        "ImportEdge",
+        "ArchetypeDefinition",
+        "ArchetypeSignal",
+        "FileClassification",
+        "ClassificationEvidence",
+        "Classifications",
+        "ClassificationsSummary",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/classify.ts",
+      "to": "packages/sourcevision/src/util/sort.ts",
+      "type": "static",
+      "symbols": [
+        "sortClassifications"
       ]
     },
     {
@@ -8106,6 +8182,14 @@
     },
     {
       "from": "packages/sourcevision/src/analyzers/context.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "buildClassificationMap"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/context.ts",
       "to": "packages/sourcevision/src/analyzers/next-steps.ts",
       "type": "static",
       "symbols": [
@@ -8120,6 +8204,7 @@
         "Manifest",
         "Inventory",
         "Imports",
+        "Classifications",
         "Zones",
         "Components"
       ]
@@ -8583,6 +8668,14 @@
     },
     {
       "from": "packages/sourcevision/src/analyzers/llms-txt.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "buildClassificationMap"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/llms-txt.ts",
       "to": "packages/sourcevision/src/analyzers/next-steps.ts",
       "type": "static",
       "symbols": [
@@ -8597,6 +8690,7 @@
         "Manifest",
         "Inventory",
         "Imports",
+        "Classifications",
         "Zones",
         "Components"
       ]
@@ -8650,13 +8744,22 @@
     },
     {
       "from": "packages/sourcevision/src/analyzers/server-route-detection.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "buildClassificationMap"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/server-route-detection.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "HttpMethod",
         "ServerRoute",
         "ServerRouteGroup",
-        "Inventory"
+        "Inventory",
+        "Classifications"
       ]
     },
     {
@@ -8819,6 +8922,16 @@
     },
     {
       "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "analyzeClassifications",
+        "enrichClassificationsWithLLM",
+        "mergeClassificationResults"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
       "to": "packages/sourcevision/src/analyzers/claude-client.ts",
       "type": "static",
       "symbols": [
@@ -8976,6 +9089,7 @@
       "type": "type",
       "symbols": [
         "CallGraph",
+        "Classifications",
         "ImportEdge",
         "Inventory",
         "AnalyzeTokenUsage"
@@ -9259,6 +9373,7 @@
         "Manifest",
         "Inventory",
         "Imports",
+        "Classifications",
         "Zones",
         "Components"
       ]
@@ -9323,6 +9438,12 @@
         "ExternalImport",
         "CircularDependency",
         "ImportsSummary",
+        "Classifications",
+        "FileClassification",
+        "ClassificationEvidence",
+        "ClassificationsSummary",
+        "ArchetypeDefinition",
+        "ArchetypeSignal",
         "Zones",
         "Zone",
         "ZoneSummary",
@@ -9364,6 +9485,7 @@
         "ManifestSchema",
         "InventorySchema",
         "ImportsSchema",
+        "ClassificationsSchema",
         "ZonesSchema",
         "FindingSchema",
         "ComponentsSchema",
@@ -9371,6 +9493,7 @@
         "validateManifest",
         "validateInventory",
         "validateImports",
+        "validateClassifications",
         "validateZones",
         "validateComponents",
         "validateCallGraph",
@@ -9429,6 +9552,8 @@
         "ZoneCrossing",
         "Inventory",
         "Imports",
+        "Classifications",
+        "FileClassification",
         "Zones",
         "Finding",
         "ComponentDefinition",
@@ -9447,6 +9572,7 @@
       "symbols": [
         "validateInventory",
         "validateImports",
+        "validateClassifications",
         "validateZones",
         "validateComponents"
       ]
@@ -9535,7 +9661,8 @@
         "Inventory",
         "Imports",
         "Zones",
-        "Components"
+        "Components",
+        "Classifications"
       ]
     },
     {
@@ -9555,7 +9682,8 @@
         "Inventory",
         "Imports",
         "Zones",
-        "Components"
+        "Components",
+        "Classifications"
       ]
     },
     {
@@ -9599,6 +9727,23 @@
         "validateImports",
         "validateZones",
         "validateComponents"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/archetypes.test.ts",
+      "to": "packages/sourcevision/src/analyzers/archetypes.ts",
+      "type": "static",
+      "symbols": [
+        "BUILTIN_ARCHETYPES",
+        "buildArchetypeMap"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/archetypes.test.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ArchetypeDefinition"
       ]
     },
     {
@@ -9653,6 +9798,36 @@
       "type": "type",
       "symbols": [
         "InventoryResult"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/classify.test.ts",
+      "to": "packages/sourcevision/src/analyzers/classify.ts",
+      "type": "static",
+      "symbols": [
+        "analyzeClassifications",
+        "buildClassificationMap",
+        "enrichClassificationsWithLLM",
+        "mergeClassificationResults"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/classify.test.ts",
+      "to": "packages/sourcevision/src/analyzers/claude-client.ts",
+      "type": "static",
+      "symbols": [
+        "callClaude"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/classify.test.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "Inventory",
+        "Imports",
+        "Classifications",
+        "ArchetypeDefinition"
       ]
     },
     {
@@ -10176,6 +10351,7 @@
         "validateImports",
         "validateZones",
         "validateComponents",
+        "validateClassifications",
         "validateModule",
         "formatValidationErrors"
       ]
@@ -10211,7 +10387,9 @@
         "ExternalImport",
         "Inventory",
         "Imports",
-        "Finding"
+        "Finding",
+        "FileClassification",
+        "Classifications"
       ]
     },
     {
@@ -10225,6 +10403,8 @@
         "sortInventory",
         "sortImports",
         "sortFindings",
+        "sortFileClassifications",
+        "sortClassifications",
         "toCanonicalJSON"
       ]
     },
@@ -13012,6 +13192,7 @@
         "packages/sourcevision/src/cli/serve.ts",
         "packages/sourcevision/src/util/sort.ts",
         "packages/sourcevision/tests/integration/claude-config.test.ts",
+        "packages/sourcevision/tests/unit/analyzers/classify.test.ts",
         "packages/sourcevision/tests/unit/analyzers/enrich-per-zone.test.ts",
         "packages/sourcevision/tests/unit/analyzers/zone-enrichment.test.ts",
         "packages/web/src/server/routes-rex.ts"
@@ -13459,8 +13640,10 @@
         "packages/sourcevision/tests/integration/context.test.ts",
         "packages/sourcevision/tests/integration/llms-txt.test.ts",
         "packages/sourcevision/tests/integration/pipeline.test.ts",
+        "packages/sourcevision/tests/unit/analyzers/archetypes.test.ts",
         "packages/sourcevision/tests/unit/analyzers/callgraph-findings.test.ts",
         "packages/sourcevision/tests/unit/analyzers/callgraph.test.ts",
+        "packages/sourcevision/tests/unit/analyzers/classify.test.ts",
         "packages/sourcevision/tests/unit/analyzers/components.test.ts",
         "packages/sourcevision/tests/unit/analyzers/dedup-findings.test.ts",
         "packages/sourcevision/tests/unit/analyzers/enrich-per-zone.test.ts",
@@ -13564,7 +13747,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 1413,
+    "totalEdges": 1430,
     "totalExternal": 16,
     "circularCount": 0,
     "circulars": [],
@@ -13627,6 +13810,10 @@
       },
       {
         "path": "packages/sourcevision/src/util/sort.ts",
+        "count": 10
+      },
+      {
+        "path": "packages/sourcevision/src/analyzers/claude-client.ts",
         "count": 9
       },
       {
@@ -13643,10 +13830,6 @@
       },
       {
         "path": "packages/rex/src/store/file-adapter.ts",
-        "count": 8
-      },
-      {
-        "path": "packages/sourcevision/src/analyzers/enrich-parsing.ts",
         "count": 8
       }
     ],

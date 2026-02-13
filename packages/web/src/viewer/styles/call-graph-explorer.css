@@ -39,6 +39,10 @@
   fill: color-mix(in srgb, var(--zone-color, var(--accent)) 5%, var(--bg-surface));
 }
 
+.cg-zone-box:active {
+  cursor: grabbing;
+}
+
 .cg-zone-box.expanded .cg-zone-rect {
   stroke: var(--zone-color, var(--border-strong));
   stroke-width: 2;
@@ -62,6 +66,36 @@
   font-size: 10px;
   fill: var(--text-muted);
   pointer-events: none;
+}
+
+/* ── Detail button (inside expanded zones) ──────────────────────────── */
+
+.cg-zone-detail-btn {
+  cursor: pointer;
+}
+
+.cg-detail-btn-bg {
+  fill: transparent;
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: fill 0.1s ease, stroke 0.1s ease;
+}
+
+.cg-zone-detail-btn:hover .cg-detail-btn-bg {
+  fill: var(--bg-hover);
+  stroke: var(--border-strong);
+}
+
+.cg-detail-btn-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 8px;
+  fill: var(--text-muted);
+  pointer-events: none;
+  transition: fill 0.1s ease;
+}
+
+.cg-zone-detail-btn:hover .cg-detail-btn-text {
+  fill: var(--text);
 }
 
 .cg-zone-divider {

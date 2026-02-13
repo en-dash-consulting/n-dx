@@ -53,3 +53,6 @@ export {
   validateAutomatedRequirements,
   formatRequirementsValidation,
 } from "rex";
+
+// ---- Finding acknowledgment -------------------------------------------------
+export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "rex";

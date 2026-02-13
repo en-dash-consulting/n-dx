@@ -139,11 +139,6 @@
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
-          "method": "GET",
-          "path": "/limit"
-        },
-        {
-          "file": "packages/web/src/server/routes-hench.ts",
           "method": "POST",
           "path": "/api/hench/templates"
         },
@@ -231,21 +226,6 @@
         },
         {
           "file": "packages/web/src/server/routes-rex.ts",
-          "method": "GET",
-          "path": "/limit"
-        },
-        {
-          "file": "packages/web/src/server/routes-rex.ts",
-          "method": "GET",
-          "path": "/minAge"
-        },
-        {
-          "file": "packages/web/src/server/routes-rex.ts",
-          "method": "GET",
-          "path": "/statuses"
-        },
-        {
-          "file": "packages/web/src/server/routes-rex.ts",
           "method": "PATCH",
           "path": "/api/rex/items/:id"
         },
@@ -267,12 +247,12 @@
         {
           "file": "packages/web/src/server/routes-rex.ts",
           "method": "POST",
-          "path": "/api/rex/batch"
+          "path": "/api/rex/batch-import"
         },
         {
           "file": "packages/web/src/server/routes-rex.ts",
           "method": "POST",
-          "path": "/api/rex/execute/epic"
+          "path": "/api/rex/execute/epic-by-epic"
         },
         {
           "file": "packages/web/src/server/routes-rex.ts",
@@ -307,12 +287,17 @@
         {
           "file": "packages/web/src/server/routes-rex.ts",
           "method": "POST",
+          "path": "/api/rex/proposals/accept-edited"
+        },
+        {
+          "file": "packages/web/src/server/routes-rex.ts",
+          "method": "POST",
           "path": "/api/rex/prune"
         },
         {
           "file": "packages/web/src/server/routes-rex.ts",
           "method": "POST",
-          "path": "/api/rex/smart"
+          "path": "/api/rex/smart-add-preview"
         }
       ]
     },
@@ -371,7 +356,12 @@
         {
           "file": "packages/web/src/server/routes-token-usage.ts",
           "method": "GET",
-          "path": "/api/token/by"
+          "path": "/api/token/by-command"
+        },
+        {
+          "file": "packages/web/src/server/routes-token-usage.ts",
+          "method": "GET",
+          "path": "/api/token/by-period"
         },
         {
           "file": "packages/web/src/server/routes-token-usage.ts",
@@ -382,26 +372,6 @@
           "file": "packages/web/src/server/routes-token-usage.ts",
           "method": "GET",
           "path": "/api/token/summary"
-        },
-        {
-          "file": "packages/web/src/server/routes-token-usage.ts",
-          "method": "GET",
-          "path": "/package"
-        },
-        {
-          "file": "packages/web/src/server/routes-token-usage.ts",
-          "method": "GET",
-          "path": "/period"
-        },
-        {
-          "file": "packages/web/src/server/routes-token-usage.ts",
-          "method": "GET",
-          "path": "/since"
-        },
-        {
-          "file": "packages/web/src/server/routes-token-usage.ts",
-          "method": "GET",
-          "path": "/until"
         }
       ]
     },
@@ -413,7 +383,7 @@
         {
           "file": "packages/web/src/server/routes-validation.ts",
           "method": "GET",
-          "path": "/api/rex/dependency"
+          "path": "/api/rex/dependency-graph"
         },
         {
           "file": "packages/web/src/server/routes-validation.ts",
@@ -454,7 +424,7 @@
     "totalComponents": 5,
     "totalRouteModules": 0,
     "totalUsageEdges": 0,
-    "totalServerRoutes": 71,
+    "totalServerRoutes": 65,
     "routeConventions": {},
     "mostUsedComponents": [],
     "layoutDepth": 0

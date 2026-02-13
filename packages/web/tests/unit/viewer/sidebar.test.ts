@@ -562,8 +562,8 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 9 sourcevision items: overview, graph, zones, call-graph, files, routes, architecture, problems, suggestions
-      expect(navItems.length).toBe(9);
+      // 8 sourcevision items: overview, graph, zones, files, routes, architecture, problems, suggestions
+      expect(navItems.length).toBe(8);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

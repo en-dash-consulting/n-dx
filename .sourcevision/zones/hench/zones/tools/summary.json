@@ -1,0 +1,18 @@
+{
+  "id": "hench/tools",
+  "name": "Tools",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/tests/unit/tools/git.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/exec-shell.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 3,
+  "lineCount": 309
+}
