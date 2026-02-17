@@ -81,13 +81,21 @@
 .progress-module.done { color: var(--green); }
 .progress-module.error { color: var(--red); }
 
-/* ── Page context bar: FAQ + Guide buttons, top-right of content area ── */
+/* ── Page context bar: breadcrumb nav + FAQ/Guide buttons ── */
 .page-context-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 0 0 8px;
+  min-height: 28px;
+}
+
+.page-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* Shared button style for page-context help buttons */

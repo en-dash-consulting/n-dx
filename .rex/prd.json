@@ -8283,17 +8283,21 @@
     {
       "id": "4a49c3cc-36e2-4ef0-bc72-b8972f29eb38",
       "title": "Auto-triggered Hench Execution",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-13T18:38:07.964Z",
+      "completedAt": "2026-02-13T18:38:07.964Z",
       "children": [
         {
           "id": "08ff884d-a41a-441d-94d7-7a8d08c2db75",
           "title": "Task UI Auto-trigger Integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Enable automatic Hench execution directly from individual tasks in the Rex task UI view",
           "source": "smart-add",
+          "startedAt": "2026-02-13T18:38:07.908Z",
+          "completedAt": "2026-02-13T18:38:07.908Z",
           "children": [
             {
               "id": "7da1e0d9-ea81-48f4-96a8-51374db850bb",
@@ -8331,7 +8335,7 @@
             {
               "id": "3908405f-3a16-48a6-9de8-a284ef529e5f",
               "title": "Add real-time execution status updates",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add WebSocket or polling mechanism to show live progress of auto-triggered Hench runs in the task UI",
               "acceptanceCriteria": [
@@ -8345,6 +8349,266 @@
                 "web-ui",
                 "real-time",
                 "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-13T18:35:08.552Z",
+              "completedAt": "2026-02-13T18:38:07.826Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b0f5ab57-2837-4c94-aa00-772a6573e4bf",
+      "title": "Enhanced CLI Help System",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "0f9babc3-25a5-47ef-be61-8326f3b5a44d",
+          "title": "Comprehensive command documentation system",
+          "status": "completed",
+          "level": "feature",
+          "description": "Create a complete help system with command-specific content, examples, and contextual guidance for all n-dx commands and subcommands",
+          "source": "smart-add",
+          "startedAt": "2026-02-17T20:56:22.290Z",
+          "completedAt": "2026-02-17T20:56:22.290Z",
+          "children": [
+            {
+              "id": "402ce915-dc9d-458a-9e58-107e1f334f8e",
+              "title": "Build dynamic help content generation with comprehensive coverage",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement a system that generates contextual help content for all commands across rex, sourcevision, and hench packages with practical usage examples",
+              "acceptanceCriteria": [
+                "Each command shows relevant options and flags only",
+                "Help content includes command-specific examples",
+                "All rex, sourcevision, and hench subcommands have detailed help text",
+                "Help includes parameter descriptions and examples",
+                "Each command shows 2-3 practical usage examples",
+                "Examples demonstrate common parameter combinations"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "documentation",
+                "ux",
+                "completeness"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-17T20:46:41.636Z",
+              "completedAt": "2026-02-17T20:56:22.209Z"
+            }
+          ]
+        },
+        {
+          "id": "4ade01ce-d446-444b-8130-9bcca7e39ded",
+          "title": "Interactive help navigation and discovery",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement enhanced navigation, search, and suggestion capabilities to help users discover and understand available commands",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "1e0b3886-6d80-4987-8f81-b6c8e6b5ad08",
+              "title": "Create hierarchical navigation with intelligent suggestions",
+              "status": "pending",
+              "level": "task",
+              "description": "Build a help system that supports drill-down navigation, command suggestions for typos, and searchable help content across all commands",
+              "acceptanceCriteria": [
+                "Main help shows command categories and navigation hints",
+                "Users can access subcommand help from parent command help",
+                "Related commands are suggested in help output",
+                "Suggests similar commands for typos with edit distance matching",
+                "Users can search help content with keywords",
+                "Search results show matching commands with relevance scoring"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "navigation",
+                "discovery",
+                "search"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "2bd470a3-9d62-4fbb-ab04-cd5e1f004763",
+          "title": "Enhanced help presentation and formatting",
+          "status": "pending",
+          "level": "feature",
+          "description": "Improve the visual presentation, formatting, and consistency of help content across all commands using standardized templates",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d2433beb-9d4b-4eff-b188-6a6e314bc05f",
+              "title": "Implement consistent formatting with visual enhancements",
+              "status": "pending",
+              "level": "task",
+              "description": "Create standardized help templates with improved formatting, semantic color coding, and consistent presentation across all packages",
+              "acceptanceCriteria": [
+                "Help output uses consistent section headers and spacing",
+                "Command names and flags are visually highlighted",
+                "All commands follow consistent help format template",
+                "Templates include sections for description, usage, options, examples",
+                "Commands are highlighted in one color consistently",
+                "Required vs optional parameters are visually distinct",
+                "Colors respect terminal theme and accessibility"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "formatting",
+                "templates",
+                "consistency",
+                "accessibility"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "22ba5028-7c95-4ecb-b74b-b5d4816bc0ae",
+      "title": "Project-aware Navigation and Context",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "2d6563f9-35c1-4839-807f-c853e66e29f4",
+          "title": "Project Context Detection and API",
+          "status": "completed",
+          "level": "feature",
+          "description": "Automatically detect project metadata and provide it through a web API endpoint for navigation components",
+          "source": "smart-add",
+          "startedAt": "2026-02-17T21:04:18.669Z",
+          "completedAt": "2026-02-17T21:04:18.669Z",
+          "children": [
+            {
+              "id": "cb82fcad-a548-462e-b634-5f2095745d40",
+              "title": "Build project metadata extraction and API service",
+              "status": "completed",
+              "level": "task",
+              "description": "Extract project information from package.json and git, then expose it through a cached API endpoint for web UI consumption",
+              "acceptanceCriteria": [
+                "Reads project name from package.json if available",
+                "Falls back to directory name if no package.json",
+                "Extracts git repository name from remote origin URL",
+                "Handles cases where git is not initialized or has no remotes",
+                "Returns JSON with project name, description, git info",
+                "Handles missing or invalid project directories gracefully",
+                "Caches project metadata to avoid repeated file system calls",
+                "Updates context when project directory changes"
+              ],
+              "priority": "high",
+              "tags": [
+                "navigation",
+                "metadata",
+                "api",
+                "backend"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-17T20:57:03.673Z",
+              "completedAt": "2026-02-17T21:04:18.588Z"
+            }
+          ]
+        },
+        {
+          "id": "45553d8b-a8e9-4910-a679-75ac7bb5bb76",
+          "title": "Enhanced Navigation Interface",
+          "status": "pending",
+          "level": "feature",
+          "description": "Update header, navigation, and sidebar to display project context and status indicators",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "0359b80f-7ab2-43a1-b6e0-fe9187bf2dbd",
+              "title": "Redesign header with project information and breadcrumb navigation",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify header to prominently display project name and implement breadcrumb navigation showing project context hierarchy",
+              "acceptanceCriteria": [
+                "Project name displays prominently in header",
+                "Truncates long project names gracefully",
+                "Shows git branch name when available",
+                "Maintains responsive design on mobile devices",
+                "Shows project > tool > view hierarchy",
+                "Links are functional and navigate correctly",
+                "Adapts to different project structures",
+                "Integrates with existing routing system"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "header",
+                "responsive",
+                "navigation",
+                "breadcrumbs",
+                "routing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-17T21:04:59.701Z",
+              "completedAt": "2026-02-17T21:11:14.661Z"
+            },
+            {
+              "id": "7a896b26-b14a-42d2-8e6b-4903a409af5c",
+              "title": "Add project status indicators to sidebar",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement visual indicators in the sidebar that show project health, analysis status, and PRD completion metrics",
+              "acceptanceCriteria": [
+                "Shows SourceVision analysis freshness status",
+                "Displays PRD completion percentage",
+                "Indicates if project has pending tasks",
+                "Updates indicators in real-time when status changes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "sidebar",
+                "status",
+                "indicators"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "986cc829-245a-4756-a64b-84bb9cf11961",
+          "title": "Project Configuration and Switching",
+          "status": "pending",
+          "level": "feature",
+          "description": "Display project-specific configuration and provide interface for switching between projects",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "350090b9-2b13-478a-a9ad-e96dc03d07c0",
+              "title": "Implement configuration display and project switching interface",
+              "status": "pending",
+              "level": "task",
+              "description": "Show active n-dx configuration in navigation footer and provide UI for switching between different project directories",
+              "acceptanceCriteria": [
+                "Shows currently configured Claude model",
+                "Displays token budget settings if configured",
+                "Indicates authentication method (API key vs CLI)",
+                "Collapses/expands to save space when needed",
+                "Detects other n-dx projects in parent/sibling directories",
+                "Provides dropdown or modal for project selection",
+                "Maintains session state when switching projects",
+                "Updates all navigation context when project changes"
+              ],
+              "priority": "low",
+              "tags": [
+                "config",
+                "footer",
+                "settings",
+                "navigation",
+                "projects",
+                "switching"
               ],
               "source": "smart-add"
             }

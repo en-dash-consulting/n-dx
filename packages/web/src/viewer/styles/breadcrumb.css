@@ -1,0 +1,104 @@
+/* ── Breadcrumb navigation ── */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  font-size: var(--font-base);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Chevron separator */
+.breadcrumb-sep {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  margin: 0 6px;
+}
+
+/* Project name — prominent styling */
+.breadcrumb-project {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* Git branch badge */
+.breadcrumb-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  font-family: monospace;
+  line-height: 1.4;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumb-branch-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* Product link — clickable, styled per product */
+.breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-dim);
+  transition: color var(--transition-normal);
+  font-family: inherit;
+}
+
+.breadcrumb-link:hover {
+  color: var(--text);
+}
+
+/* Product-specific accent on hover */
+.breadcrumb-product-sourcevision:hover {
+  color: var(--brand-teal);
+}
+
+.breadcrumb-product-rex:hover {
+  color: var(--brand-purple);
+}
+
+.breadcrumb-product-hench:hover {
+  color: var(--brand-orange);
+}
+
+/* Current page segment — not a link */
+.breadcrumb-current {
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}

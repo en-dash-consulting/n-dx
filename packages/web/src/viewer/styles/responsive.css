@@ -133,6 +133,23 @@
     padding: 0 0 6px;
   }
 
+  /* Breadcrumb: hide git branch, truncate project name more aggressively */
+  .breadcrumb-branch {
+    display: none;
+  }
+
+  .breadcrumb-project {
+    max-width: 120px;
+  }
+
+  .breadcrumb-item {
+    font-size: var(--font-sm);
+  }
+
+  .breadcrumb-sep {
+    margin: 0 4px;
+  }
+
   .detail-panel {
     position: fixed;
     inset: 0;

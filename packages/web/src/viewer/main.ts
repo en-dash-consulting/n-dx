@@ -8,6 +8,7 @@ import { Sidebar } from "./components/sidebar.js";
 import { DetailPanel } from "./components/detail-panel.js";
 import { Guide } from "./components/guide.js";
 import { HeaderFAQ } from "./components/faq.js";
+import { Breadcrumb } from "./components/breadcrumb.js";
 import { initTheme } from "./components/theme-toggle.js";
 import { updateFavicon } from "./components/favicon.js";
 import { Overview } from "./views/overview.js";
@@ -280,10 +281,13 @@ function App({ scope }: { scope: string | null }) {
       role: "main",
       "aria-label": "Main content",
     },
-      // Page-context controls: FAQ + Guide, positioned in the content area
-      h("div", { class: "page-context-bar", role: "group", "aria-label": "Page help" },
-        h(HeaderFAQ, { view }),
-        h(Guide, { view }),
+      // Page-context bar: breadcrumb navigation + help buttons
+      h("div", { class: "page-context-bar", role: "group", "aria-label": "Page navigation and help" },
+        h(Breadcrumb, { view, navigateTo, scope }),
+        h("div", { class: "page-context-actions" },
+          h(HeaderFAQ, { view }),
+          h(Guide, { view }),
+        ),
       ),
       renderView()
     ),
