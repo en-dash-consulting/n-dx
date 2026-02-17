@@ -14,6 +14,7 @@
 
 import { resolve } from "node:path";
 import { usage } from "./commands/constants.js";
+import { showCommandHelp } from "./help.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdReset } from "./commands/reset.js";
 import { cmdAnalyze } from "./commands/analyze.js";
@@ -29,6 +30,7 @@ const command = args[0];
 
 let port = 3117;
 let quiet = false;
+let help = false;
 let outputPath: string | undefined;
 const passthrough: string[] = [];
 
@@ -39,6 +41,8 @@ for (const a of args.slice(1)) {
     outputPath = a.split("=").slice(1).join("=");
   } else if (a === "--quiet" || a === "-q") {
     quiet = true;
+  } else if (a === "--help" || a === "-h") {
+    help = true;
   } else if (a.startsWith("--phase=") || a.startsWith("--only=") || a === "--fast" || a === "--full") {
     passthrough.push(a);
   }
@@ -65,6 +69,15 @@ async function cmdMcp(dir: string): Promise<void> {
 const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "mcp"]);
 
 try {
+  // Show help: per-command help when --help/-h is given with a command,
+  // else top-level usage.
+  if (help && command && command !== "--help" && command !== "-h") {
+    if (!showCommandHelp(command)) {
+      usage();
+    }
+    process.exit(0);
+  }
+
   if (command && NEEDS_SV_DIR.has(command)) {
     requireSvDir(resolve(targetArg || "."));
   }

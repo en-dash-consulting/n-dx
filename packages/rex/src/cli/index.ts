@@ -3,6 +3,7 @@
 import { resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import { usage } from "./commands/constants.js";
+import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
 import { setQuiet } from "./output.js";
 
@@ -67,11 +68,15 @@ function parseArgs(argv: string[]): {
 async function main(): Promise<void> {
   const { command, positional, flags, multiFlags } = parseArgs(process.argv.slice(2));
 
-  // Show top-level help if no command, or --help without a command that
-  // handles its own help (e.g. adapter has subcommand-level help).
-  const SELF_HELP_COMMANDS = new Set(["adapter"]);
-  if (!command || (flags.help && !SELF_HELP_COMMANDS.has(command))) {
+  // Show help: per-command help when a command is given, else top-level usage.
+  if (!command) {
     usage();
+    process.exit(0);
+  }
+  if (flags.help) {
+    if (!showCommandHelp(command)) {
+      usage();
+    }
     process.exit(0);
   }
 

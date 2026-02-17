@@ -153,7 +153,215 @@ function requireInit(dir, dirs) {
   }
 }
 
+// ── Per-command help for orchestration commands ─────────────────────────────
+
+const ORCHESTRATION_HELP = {
+  init: `ndx init — initialize all tools
+
+Usage: ndx init [options] [dir]
+
+Sets up .sourcevision/, .rex/, and .hench/ in the target directory.
+Runs sourcevision init → rex init → hench init in sequence.
+
+Options:
+  --project=<name>    Project name for config (default: directory basename)
+  --analyze           Also run SourceVision analysis after init
+
+Examples:
+  ndx init                         Initialize in current directory
+  ndx init ./my-project            Initialize in a specific directory
+  ndx init --analyze .             Initialize and analyze codebase`,
+
+  plan: `ndx plan — analyze codebase and generate PRD proposals
+
+Usage: ndx plan [options] [dir]
+
+Runs SourceVision analysis then Rex analyze to scan the codebase and
+generate PRD proposals. Proposals are reviewed interactively unless
+--accept is passed.
+
+Options:
+  --accept              Accept all proposals without review
+  --guided              Interactive spec builder for new projects
+  --file=<path>         Import from a document (skip SourceVision scan)
+  --lite                File-name-only scan (faster, less detail)
+  --no-llm              Force algorithmic pipeline, skip LLM
+  --model=<name>        Override LLM model
+  --chunk-size=<n>      Proposals per page in interactive review
+  --quiet, -q           Suppress informational output
+
+Examples:
+  ndx plan                         Analyze and review proposals interactively
+  ndx plan --accept .              Auto-accept all proposals
+  ndx plan --file=spec.md .        Generate PRD from a spec document
+  ndx plan --guided .              Guided setup for a new project`,
+
+  work: `ndx work — execute the next task autonomously
+
+Usage: ndx work [options] [dir]
+
+Picks the next actionable task from the PRD and runs an autonomous
+agent (hench) to implement it. Delegates to 'hench run'.
+
+Options:
+  --task=<id>           Target a specific Rex task ID
+  --epic=<id|title>     Only consider tasks within the specified epic
+  --epic-by-epic        Process epics sequentially
+  --auto                Skip interactive selection, autoselect by priority
+  --iterations=<n>      Run multiple tasks sequentially
+  --loop                Run continuously until all tasks complete or Ctrl+C
+  --dry-run             Print the task brief without calling Claude
+  --review              Show proposed changes and prompt for approval
+  --max-turns=<n>       Override max agent turns per task
+  --token-budget=<n>    Cap total tokens per run (0 = unlimited)
+  --model=<model>       Override the Claude model
+
+Examples:
+  ndx work                         Run next task interactively
+  ndx work --task=abc123 .         Run a specific task
+  ndx work --auto --loop .         Continuously auto-run tasks
+  ndx work --dry-run .             Preview the brief without execution`,
+
+  status: `ndx status — show PRD status tree
+
+Usage: ndx status [options] [dir]
+
+Displays the PRD hierarchy with status icons and completion stats.
+Delegates to 'rex status'. Completed items are hidden by default.
+
+Options:
+  --all               Show all items including completed
+  --coverage          Show test coverage per task
+  --tokens=false      Hide token usage summary
+  --since=<ISO>       Filter token usage after timestamp
+  --until=<ISO>       Filter token usage before timestamp
+  --format=tree|json  Output format (default: tree)
+
+Examples:
+  ndx status                       Show PRD tree
+  ndx status --all                 Include completed items
+  ndx status --format=json .       JSON output for scripting`,
+
+  usage: `ndx usage — token usage analytics
+
+Usage: ndx usage [options] [dir]
+
+Shows token consumption and cost estimates across all LLM operations.
+Delegates to 'rex usage'.
+
+Options:
+  --group=day|week|month  Group usage by time period
+  --since=<ISO>           Filter usage after timestamp
+  --until=<ISO>           Filter usage before timestamp
+  --format=tree|json      Output format (default: tree)
+
+Examples:
+  ndx usage                        Show total token usage
+  ndx usage --group=week           Usage grouped by week
+  ndx usage --format=json .        Machine-readable output`,
+
+  sync: `ndx sync — sync local PRD with remote adapter
+
+Usage: ndx sync [options] [dir]
+
+Bidirectional sync between local .rex/prd.json and a remote service.
+Delegates to 'rex sync'.
+
+Options:
+  --push              Push local changes to remote only
+  --pull              Pull remote changes to local only
+  --adapter=<name>    Adapter name (default: notion)
+  --dry-run           Preview sync without writing
+
+Examples:
+  ndx sync                         Full bidirectional sync
+  ndx sync --push .                Push local changes to Notion
+  ndx sync --pull .                Pull remote changes down`,
+
+  start: `ndx start — start the dashboard and MCP server
+
+Usage: ndx start [subcommand] [options] [dir]
+
+Starts the unified web server serving both the dashboard UI and
+MCP HTTP endpoints for Rex and SourceVision.
+
+Subcommands:
+  (none)              Start the server (foreground)
+  stop                Stop a background server
+  status              Check if a background server is running
+
+Options:
+  --port=<N>          Server port (default: 3117)
+  --background        Run as a background daemon
+
+Examples:
+  ndx start .                      Start server in foreground
+  ndx start --background .         Start as background daemon
+  ndx start status .               Check if server is running
+  ndx start stop .                 Stop background server`,
+
+  web: `ndx web — alias for 'ndx start'
+
+Usage: ndx web [subcommand] [options] [dir]
+
+Legacy alias for 'ndx start'. See 'ndx start --help' for full details.
+
+Examples:
+  ndx web .                        Start server
+  ndx web --background .           Start as background daemon`,
+
+  ci: `ndx ci — run analysis pipeline and validate PRD health
+
+Usage: ndx ci [options] [dir]
+
+Runs the full CI pipeline: SourceVision analysis followed by PRD
+validation. Reports pass/fail status suitable for CI systems.
+
+Options:
+  --format=json       Machine-readable JSON output
+
+Examples:
+  ndx ci                           Run CI pipeline
+  ndx ci --format=json .           JSON output for CI integration`,
+
+  dev: `ndx dev — start dev server with live reload
+
+Usage: ndx dev [options] [dir]
+
+Starts the development server with hot module replacement for the
+web dashboard. Requires .sourcevision/ to exist.
+
+Options:
+  --port=<N>          Server port (default: 3117)
+  --scope=<pkg>       Limit to a specific package
+
+Examples:
+  ndx dev .                        Start dev server
+  ndx dev --port=8080 .            Custom port`,
+
+  // config is excluded: config.js has its own comprehensive --help handler
+  // that documents all per-package keys, types, and examples.
+};
+
+/**
+ * Show per-command help for an orchestration command.
+ * Returns true if help was shown, false otherwise.
+ */
+function showCommandHelp(cmd) {
+  const text = ORCHESTRATION_HELP[cmd];
+  if (!text) return false;
+  console.log(text);
+  return true;
+}
+
 const [command, ...rest] = process.argv.slice(2);
+
+// ── Per-command --help ──────────────────────────────────────────────────────
+
+const hasHelp = rest.some((a) => a === "--help" || a === "-h");
+if (hasHelp && command && showCommandHelp(command)) {
+  process.exit(0);
+}
 
 // --- Orchestration commands ---
 

@@ -21,6 +21,7 @@
 
 import { resolve } from "node:path";
 import { usage } from "./commands/constants.js";
+import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
 
@@ -58,8 +59,15 @@ function parseArgs(argv: string[]): {
 async function main(): Promise<void> {
   const { command, positional, flags } = parseArgs(process.argv.slice(2));
 
-  if (flags.help || !command) {
+  // Show help: per-command help when a command is given, else top-level usage.
+  if (!command) {
     usage();
+    process.exit(0);
+  }
+  if (flags.help) {
+    if (!showCommandHelp(command)) {
+      usage();
+    }
     process.exit(0);
   }
 
