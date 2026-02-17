@@ -8413,7 +8413,7 @@
             {
               "id": "1e0b3886-6d80-4987-8f81-b6c8e6b5ad08",
               "title": "Create hierarchical navigation with intelligent suggestions",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Build a help system that supports drill-down navigation, command suggestions for typos, and searchable help content across all commands",
               "acceptanceCriteria": [
@@ -8431,7 +8431,66 @@
                 "discovery",
                 "search"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-17T21:55:01.655Z",
+              "children": [
+                {
+                  "id": "5df1865c-e076-475b-9c4c-b37000615d06",
+                  "title": "Add navigation hints and related commands to help output",
+                  "status": "pending",
+                  "level": "subtask",
+                  "description": "Enhance the main help in cli.js to include navigation hints (e.g., 'Run ndx <cmd> --help for details'). Add 'See also' related command suggestions to per-command help output in all three package help.ts files. Add subcommand help accessibility from parent command help (e.g., ndx rex --help shows rex commands with hint to drill down).",
+                  "acceptanceCriteria": [
+                    "Main help shows navigation hints like 'Run ndx <command> --help for details'",
+                    "Per-command help includes 'See also:' section with related commands",
+                    "Users can access subcommand help from parent command help (ndx rex --help → rex subcommands)"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "cli",
+                    "help",
+                    "navigation"
+                  ]
+                },
+                {
+                  "id": "ccff7d53-6a94-4821-b718-0446e4974293",
+                  "title": "Implement typo correction with edit distance matching",
+                  "status": "pending",
+                  "level": "subtask",
+                  "description": "Add Levenshtein edit distance matching to suggest similar commands when the user types an unrecognized command. Applies to both the orchestrator (cli.js) and per-package CLIs (rex, hench, sourcevision). Suggest commands within distance ≤ 2.",
+                  "acceptanceCriteria": [
+                    "Typing 'ndx statis' suggests 'ndx status'",
+                    "Typing 'rex valdate' suggests 'rex validate'",
+                    "Suggestions only shown when edit distance ≤ 2",
+                    "Works for all three package CLIs and orchestrator"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "cli",
+                    "typo-correction",
+                    "discovery"
+                  ]
+                },
+                {
+                  "id": "5717ebd1-09f2-4f8e-a8af-38d39fb484e6",
+                  "title": "Implement keyword search across all help content",
+                  "level": "subtask",
+                  "status": "pending",
+                  "description": "Add 'ndx help <keyword>' command to search across all help content (orchestrator + packages). Score results by relevance (title match > description match > option match). Display matched commands with context snippets showing why they matched.",
+                  "priority": "medium",
+                  "acceptanceCriteria": [
+                    "ndx help PRD returns commands related to PRD management",
+                    "ndx help sync returns the sync command with relevant context",
+                    "Results are scored and sorted by relevance",
+                    "Search covers orchestrator commands and all package commands"
+                  ],
+                  "tags": [
+                    "cli",
+                    "search",
+                    "discovery"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -8521,10 +8580,12 @@
         {
           "id": "45553d8b-a8e9-4910-a679-75ac7bb5bb76",
           "title": "Enhanced Navigation Interface",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Update header, navigation, and sidebar to display project context and status indicators",
           "source": "smart-add",
+          "startedAt": "2026-02-17T21:54:25.627Z",
+          "completedAt": "2026-02-17T21:54:25.627Z",
           "children": [
             {
               "id": "0359b80f-7ab2-43a1-b6e0-fe9187bf2dbd",
@@ -8558,7 +8619,7 @@
             {
               "id": "7a896b26-b14a-42d2-8e6b-4903a409af5c",
               "title": "Add project status indicators to sidebar",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement visual indicators in the sidebar that show project health, analysis status, and PRD completion metrics",
               "acceptanceCriteria": [
@@ -8573,7 +8634,9 @@
                 "status",
                 "indicators"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-17T21:12:02.874Z",
+              "completedAt": "2026-02-17T21:54:25.548Z"
             }
           ]
         },
