@@ -11,6 +11,7 @@ import {
   RexCompletionIndicator,
   HenchActivityIndicator,
 } from "./status-indicators.js";
+import { ConfigFooter } from "./config-footer.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -398,9 +399,11 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
         );
       })
     ),
-    // Sidebar footer with collapse toggle and theme toggle
+    // Sidebar footer with config display, collapse toggle, and theme toggle
     !sidebarCollapsed
       ? h("div", { class: "sidebar-footer", role: "group", "aria-label": "Sidebar controls" },
+          h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
+          h(ConfigFooter, null),
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarThemeToggle, null),
