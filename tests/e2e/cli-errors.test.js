@@ -125,8 +125,8 @@ describe("n-dx help navigation", () => {
     it("shows detailed help for orchestration commands", () => {
       const output = run(["help", "plan"]);
       expect(output).toContain("ndx plan");
-      expect(output).toContain("Usage:");
-      expect(output).toContain("Examples:");
+      expect(output).toContain("USAGE");
+      expect(output).toContain("EXAMPLES");
       expect(output).toContain("See also:");
     });
   });

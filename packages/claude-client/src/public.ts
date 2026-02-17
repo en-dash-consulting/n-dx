@@ -166,3 +166,28 @@ export {
   suggestCommands,
   formatTypoSuggestion,
 } from "./suggest.js";
+
+// CLI help formatting
+export {
+  isColorEnabled,
+  resetColorCache,
+  bold,
+  dim,
+  cyan,
+  yellow,
+  cmd,
+  flag,
+  sectionHeader,
+  requiredParam,
+  optionalParam,
+  formatHelp,
+  formatUsage,
+} from "./help-format.js";
+
+export type {
+  HelpOption,
+  HelpExample,
+  HelpDefinition,
+  UsageSection,
+  UsageDefinition,
+} from "./help-format.js";

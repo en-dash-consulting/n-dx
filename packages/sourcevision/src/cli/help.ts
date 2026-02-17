@@ -1,23 +1,155 @@
 /**
  * Command-specific help content for the sourcevision CLI.
  *
- * Each command has a dedicated help function that shows:
+ * Each command has a dedicated help definition that includes:
  *   - Synopsis / usage pattern
  *   - Relevant flags only
  *   - 2–3 practical examples
  *
+ * Uses the shared formatHelp() from @n-dx/claude-client for consistent
+ * presentation with semantic color coding across all n-dx packages.
+ *
  * @module sourcevision/cli/help
  */
 
-/** Map of command name → help renderer. */
-const COMMAND_HELP: Record<string, () => void> = {
-  init: helpInit,
-  analyze: helpAnalyze,
-  serve: helpServe,
-  validate: helpValidate,
-  reset: helpReset,
-  "export-pdf": helpExportPdf,
-  mcp: helpMcp,
+import { formatHelp } from "@n-dx/claude-client";
+import type { HelpDefinition } from "@n-dx/claude-client";
+
+/** Map of command name → help definition. */
+const COMMAND_DEFS: Record<string, HelpDefinition> = {
+  init: {
+    tool: "sourcevision",
+    command: "init",
+    summary: "set up .sourcevision/ directory",
+    usage: "sourcevision init [dir]",
+    description:
+      "Creates .sourcevision/ with a manifest.json in the target directory.\n" +
+      "If .sourcevision/ already exists, reports it and suggests running analyze.",
+    examples: [
+      { command: "sourcevision init", description: "Initialize in current directory" },
+      { command: "sourcevision init ./my-project", description: "Initialize in a specific directory" },
+      { command: "sv init .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze"],
+  },
+  analyze: {
+    tool: "sourcevision",
+    command: "analyze",
+    summary: "run the analysis pipeline",
+    usage: "sourcevision analyze [options] [dir]",
+    description:
+      "Runs the full four-phase analysis pipeline: inventory, imports, zone\n" +
+      "detection, and component cataloging. Generates CONTEXT.md, llms.txt,\n" +
+      "and structured JSON data files in .sourcevision/.",
+    sections: [
+      {
+        title: "Phases",
+        content:
+          "1. Inventory    File listing with metadata and classifications\n" +
+          "2. Imports      Dependency graph and import edges\n" +
+          "3. Zones        Architectural zone detection (Louvain community detection)\n" +
+          "4. Components   React component catalog and prop analysis",
+      },
+    ],
+    options: [
+      { flag: "--phase=<N>", description: "Run only phase N (1–4)" },
+      { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
+      { flag: "--fast", description: "Skip AI zone-name enrichment (algorithmic names only)" },
+      { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
+      { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
+      { flag: "--quiet, -q", description: "Suppress informational output" },
+    ],
+    examples: [
+      { command: "sourcevision analyze", description: "Full analysis of current directory" },
+      { command: "sourcevision analyze --fast .", description: "Skip AI enrichment for speed" },
+      { command: "sourcevision analyze --phase=1", description: "Run only the inventory phase" },
+      { command: "sv analyze --only=zones .", description: "Re-run zone detection only" },
+    ],
+    related: ["validate", "serve"],
+  },
+  serve: {
+    tool: "sourcevision",
+    command: "serve",
+    summary: "start a local viewer server",
+    usage: "sourcevision serve [options] [dir]",
+    description:
+      "Starts an HTTP server to browse the analysis results interactively.\n" +
+      "Requires .sourcevision/ to exist (run 'sourcevision init' and\n" +
+      "'sourcevision analyze' first).",
+    options: [
+      { flag: "--port=<N>", description: "Server port (default: 3117)" },
+    ],
+    examples: [
+      { command: "sourcevision serve", description: "Start viewer on default port" },
+      { command: "sourcevision serve --port=8080", description: "Start viewer on custom port" },
+      { command: "sv serve .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze"],
+  },
+  validate: {
+    tool: "sourcevision",
+    command: "validate",
+    summary: "validate analysis output files",
+    usage: "sourcevision validate [dir]",
+    description:
+      "Checks that .sourcevision/ contains valid manifest.json and data files.\n" +
+      "Useful for CI pipelines to ensure analysis output is consistent.",
+    examples: [
+      { command: "sourcevision validate", description: "Validate current directory" },
+      { command: "sourcevision validate ./project", description: "Validate a specific project" },
+      { command: "sv validate .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze"],
+  },
+  reset: {
+    tool: "sourcevision",
+    command: "reset",
+    summary: "remove .sourcevision/ and start fresh",
+    usage: "sourcevision reset [dir]",
+    description:
+      "Deletes the entire .sourcevision/ directory. Use this when you want\n" +
+      "a clean re-analysis or when troubleshooting stale data.",
+    examples: [
+      { command: "sourcevision reset", description: "Reset current directory" },
+      { command: "sourcevision reset ./project", description: "Reset a specific project" },
+      { command: "sv reset .", description: "Using the 'sv' alias" },
+    ],
+    related: ["init"],
+  },
+  "export-pdf": {
+    tool: "sourcevision",
+    command: "export-pdf",
+    summary: "export analysis as PDF report",
+    usage: "sourcevision export-pdf [options] [dir]",
+    description:
+      "Generates a PDF report from the analysis data. Requires .sourcevision/\n" +
+      "to exist with completed analysis.",
+    options: [
+      { flag: "--output=<path>", description: "Output file path (default: .sourcevision/report.pdf)" },
+    ],
+    examples: [
+      { command: "sourcevision export-pdf", description: "Export to default location" },
+      { command: "sourcevision export-pdf --output=report.pdf", description: "Custom output path" },
+      { command: "sv export-pdf .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze"],
+  },
+  mcp: {
+    tool: "sourcevision",
+    command: "mcp",
+    summary: "start MCP server for AI tool integration",
+    usage: "sourcevision mcp [dir]",
+    description:
+      "Starts a Model Context Protocol (MCP) server over stdio for integration\n" +
+      "with AI coding assistants. Exposes tools for querying the codebase:\n" +
+      "inventory, imports, zones, components, and full context.",
+    examples: [
+      { command: "sourcevision mcp", description: "Start MCP server in current directory" },
+      { command: "sourcevision mcp /path/to/proj", description: "Start MCP server for a specific project" },
+      { command: "sv mcp .", description: "Using the 'sv' alias" },
+    ],
+    related: [],
+  },
 };
 
 /** Related commands for each sourcevision command (shown as "See also"). */
@@ -36,24 +168,19 @@ const RELATED_COMMANDS: Record<string, string[]> = {
  * Returns null if the command has no dedicated help.
  */
 export function getCommandHelp(command: string): string | null {
-  const fn = COMMAND_HELP[command];
-  if (!fn) return null;
+  const def = COMMAND_DEFS[command];
+  if (!def) return null;
 
-  const lines: string[] = [];
-  const origLog = console.log;
-  console.log = (...args: unknown[]) => lines.push(args.join(" "));
-  try {
-    fn();
-  } finally {
-    console.log = origLog;
-  }
+  const related = def.related && def.related.length > 0
+    ? def.related
+    : RELATED_COMMANDS[command];
 
-  let text = lines.join("\n");
-  const related = RELATED_COMMANDS[command];
-  if (related && related.length > 0) {
-    text += `\nSee also: ${related.map((r) => `sourcevision ${r}`).join(", ")}`;
-  }
-  return text;
+  const fullDef: HelpDefinition = {
+    ...def,
+    related: related && related.length > 0 ? related : undefined,
+  };
+
+  return formatHelp(fullDef);
 }
 
 /**
@@ -65,136 +192,4 @@ export function showCommandHelp(command: string): boolean {
   if (!text) return false;
   console.log(text);
   return true;
-}
-
-// ── Per-command help ──────────────────────────────────────────────────
-
-function helpInit(): void {
-  console.log(`sourcevision init — set up .sourcevision/ directory
-
-Usage: sourcevision init [dir]
-
-Creates .sourcevision/ with a manifest.json in the target directory.
-If .sourcevision/ already exists, reports it and suggests running analyze.
-
-Examples:
-  sourcevision init                Initialize in current directory
-  sourcevision init ./my-project   Initialize in a specific directory
-  sv init .                        Using the 'sv' alias
-`);
-}
-
-function helpAnalyze(): void {
-  console.log(`sourcevision analyze — run the analysis pipeline
-
-Usage: sourcevision analyze [options] [dir]
-
-Runs the full four-phase analysis pipeline: inventory, imports, zone
-detection, and component cataloging. Generates CONTEXT.md, llms.txt,
-and structured JSON data files in .sourcevision/.
-
-Phases:
-  1. Inventory    File listing with metadata and classifications
-  2. Imports      Dependency graph and import edges
-  3. Zones        Architectural zone detection (Louvain community detection)
-  4. Components   React component catalog and prop analysis
-
-Options:
-  --phase=<N>         Run only phase N (1–4)
-  --only=<module>     Run only a named module: inventory, imports, zones,
-                      components
-  --fast              Skip AI zone-name enrichment (algorithmic names only)
-  --full              Run all 4 enrichment passes in sequence
-  --per-zone          Per-zone enrichment (smaller context, parallelizable)
-  --quiet, -q         Suppress informational output
-
-Examples:
-  sourcevision analyze             Full analysis of current directory
-  sourcevision analyze --fast .    Skip AI enrichment for speed
-  sourcevision analyze --phase=1   Run only the inventory phase
-  sv analyze --only=zones .        Re-run zone detection only
-`);
-}
-
-function helpServe(): void {
-  console.log(`sourcevision serve — start a local viewer server
-
-Usage: sourcevision serve [options] [dir]
-
-Starts an HTTP server to browse the analysis results interactively.
-Requires .sourcevision/ to exist (run 'sourcevision init' and
-'sourcevision analyze' first).
-
-Options:
-  --port=<N>          Server port (default: 3117)
-
-Examples:
-  sourcevision serve               Start viewer on default port
-  sourcevision serve --port=8080   Start viewer on custom port
-  sv serve .                       Using the 'sv' alias
-`);
-}
-
-function helpValidate(): void {
-  console.log(`sourcevision validate — validate analysis output files
-
-Usage: sourcevision validate [dir]
-
-Checks that .sourcevision/ contains valid manifest.json and data files.
-Useful for CI pipelines to ensure analysis output is consistent.
-
-Examples:
-  sourcevision validate            Validate current directory
-  sourcevision validate ./project  Validate a specific project
-  sv validate .                    Using the 'sv' alias
-`);
-}
-
-function helpReset(): void {
-  console.log(`sourcevision reset — remove .sourcevision/ and start fresh
-
-Usage: sourcevision reset [dir]
-
-Deletes the entire .sourcevision/ directory. Use this when you want
-a clean re-analysis or when troubleshooting stale data.
-
-Examples:
-  sourcevision reset               Reset current directory
-  sourcevision reset ./project     Reset a specific project
-  sv reset .                       Using the 'sv' alias
-`);
-}
-
-function helpExportPdf(): void {
-  console.log(`sourcevision export-pdf — export analysis as PDF report
-
-Usage: sourcevision export-pdf [options] [dir]
-
-Generates a PDF report from the analysis data. Requires .sourcevision/
-to exist with completed analysis.
-
-Options:
-  --output=<path>     Output file path (default: .sourcevision/report.pdf)
-
-Examples:
-  sourcevision export-pdf                       Export to default location
-  sourcevision export-pdf --output=report.pdf   Custom output path
-  sv export-pdf .                               Using the 'sv' alias
-`);
-}
-
-function helpMcp(): void {
-  console.log(`sourcevision mcp — start MCP server for AI tool integration
-
-Usage: sourcevision mcp [dir]
-
-Starts a Model Context Protocol (MCP) server over stdio for integration
-with AI coding assistants. Exposes tools for querying the codebase:
-inventory, imports, zones, components, and full context.
-
-Examples:
-  sourcevision mcp                 Start MCP server in current directory
-  sourcevision mcp /path/to/proj   Start MCP server for a specific project
-  sv mcp .                         Using the 'sv' alias
-`);
 }

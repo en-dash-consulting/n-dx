@@ -43,10 +43,10 @@ describe("sourcevision CLI help", () => {
         const output = logSpy.mock.calls[0][0] as string;
 
         // Every command help should include a usage line
-        expect(output).toMatch(/Usage:/);
+        expect(output).toMatch(/USAGE/);
 
         // Every command should have at least one example
-        expect(output).toMatch(/Examples:/);
+        expect(output).toMatch(/EXAMPLES/);
 
         // Should start with "sourcevision <command>"
         expect(output).toMatch(new RegExp(`^sourcevision\\s+${cmd}`));

@@ -6,9 +6,67 @@
  *   - Typo correction via Levenshtein edit distance
  *   - Keyword search across all help content with relevance scoring
  *   - Related command suggestions ("See also")
+ *   - Consistent visual formatting with semantic color coding
+ *
+ * ## Color support
+ *
+ * Respects NO_COLOR (https://no-color.org/) and FORCE_COLOR environment
+ * variables for accessible terminal output. Color semantics match the
+ * shared formatter in @n-dx/claude-client/help-format.
  *
  * @module n-dx/help
  */
+
+// ── ANSI color support ──────────────────────────────────────────────────
+
+/**
+ * Detect whether the terminal supports color output.
+ * Mirrors the logic in @n-dx/claude-client/help-format.
+ */
+function supportsColor() {
+  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
+    return true;
+  }
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
+    return false;
+  }
+  if (process.stdout && typeof process.stdout.isTTY === "boolean") {
+    return process.stdout.isTTY;
+  }
+  return false;
+}
+
+let _colorEnabled = null;
+
+function isColorEnabled() {
+  if (_colorEnabled === null) {
+    _colorEnabled = supportsColor();
+  }
+  return _colorEnabled;
+}
+
+function ansi(code, text, reset) {
+  if (!isColorEnabled()) return text;
+  return `\x1b[${code}m${text}\x1b[${reset}m`;
+}
+
+function bold(text) { return ansi("1", text, "22"); }
+function dim(text) { return ansi("2", text, "22"); }
+function cyan(text) { return ansi("36", text, "39"); }
+function yellow(text) { return ansi("33", text, "39"); }
+
+/** Format a command name (cyan). */
+function cmd(text) { return cyan(text); }
+/** Format a flag/option name (yellow). */
+function flag(text) { return yellow(text); }
+
+/**
+ * Format a flag string with color highlighting.
+ * Highlights flag names in yellow.
+ */
+function formatFlag(flagStr) {
+  return flagStr.replace(/--[\w-]+(?:=<[^>]+>)?|-\w/g, (match) => flag(match));
+}
 
 // ── Command registry ────────────────────────────────────────────────────
 
@@ -358,7 +416,7 @@ export function searchHelp(query) {
 }
 
 /**
- * Format search results for CLI output.
+ * Format search results for CLI output with color highlighting.
  *
  * @param {SearchResult[]} results
  * @param {string} query
@@ -368,22 +426,21 @@ export function formatSearchResults(results, query) {
   if (results.length === 0) {
     return `No commands found matching '${query}'.
 
-Try 'ndx --help' to see all available commands.`;
+Try '${cmd("ndx --help")}' to see all available commands.`;
   }
 
   const lines = [`Search results for '${query}':\n`];
 
   for (const r of results.slice(0, 10)) {
-    const prefix = r.name.includes(" ") ? "ndx " : "ndx ";
-    lines.push(`  ${prefix}${r.name}`);
-    lines.push(`    ${r.summary}`);
+    lines.push(`  ${cmd("ndx " + r.name)}`);
+    lines.push(`    ${dim(r.summary)}`);
   }
 
   if (results.length > 10) {
-    lines.push(`\n  ... and ${results.length - 10} more results`);
+    lines.push(`\n  ${dim(`... and ${results.length - 10} more results`)}`);
   }
 
-  lines.push(`\nRun 'ndx <command> --help' for detailed help on a specific command.`);
+  lines.push(`\n${dim("Run 'ndx <command> --help' for detailed help on a specific command.")}`);
 
   return lines.join("\n");
 }
@@ -416,7 +473,7 @@ export function getRelatedCommands(command, tool) {
  */
 export function formatRelatedCommands(related, prefix = "ndx") {
   if (related.length === 0) return null;
-  return `See also: ${related.map((r) => `${prefix} ${r}`).join(", ")}`;
+  return `See also: ${related.map((r) => cmd(`${prefix} ${r}`)).join(dim(", "))}`;
 }
 
 // ── Navigation helpers ────────────────────────────────────────────────
@@ -441,6 +498,7 @@ export function getToolSubcommands(tool) {
 
 /**
  * Format tool-specific help showing its subcommands with drill-down hints.
+ * Uses consistent color coding: command names in cyan, summaries in default.
  *
  * @param {string} tool - Tool name
  * @returns {string | null}
@@ -453,14 +511,360 @@ export function formatToolHelp(tool) {
   const toolLabels = { rex: "Rex", hench: "Hench", sourcevision: "SourceVision" };
   const label = toolLabels[normalizedTool] || normalizedTool;
 
-  const lines = [`${label} — available commands:\n`];
+  const lines = [`${bold(label)} ${dim("—")} available commands:\n`];
+
+  // Calculate padding for alignment
+  const maxNameLen = Math.max(...subs.map((e) => e.name.length));
+  const pad = Math.max(maxNameLen + 4, 18);
 
   for (const entry of subs) {
-    const padded = entry.name.padEnd(16);
-    lines.push(`  ${padded}${entry.summary}`);
+    const nameText = cmd(entry.name);
+    const rawNameLen = entry.name.length;
+    const spacing = " ".repeat(Math.max(pad - rawNameLen - 2, 2));
+    lines.push(`  ${nameText}${spacing}${entry.summary}`);
   }
 
-  lines.push(`\nRun '${tool} <command> --help' for detailed help on a specific command.`);
+  lines.push(`\n${dim(`Run '${tool} <command> --help' for detailed help on a specific command.`)}`);
+
+  return lines.join("\n");
+}
+
+// ── Orchestration command help definitions ────────────────────────────
+
+/**
+ * @typedef {Object} OrchestratorHelpDef
+ * @property {string} summary - One-line description
+ * @property {string} [description] - Multi-line description
+ * @property {string|string[]} usage - Usage pattern(s)
+ * @property {{title: string, content: string}[]} [sections] - Custom sections
+ * @property {{flag: string, description: string}[]} [options] - Options
+ * @property {{command: string, description: string}[]} [examples] - Examples
+ * @property {string[]} [related] - Related commands
+ */
+
+/** @type {Record<string, OrchestratorHelpDef>} */
+const ORCHESTRATOR_HELP_DEFS = {
+  init: {
+    summary: "initialize all tools",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.",
+    usage: "ndx init [options] [dir]",
+    options: [
+      { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
+      { flag: "--analyze", description: "Also run SourceVision analysis after init" },
+    ],
+    examples: [
+      { command: "ndx init", description: "Initialize in current directory" },
+      { command: "ndx init ./my-project", description: "Initialize in a specific directory" },
+      { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
+    ],
+    related: ["plan", "status"],
+  },
+  plan: {
+    summary: "analyze codebase and generate PRD proposals",
+    description: "Runs SourceVision analysis then Rex analyze to scan the codebase and\ngenerate PRD proposals. Proposals are reviewed interactively unless\n--accept is passed.",
+    usage: "ndx plan [options] [dir]",
+    options: [
+      { flag: "--accept", description: "Accept all proposals without review" },
+      { flag: "--guided", description: "Interactive spec builder for new projects" },
+      { flag: "--file=<path>", description: "Import from a document (skip SourceVision scan)" },
+      { flag: "--lite", description: "File-name-only scan (faster, less detail)" },
+      { flag: "--no-llm", description: "Force algorithmic pipeline, skip LLM" },
+      { flag: "--model=<name>", description: "Override LLM model" },
+      { flag: "--chunk-size=<n>", description: "Proposals per page in interactive review" },
+      { flag: "--quiet, -q", description: "Suppress informational output" },
+    ],
+    examples: [
+      { command: "ndx plan", description: "Analyze and review proposals interactively" },
+      { command: "ndx plan --accept .", description: "Auto-accept all proposals" },
+      { command: "ndx plan --file=spec.md .", description: "Generate PRD from a spec document" },
+      { command: "ndx plan --guided .", description: "Guided setup for a new project" },
+    ],
+    related: ["init", "work", "status"],
+  },
+  work: {
+    summary: "execute the next task autonomously",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.",
+    usage: "ndx work [options] [dir]",
+    options: [
+      { flag: "--task=<id>", description: "Target a specific Rex task ID" },
+      { flag: "--epic=<id|title>", description: "Only consider tasks within the specified epic" },
+      { flag: "--epic-by-epic", description: "Process epics sequentially" },
+      { flag: "--auto", description: "Skip interactive selection, autoselect by priority" },
+      { flag: "--iterations=<n>", description: "Run multiple tasks sequentially" },
+      { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
+      { flag: "--dry-run", description: "Print the task brief without calling Claude" },
+      { flag: "--review", description: "Show proposed changes and prompt for approval" },
+      { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
+      { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
+      { flag: "--model=<model>", description: "Override the Claude model" },
+    ],
+    examples: [
+      { command: "ndx work", description: "Run next task interactively" },
+      { command: "ndx work --task=abc123 .", description: "Run a specific task" },
+      { command: "ndx work --auto --loop .", description: "Continuously auto-run tasks" },
+      { command: "ndx work --dry-run .", description: "Preview the brief without execution" },
+    ],
+    related: ["plan", "status"],
+  },
+  status: {
+    summary: "show PRD status tree",
+    description: "Displays the PRD hierarchy with status icons and completion stats.\nDelegates to 'rex status'. Completed items are hidden by default.",
+    usage: "ndx status [options] [dir]",
+    options: [
+      { flag: "--all", description: "Show all items including completed" },
+      { flag: "--coverage", description: "Show test coverage per task" },
+      { flag: "--tokens=false", description: "Hide token usage summary" },
+      { flag: "--since=<ISO>", description: "Filter token usage after timestamp" },
+      { flag: "--until=<ISO>", description: "Filter token usage before timestamp" },
+      { flag: "--format=tree|json", description: "Output format (default: tree)" },
+    ],
+    examples: [
+      { command: "ndx status", description: "Show PRD tree" },
+      { command: "ndx status --all", description: "Include completed items" },
+      { command: "ndx status --format=json .", description: "JSON output for scripting" },
+    ],
+    related: ["plan", "usage", "work"],
+  },
+  usage: {
+    summary: "token usage analytics",
+    description: "Shows token consumption and cost estimates across all LLM operations.\nDelegates to 'rex usage'.",
+    usage: "ndx usage [options] [dir]",
+    options: [
+      { flag: "--group=day|week|month", description: "Group usage by time period" },
+      { flag: "--since=<ISO>", description: "Filter usage after timestamp" },
+      { flag: "--until=<ISO>", description: "Filter usage before timestamp" },
+      { flag: "--format=tree|json", description: "Output format (default: tree)" },
+    ],
+    examples: [
+      { command: "ndx usage", description: "Show total token usage" },
+      { command: "ndx usage --group=week", description: "Usage grouped by week" },
+      { command: "ndx usage --format=json .", description: "Machine-readable output" },
+    ],
+    related: ["status"],
+  },
+  sync: {
+    summary: "sync local PRD with remote adapter",
+    description: "Bidirectional sync between local .rex/prd.json and a remote service.\nDelegates to 'rex sync'.",
+    usage: "ndx sync [options] [dir]",
+    options: [
+      { flag: "--push", description: "Push local changes to remote only" },
+      { flag: "--pull", description: "Pull remote changes to local only" },
+      { flag: "--adapter=<name>", description: "Adapter name (default: notion)" },
+      { flag: "--dry-run", description: "Preview sync without writing" },
+    ],
+    examples: [
+      { command: "ndx sync", description: "Full bidirectional sync" },
+      { command: "ndx sync --push .", description: "Push local changes to Notion" },
+      { command: "ndx sync --pull .", description: "Pull remote changes down" },
+    ],
+    related: ["status"],
+  },
+  start: {
+    summary: "start the dashboard and MCP server",
+    description: "Starts the unified web server serving both the dashboard UI and\nMCP HTTP endpoints for Rex and SourceVision.",
+    usage: "ndx start [subcommand] [options] [dir]",
+    sections: [
+      {
+        title: "Subcommands",
+        content: "(none)              Start the server (foreground)\nstop                Stop a background server\nstatus              Check if a background server is running",
+      },
+    ],
+    options: [
+      { flag: "--port=<N>", description: "Server port (default: 3117)" },
+      { flag: "--background", description: "Run as a background daemon" },
+    ],
+    examples: [
+      { command: "ndx start .", description: "Start server in foreground" },
+      { command: "ndx start --background .", description: "Start as background daemon" },
+      { command: "ndx start status .", description: "Check if server is running" },
+      { command: "ndx start stop .", description: "Stop background server" },
+    ],
+    related: ["web", "dev"],
+  },
+  web: {
+    summary: "alias for 'ndx start'",
+    description: "Legacy alias for 'ndx start'. See 'ndx start --help' for full details.",
+    usage: "ndx web [subcommand] [options] [dir]",
+    examples: [
+      { command: "ndx web .", description: "Start server" },
+      { command: "ndx web --background .", description: "Start as background daemon" },
+    ],
+    related: ["start"],
+  },
+  ci: {
+    summary: "run analysis pipeline and validate PRD health",
+    description: "Runs the full CI pipeline: SourceVision analysis followed by PRD\nvalidation. Reports pass/fail status suitable for CI systems.",
+    usage: "ndx ci [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+    ],
+    examples: [
+      { command: "ndx ci", description: "Run CI pipeline" },
+      { command: "ndx ci --format=json .", description: "JSON output for CI integration" },
+    ],
+    related: ["plan", "status"],
+  },
+  dev: {
+    summary: "start dev server with live reload",
+    description: "Starts the development server with hot module replacement for the\nweb dashboard. Requires .sourcevision/ to exist.",
+    usage: "ndx dev [options] [dir]",
+    options: [
+      { flag: "--port=<N>", description: "Server port (default: 3117)" },
+      { flag: "--scope=<pkg>", description: "Limit to a specific package" },
+    ],
+    examples: [
+      { command: "ndx dev .", description: "Start dev server" },
+      { command: "ndx dev --port=8080 .", description: "Custom port" },
+    ],
+    related: ["start"],
+  },
+};
+
+/**
+ * Format help for an orchestration command using consistent styling.
+ * Returns null if the command has no help definition.
+ *
+ * @param {string} command - Command name
+ * @returns {string | null}
+ */
+export function formatOrchestratorCommandHelp(command) {
+  const def = ORCHESTRATOR_HELP_DEFS[command];
+  if (!def) return null;
+
+  const lines = [];
+
+  // ── Title ──
+  lines.push(`${cmd("ndx")} ${cmd(command)} ${dim("—")} ${def.summary}`);
+  lines.push("");
+
+  // ── Description ──
+  if (def.description) {
+    lines.push(bold("DESCRIPTION"));
+    for (const line of def.description.split("\n")) {
+      lines.push(line ? `  ${line}` : "");
+    }
+    lines.push("");
+  }
+
+  // ── Usage ──
+  const usageLines = Array.isArray(def.usage) ? def.usage : [def.usage];
+  lines.push(bold("USAGE"));
+  for (const u of usageLines) {
+    lines.push(`  ${u}`);
+  }
+  lines.push("");
+
+  // ── Custom sections ──
+  if (def.sections) {
+    for (const section of def.sections) {
+      lines.push(bold(section.title.toUpperCase()));
+      for (const line of section.content.split("\n")) {
+        lines.push(line ? `  ${line}` : "");
+      }
+      lines.push("");
+    }
+  }
+
+  // ── Options ──
+  if (def.options && def.options.length > 0) {
+    lines.push(bold("OPTIONS"));
+    const maxFlagLen = Math.max(...def.options.map((o) => o.flag.length));
+    const pad = Math.max(maxFlagLen + 4, 24);
+    for (const opt of def.options) {
+      const flagText = formatFlag(opt.flag);
+      const rawFlagLen = opt.flag.length;
+      const spacing = " ".repeat(Math.max(pad - rawFlagLen - 2, 2));
+      lines.push(`  ${flagText}${spacing}${opt.description}`);
+    }
+    lines.push("");
+  }
+
+  // ── Examples ──
+  if (def.examples && def.examples.length > 0) {
+    lines.push(bold("EXAMPLES"));
+    const maxCmdLen = Math.max(...def.examples.map((e) => e.command.length));
+    const pad = Math.max(maxCmdLen + 4, 36);
+    for (const ex of def.examples) {
+      const cmdText = cmd(ex.command);
+      const rawCmdLen = ex.command.length;
+      const spacing = " ".repeat(Math.max(pad - rawCmdLen - 2, 2));
+      lines.push(`  ${cmdText}${spacing}${dim(ex.description)}`);
+    }
+    lines.push("");
+  }
+
+  // ── See also ──
+  if (def.related && def.related.length > 0) {
+    const relatedStr = def.related.map((r) => cmd(`ndx ${r}`)).join(dim(", "));
+    lines.push(dim("See also: ") + relatedStr);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format the main ndx help page with consistent visual styling.
+ * @returns {string}
+ */
+export function formatMainHelp() {
+  const lines = [];
+
+  lines.push(`${bold("n-dx")} ${dim("—")} AI-powered development toolkit`);
+  lines.push("");
+
+  // ── Orchestration ──
+  lines.push(bold("ORCHESTRATION"));
+  const orchestrationItems = [
+    ["init [dir]", "Initialize all tools (sourcevision + rex + hench)"],
+    ["plan [dir]", "Analyze codebase and show PRD proposals (--guided for new projects)"],
+    ["plan --accept [dir]", "Analyze and accept proposals into PRD"],
+    ["work [dir]", "Run next task (--task=ID, --epic=ID, --epic-by-epic, --auto)"],
+    ["status [dir]", "Show PRD status (--format=json, --since, --until)"],
+    ["usage [dir]", "Token usage analytics (--format=json, --group=day|week|month)"],
+    ["sync [dir]", "Sync local PRD with remote adapter (--push, --pull)"],
+    ["start [dir]", "Start server: dashboard + MCP (--port=N, --background, stop, status)"],
+    ["dev [dir]", "Start dev server with live reload (--port=N, --scope=<pkg>)"],
+    ["web [dir]", "Alias for start (--port=N, --background, stop, status)"],
+    ["ci [dir]", "Run analysis pipeline and validate PRD health"],
+    ["config [key] [value]", "View and edit settings (--json, --help)"],
+  ];
+  const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));
+  const orchPad = Math.max(maxOrchLen + 4, 24);
+  for (const [name, desc] of orchestrationItems) {
+    const spacing = " ".repeat(Math.max(orchPad - name.length - 2, 2));
+    lines.push(`  ${cmd(name)}${spacing}${desc}`);
+  }
+  lines.push("");
+
+  // ── Tools ──
+  lines.push(bold("TOOLS") + dim(" (via orchestrator or standalone)"));
+  const toolItems = [
+    ["rex ...", "PRD management and task tracking"],
+    ["hench ...", "Autonomous agent for task execution"],
+    ["sourcevision ...", "Codebase analysis and visualization"],
+    ["sv ...", "Alias for sourcevision"],
+  ];
+  for (const [name, desc] of toolItems) {
+    const spacing = " ".repeat(Math.max(orchPad - name.length - 2, 2));
+    lines.push(`  ${cmd(name)}${spacing}${desc}`);
+  }
+  lines.push("");
+
+  // ── Options ──
+  lines.push(bold("OPTIONS"));
+  lines.push(`  ${formatFlag("--quiet, -q")}           Suppress informational output (for scripting)`);
+  lines.push("");
+
+  // ── Usage ──
+  lines.push(bold("USAGE"));
+  lines.push(`  ${cmd("ndx")} ${dim("<command>")} ${dim("[args...]")}`);
+  lines.push(`  ${cmd("n-dx")} ${dim("<command>")} ${dim("[args...]")}`);
+  lines.push("");
+
+  // ── Footer hints ──
+  lines.push(dim("Run 'ndx <command> --help' for detailed help on any command."));
+  lines.push(dim("Run 'ndx help <keyword>' to search all commands by keyword."));
+  lines.push(dim("Standalone binaries (rex, hench, sourcevision, sv) are also available after install."));
 
   return lines.join("\n");
 }

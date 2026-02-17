@@ -1,4 +1,4 @@
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS, formatUsage } from "@n-dx/claude-client";
 import { CLIError } from "../errors.js";
 
 export const HENCH_DIR = PROJECT_DIRS.HENCH;
@@ -27,35 +27,29 @@ export function safeParseNonNegInt(value: string, name: string): number {
 }
 
 export function usage(): void {
-  console.log(`hench v${TOOL_VERSION} — autonomous AI agent for Rex tasks
-
-Usage: hench <command> [options] [dir]
-
-Commands:
-  init [dir]              Create .hench/ with config.json and runs/
-  run [dir]               Execute one task from Rex PRD
-  config [key] [value]    View or edit workflow configuration
-  template [subcommand]   Manage workflow templates (list, show, apply, save, delete)
-  status [dir]            Show recent run history
-  show <run-id> [dir]     Show full details of a specific run
-
-Options:
-  --help, -h              Show this help
-  --task=<id>             Target a specific Rex task ID (for run)
-  --epic=<id|title>       Only consider tasks within the specified epic (for run)
-  --epic-by-epic          Process epics sequentially, advancing when each completes (for run)
-  --auto                  Skip interactive selection, autoselect by priority (for run)
-  --iterations=<n>        Run multiple tasks sequentially (for run)
-  --loop                  Run continuously until all tasks complete or Ctrl+C (for run)
-  --loop-pause=<ms>       Pause between loop iterations in ms (default: config loopPauseMs)
-  --dry-run               Print brief without calling Claude API (for run)
-  --review                Show proposed changes and prompt for approval (for run)
-  --max-turns=<n>         Override max turns (for run)
-  --token-budget=<n>      Cap total tokens (input+output) per run; 0 = unlimited (for run)
-  --model=<m>             Override model (for run)
-  --interactive           Interactive configuration menu (for config)
-  --format=json           Output as JSON (for status/show/config)
-  --last=<n>              Number of recent runs to show (for status)
-  --quiet, -q             Suppress informational output (for scripting)
-`);
+  console.log(formatUsage({
+    title: `hench v${TOOL_VERSION} — autonomous AI agent for Rex tasks`,
+    usage: "hench <command> [options] [dir]",
+    sections: [
+      {
+        title: "Commands",
+        items: [
+          { name: "init [dir]", description: "Create .hench/ with config.json and runs/" },
+          { name: "run [dir]", description: "Execute one task from Rex PRD" },
+          { name: "config [key] [value]", description: "View or edit workflow configuration" },
+          { name: "template [subcommand]", description: "Manage workflow templates (list, show, apply, save, delete)" },
+          { name: "status [dir]", description: "Show recent run history" },
+          { name: "show <run-id> [dir]", description: "Show full details of a specific run" },
+        ],
+      },
+    ],
+    options: [
+      { flag: "--help, -h", description: "Show this help" },
+      { flag: "--quiet, -q", description: "Suppress informational output (for scripting)" },
+      { flag: "--format=json", description: "Output as JSON (for status/show/config)" },
+    ],
+    footer: [
+      "Run 'hench <command> --help' for detailed help on any command.",
+    ],
+  }));
 }
