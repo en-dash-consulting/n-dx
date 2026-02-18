@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks"
 import { MetricCard } from "../components/data-display/health-gauge.js";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
+import { CopyLinkButton } from "../components/copy-link-button.js";
 import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
 import type { ActiveRun } from "../components/active-tasks-panel.js";
 import type { NavigateTo } from "../types.js";
@@ -254,11 +255,14 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
   return h("div", { class: "hench-run-detail" },
     // Back button + header
     h("div", { class: "hench-detail-header" },
-      h("button", {
-        class: "hench-back-btn",
-        onClick: onBack,
-        "aria-label": "Back to runs list",
-      }, "← Back"),
+      h("div", { class: "hench-detail-header-top" },
+        h("button", {
+          class: "hench-back-btn",
+          onClick: onBack,
+          "aria-label": "Back to runs list",
+        }, "\u2190 Back"),
+        h(CopyLinkButton, { path: `/hench-runs/${run.id}`, compact: true }),
+      ),
       h("div", { class: "hench-detail-title-row" },
         h("span", {
           class: "hench-run-status",

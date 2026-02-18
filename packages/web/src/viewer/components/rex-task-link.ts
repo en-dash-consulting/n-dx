@@ -15,6 +15,7 @@
 import { h } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId } from "../types.js";
+import { buildShareableUrl } from "./copy-link-button.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -140,6 +141,12 @@ function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: Co
     onClose();
   };
 
+  const handleCopyLink = () => {
+    const url = buildShareableUrl(`/prd/${task.id}`);
+    navigator.clipboard.writeText(url).catch(() => {});
+    onClose();
+  };
+
   return h("div", { ref, class: "rex-context-menu", style, role: "menu" },
     // Header
     h("div", { class: "rex-context-menu-header" },
@@ -172,6 +179,16 @@ function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: Co
     ),
 
     h("div", { class: "rex-context-menu-divider" }),
+
+    // Copy Link
+    h("button", {
+      class: "rex-context-menu-item",
+      role: "menuitem",
+      onClick: handleCopyLink,
+    },
+      h("span", { class: "rex-context-menu-status-icon", "aria-hidden": "true" }, "\ud83d\udd17"),
+      "Copy Link",
+    ),
 
     // Copy ID
     h("button", {

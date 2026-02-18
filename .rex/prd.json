@@ -8571,7 +8571,7 @@
     {
       "id": "52349534-7b69-4802-8627-c6fb00cc3f00",
       "title": "Deep-linking Navigation System",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -8654,15 +8654,17 @@
         {
           "id": "e03dbe28-2101-4e1c-8c54-0815f652b384",
           "title": "Universal Deep-link URL Generation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Provide consistent URL generation for shareable deep-links across all Rex and Hench items",
           "source": "smart-add",
+          "startedAt": "2026-02-18T08:49:27.875Z",
+          "completedAt": "2026-02-18T08:49:27.875Z",
           "children": [
             {
               "id": "3b3c805f-ad42-4f4d-bb25-5b59518db180",
               "title": "Add shareable link generation across all items",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add UI controls to generate and copy shareable deep-links for any rex task, feature, epic, or hench run from the web interface",
               "acceptanceCriteria": [
@@ -8678,11 +8680,15 @@
                 "sharing",
                 "ui"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T08:43:02.591Z",
+              "completedAt": "2026-02-18T08:49:27.791Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-18T08:49:27.933Z",
+      "completedAt": "2026-02-18T08:49:27.933Z"
     },
     {
       "id": "5fd0de0b-02c3-4895-88be-a0b13f404b8e",
@@ -8854,6 +8860,8 @@
           "level": "feature",
           "description": "Remove the non-functional workspace switcher from the sidebar footer",
           "source": "smart-add",
+          "startedAt": "2026-02-18T08:29:10.313Z",
+          "completedAt": "2026-02-18T08:29:10.313Z",
           "children": [
             {
               "id": "8e918f40-c715-476b-b4b4-c515441f2baf",
@@ -8876,9 +8884,7 @@
               "startedAt": "2026-02-18T08:26:06.822Z",
               "completedAt": "2026-02-18T08:29:10.228Z"
             }
-          ],
-          "startedAt": "2026-02-18T08:29:10.313Z",
-          "completedAt": "2026-02-18T08:29:10.313Z"
+          ]
         }
       ]
     },
@@ -9139,22 +9145,26 @@
     {
       "id": "979ba1e0-1546-491f-832a-fa65dc5416bf",
       "title": "Rex CLI Natural Language Interaction Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T08:42:14.210Z",
+      "completedAt": "2026-02-18T08:42:14.210Z",
       "children": [
         {
           "id": "a5b424c6-5598-45cc-aa64-1bf986d041ed",
           "title": "Natural language proposal modification",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Allow users to provide natural language feedback to modify LLM-generated proposals instead of only accepting/rejecting them",
           "source": "smart-add",
+          "startedAt": "2026-02-18T08:42:14.151Z",
+          "completedAt": "2026-02-18T08:42:14.151Z",
           "children": [
             {
               "id": "70704abd-fe18-4123-ba17-0c1eeacf4c11",
               "title": "Extend rex add command to accept natural language modification requests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Modify the rex add command's interactive proposal review flow to detect and handle natural language input that requests changes to the generated proposal, rather than just accepting standard control commands (y/n/b1/c1/etc.)",
               "acceptanceCriteria": [
@@ -9168,7 +9178,9 @@
                 "ux",
                 "natural-language"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T08:35:24.428Z",
+              "completedAt": "2026-02-18T08:42:14.071Z"
             },
             {
               "id": "6379a1ad-f280-41ea-af86-e0fcb2a9332d",
@@ -9195,7 +9207,7 @@
             {
               "id": "4e7e3ba2-0a50-4988-b6b4-8979370dae07",
               "title": "Add modification request validation and feedback loop",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement validation logic to ensure modification requests are actionable and provide user feedback when requests are ambiguous or cannot be processed",
               "acceptanceCriteria": [
@@ -9210,7 +9222,9 @@
                 "ux",
                 "error-handling"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T08:29:47.790Z",
+              "completedAt": "2026-02-18T08:34:47.064Z"
             }
           ]
         }

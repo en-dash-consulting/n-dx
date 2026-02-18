@@ -11,6 +11,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCategory, RequirementValidationType } from "./types.js";
 import { formatTimestamp } from "./compute.js";
 import { findItemById } from "./tree-utils.js";
+import { CopyLinkButton } from "../copy-link-button.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -937,6 +938,7 @@ export function TaskDetail({ item, allItems, onUpdate, onNavigateToItem, onExecu
       { class: "task-meta-header" },
       h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level] || item.level),
       h("span", { class: "task-id" }, item.id.slice(0, 8)),
+      h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
     ),
 
     // Status selector
