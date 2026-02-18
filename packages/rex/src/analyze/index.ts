@@ -64,3 +64,6 @@ export { reasonForReshape, parseReshapeResponse, formatReshapeProposal } from ".
 
 export type { ModifyProposalOptions, ModifyProposalResult } from "./modify-reason.js";
 export { buildModifyPrompt, modifyProposals } from "./modify-reason.js";
+
+export type { ValidationResult, ClassificationResult } from "./validate-modification.js";
+export { validateModificationRequest, classifyModificationRequest } from "./validate-modification.js";

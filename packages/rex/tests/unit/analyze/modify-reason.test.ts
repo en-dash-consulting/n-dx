@@ -288,7 +288,7 @@ describe("modifyProposals", () => {
     mockComplete.mockResolvedValueOnce({ text: modifiedJson, tokenUsage: undefined });
 
     const originals = [makeProposal("Original")];
-    const result = await modifyProposals(originals, "Change title");
+    const result = await modifyProposals(originals, "Change the epic title to Modified");
 
     expect(result.originalProposals).toBe(originals);
     expect(result.proposals[0].epic.title).toBe("Modified");
@@ -308,7 +308,7 @@ describe("modifyProposals", () => {
 
     const result = await modifyProposals(
       [makeProposal("Auth")],
-      "Simplify tasks",
+      "Simplify all tasks to be shorter and simpler",
     );
 
     expect(result.qualityIssues.length).toBeGreaterThan(0);
@@ -534,5 +534,72 @@ describe("modifyProposals", () => {
     expect(result.proposals[0].epic.source).toBe("llm");
     expect(result.proposals[0].features[0].source).toBe("llm");
     expect(result.proposals[0].features[0].tasks[0].source).toBe("llm");
+  });
+
+  // ─── Validation integration ────────────────────────────────────────
+
+  it("returns validation error for vague single-word requests without calling LLM", async () => {
+    const proposals = [makeProposal("Auth")];
+    const result = await modifyProposals(proposals, "change");
+
+    expect(result.validationError).toBeDefined();
+    expect(result.validationError).toMatch(/vague|specific/i);
+    expect(result.validationSuggestion).toBeDefined();
+    expect(result.proposals).toEqual(proposals); // originals unchanged
+    expect(result.tokenUsage.calls).toBe(0); // no LLM call
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  it("returns validation error for known vague phrases without calling LLM", async () => {
+    const proposals = [makeProposal("Auth")];
+    const result = await modifyProposals(proposals, "make it better");
+
+    expect(result.validationError).toBeDefined();
+    expect(result.validationError).toMatch(/vague|specific/i);
+    expect(result.tokenUsage.calls).toBe(0);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  it("skips validation when skipValidation option is set", async () => {
+    const modifiedJson = JSON.stringify([{
+      epic: { title: "Auth" },
+      features: [{
+        title: "Login",
+        tasks: [{ title: "Implement login form", description: "d", acceptanceCriteria: ["c"] }],
+      }],
+    }]);
+
+    mockComplete.mockResolvedValueOnce({ text: modifiedJson, tokenUsage: undefined });
+
+    const proposals = [makeProposal("Auth")];
+    // "change" would normally fail validation, but skipValidation bypasses it
+    const result = await modifyProposals(proposals, "change", { skipValidation: true });
+
+    expect(result.validationError).toBeUndefined();
+    expect(result.proposals).toHaveLength(1);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes validation for specific requests and calls LLM", async () => {
+    const modifiedJson = JSON.stringify([{
+      epic: { title: "User Authentication" },
+      features: [{
+        title: "OAuth2 Login",
+        tasks: [{ title: "Add Google OAuth2", description: "d", acceptanceCriteria: ["c"] }],
+      }],
+    }]);
+
+    mockComplete.mockResolvedValueOnce({
+      text: modifiedJson,
+      tokenUsage: { input: 500, output: 200 },
+    });
+
+    const proposals = [makeProposal("Auth")];
+    const result = await modifyProposals(proposals, "Rename the epic to User Authentication and add OAuth2 login");
+
+    expect(result.validationError).toBeUndefined();
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].epic.title).toBe("User Authentication");
+    expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 });

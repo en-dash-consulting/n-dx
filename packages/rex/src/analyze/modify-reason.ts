@@ -30,6 +30,7 @@ import {
   DEFAULT_MODEL,
   MAX_RETRIES,
 } from "./reason.js";
+import { validateModificationRequest } from "./validate-modification.js";
 
 // ── Types ──
 
@@ -42,6 +43,8 @@ export interface ModifyProposalOptions {
   existingItems?: PRDItem[];
   /** Maximum number of retry attempts on parse failure. */
   maxRetries?: number;
+  /** Skip validation of the modification request (default: false). */
+  skipValidation?: boolean;
 }
 
 export interface ModifyProposalResult extends ReasonResult {
@@ -49,6 +52,10 @@ export interface ModifyProposalResult extends ReasonResult {
   originalProposals: Proposal[];
   /** Quality issues found in the modified proposals. */
   qualityIssues: ReturnType<typeof validateProposalQuality>;
+  /** Validation error when the request was rejected before LLM call. */
+  validationError?: string;
+  /** Suggestion for improving a rejected request. */
+  validationSuggestion?: string;
 }
 
 // ── Prompt building ──
@@ -172,6 +179,21 @@ export async function modifyProposals(
       tokenUsage: emptyAnalyzeTokenUsage(),
       qualityIssues: validateProposalQuality(proposals),
     };
+  }
+
+  // Validate the modification request before calling the LLM
+  if (!options.skipValidation) {
+    const validation = validateModificationRequest(modificationRequest, proposals);
+    if (!validation.valid) {
+      return {
+        proposals,
+        originalProposals: proposals,
+        tokenUsage: emptyAnalyzeTokenUsage(),
+        qualityIssues: validateProposalQuality(proposals),
+        validationError: validation.error,
+        validationSuggestion: validation.suggestion,
+      };
+    }
   }
 
   const model = options.model ?? DEFAULT_MODEL;
