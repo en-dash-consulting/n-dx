@@ -2,8 +2,8 @@
  * Notion integration configuration API routes.
  *
  * Manages Notion API credentials (token + database ID) through the
- * adapter registry, validates connection health, and provides a secure
- * configuration endpoint for the dashboard UI.
+ * adapter registry, validates connection health, validates the database
+ * schema, and provides configuration endpoints for the dashboard UI.
  *
  * Credentials are stored via the adapter registry's redaction mechanism:
  * sensitive fields (token) are replaced with `{ __redacted, envVar, hint }`
@@ -13,6 +13,8 @@
  * GET  /api/notion/config       — current Notion adapter config (masked)
  * PUT  /api/notion/config       — save/update Notion adapter config
  * POST /api/notion/test         — test connection to Notion API
+ * POST /api/notion/schema       — validate database schema for PRD mapping
+ * POST /api/notion/schema/fix   — create missing properties in database
  * DELETE /api/notion/config     — remove Notion adapter config
  */
 
@@ -89,6 +91,314 @@ interface ConnectionTestResult {
     /** Number of pages in database (if accessible). */
     pageCount?: number;
   };
+}
+
+// ---------------------------------------------------------------------------
+// Schema validation types
+// ---------------------------------------------------------------------------
+
+/**
+ * Expected database properties for PRD mapping.
+ *
+ * Mirrors DATABASE_SCHEMA from rex's notion-map.ts. Defined here locally
+ * to avoid a compile-time import (rex is dynamically imported only for
+ * the adapter registry).
+ */
+const REQUIRED_PROPERTIES: Record<string, string> = {
+  Name: "title",
+  Status: "status",
+  Level: "select",
+  "PRD ID": "rich_text",
+};
+
+const OPTIONAL_PROPERTIES: Record<string, string> = {
+  Description: "rich_text",
+  Priority: "select",
+  Tags: "multi_select",
+  Source: "rich_text",
+  "Blocked By": "rich_text",
+  "Started At": "rich_text",
+  "Completed At": "rich_text",
+};
+
+/** All expected properties (required + optional). */
+const ALL_PROPERTIES: Record<string, string> = {
+  ...REQUIRED_PROPERTIES,
+  ...OPTIONAL_PROPERTIES,
+};
+
+/** Properties that can be created via the Notion API (Status cannot). */
+const CREATABLE_TYPES = new Set(["rich_text", "select", "multi_select"]);
+
+interface SchemaPropertyResult {
+  name: string;
+  expectedType: string;
+  actualType: string | null;
+  required: boolean;
+  status: "ok" | "missing" | "wrong_type";
+  /** Whether this property can be auto-created via the API. */
+  canAutoCreate: boolean;
+  /** Human-readable guidance for fixing the issue. */
+  guidance?: string;
+}
+
+interface SchemaValidationResponse {
+  valid: boolean;
+  databaseTitle: string;
+  properties: SchemaPropertyResult[];
+  /** Summary counts for quick display. */
+  summary: {
+    total: number;
+    ok: number;
+    missing: number;
+    wrongType: number;
+    fixable: number;
+  };
+}
+
+/**
+ * Validate a Notion database's property schema against the expected
+ * PRD property structure. Returns per-property diagnostics.
+ */
+async function validateNotionSchema(
+  token: string,
+  databaseId: string,
+): Promise<SchemaValidationResponse | ConnectionTestResult> {
+  // Fetch the database to inspect its properties
+  let dbData: { title?: Array<{ plain_text?: string }>; properties?: Record<string, { type: string }> };
+
+  try {
+    const dbRes = await fetch(`${NOTION_API}/databases/${databaseId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Notion-Version": NOTION_VERSION,
+      },
+    });
+
+    if (!dbRes.ok) {
+      if (dbRes.status === 401) {
+        return {
+          status: "red",
+          message: "Invalid API key. Check your Notion integration token.",
+          details: { authValid: false, databaseAccessible: false },
+        };
+      }
+      if (dbRes.status === 404) {
+        return {
+          status: "red",
+          message: "Database not found. Check the database ID and ensure your integration has access.",
+          details: { authValid: true, databaseAccessible: false },
+        };
+      }
+      const text = await dbRes.text().catch(() => "");
+      return {
+        status: "red",
+        message: `Cannot access database (${dbRes.status}): ${text.slice(0, 200)}`,
+        details: { authValid: true, databaseAccessible: false },
+      };
+    }
+
+    dbData = await dbRes.json();
+  } catch (err) {
+    return {
+      status: "red",
+      message: `Cannot reach Notion API: ${err instanceof Error ? err.message : String(err)}`,
+      details: { authValid: false, databaseAccessible: false },
+    };
+  }
+
+  const databaseTitle = dbData.title?.[0]?.plain_text ?? "Untitled";
+  const dbProps = dbData.properties ?? {};
+
+  const properties: SchemaPropertyResult[] = [];
+  let ok = 0;
+  let missing = 0;
+  let wrongType = 0;
+  let fixable = 0;
+
+  for (const [name, expectedType] of Object.entries(ALL_PROPERTIES)) {
+    const isRequired = name in REQUIRED_PROPERTIES;
+    const dbProp = dbProps[name];
+
+    if (!dbProp) {
+      const canAutoCreate = CREATABLE_TYPES.has(expectedType);
+      let guidance: string;
+      if (expectedType === "status") {
+        guidance = "The Status property must be created manually in Notion. Open your database, click + to add a property, and select \"Status\" as the type.";
+      } else if (expectedType === "title") {
+        guidance = "Every Notion database has a Title property. It may have been renamed. Ensure a property named \"Name\" exists with type \"Title\".";
+      } else if (canAutoCreate) {
+        guidance = "This property can be created automatically using the \"Fix Missing Properties\" button.";
+      } else {
+        guidance = `Add a property named "${name}" with type "${expectedType}" in your Notion database.`;
+      }
+
+      properties.push({
+        name,
+        expectedType,
+        actualType: null,
+        required: isRequired,
+        status: "missing",
+        canAutoCreate,
+        guidance,
+      });
+      missing++;
+      if (canAutoCreate) fixable++;
+    } else if (dbProp.type !== expectedType) {
+      properties.push({
+        name,
+        expectedType,
+        actualType: dbProp.type,
+        required: isRequired,
+        status: "wrong_type",
+        canAutoCreate: false,
+        guidance: `Property "${name}" has type "${dbProp.type}" but should be "${expectedType}". Delete the property and recreate it with the correct type in Notion.`,
+      });
+      wrongType++;
+    } else {
+      properties.push({
+        name,
+        expectedType,
+        actualType: dbProp.type,
+        required: isRequired,
+        status: "ok",
+        canAutoCreate: false,
+      });
+      ok++;
+    }
+  }
+
+  // Sort: required first, then by status (missing → wrong_type → ok), then by name
+  const statusOrder = { missing: 0, wrong_type: 1, ok: 2 };
+  properties.sort((a, b) => {
+    if (a.required !== b.required) return a.required ? -1 : 1;
+    const sa = statusOrder[a.status];
+    const sb = statusOrder[b.status];
+    if (sa !== sb) return sa - sb;
+    return a.name.localeCompare(b.name);
+  });
+
+  const valid = properties
+    .filter((p) => p.required)
+    .every((p) => p.status === "ok");
+
+  return {
+    valid,
+    databaseTitle,
+    properties,
+    summary: {
+      total: properties.length,
+      ok,
+      missing,
+      wrongType,
+      fixable,
+    },
+  };
+}
+
+/**
+ * Create missing properties in the Notion database.
+ *
+ * Only creates properties whose type is in CREATABLE_TYPES.
+ * Status and Title properties cannot be created via the API.
+ */
+async function createMissingProperties(
+  token: string,
+  databaseId: string,
+  propertyNames: string[],
+): Promise<{ created: string[]; failed: Array<{ name: string; error: string }> }> {
+  const created: string[] = [];
+  const failed: Array<{ name: string; error: string }> = [];
+
+  // Build a single update payload with all properties to create
+  const propertiesToCreate: Record<string, unknown> = {};
+
+  for (const name of propertyNames) {
+    const expectedType = ALL_PROPERTIES[name];
+    if (!expectedType) {
+      failed.push({ name, error: `Unknown property "${name}"` });
+      continue;
+    }
+    if (!CREATABLE_TYPES.has(expectedType)) {
+      failed.push({
+        name,
+        error: `Property type "${expectedType}" cannot be created via the API. Create it manually in Notion.`,
+      });
+      continue;
+    }
+
+    // Build the property schema for the Notion API
+    if (expectedType === "rich_text") {
+      propertiesToCreate[name] = { rich_text: {} };
+    } else if (expectedType === "select") {
+      // Pre-populate select options where applicable
+      if (name === "Level") {
+        propertiesToCreate[name] = {
+          select: {
+            options: [
+              { name: "epic", color: "purple" },
+              { name: "feature", color: "blue" },
+              { name: "task", color: "green" },
+              { name: "subtask", color: "gray" },
+            ],
+          },
+        };
+      } else if (name === "Priority") {
+        propertiesToCreate[name] = {
+          select: {
+            options: [
+              { name: "Critical", color: "red" },
+              { name: "High", color: "orange" },
+              { name: "Medium", color: "yellow" },
+              { name: "Low", color: "gray" },
+            ],
+          },
+        };
+      } else {
+        propertiesToCreate[name] = { select: {} };
+      }
+    } else if (expectedType === "multi_select") {
+      propertiesToCreate[name] = { multi_select: {} };
+    }
+  }
+
+  if (Object.keys(propertiesToCreate).length === 0) {
+    return { created, failed };
+  }
+
+  try {
+    const updateRes = await fetch(`${NOTION_API}/databases/${databaseId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Notion-Version": NOTION_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ properties: propertiesToCreate }),
+    });
+
+    if (!updateRes.ok) {
+      const text = await updateRes.text().catch(() => "");
+      // All properties failed
+      for (const name of Object.keys(propertiesToCreate)) {
+        failed.push({
+          name,
+          error: `Notion API error (${updateRes.status}): ${text.slice(0, 200)}`,
+        });
+      }
+    } else {
+      created.push(...Object.keys(propertiesToCreate));
+    }
+  } catch (err) {
+    for (const name of Object.keys(propertiesToCreate)) {
+      failed.push({
+        name,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { created, failed };
 }
 
 async function testNotionConnection(
@@ -411,6 +721,120 @@ export async function handleNotionRoute(
       jsonResponse(res, 200, result);
     } catch (err) {
       errorResponse(res, 500, err instanceof Error ? err.message : "Test failed");
+    }
+    return true;
+  }
+
+  // ── POST /api/notion/schema ─────────────────────────────────────────
+
+  if (method === "POST" && url === "/api/notion/schema") {
+    try {
+      const body = await readBody(req);
+      const data = JSON.parse(body) as { token?: string; databaseId?: string };
+
+      // Resolve credentials (same pattern as /test)
+      let token = data.token?.trim();
+      let databaseId = data.databaseId?.trim();
+
+      if (!token || !databaseId) {
+        const { getDefaultRegistry, isRedactedField } = await loadRegistry();
+        const registry = getDefaultRegistry();
+        const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+
+        if (existing) {
+          if (!token) {
+            const storedToken = existing.config.token;
+            if (isRedactedField(storedToken)) {
+              const envVal = process.env[storedToken.envVar];
+              if (envVal) token = envVal;
+            } else if (typeof storedToken === "string") {
+              token = storedToken;
+            }
+          }
+          if (!databaseId && typeof existing.config.databaseId === "string") {
+            databaseId = existing.config.databaseId;
+          }
+        }
+      }
+
+      if (!token) {
+        jsonResponse(res, 200, {
+          status: "red",
+          message: "No API key provided or configured. Save credentials first.",
+          details: { authValid: false, databaseAccessible: false },
+        } satisfies ConnectionTestResult);
+        return true;
+      }
+
+      if (!databaseId) {
+        jsonResponse(res, 200, {
+          status: "red",
+          message: "No database ID provided or configured.",
+          details: { authValid: false, databaseAccessible: false },
+        } satisfies ConnectionTestResult);
+        return true;
+      }
+
+      const result = await validateNotionSchema(token, databaseId);
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      errorResponse(res, 500, err instanceof Error ? err.message : "Schema validation failed");
+    }
+    return true;
+  }
+
+  // ── POST /api/notion/schema/fix ─────────────────────────────────────
+
+  if (method === "POST" && url === "/api/notion/schema/fix") {
+    try {
+      const body = await readBody(req);
+      const data = JSON.parse(body) as {
+        token?: string;
+        databaseId?: string;
+        properties?: string[];
+      };
+
+      // Validate properties input before resolving credentials
+      const propertyNames = data.properties;
+      if (!propertyNames || propertyNames.length === 0) {
+        errorResponse(res, 400, "No properties specified to create.");
+        return true;
+      }
+
+      // Resolve credentials
+      let token = data.token?.trim();
+      let databaseId = data.databaseId?.trim();
+
+      if (!token || !databaseId) {
+        const { getDefaultRegistry, isRedactedField } = await loadRegistry();
+        const registry = getDefaultRegistry();
+        const existing = await registry.getAdapterConfig(ctx.rexDir, "notion");
+
+        if (existing) {
+          if (!token) {
+            const storedToken = existing.config.token;
+            if (isRedactedField(storedToken)) {
+              const envVal = process.env[storedToken.envVar];
+              if (envVal) token = envVal;
+            } else if (typeof storedToken === "string") {
+              token = storedToken;
+            }
+          }
+          if (!databaseId && typeof existing.config.databaseId === "string") {
+            databaseId = existing.config.databaseId;
+          }
+        }
+      }
+
+      if (!token || !databaseId) {
+        errorResponse(res, 400, "Credentials not configured. Save token and database ID first.");
+        return true;
+      }
+
+      const result = await createMissingProperties(token, databaseId, propertyNames);
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      errorResponse(res, 500, err instanceof Error ? err.message : "Property creation failed");
     }
     return true;
   }
