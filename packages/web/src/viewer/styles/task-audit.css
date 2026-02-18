@@ -189,6 +189,16 @@
   border-left: 3px solid var(--orange);
 }
 
+.audit-task-heartbeat-warning {
+  border-color: color-mix(in srgb, var(--orange) 30%, var(--border));
+  border-left: 3px solid var(--orange);
+}
+
+.audit-task-unresponsive {
+  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+  border-left: 3px solid var(--red);
+}
+
 .audit-task-header {
   display: flex;
   align-items: flex-start;
@@ -269,6 +279,27 @@
   border-radius: var(--radius-sm);
 }
 
+.audit-task-warning-badge {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.audit-task-unresponsive-badge {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-bold);
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  animation: audit-pulse-stale 1s ease-in-out infinite;
+}
+
 /* ── Metadata chips ──────────────────────────────────────────────── */
 
 .audit-task-meta {
@@ -322,6 +353,28 @@
 .audit-chip-model-sonnet { color: var(--brand-teal); }
 .audit-chip-model-opus { color: var(--brand-purple); }
 .audit-chip-model-haiku { color: var(--brand-orange); }
+
+/* Heartbeat chips */
+.audit-chip-heartbeat-time {
+  color: var(--text-dim);
+}
+
+.audit-chip-heartbeat-warning {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, var(--bg-hover));
+  font-weight: var(--weight-semibold);
+}
+
+.audit-chip-heartbeat-unresponsive {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, var(--bg-hover));
+  font-weight: var(--weight-bold);
+}
+
+.audit-chip-heartbeat-unknown {
+  color: var(--text-dim);
+  font-style: italic;
+}
 
 /* ── Action buttons ──────────────────────────────────────────────── */
 

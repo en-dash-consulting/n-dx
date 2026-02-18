@@ -10,6 +10,7 @@ import { loadClaudeConfig, resolveApiKey } from "../../store/project-config.js";
 import { resolveModel } from "@n-dx/claude-client";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
+import { startHeartbeat } from "./heartbeat.js";
 import {
   prepareBrief,
   executeDryRun,
@@ -151,6 +152,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   section(`Agent Run (${model})`);
 
+  // Start heartbeat — writes lastActivityAt to disk periodically so long-running
+  // tool calls don't make the run appear stale to the web dashboard.
+  const heartbeat = startHeartbeat(henchDir, run);
+
   // API-specific: turn-based execution loop
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
@@ -288,6 +293,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
     await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
   }
+
+  // Stop heartbeat before finalization
+  heartbeat.stop();
 
   // Shared: review gate
   if (opts.review && run.status === "completed") {

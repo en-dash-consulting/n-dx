@@ -13,7 +13,7 @@ import { handleRexRoute } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
-import { handleHenchRoute } from "./routes-hench.js";
+import { handleHenchRoute, startHeartbeatMonitor } from "./routes-hench.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute } from "./routes-mcp.js";
@@ -165,6 +165,12 @@ export async function startServer(
     } catch {
       // ignore
     }
+  }
+
+  // Start heartbeat monitor — periodically checks for unresponsive tasks and
+  // broadcasts alerts via WebSocket.
+  if (inScope("hench")) {
+    startHeartbeatMonitor(henchRunsDir, ws.broadcast);
   }
 
   // Create HTTP server

@@ -6,6 +6,7 @@ import { validateCompletion, formatValidationResult } from "../../validation/com
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
+import { startHeartbeat } from "./heartbeat.js";
 import { section, stream, info } from "../../types/output.js";
 import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
 import type { ClaudeConfig } from "../../store/project-config.js";
@@ -359,6 +360,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let accumulatedTurnTokenUsage: TurnTokenUsage[] = [];
   let lastError: string | undefined;
 
+  // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
+  // subprocess doesn't appear stale to the web dashboard during long tool calls.
+  const heartbeat = startHeartbeat(henchDir, run);
+
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       const prompt = attempt === 0
@@ -504,6 +509,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       detail: run.error,
     });
   }
+
+  // Stop heartbeat before finalization
+  heartbeat.stop();
 
   // Shared: finalize run (build summary, post-task tests, save)
   await finalizeRun(run, henchDir, projectDir, brief.project.testCommand);

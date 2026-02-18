@@ -18,6 +18,8 @@ import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
+type HeartbeatStatus = "healthy" | "warning" | "unresponsive" | "unknown";
+
 interface AuditEntry {
   taskId: string;
   taskTitle: string;
@@ -33,6 +35,8 @@ interface AuditEntry {
   turns?: number;
   model?: string;
   tokenUsage?: { input: number; output: number };
+  heartbeatStatus?: HeartbeatStatus;
+  missedHeartbeats?: number;
 }
 
 interface SystemInfo {
@@ -105,6 +109,28 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
+function fmtTimeSince(isoString: string): string {
+  const elapsed = Date.now() - new Date(isoString).getTime();
+  if (elapsed < 0) return "just now";
+  const secs = Math.floor(elapsed / 1000);
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
+}
+
+function heartbeatLabel(status?: HeartbeatStatus): string {
+  switch (status) {
+    case "healthy": return "Healthy";
+    case "warning": return "Delayed";
+    case "unresponsive": return "Unresponsive";
+    case "unknown": return "Unknown";
+    default: return "";
+  }
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 /** System resource usage panel. */
@@ -173,9 +199,15 @@ function AuditTaskCard({
     return () => clearInterval(timer);
   }, [entry.startedAt]);
 
-  return h("div", {
-    class: `audit-task-card${entry.stale ? " audit-task-stale" : ""}`,
-  },
+  const cardClass = entry.heartbeatStatus === "unresponsive"
+    ? "audit-task-card audit-task-unresponsive"
+    : entry.stale
+      ? "audit-task-card audit-task-stale"
+      : entry.heartbeatStatus === "warning"
+        ? "audit-task-card audit-task-heartbeat-warning"
+        : "audit-task-card";
+
+  return h("div", { class: cardClass },
     // Header row: status + title + actions
     h("div", { class: "audit-task-header" },
       // Pulsing indicator
@@ -201,9 +233,13 @@ function AuditTaskCard({
                 class: "audit-task-link",
               })
             : h("span", { class: "audit-task-title" }, entry.taskTitle),
-          entry.stale
-            ? h("span", { class: "audit-task-stale-badge" }, "Possibly stuck")
-            : null,
+          entry.heartbeatStatus === "unresponsive"
+            ? h("span", { class: "audit-task-unresponsive-badge" }, "Unresponsive")
+            : entry.stale
+              ? h("span", { class: "audit-task-stale-badge" }, "Possibly stuck")
+              : entry.heartbeatStatus === "warning"
+                ? h("span", { class: "audit-task-warning-badge" }, "Heartbeat delayed")
+                : null,
         ),
 
         // Metadata chips
@@ -238,6 +274,28 @@ function AuditTaskCard({
             ? h("span", { class: "audit-chip" },
                 fmtTokens((entry.tokenUsage.input ?? 0) + (entry.tokenUsage.output ?? 0)),
                 " tokens",
+              )
+            : null,
+          // Heartbeat status chip
+          entry.heartbeatStatus && entry.heartbeatStatus !== "healthy"
+            ? h("span", {
+                class: `audit-chip audit-chip-heartbeat audit-chip-heartbeat-${entry.heartbeatStatus}`,
+                title: entry.missedHeartbeats
+                  ? `${entry.missedHeartbeats} missed heartbeat${entry.missedHeartbeats === 1 ? "" : "s"}`
+                  : "Heartbeat status",
+              },
+                h("span", { class: "audit-chip-icon" }, "\u2665"),
+                heartbeatLabel(entry.heartbeatStatus),
+              )
+            : null,
+          // Last heartbeat timestamp
+          entry.lastActivityAt
+            ? h("span", {
+                class: "audit-chip audit-chip-heartbeat-time",
+                title: `Last heartbeat: ${new Date(entry.lastActivityAt).toLocaleString()}`,
+              },
+                h("span", { class: "audit-chip-icon" }, "\u2665"),
+                fmtTimeSince(entry.lastActivityAt),
               )
             : null,
         ),
@@ -420,6 +478,17 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
           const msg = JSON.parse(event.data);
           if (msg.type === "hench:task-execution-progress") {
             // Refresh audit data on any execution event
+            fetchAudit();
+          } else if (msg.type === "hench:heartbeat-alert") {
+            // Show toast for heartbeat alerts
+            const status = msg.heartbeatStatus as string;
+            const title = msg.taskTitle as string || "Unknown task";
+            const missed = msg.missedHeartbeats as number || 0;
+            if (status === "unresponsive") {
+              setToast(`Task "${title}" is unresponsive (${missed} missed heartbeats)`);
+            } else if (status === "warning") {
+              setToast(`Task "${title}" heartbeat delayed (${missed} missed)`);
+            }
             fetchAudit();
           }
         } catch {

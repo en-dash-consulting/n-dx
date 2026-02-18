@@ -983,6 +983,42 @@ function handleExecuteStatusForTask(taskId: string, res: ServerResponse): boolea
 /** Default staleness threshold: 5 minutes in milliseconds. */
 const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
+/**
+ * Heartbeat interval expected from the agent (matches hench heartbeat writer).
+ * Used to compute missedHeartbeats and heartbeatStatus.
+ */
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+/** Warning threshold: flag as "warning" after 2 missed heartbeats (60s). */
+const HEARTBEAT_WARNING_MS = HEARTBEAT_INTERVAL_MS * 2;
+
+/** Unresponsive threshold: flag as "unresponsive" after 4 missed heartbeats (120s). */
+const HEARTBEAT_UNRESPONSIVE_MS = HEARTBEAT_INTERVAL_MS * 4;
+
+export type HeartbeatStatus = "healthy" | "warning" | "unresponsive" | "unknown";
+
+/** Compute heartbeat health from time since last activity. */
+function computeHeartbeatStatus(
+  lastActivityMs: number | null,
+  nowMs: number,
+): { status: HeartbeatStatus; missedHeartbeats: number } {
+  if (lastActivityMs == null) {
+    return { status: "unknown", missedHeartbeats: 0 };
+  }
+  const elapsed = nowMs - lastActivityMs;
+  const missedHeartbeats = Math.max(0, Math.floor(elapsed / HEARTBEAT_INTERVAL_MS));
+
+  let status: HeartbeatStatus;
+  if (elapsed < HEARTBEAT_WARNING_MS) {
+    status = "healthy";
+  } else if (elapsed < HEARTBEAT_UNRESPONSIVE_MS) {
+    status = "warning";
+  } else {
+    status = "unresponsive";
+  }
+  return { status, missedHeartbeats };
+}
+
 /** GET /api/hench/runs/health — detect stale "running" runs. */
 function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
   let files: string[];
@@ -1072,6 +1108,101 @@ function handleMarkStuck(
   return true;
 }
 
+// ── Heartbeat monitor ─────────────────────────────────────────────────
+
+/**
+ * Start a periodic heartbeat monitor that scans for unresponsive running tasks
+ * and broadcasts alerts via WebSocket.
+ *
+ * The monitor runs every 30 seconds and broadcasts:
+ * - `hench:heartbeat-alert` when a task transitions to "warning" or "unresponsive"
+ * - `hench:heartbeat-status` with a summary of all running task heartbeats
+ *
+ * Call this once at server startup. The timer is unref'd so it won't prevent
+ * process exit.
+ */
+export function startHeartbeatMonitor(
+  runsDir: string,
+  broadcast: WebSocketBroadcaster,
+): void {
+  // Track previously-alerted runs to only broadcast on transitions
+  const alertedRuns = new Map<string, HeartbeatStatus>();
+
+  const timer = setInterval(() => {
+    let files: string[];
+    try {
+      files = readdirSync(runsDir);
+    } catch {
+      return; // runs dir may not exist yet
+    }
+
+    const now = Date.now();
+    const alerts: Array<{
+      runId: string;
+      taskId: string;
+      taskTitle: string;
+      heartbeatStatus: HeartbeatStatus;
+      missedHeartbeats: number;
+      lastActivityAt?: string;
+    }> = [];
+
+    const activeRunIds = new Set<string>();
+
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.replace(/\.json$/, "");
+      const run = loadRunFile(runsDir, id);
+      if (!run || run.status !== "running") continue;
+
+      activeRunIds.add(id);
+
+      const lastActivity = run.lastActivityAt as string | undefined;
+      const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
+      const hb = computeHeartbeatStatus(lastActivityMs, now);
+
+      // Only alert on transitions to warning or unresponsive
+      const previousStatus = alertedRuns.get(id);
+      if (
+        hb.status !== "healthy" &&
+        hb.status !== "unknown" &&
+        hb.status !== previousStatus
+      ) {
+        alerts.push({
+          runId: run.id as string,
+          taskId: run.taskId as string,
+          taskTitle: run.taskTitle as string,
+          heartbeatStatus: hb.status,
+          missedHeartbeats: hb.missedHeartbeats,
+          lastActivityAt: lastActivity,
+        });
+      }
+
+      alertedRuns.set(id, hb.status);
+    }
+
+    // Clean up stale entries from alertedRuns
+    for (const id of alertedRuns.keys()) {
+      if (!activeRunIds.has(id)) {
+        alertedRuns.delete(id);
+      }
+    }
+
+    // Broadcast alerts for newly-unresponsive tasks
+    for (const alert of alerts) {
+      broadcast({
+        type: "hench:heartbeat-alert",
+        ...alert,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // Don't prevent process exit
+  if (timer.unref) {
+    timer.unref();
+  }
+}
+
 // ── Audit interface ───────────────────────────────────────────────────
 
 /** Audit info for a single active task. */
@@ -1091,6 +1222,10 @@ interface AuditEntry {
   turns?: number;
   model?: string;
   tokenUsage?: { input: number; output: number };
+  /** Heartbeat health status: healthy, warning, unresponsive, or unknown. */
+  heartbeatStatus: HeartbeatStatus;
+  /** Number of missed heartbeat intervals since last activity. */
+  missedHeartbeats: number;
 }
 
 /** GET /api/hench/audit — aggregate audit info for all active tasks. */
@@ -1112,6 +1247,8 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       stale: false, // dashboard executions are tracked in real-time
       source: "dashboard",
       lastOutput: entry.state.lastOutput,
+      heartbeatStatus: "healthy", // dashboard executions are tracked in real-time
+      missedHeartbeats: 0,
     });
   }
 
@@ -1140,6 +1277,7 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       ? (now - lastActivityMs) > STALE_THRESHOLD_MS
       : true;
     const startMs = new Date(run.startedAt as string).getTime();
+    const hb = computeHeartbeatStatus(lastActivityMs, now);
 
     entries.push({
       taskId: runTaskId,
@@ -1155,6 +1293,8 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
       turns: run.turns as number | undefined,
       model: run.model as string | undefined,
       tokenUsage: run.tokenUsage as { input: number; output: number } | undefined,
+      heartbeatStatus: hb.status,
+      missedHeartbeats: hb.missedHeartbeats,
     });
   }
 
