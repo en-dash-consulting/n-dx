@@ -7,7 +7,7 @@
  */
 
 import { h, Fragment, VNode } from "preact";
-import { useState, useMemo, useCallback } from "preact/hooks";
+import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority } from "./types.js";
 import { computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter } from "./compute.js";
 import { StatusFilter, defaultStatusFilter } from "./status-filter.js";
@@ -159,9 +159,13 @@ interface NodeRowProps {
   onInlineAdd?: (item: PRDItemData) => void;
   /** Whether the inline add form is currently open for this node. */
   isInlineAddActive?: boolean;
+  /** Whether this node is highlighted by a deep-link animation. */
+  isHighlighted?: boolean;
+  /** Ref callback for scroll-into-view on deep-link highlight. */
+  nodeRef?: (el: HTMLDivElement | null) => void;
 }
 
-function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect, onInlineAdd, isInlineAddActive }: NodeRowProps) {
+function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect, onInlineAdd, isInlineAddActive, isHighlighted, nodeRef }: NodeRowProps) {
   const children = item.children ?? [];
   const stats = hasChildren ? computeBranchStats(children) : null;
   const ratio = stats ? completionRatio(stats) : 0;
@@ -236,7 +240,7 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
   return h(
     "div",
     {
-      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""} prd-level-${item.level}`,
+      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""} prd-level-${item.level}`,
       style: `padding-left: ${indent + 8}px`,
       onClick: handleClick,
       role: "treeitem",
@@ -244,6 +248,7 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
       "aria-selected": String(isSelected),
       tabIndex: 0,
       onKeyDown: handleKeyDown,
+      ref: nodeRef,
     },
     // Bulk selection checkbox
     onToggleBulkSelect
@@ -329,9 +334,13 @@ interface TreeNodesProps {
   onInlineAddSubmit?: (data: InlineAddInput) => Promise<void>;
   /** Called when the inline add form is cancelled. */
   onInlineAddCancel?: () => void;
+  /** ID of the item highlighted by a deep-link. */
+  highlightedItemId?: string | null;
+  /** Ref callback for the highlighted node (scroll-into-view). */
+  highlightedNodeRef?: (el: HTMLDivElement | null) => void;
 }
 
-function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel }: TreeNodesProps) {
+function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -342,6 +351,7 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
         const hasChildren = children.length > 0;
         const isOpen = expanded.has(item.id);
         const isInlineAddActive = inlineAddParentId === item.id;
+        const isHL = highlightedItemId === item.id;
 
         return h(
           "div",
@@ -358,6 +368,8 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
             onToggleBulkSelect,
             onInlineAdd,
             isInlineAddActive,
+            isHighlighted: isHL,
+            nodeRef: isHL ? highlightedNodeRef : undefined,
           }),
           // Inline add form — rendered below the parent node, above its children
           isInlineAddActive && onInlineAddSubmit && onInlineAddCancel
@@ -387,6 +399,8 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
                   onInlineAdd,
                   onInlineAddSubmit,
                   onInlineAddCancel,
+                  highlightedItemId,
+                  highlightedNodeRef,
                 }),
               )
             : null,
@@ -493,9 +507,13 @@ export interface PRDTreeProps {
   onToggleBulkSelect?: (item: PRDItemData) => void;
   /** Called when inline add form is submitted. */
   onInlineAddSubmit?: (data: InlineAddInput) => Promise<void>;
+  /** ID of the item highlighted by a deep-link animation. */
+  highlightedItemId?: string | null;
+  /** IDs of ancestor nodes to force-expand for deep-link visibility. */
+  deepLinkExpandIds?: Set<string> | null;
 }
 
-export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit }: PRDTreeProps) {
+export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds }: PRDTreeProps) {
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -512,6 +530,30 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, s
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     collectIdsToDepth(doc.items, defaultExpandDepth),
   );
+
+  // Deep-link: force-expand ancestor nodes so the target item is visible
+  useEffect(() => {
+    if (!deepLinkExpandIds || deepLinkExpandIds.size === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const id of deepLinkExpandIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [deepLinkExpandIds]);
+
+  // Scroll the deep-linked node into view when it renders
+  const scrolledRef = useRef(false);
+  const deepLinkNodeRef = useCallback((el: HTMLDivElement | null) => {
+    if (el && !scrolledRef.current) {
+      scrolledRef.current = true;
+      // Defer so the DOM has settled after ancestor expansion
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, []);
 
   const [activeStatuses, setActiveStatuses] = useState<Set<ItemStatus>>(() =>
     defaultStatusFilter(),
@@ -603,6 +645,8 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, s
         onInlineAdd: onInlineAddSubmit ? handleInlineAdd : undefined,
         onInlineAddSubmit: onInlineAddSubmit ? handleInlineAddSubmit : undefined,
         onInlineAddCancel: onInlineAddSubmit ? handleInlineAddCancel : undefined,
+        highlightedItemId,
+        highlightedNodeRef: deepLinkNodeRef,
       }),
     ),
   );

@@ -397,6 +397,62 @@
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+/* Deep-link highlight state */
+.prd-node-highlighted {
+  animation: prd-node-highlight-pulse 2s ease-out;
+  border-left: 2px solid var(--accent);
+}
+
+@keyframes prd-node-highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 50%, transparent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface));
+  }
+  70% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+}
+
+/* Deep-link error banner */
+.prd-deep-link-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 30%, var(--border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--red);
+}
+
+.prd-deep-link-error-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: var(--font-lg);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.prd-deep-link-error-dismiss:hover {
+  opacity: 1;
+}
+
 /* Chevron */
 .prd-chevron {
   width: 14px;

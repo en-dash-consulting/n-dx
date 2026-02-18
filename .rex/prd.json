@@ -8578,7 +8578,7 @@
         {
           "id": "e52db876-a088-4c5b-ba98-5725da79f0dc",
           "title": "Rex Task Deep-linking",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Enable direct navigation to specific PRD items with automatic page routing, item selection, and visibility",
           "source": "smart-add",
@@ -8586,7 +8586,7 @@
             {
               "id": "735ab51a-d31a-4256-b9b7-054e44068a22",
               "title": "Implement complete Rex task deep-linking",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add URL-based routing to navigate directly to specific rex tasks with automatic selection, highlighting, and scroll-to-view functionality",
               "acceptanceCriteria": [
@@ -8605,9 +8605,13 @@
                 "ui",
                 "selection"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T08:06:19.076Z",
+              "completedAt": "2026-02-18T08:16:28.652Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-18T08:16:28.741Z",
+          "completedAt": "2026-02-18T08:16:28.741Z"
         },
         {
           "id": "a62d284c-e430-4c74-aadf-1972f2d913c0",
@@ -8616,6 +8620,8 @@
           "level": "feature",
           "description": "Enable direct navigation to specific hench execution runs with automatic page routing, run selection, and transcript visibility",
           "source": "smart-add",
+          "startedAt": "2026-02-18T08:05:25.131Z",
+          "completedAt": "2026-02-18T08:05:25.131Z",
           "children": [
             {
               "id": "bafb2115-1e54-4462-bd8b-3ec8458c288a",
@@ -8643,9 +8649,7 @@
               "startedAt": "2026-02-18T07:58:59.334Z",
               "completedAt": "2026-02-18T08:05:25.051Z"
             }
-          ],
-          "startedAt": "2026-02-18T08:05:25.131Z",
-          "completedAt": "2026-02-18T08:05:25.131Z"
+          ]
         },
         {
           "id": "e03dbe28-2101-4e1c-8c54-0815f652b384",

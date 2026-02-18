@@ -8,7 +8,7 @@
 
 import { h, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { PRDTree } from "../components/prd-tree/index.js";
 import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
@@ -18,8 +18,9 @@ import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js"
 import { BrandedHeader } from "../components/prd-tree/shared-imports.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
 import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
-import { findItemById } from "../components/prd-tree/tree-utils.js";
+import { findItemById, getAncestorIds } from "../components/prd-tree/tree-utils.js";
 import type { DetailItem } from "../components/prd-tree/shared-imports.js";
+import type { NavigateTo } from "../types.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -29,12 +30,16 @@ export interface PRDViewProps {
   /** Called with rendered TaskDetail content for the detail panel. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onDetailContent?: (content: VNode<any> | null) => void;
+  /** When set, auto-select this task on mount (from deep-link URL). */
+  initialTaskId?: string | null;
+  /** Navigation callback for URL updates. */
+  navigateTo?: NavigateTo;
 }
 
 /** Active tab in the command bar. */
 type CommandTab = null | "add" | "merge" | "prune";
 
-export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps) {
+export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo }: PRDViewProps) {
   const [data, setData] = useState<PRDDocumentData | null>(prdData ?? null);
   const [loading, setLoading] = useState(!prdData);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +48,15 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+
+  // Deep-link state
+  const [deepLinkError, setDeepLinkError] = useState<string | null>(null);
+  /** Task ID currently highlighted by the deep-link animation. */
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  /** IDs to force-expand in the tree (ancestors of the deep-linked task). */
+  const [deepLinkExpandIds, setDeepLinkExpandIds] = useState<Set<string> | null>(null);
+  /** Whether the initial deep-link has been consumed. */
+  const deepLinkConsumedRef = useRef(false);
 
   // Resolve selected items for merge preview
   const selectedItems = useMemo(() => {
@@ -111,6 +125,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
   const handleSelectItem = useCallback(
     (item: PRDItemData) => {
       setSelectedItemId(item.id);
+      // Update URL to include task ID for shareability
+      history.replaceState(
+        { view: "prd", file: null, zone: null, runId: null, taskId: item.id },
+        "",
+        `/prd/${item.id}`,
+      );
       if (onSelectItem) {
         onSelectItem({
           type: "prd",
@@ -130,6 +150,39 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
     },
     [onSelectItem],
   );
+
+  // Deep-link: auto-select the target task once data is loaded
+  useEffect(() => {
+    if (deepLinkConsumedRef.current || !initialTaskId || loading || !data) return;
+    deepLinkConsumedRef.current = true;
+
+    const item = findItemById(data.items, initialTaskId);
+    if (!item) {
+      setDeepLinkError(`Task "${initialTaskId}" not found`);
+      // Clean URL back to /prd
+      history.replaceState(
+        { view: "prd", file: null, zone: null, runId: null, taskId: null },
+        "",
+        "/prd",
+      );
+      return;
+    }
+
+    // Expand ancestor nodes so the target is visible
+    const ancestors = getAncestorIds(data.items, initialTaskId);
+    if (ancestors.length > 0) {
+      setDeepLinkExpandIds(new Set(ancestors));
+    }
+
+    // Select and highlight the item
+    setSelectedItemId(initialTaskId);
+    setHighlightedTaskId(initialTaskId);
+    handleSelectItem(item);
+
+    // Clear highlight after animation completes
+    const timer = setTimeout(() => setHighlightedTaskId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [initialTaskId, loading, data, handleSelectItem]);
 
   // Handle checkbox toggle for bulk selection
   const handleToggleBulkSelect = useCallback(
@@ -303,6 +356,18 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
       h("h2", { class: "section-header" }, "Tasks"),
     ),
 
+    // Deep-link error banner
+    deepLinkError
+      ? h("div", { class: "prd-deep-link-error", role: "alert" },
+          h("span", null, deepLinkError),
+          h("button", {
+            class: "prd-deep-link-error-dismiss",
+            onClick: () => setDeepLinkError(null),
+            "aria-label": "Dismiss",
+          }, "\u00d7"),
+        )
+      : null,
+
     // Command bar — action buttons
     h("div", { class: "rex-command-bar" },
       h("button", {
@@ -358,6 +423,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
       bulkSelectedIds,
       onToggleBulkSelect: handleToggleBulkSelect,
       onInlineAddSubmit: handleInlineAddItem,
+      highlightedItemId: highlightedTaskId,
+      deepLinkExpandIds,
     }),
 
     // Bulk actions bar (floating at bottom)

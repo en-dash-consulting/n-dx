@@ -25,3 +25,26 @@ export function findItemById(items: PRDItemData[], id: string): PRDItemData | nu
   }
   return null;
 }
+
+/**
+ * Collect the IDs of all ancestors of the target item (excluding the target itself).
+ * Returns an empty array if the target is not found or is a root item.
+ */
+export function getAncestorIds(items: PRDItemData[], targetId: string): string[] {
+  const path: string[] = [];
+
+  function walk(nodes: PRDItemData[]): boolean {
+    for (const node of nodes) {
+      if (node.id === targetId) return true;
+      if (node.children) {
+        path.push(node.id);
+        if (walk(node.children)) return true;
+        path.pop();
+      }
+    }
+    return false;
+  }
+
+  walk(items);
+  return path;
+}

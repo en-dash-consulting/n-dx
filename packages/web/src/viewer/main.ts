@@ -84,6 +84,11 @@ function getInitialRunId(validViews: Set<ViewId>): string | null {
   return view === "hench-runs" ? subId : null;
 }
 
+function getInitialTaskId(validViews: Set<ViewId>): string | null {
+  const { view, subId } = parsePathname(location.pathname, validViews);
+  return view === "prd" ? subId : null;
+}
+
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
 function getInitialSidebarCollapsed(): boolean {
@@ -98,6 +103,7 @@ function App({ scope }: { scope: string | null }) {
   const validViews = useMemo(() => buildValidViews(scope), [scope]);
   const [view, setView] = useState<ViewId>(() => getInitialView(validViews));
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => getInitialRunId(validViews));
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => getInitialTaskId(validViews));
   const [data, setData] = useState<LoadedData>({
     manifest: null,
     inventory: null,
@@ -129,20 +135,24 @@ function App({ scope }: { scope: string | null }) {
     const file = opts?.file ?? null;
     const zone = opts?.zone ?? null;
     const runId = opts?.runId ?? null;
+    const taskId = opts?.taskId ?? null;
     setSelectedFile(file);
     setSelectedZone(zone);
     setSelectedRunId(runId);
+    setSelectedTaskId(taskId);
     setView(targetView);
-    const urlPath = runId ? `/${targetView}/${runId}` : `/${targetView}`;
-    history.pushState({ view: targetView, file, zone, runId }, "", urlPath);
+    const subId = runId ?? taskId;
+    const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
+    history.pushState({ view: targetView, file, zone, runId, taskId }, "", urlPath);
   }, []);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
     setSelectedFile(null);
     setSelectedZone(null);
     setSelectedRunId(null);
+    setSelectedTaskId(null);
     setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null }, "", `/${id}`);
+    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null }, "", `/${id}`);
   }, []);
 
   // Scroll to top on view change
@@ -161,22 +171,24 @@ function App({ scope }: { scope: string | null }) {
       const hashView = location.hash.replace("#", "") as ViewId;
       if (validViews.has(hashView)) {
         setView(hashView);
-        history.replaceState({ view: hashView, file: null, zone: null, runId: null }, "", `/${hashView}`);
+        history.replaceState({ view: hashView, file: null, zone: null, runId: null, taskId: null }, "", `/${hashView}`);
       }
     } else {
       // Seed the initial history entry — preserve deep-link path if present
-      const initialUrl = selectedRunId ? `/${view}/${selectedRunId}` : `/${view}`;
-      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId }, "", initialUrl);
+      const subId = selectedRunId ?? selectedTaskId;
+      const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
+      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId }, "", initialUrl);
     }
 
     const handlePopState = (e: PopStateEvent) => {
       if (e.state) {
-        const s = e.state as { view?: string; file?: string | null; zone?: string | null; runId?: string | null };
+        const s = e.state as { view?: string; file?: string | null; zone?: string | null; runId?: string | null; taskId?: string | null };
         if (s.view && validViews.has(s.view as ViewId)) {
           setView(s.view as ViewId);
           setSelectedFile(s.file ?? null);
           setSelectedZone(s.zone ?? null);
           setSelectedRunId(s.runId ?? null);
+          setSelectedTaskId(s.taskId ?? null);
         }
       } else {
         // Fallback: parse from pathname
@@ -185,9 +197,12 @@ function App({ scope }: { scope: string | null }) {
           setView(parsed.view);
           setSelectedFile(null);
           setSelectedZone(null);
-          setSelectedRunId(parsed.subId);
+          const isRunView = parsed.view === "hench-runs";
+          const isTaskView = parsed.view === "prd";
+          setSelectedRunId(isRunView ? parsed.subId : null);
+          setSelectedTaskId(isTaskView ? parsed.subId : null);
           const fallbackUrl = parsed.subId ? `/${parsed.view}/${parsed.subId}` : `/${parsed.view}`;
-          history.replaceState({ view: parsed.view, file: null, zone: null, runId: parsed.subId }, "", fallbackUrl);
+          history.replaceState({ view: parsed.view, file: null, zone: null, runId: isRunView ? parsed.subId : null, taskId: isTaskView ? parsed.subId : null }, "", fallbackUrl);
         }
       }
     };
@@ -282,7 +297,7 @@ function App({ scope }: { scope: string | null }) {
       case "rex-dashboard":
         return h(RexDashboard, { navigateTo });
       case "prd":
-        return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent });
+        return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo });
       case "rex-analysis":
         return h(AnalysisView, null);
       case "token-usage":

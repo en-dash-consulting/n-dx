@@ -29,7 +29,7 @@ export interface TaskRef {
 export interface RexTaskLinkProps {
   task: TaskRef;
   /** Navigate to a view. Used to go to the PRD view on click. */
-  navigateTo?: (view: ViewId) => void;
+  navigateTo?: (view: ViewId, opts?: { taskId?: string }) => void;
   /** Optional additional CSS class. */
   class?: string;
   /** Show the level badge (e.g. "Epic", "Task"). Default: false */
@@ -73,7 +73,7 @@ interface ContextMenuProps {
   x: number;
   y: number;
   onClose: () => void;
-  navigateTo?: (view: ViewId) => void;
+  navigateTo?: (view: ViewId, opts?: { taskId?: string }) => void;
   onStatusChange?: (taskId: string, status: string) => void;
 }
 
@@ -113,7 +113,7 @@ function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: Co
   };
 
   const handleViewDetail = () => {
-    if (navigateTo) navigateTo("prd" as ViewId);
+    if (navigateTo) navigateTo("prd" as ViewId, { taskId: task.id });
     onClose();
   };
 
@@ -201,17 +201,17 @@ export function RexTaskLink({
     // Stop propagation so parent clickable elements (e.g. run cards) don't also fire
     e.stopPropagation();
     if (onClick) onClick();
-    if (navigateTo) navigateTo("prd" as ViewId);
-  }, [onClick, navigateTo]);
+    if (navigateTo) navigateTo("prd" as ViewId, { taskId: task.id });
+  }, [onClick, navigateTo, task.id]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       e.stopPropagation();
       if (onClick) onClick();
-      if (navigateTo) navigateTo("prd" as ViewId);
+      if (navigateTo) navigateTo("prd" as ViewId, { taskId: task.id });
     }
-  }, [onClick, navigateTo]);
+  }, [onClick, navigateTo, task.id]);
 
   const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault();

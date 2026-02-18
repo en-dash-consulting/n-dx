@@ -11,7 +11,7 @@ export interface LoadedData {
 
 export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "notion-config" | "hench-runs" | "hench-config" | "hench-templates" | "hench-optimization";
 
-export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string }) => void;
+export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string }) => void;
 
 export interface FileDetail {
   type: "file";
