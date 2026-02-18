@@ -8456,9 +8456,11 @@
     {
       "id": "79851c84-e061-42b7-866a-c4d3697c686e",
       "title": "Hench UI Real-time Task Monitoring",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T09:11:29.123Z",
+      "completedAt": "2026-02-18T09:11:29.123Z",
       "children": [
         {
           "id": "0017b9f6-0247-4b31-9eb6-7bc38fbc5183",
@@ -8519,15 +8521,17 @@
         {
           "id": "b265212f-991c-46c5-aa83-9bb70fa1c5a8",
           "title": "Task Audit and Control Interface",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Provide tools to audit and control running task execution",
           "source": "smart-add",
+          "startedAt": "2026-02-18T09:11:29.065Z",
+          "completedAt": "2026-02-18T09:11:29.065Z",
           "children": [
             {
               "id": "15d6d8ff-0356-4d6d-8720-fcfad953186e",
               "title": "Add task execution audit interface",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create an audit view that shows detailed execution information and allows verification that tasks are actually running",
               "acceptanceCriteria": [
@@ -8542,12 +8546,14 @@
                 "control",
                 "debugging"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T08:50:22.404Z",
+              "completedAt": "2026-02-18T09:01:10.519Z"
             },
             {
               "id": "20bdeb0a-32fa-47db-8ea5-cd3bdb747a99",
               "title": "Implement task heartbeat monitoring system",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a heartbeat mechanism to ensure running tasks are actively progressing and not silently failed",
               "acceptanceCriteria": [
@@ -8562,7 +8568,9 @@
                 "monitoring",
                 "reliability"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T09:01:57.539Z",
+              "completedAt": "2026-02-18T09:11:28.983Z"
             }
           ]
         }
@@ -8574,6 +8582,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T08:49:27.933Z",
+      "completedAt": "2026-02-18T08:49:27.933Z",
       "children": [
         {
           "id": "e52db876-a088-4c5b-ba98-5725da79f0dc",
@@ -8686,16 +8696,16 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-18T08:49:27.933Z",
-      "completedAt": "2026-02-18T08:49:27.933Z"
+      ]
     },
     {
       "id": "5fd0de0b-02c3-4895-88be-a0b13f404b8e",
       "title": "External Integration Configuration UI",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T09:31:53.840Z",
+      "completedAt": "2026-02-18T09:31:53.840Z",
       "children": [
         {
           "id": "d7e6c7a6-81c9-4a8f-bd8d-43cdcc7625b0",
@@ -8763,15 +8773,17 @@
         {
           "id": "d564a902-d543-4908-9923-91a4c6bb48d9",
           "title": "Generic External Integration Framework",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create a flexible configuration framework that can support multiple external integrations beyond just Notion with dynamic UI generation",
           "source": "smart-add",
+          "startedAt": "2026-02-18T09:31:53.782Z",
+          "completedAt": "2026-02-18T09:31:53.782Z",
           "children": [
             {
               "id": "de6efc49-5319-47a7-ac6a-2b90ec508f14",
               "title": "Build extensible integration framework with dynamic configuration UI",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Design and implement a flexible schema-based system that supports multiple integration types with automatically generated configuration interfaces",
               "acceptanceCriteria": [
@@ -8792,7 +8804,9 @@
                 "ui",
                 "dynamic"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T09:18:34.169Z",
+              "completedAt": "2026-02-18T09:31:53.703Z"
             }
           ]
         }
@@ -9017,15 +9031,16 @@
         {
           "id": "61e1e1c2-e741-4719-a887-5b390ac8af36",
           "title": "Import graph visibility controls",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Allow users to toggle the import graph visualization on/off due to current usability limitations",
           "source": "smart-add",
+          "startedAt": "2026-02-18T09:32:29.895Z",
           "children": [
             {
               "id": "75d504cd-d043-43c6-81bf-5290a0254921",
               "title": "Add import graph toggle to SourceVision UI",
-              "status": "deferred",
+              "status": "completed",
               "level": "task",
               "description": "Implement a toggle control that allows users to hide/show the import graph visualization when it becomes overwhelming or unusable for large projects",
               "acceptanceCriteria": [
@@ -9041,9 +9056,12 @@
                 "import-graph"
               ],
               "source": "smart-add",
-              "requirements": []
+              "requirements": [],
+              "startedAt": "2026-02-18T09:32:47.228Z",
+              "completedAt": "2026-02-18T09:36:07.024Z"
             }
-          ]
+          ],
+          "completedAt": "2026-02-18T09:36:07.104Z"
         },
         {
           "id": "88d0c551-0e1e-4204-a351-fd4331eccbcc",
@@ -9086,22 +9104,26 @@
     {
       "id": "0bff2aa4-4aa3-4eb0-bee3-d3a5c1daf5bd",
       "title": "SourceVision Files UI Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T09:18:06.113Z",
+      "completedAt": "2026-02-18T09:18:06.113Z",
       "children": [
         {
           "id": "90be331b-39aa-4b13-8a38-23e72242e221",
           "title": "Selective file filtering",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Filter out internal tool directories from the default Files page view while providing an option to show all files",
           "source": "smart-add",
+          "startedAt": "2026-02-18T09:18:06.075Z",
+          "completedAt": "2026-02-18T09:18:06.075Z",
           "children": [
             {
               "id": "95cb4832-189c-4d06-8023-80964879c6f4",
               "title": "Implement file filtering logic for internal directories",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add filtering logic to hide .hench, .rex, and .sourcevision directories from the Files page by default, while preserving the full file inventory data",
               "acceptanceCriteria": [
@@ -9116,12 +9138,14 @@
                 "sourcevision",
                 "files"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T09:18:05.992Z",
+              "completedAt": "2026-02-18T09:18:05.992Z"
             },
             {
               "id": "92ebb1f8-7cce-459b-a010-ecb2a211e4f1",
               "title": "Add toggle control for showing all files",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement a toggle button or checkbox that allows users to show all files including internal tool directories when needed",
               "acceptanceCriteria": [
@@ -9136,7 +9160,9 @@
                 "sourcevision",
                 "controls"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-18T09:12:00.973Z",
+              "completedAt": "2026-02-18T09:18:04.733Z"
             }
           ]
         }
