@@ -70,6 +70,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
   "notion-config":       { product: "rex",          label: "Notion",          productLabel: "Rex" },
   "hench-runs":          { product: "hench",        label: "Runs",            productLabel: "Hench" },
+  "hench-audit":         { product: "hench",        label: "Audit",           productLabel: "Hench" },
   "hench-config":        { product: "hench",        label: "Config",          productLabel: "Hench" },
   "hench-templates":     { product: "hench",        label: "Templates",       productLabel: "Hench" },
   "hench-optimization":  { product: "hench",        label: "Optimization",    productLabel: "Hench" },

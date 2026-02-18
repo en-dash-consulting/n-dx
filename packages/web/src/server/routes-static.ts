@@ -130,8 +130,8 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
 const SPA_VIEWS = new Set([
   "overview", "graph", "zones", "files", "routes", "architecture",
   "problems", "suggestions", "rex-dashboard", "prd", "rex-analysis",
-  "token-usage", "validation", "hench-runs", "hench-config",
-  "hench-templates", "hench-optimization",
+  "token-usage", "validation", "hench-runs", "hench-audit",
+  "hench-config", "hench-templates", "hench-optimization",
 ]);
 
 /** Check if the project has been initialized (any tool directory exists). */

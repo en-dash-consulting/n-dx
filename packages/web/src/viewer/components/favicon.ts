@@ -49,6 +49,7 @@ const VIEW_TO_PRODUCT: Partial<Record<ViewId, Product>> = {
   "token-usage": "rex",
   validation: "rex",
   "hench-runs": "hench",
+  "hench-audit": "hench",
 };
 
 /** Cached reference to the <link rel="icon"> element. */

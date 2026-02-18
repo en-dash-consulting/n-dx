@@ -28,6 +28,7 @@ import { HenchRunsView } from "./views/hench-runs.js";
 import { HenchConfigView } from "./views/hench-config.js";
 import { HenchTemplatesView } from "./views/hench-templates.js";
 import { WorkflowOptimizationView } from "./views/workflow-optimization.js";
+import { TaskAuditView } from "./views/task-audit.js";
 import { NotionConfigView } from "./views/notion-config.js";
 
 initTheme();
@@ -36,7 +37,7 @@ initTheme();
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
   sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
   rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation", "notion-config"],
-  hench: ["hench-runs", "hench-config", "hench-templates", "hench-optimization"],
+  hench: ["hench-runs", "hench-audit", "hench-config", "hench-templates", "hench-optimization"],
 };
 
 const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
@@ -308,6 +309,8 @@ function App({ scope }: { scope: string | null }) {
         return h(NotionConfigView, null);
       case "hench-runs":
         return h(HenchRunsView, { navigateTo, initialRunId: selectedRunId });
+      case "hench-audit":
+        return h(TaskAuditView, { navigateTo });
       case "hench-config":
         return h(HenchConfigView, null);
       case "hench-templates":

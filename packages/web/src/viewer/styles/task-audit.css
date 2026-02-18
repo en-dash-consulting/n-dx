@@ -1,0 +1,586 @@
+/* Task Audit view */
+
+.audit-container {
+  max-width: 1200px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+
+.audit-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-4);
+  gap: var(--space-1);
+}
+
+.audit-title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.audit-title-row h2 {
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-bold);
+  margin: 0;
+  line-height: var(--leading-tight);
+}
+
+.audit-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+}
+
+.audit-timestamp {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+/* ── Error state ─────────────────────────────────────────────────── */
+
+.audit-error {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-dim);
+}
+
+/* ── System resource panel ───────────────────────────────────────── */
+
+.audit-system-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.audit-system-panel h3 {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--space-3) 0;
+}
+
+.audit-system-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.audit-system-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.audit-system-label {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.audit-system-value {
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.audit-system-pct {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-normal);
+  color: var(--text-dim);
+}
+
+.audit-mono {
+  font-family: monospace;
+}
+
+/* ── Section ─────────────────────────────────────────────────────── */
+
+.audit-section {
+  margin-bottom: var(--space-5);
+}
+
+.audit-section h3 {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+
+.audit-empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-5);
+  color: var(--text-dim);
+}
+
+.audit-empty-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-4);
+  opacity: 0.3;
+  color: var(--green);
+}
+
+.audit-empty p {
+  margin: var(--space-1) 0;
+  font-size: var(--font-md);
+}
+
+.audit-empty-hint {
+  font-size: var(--font-sm) !important;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.audit-empty code {
+  font-family: monospace;
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* ── Task list ───────────────────────────────────────────────────── */
+
+.audit-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.audit-task-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Task card ───────────────────────────────────────────────────── */
+
+.audit-task-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  transition: border-color var(--transition-normal);
+}
+
+.audit-task-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.audit-task-stale {
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
+  border-left: 3px solid var(--orange);
+}
+
+.audit-task-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.audit-task-pulse-wrapper {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 3px;
+}
+
+.audit-task-pulse {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: audit-pulse 2s ease-in-out infinite;
+}
+
+.audit-task-pulse-stale {
+  background: var(--orange);
+  animation: audit-pulse-stale 1s ease-in-out infinite;
+}
+
+@keyframes audit-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+@keyframes audit-pulse-stale {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 40%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 0%, transparent); }
+}
+
+.audit-task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-task-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.audit-task-title {
+  font-weight: var(--weight-medium);
+  font-size: var(--font-md);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-task-link {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-medium);
+}
+
+.audit-task-stale-badge {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Metadata chips ──────────────────────────────────────────────── */
+
+.audit-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.audit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.audit-chip-icon {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.audit-chip-pid {
+  font-family: monospace;
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-hover));
+}
+
+.audit-chip-nopid {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.audit-chip-source-dashboard {
+  color: var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 10%, var(--bg-hover));
+}
+
+.audit-chip-source-disk {
+  color: var(--text-dim);
+}
+
+.audit-chip-model {
+  font-weight: var(--weight-semibold);
+}
+
+.audit-chip-model-sonnet { color: var(--brand-teal); }
+.audit-chip-model-opus { color: var(--brand-purple); }
+.audit-chip-model-haiku { color: var(--brand-orange); }
+
+/* ── Action buttons ──────────────────────────────────────────────── */
+
+.audit-task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.audit-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.audit-btn-logs {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.audit-btn-logs:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.audit-btn-terminate {
+  background: color-mix(in srgb, var(--red) 10%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 30%, var(--border));
+  color: var(--red);
+}
+
+.audit-btn-terminate:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 18%, var(--bg-surface));
+  border-color: var(--red);
+}
+
+.audit-btn-terminate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Last output snippet ─────────────────────────────────────────── */
+
+.audit-task-last-output {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.audit-last-output-label {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.audit-task-last-output code {
+  font-family: monospace;
+  font-size: var(--font-xs);
+  color: var(--text);
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Log viewer ──────────────────────────────────────────────────── */
+
+.audit-log-viewer {
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--border));
+  border-top: none;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.audit-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.audit-log-count {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  font-weight: var(--weight-medium);
+}
+
+.audit-log-autoscroll {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.audit-log-autoscroll input {
+  margin: 0;
+}
+
+.audit-log-entries {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.audit-log-entry {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-3);
+}
+
+.audit-log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.audit-log-turn {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  font-weight: var(--weight-semibold);
+}
+
+.audit-log-tool {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+}
+
+.audit-log-duration {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-log-output {
+  font-family: monospace;
+  font-size: var(--font-xs);
+  color: var(--text);
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--leading-relaxed);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.audit-log-empty {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.audit-log-loading {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.audit-log-error {
+  font-size: var(--font-sm);
+  color: var(--red);
+  padding: var(--space-3);
+}
+
+.audit-log-error-box {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 25%, var(--border));
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+  color: var(--red);
+}
+
+.audit-log-summary {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);
+}
+
+.audit-log-summary pre {
+  font-family: monospace;
+  font-size: var(--font-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: var(--space-1) 0 0 0;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────── */
+
+.audit-toast {
+  position: fixed;
+  bottom: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: audit-toast-in 0.2s ease-out;
+}
+
+@keyframes audit-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .audit-task-header {
+    flex-direction: column;
+  }
+
+  .audit-task-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .audit-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .audit-system-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

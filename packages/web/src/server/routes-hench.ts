@@ -5,6 +5,10 @@
  *
  * GET    /api/hench/runs                  — list runs with summary (newest first, ?limit=N)
  * GET    /api/hench/runs/:id              — full run detail with transcript
+ * GET    /api/hench/runs/health           — staleness health check for running runs
+ * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
+ * POST   /api/hench/execute/:taskId/terminate — terminate a running task
  * GET    /api/hench/config                — current workflow configuration with field metadata
  * PUT    /api/hench/config                — update workflow configuration (partial or full)
  * GET    /api/hench/templates             — list all workflow templates (built-in + user)
@@ -13,6 +17,8 @@
  * POST   /api/hench/templates/:id/apply   — apply a template to current config
  * DELETE /api/hench/templates/:id         — delete a user-defined template
  * POST   /api/hench/execute               — trigger Hench run for a specific task
+ * GET    /api/hench/execute/status         — get all active execution statuses
+ * GET    /api/hench/execute/status/:taskId — get specific task execution status
  */
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
@@ -252,6 +258,17 @@ export function handleHenchRoute(
   const path = qIdx === -1 ? fullPath : fullPath.slice(0, qIdx);
 
   const runsDir = join(ctx.projectDir, ".hench", "runs");
+
+  // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
+  if (path === "audit" && method === "GET") {
+    return handleAudit(res, runsDir);
+  }
+
+  // POST /api/hench/execute/:taskId/terminate — terminate a running task
+  const terminateMatch = path.match(/^execute\/([^/?]+)\/terminate$/);
+  if (terminateMatch && method === "POST") {
+    return handleTerminate(terminateMatch[1], res, runsDir, broadcast);
+  }
 
   // GET /api/hench/runs/health — staleness health check for running runs
   if (path === "runs/health" && method === "GET") {
@@ -1052,5 +1069,185 @@ function handleMarkStuck(
   clearStatusCache();
 
   jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: run.finishedAt });
+  return true;
+}
+
+// ── Audit interface ───────────────────────────────────────────────────
+
+/** Audit info for a single active task. */
+interface AuditEntry {
+  taskId: string;
+  taskTitle: string;
+  runId: string;
+  pid: number | null;
+  status: string;
+  startedAt: string;
+  lastActivityAt?: string;
+  elapsedMs: number;
+  stale: boolean;
+  /** Source: "dashboard" (in-memory execution) or "disk" (run file with status=running). */
+  source: "dashboard" | "disk";
+  lastOutput?: string;
+  turns?: number;
+  model?: string;
+  tokenUsage?: { input: number; output: number };
+}
+
+/** GET /api/hench/audit — aggregate audit info for all active tasks. */
+function handleAudit(res: ServerResponse, runsDir: string): boolean {
+  const now = Date.now();
+  const entries: AuditEntry[] = [];
+
+  // 1. Dashboard-triggered executions (have PID from the managed child handle)
+  for (const [taskId, entry] of activeExecutions.entries()) {
+    const startMs = new Date(entry.state.startedAt).getTime();
+    entries.push({
+      taskId,
+      taskTitle: entry.state.taskTitle,
+      runId: entry.state.runId,
+      pid: entry.handle.pid ?? null,
+      status: entry.state.status,
+      startedAt: entry.state.startedAt,
+      elapsedMs: now - startMs,
+      stale: false, // dashboard executions are tracked in real-time
+      source: "dashboard",
+      lastOutput: entry.state.lastOutput,
+    });
+  }
+
+  // 2. Disk-based running runs (from .hench/runs/*.json)
+  const dashboardTaskIds = new Set(activeExecutions.keys());
+  let files: string[];
+  try {
+    files = readdirSync(runsDir);
+  } catch {
+    files = [];
+  }
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const id = file.replace(/\.json$/, "");
+    const run = loadRunFile(runsDir, id);
+    if (!run || run.status !== "running") continue;
+
+    const runTaskId = run.taskId as string;
+    // Skip if already tracked by a dashboard execution
+    if (dashboardTaskIds.has(runTaskId)) continue;
+
+    const lastActivity = run.lastActivityAt as string | undefined;
+    const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
+    const stale = lastActivityMs != null
+      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
+      : true;
+    const startMs = new Date(run.startedAt as string).getTime();
+
+    entries.push({
+      taskId: runTaskId,
+      taskTitle: run.taskTitle as string,
+      runId: run.id as string,
+      pid: null, // PIDs are not tracked in run files
+      status: "running",
+      startedAt: run.startedAt as string,
+      lastActivityAt: lastActivity,
+      elapsedMs: now - startMs,
+      stale,
+      source: "disk",
+      turns: run.turns as number | undefined,
+      model: run.model as string | undefined,
+      tokenUsage: run.tokenUsage as { input: number; output: number } | undefined,
+    });
+  }
+
+  // System resource snapshot (process-level, not per-child)
+  const mem = process.memoryUsage();
+  const systemInfo = {
+    serverPid: process.pid,
+    serverUptime: Math.floor(process.uptime()),
+    memoryUsage: {
+      heapUsed: mem.heapUsed,
+      heapTotal: mem.heapTotal,
+      rss: mem.rss,
+      external: mem.external,
+    },
+    activeExecutions: activeExecutions.size,
+  };
+
+  jsonResponse(res, 200, { entries, systemInfo, timestamp: new Date().toISOString() });
+  return true;
+}
+
+/** POST /api/hench/execute/:taskId/terminate — terminate a running task. */
+function handleTerminate(
+  taskId: string,
+  res: ServerResponse,
+  runsDir: string,
+  broadcast?: WebSocketBroadcaster,
+): boolean {
+  const entry = activeExecutions.get(taskId);
+
+  if (!entry) {
+    // Check if there's a disk-based running run we can at least mark as failed
+    let files: string[];
+    try {
+      files = readdirSync(runsDir);
+    } catch {
+      errorResponse(res, 404, `No active execution found for task "${taskId}"`);
+      return true;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.replace(/\.json$/, "");
+      const run = loadRunFile(runsDir, id);
+      if (run && run.status === "running" && run.taskId === taskId) {
+        // Mark as terminated on disk
+        run.status = "failed";
+        run.error = "Terminated via audit interface";
+        run.finishedAt = new Date().toISOString();
+        const runPath = join(runsDir, `${id}.json`);
+        try {
+          writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+        } catch (err) {
+          errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+          return true;
+        }
+        clearStatusCache();
+        jsonResponse(res, 200, {
+          taskId,
+          runId: id,
+          terminated: true,
+          method: "disk-mark",
+          message: "Run marked as terminated (process not managed by dashboard)",
+        });
+        return true;
+      }
+    }
+
+    errorResponse(res, 404, `No active execution found for task "${taskId}"`);
+    return true;
+  }
+
+  // Kill the managed process
+  const pid = entry.handle.pid;
+  const killed = entry.handle.kill("SIGTERM");
+
+  // Update state
+  entry.state.status = "failed";
+  entry.state.finishedAt = new Date().toISOString();
+  entry.state.error = "Terminated via audit interface";
+
+  broadcastExecState(broadcast, { ...entry.state });
+  activeExecutions.delete(taskId);
+  clearStatusCache();
+
+  jsonResponse(res, 200, {
+    taskId,
+    runId: entry.state.runId,
+    pid,
+    terminated: true,
+    signalSent: killed,
+    method: "sigterm",
+    message: "Process terminated",
+  });
   return true;
 }
