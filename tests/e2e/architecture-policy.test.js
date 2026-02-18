@@ -67,12 +67,12 @@ describe("architecture policy: process execution", () => {
     const violations = [];
 
     for (const file of files) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
 
       // Skip allowed files
       if (ALLOWED.has(rel)) continue;
       // Skip test files
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /\/tests?\//.test(rel)) continue;
+      if (/\.test\.(ts|js|mjs)$/.test(rel) || /[\/\\]tests?[\/\\]/.test(rel)) continue;
 
       const content = readFileSync(file, "utf-8");
 

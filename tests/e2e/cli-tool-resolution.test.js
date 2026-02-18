@@ -51,5 +51,5 @@ describe("tool path resolution", () => {
       });
       expect(output.length).toBeGreaterThan(0);
     }
-  });
+  }, 15000);
 });

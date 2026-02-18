@@ -274,11 +274,13 @@ describe("detectSubAnalyses", () => {
   });
 
   it("detects a subdirectory with .sourcevision", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
     // Root directory
     mockedReaddirSync.mockImplementation((dir: any) => {
-      if (dir === "/root") return ["packages"] as any;
-      if (dir === "/root/packages") return ["rex"] as any;
-      if (dir === "/root/packages/rex") return [".sourcevision"] as any;
+      const d = n(String(dir));
+      if (d === "/root") return ["packages"] as any;
+      if (d === "/root/packages") return ["rex"] as any;
+      if (d === "/root/packages/rex") return [".sourcevision"] as any;
       return [] as any;
     });
 
@@ -287,8 +289,9 @@ describe("detectSubAnalyses", () => {
     });
 
     mockedExistsSync.mockImplementation((p: any) => {
-      if (p === "/root/packages/rex/.sourcevision") return true;
-      if (p === "/root/packages/rex/.sourcevision/manifest.json") return true;
+      const s = n(String(p));
+      if (s === "/root/packages/rex/.sourcevision") return true;
+      if (s === "/root/packages/rex/.sourcevision/manifest.json") return true;
       return false;
     });
 
@@ -308,9 +311,11 @@ describe("detectSubAnalyses", () => {
   });
 
   it("skips excluded directories like node_modules", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
     mockedReaddirSync.mockImplementation((dir: any) => {
-      if (dir === "/root") return ["node_modules", "packages"] as any;
-      if (dir === "/root/packages") return ["rex"] as any;
+      const d = n(String(dir));
+      if (d === "/root") return ["node_modules", "packages"] as any;
+      if (d === "/root/packages") return ["rex"] as any;
       return [] as any;
     });
 
@@ -322,15 +327,18 @@ describe("detectSubAnalyses", () => {
 
     const result = detectSubAnalyses("/root");
 
-    // Should not try to read node_modules
-    expect(mockedReaddirSync).not.toHaveBeenCalledWith("/root/node_modules");
+    // Should not try to read node_modules — check with normalized path
+    const readdirCalls = mockedReaddirSync.mock.calls.map((c) => n(String(c[0])));
+    expect(readdirCalls).not.toContain("/root/node_modules");
     expect(result).toEqual([]);
   });
 
   it("skips root .sourcevision directory", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
     mockedReaddirSync.mockImplementation((dir: any) => {
-      if (dir === "/root") return [".sourcevision", "packages"] as any;
-      if (dir === "/root/packages") return [] as any;
+      const d = n(String(dir));
+      if (d === "/root") return [".sourcevision", "packages"] as any;
+      if (d === "/root/packages") return [] as any;
       return [] as any;
     });
 
@@ -347,17 +355,19 @@ describe("detectSubAnalyses", () => {
   });
 
   it("loads zones and inventory if available", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
     mockedReaddirSync.mockImplementation((dir: any) => {
-      if (dir === "/root") return ["packages"] as any;
-      if (dir === "/root/packages") return ["rex"] as any;
-      if (dir === "/root/packages/rex") return [".sourcevision"] as any;
+      const d = n(String(dir));
+      if (d === "/root") return ["packages"] as any;
+      if (d === "/root/packages") return ["rex"] as any;
+      if (d === "/root/packages/rex") return [".sourcevision"] as any;
       return [] as any;
     });
 
     mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
 
     mockedExistsSync.mockImplementation((p: any) => {
-      const pathStr = String(p);
+      const pathStr = n(String(p));
       return (
         pathStr.includes(".sourcevision") ||
         pathStr.includes("manifest.json") ||
@@ -371,7 +381,7 @@ describe("detectSubAnalyses", () => {
     const inventory = makeInventory(["src/api.ts"]);
 
     mockedReadFileSync.mockImplementation((p: any) => {
-      const pathStr = String(p);
+      const pathStr = n(String(p));
       if (pathStr.includes("manifest.json")) return JSON.stringify(manifest);
       if (pathStr.includes("zones.json")) return JSON.stringify(zones);
       if (pathStr.includes("inventory.json")) return JSON.stringify(inventory);
@@ -386,9 +396,10 @@ describe("detectSubAnalyses", () => {
   });
 
   it("sorts results by prefix", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
     // Setup: /root/packages/{zulu,alpha}/.sourcevision/
     mockedReaddirSync.mockImplementation((dir: any) => {
-      const d = String(dir);
+      const d = n(String(dir));
       if (d === "/root") return ["packages"] as any;
       if (d === "/root/packages") return ["zulu", "alpha"] as any;
       // Return empty for subdirs so it checks for .sourcevision inside them
@@ -398,7 +409,7 @@ describe("detectSubAnalyses", () => {
     mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
 
     mockedExistsSync.mockImplementation((p: any) => {
-      const pathStr = String(p);
+      const pathStr = n(String(p));
       // .sourcevision dirs exist inside alpha and zulu
       if (pathStr === "/root/packages/alpha/.sourcevision") return true;
       if (pathStr === "/root/packages/zulu/.sourcevision") return true;

@@ -98,7 +98,7 @@ describe("architecture policy: domain layer isolation", () => {
     const violations = [];
 
     for (const file of rexSrc) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
       const content = readFileSync(file, "utf-8");
 
       for (const pkg of forbidden) {
@@ -135,7 +135,7 @@ describe("architecture policy: domain layer isolation", () => {
     const violations = [];
 
     for (const file of svSrc) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
       const content = readFileSync(file, "utf-8");
 
       for (const pkg of forbidden) {
@@ -180,7 +180,7 @@ describe("architecture policy: gateway enforcement", () => {
     const violations = [];
 
     for (const file of henchSrc) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
 
       // The gateway itself and its legacy re-export are allowed
       if (rel === GATEWAY || rel === LEGACY_GATEWAY) continue;
@@ -223,7 +223,7 @@ describe("architecture policy: gateway enforcement", () => {
     const violations = [];
 
     for (const file of webSrc) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
 
       // The gateway itself and its legacy re-export are allowed
       if (rel === GATEWAY || rel === LEGACY_GATEWAY) continue;
@@ -262,7 +262,7 @@ describe("architecture policy: gateway enforcement", () => {
     const violations = [];
 
     for (const file of henchSrc) {
-      const rel = relative(ROOT, file);
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
       const content = readFileSync(file, "utf-8");
 
       if (hasRuntimeImportFrom(content, "sourcevision")) {
