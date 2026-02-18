@@ -25,6 +25,7 @@ interface RunSummary {
   taskStatus?: string;
   startedAt: string;
   finishedAt?: string;
+  lastActivityAt?: string;
   status: string;
   turns: number;
   summary?: string;
@@ -114,6 +115,14 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] ?? { icon: "○", label: status, color: "var(--text-dim)" };
 }
 
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+
+function isStaleRun(run: RunSummary): boolean {
+  if (run.status !== "running") return false;
+  if (!run.lastActivityAt) return true; // Legacy run without timestamp
+  return Date.now() - new Date(run.lastActivityAt).getTime() > STALE_THRESHOLD_MS;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 /** Aggregate metrics shown above the runs list. */
@@ -164,6 +173,7 @@ function RunCard({ run, isSelected, onClick, navigateTo }: {
   navigateTo?: NavigateTo;
 }) {
   const status = getStatusConfig(run.status);
+  const stale = isStaleRun(run);
   const totalTokens = (run.tokenUsage.input ?? 0)
     + (run.tokenUsage.output ?? 0)
     + (run.tokenUsage.cacheCreationInput ?? 0)
@@ -172,7 +182,7 @@ function RunCard({ run, isSelected, onClick, navigateTo }: {
   const counts = run.structuredSummary?.counts;
 
   return h("div", {
-    class: `hench-run-card${isSelected ? " selected" : ""}${run.status === "failed" || run.status === "error" ? " failed" : ""}`,
+    class: `hench-run-card${isSelected ? " selected" : ""}${run.status === "failed" || run.status === "error" ? " failed" : ""}${stale ? " stale" : ""}`,
     onClick,
     role: "button",
     tabIndex: 0,
@@ -216,6 +226,12 @@ function RunCard({ run, isSelected, onClick, navigateTo }: {
         ? h("span", { class: "hench-run-chip" },
             `${counts.filesChanged} file${counts.filesChanged === 1 ? "" : "s"} changed`,
           )
+        : null,
+      run.lastActivityAt && run.status === "running"
+        ? h("span", { class: "hench-run-chip" }, `Active ${fmtTimestamp(run.lastActivityAt)}`)
+        : null,
+      stale
+        ? h("span", { class: "hench-run-chip hench-run-chip-warning" }, "Possibly stuck")
         : null,
     ),
   );
@@ -380,6 +396,35 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
       ? h("div", { class: "hench-detail-section" },
           h("h3", null, "Summary"),
           h("pre", { class: "hench-summary-box" }, run.summary),
+        )
+      : null,
+
+    // Mark as stuck button — only for running runs
+    run.status === "running"
+      ? h("div", { class: "hench-detail-section" },
+          h("h3", null, "Actions"),
+          h("div", { class: "hench-detail-actions" },
+            h("button", {
+              class: "btn btn-danger",
+              onClick: async () => {
+                try {
+                  const resp = await fetch(`/api/hench/runs/${run.id}/mark-stuck`, { method: "POST" });
+                  if (resp.ok) {
+                    onBack(); // Return to list, which will re-fetch
+                  }
+                } catch {
+                  // Silently fail — user can retry
+                }
+              },
+            }, "Mark as Stuck"),
+            run.lastActivityAt
+              ? h("span", { class: "hench-detail-activity" },
+                  `Last activity: ${new Date(run.lastActivityAt).toLocaleString()}`,
+                )
+              : h("span", { class: "hench-detail-activity hench-detail-activity-unknown" },
+                  "No activity timestamp (legacy run)",
+                ),
+          ),
         )
       : null,
   );

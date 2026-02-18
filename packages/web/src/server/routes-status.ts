@@ -54,8 +54,12 @@ export interface RexStatus {
 export interface HenchStatus {
   /** Whether hench is configured (config.json exists). */
   configured: boolean;
-  /** Number of run directories. */
+  /** Number of run files (JSON). */
   totalRuns: number;
+  /** Number of currently running (active) runs. */
+  activeRuns: number;
+  /** Number of running runs that appear stale (no recent activity). */
+  staleRuns: number;
 }
 
 export interface ProjectStatus {
@@ -183,16 +187,45 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
   }
 }
 
+/** Staleness threshold for running runs: 5 minutes. */
+const HENCH_STALE_THRESHOLD_MS = 5 * 60 * 1000;
+
 function extractHenchStatus(ctx: ServerContext): HenchStatus {
   const henchDir = join(ctx.projectDir, ".hench");
   const configPath = join(henchDir, "config.json");
   const runsDir = join(henchDir, "runs");
 
   let totalRuns = 0;
+  let activeRuns = 0;
+  let staleRuns = 0;
+
   if (existsSync(runsDir)) {
     try {
-      const entries = readdirSync(runsDir, { withFileTypes: true });
-      totalRuns = entries.filter((e) => e.isDirectory()).length;
+      const entries = readdirSync(runsDir);
+      const jsonFiles = entries.filter((f) => typeof f === "string" ? f.endsWith(".json") : false);
+      totalRuns = jsonFiles.length;
+
+      const now = Date.now();
+      for (const file of jsonFiles) {
+        try {
+          const raw = readFileSync(join(runsDir, file as string), "utf-8");
+          const run = JSON.parse(raw);
+          if (run.status === "running") {
+            activeRuns++;
+            const lastActivity = run.lastActivityAt as string | undefined;
+            if (lastActivity) {
+              if (now - new Date(lastActivity).getTime() > HENCH_STALE_THRESHOLD_MS) {
+                staleRuns++;
+              }
+            } else {
+              // No lastActivityAt field (legacy run still marked running) = stale
+              staleRuns++;
+            }
+          }
+        } catch {
+          // Skip unreadable files
+        }
+      }
     } catch {
       // ignore
     }
@@ -201,6 +234,8 @@ function extractHenchStatus(ctx: ServerContext): HenchStatus {
   return {
     configured: existsSync(configPath),
     totalRuns,
+    activeRuns,
+    staleRuns,
   };
 }
 

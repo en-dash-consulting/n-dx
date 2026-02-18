@@ -387,6 +387,23 @@ describe("validateRunRecord", () => {
       expect(result.data.finishedAt).toBeUndefined();
     }
   });
+
+  it("accepts run with lastActivityAt", () => {
+    const run = { ...validRun, lastActivityAt: "2025-01-01T00:03:00Z" };
+    const result = validateRunRecord(run);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.lastActivityAt).toBe("2025-01-01T00:03:00Z");
+    }
+  });
+
+  it("accepts run without lastActivityAt (backward compat)", () => {
+    const result = validateRunRecord(validRun);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.lastActivityAt).toBeUndefined();
+    }
+  });
 });
 
 describe("formatValidationErrors", () => {

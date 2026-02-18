@@ -106,6 +106,7 @@ export const RunRecordSchema = z.object({
   taskTitle: z.string(),
   startedAt: z.string(),
   finishedAt: z.string().optional(),
+  lastActivityAt: z.string().optional(),
   status: RunStatusSchema,
   turns: z.number(),
   summary: z.string().optional(),

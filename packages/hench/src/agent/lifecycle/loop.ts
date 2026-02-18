@@ -179,6 +179,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     model,
   };
 
+  run.lastActivityAt = new Date().toISOString();
   await saveRun(henchDir, run);
 
   const systemPrompt = buildSystemPrompt(brief.project, config);
@@ -317,6 +318,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       messages.push({ role: "user", content: toolResults });
 
       // Save progress periodically
+      run.lastActivityAt = new Date().toISOString();
       await saveRun(henchDir, run);
     }
 
@@ -392,6 +394,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   }
 
   run.finishedAt = new Date().toISOString();
+  run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
 
   return { run };

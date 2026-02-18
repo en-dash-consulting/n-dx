@@ -372,6 +372,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     model,
   };
 
+  run.lastActivityAt = new Date().toISOString();
   await saveRun(henchDir, run);
 
   // Load unified Claude config for CLI path resolution
@@ -600,6 +601,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   run.finishedAt = new Date().toISOString();
+  run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
 
   return { run };

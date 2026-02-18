@@ -48,6 +48,8 @@ interface RexStatus {
 interface HenchStatus {
   configured: boolean;
   totalRuns: number;
+  activeRuns: number;
+  staleRuns: number;
 }
 
 interface ProjectStatus {
@@ -275,11 +277,13 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
     );
   }
 
+  const hasStaleRuns = status.staleRuns > 0;
+
   return h("div", {
-    class: "sidebar-indicator sidebar-indicator-ok",
+    class: `sidebar-indicator ${hasStaleRuns ? "sidebar-indicator-warning" : "sidebar-indicator-ok"}`,
     role: "button",
     tabIndex,
-    "aria-label": `Hench: ${status.totalRuns} runs — click to view`,
+    "aria-label": `Hench: ${status.totalRuns} runs${hasStaleRuns ? `, ${status.staleRuns} stuck` : ""} — click to view`,
     onClick: () => onNavigate("hench-runs"),
     onKeyDown: (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -288,8 +292,15 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
       }
     },
   },
-    h("span", { class: "indicator-dot indicator-dot-fresh", "aria-hidden": "true" }),
-    h("span", { class: "indicator-text" }, `${status.totalRuns} run${status.totalRuns === 1 ? "" : "s"}`),
+    h("span", {
+      class: `indicator-dot ${hasStaleRuns ? "indicator-dot-stale" : "indicator-dot-fresh"}`,
+      "aria-hidden": "true",
+    }),
+    h("span", { class: "indicator-text" },
+      hasStaleRuns
+        ? `${status.staleRuns} stuck run${status.staleRuns === 1 ? "" : "s"}`
+        : `${status.totalRuns} run${status.totalRuns === 1 ? "" : "s"}`,
+    ),
   );
 }
 

@@ -138,6 +138,8 @@ export interface RunRecord {
   taskTitle: string;
   startedAt: string;
   finishedAt?: string;
+  /** ISO timestamp of the most recent agent activity. Updated on every periodic save. */
+  lastActivityAt?: string;
   status: RunStatus;
   turns: number;
   summary?: string;

@@ -223,17 +223,105 @@ describe("Status API routes", () => {
       expect(data.hench.configured).toBe(true);
     });
 
-    it("counts run directories", async () => {
+    it("counts run JSON files", async () => {
       const runsDir = join(tmpDir, ".hench", "runs");
       await mkdir(runsDir, { recursive: true });
-      await mkdir(join(runsDir, "run-001"), { recursive: true });
-      await mkdir(join(runsDir, "run-002"), { recursive: true });
+      const run1 = {
+        id: "run-1", taskId: "t1", taskTitle: "Task 1",
+        startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
+        status: "completed", turns: 5,
+        tokenUsage: { input: 100, output: 50 }, toolCalls: [], model: "sonnet",
+      };
+      const run2 = {
+        id: "run-2", taskId: "t2", taskTitle: "Task 2",
+        startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
+        status: "completed", turns: 3,
+        tokenUsage: { input: 200, output: 100 }, toolCalls: [], model: "sonnet",
+      };
+      await writeFile(join(runsDir, "run-1.json"), JSON.stringify(run1));
+      await writeFile(join(runsDir, "run-2.json"), JSON.stringify(run2));
       await writeFile(join(join(tmpDir, ".hench"), "config.json"), "{}");
 
       clearStatusCache();
       const res = await fetch(`http://localhost:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.totalRuns).toBe(2);
+    });
+
+    it("detects stale running runs", async () => {
+      const henchDir = join(tmpDir, ".hench");
+      const runsDir = join(henchDir, "runs");
+      await mkdir(runsDir, { recursive: true });
+      await writeFile(join(henchDir, "config.json"), "{}");
+
+      const staleRun = {
+        id: "stale-run-1", taskId: "task-1", taskTitle: "Stale Task",
+        startedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        status: "running",
+        lastActivityAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        turns: 5,
+        tokenUsage: { input: 1000, output: 500 }, toolCalls: [], model: "sonnet",
+      };
+      await writeFile(join(runsDir, "stale-run-1.json"), JSON.stringify(staleRun));
+
+      const completedRun = {
+        id: "done-run-1", taskId: "task-2", taskTitle: "Done Task",
+        startedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        finishedAt: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
+        status: "completed", turns: 10,
+        tokenUsage: { input: 2000, output: 1000 }, toolCalls: [], model: "sonnet",
+      };
+      await writeFile(join(runsDir, "done-run-1.json"), JSON.stringify(completedRun));
+
+      clearStatusCache();
+      const res = await fetch(`http://localhost:${port}/api/status`);
+      const data = await res.json();
+      expect(data.hench.totalRuns).toBe(2);
+      expect(data.hench.activeRuns).toBe(1);
+      expect(data.hench.staleRuns).toBe(1);
+    });
+
+    it("reports zero stale runs when running run is fresh", async () => {
+      const henchDir = join(tmpDir, ".hench");
+      const runsDir = join(henchDir, "runs");
+      await mkdir(runsDir, { recursive: true });
+      await writeFile(join(henchDir, "config.json"), "{}");
+
+      const freshRun = {
+        id: "fresh-run-1", taskId: "task-1", taskTitle: "Fresh Task",
+        startedAt: new Date().toISOString(),
+        status: "running",
+        lastActivityAt: new Date().toISOString(),
+        turns: 2,
+        tokenUsage: { input: 500, output: 200 }, toolCalls: [], model: "sonnet",
+      };
+      await writeFile(join(runsDir, "fresh-run-1.json"), JSON.stringify(freshRun));
+
+      clearStatusCache();
+      const res = await fetch(`http://localhost:${port}/api/status`);
+      const data = await res.json();
+      expect(data.hench.activeRuns).toBe(1);
+      expect(data.hench.staleRuns).toBe(0);
+    });
+
+    it("treats running run without lastActivityAt as stale (legacy compat)", async () => {
+      const henchDir = join(tmpDir, ".hench");
+      const runsDir = join(henchDir, "runs");
+      await mkdir(runsDir, { recursive: true });
+      await writeFile(join(henchDir, "config.json"), "{}");
+
+      const legacyRun = {
+        id: "legacy-run-1", taskId: "task-1", taskTitle: "Legacy Task",
+        startedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        status: "running", turns: 5,
+        tokenUsage: { input: 1000, output: 500 }, toolCalls: [], model: "sonnet",
+      };
+      await writeFile(join(runsDir, "legacy-run-1.json"), JSON.stringify(legacyRun));
+
+      clearStatusCache();
+      const res = await fetch(`http://localhost:${port}/api/status`);
+      const data = await res.json();
+      expect(data.hench.staleRuns).toBe(1);
     });
   });
 

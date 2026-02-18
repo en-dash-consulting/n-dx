@@ -402,6 +402,47 @@
   margin: 0;
 }
 
+/* Stale run indicator */
+.hench-run-card.stale {
+  border-left: 3px solid var(--yellow, #f59e0b);
+}
+
+.hench-run-chip-warning {
+  color: var(--yellow, #f59e0b);
+  font-weight: 500;
+}
+
+/* Actions in detail view */
+.hench-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hench-detail-activity {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.hench-detail-activity-unknown {
+  color: var(--yellow, #f59e0b);
+  font-style: italic;
+}
+
+.btn-danger {
+  background: var(--red);
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-danger:hover {
+  opacity: 0.85;
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .hench-run-meta {

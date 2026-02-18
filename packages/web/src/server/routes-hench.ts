@@ -33,6 +33,7 @@ interface RunSummary {
   taskTitle: string;
   startedAt: string;
   finishedAt?: string;
+  lastActivityAt?: string;
   status: string;
   turns: number;
   summary?: string;
@@ -220,6 +221,7 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     taskTitle: run.taskTitle as string,
     startedAt: run.startedAt as string,
     finishedAt: run.finishedAt as string | undefined,
+    lastActivityAt: run.lastActivityAt as string | undefined,
     status: run.status as string,
     turns: run.turns as number,
     summary: run.summary as string | undefined,
@@ -249,6 +251,17 @@ export function handleHenchRoute(
   const path = qIdx === -1 ? fullPath : fullPath.slice(0, qIdx);
 
   const runsDir = join(ctx.projectDir, ".hench", "runs");
+
+  // GET /api/hench/runs/health — staleness health check for running runs
+  if (path === "runs/health" && method === "GET") {
+    return handleRunsHealth(res, runsDir);
+  }
+
+  // POST /api/hench/runs/:id/mark-stuck — mark a running run as failed
+  const markStuckMatch = path.match(/^runs\/([^/?]+)\/mark-stuck$/);
+  if (markStuckMatch && method === "POST") {
+    return handleMarkStuck(markStuckMatch[1], res, runsDir);
+  }
 
   // GET /api/hench/runs — list runs with summary
   if (path === "runs" && method === "GET") {
@@ -944,5 +957,96 @@ function handleExecuteStatusForTask(taskId: string, res: ServerResponse): boolea
     return true;
   }
   jsonResponse(res, 200, { execution: { ...entry.state } });
+  return true;
+}
+
+// ── Health monitoring ─────────────────────────────────────────────────
+
+/** Default staleness threshold: 5 minutes in milliseconds. */
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+
+/** GET /api/hench/runs/health — detect stale "running" runs. */
+function handleRunsHealth(res: ServerResponse, runsDir: string): boolean {
+  let files: string[];
+  try {
+    files = readdirSync(runsDir);
+  } catch {
+    jsonResponse(res, 200, { activeRuns: 0, staleRuns: 0, runs: [] });
+    return true;
+  }
+
+  const now = Date.now();
+  const runningRuns: Array<{
+    id: string;
+    taskId: string;
+    taskTitle: string;
+    startedAt: string;
+    lastActivityAt?: string;
+    stale: boolean;
+    staleSinceMs?: number;
+  }> = [];
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const id = file.replace(/\.json$/, "");
+    const run = loadRunFile(runsDir, id);
+    if (!run || run.status !== "running") continue;
+
+    const lastActivity = run.lastActivityAt as string | undefined;
+    const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : null;
+    const stale = lastActivityMs != null
+      ? (now - lastActivityMs) > STALE_THRESHOLD_MS
+      : true; // No lastActivityAt = legacy run, treat as stale if still "running"
+
+    runningRuns.push({
+      id: run.id as string,
+      taskId: run.taskId as string,
+      taskTitle: run.taskTitle as string,
+      startedAt: run.startedAt as string,
+      lastActivityAt: lastActivity,
+      stale,
+      staleSinceMs: lastActivityMs != null ? Math.max(0, now - lastActivityMs) : undefined,
+    });
+  }
+
+  jsonResponse(res, 200, {
+    activeRuns: runningRuns.length,
+    staleRuns: runningRuns.filter((r) => r.stale).length,
+    runs: runningRuns,
+  });
+  return true;
+}
+
+/** POST /api/hench/runs/:id/mark-stuck — mark a stuck run as failed. */
+function handleMarkStuck(
+  runId: string,
+  res: ServerResponse,
+  runsDir: string,
+): boolean {
+  const runPath = join(runsDir, `${runId}.json`);
+  const run = loadRunFile(runsDir, runId);
+  if (!run) {
+    errorResponse(res, 404, `Run "${runId}" not found`);
+    return true;
+  }
+
+  if (run.status !== "running") {
+    errorResponse(res, 409, `Run is "${run.status}", not "running". Cannot mark as stuck.`);
+    return true;
+  }
+
+  // Patch the run file on disk
+  run.status = "failed";
+  run.error = "Manually marked as stuck (no recent activity)";
+  run.finishedAt = new Date().toISOString();
+
+  try {
+    writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
+  } catch (err) {
+    errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+    return true;
+  }
+
+  jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: run.finishedAt });
   return true;
 }
