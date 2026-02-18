@@ -8818,6 +8818,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-18T10:48:07.315Z",
+      "completedAt": "2026-02-18T10:48:07.315Z",
       "children": [
         {
           "id": "dee97c9f-f407-4ade-a57a-d02ff11fe5cf",
@@ -8906,9 +8908,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-18T10:48:07.315Z",
-      "completedAt": "2026-02-18T10:48:07.315Z"
+      ]
     },
     {
       "id": "2171d478-2d5b-4926-8e85-837f52c99abd",
@@ -9038,7 +9038,7 @@
     {
       "id": "b39d3ad8-6c3c-4e9b-9788-d18168348f90",
       "title": "SourceVision UI Import Graph Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -9080,15 +9080,17 @@
         {
           "id": "88d0c551-0e1e-4204-a351-fd4331eccbcc",
           "title": "Global feature toggle configuration system",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create a centralized configuration panel for managing experimental or problematic features across the n-dx toolkit",
           "source": "smart-add",
+          "startedAt": "2026-02-18T11:29:02.270Z",
+          "completedAt": "2026-02-18T11:29:02.270Z",
           "children": [
             {
               "id": "b3a50216-5a96-47ff-99b1-b6b5bb60a56e",
               "title": "Create feature toggle configuration section in n-dx config",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Build a dedicated configuration area within the unified config system that allows users to enable/disable experimental or problematic features across all n-dx packages\n\n---\n\nCreate a user-friendly web interface for managing feature toggles, providing easy access to experimental or problematic feature controls",
               "acceptanceCriteria": [
@@ -9109,11 +9111,15 @@
                 "web"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-18T10:49:15.968Z",
+              "completedAt": "2026-02-18T11:29:02.189Z",
               "children": []
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-18T11:29:02.328Z",
+      "completedAt": "2026-02-18T11:29:02.328Z"
     },
     {
       "id": "0bff2aa4-4aa3-4eb0-bee3-d3a5c1daf5bd",
