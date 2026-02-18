@@ -24,7 +24,7 @@ const PACKAGES = {
  * Sections stored in .n-dx.json rather than package config files.
  * These are cross-cutting settings that apply to all packages.
  */
-const PROJECT_SECTIONS = new Set(["claude", "web"]);
+const PROJECT_SECTIONS = new Set(["claude", "web", "features"]);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

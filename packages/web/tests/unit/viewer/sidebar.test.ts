@@ -51,7 +51,7 @@ describe("Sidebar", () => {
     it("renders section headers as clickable buttons", () => {
       renderSidebar();
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(3); // SOURCEVISION, REX, HENCH
+      expect(sectionHeaders.length).toBe(4); // SOURCEVISION, REX, HENCH, SETTINGS
     });
 
     it("section headers have aria-expanded attribute", () => {
@@ -427,7 +427,7 @@ describe("Sidebar", () => {
     it("shows chevron on section headers", () => {
       renderSidebar();
       const chevrons = root.querySelectorAll(".nav-section-chevron");
-      expect(chevrons.length).toBe(3);
+      expect(chevrons.length).toBe(4);
     });
 
     it("expanded section has open chevron class", () => {
@@ -529,41 +529,41 @@ describe("Sidebar", () => {
   });
 
   describe("scope filtering", () => {
-    it("shows all three sections when no scope is set", () => {
+    it("shows all four sections when no scope is set", () => {
       renderSidebar({ scope: null });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(3);
+      expect(sectionHeaders.length).toBe(4); // SOURCEVISION, REX, HENCH, SETTINGS
     });
 
-    it("shows only sourcevision section when scope=sourcevision", () => {
+    it("shows sourcevision + settings sections when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(1);
+      expect(sectionHeaders.length).toBe(2);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("SOURCEVISION");
     });
 
-    it("shows only rex section when scope=rex", () => {
+    it("shows rex + settings sections when scope=rex", () => {
       renderSidebar({ scope: "rex", view: "rex-dashboard" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(1);
+      expect(sectionHeaders.length).toBe(2);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("REX");
     });
 
-    it("shows only hench section when scope=hench", () => {
+    it("shows hench + settings sections when scope=hench", () => {
       renderSidebar({ scope: "hench", view: "hench-runs" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(1);
+      expect(sectionHeaders.length).toBe(2);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("HENCH");
     });
 
-    it("shows sourcevision nav items when scope=sourcevision", () => {
+    it("shows sourcevision nav items + settings items when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 8 sourcevision items: overview, graph, zones, files, routes, architecture, problems, suggestions
-      expect(navItems.length).toBe(8);
+      // 8 sourcevision items + 1 settings item (Feature Flags)
+      expect(navItems.length).toBe(9);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

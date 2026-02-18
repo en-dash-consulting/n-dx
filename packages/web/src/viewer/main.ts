@@ -31,6 +31,7 @@ import { WorkflowOptimizationView } from "./views/workflow-optimization.js";
 import { TaskAuditView } from "./views/task-audit.js";
 import { NotionConfigView } from "./views/notion-config.js";
 import { IntegrationConfigView } from "./views/integration-config.js";
+import { FeatureTogglesView } from "./views/feature-toggles.js";
 
 initTheme();
 
@@ -41,12 +42,15 @@ const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
   hench: ["hench-runs", "hench-audit", "hench-config", "hench-templates", "hench-optimization"],
 };
 
-const ALL_VIEWS = new Set<ViewId>(Object.values(VIEWS_BY_SCOPE).flat() as ViewId[]);
+/** Cross-cutting views available in all scopes. */
+const CROSS_CUTTING_VIEWS: ViewId[] = ["feature-toggles"];
+
+const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 
 /** Build the valid view set based on an optional scope. */
 function buildValidViews(scope: string | null): Set<ViewId> {
   if (!scope) return ALL_VIEWS;
-  return new Set<ViewId>((VIEWS_BY_SCOPE[scope] ?? []) as ViewId[]);
+  return new Set<ViewId>([...(VIEWS_BY_SCOPE[scope] ?? []), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 }
 
 /** Fetch viewer scope from the server config endpoint. */
@@ -320,6 +324,8 @@ function App({ scope }: { scope: string | null }) {
         return h(HenchTemplatesView, null);
       case "hench-optimization":
         return h(WorkflowOptimizationView, null);
+      case "feature-toggles":
+        return h(FeatureTogglesView, null);
       default:
         return null;
     }

@@ -61,6 +61,8 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "hench-config", icon: "\u2699", label: "Config", minPass: 0 },
   { type: "item", id: "hench-templates", icon: "\u25A6", label: "Templates", minPass: 0 },
   { type: "item", id: "hench-optimization", icon: "\u26A1", label: "Optimization", minPass: 0 },
+  { type: "section", label: "SETTINGS" },
+  { type: "item", id: "feature-toggles", icon: "\u2699", label: "Feature Flags", minPass: 0 },
 ];
 
 /** Group flat NAV_ENTRIES into sections with their items */
@@ -115,10 +117,10 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
 
-  /** Sections filtered by scope — when scoped, show only the matching section. */
+  /** Sections filtered by scope — when scoped, show only the matching section + cross-cutting sections. */
   const visibleSections = useMemo(() => {
     if (!scope) return SECTIONS;
-    return SECTIONS.filter((s) => s.product === scope);
+    return SECTIONS.filter((s) => s.product === scope || !s.product);
   }, [scope]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>

@@ -29,4 +29,5 @@
 @import "./breadcrumb.css";
 @import "./notion-config.css";
 @import "./integration-config.css";
+@import "./feature-toggles.css";
 @import "./responsive.css";

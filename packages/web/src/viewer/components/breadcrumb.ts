@@ -64,6 +64,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "hench-config":        { product: "hench",        label: "Config",          productLabel: "Hench" },
   "hench-templates":     { product: "hench",        label: "Templates",       productLabel: "Hench" },
   "hench-optimization":  { product: "hench",        label: "Optimization",    productLabel: "Hench" },
+  "feature-toggles":     { product: "rex",          label: "Feature Flags",   productLabel: "Settings" },
 };
 
 // ---------------------------------------------------------------------------
