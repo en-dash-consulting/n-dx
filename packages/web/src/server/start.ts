@@ -4,6 +4,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, watch } from "node:fs";
+import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -22,6 +23,13 @@ import { handleConfigRoute } from "./routes-config.js";
 import { createWebSocketManager } from "./websocket.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
 import { findAvailablePort } from "./port.js";
+
+/**
+ * File written by the server process to communicate the actual port it bound to.
+ * Used by the orchestrator (web.js) to discover the port in background mode,
+ * where the server's stdout is not available.
+ */
+export const PORT_FILE = ".n-dx-web.port";
 
 /** Result returned by startServer with the actual port used. */
 export interface StartResult {
@@ -274,7 +282,16 @@ export async function startServer(
       }
     });
 
-    server.listen(actualPort, () => {
+    server.listen(actualPort, async () => {
+      // Write port file so the orchestrator can discover the actual port
+      // (especially important in background mode where stdout is unavailable).
+      const portFilePath = join(absDir, PORT_FILE);
+      try {
+        await writeFile(portFilePath, String(actualPort) + "\n", "utf-8");
+      } catch {
+        // Non-fatal: port file is a convenience, not a requirement
+      }
+
       const label = scope ? `${scope} viewer` : "n-dx dashboard";
       console.log(`${label} running at http://localhost:${actualPort}`);
       if (inScope("sourcevision")) {
@@ -291,7 +308,20 @@ export async function startServer(
       console.log(`WebSocket available at ws://localhost:${actualPort}`);
       if (scope) console.log(`Scope: ${scope} (standalone mode)`);
       if (dev) console.log("Dev mode: live reload enabled");
+      console.log("");
+      console.log("Claude Code MCP setup:");
+      console.log(`  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex`);
+      console.log(`  claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision`);
+      console.log("");
       console.log("Press Ctrl+C to stop.");
+
+      // Clean up port file on process exit
+      const removePortFile = () => {
+        unlink(portFilePath).catch(() => {});
+      };
+      process.once("SIGINT", removePortFile);
+      process.once("SIGTERM", removePortFile);
+      process.once("exit", removePortFile);
 
       resolvePromise({
         port: actualPort,

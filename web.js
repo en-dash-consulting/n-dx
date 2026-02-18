@@ -24,6 +24,7 @@ import { join, resolve } from "path";
 
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
+const PORT_FILE = ".n-dx-web.port";
 
 // ── Output helpers ───────────────────────────────────────────────────────────
 // Orchestration files avoid importing from packages (they spawn CLIs instead).
@@ -78,6 +79,48 @@ function isPortInUse(port) {
       res(false);
     });
   });
+}
+
+/**
+ * Read the port file written by the server process.
+ * Returns the actual port number or null.
+ */
+async function readPortFile(dir) {
+  const portPath = join(dir, PORT_FILE);
+  if (!(await fileExists(portPath))) return null;
+  try {
+    const raw = await readFile(portPath, "utf-8");
+    const port = parseInt(raw.trim(), 10);
+    return isNaN(port) ? null : port;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove the port file.
+ */
+async function removePortFile(dir) {
+  const portPath = join(dir, PORT_FILE);
+  try {
+    await unlink(portPath);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Wait for the server process to write its port file, polling at intervals.
+ * Returns the actual port or null if the timeout expires.
+ */
+async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const port = await readPortFile(dir);
+    if (port !== null) return port;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
 }
 
 /**
@@ -147,6 +190,7 @@ async function stopServer(dir, label = "n-dx server") {
   if (!isProcessRunning(info.pid)) {
     log("Server process is no longer running (stale PID file).");
     await removePidFile(dir);
+    await removePortFile(dir);
     return true;
   }
 
@@ -154,6 +198,7 @@ async function stopServer(dir, label = "n-dx server") {
     process.kill(info.pid, "SIGTERM");
     log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);
     await removePidFile(dir);
+    await removePortFile(dir);
     return true;
   } catch (err) {
     console.error(`Failed to stop server (PID ${info.pid}): ${err.message}`);
@@ -175,18 +220,24 @@ async function showStatus(dir, port, label = "n-dx server") {
     return;
   }
 
+  // The port file reflects the actual port the server bound to (may differ
+  // from the PID file's port if dynamic allocation kicked in).
+  const actualPort = (await readPortFile(dir)) ?? info.port;
   const running = isProcessRunning(info.pid);
-  const portActive = await isPortInUse(info.port);
+  const portActive = await isPortInUse(actualPort);
 
   if (running && portActive) {
-    log(`${label} is running (PID ${info.pid}, port ${info.port}).`);
-    log(`  URL: http://localhost:${info.port}`);
+    log(`${label} is running (PID ${info.pid}, port ${actualPort}).`);
+    log(`  URL: http://localhost:${actualPort}`);
+    log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
+    log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
     log(`  Started: ${info.startedAt}`);
   } else if (running) {
-    log(`Server process is running (PID ${info.pid}) but port ${info.port} is not responding.`);
+    log(`Server process is running (PID ${info.pid}) but port ${actualPort} is not responding.`);
   } else {
     log("Server process is no longer running (stale PID file).");
     await removePidFile(dir);
+    await removePortFile(dir);
   }
 }
 
@@ -276,6 +327,7 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
   } else if (existing) {
     // Stale PID file — clean up
     await removePidFile(absDir);
+    await removePortFile(absDir);
   }
 
   // Note: Port availability is checked inside the server process itself,
@@ -287,6 +339,9 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
 
   // --- Background mode ---
   if (isBackground) {
+    // Remove stale port file before spawning so we can detect the fresh one
+    await removePortFile(absDir);
+
     const script = resolve(__dir, tools.web);
     const child = spawn(process.execPath, [script, ...serveArgs], {
       stdio: "ignore",
@@ -294,16 +349,50 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
     });
     child.unref();
 
-    await writePidFile(absDir, child.pid, port);
+    // Wait for the server to write its port file with the actual bound port.
+    // This handles dynamic port allocation — the actual port may differ from
+    // the requested port if the requested port was already in use.
+    const actualPort = await waitForPortFile(absDir);
+
+    if (actualPort === null) {
+      // Server may have failed to start. Check if process is still running.
+      if (!isProcessRunning(child.pid)) {
+        console.error(`${label} failed to start. Check logs for details.`);
+        return 1;
+      }
+      // Process is alive but port file not written yet — use requested port as fallback
+      await writePidFile(absDir, child.pid, port);
+      log(`${label} started in background (PID ${child.pid}).`);
+      log(`  URL: http://localhost:${port}`);
+      log(`Use '${stopCmd}' to stop it.`);
+      return 0;
+    }
+
+    await writePidFile(absDir, child.pid, actualPort);
+
+    if (actualPort !== port) {
+      log(`Port ${port} is in use — using port ${actualPort} instead.`);
+    }
+
     log(`${label} started in background (PID ${child.pid}).`);
-    log(`  URL: http://localhost:${port}`);
+    log(`  URL: http://localhost:${actualPort}`);
+    log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
+    log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
+    log("");
+    log("Claude Code MCP setup:");
+    log(`  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex`);
+    log(`  claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision`);
+    log("");
     log(`Use '${stopCmd}' to stop it.`);
     return 0;
   }
 
   // --- Foreground mode ---
-  // Clean up PID file on exit (in case of SIGINT/SIGTERM)
-  const cleanup = () => removePidFile(absDir).catch(() => {});
+  // Clean up PID and port files on exit (in case of SIGINT/SIGTERM)
+  const cleanup = () => Promise.all([
+    removePidFile(absDir).catch(() => {}),
+    removePortFile(absDir).catch(() => {}),
+  ]);
 
   process.on("SIGINT", async () => {
     await cleanup();

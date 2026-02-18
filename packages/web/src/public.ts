@@ -45,7 +45,7 @@
  * @see packages/hench/src/prd/ops.ts — hench's equivalent gateway pattern
  */
 
-export { startServer } from "./server/start.js";
+export { startServer, PORT_FILE } from "./server/start.js";
 export type { ServerOptions, StartResult } from "./server/start.js";
 export type { ServerContext, RouteHandler, ViewerScope } from "./server/types.js";
 export type { WebSocketBroadcaster } from "./server/websocket.js";

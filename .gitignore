@@ -4,5 +4,7 @@ dist/
 .hench/runs/
 .n-dx.json
 .n-dx2.json
+.n-dx-web.pid
+.n-dx-web.port
 .sv2/
 .sv3/

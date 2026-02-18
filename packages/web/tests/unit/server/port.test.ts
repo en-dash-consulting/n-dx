@@ -7,6 +7,7 @@ import {
   PORT_RANGE_START,
   PORT_RANGE_END,
 } from "../../../src/server/port.js";
+import { PORT_FILE } from "../../../src/server/start.js";
 
 /** Occupy a port by binding a TCP server to it. */
 function occupyPort(port: number): Promise<Server> {
@@ -36,6 +37,10 @@ describe("port utilities", () => {
       expect(DEFAULT_PORT).toBe(3117);
       expect(PORT_RANGE_START).toBe(3117);
       expect(PORT_RANGE_END).toBe(3200);
+    });
+
+    it("exports PORT_FILE constant for server-to-orchestrator communication", () => {
+      expect(PORT_FILE).toBe(".n-dx-web.port");
     });
   });
 

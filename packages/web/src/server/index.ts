@@ -32,7 +32,7 @@
  * @see ./mcp-deps.ts — runtime import gateway (all cross-package imports)
  */
 
-export { startServer } from "./start.js";
+export { startServer, PORT_FILE } from "./start.js";
 export type { ServerOptions, StartResult } from "./start.js";
 export type { ServerContext, RouteHandler } from "./types.js";
 export type { WebSocketBroadcaster } from "./websocket.js";
