@@ -1,37 +1,27 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
 import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
-import { getCurrentHead } from "../../process/index.js";
-import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
-import { buildSystemPrompt } from "../planning/prompt.js";
 import { saveRun } from "../../store/index.js";
-import { buildRunSummary } from "../analysis/summary.js";
-import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../../tools/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
-import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
+import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
-import { section, subsection, stream, detail, info } from "../../types/output.js";
-import { displayTaskInfo } from "./task-display.js";
+import { section, stream, info } from "../../types/output.js";
 import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
 import type { ClaudeConfig } from "../../store/project-config.js";
+import {
+  prepareBrief,
+  executeDryRun,
+  transitionToInProgress,
+  initRunRecord,
+  captureStartingHead,
+  runReviewGate,
+  finalizeRun,
+  handleRunFailure,
+} from "./shared.js";
+import type { SharedLoopOptions } from "./shared.js";
 
-export interface CliLoopOptions {
-  config: HenchConfig;
-  store: PRDStore;
-  projectDir: string;
-  henchDir: string;
-  taskId?: string;
-  dryRun?: boolean;
-  model?: string;
-  /** Show diff and prompt for approval before finalizing. */
-  review?: boolean;
-  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
-  excludeTaskIds?: Set<string>;
-  /** Restrict task selection to this epic (ID). */
-  epicId?: string;
-}
+export interface CliLoopOptions extends SharedLoopOptions {}
 
 export interface CliLoopResult {
   run: RunRecord;
@@ -317,70 +307,43 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
   const model = opts.model ?? config.model;
 
-  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {
-    excludeTaskIds: opts.excludeTaskIds,
-    epicId: opts.epicId,
-  });
-  const briefText = formatTaskBrief(brief);
-  const systemPrompt = buildSystemPrompt(brief.project, config);
+  // Shared: assemble brief, format, build system prompt, display task info
+  const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
+    store, config, opts.taskId,
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
+  );
 
-  // Display task info before any work begins
-  displayTaskInfo(brief);
-
+  // Shared: dry run path
   if (dryRun) {
-    section("Dry Run (CLI)");
-    subsection("System Prompt");
-    info(systemPrompt);
-    subsection("Task Brief");
-    info(briefText);
-    subsection("Provider");
-    info("cli (claude binary)");
-
-    const run: RunRecord = {
-      id: randomUUID(),
+    const run = executeDryRun({
+      label: "CLI",
+      briefText,
+      systemPrompt,
       taskId,
       taskTitle: brief.task.title,
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      status: "completed",
-      turns: 0,
-      summary: "Dry run — no CLI invocation",
-      tokenUsage: { input: 0, output: 0 },
-      toolCalls: [],
       model,
-    };
-
+      extraInfo: [{ heading: "Provider", content: "cli (claude binary)" }],
+    });
     return { run };
   }
 
-  // Atomically transition task to in_progress before any work begins.
-  // Idempotent: skip if already in_progress (e.g. resumed task).
-  if (brief.task.status !== "in_progress") {
-    await toolRexUpdateStatus(store, taskId, { status: "in_progress" });
-  }
+  // Shared: transition task to in_progress
+  await transitionToInProgress(store, taskId, brief.task.status);
 
-  const run: RunRecord = {
-    id: randomUUID(),
+  // Shared: initialize run record
+  const run = await initRunRecord({
     taskId,
     taskTitle: brief.task.title,
-    startedAt: new Date().toISOString(),
-    status: "running",
-    turns: 0,
-    tokenUsage: { input: 0, output: 0 },
-    turnTokenUsage: [],
-    toolCalls: [],
     model,
-  };
+    henchDir,
+  });
 
-  run.lastActivityAt = new Date().toISOString();
-  await saveRun(henchDir, run);
-
-  // Load unified Claude config for CLI path resolution
+  // CLI-specific: load config for CLI path resolution
   const claudeConfig = await loadClaudeConfig(henchDir);
   const cliBinary = resolveCliPath(claudeConfig);
 
-  // Capture HEAD before agent runs so we can diff against it even if agent commits
-  const startingHead = getCurrentHead(projectDir);
+  // Shared: capture HEAD before agent runs
+  const startingHead = captureStartingHead(projectDir);
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -388,9 +351,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     maxDelayMs: 30000,
   };
 
-  // Build --allowed-tools from guard config instead of --dangerously-skip-permissions.
-  // This keeps Claude CLI's directory scoping active (files scoped to cwd)
-  // while auto-approving the specific tools we want.
+  // CLI-specific: build --allowed-tools from guard config
   const allowedTools = buildAllowedTools(config.guard.allowedCommands);
 
   let accumulatedTurns = 0;
@@ -428,7 +389,6 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
       if (!result.error) {
         // Validate completion: require meaningful changes
-        // Pass startingHead so we detect changes even if agent committed them
         const validation = await validateCompletion(projectDir, {
           testCommand: brief.project.testCommand,
           startingHead,
@@ -449,33 +409,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
           info(`\n${run.error}`);
 
-          await toolRexUpdateStatus(store, taskId, { status: "pending" });
-          await toolRexAppendLog(store, taskId, {
-            event: "budget_exceeded",
-            detail: run.error,
-          });
+          await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
           break;
         }
 
         if (validation.valid) {
-          // Review gate — prompt user before finalizing
+          // Shared: review gate
           if (opts.review) {
-            const reviewDiff = await collectReviewDiff(projectDir);
-            const reviewResult = await promptReview(reviewDiff);
-
-            if (!reviewResult.approved) {
-              run.status = "failed";
+            const reviewGate = await runReviewGate(projectDir, store, taskId, run);
+            if (reviewGate.rejected) {
               run.summary = result.summary;
-              run.error = reviewResult.reason;
-
-              info(`\nChanges rejected — reverting...`);
-              await revertChanges(projectDir);
-
-              await toolRexUpdateStatus(store, taskId, { status: "pending" });
-              await toolRexAppendLog(store, taskId, {
-                event: "review_rejected",
-                detail: reviewResult.reason ?? "Changes rejected by reviewer",
-              });
               break;
             }
           }
@@ -498,11 +441,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           info(`\nCompletion rejected: ${validation.reason}`);
           info(formatValidationResult(validation));
 
-          await toolRexUpdateStatus(store, taskId, { status: "pending" });
-          await toolRexAppendLog(store, taskId, {
-            event: "completion_rejected",
-            detail: formatValidationResult(validation),
-          });
+          await handleRunFailure(store, taskId, "pending", "completion_rejected", formatValidationResult(validation));
         }
         break;
       }
@@ -521,11 +460,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.error = result.error;
         run.retryAttempts = attempt > 0 ? attempt : undefined;
 
-        await toolRexUpdateStatus(store, taskId, { status: "deferred" });
-        await toolRexAppendLog(store, taskId, {
-          event: "task_failed",
-          detail: run.error,
-        });
+        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
         break;
       }
 
@@ -551,11 +486,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         run.retryAttempts = attempt;
 
         // Revert to pending so it gets auto-picked next run
-        await toolRexUpdateStatus(store, taskId, { status: "pending" });
-        await toolRexAppendLog(store, taskId, {
-          event: "task_transient_exhausted",
-          detail: `All ${retryConfig.maxRetries + 1} attempts failed with transient errors. Last: ${result.error}`,
-        });
+        await handleRunFailure(
+          store, taskId, "pending", "task_transient_exhausted",
+          `All ${retryConfig.maxRetries + 1} attempts failed with transient errors. Last: ${result.error}`,
+        );
       }
     }
   } catch (err) {
@@ -571,38 +505,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     });
   }
 
-  run.structuredSummary = buildRunSummary(run.toolCalls);
-
-  // Automatic post-task test run — only for completed runs
-  if (run.status === "completed" && brief.project.testCommand) {
-    subsection("Post-Task Tests");
-    const testResult = await runPostTaskTests({
-      projectDir,
-      filesChanged: run.structuredSummary.filesChanged,
-      testCommand: brief.project.testCommand,
-    });
-    run.structuredSummary.postRunTests = testResult;
-
-    if (testResult.ran) {
-      const scope = testResult.targetedFiles.length > 0
-        ? ` (${testResult.targetedFiles.length} targeted file(s))`
-        : " (full suite)";
-      const status = testResult.passed ? "passed" : "FAILED";
-      stream("Tests", `${status}${scope}`);
-      if (testResult.durationMs != null) {
-        detail(`${testResult.durationMs}ms`);
-      }
-      if (!testResult.passed && testResult.output) {
-        info(testResult.output.slice(-500));
-      }
-    } else if (testResult.error) {
-      detail(testResult.error);
-    }
-  }
-
-  run.finishedAt = new Date().toISOString();
-  run.lastActivityAt = run.finishedAt;
-  await saveRun(henchDir, run);
+  // Shared: finalize run (build summary, post-task tests, save)
+  await finalizeRun(run, henchDir, projectDir, brief.project.testCommand);
 
   return { run };
 }

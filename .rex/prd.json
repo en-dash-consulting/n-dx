@@ -8340,11 +8340,60 @@
     {
       "id": "fc2ee90a-c6ac-4267-bcab-00e2778e7066",
       "title": "Address suggestion issues (4 findings)",
-      "status": "pending",
+      "status": "in_progress",
       "level": "feature",
       "description": "- Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation logic to prevent behavior divergence between CLI and programmatic execution\n- Process execution in exec.ts lacks timeout and resource controls, creating risk for runaway autonomous operations\n- Autonomous operation safety controls are fragmented across zones - consider unified resource limits and safety policy enforcement across orchestration process spawning, execution-gateway process execution, and tool-infrastructure command dispatch\n- Guard system lacks runtime policy enforcement - commands.ts and paths.ts define boundaries but don't actively monitor violations",
       "priority": "high",
-      "source": "sourcevision"
+      "source": "sourcevision",
+      "startedAt": "2026-02-18T07:09:51.894Z",
+      "children": [
+        {
+          "id": "c1e50f76-b9cc-42db-8555-2c068163b1ef",
+          "title": "Extract shared lifecycle validation into common module",
+          "status": "completed",
+          "level": "task",
+          "description": "Extract the duplicated validation logic from cli-loop.ts and loop.ts into a shared lifecycle module. Both entry points duplicate: brief assembly, dry run handling, task status transitions, run record management, review gate, post-task tests, and run finalization. Create a common module that both loops delegate to, keeping only the provider-specific execution mechanism in each.",
+          "acceptanceCriteria": [
+            "Common lifecycle module exists with shared validation logic",
+            "cli-loop.ts and loop.ts delegate to common module for non-provider-specific operations",
+            "Both entry points produce identical behavior for shared operations",
+            "Existing tests pass without modification"
+          ],
+          "priority": "high",
+          "startedAt": "2026-02-18T07:12:09.640Z",
+          "completedAt": "2026-02-18T07:20:01.315Z"
+        },
+        {
+          "id": "a3f2ac13-f411-4435-b01c-bde40b7a97cb",
+          "title": "Add timeout and resource controls to process execution",
+          "status": "pending",
+          "level": "task",
+          "description": "Add missing timeout and resource controls to process execution paths that currently lack them. The exec function in foundation supports timeout/maxBuffer, but spawnTool and spawnManaged have no timeout protection. Add configurable timeout to spawn-based execution paths and add a concurrent process limit to prevent runaway process spawning.",
+          "acceptanceCriteria": [
+            "spawnTool and spawnManaged support configurable timeout",
+            "Concurrent process limit prevents unbounded process spawning",
+            "Timeout values are configurable through guard config",
+            "Tests verify timeout and resource control behavior"
+          ],
+          "priority": "high"
+        },
+        {
+          "id": "9fc5718e-1c12-45ae-8daf-0378ab04898c",
+          "title": "Unify safety controls with centralized policy enforcement",
+          "status": "pending",
+          "level": "task",
+          "description": "Address findings 3 and 4 together: unify the fragmented safety controls and add runtime policy enforcement. Currently safety is split across guard/ (command+path validation), tools/git.ts (independent allowlist), cli-loop.ts (CLI tool translation), and individual tools (timeout/size enforcement). GuardRails is stateless and doesn't track cumulative usage. Add session-aware policy tracking with cumulative resource tracking, rate limiting, and an audit trail of guard decisions.",
+          "acceptanceCriteria": [
+            "GuardRails tracks session state: cumulative commands run, bytes written, operations per minute",
+            "Rate limiting prevents excessive operations within a time window",
+            "Guard decisions are logged for audit trail",
+            "git.ts subcommand allowlist is integrated into the guard system",
+            "New tools automatically benefit from guard protections without manual integration",
+            "Tests verify rate limiting and cumulative tracking behavior"
+          ],
+          "priority": "high"
+        }
+      ]
     },
     {
       "id": "573c20ed-3795-4801-af87-4d036116d3e1",

@@ -1,41 +1,32 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
-import { getCurrentHead } from "../../process/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
-import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
-import { buildSystemPrompt } from "../planning/prompt.js";
 import { saveRun } from "../../store/index.js";
-import { buildRunSummary } from "../analysis/summary.js";
-import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
-import { checkTokenBudget } from "./token-budget.js";
-import { parseTokenUsage } from "./token-usage.js";
-import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../../tools/index.js";
-import { section, subsection, stream, detail, info } from "../../types/output.js";
-import { displayTaskInfo } from "./task-display.js";
+import { section, subsection, stream, detail } from "../../types/output.js";
 import type { ToolContext } from "../../types/index.js";
 import { loadClaudeConfig, resolveApiKey } from "../../store/project-config.js";
 import { resolveModel } from "@n-dx/claude-client";
+import { checkTokenBudget } from "./token-budget.js";
+import { parseTokenUsage } from "./token-usage.js";
+import {
+  prepareBrief,
+  executeDryRun,
+  transitionToInProgress,
+  initRunRecord,
+  captureStartingHead,
+  runReviewGate,
+  finalizeRun,
+  handleRunFailure,
+  handleBudgetExceeded,
+} from "./shared.js";
+import type { SharedLoopOptions } from "./shared.js";
 
-export interface AgentLoopOptions {
-  config: HenchConfig;
-  store: PRDStore;
-  projectDir: string;
-  henchDir: string;
-  taskId?: string;
-  dryRun?: boolean;
+export interface AgentLoopOptions extends SharedLoopOptions {
   maxTurns?: number;
   /** Total token budget per run (input + output). Overrides config. */
   tokenBudget?: number;
-  model?: string;
-  /** Show diff and prompt for approval before finalizing. */
-  review?: boolean;
-  /** Task IDs to skip during autoselection (e.g. stuck tasks). */
-  excludeTaskIds?: Set<string>;
-  /** Restrict task selection to this epic (ID). */
-  epicId?: string;
 }
 
 export interface AgentLoopResult {
@@ -94,49 +85,30 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const tokenBudget = opts.tokenBudget ?? config.tokenBudget;
   const model = resolveModel(opts.model ?? config.model);
 
-  // Assemble brief
-  const { brief, taskId } = await assembleTaskBrief(store, opts.taskId, {
-    excludeTaskIds: opts.excludeTaskIds,
-    epicId: opts.epicId,
-  });
-  const briefText = formatTaskBrief(brief);
+  // Shared: assemble brief, format, build system prompt, display task info
+  const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
+    store, config, opts.taskId,
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
+  );
 
-  // Display task info before any work begins
-  displayTaskInfo(brief);
-
+  // Shared: dry run path
   if (dryRun) {
-    section("Dry Run");
-    subsection("System Prompt");
-    info(buildSystemPrompt(brief.project, config));
-    subsection("Task Brief");
-    info(briefText);
-    subsection("Tools");
-    info(TOOL_DEFINITIONS.map((t) => t.name).join(", "));
-
-    const run: RunRecord = {
-      id: randomUUID(),
+    const run = executeDryRun({
+      label: "",
+      briefText,
+      systemPrompt,
       taskId,
       taskTitle: brief.task.title,
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      status: "completed",
-      turns: 0,
-      summary: "Dry run — no API calls made",
-      tokenUsage: { input: 0, output: 0 },
-      toolCalls: [],
       model,
-    };
-
+      extraInfo: [{ heading: "Tools", content: TOOL_DEFINITIONS.map((t) => t.name).join(", ") }],
+    });
     return { run };
   }
 
-  // Atomically transition task to in_progress before any work begins.
-  // Idempotent: skip if already in_progress (e.g. resumed task).
-  if (brief.task.status !== "in_progress") {
-    await toolRexUpdateStatus(store, taskId, { status: "in_progress" });
-  }
+  // Shared: transition task to in_progress
+  await transitionToInProgress(store, taskId, brief.task.status);
 
-  // Get API key: unified config (.n-dx.json) > environment variable
+  // API-specific: resolve API key
   const claudeConfig = await loadClaudeConfig(henchDir);
   const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
   if (!apiKey) {
@@ -145,11 +117,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     );
   }
 
-  // Capture the starting HEAD so completion validation can diff against it
-  // even if the agent commits changes during the run.
-  const startingHead = getCurrentHead(projectDir);
+  // Shared: capture starting HEAD
+  const startingHead = captureStartingHead(projectDir);
 
-  // Build Anthropic client options — use custom endpoint from .n-dx.json if configured
+  // API-specific: build Anthropic client
   const anthropicOpts: Record<string, unknown> = { apiKey };
   if (claudeConfig.api_endpoint) {
     anthropicOpts.baseURL = claudeConfig.api_endpoint;
@@ -166,23 +137,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     startingHead,
   };
 
-  const run: RunRecord = {
-    id: randomUUID(),
+  // Shared: initialize run record
+  const run = await initRunRecord({
     taskId,
     taskTitle: brief.task.title,
-    startedAt: new Date().toISOString(),
-    status: "running",
-    turns: 0,
-    tokenUsage: { input: 0, output: 0 },
-    turnTokenUsage: [],
-    toolCalls: [],
     model,
-  };
-
-  run.lastActivityAt = new Date().toISOString();
-  await saveRun(henchDir, run);
-
-  const systemPrompt = buildSystemPrompt(brief.project, config);
+    henchDir,
+  });
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: briefText },
@@ -190,6 +151,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   section(`Agent Run (${model})`);
 
+  // API-specific: turn-based execution loop
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       run.turns = turn + 1;
@@ -227,18 +189,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       if (parsed.cacheReadInput) turnUsage.cacheReadInput = parsed.cacheReadInput;
       run.turnTokenUsage!.push(turnUsage);
 
-      // Check token budget
+      // Shared: check token budget
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
       if (budgetCheck.exceeded) {
-        run.status = "budget_exceeded";
-        run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
-        stream("Budget", run.error);
-
-        await toolRexUpdateStatus(store, taskId, { status: "pending" });
-        await toolRexAppendLog(store, taskId, {
-          event: "budget_exceeded",
-          detail: run.error,
-        });
+        await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
         break;
       }
 
@@ -267,7 +221,6 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       if (response.stop_reason === "max_tokens") {
         stream("Warning", "Response truncated (max_tokens). Continuing...");
-        // Send a continuation prompt so the agent can finish its thought
         messages.push({
           role: "user",
           content: "Your response was truncated due to length. Please continue where you left off. If you were in the middle of a tool call, please retry it.",
@@ -326,76 +279,23 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
 
-      await toolRexUpdateStatus(store, taskId, { status: "deferred" });
-      await toolRexAppendLog(store, taskId, {
-        event: "task_failed",
-        detail: run.error,
-      });
+      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
 
-    await toolRexUpdateStatus(store, taskId, { status: "deferred" });
-    await toolRexAppendLog(store, taskId, {
-      event: "task_failed",
-      detail: run.error,
-    });
+    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
   }
 
-  // Review gate — prompt user before finalizing a completed run
+  // Shared: review gate
   if (opts.review && run.status === "completed") {
-    const reviewDiff = await collectReviewDiff(projectDir);
-    const reviewResult = await promptReview(reviewDiff);
-
-    if (!reviewResult.approved) {
-      run.status = "failed";
-      run.error = reviewResult.reason;
-
-      info(`\nChanges rejected — reverting...`);
-      await revertChanges(projectDir);
-
-      await toolRexUpdateStatus(store, taskId, { status: "pending" });
-      await toolRexAppendLog(store, taskId, {
-        event: "review_rejected",
-        detail: reviewResult.reason ?? "Changes rejected by reviewer",
-      });
-    }
+    await runReviewGate(projectDir, store, taskId, run);
   }
 
-  run.structuredSummary = buildRunSummary(run.toolCalls);
-
-  // Automatic post-task test run — only for completed runs
-  if (run.status === "completed" && brief.project.testCommand) {
-    subsection("Post-Task Tests");
-    const testResult = await runPostTaskTests({
-      projectDir,
-      filesChanged: run.structuredSummary.filesChanged,
-      testCommand: brief.project.testCommand,
-    });
-    run.structuredSummary.postRunTests = testResult;
-
-    if (testResult.ran) {
-      const scope = testResult.targetedFiles.length > 0
-        ? ` (${testResult.targetedFiles.length} targeted file(s))`
-        : " (full suite)";
-      const status = testResult.passed ? "passed" : "FAILED";
-      stream("Tests", `${status}${scope}`);
-      if (testResult.durationMs != null) {
-        detail(`${testResult.durationMs}ms`);
-      }
-      if (!testResult.passed && testResult.output) {
-        info(testResult.output.slice(-500));
-      }
-    } else if (testResult.error) {
-      detail(testResult.error);
-    }
-  }
-
-  run.finishedAt = new Date().toISOString();
-  run.lastActivityAt = run.finishedAt;
-  await saveRun(henchDir, run);
+  // Shared: finalize run (build summary, post-task tests, save)
+  await finalizeRun(run, henchDir, projectDir, brief.project.testCommand);
 
   return { run };
 }
