@@ -16,6 +16,8 @@ export { ProposalEditor } from "./proposal-editor.js";
 export type { ProposalEditorProps, RawProposal } from "./proposal-editor.js";
 export { SmartAddInput } from "./smart-add-input.js";
 export type { SmartAddInputProps } from "./smart-add-input.js";
+export { InlineAddForm } from "./inline-add-form.js";
+export type { InlineAddFormProps, InlineAddInput } from "./inline-add-form.js";
 export { BatchImportPanel } from "./batch-import-panel.js";
 export type { BatchImportPanelProps } from "./batch-import-panel.js";
 export { ExecutionPanel } from "./execution-panel.js";

@@ -11,6 +11,11 @@ import { useState, useMemo, useCallback } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority } from "./types.js";
 import { computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter } from "./compute.js";
 import { StatusFilter, defaultStatusFilter } from "./status-filter.js";
+import { InlineAddForm } from "./inline-add-form.js";
+import type { InlineAddInput } from "./inline-add-form.js";
+
+/** Levels that can have children added via inline form. */
+const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
 
 // ── Status rendering ────────────────────────────────────────────────
 
@@ -150,12 +155,17 @@ interface NodeRowProps {
   isBulkSelected?: boolean;
   /** Called when the checkbox is toggled. */
   onToggleBulkSelect?: (item: PRDItemData) => void;
+  /** Called when the inline add button is clicked. */
+  onInlineAdd?: (item: PRDItemData) => void;
+  /** Whether the inline add form is currently open for this node. */
+  isInlineAddActive?: boolean;
 }
 
-function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect }: NodeRowProps) {
+function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect, onInlineAdd, isInlineAddActive }: NodeRowProps) {
   const children = item.children ?? [];
   const stats = hasChildren ? computeBranchStats(children) : null;
   const ratio = stats ? completionRatio(stats) : 0;
+  const canAddChild = ADDABLE_LEVELS.has(item.level);
 
   const indent = depth * 24;
 
@@ -163,6 +173,10 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
     const target = e.target as HTMLElement;
     // If clicking the checkbox or its container, don't process as row click
     if (target.classList.contains("prd-bulk-checkbox") || target.closest(".prd-bulk-checkbox-wrapper")) {
+      return;
+    }
+    // If clicking the inline add button, don't process as row click
+    if (target.closest(".prd-inline-add-btn")) {
       return;
     }
     // If clicking the chevron area, toggle expand
@@ -280,6 +294,18 @@ function NodeRow({ item, depth, isExpanded, hasChildren, isSelected, onToggle, o
       : null,
     // Timestamp
     h(TimestampSuffix, { item }),
+    // Inline add child button (appears on hover, only for addable levels)
+    canAddChild && onInlineAdd
+      ? h("button", {
+          class: `prd-inline-add-btn${isInlineAddActive ? " active" : ""}`,
+          onClick: (e: MouseEvent) => {
+            e.stopPropagation();
+            onInlineAdd(item);
+          },
+          title: `Add child to ${item.title}`,
+          "aria-label": `Add child item to ${item.title}`,
+        }, "+")
+      : null,
   );
 }
 
@@ -295,9 +321,17 @@ interface TreeNodesProps {
   onSelectItem?: (item: PRDItemData) => void;
   bulkSelectedIds?: Set<string>;
   onToggleBulkSelect?: (item: PRDItemData) => void;
+  /** ID of the parent node whose inline add form is currently open. */
+  inlineAddParentId?: string | null;
+  /** Called when the inline add button is clicked on a node. */
+  onInlineAdd?: (item: PRDItemData) => void;
+  /** Called when the inline add form is submitted. */
+  onInlineAddSubmit?: (data: InlineAddInput) => Promise<void>;
+  /** Called when the inline add form is cancelled. */
+  onInlineAddCancel?: () => void;
 }
 
-function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect }: TreeNodesProps) {
+function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -307,6 +341,7 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
         const children = item.children ?? [];
         const hasChildren = children.length > 0;
         const isOpen = expanded.has(item.id);
+        const isInlineAddActive = inlineAddParentId === item.id;
 
         return h(
           "div",
@@ -321,7 +356,19 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
             onSelect: onSelectItem,
             isBulkSelected: bulkSelectedIds?.has(item.id),
             onToggleBulkSelect,
+            onInlineAdd,
+            isInlineAddActive,
           }),
+          // Inline add form — rendered below the parent node, above its children
+          isInlineAddActive && onInlineAddSubmit && onInlineAddCancel
+            ? h(InlineAddForm, {
+                parentLevel: item.level,
+                parentId: item.id,
+                depth,
+                onSubmit: onInlineAddSubmit,
+                onCancel: onInlineAddCancel,
+              })
+            : null,
           hasChildren && isOpen
             ? h(
                 "div",
@@ -336,6 +383,10 @@ function TreeNodes({ items, depth, expanded, selectedItemId, activeStatuses, onT
                   onSelectItem,
                   bulkSelectedIds,
                   onToggleBulkSelect,
+                  inlineAddParentId,
+                  onInlineAdd,
+                  onInlineAddSubmit,
+                  onInlineAddCancel,
                 }),
               )
             : null,
@@ -440,9 +491,11 @@ export interface PRDTreeProps {
   bulkSelectedIds?: Set<string>;
   /** Called when a bulk-select checkbox is toggled. */
   onToggleBulkSelect?: (item: PRDItemData) => void;
+  /** Called when inline add form is submitted. */
+  onInlineAddSubmit?: (data: InlineAddInput) => Promise<void>;
 }
 
-export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect }: PRDTreeProps) {
+export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit }: PRDTreeProps) {
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -462,6 +515,36 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, s
 
   const [activeStatuses, setActiveStatuses] = useState<Set<ItemStatus>>(() =>
     defaultStatusFilter(),
+  );
+
+  // Inline add form state — tracks which parent node has its form open
+  const [inlineAddParentId, setInlineAddParentId] = useState<string | null>(null);
+
+  const handleInlineAdd = useCallback(
+    (item: PRDItemData) => {
+      // Toggle: if already open for this item, close it; otherwise open it
+      setInlineAddParentId((prev) => (prev === item.id ? null : item.id));
+      // Auto-expand the node so the form is visible in context
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleInlineAddCancel = useCallback(() => {
+    setInlineAddParentId(null);
+  }, []);
+
+  const handleInlineAddSubmit = useCallback(
+    async (data: InlineAddInput) => {
+      if (!onInlineAddSubmit) return;
+      await onInlineAddSubmit(data);
+      setInlineAddParentId(null);
+    },
+    [onInlineAddSubmit],
   );
 
   const toggle = useCallback(
@@ -516,6 +599,10 @@ export function PRDTree({ document: doc, defaultExpandDepth = 2, onSelectItem, s
         onSelectItem,
         bulkSelectedIds,
         onToggleBulkSelect,
+        inlineAddParentId: onInlineAddSubmit ? inlineAddParentId : null,
+        onInlineAdd: onInlineAddSubmit ? handleInlineAdd : undefined,
+        onInlineAddSubmit: onInlineAddSubmit ? handleInlineAddSubmit : undefined,
+        onInlineAddCancel: onInlineAddSubmit ? handleInlineAddCancel : undefined,
       }),
     ),
   );

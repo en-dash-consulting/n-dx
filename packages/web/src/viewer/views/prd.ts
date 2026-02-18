@@ -17,6 +17,7 @@ import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { BrandedHeader } from "../components/prd-tree/shared-imports.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
+import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import type { DetailItem } from "../components/prd-tree/shared-imports.js";
 
@@ -228,6 +229,32 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
     [fetchPRDData],
   );
 
+  // Handle inline add item submission (from tree node inline form)
+  const handleInlineAddItem = useCallback(
+    async (input: InlineAddInput) => {
+      const res = await fetch("/api/rex/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: "Failed to add item" }));
+        throw new Error(errBody.error || `HTTP ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      // Show toast
+      setToast(`Created ${result.level}: ${result.title}`);
+      setTimeout(() => setToast(null), 3000);
+
+      // Refresh tree data
+      await fetchPRDData();
+    },
+    [fetchPRDData],
+  );
+
   // Handle merge completion
   const handleMergeComplete = useCallback(() => {
     setActiveTab(null);
@@ -330,6 +357,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent }: PRDViewProps
       selectedItemId,
       bulkSelectedIds,
       onToggleBulkSelect: handleToggleBulkSelect,
+      onInlineAddSubmit: handleInlineAddItem,
     }),
 
     // Bulk actions bar (floating at bottom)
