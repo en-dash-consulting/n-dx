@@ -27,6 +27,7 @@
  * 3. {@link mergeBidirectionalCoupling} — combine over-coupled communities
  * 4. {@link mergeSmallCommunities} — absorb tiny fragments into neighbors
  * 5. {@link capZoneCount} — enforce maximum zone limit
+ * 6. {@link splitLargeCommunities} — subdivide oversized communities
  *
  * All steps are deterministic: same import graph → same zones every time.
  *
@@ -383,6 +384,84 @@ export function mergeBidirectionalCoupling(
     members.set(target, targetMembers);
     members.delete(source);
     merged.add(source);
+  }
+
+  return result;
+}
+
+// ── Split large communities ──────────────────────────────────────────────────
+
+/**
+ * Split communities that exceed `maxSize` files by running Louvain
+ * internally on their subgraph. If subdivision produces only one
+ * community (the zone is truly monolithic), the zone is left intact.
+ *
+ * Deterministic: processes communities in sorted order, applies
+ * deterministic Louvain subdivision.
+ */
+export function splitLargeCommunities(
+  community: Map<string, string>,
+  graph: UndirectedGraph,
+  maxSize: number
+): Map<string, string> {
+  const result = new Map(community);
+
+  // Gather community → members
+  const members = new Map<string, string[]>();
+  for (const [node, comm] of result) {
+    let list = members.get(comm);
+    if (!list) {
+      list = [];
+      members.set(comm, list);
+    }
+    list.push(node);
+  }
+
+  // Process oversized communities in sorted order for determinism
+  const oversized = [...members.entries()]
+    .filter(([, m]) => m.length > maxSize)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+  for (const [comm, commMembers] of oversized) {
+    // Build subgraph containing only nodes in this community
+    const memberSet = new Set(commMembers);
+    const subGraph: UndirectedGraph = new Map();
+
+    for (const node of commMembers) {
+      const neighbors = graph.get(node);
+      if (!neighbors) continue;
+
+      const subNeighbors = new Map<string, number>();
+      for (const [neighbor, weight] of neighbors) {
+        if (memberSet.has(neighbor)) {
+          subNeighbors.set(neighbor, weight);
+        }
+      }
+      if (subNeighbors.size > 0) {
+        subGraph.set(node, subNeighbors);
+      }
+    }
+
+    // Ensure all member nodes exist in the subgraph (even if isolated)
+    for (const node of commMembers) {
+      if (!subGraph.has(node)) {
+        subGraph.set(node, new Map());
+      }
+    }
+
+    // Run Louvain on the subgraph
+    let subCommunity = louvainPhase1(subGraph);
+    subCommunity = mergeSmallCommunities(subCommunity, subGraph);
+
+    // Check if subdivision was meaningful (>1 community)
+    const subComms = new Set(subCommunity.values());
+    if (subComms.size <= 1) continue;
+
+    // Apply sub-community assignments: use "parentComm\0subComm" as new ID
+    // to avoid collisions with existing community IDs
+    for (const [node, subComm] of subCommunity) {
+      result.set(node, `${comm}\0${subComm}`);
+    }
   }
 
   return result;

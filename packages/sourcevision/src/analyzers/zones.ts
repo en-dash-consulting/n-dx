@@ -44,6 +44,7 @@ import {
   mergeBidirectionalCoupling,
   mergeSmallCommunities,
   capZoneCount,
+  splitLargeCommunities,
 } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import type { EnrichResult, PerZoneEnrichResult } from "./enrich.js";
@@ -647,7 +648,8 @@ export function generateStructuralInsights(
  * into properly named sub-zones.
  */
 function mergeSameIdCommunities(
-  community: Map<string, string>
+  community: Map<string, string>,
+  maxSize?: number
 ): void {
   const tempMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
@@ -657,7 +659,7 @@ function mergeSameIdCommunities(
   }
 
   // Pass 1: merge communities with the same derived zone ID
-  mergeByKey(community, tempMembers, (members) => deriveZoneId(members));
+  mergeByKey(community, tempMembers, (members) => deriveZoneId(members), maxSize);
 
   // Rebuild member map after pass 1 (community assignments may have changed)
   tempMembers.clear();
@@ -669,18 +671,23 @@ function mergeSameIdCommunities(
 
   // Pass 2: merge communities whose files predominantly share the same
   // package root (e.g., packages/rex/src/* and packages/rex/tests/*)
-  mergeByKey(community, tempMembers, (members) => dominantPackageRoot(members));
+  mergeByKey(community, tempMembers, (members) => dominantPackageRoot(members), maxSize);
 }
 
 /**
  * Generic community merger: group communities by a key derived from their
  * members, then merge all communities that share the same non-null key into
  * the largest one.
+ *
+ * When `maxSize` is provided, merges that would create a community exceeding
+ * the limit are skipped — this prevents the same-ID merge from undoing
+ * size-based splits.
  */
 function mergeByKey(
   community: Map<string, string>,
   tempMembers: Map<string, string[]>,
   keyFn: (members: string[]) => string | null,
+  maxSize?: number,
 ): void {
   const keyToCommunities = new Map<string, string[]>();
   for (const [comm, members] of tempMembers) {
@@ -699,10 +706,15 @@ function mergeByKey(
       return sizeB - sizeA || a.localeCompare(b);
     });
     const target = comms[0];
+    let targetSize = tempMembers.get(target)?.length ?? 0;
     for (let i = 1; i < comms.length; i++) {
-      for (const node of tempMembers.get(comms[i])!) {
+      const sourceMembers = tempMembers.get(comms[i])!;
+      // Skip merge if it would exceed the max zone size policy
+      if (maxSize && targetSize + sourceMembers.length > maxSize) continue;
+      for (const node of sourceMembers) {
         community.set(node, target);
       }
+      targetSize += sourceMembers.length;
     }
   }
 }
@@ -1216,6 +1228,13 @@ function backPopulateInsights(
 
 // ── Main entry point ────────────────────────────────────────────────────────
 
+/**
+ * Maximum percentage of project files a single zone should contain.
+ * Zones exceeding this threshold are split via internal Louvain subdivision.
+ * Default: 30% — prevents over-aggregation where one zone dominates the codebase.
+ */
+export const DEFAULT_MAX_ZONE_PERCENT = 30;
+
 export async function analyzeZones(
   inventory: Inventory,
   imports: Imports,
@@ -1228,6 +1247,13 @@ export async function analyzeZones(
     onReset?: (fromPass: number, toPass: number) => void;
     /** File archetype classifications for enrichment prompts. */
     fileArchetypes?: Map<string, string | null>;
+    /**
+     * Maximum percentage of project files a single zone may contain (1–100).
+     * Zones exceeding this are split via internal Louvain subdivision.
+     * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+     * Set to `100` to disable the zone size cap.
+     */
+    maxZonePercent?: number;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -1258,7 +1284,14 @@ export async function analyzeZones(
   community = mergeBidirectionalCoupling(community, graph);
   community = mergeSmallCommunities(community, graph);
   community = capZoneCount(community, graph, 15);
-  mergeSameIdCommunities(community);
+
+  // ── Split oversized communities ──
+  const maxPct = Math.max(1, Math.min(100, options?.maxZonePercent ?? DEFAULT_MAX_ZONE_PERCENT));
+  const graphNodeCount = graph.size;
+  const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
+  community = splitLargeCommunities(community, graph, maxZoneSize);
+
+  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
 
   // ── Build zones from communities ──
   const zones = buildZonesFromCommunities(

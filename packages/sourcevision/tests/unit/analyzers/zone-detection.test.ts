@@ -286,7 +286,8 @@ describe("analyzeZones", () => {
       makeEdge("packages/mypkg/src/agent/a.ts", "packages/mypkg/src/cli/x.ts"),
     ]);
 
-    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+    // Disable zone size cap (maxZonePercent=100) to test pure same-ID merge
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false, maxZonePercent: 100 });
 
     // Should be merged into a single zone since both derive "mypkg"
     expect(result.zones).toHaveLength(1);
@@ -319,7 +320,8 @@ describe("analyzeZones", () => {
       makeEdge("packages/rex/src/cli/commands.ts", "packages/rex/src/core/store.ts"),
     ]);
 
-    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+    // Disable zone size cap (maxZonePercent=100) to test pure package-root merge
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false, maxZonePercent: 100 });
 
     // Should be merged into a single zone since both live under packages/rex
     expect(result.zones).toHaveLength(1);
