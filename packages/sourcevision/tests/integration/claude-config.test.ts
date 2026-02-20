@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveCliPath, resolveApiKey } from "@n-dx/claude-client";
-import type { ClaudeConfig } from "@n-dx/claude-client";
+import { loadClaudeConfig, resolveCliPath, resolveApiKey } from "@n-dx/llm-client";
+import type { ClaudeConfig } from "@n-dx/llm-client";
 import { setClaudeConfig, setClaudeClient, getAuthMode } from "../../src/analyzers/claude-client.js";
 
 describe("Claude config integration (sourcevision)", () => {

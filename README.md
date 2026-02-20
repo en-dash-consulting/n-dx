@@ -22,6 +22,9 @@ pnpm link --global
 # Initialize all tools in a project
 ndx init .
 
+# Select LLM vendor for this project
+ndx config llm.vendor claude .
+
 # Analyze codebase and generate PRD proposals
 ndx plan .
 
@@ -56,6 +59,7 @@ Both `n-dx` and `ndx` work identically. Examples in this doc use `ndx` for brevi
 
 ```
 ndx init [dir]             sourcevision init + rex init + hench init
+ndx config llm.vendor ...  set active LLM vendor (claude|codex)
 ndx plan [dir]             sourcevision analyze + rex analyze (show proposals)
 ndx plan --accept [dir]    ...then accept proposals into PRD
 ndx plan --file=<path>     import PRD from a document (skips sourcevision)

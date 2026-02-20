@@ -7,30 +7,30 @@
 
 Project: n-dx
 Git: feature/from-recommend @ 536ec50
-Files: 627, Lines: 186861
-Languages: TypeScript(512) CSS(30) JSON(27) Other(20) JavaScript(19)
-Zones: 11, Described: 11
-Import edges: 1494, External packages: 16
+Files: 707, Lines: 209521
+Languages: TypeScript(585) CSS(35) JSON(26) Other(22) JavaScript(19)
+Zones: 10, Described: 10
+Import edges: 1670, External packages: 17
 
 </architecture>
 
 <zones>
 
-[autonomous-agent] Autonomous Agent Core (76 files, coh=0.93 coup=0.07)
-  Primary agent execution engine handling task analysis, lifecycle management, and autonomous workflow orchestration.
-  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service], packages/hench/src/agent/lifecycle/task-display.ts [utility], packages/hench/src/agent/lifecycle/token-budget.ts [utility] +66
-[dashboard-components] Dashboard Components (92 files, coh=0.95 coup=0.05)
-  Comprehensive UI component library providing data visualization, navigation, and interactive elements for the web dashboard.
-  files: packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/viewer/components/breadcrumb.ts [component], packages/web/src/viewer/components/config-footer.ts [component], packages/web/src/viewer/components/constants.ts [types], packages/web/src/viewer/components/data-display/collapsible-section.ts [component], packages/web/src/viewer/components/data-display/findings-list.ts [component], packages/web/src/viewer/components/data-display/health-gauge.ts [component], packages/web/src/viewer/components/data-display/mini-charts.ts [component], packages/web/src/viewer/components/data-display/tree-view.ts [component] +82
-[execution-gateway] Execution Gateway (14 files, coh=0.60 coup=0.40)
-  Cross-package integration layer managing PRD operations, process execution, and tool dispatch for the autonomous agent.
-  files: packages/hench/src/agent/completion.ts [service], packages/hench/src/prd/ops.ts [gateway], packages/hench/src/process/exec.ts [utility], packages/hench/src/process/index.ts [entrypoint], packages/hench/src/tools/index.ts [entrypoint], packages/hench/src/tools/rex.ts [utility], packages/hench/src/tools/test-runner.ts [utility], packages/hench/src/validation/completion.ts [utility], packages/hench/src/validation/index.ts [entrypoint], packages/hench/tests/unit/agent/completion.test.ts +4
-[foundation-layer] Foundation Layer (28 files, coh=1.00 coup=0.00)
-  Shared infrastructure providing Claude API abstraction, authentication, and common utilities for all domain packages.
+[adaptive-web-services-shell] Adaptive Web Services Shell (53 files, coh=0.99 coup=0.01)
+  Hosts the adaptive HTTP server, CLI surface, and domain gateways that expose backend capabilities to other packages.
+  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [page], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility] +43
+[claude-foundation-client] Claude Foundation Client (28 files, coh=1.00 coup=0.00)
+  Shared client SDK that abstracts Anthropic CLI/API usage, retries, and telemetry for the rest of the stack.
   files: packages/claude-client/src/api-provider.ts [service], packages/claude-client/src/auth.ts [utility], packages/claude-client/src/cli-provider.ts [service], packages/claude-client/src/config.ts [config], packages/claude-client/src/create-client.ts [utility], packages/claude-client/src/exec.ts [utility], packages/claude-client/src/help-format.ts [utility], packages/claude-client/src/json.ts [utility], packages/claude-client/src/output.ts [utility], packages/claude-client/src/project-config.ts [config] +18
-[orchestration-layer] Orchestration Layer (6 files, coh=1.00 coup=0.00)
-  Command-line entry points and configuration management that coordinate package execution without direct library dependencies.
+[cli-orchestration-surface] CLI Orchestration Surface (6 files, coh=1.00 coup=0.00)
+  Top-level scripts that broker every n-dx workflow by spawning package CLIs and presenting a cohesive developer UX.
   files: ci.js [entrypoint], cli.js [entrypoint], config.js [config], help.js [utility], tests/unit/help.test.js, web.js [entrypoint]
+[hench-agent-core] Hench Agent Core (94 files, coh=0.95 coup=0.05)
+  Execution engine that assembles briefs, runs the agent loop, validates output, and summarizes autonomous work.
+  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/completion.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/heartbeat.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service] +84
+[hench-guard-and-tools] Hench Guard & Tools (16 files, coh=0.74 coup=0.26)
+  Security guardrails plus the tool-dispatch layer that mediates every filesystem, shell, git, and Rex action the agent performs.
+  files: packages/hench/src/agent/tools.ts [utility], packages/hench/src/guard/commands.ts [utility], packages/hench/src/guard/index.ts [entrypoint], packages/hench/src/guard/paths.ts [utility], packages/hench/src/guard/policy.ts [service], packages/hench/src/tools/dispatch.ts [service], packages/hench/src/tools/files.ts [service], packages/hench/src/tools/git.ts [service], packages/hench/src/tools/shell.ts [service], packages/hench/tests/unit/guard/commands.test.ts +6
 [packages-rex:rex-cli] Rex PRD Management CLI (36 files, coh=1.00 coup=0.00)
   A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
   files: packages/rex/src/analyze/index.ts [entrypoint], packages/rex/src/analyze/propose.ts [utility], packages/rex/src/analyze/reconcile.ts [utility], packages/rex/src/analyze/scanners.ts [utility], packages/rex/src/cli/commands/add.ts [cli-command], packages/rex/src/cli/commands/analyze.ts [cli-command], packages/rex/src/cli/commands/constants.ts [types], packages/rex/src/cli/commands/init.ts [cli-command], packages/rex/src/cli/commands/next.ts [cli-command], packages/rex/src/cli/commands/recommend.ts [cli-command] +26
@@ -39,17 +39,14 @@ Import edges: 1494, External packages: 16
   files: packages/sourcevision/src/cli/commands/constants.ts [types], packages/sourcevision/src/cli/commands/export-pdf.ts [cli-command], packages/sourcevision/src/cli/commands/init.ts [cli-command], packages/sourcevision/src/cli/commands/reset.ts [cli-command], packages/sourcevision/src/cli/commands/validate.ts [cli-command], packages/sourcevision/src/cli/errors.ts [utility], packages/sourcevision/src/cli/index.ts [entrypoint], packages/sourcevision/src/cli/output.ts [utility], packages/sourcevision/src/cli/serve.ts [cli-command], packages/sourcevision/tests/unit/cli/errors.test.ts +2
 [packages-sourcevision:tests] Tests (68 files, coh=0.94 coup=0.06)
   66 files, primarily TypeScript
-  files: packages/sourcevision/src/analyzers/callgraph-findings.ts [utility], packages/sourcevision/src/analyzers/callgraph.ts [utility], packages/sourcevision/src/analyzers/claude-client.ts [utility], packages/sourcevision/src/analyzers/components.ts [utility], packages/sourcevision/src/analyzers/context.ts [service], packages/sourcevision/src/analyzers/enrich-batch.ts [service], packages/sourcevision/src/analyzers/enrich-config.ts [service], packages/sourcevision/src/analyzers/enrich-parsing.ts [service], packages/sourcevision/src/analyzers/enrich-per-zone.ts [service], packages/sourcevision/src/analyzers/enrich.ts [service] +58
-[prd-management-ui] PRD Management UI (28 files, coh=0.93 coup=0.07)
-  Specialized interface components for PRD tree manipulation, task execution, and project analysis workflows.
-  files: packages/web/src/viewer/components/prd-tree/add-item-form.ts [component], packages/web/src/viewer/components/prd-tree/analyze-panel.ts [component], packages/web/src/viewer/components/prd-tree/batch-import-panel.ts [component], packages/web/src/viewer/components/prd-tree/bulk-actions.ts [component], packages/web/src/viewer/components/prd-tree/compute.ts [component], packages/web/src/viewer/components/prd-tree/execution-panel.ts [component], packages/web/src/viewer/components/prd-tree/index.ts [entrypoint], packages/web/src/viewer/components/prd-tree/merge-preview.ts [component], packages/web/src/viewer/components/prd-tree/prd-tree.ts [component], packages/web/src/viewer/components/prd-tree/proposal-editor.ts [component] +18
-[presentation-gateway] Presentation Gateway (45 files, coh=0.99 coup=0.01)
-  Core web server infrastructure providing MCP endpoints, routing, and configuration management.
-  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [page], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility], packages/web/src/server/routes-adaptive.ts [route-handler] +35
-[tool-infrastructure] Tool Infrastructure (11 files, coh=0.68 coup=0.33)
-  Agent tooling subsystem providing command guards, file operations, shell execution, and tool dispatch mechanisms.
-  files: packages/hench/src/agent/tools.ts [utility], packages/hench/src/guard/commands.ts [utility], packages/hench/src/guard/index.ts [entrypoint], packages/hench/src/guard/paths.ts [utility], packages/hench/src/tools/dispatch.ts [utility], packages/hench/src/tools/files.ts [utility], packages/hench/src/tools/shell.ts [utility], packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/tools/files.test.ts +1
-[unzoned] 52 files: .claude/settings.local.json, .gitignore, .hench/config.json, .npmrc, .rex/archive.json ...
+  files: packages/sourcevision/src/analyzers/callgraph-findings.ts [utility], packages/sourcevision/src/analyzers/callgraph.ts [utility], packages/sourcevision/src/analyzers/claude-client.ts [service], packages/sourcevision/src/analyzers/components.ts [utility], packages/sourcevision/src/analyzers/context.ts [service], packages/sourcevision/src/analyzers/enrich-batch.ts [service], packages/sourcevision/src/analyzers/enrich-config.ts [service], packages/sourcevision/src/analyzers/enrich-parsing.ts [service], packages/sourcevision/src/analyzers/enrich-per-zone.ts [service], packages/sourcevision/src/analyzers/enrich.ts [service] +58
+[schema-driven-viewer-surface] Schema-Driven Viewer Surface (137 files, coh=1.00 coup=0.00)
+  Combines runtime schemas and viewer components to render and validate task data for the web UI.
+  files: packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/viewer/components/active-tasks-panel.ts [component], packages/web/src/viewer/components/breadcrumb.ts [component], packages/web/src/viewer/components/config-footer.ts [component], packages/web/src/viewer/components/constants.ts [types], packages/web/src/viewer/components/copy-link-button.ts [component], packages/web/src/viewer/components/data-display/collapsible-section.ts [component], packages/web/src/viewer/components/data-display/findings-list.ts [component], packages/web/src/viewer/components/data-display/health-gauge.ts [component] +127
+[vendor-agnostic-llm-adapter] Vendor-Agnostic LLM Adapter (34 files, coh=1.00 coup=0.00)
+  A higher-level client that selects Claude or Codex providers and loads unified LLM config for consumers such as hench.
+  files: packages/llm-client/src/api-provider.ts [service], packages/llm-client/src/auth.ts [service], packages/llm-client/src/cli-provider.ts [service], packages/llm-client/src/codex-cli-provider.ts [service], packages/llm-client/src/config.ts [config], packages/llm-client/src/create-client.ts [service], packages/llm-client/src/exec.ts [utility], packages/llm-client/src/help-format.ts [utility], packages/llm-client/src/json.ts [utility], packages/llm-client/src/llm-client.ts [service] +24
+[unzoned] 57 files: .gitignore, .hench/config.json, .npmrc, .rex/archive.json, .rex/config.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -60,20 +57,20 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 Most imported:
   packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add.ts +30
   packages/rex/src/cli/errors.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/prune.ts +18
-  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts +97
+  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/modify-reason.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts +98
   packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts +22
   packages/rex/src/cli/commands/constants.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts +17
   packages/rex/src/cli/output.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/chunked-review.ts +17
-  packages/web/src/viewer/components/logos.ts ← packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/views/analysis.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/graph.ts +13
-  packages/hench/src/store/config.ts ← packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/task-lookup.ts, packages/hench/src/cli/commands/template.ts, packages/hench/src/store/index.ts, packages/hench/tests/integration/store-roundtrip.test.ts +11
+  packages/web/src/viewer/components/logos.ts ← packages/web/src/viewer/components/prd-tree/shared-imports.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/files.ts +16
+  packages/hench/src/store/config.ts ← packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/task-lookup.ts, packages/hench/src/cli/commands/template.ts, packages/hench/src/store/index.ts, packages/hench/tests/integration/store-roundtrip.test.ts +13
+  packages/rex/src/analyze/reason.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/modify-reason.ts +16
   packages/rex/src/core/canonical.ts ← packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/prune.ts, packages/rex/src/cli/commands/reshape.ts, packages/rex/src/store/adapter-registry.ts, packages/rex/src/store/file-adapter.ts +11
-  packages/rex/src/analyze/reason.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/reshape-reason.ts +14
 
 </imports>
 
 <routes>
 
-Server routes: 71 endpoints in 10 handler(s)
+Server routes: 90 endpoints in 13 handler(s)
 
 /api/hench/adaptive/ (handleAdaptiveRoute) — packages/web/src/server/routes-adaptive.ts
   DELETE  /api/hench/adaptive/override/:key
@@ -90,17 +87,39 @@ Server routes: 71 endpoints in 10 handler(s)
   GET     /api/ndx-config
   GET     /api/projects
   POST    /api/projects/switch
+/api/features (handleFeaturesRoute) — packages/web/src/server/routes-features.ts
+  GET     /api/features
+  PUT     /api/features
 /api/hench/ (handleHenchRoute) — packages/web/src/server/routes-hench.ts
   DELETE  /api/hench/templates/:id
+  GET     /api/hench/audit
   GET     /api/hench/config
+  GET     /api/hench/execute/status
+  GET     /api/hench/execute/status/:taskId
   GET     /api/hench/runs
   GET     /api/hench/runs/:id
+  GET     /api/hench/runs/health
   GET     /api/hench/templates
   GET     /api/hench/templates/:id
   POST    /api/hench/execute
+  POST    /api/hench/execute/:taskId/terminate
+  POST    /api/hench/runs/:id/mark-stuck
   POST    /api/hench/templates
   POST    /api/hench/templates/:id/apply
   PUT     /api/hench/config
+/api/ (handleIntegrationRoute) — packages/web/src/server/routes-integrations.ts
+  DELETE  /api/integrations/:id/config
+  GET     /api/integrations
+  GET     /api/integrations/:id/config
+  GET     /api/integrations/:id/schema
+  PUT     /api/integrations/:id/config
+/api/notion/ (handleNotionRoute) — packages/web/src/server/routes-notion.ts
+  DELETE  /api/notion/config
+  GET     /api/notion/config
+  POST    /api/notion/schema
+  POST    /api/notion/schema/fix
+  POST    /api/notion/test
+  PUT     /api/notion/config
 /api/project (handleProjectRoute) — packages/web/src/server/routes-project.ts
   GET     /api/project
 /api/rex/ (handleRexRoute) — packages/web/src/server/routes-rex.ts
@@ -161,35 +180,16 @@ Server routes: 71 endpoints in 10 handler(s)
 
 <findings>
 
-[warning] Bidirectional coupling: "autonomous-agent" ↔ "execution-gateway" (14+1 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "dashboard-components" ↔ "prd-management-ui" (4+6 crossings) — consider extracting shared interface
-[warning] Inconsistent gateway naming pattern: autonomous-agent uses 'prd/ops.ts' while presentation-gateway uses 'mcp-deps.ts', reducing architectural clarity
-[warning] God function: handleRexRoute in packages/web/src/server/routes-rex.ts calls 48 unique functions — consider decomposing into smaller, focused functions
-[warning] Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation logic to prevent behavior divergence between CLI and programmatic execution [autonomous-agent]
-[warning] Process execution in exec.ts lacks timeout and resource controls, creating risk for runaway autonomous operations [execution-gateway]
-[warning] Autonomous operation safety controls are fragmented across zones - consider unified resource limits and safety policy enforcement across orchestration process spawning, execution-gateway process execution, and tool-infrastructure command dispatch
-[warning] Guard system lacks runtime policy enforcement - commands.ts and paths.ts define boundaries but don't actively monitor violations [tool-infrastructure]
+[warning] Bidirectional coupling: "hench-agent-core" ↔ "hench-guard-and-tools" (8+10 crossings) — consider extracting shared interface
+[warning] God function: startServer in packages/web/src/server/start.ts calls 50 unique functions — consider decomposing into smaller, focused functions
 
 </findings>
 
 <next-steps>
 
-[medium] Inconsistent gateway naming pattern: autonomous-agent uses … (+1 related)
+[medium] God function: startServer in packages/web/src/server/start.ts calls 50 unique f…
   category: refactor
-[medium] Process execution in exec.ts lacks timeout and resource controls, creating risk…
-  files: packages/hench/src/agent/completion.ts, packages/hench/src/prd/ops.ts, packages/hench/src/process/exec.ts
-  category: refactor
-[medium] Guard system lacks runtime policy enforcement - commands.ts and paths.ts define…
-  files: packages/hench/src/agent/tools.ts, packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts
-  category: refactor
-[medium] Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation …
-  files: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts
-  category: refactor
-[medium] Autonomous operation safety controls are fragmented across zones - consider uni…
-  category: refactor
-[medium] Bidirectional coupling: "autonomous-agent" ↔ "execution-gateway" (14+1 crossing…
-  category: refactor
-[medium] Bidirectional coupling: "dashboard-components" ↔ "prd-management-ui" (4+6 cross…
+[medium] Bidirectional coupling: "hench-agent-core" ↔ "hench-guard-and-tools" (8+10 cros…
   category: refactor
 
 </next-steps>

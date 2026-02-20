@@ -22,7 +22,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdExportPdf } from "./commands/export-pdf.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/claude-client";
+import { formatTypoSuggestion } from "@n-dx/llm-client";
 
 const args = process.argv.slice(2);
 const command = args[0];

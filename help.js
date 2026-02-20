@@ -583,7 +583,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   work: {
     summary: "execute the next task autonomously",
-    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: 'n-dx config llm.vendor claude'.",
     usage: "ndx work [options] [dir]",
     options: [
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },

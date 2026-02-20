@@ -1,0 +1,19 @@
+{
+  "id": "web-2/web",
+  "name": "Web",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/schema/v1.ts",
+    "packages/web/src/schema/validate.ts",
+    "packages/web/src/viewer/loader.ts",
+    "packages/web/src/viewer/schema-compat.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/schema/v1.ts",
+    "packages/web/src/viewer/loader.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 4,
+  "lineCount": 947
+}

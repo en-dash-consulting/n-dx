@@ -14,10 +14,13 @@ export { formatDiff } from "./diff.js";
 export type { FileFormat, AddPromptOptions, QualityIssue, ClaudeResult, ReasonResult, GranularityAssessment, GranularityAssessmentResult, BatchImportItem, BatchImportResult } from "./reason.js";
 export {
   DEFAULT_MODEL,
+  DEFAULT_CODEX_MODEL,
   MAX_RETRIES,
+  setLLMConfig,
   setClaudeConfig,
   setClaudeClient,
   getAuthMode,
+  getLLMVendor,
   CHUNK_CHAR_LIMIT,
   CHUNK_ITEM_LIMIT,
   FEW_SHOT_EXAMPLE,

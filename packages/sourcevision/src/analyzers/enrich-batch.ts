@@ -68,7 +68,7 @@ export async function runMetaEvaluation(
   } catch (err) {
     if (err instanceof ClaudeClientError) {
       if (err.reason === "auth" || err.reason === "not-found") {
-        console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error" : "Claude not found"} — using algorithmic names`);
+        console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error" : "LLM CLI not found"} — using algorithmic names`);
         return null;
       }
       accumulateTokenUsage(metaTokenUsage, undefined);
@@ -132,7 +132,7 @@ export async function runMetaEvaluation(
 // ── Batch enrichment ─────────────────────────────────────────────────────────
 
 /**
- * Enrich a single batch of zones via Claude with retry.
+ * Enrich a single batch of zones via active LLM vendor with retry.
  * Returns the parsed response + batch zones, or null on total failure.
  * On auth error, returns { authError: true } to signal caller to stop.
  */
@@ -193,7 +193,7 @@ export async function enrichBatch(
       : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
-    console.log(`  [enrich]${batchLabel} Calling Claude (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
+    console.log(`  [enrich]${batchLabel} Calling LLM (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
 
     let callText: string;
     try {
@@ -203,7 +203,7 @@ export async function enrichBatch(
     } catch (err) {
       if (err instanceof ClaudeClientError) {
         if (err.reason === "auth" || err.reason === "not-found") {
-          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'ndx config' and verify vendor credentials" : "LLM CLI not found"}`);
           console.warn(`  [enrich]   ${err.message.slice(0, 200)}`);
           return { authError: true };
         }

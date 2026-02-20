@@ -5,10 +5,20 @@ import type { PRDItem, TokenUsage, AnalyzeTokenUsage } from "../schema/index.js"
 import type { ScanResult } from "./scanners.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import { walkTree } from "../core/tree.js";
-import type { ClaudeConfig, ClaudeClient, AuthMode } from "@n-dx/claude-client";
-import { createClient, detectAuthMode } from "@n-dx/claude-client";
+import type {
+  ClaudeConfig,
+  ClaudeClient,
+  AuthMode,
+  LLMConfig,
+  LLMVendor,
+} from "@n-dx/claude-client";
+import {
+  createLLMClient,
+  detectLLMAuthMode,
+} from "@n-dx/claude-client";
 
 export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 /** Maximum number of LLM retry attempts for transient/parse failures. */
 export const MAX_RETRIES = 2;
@@ -18,13 +28,31 @@ export const MAX_RETRIES = 2;
  * `setClaudeConfig()` so that all internal `spawnClaude()` calls inherit
  * the resolved CLI path without threading config through every function.
  */
-let _claudeConfig: ClaudeConfig | undefined;
+let _llmConfig: LLMConfig | undefined;
 
 /**
  * Module-level Claude client instance. Created lazily from the config
  * when the first LLM call is made, or set explicitly at CLI entry points.
  */
-let _claudeClient: ClaudeClient | undefined;
+let _llmClient: ClaudeClient | undefined;
+
+function resolveVendor(): LLMVendor {
+  return _llmConfig?.vendor ?? "claude";
+}
+
+function resolveModel(model?: string): string {
+  if (model) return model;
+  const vendor = resolveVendor();
+  if (vendor === "codex") {
+    return _llmConfig?.codex?.model ?? DEFAULT_CODEX_MODEL;
+  }
+  return _llmConfig?.claude?.model ?? DEFAULT_MODEL;
+}
+
+export function setLLMConfig(config: LLMConfig): void {
+  _llmConfig = config;
+  _llmClient = undefined;
+}
 
 /**
  * Set the module-level Claude configuration (CLI path, API key, etc.).
@@ -33,8 +61,12 @@ let _claudeClient: ClaudeClient | undefined;
  * using the new configuration.
  */
 export function setClaudeConfig(config: ClaudeConfig): void {
-  _claudeConfig = config;
-  _claudeClient = undefined;
+  _llmConfig = {
+    ...(_llmConfig ?? {}),
+    claude: config,
+    vendor: _llmConfig?.vendor ?? "claude",
+  };
+  _llmClient = undefined;
 }
 
 /**
@@ -42,7 +74,7 @@ export function setClaudeConfig(config: ClaudeConfig): void {
  * client has already been created at the CLI entry point.
  */
 export function setClaudeClient(client: ClaudeClient): void {
-  _claudeClient = client;
+  _llmClient = client;
 }
 
 /**
@@ -52,8 +84,18 @@ export function setClaudeClient(client: ClaudeClient): void {
  * has been set yet.
  */
 export function getAuthMode(): AuthMode | undefined {
-  if (_claudeClient) return _claudeClient.mode;
-  if (_claudeConfig) return detectAuthMode({ claudeConfig: _claudeConfig });
+  if (_llmClient) return _llmClient.mode;
+  if (_llmConfig) {
+    return detectLLMAuthMode({
+      vendor: resolveVendor(),
+      llmConfig: _llmConfig,
+    });
+  }
+  return undefined;
+}
+
+export function getLLMVendor(): LLMVendor | undefined {
+  if (_llmClient || _llmConfig) return resolveVendor();
   return undefined;
 }
 
@@ -62,11 +104,13 @@ export function getAuthMode(): AuthMode | undefined {
  * Falls back to CLI mode when no configuration is available.
  */
 function getClient(): ClaudeClient {
-  if (_claudeClient) return _claudeClient;
-
-  const config = _claudeConfig ?? {};
-  _claudeClient = createClient({ claudeConfig: config });
-  return _claudeClient;
+  if (_llmClient) return _llmClient;
+  const llmConfig = _llmConfig ?? {};
+  _llmClient = createLLMClient({
+    vendor: resolveVendor(),
+    llmConfig,
+  });
+  return _llmClient;
 }
 
 // ── Token usage helpers ──
@@ -619,10 +663,16 @@ export async function spawnClaude(prompt: string, model: string, claudeConfig?: 
   // When an explicit config is passed, create a one-off client for it
   // instead of using the module-level client.
   const client = claudeConfig
-    ? createClient({ claudeConfig })
+    ? createLLMClient({
+      vendor: resolveVendor(),
+      llmConfig: {
+        ...(_llmConfig ?? {}),
+        claude: claudeConfig,
+      },
+    })
     : getClient();
 
-  const result = await client.complete({ prompt, model });
+  const result = await client.complete({ prompt, model: resolveModel(model) });
   return {
     text: result.text,
     tokenUsage: result.tokenUsage,

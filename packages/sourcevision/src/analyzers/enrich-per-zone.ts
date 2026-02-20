@@ -49,7 +49,7 @@ interface SingleZoneResult {
 }
 
 /**
- * Enrich a single zone with Claude.
+ * Enrich a single zone with the active LLM vendor.
  * Sends only this zone's files + entry points + boundary crossings.
  * Includes 1-line summaries of other zones for context.
  */
@@ -171,7 +171,7 @@ Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine
       if (err instanceof ClaudeClientError) {
         zoneTokenUsage.calls++;
         if (err.reason === "auth" || err.reason === "not-found") {
-          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'ndx config' and verify vendor credentials" : "LLM CLI not found"}`);
           return { zone, newInsights: [], newFindings: [], tokenUsage: zoneTokenUsage, success: false };
         }
         const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying" : "giving up";

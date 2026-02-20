@@ -13,15 +13,30 @@ import {
   reasonFromIdeasFile,
   validateProposalQuality,
   DEFAULT_MODEL,
+  setLLMConfig,
   setClaudeConfig,
   getAuthMode,
+  getLLMVendor,
 } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import { CHILD_LEVEL } from "../../schema/index.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
-import { loadClaudeConfig } from "../../store/project-config.js";
+import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import type { LLMVendor } from "@n-dx/claude-client";
 
 const PENDING_FILE = "pending-smart-proposals.json";
+
+function isLLMDebugEnabled(): boolean {
+  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
+  return v === "1" || v === "true" || v === "yes";
+}
+
+function llmDebug(message: string): void {
+  if (isLLMDebugEnabled()) {
+    // eslint-disable-next-line no-console
+    console.error(`[ndx:rex:smart-add] ${message}`);
+  }
+}
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
@@ -303,11 +318,20 @@ function parseNumericList(input: string, total: number): number[] {
 export function classifySmartAddError(
   err: Error,
   mode: "description" | "file",
+  vendor: LLMVendor = "claude",
 ): { message: string; suggestion: string } {
   const msg = err.message.toLowerCase();
+  const hasInvalidApiKey = /invalid.*api.*key/i.test(err.message);
+  llmDebug(`classify error vendor=${vendor} mode=${mode} message="${err.message}"`);
 
   // Authentication issues
-  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid.*api.*key") || msg.includes("authentication")) {
+  if (msg.includes("401") || msg.includes("unauthorized") || hasInvalidApiKey || msg.includes("authentication")) {
+    if (vendor === "codex") {
+      return {
+        message: "Authentication failed — Codex CLI credentials were rejected.",
+        suggestion: "Run 'codex login', then retry. If needed, set the binary path with: n-dx config llm.codex.cli_path /path/to/codex",
+      };
+    }
     return {
       message: "Authentication failed — your API key was rejected.",
       suggestion: "Check your API key with: n-dx config claude.apiKey, or switch to CLI mode.",
@@ -331,7 +355,17 @@ export function classifySmartAddError(
   }
 
   // Claude CLI not found
-  if (msg.includes("claude cli not found") || msg.includes("enoent") && msg.includes("claude")) {
+  if (
+    msg.includes("codex cli not found") ||
+    msg.includes("claude cli not found") ||
+    (msg.includes("enoent") && (msg.includes("claude") || msg.includes("codex")))
+  ) {
+    if (vendor === "codex") {
+      return {
+        message: "Codex CLI not found on your system.",
+        suggestion: "Install Codex CLI and/or set its path: n-dx config llm.codex.cli_path /path/to/codex",
+      };
+    }
     return {
       message: "Claude CLI not found on your system.",
       suggestion: "Install it (npm install -g @anthropic-ai/claude-cli) or set an API key: n-dx config claude.apiKey <key>",
@@ -356,9 +390,12 @@ export function classifySmartAddError(
 
   // Generic fallback with mode-specific context
   const modeLabel = mode === "file" ? "process ideas file" : "analyze description";
+  const authHint = vendor === "codex"
+    ? "Check Codex CLI login (codex login) and your network connection, then try again."
+    : "Check your API key and network connection, then try again.";
   return {
     message: `Failed to ${modeLabel}: ${err.message}`,
-    suggestion: "Check your API key and network connection, then try again.",
+    suggestion: authHint,
   };
 }
 
@@ -596,14 +633,20 @@ export async function cmdSmartAdd(
   const parentId = flags.parent;
   const filePaths: string[] = multiFlags.file ?? (flags.file ? [flags.file] : []);
 
-  // Load unified Claude config and initialize the client abstraction layer
+  // Load unified LLM config and initialize the client abstraction layer
   const rexConfigDir = join(dir, REX_DIR);
+  const llmConfig = await loadLLMConfig(rexConfigDir);
+  setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
   // Display which authentication method will be used for LLM calls
   if (flags.format !== "json") {
+    const vendor = getLLMVendor();
+    if (vendor) info(`Using ${vendor} for reasoning.`);
+    llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
     const authMode = getAuthMode();
+    llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
     if (authMode === "api") {
       info("Using direct API authentication.");
     }
@@ -635,6 +678,7 @@ export async function cmdSmartAdd(
       // Config unreadable — fall through to default
     }
   }
+  llmDebug(`effective model=${model ?? DEFAULT_MODEL}`);
 
   // Load existing PRD for context
   const rexDir = join(dir, REX_DIR);
@@ -686,7 +730,7 @@ export async function cmdSmartAdd(
       spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
     } catch (err) {
       spinner?.stop();
-      const classified = classifySmartAddError(err as Error, "file");
+      const classified = classifySmartAddError(err as Error, "file", getLLMVendor() ?? "claude");
       throw new CLIError(classified.message, classified.suggestion);
     }
   } else {
@@ -708,7 +752,7 @@ export async function cmdSmartAdd(
       spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
     } catch (err) {
       spinner?.stop();
-      const classified = classifySmartAddError(err as Error, "description");
+      const classified = classifySmartAddError(err as Error, "description", getLLMVendor() ?? "claude");
       throw new CLIError(classified.message, classified.suggestion);
     }
   }

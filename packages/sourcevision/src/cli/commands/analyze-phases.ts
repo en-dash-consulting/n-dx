@@ -29,7 +29,7 @@ import { readManifest, writeManifest, updateManifestModule, updateManifestError 
 import { detectSubAnalyses, buildSubAnalysisRefs } from "../../analyzers/workspace.js";
 import { info } from "../output.js";
 import type { AnalyzeTokenUsage } from "../../schema/index.js";
-import { loadProjectOverrides } from "@n-dx/claude-client";
+import { loadProjectOverrides } from "@n-dx/llm-client";
 
 // ── Shared context passed between phases ─────────────────────────────
 

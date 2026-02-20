@@ -1,511 +1,84 @@
 {
   "zones": [
     {
-      "id": "autonomous-agent",
-      "name": "Autonomous Agent Core",
-      "description": "Primary agent execution engine handling task analysis, lifecycle management, and autonomous workflow orchestration.",
+      "id": "adaptive-web-services-shell",
+      "name": "Adaptive Web Services Shell",
+      "description": "Hosts the adaptive HTTP server, CLI surface, and domain gateways that expose backend capabilities to other packages.",
       "files": [
-        "packages/hench/src/agent/analysis/adaptive.ts",
-        "packages/hench/src/agent/analysis/review.ts",
-        "packages/hench/src/agent/analysis/stuck.ts",
-        "packages/hench/src/agent/analysis/summary.ts",
-        "packages/hench/src/agent/analysis/workflow.ts",
-        "packages/hench/src/agent/index.ts",
-        "packages/hench/src/agent/lifecycle/cli-loop.ts",
-        "packages/hench/src/agent/lifecycle/loop.ts",
-        "packages/hench/src/agent/lifecycle/task-display.ts",
-        "packages/hench/src/agent/lifecycle/token-budget.ts",
-        "packages/hench/src/agent/lifecycle/token-usage.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/agent/planning/prompt.ts",
-        "packages/hench/src/cli/commands/config.ts",
-        "packages/hench/src/cli/commands/constants.ts",
-        "packages/hench/src/cli/commands/init.ts",
-        "packages/hench/src/cli/commands/run.ts",
-        "packages/hench/src/cli/commands/show.ts",
-        "packages/hench/src/cli/commands/status.ts",
-        "packages/hench/src/cli/commands/task-lookup.ts",
-        "packages/hench/src/cli/commands/template.ts",
-        "packages/hench/src/cli/errors.ts",
-        "packages/hench/src/cli/help.ts",
-        "packages/hench/src/cli/index.ts",
-        "packages/hench/src/cli/output.ts",
-        "packages/hench/src/public.ts",
-        "packages/hench/src/schema/index.ts",
-        "packages/hench/src/schema/templates.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/schema/validate.ts",
-        "packages/hench/src/store/config.ts",
-        "packages/hench/src/store/index.ts",
-        "packages/hench/src/store/json.ts",
-        "packages/hench/src/store/project-config.ts",
-        "packages/hench/src/store/runs.ts",
-        "packages/hench/src/store/suggestions.ts",
-        "packages/hench/src/store/templates.ts",
-        "packages/hench/src/tools/exec-shell.ts",
-        "packages/hench/src/tools/git.ts",
-        "packages/hench/src/types/index.ts",
-        "packages/hench/src/types/output.ts",
-        "packages/hench/tests/e2e/cli-init.test.ts",
-        "packages/hench/tests/integration/store-roundtrip.test.ts",
-        "packages/hench/tests/unit/agent/adaptive.test.ts",
-        "packages/hench/tests/unit/agent/api-auth.test.ts",
-        "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-        "packages/hench/tests/unit/agent/brief.test.ts",
-        "packages/hench/tests/unit/agent/cli-retry.test.ts",
-        "packages/hench/tests/unit/agent/loop.test.ts",
-        "packages/hench/tests/unit/agent/prompt.test.ts",
-        "packages/hench/tests/unit/agent/review.test.ts",
-        "packages/hench/tests/unit/agent/stuck.test.ts",
-        "packages/hench/tests/unit/agent/summary.test.ts",
-        "packages/hench/tests/unit/agent/task-display.test.ts",
-        "packages/hench/tests/unit/agent/task-failure.test.ts",
-        "packages/hench/tests/unit/agent/token-budget.test.ts",
-        "packages/hench/tests/unit/agent/token-tracking.test.ts",
-        "packages/hench/tests/unit/agent/token-usage.test.ts",
-        "packages/hench/tests/unit/agent/workflow.test.ts",
-        "packages/hench/tests/unit/cli/commands/config.test.ts",
-        "packages/hench/tests/unit/cli/commands/constants.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
-        "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
-        "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
-        "packages/hench/tests/unit/cli/errors.test.ts",
-        "packages/hench/tests/unit/cli/help.test.ts",
-        "packages/hench/tests/unit/cli/output.test.ts",
-        "packages/hench/tests/unit/schema/templates.test.ts",
-        "packages/hench/tests/unit/schema/validate.test.ts",
-        "packages/hench/tests/unit/store/claude-config.test.ts",
-        "packages/hench/tests/unit/store/project-config.test.ts",
-        "packages/hench/tests/unit/store/suggestions.test.ts",
-        "packages/hench/tests/unit/store/templates.test.ts",
-        "packages/hench/tests/unit/tools/git.test.ts"
+        "packages/web/src/cli/index.ts",
+        "packages/web/src/landing/index.html",
+        "packages/web/src/landing/landing.css",
+        "packages/web/src/landing/landing.ts",
+        "packages/web/src/public.ts",
+        "packages/web/src/schema/data-files.ts",
+        "packages/web/src/server/domain-gateway.ts",
+        "packages/web/src/server/index.ts",
+        "packages/web/src/server/mcp-deps.ts",
+        "packages/web/src/server/port.ts",
+        "packages/web/src/server/routes-adaptive.ts",
+        "packages/web/src/server/routes-config.ts",
+        "packages/web/src/server/routes-data.ts",
+        "packages/web/src/server/routes-features.ts",
+        "packages/web/src/server/routes-hench.ts",
+        "packages/web/src/server/routes-integrations.ts",
+        "packages/web/src/server/routes-mcp.ts",
+        "packages/web/src/server/routes-notion.ts",
+        "packages/web/src/server/routes-project.ts",
+        "packages/web/src/server/routes-rex.ts",
+        "packages/web/src/server/routes-sourcevision.ts",
+        "packages/web/src/server/routes-static.ts",
+        "packages/web/src/server/routes-status.ts",
+        "packages/web/src/server/routes-token-usage.ts",
+        "packages/web/src/server/routes-validation.ts",
+        "packages/web/src/server/routes-workflow.ts",
+        "packages/web/src/server/start.ts",
+        "packages/web/src/server/types.ts",
+        "packages/web/src/server/websocket.ts",
+        "packages/web/tests/unit/server/dev-reload.test.ts",
+        "packages/web/tests/unit/server/port.test.ts",
+        "packages/web/tests/unit/server/routes-adaptive.test.ts",
+        "packages/web/tests/unit/server/routes-config.test.ts",
+        "packages/web/tests/unit/server/routes-data.test.ts",
+        "packages/web/tests/unit/server/routes-hench-audit.test.ts",
+        "packages/web/tests/unit/server/routes-hench-config.test.ts",
+        "packages/web/tests/unit/server/routes-hench-execute.test.ts",
+        "packages/web/tests/unit/server/routes-hench-health.test.ts",
+        "packages/web/tests/unit/server/routes-hench-heartbeat.test.ts",
+        "packages/web/tests/unit/server/routes-hench-templates.test.ts",
+        "packages/web/tests/unit/server/routes-mcp.test.ts",
+        "packages/web/tests/unit/server/routes-notion.test.ts",
+        "packages/web/tests/unit/server/routes-project.test.ts",
+        "packages/web/tests/unit/server/routes-requirements.test.ts",
+        "packages/web/tests/unit/server/routes-rex.test.ts",
+        "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+        "packages/web/tests/unit/server/routes-status.test.ts",
+        "packages/web/tests/unit/server/routes-token-usage.test.ts",
+        "packages/web/tests/unit/server/routes-validation.test.ts",
+        "packages/web/tests/unit/server/routes-workflow.test.ts",
+        "packages/web/tests/unit/server/scope.test.ts",
+        "packages/web/tests/unit/server/type-consistency.test.ts",
+        "packages/web/tests/unit/server/websocket.test.ts"
       ],
       "entryPoints": [
-        "packages/hench/src/schema/index.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/tools/exec-shell.ts",
-        "packages/hench/src/tools/git.ts",
-        "packages/hench/src/types/index.ts"
+        "packages/web/src/schema/data-files.ts"
       ],
-      "cohesion": 0.93,
-      "coupling": 0.07,
-      "subZones": [
-        {
-          "id": "hench/tests",
-          "name": "Tests",
-          "description": "71 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/agent/analysis/adaptive.ts",
-            "packages/hench/src/agent/analysis/review.ts",
-            "packages/hench/src/agent/analysis/stuck.ts",
-            "packages/hench/src/agent/analysis/summary.ts",
-            "packages/hench/src/agent/analysis/workflow.ts",
-            "packages/hench/src/agent/index.ts",
-            "packages/hench/src/agent/lifecycle/cli-loop.ts",
-            "packages/hench/src/agent/lifecycle/loop.ts",
-            "packages/hench/src/agent/lifecycle/task-display.ts",
-            "packages/hench/src/agent/lifecycle/token-budget.ts",
-            "packages/hench/src/agent/lifecycle/token-usage.ts",
-            "packages/hench/src/agent/planning/brief.ts",
-            "packages/hench/src/agent/planning/prompt.ts",
-            "packages/hench/src/cli/commands/config.ts",
-            "packages/hench/src/cli/commands/constants.ts",
-            "packages/hench/src/cli/commands/init.ts",
-            "packages/hench/src/cli/commands/run.ts",
-            "packages/hench/src/cli/commands/show.ts",
-            "packages/hench/src/cli/commands/status.ts",
-            "packages/hench/src/cli/commands/task-lookup.ts",
-            "packages/hench/src/cli/commands/template.ts",
-            "packages/hench/src/cli/errors.ts",
-            "packages/hench/src/cli/help.ts",
-            "packages/hench/src/cli/index.ts",
-            "packages/hench/src/cli/output.ts",
-            "packages/hench/src/public.ts",
-            "packages/hench/src/schema/index.ts",
-            "packages/hench/src/schema/templates.ts",
-            "packages/hench/src/schema/v1.ts",
-            "packages/hench/src/schema/validate.ts",
-            "packages/hench/src/store/config.ts",
-            "packages/hench/src/store/index.ts",
-            "packages/hench/src/store/json.ts",
-            "packages/hench/src/store/project-config.ts",
-            "packages/hench/src/store/runs.ts",
-            "packages/hench/src/store/templates.ts",
-            "packages/hench/src/types/index.ts",
-            "packages/hench/src/types/output.ts",
-            "packages/hench/tests/e2e/cli-init.test.ts",
-            "packages/hench/tests/integration/store-roundtrip.test.ts",
-            "packages/hench/tests/unit/agent/adaptive.test.ts",
-            "packages/hench/tests/unit/agent/api-auth.test.ts",
-            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-            "packages/hench/tests/unit/agent/brief.test.ts",
-            "packages/hench/tests/unit/agent/cli-retry.test.ts",
-            "packages/hench/tests/unit/agent/loop.test.ts",
-            "packages/hench/tests/unit/agent/prompt.test.ts",
-            "packages/hench/tests/unit/agent/review.test.ts",
-            "packages/hench/tests/unit/agent/stuck.test.ts",
-            "packages/hench/tests/unit/agent/summary.test.ts",
-            "packages/hench/tests/unit/agent/task-display.test.ts",
-            "packages/hench/tests/unit/agent/task-failure.test.ts",
-            "packages/hench/tests/unit/agent/token-budget.test.ts",
-            "packages/hench/tests/unit/agent/token-tracking.test.ts",
-            "packages/hench/tests/unit/agent/token-usage.test.ts",
-            "packages/hench/tests/unit/agent/workflow.test.ts",
-            "packages/hench/tests/unit/cli/commands/config.test.ts",
-            "packages/hench/tests/unit/cli/commands/constants.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
-            "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
-            "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
-            "packages/hench/tests/unit/cli/errors.test.ts",
-            "packages/hench/tests/unit/cli/help.test.ts",
-            "packages/hench/tests/unit/cli/output.test.ts",
-            "packages/hench/tests/unit/schema/templates.test.ts",
-            "packages/hench/tests/unit/schema/validate.test.ts",
-            "packages/hench/tests/unit/store/claude-config.test.ts",
-            "packages/hench/tests/unit/store/project-config.test.ts",
-            "packages/hench/tests/unit/store/templates.test.ts"
-          ],
-          "entryPoints": [],
-          "cohesion": 1,
-          "coupling": 0,
-          "depth": 1
-        },
-        {
-          "id": "hench/store",
-          "name": "Store",
-          "description": "2 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/store/suggestions.ts",
-            "packages/hench/tests/unit/store/suggestions.test.ts"
-          ],
-          "entryPoints": [],
-          "cohesion": 1,
-          "coupling": 0,
-          "depth": 1
-        },
-        {
-          "id": "hench/tools",
-          "name": "Tools",
-          "description": "3 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/tools/exec-shell.ts",
-            "packages/hench/src/tools/git.ts",
-            "packages/hench/tests/unit/tools/git.test.ts"
-          ],
-          "entryPoints": [],
-          "cohesion": 1,
-          "coupling": 0,
-          "depth": 1
-        }
-      ],
+      "cohesion": 0.99,
+      "coupling": 0.01,
       "insights": [
-        "High cohesion (0.93) — files are tightly interconnected",
-        "High cohesion (0.93) indicates strong internal organization around agent responsibilities",
-        "Analysis subsystem provides adaptive behavior and workflow review capabilities",
-        "Lifecycle management separates CLI and programmatic execution paths cleanly",
-        "Strong cohesion (0.93) with minimal coupling (0.07) demonstrates well-designed agent architecture",
-        "Analysis subsystem provides sophisticated agent capabilities including adaptive behavior and stuck detection",
-        "Multiple entry points indicate flexible integration patterns for different consumption scenarios",
-        "Forms the core processing engine with sophisticated internal modularity but clear external interfaces",
-        "Bidirectional coupling with execution-gateway suggests potential interface extraction opportunity",
-        "Gateway module naming inconsistency: uses 'prd/ops.ts' instead of standard 'gateway.ts' or 'deps.ts' pattern seen elsewhere",
-        "Complete architectural isolation with zero coupling despite being largest zone (101 files) demonstrates exceptional design discipline",
-        "CLI-heavy composition creates very low public API surface (types/schema only) preventing inappropriate library usage patterns",
-        "Gateway module naming inconsistency: uses 'prd/ops.ts' instead of standard 'gateway.ts' or 'deps.ts' pattern seen in web package (mcp-deps.ts)",
-        "Analysis subsystem (adaptive.ts, review.ts, stuck.ts) implements sophisticated state machine but lacks centralized state validation",
-        "Multiple lifecycle entry points (cli-loop.ts, loop.ts) suggest different execution contexts but create potential behavior divergence",
-        "Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation logic to prevent behavior divergence between CLI and programmatic execution",
-        "Analysis state machine lacks centralized validation - adaptive.ts, review.ts, stuck.ts operate independently without state consistency checks",
-        "[call graph] 1600 internal calls, 57 outgoing, 4 incoming (cohesion: 0.97, coupling: 0.03)"
+        "High cohesion (0.99) — files are tightly interconnected",
+        "Stabilize `packages/web/src/server/domain-gateway.ts` as the single ingress/egress point so future transports do not bypass shared policies.",
+        "Trim `packages/web/src/public.ts` exports to the contract actually used by dependents to keep the public surface disciplined.",
+        "Add integration tests around `packages/web/src/server/routes-adaptive.ts` to guard adaptive routing logic as new features land.",
+        "Extremely high cohesion (0.99) indicates the CLI, HTTP server, and domain gateways belong together—keep new backend utilities inside this shell to preserve that property.",
+        "Gateway files (`domain-gateway.ts`, `mcp-deps.ts`) already abstract external connectors; adding contract tests before onboarding integrations will keep coupling at its current 0.01 level.",
+        "`routes-adaptive.ts` centralizes adaptive route wiring; pair it with smoke tests whenever new adaptive surfaces are introduced to avoid regressions.",
+        "[call graph] 972 internal calls, 21 outgoing, 1 incoming (cohesion: 0.98, coupling: 0.02)"
       ]
     },
     {
-      "id": "dashboard-components",
-      "name": "Dashboard Components",
-      "description": "Comprehensive UI component library providing data visualization, navigation, and interactive elements for the web dashboard.",
-      "files": [
-        "packages/web/src/schema/v1.ts",
-        "packages/web/src/schema/validate.ts",
-        "packages/web/src/viewer/components/breadcrumb.ts",
-        "packages/web/src/viewer/components/config-footer.ts",
-        "packages/web/src/viewer/components/constants.ts",
-        "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-        "packages/web/src/viewer/components/data-display/findings-list.ts",
-        "packages/web/src/viewer/components/data-display/health-gauge.ts",
-        "packages/web/src/viewer/components/data-display/mini-charts.ts",
-        "packages/web/src/viewer/components/data-display/tree-view.ts",
-        "packages/web/src/viewer/components/data-display/zone-map.ts",
-        "packages/web/src/viewer/components/detail-panel.ts",
-        "packages/web/src/viewer/components/faq.ts",
-        "packages/web/src/viewer/components/favicon.ts",
-        "packages/web/src/viewer/components/guide.ts",
-        "packages/web/src/viewer/components/logos.ts",
-        "packages/web/src/viewer/components/rex-task-link.ts",
-        "packages/web/src/viewer/components/search-filter.ts",
-        "packages/web/src/viewer/components/sidebar.ts",
-        "packages/web/src/viewer/components/status-indicators.ts",
-        "packages/web/src/viewer/components/theme-toggle.ts",
-        "packages/web/src/viewer/darkmode_logo.png",
-        "packages/web/src/viewer/graph/physics.ts",
-        "packages/web/src/viewer/graph/renderer.ts",
-        "packages/web/src/viewer/hooks/use-file-edges.ts",
-        "packages/web/src/viewer/hooks/use-pan-zoom.ts",
-        "packages/web/src/viewer/hooks/use-zone-drag.ts",
-        "packages/web/src/viewer/index.html",
-        "packages/web/src/viewer/lightmode_logo.png",
-        "packages/web/src/viewer/loader.ts",
-        "packages/web/src/viewer/main.ts",
-        "packages/web/src/viewer/schema-compat.ts",
-        "packages/web/src/viewer/styles/a11y.css",
-        "packages/web/src/viewer/styles/analysis.css",
-        "packages/web/src/viewer/styles/base.css",
-        "packages/web/src/viewer/styles/branding.css",
-        "packages/web/src/viewer/styles/breadcrumb.css",
-        "packages/web/src/viewer/styles/call-graph-explorer.css",
-        "packages/web/src/viewer/styles/cards.css",
-        "packages/web/src/viewer/styles/components.css",
-        "packages/web/src/viewer/styles/detail.css",
-        "packages/web/src/viewer/styles/faq.css",
-        "packages/web/src/viewer/styles/forms.css",
-        "packages/web/src/viewer/styles/graph.css",
-        "packages/web/src/viewer/styles/hench-config.css",
-        "packages/web/src/viewer/styles/hench-runs.css",
-        "packages/web/src/viewer/styles/hench-templates.css",
-        "packages/web/src/viewer/styles/index.css",
-        "packages/web/src/viewer/styles/layout.css",
-        "packages/web/src/viewer/styles/overview.css",
-        "packages/web/src/viewer/styles/prd-tree.css",
-        "packages/web/src/viewer/styles/responsive.css",
-        "packages/web/src/viewer/styles/rex-dashboard.css",
-        "packages/web/src/viewer/styles/routes.css",
-        "packages/web/src/viewer/styles/tables.css",
-        "packages/web/src/viewer/styles/task-link.css",
-        "packages/web/src/viewer/styles/token-usage.css",
-        "packages/web/src/viewer/styles/tokens.css",
-        "packages/web/src/viewer/styles/utils.css",
-        "packages/web/src/viewer/styles/validation.css",
-        "packages/web/src/viewer/styles/zone-map.css",
-        "packages/web/src/viewer/types.ts",
-        "packages/web/src/viewer/utils.ts",
-        "packages/web/src/viewer/views/architecture.ts",
-        "packages/web/src/viewer/views/files.ts",
-        "packages/web/src/viewer/views/graph.ts",
-        "packages/web/src/viewer/views/hench-config.ts",
-        "packages/web/src/viewer/views/hench-runs.ts",
-        "packages/web/src/viewer/views/hench-templates.ts",
-        "packages/web/src/viewer/views/overview.ts",
-        "packages/web/src/viewer/views/problems.ts",
-        "packages/web/src/viewer/views/rex-dashboard.ts",
-        "packages/web/src/viewer/views/routes.ts",
-        "packages/web/src/viewer/views/suggestions.ts",
-        "packages/web/src/viewer/views/token-usage.ts",
-        "packages/web/src/viewer/views/validation.ts",
-        "packages/web/src/viewer/views/workflow-optimization.ts",
-        "packages/web/src/viewer/views/zone-types.ts",
-        "packages/web/src/viewer/views/zones.ts",
-        "packages/web/tests/unit/viewer/bar-chart.test.ts",
-        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
-        "packages/web/tests/unit/viewer/detail-panel.test.ts",
-        "packages/web/tests/unit/viewer/favicon.test.ts",
-        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
-        "packages/web/tests/unit/viewer/graph-interaction.test.ts",
-        "packages/web/tests/unit/viewer/graph-layout.test.ts",
-        "packages/web/tests/unit/viewer/graph-zoom.test.ts",
-        "packages/web/tests/unit/viewer/hench-config.test.ts",
-        "packages/web/tests/unit/viewer/label-utils.test.ts",
-        "packages/web/tests/unit/viewer/sidebar.test.ts",
-        "packages/web/tests/unit/viewer/status-indicators.test.ts",
-        "packages/web/tests/unit/viewer/tree-view.test.ts"
-      ],
-      "entryPoints": [
-        "packages/web/src/viewer/components/guide.ts",
-        "packages/web/src/viewer/components/logos.ts",
-        "packages/web/src/viewer/components/theme-toggle.ts",
-        "packages/web/src/viewer/types.ts",
-        "packages/web/src/viewer/utils.ts"
-      ],
-      "cohesion": 0.95,
-      "coupling": 0.05,
-      "subZones": [
-        {
-          "id": "web-2/web",
-          "name": "Web",
-          "description": "44 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/schema/v1.ts",
-            "packages/web/src/schema/validate.ts",
-            "packages/web/src/viewer/components/breadcrumb.ts",
-            "packages/web/src/viewer/components/config-footer.ts",
-            "packages/web/src/viewer/components/constants.ts",
-            "packages/web/src/viewer/components/data-display/findings-list.ts",
-            "packages/web/src/viewer/components/data-display/tree-view.ts",
-            "packages/web/src/viewer/components/detail-panel.ts",
-            "packages/web/src/viewer/components/faq.ts",
-            "packages/web/src/viewer/components/favicon.ts",
-            "packages/web/src/viewer/components/guide.ts",
-            "packages/web/src/viewer/components/logos.ts",
-            "packages/web/src/viewer/components/rex-task-link.ts",
-            "packages/web/src/viewer/components/search-filter.ts",
-            "packages/web/src/viewer/components/sidebar.ts",
-            "packages/web/src/viewer/components/status-indicators.ts",
-            "packages/web/src/viewer/components/theme-toggle.ts",
-            "packages/web/src/viewer/graph/physics.ts",
-            "packages/web/src/viewer/graph/renderer.ts",
-            "packages/web/src/viewer/loader.ts",
-            "packages/web/src/viewer/main.ts",
-            "packages/web/src/viewer/schema-compat.ts",
-            "packages/web/src/viewer/types.ts",
-            "packages/web/src/viewer/utils.ts",
-            "packages/web/src/viewer/views/architecture.ts",
-            "packages/web/src/viewer/views/files.ts",
-            "packages/web/src/viewer/views/graph.ts",
-            "packages/web/src/viewer/views/hench-config.ts",
-            "packages/web/src/viewer/views/hench-runs.ts",
-            "packages/web/src/viewer/views/hench-templates.ts",
-            "packages/web/src/viewer/views/problems.ts",
-            "packages/web/src/viewer/views/rex-dashboard.ts",
-            "packages/web/src/viewer/views/routes.ts",
-            "packages/web/src/viewer/views/suggestions.ts",
-            "packages/web/src/viewer/views/validation.ts",
-            "packages/web/src/viewer/views/workflow-optimization.ts",
-            "packages/web/tests/unit/viewer/detail-panel.test.ts",
-            "packages/web/tests/unit/viewer/favicon.test.ts",
-            "packages/web/tests/unit/viewer/graph-layout.test.ts",
-            "packages/web/tests/unit/viewer/hench-config.test.ts",
-            "packages/web/tests/unit/viewer/label-utils.test.ts",
-            "packages/web/tests/unit/viewer/sidebar.test.ts",
-            "packages/web/tests/unit/viewer/status-indicators.test.ts",
-            "packages/web/tests/unit/viewer/tree-view.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/schema/v1.ts",
-            "packages/web/src/viewer/utils.ts",
-            "packages/web/src/viewer/components/logos.ts",
-            "packages/web/src/viewer/types.ts",
-            "packages/web/src/viewer/components/search-filter.ts"
-          ],
-          "cohesion": 0.9,
-          "coupling": 0.1,
-          "depth": 1
-        },
-        {
-          "id": "web-2/web-2",
-          "name": "Web 2",
-          "description": "7 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-            "packages/web/src/viewer/hooks/use-file-edges.ts",
-            "packages/web/src/viewer/hooks/use-pan-zoom.ts",
-            "packages/web/src/viewer/hooks/use-zone-drag.ts",
-            "packages/web/src/viewer/views/zone-types.ts",
-            "packages/web/src/viewer/views/zones.ts",
-            "packages/web/tests/unit/viewer/collapsible-section.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-            "packages/web/src/viewer/views/zones.ts"
-          ],
-          "cohesion": 0.64,
-          "coupling": 0.36,
-          "depth": 1
-        },
-        {
-          "id": "web-2/web-3",
-          "name": "Web 3",
-          "description": "7 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/viewer/components/data-display/health-gauge.ts",
-            "packages/web/src/viewer/components/data-display/mini-charts.ts",
-            "packages/web/src/viewer/components/data-display/zone-map.ts",
-            "packages/web/src/viewer/views/overview.ts",
-            "packages/web/src/viewer/views/token-usage.ts",
-            "packages/web/tests/unit/viewer/bar-chart.test.ts",
-            "packages/web/tests/unit/viewer/flow-diagram.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/viewer/views/overview.ts",
-            "packages/web/src/viewer/views/token-usage.ts",
-            "packages/web/src/viewer/components/data-display/mini-charts.ts",
-            "packages/web/src/viewer/components/data-display/health-gauge.ts"
-          ],
-          "cohesion": 0.5,
-          "coupling": 0.5,
-          "depth": 1
-        }
-      ],
-      "insights": [
-        "High cohesion (0.95) — files are tightly interconnected",
-        "Contains the bulk of the presentation layer with reusable components across multiple views",
-        "Provides specialized data display components for complex domain objects like findings and health metrics",
-        "Maintains strong cohesion despite large size, indicating well-organized component architecture",
-        "High cohesion (0.95) across 92 files demonstrates excellent component organization and reusability",
-        "Multiple entry points suggest well-designed component exports with clear public APIs",
-        "Specialized data display components provide domain-specific visualizations for complex analysis results",
-        "Functions as the shared component library that enables code reuse across different UI domains while maintaining architectural boundaries",
-        "Provides domain-agnostic visualization components that can be composed by specialized zones like prd-management-ui",
-        "Clean provider-consumer relationship with prd-management-ui - shared components are consumed without internal coupling",
-        "Component organization follows nested directory structure with logical grouping: data-display/, navigation/, sidebar/ indicating mature component taxonomy",
-        "Health gauge and findings visualization components suggest sophisticated domain-aware UI patterns for complex analysis data",
-        "Multiple index.ts files at different levels create hierarchical export structure enabling selective component imports",
-        "Consider establishing consistent component naming convention - some use kebab-case (collapsible-section.ts) while others may follow different patterns",
-        "[call graph] 632 internal calls, 1 outgoing, 1 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "execution-gateway",
-      "name": "Execution Gateway",
-      "description": "Cross-package integration layer managing PRD operations, process execution, and tool dispatch for the autonomous agent.",
-      "files": [
-        "packages/hench/src/agent/completion.ts",
-        "packages/hench/src/prd/ops.ts",
-        "packages/hench/src/process/exec.ts",
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/tools/index.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/tools/test-runner.ts",
-        "packages/hench/src/validation/completion.ts",
-        "packages/hench/src/validation/index.ts",
-        "packages/hench/tests/unit/agent/completion.test.ts",
-        "packages/hench/tests/unit/process/exec.test.ts",
-        "packages/hench/tests/unit/tools/completion-validation.test.ts",
-        "packages/hench/tests/unit/tools/rex.test.ts",
-        "packages/hench/tests/unit/tools/test-runner.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/prd/ops.ts",
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/tools/index.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/validation/completion.ts"
-      ],
-      "cohesion": 0.6,
-      "coupling": 0.4,
-      "insights": [
-        "Gateway pattern centralizes all cross-package imports in ops.ts, maintaining architectural discipline",
-        "Process and tool management provide the execution infrastructure for agent operations",
-        "Validation layer ensures completion criteria and operational integrity",
-        "Gateway pattern correctly isolates cross-package dependencies in ops.ts, preventing import sprawl",
-        "Moderate coupling (0.4) is appropriate for a gateway layer that bridges domain packages",
-        "Multiple entry points provide granular access to execution capabilities while maintaining cohesion",
-        "Successfully isolates cross-package dependencies through gateway pattern, preventing import sprawl in agent core",
-        "Gateway pattern correctly centralizes cross-package imports in ops.ts, maintaining architectural discipline",
-        "Dynamic imports in task-lookup.ts (lines 14-15, 45-46) bypass gateway pattern by directly importing from 'rex' instead of using prd/ops.ts",
-        "Dynamic imports in task-lookup.ts bypass gateway pattern by directly importing from 'rex' instead of using centralized prd/ops.ts gateway",
-        "Gateway ops.ts successfully isolates rex dependencies but creates potential single point of failure for all agent-PRD interactions",
-        "Process execution utilities (exec.ts) lack timeout and resource limit controls for autonomous operations",
-        "Process execution in exec.ts lacks timeout and resource controls, creating risk for runaway autonomous operations",
-        "Gateway ops.ts becomes single point of failure - consider circuit breaker pattern for rex service calls",
-        "[call graph] 164 internal calls, 0 outgoing, 58 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "foundation-layer",
-      "name": "Foundation Layer",
-      "description": "Shared infrastructure providing Claude API abstraction, authentication, and common utilities for all domain packages.",
+      "id": "claude-foundation-client",
+      "name": "Claude Foundation Client",
+      "description": "Shared client SDK that abstracts Anthropic CLI/API usage, retries, and telemetry for the rest of the stack.",
       "files": [
         "packages/claude-client/src/api-provider.ts",
         "packages/claude-client/src/auth.ts",
@@ -541,24 +114,18 @@
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "Serves as the foundation layer with zero coupling, correctly positioned at the bottom of the dependency hierarchy",
-        "Comprehensive API abstraction including both API and CLI providers for flexible Claude integration",
-        "Strong utility coverage for JSON handling, execution, and configuration management",
-        "Perfect isolation (coupling: 0) correctly implements the foundation layer pattern with no external dependencies",
-        "Dual provider architecture (API + CLI) offers deployment flexibility for different integration scenarios",
-        "Comprehensive utility suite covering authentication, execution, and data handling reduces code duplication",
-        "Provides stable API abstraction layer that shields upper layers from Claude API implementation details",
-        "Zero coupling correctly implements foundation layer isolation, preventing dependency inversion violations",
-        "Provider abstraction pattern (api-provider.ts, cli-provider.ts) creates extensibility point for future Claude model integrations",
-        "Utility functions exhibit high reuse across upper layers but lack consistent error propagation patterns",
-        "Consider extracting common error handling patterns from utilities into shared error boundary module",
-        "[call graph] 288 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "Implements dual providers (API + CLI) so any caller gets transparent failover.",
+        "Centralizes token-usage parsing and project-config access for downstream analytics.",
+        "Provider selection logic in `packages/claude-client/src/create-client.ts:1` already encapsulates auto-detect/fallback, so standardize new consumers on this factory rather than instantiating providers directly to preserve consistent behavior.",
+        "Anthropic SDK integration in `packages/claude-client/src/api-provider.ts:21` exposes retry/backoff knobs; plumb those options through repo-level config before running heavier CI workloads so operators can tune quotas safely.",
+        "Token-usage normalization in `packages/claude-client/src/token-usage.ts:1` is the single source for billing data, so extend it whenever the SDK ships new usage fields (e.g., cache hits) to keep downstream cost analytics accurate.",
+        "[call graph] 317 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
-      "id": "orchestration-layer",
-      "name": "Orchestration Layer",
-      "description": "Command-line entry points and configuration management that coordinate package execution without direct library dependencies.",
+      "id": "cli-orchestration-surface",
+      "name": "CLI Orchestration Surface",
+      "description": "Top-level scripts that broker every n-dx workflow by spawning package CLIs and presenting a cohesive developer UX.",
       "files": [
         "ci.js",
         "cli.js",
@@ -572,18 +139,362 @@
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "Clean separation of concerns with entry points handling orchestration while avoiding direct package imports",
-        "Configuration centralization through config.js provides unified settings management",
-        "All files serve as pure orchestrators, delegating to CLI tools rather than importing libraries",
-        "Perfect cohesion (1.0) and zero coupling demonstrates excellent architectural discipline in the orchestration layer",
-        "Entry points follow the spawn-CLI pattern rather than library imports, maintaining loose coupling",
-        "Help utility and test coverage indicate good developer experience support",
-        "Acts as pure dispatcher layer with no direct domain logic, maintaining strict separation from implementation details",
-        "Implements clean orchestration pattern where entry points delegate to CLI tools rather than importing domain packages directly",
-        "Entry point files (cli.js, web.js, ci.js) lack consistent error handling patterns for subprocess failures",
-        "Configuration management through config.js creates single point of failure for all orchestration commands",
-        "Standardize error handling across entry points - currently each handles subprocess failures differently",
-        "[call graph] 281 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "Holds the entrypoints (CLI, CI, web) that enforce the repo's four-tier dependency layering.",
+        "Shares config/help/test helpers so onboarding and diagnostics feel the same across commands.",
+        "Documented four-tier dependency rules in `cli.js:3` keep orchestration decoupled from execution; add an automated import-lint or test so future entrypoints cannot bypass the spawn-only contract.",
+        "Secret-aware config writing in `config.js:49` already chmods `.n-dx.json` when API keys exist, so route any new sensitive settings through this helper instead of ad-hoc package config writers to keep credentials locked down.",
+        "The command registry/search UX in `help.js:83` and its regression coverage in `tests/unit/help.test.js:4` should be treated as required touchpoints whenever commands are added or renamed to keep typo suggestions and docs accurate.",
+        "[call graph] 284 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ]
+    },
+    {
+      "id": "hench-agent-core",
+      "name": "Hench Agent Core",
+      "description": "Execution engine that assembles briefs, runs the agent loop, validates output, and summarizes autonomous work.",
+      "files": [
+        "packages/hench/src/agent/analysis/adaptive.ts",
+        "packages/hench/src/agent/analysis/review.ts",
+        "packages/hench/src/agent/analysis/stuck.ts",
+        "packages/hench/src/agent/analysis/summary.ts",
+        "packages/hench/src/agent/analysis/workflow.ts",
+        "packages/hench/src/agent/completion.ts",
+        "packages/hench/src/agent/index.ts",
+        "packages/hench/src/agent/lifecycle/cli-loop.ts",
+        "packages/hench/src/agent/lifecycle/heartbeat.ts",
+        "packages/hench/src/agent/lifecycle/loop.ts",
+        "packages/hench/src/agent/lifecycle/shared.ts",
+        "packages/hench/src/agent/lifecycle/task-display.ts",
+        "packages/hench/src/agent/lifecycle/token-budget.ts",
+        "packages/hench/src/agent/lifecycle/token-usage.ts",
+        "packages/hench/src/agent/planning/brief.ts",
+        "packages/hench/src/agent/planning/prompt.ts",
+        "packages/hench/src/cli/commands/config.ts",
+        "packages/hench/src/cli/commands/constants.ts",
+        "packages/hench/src/cli/commands/init.ts",
+        "packages/hench/src/cli/commands/run.ts",
+        "packages/hench/src/cli/commands/show.ts",
+        "packages/hench/src/cli/commands/status.ts",
+        "packages/hench/src/cli/commands/task-lookup.ts",
+        "packages/hench/src/cli/commands/template.ts",
+        "packages/hench/src/cli/errors.ts",
+        "packages/hench/src/cli/help.ts",
+        "packages/hench/src/cli/index.ts",
+        "packages/hench/src/cli/output.ts",
+        "packages/hench/src/prd/ops.ts",
+        "packages/hench/src/prd/rex-gateway.ts",
+        "packages/hench/src/process/exec-shell.ts",
+        "packages/hench/src/process/exec.ts",
+        "packages/hench/src/process/index.ts",
+        "packages/hench/src/public.ts",
+        "packages/hench/src/schema/index.ts",
+        "packages/hench/src/schema/templates.ts",
+        "packages/hench/src/schema/v1.ts",
+        "packages/hench/src/schema/validate.ts",
+        "packages/hench/src/store/config.ts",
+        "packages/hench/src/store/index.ts",
+        "packages/hench/src/store/json.ts",
+        "packages/hench/src/store/project-config.ts",
+        "packages/hench/src/store/runs.ts",
+        "packages/hench/src/store/suggestions.ts",
+        "packages/hench/src/store/templates.ts",
+        "packages/hench/src/tools/exec-shell.ts",
+        "packages/hench/src/tools/index.ts",
+        "packages/hench/src/tools/rex.ts",
+        "packages/hench/src/tools/test-runner.ts",
+        "packages/hench/src/types/index.ts",
+        "packages/hench/src/types/output.ts",
+        "packages/hench/src/validation/completion.ts",
+        "packages/hench/src/validation/index.ts",
+        "packages/hench/tests/e2e/cli-init.test.ts",
+        "packages/hench/tests/integration/store-roundtrip.test.ts",
+        "packages/hench/tests/unit/agent/adaptive.test.ts",
+        "packages/hench/tests/unit/agent/api-auth.test.ts",
+        "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+        "packages/hench/tests/unit/agent/brief.test.ts",
+        "packages/hench/tests/unit/agent/cli-retry.test.ts",
+        "packages/hench/tests/unit/agent/completion.test.ts",
+        "packages/hench/tests/unit/agent/heartbeat.test.ts",
+        "packages/hench/tests/unit/agent/loop.test.ts",
+        "packages/hench/tests/unit/agent/prompt.test.ts",
+        "packages/hench/tests/unit/agent/review.test.ts",
+        "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+        "packages/hench/tests/unit/agent/stuck.test.ts",
+        "packages/hench/tests/unit/agent/summary.test.ts",
+        "packages/hench/tests/unit/agent/task-display.test.ts",
+        "packages/hench/tests/unit/agent/task-failure.test.ts",
+        "packages/hench/tests/unit/agent/token-budget.test.ts",
+        "packages/hench/tests/unit/agent/token-tracking.test.ts",
+        "packages/hench/tests/unit/agent/token-usage.test.ts",
+        "packages/hench/tests/unit/agent/workflow.test.ts",
+        "packages/hench/tests/unit/cli/commands/config.test.ts",
+        "packages/hench/tests/unit/cli/commands/constants.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
+        "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+        "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
+        "packages/hench/tests/unit/cli/errors.test.ts",
+        "packages/hench/tests/unit/cli/help.test.ts",
+        "packages/hench/tests/unit/cli/output.test.ts",
+        "packages/hench/tests/unit/process/exec.test.ts",
+        "packages/hench/tests/unit/schema/templates.test.ts",
+        "packages/hench/tests/unit/schema/validate.test.ts",
+        "packages/hench/tests/unit/store/claude-config.test.ts",
+        "packages/hench/tests/unit/store/project-config.test.ts",
+        "packages/hench/tests/unit/store/suggestions.test.ts",
+        "packages/hench/tests/unit/store/templates.test.ts",
+        "packages/hench/tests/unit/tools/completion-validation.test.ts",
+        "packages/hench/tests/unit/tools/rex.test.ts",
+        "packages/hench/tests/unit/tools/test-runner.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/process/exec-shell.ts",
+        "packages/hench/src/schema/index.ts",
+        "packages/hench/src/schema/v1.ts",
+        "packages/hench/src/tools/rex.ts",
+        "packages/hench/src/types/index.ts"
+      ],
+      "cohesion": 0.95,
+      "coupling": 0.05,
+      "subZones": [
+        {
+          "id": "hench/tests",
+          "name": "Tests",
+          "description": "47 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/agent/analysis/adaptive.ts",
+            "packages/hench/src/agent/analysis/review.ts",
+            "packages/hench/src/agent/analysis/stuck.ts",
+            "packages/hench/src/agent/analysis/summary.ts",
+            "packages/hench/src/agent/analysis/workflow.ts",
+            "packages/hench/src/agent/index.ts",
+            "packages/hench/src/agent/lifecycle/cli-loop.ts",
+            "packages/hench/src/agent/lifecycle/heartbeat.ts",
+            "packages/hench/src/agent/lifecycle/loop.ts",
+            "packages/hench/src/agent/lifecycle/shared.ts",
+            "packages/hench/src/agent/lifecycle/task-display.ts",
+            "packages/hench/src/agent/lifecycle/token-budget.ts",
+            "packages/hench/src/agent/lifecycle/token-usage.ts",
+            "packages/hench/src/agent/planning/brief.ts",
+            "packages/hench/src/agent/planning/prompt.ts",
+            "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/template.ts",
+            "packages/hench/src/public.ts",
+            "packages/hench/src/schema/index.ts",
+            "packages/hench/src/schema/templates.ts",
+            "packages/hench/src/schema/v1.ts",
+            "packages/hench/src/schema/validate.ts",
+            "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/store/templates.ts",
+            "packages/hench/src/types/index.ts",
+            "packages/hench/src/types/output.ts",
+            "packages/hench/tests/e2e/cli-init.test.ts",
+            "packages/hench/tests/unit/agent/adaptive.test.ts",
+            "packages/hench/tests/unit/agent/api-auth.test.ts",
+            "packages/hench/tests/unit/agent/brief.test.ts",
+            "packages/hench/tests/unit/agent/cli-retry.test.ts",
+            "packages/hench/tests/unit/agent/heartbeat.test.ts",
+            "packages/hench/tests/unit/agent/prompt.test.ts",
+            "packages/hench/tests/unit/agent/review.test.ts",
+            "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+            "packages/hench/tests/unit/agent/stuck.test.ts",
+            "packages/hench/tests/unit/agent/summary.test.ts",
+            "packages/hench/tests/unit/agent/task-display.test.ts",
+            "packages/hench/tests/unit/agent/token-budget.test.ts",
+            "packages/hench/tests/unit/agent/token-tracking.test.ts",
+            "packages/hench/tests/unit/agent/token-usage.test.ts",
+            "packages/hench/tests/unit/agent/workflow.test.ts",
+            "packages/hench/tests/unit/cli/commands/config.test.ts",
+            "packages/hench/tests/unit/schema/templates.test.ts",
+            "packages/hench/tests/unit/schema/validate.test.ts",
+            "packages/hench/tests/unit/store/claude-config.test.ts",
+            "packages/hench/tests/unit/store/templates.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/agent/analysis/stuck.ts",
+            "packages/hench/src/agent/lifecycle/cli-loop.ts",
+            "packages/hench/src/agent/lifecycle/loop.ts",
+            "packages/hench/src/agent/planning/brief.ts",
+            "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/template.ts",
+            "packages/hench/src/types/output.ts",
+            "packages/hench/src/schema/index.ts",
+            "packages/hench/src/schema/v1.ts",
+            "packages/hench/src/schema/validate.ts"
+          ],
+          "cohesion": 0.83,
+          "coupling": 0.17,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-2",
+          "name": "Tests 2",
+          "description": "9 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/agent/completion.ts",
+            "packages/hench/src/prd/ops.ts",
+            "packages/hench/src/prd/rex-gateway.ts",
+            "packages/hench/src/tools/rex.ts",
+            "packages/hench/src/validation/completion.ts",
+            "packages/hench/src/validation/index.ts",
+            "packages/hench/tests/unit/agent/completion.test.ts",
+            "packages/hench/tests/unit/tools/completion-validation.test.ts",
+            "packages/hench/tests/unit/tools/rex.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/validation/completion.ts",
+            "packages/hench/src/prd/rex-gateway.ts",
+            "packages/hench/src/tools/rex.ts"
+          ],
+          "cohesion": 0.67,
+          "coupling": 0.33,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-3",
+          "name": "Tests 3",
+          "description": "24 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/cli/commands/constants.ts",
+            "packages/hench/src/cli/commands/init.ts",
+            "packages/hench/src/cli/commands/show.ts",
+            "packages/hench/src/cli/commands/status.ts",
+            "packages/hench/src/cli/commands/task-lookup.ts",
+            "packages/hench/src/cli/errors.ts",
+            "packages/hench/src/cli/help.ts",
+            "packages/hench/src/cli/index.ts",
+            "packages/hench/src/cli/output.ts",
+            "packages/hench/src/store/config.ts",
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/store/json.ts",
+            "packages/hench/src/store/runs.ts",
+            "packages/hench/tests/integration/store-roundtrip.test.ts",
+            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+            "packages/hench/tests/unit/agent/loop.test.ts",
+            "packages/hench/tests/unit/agent/task-failure.test.ts",
+            "packages/hench/tests/unit/cli/commands/constants.test.ts",
+            "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+            "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
+            "packages/hench/tests/unit/cli/errors.test.ts",
+            "packages/hench/tests/unit/cli/help.test.ts",
+            "packages/hench/tests/unit/cli/output.test.ts",
+            "packages/hench/tests/unit/store/project-config.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/cli/errors.ts",
+            "packages/hench/src/cli/output.ts",
+            "packages/hench/src/store/config.ts",
+            "packages/hench/src/cli/commands/constants.ts",
+            "packages/hench/src/store/json.ts"
+          ],
+          "cohesion": 0.7,
+          "coupling": 0.3,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-4",
+          "name": "Tests 4",
+          "description": "4 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/cli/commands/run.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-loop.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/cli/commands/run.ts"
+          ],
+          "cohesion": 0.29,
+          "coupling": 0.71,
+          "depth": 1
+        },
+        {
+          "id": "hench/process",
+          "name": "Process",
+          "description": "8 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/process/exec-shell.ts",
+            "packages/hench/src/process/exec.ts",
+            "packages/hench/src/process/index.ts",
+            "packages/hench/src/tools/exec-shell.ts",
+            "packages/hench/src/tools/index.ts",
+            "packages/hench/src/tools/test-runner.ts",
+            "packages/hench/tests/unit/process/exec.test.ts",
+            "packages/hench/tests/unit/tools/test-runner.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/process/index.ts",
+            "packages/hench/src/tools/index.ts"
+          ],
+          "cohesion": 0.7,
+          "coupling": 0.3,
+          "depth": 1
+        },
+        {
+          "id": "hench/store",
+          "name": "Store",
+          "description": "2 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/store/suggestions.ts",
+            "packages/hench/tests/unit/store/suggestions.test.ts"
+          ],
+          "entryPoints": [],
+          "cohesion": 1,
+          "coupling": 0,
+          "depth": 1
+        }
+      ],
+      "insights": [
+        "High cohesion (0.95) — files are tightly interconnected",
+        "Re-exports lifecycle/planning/analysis APIs so upstream callers have a single surface.",
+        "Owns human-in-the-loop checkpoints like review gates and stuck-task detection.",
+        "Use `packages/hench/src/agent/index.ts:1` as the lone import surface for lifecycle, planning, and analysis primitives so CLI layers don’t deep-import internals and accidentally create cycles.",
+        "The review gate in `packages/hench/src/agent/analysis/review.ts:1` hardcodes a 30s prompt timeout; expose that through config or CLI flags before enabling unattended review flows, otherwise approvals can block runs.",
+        "Stuck-task heuristics in `packages/hench/src/agent/analysis/stuck.ts:1` depend on callers to pass a threshold, so document or set a default in the run orchestration to keep failure detection consistent across commands.",
+        "[call graph] 1824 internal calls, 2 outgoing, 27 incoming (cohesion: 1, coupling: 0)"
+      ]
+    },
+    {
+      "id": "hench-guard-and-tools",
+      "name": "Hench Guard & Tools",
+      "description": "Security guardrails plus the tool-dispatch layer that mediates every filesystem, shell, git, and Rex action the agent performs.",
+      "files": [
+        "packages/hench/src/agent/tools.ts",
+        "packages/hench/src/guard/commands.ts",
+        "packages/hench/src/guard/index.ts",
+        "packages/hench/src/guard/paths.ts",
+        "packages/hench/src/guard/policy.ts",
+        "packages/hench/src/tools/dispatch.ts",
+        "packages/hench/src/tools/files.ts",
+        "packages/hench/src/tools/git.ts",
+        "packages/hench/src/tools/shell.ts",
+        "packages/hench/tests/unit/guard/commands.test.ts",
+        "packages/hench/tests/unit/guard/guard-integration.test.ts",
+        "packages/hench/tests/unit/guard/paths.test.ts",
+        "packages/hench/tests/unit/guard/policy.test.ts",
+        "packages/hench/tests/unit/tools/files.test.ts",
+        "packages/hench/tests/unit/tools/git.test.ts",
+        "packages/hench/tests/unit/tools/shell.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/agent/tools.ts",
+        "packages/hench/src/guard/index.ts",
+        "packages/hench/src/tools/dispatch.ts",
+        "packages/hench/src/tools/files.ts",
+        "packages/hench/src/tools/git.ts",
+        "packages/hench/src/tools/shell.ts"
+      ],
+      "cohesion": 0.74,
+      "coupling": 0.26,
+      "insights": [
+        "GuardRails centralizes command/path/git validation along with audit logging.",
+        "Tool dispatcher is the single interface Anthropics tool-calls can reach, keeping GuardError handling uniform.",
+        "GuardRails in `packages/hench/src/guard/index.ts:1` already enforces path, command, and git allowlists, so thread any new tool operations through this facade to keep policy enforcement and auditing centralized.",
+        "Session-aware limits in `packages/hench/src/guard/policy.ts:1` log every allow/deny decision; review or persist that audit log before raising rate/byte caps so you don’t lose visibility into abusive sequences.",
+        "Anthropic tool definitions live exclusively in `packages/hench/src/tools/dispatch.ts:1`, so register any new automation there to inherit GuardError handling instead of bypassing the dispatcher.",
+        "[call graph] 198 internal calls, 27 outgoing, 2 incoming (cohesion: 0.88, coupling: 0.12)"
       ]
     },
     {
@@ -686,7 +597,7 @@
       "cohesion": 0.74,
       "coupling": 0.26,
       "insights": [
-        "[call graph] 73 internal calls, 3 outgoing, 36 incoming (cohesion: 0.96, coupling: 0.04)"
+        "[call graph] 73 internal calls, 3 outgoing, 37 incoming (cohesion: 0.96, coupling: 0.04)"
       ],
       "childId": "packages-sourcevision",
       "depth": 1
@@ -887,16 +798,35 @@
       "insights": [
         "High cohesion (0.94) — files are tightly interconnected",
         "Contains 70% of project files (68/97) — subdivided into 3 sub-zones",
-        "[call graph] 2160 internal calls, 23 outgoing, 138 incoming (cohesion: 0.99, coupling: 0.01)"
+        "[call graph] 2168 internal calls, 24 outgoing, 138 incoming (cohesion: 0.99, coupling: 0.01)"
       ],
       "childId": "packages-sourcevision",
       "depth": 1
     },
     {
-      "id": "prd-management-ui",
-      "name": "PRD Management UI",
-      "description": "Specialized interface components for PRD tree manipulation, task execution, and project analysis workflows.",
+      "id": "schema-driven-viewer-surface",
+      "name": "Schema-Driven Viewer Surface",
+      "description": "Combines runtime schemas and viewer components to render and validate task data for the web UI.",
       "files": [
+        "packages/web/src/schema/v1.ts",
+        "packages/web/src/schema/validate.ts",
+        "packages/web/src/viewer/components/active-tasks-panel.ts",
+        "packages/web/src/viewer/components/breadcrumb.ts",
+        "packages/web/src/viewer/components/config-footer.ts",
+        "packages/web/src/viewer/components/constants.ts",
+        "packages/web/src/viewer/components/copy-link-button.ts",
+        "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+        "packages/web/src/viewer/components/data-display/findings-list.ts",
+        "packages/web/src/viewer/components/data-display/health-gauge.ts",
+        "packages/web/src/viewer/components/data-display/mini-charts.ts",
+        "packages/web/src/viewer/components/data-display/tree-view.ts",
+        "packages/web/src/viewer/components/data-display/zone-map.ts",
+        "packages/web/src/viewer/components/detail-panel.ts",
+        "packages/web/src/viewer/components/faq.ts",
+        "packages/web/src/viewer/components/favicon.ts",
+        "packages/web/src/viewer/components/guide.ts",
+        "packages/web/src/viewer/components/logos.ts",
+        "packages/web/src/viewer/components/notion-schema-wizard.ts",
         "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
         "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
         "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
@@ -904,619 +834,757 @@
         "packages/web/src/viewer/components/prd-tree/compute.ts",
         "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
         "packages/web/src/viewer/components/prd-tree/index.ts",
+        "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
         "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
         "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
         "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
         "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
         "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
+        "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
         "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
         "packages/web/src/viewer/components/prd-tree/status-filter.ts",
         "packages/web/src/viewer/components/prd-tree/task-detail.ts",
         "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
         "packages/web/src/viewer/components/prd-tree/types.ts",
+        "packages/web/src/viewer/components/rex-task-link.ts",
+        "packages/web/src/viewer/components/search-filter.ts",
+        "packages/web/src/viewer/components/sidebar.ts",
+        "packages/web/src/viewer/components/status-indicators.ts",
+        "packages/web/src/viewer/components/theme-toggle.ts",
+        "packages/web/src/viewer/darkmode_logo.png",
+        "packages/web/src/viewer/graph/physics.ts",
+        "packages/web/src/viewer/graph/renderer.ts",
+        "packages/web/src/viewer/hooks/use-file-edges.ts",
+        "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+        "packages/web/src/viewer/hooks/use-project-metadata.ts",
+        "packages/web/src/viewer/hooks/use-zone-drag.ts",
+        "packages/web/src/viewer/index.html",
+        "packages/web/src/viewer/lightmode_logo.png",
+        "packages/web/src/viewer/loader.ts",
+        "packages/web/src/viewer/main.ts",
+        "packages/web/src/viewer/schema-compat.ts",
+        "packages/web/src/viewer/styles/a11y.css",
+        "packages/web/src/viewer/styles/analysis.css",
+        "packages/web/src/viewer/styles/base.css",
+        "packages/web/src/viewer/styles/branding.css",
+        "packages/web/src/viewer/styles/breadcrumb.css",
+        "packages/web/src/viewer/styles/call-graph-explorer.css",
+        "packages/web/src/viewer/styles/cards.css",
+        "packages/web/src/viewer/styles/components.css",
+        "packages/web/src/viewer/styles/copy-link.css",
+        "packages/web/src/viewer/styles/detail.css",
+        "packages/web/src/viewer/styles/faq.css",
+        "packages/web/src/viewer/styles/feature-toggles.css",
+        "packages/web/src/viewer/styles/forms.css",
+        "packages/web/src/viewer/styles/graph.css",
+        "packages/web/src/viewer/styles/hench-config.css",
+        "packages/web/src/viewer/styles/hench-runs.css",
+        "packages/web/src/viewer/styles/hench-templates.css",
+        "packages/web/src/viewer/styles/index.css",
+        "packages/web/src/viewer/styles/integration-config.css",
+        "packages/web/src/viewer/styles/layout.css",
+        "packages/web/src/viewer/styles/notion-config.css",
+        "packages/web/src/viewer/styles/overview.css",
+        "packages/web/src/viewer/styles/prd-tree.css",
+        "packages/web/src/viewer/styles/responsive.css",
+        "packages/web/src/viewer/styles/rex-dashboard.css",
+        "packages/web/src/viewer/styles/routes.css",
+        "packages/web/src/viewer/styles/tables.css",
+        "packages/web/src/viewer/styles/task-audit.css",
+        "packages/web/src/viewer/styles/task-link.css",
+        "packages/web/src/viewer/styles/token-usage.css",
+        "packages/web/src/viewer/styles/tokens.css",
+        "packages/web/src/viewer/styles/utils.css",
+        "packages/web/src/viewer/styles/validation.css",
+        "packages/web/src/viewer/styles/zone-map.css",
+        "packages/web/src/viewer/types.ts",
+        "packages/web/src/viewer/utils.ts",
         "packages/web/src/viewer/views/analysis.ts",
+        "packages/web/src/viewer/views/architecture.ts",
+        "packages/web/src/viewer/views/feature-toggles.ts",
+        "packages/web/src/viewer/views/files.ts",
+        "packages/web/src/viewer/views/graph.ts",
+        "packages/web/src/viewer/views/hench-config.ts",
+        "packages/web/src/viewer/views/hench-runs.ts",
+        "packages/web/src/viewer/views/hench-templates.ts",
+        "packages/web/src/viewer/views/integration-config.ts",
+        "packages/web/src/viewer/views/notion-config.ts",
+        "packages/web/src/viewer/views/overview.ts",
         "packages/web/src/viewer/views/prd.ts",
+        "packages/web/src/viewer/views/problems.ts",
+        "packages/web/src/viewer/views/rex-dashboard.ts",
+        "packages/web/src/viewer/views/routes.ts",
+        "packages/web/src/viewer/views/suggestions.ts",
+        "packages/web/src/viewer/views/task-audit.ts",
+        "packages/web/src/viewer/views/token-usage.ts",
+        "packages/web/src/viewer/views/validation.ts",
+        "packages/web/src/viewer/views/workflow-optimization.ts",
+        "packages/web/src/viewer/views/zone-types.ts",
+        "packages/web/src/viewer/views/zones.ts",
         "packages/web/tests/unit/viewer/accessibility.test.ts",
+        "packages/web/tests/unit/viewer/add-item-form.test.ts",
+        "packages/web/tests/unit/viewer/bar-chart.test.ts",
         "packages/web/tests/unit/viewer/batch-import-panel.test.ts",
+        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+        "packages/web/tests/unit/viewer/copy-link-button.test.ts",
+        "packages/web/tests/unit/viewer/detail-panel.test.ts",
+        "packages/web/tests/unit/viewer/favicon.test.ts",
+        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+        "packages/web/tests/unit/viewer/graph-interaction.test.ts",
+        "packages/web/tests/unit/viewer/graph-layout.test.ts",
+        "packages/web/tests/unit/viewer/graph-zoom.test.ts",
+        "packages/web/tests/unit/viewer/hench-config.test.ts",
+        "packages/web/tests/unit/viewer/label-utils.test.ts",
         "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
         "packages/web/tests/unit/viewer/prd-tree.test.ts",
         "packages/web/tests/unit/viewer/prune-diff-tree.test.ts",
+        "packages/web/tests/unit/viewer/sidebar.test.ts",
         "packages/web/tests/unit/viewer/smart-add-input.test.ts",
         "packages/web/tests/unit/viewer/status-filter.test.ts",
+        "packages/web/tests/unit/viewer/status-indicators.test.ts",
         "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
-        "packages/web/tests/unit/viewer/task-detail-requirements.test.ts"
+        "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
+        "packages/web/tests/unit/viewer/tree-view.test.ts"
       ],
-      "entryPoints": [
-        "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-        "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-        "packages/web/src/viewer/views/analysis.ts",
-        "packages/web/src/viewer/views/prd.ts"
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "subZones": [
+        {
+          "id": "web-2/web",
+          "name": "Web",
+          "description": "4 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/schema/v1.ts",
+            "packages/web/src/schema/validate.ts",
+            "packages/web/src/viewer/loader.ts",
+            "packages/web/src/viewer/schema-compat.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/schema/v1.ts",
+            "packages/web/src/viewer/loader.ts"
+          ],
+          "cohesion": 0.4,
+          "coupling": 0.6,
+          "depth": 1
+        },
+        {
+          "id": "web-2/web-2",
+          "name": "Web 2",
+          "description": "61 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/viewer/components/active-tasks-panel.ts",
+            "packages/web/src/viewer/components/breadcrumb.ts",
+            "packages/web/src/viewer/components/config-footer.ts",
+            "packages/web/src/viewer/components/constants.ts",
+            "packages/web/src/viewer/components/copy-link-button.ts",
+            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+            "packages/web/src/viewer/components/data-display/findings-list.ts",
+            "packages/web/src/viewer/components/data-display/health-gauge.ts",
+            "packages/web/src/viewer/components/data-display/mini-charts.ts",
+            "packages/web/src/viewer/components/data-display/tree-view.ts",
+            "packages/web/src/viewer/components/data-display/zone-map.ts",
+            "packages/web/src/viewer/components/detail-panel.ts",
+            "packages/web/src/viewer/components/faq.ts",
+            "packages/web/src/viewer/components/favicon.ts",
+            "packages/web/src/viewer/components/logos.ts",
+            "packages/web/src/viewer/components/notion-schema-wizard.ts",
+            "packages/web/src/viewer/components/rex-task-link.ts",
+            "packages/web/src/viewer/components/search-filter.ts",
+            "packages/web/src/viewer/components/sidebar.ts",
+            "packages/web/src/viewer/components/status-indicators.ts",
+            "packages/web/src/viewer/graph/physics.ts",
+            "packages/web/src/viewer/graph/renderer.ts",
+            "packages/web/src/viewer/hooks/use-file-edges.ts",
+            "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+            "packages/web/src/viewer/hooks/use-project-metadata.ts",
+            "packages/web/src/viewer/hooks/use-zone-drag.ts",
+            "packages/web/src/viewer/main.ts",
+            "packages/web/src/viewer/types.ts",
+            "packages/web/src/viewer/utils.ts",
+            "packages/web/src/viewer/views/architecture.ts",
+            "packages/web/src/viewer/views/feature-toggles.ts",
+            "packages/web/src/viewer/views/files.ts",
+            "packages/web/src/viewer/views/graph.ts",
+            "packages/web/src/viewer/views/hench-config.ts",
+            "packages/web/src/viewer/views/hench-runs.ts",
+            "packages/web/src/viewer/views/hench-templates.ts",
+            "packages/web/src/viewer/views/integration-config.ts",
+            "packages/web/src/viewer/views/notion-config.ts",
+            "packages/web/src/viewer/views/overview.ts",
+            "packages/web/src/viewer/views/problems.ts",
+            "packages/web/src/viewer/views/rex-dashboard.ts",
+            "packages/web/src/viewer/views/routes.ts",
+            "packages/web/src/viewer/views/suggestions.ts",
+            "packages/web/src/viewer/views/task-audit.ts",
+            "packages/web/src/viewer/views/token-usage.ts",
+            "packages/web/src/viewer/views/validation.ts",
+            "packages/web/src/viewer/views/workflow-optimization.ts",
+            "packages/web/src/viewer/views/zone-types.ts",
+            "packages/web/src/viewer/views/zones.ts",
+            "packages/web/tests/unit/viewer/bar-chart.test.ts",
+            "packages/web/tests/unit/viewer/collapsible-section.test.ts",
+            "packages/web/tests/unit/viewer/copy-link-button.test.ts",
+            "packages/web/tests/unit/viewer/detail-panel.test.ts",
+            "packages/web/tests/unit/viewer/favicon.test.ts",
+            "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+            "packages/web/tests/unit/viewer/graph-layout.test.ts",
+            "packages/web/tests/unit/viewer/hench-config.test.ts",
+            "packages/web/tests/unit/viewer/label-utils.test.ts",
+            "packages/web/tests/unit/viewer/sidebar.test.ts",
+            "packages/web/tests/unit/viewer/status-indicators.test.ts",
+            "packages/web/tests/unit/viewer/tree-view.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/viewer/components/logos.ts",
+            "packages/web/src/viewer/types.ts",
+            "packages/web/src/viewer/components/copy-link-button.ts"
+          ],
+          "cohesion": 0.91,
+          "coupling": 0.09,
+          "depth": 1,
+          "subZones": [
+            {
+              "id": "web-2/web-2/web",
+              "name": "Web",
+              "description": "47 files, primarily TypeScript",
+              "files": [
+                "packages/web/src/viewer/components/active-tasks-panel.ts",
+                "packages/web/src/viewer/components/breadcrumb.ts",
+                "packages/web/src/viewer/components/config-footer.ts",
+                "packages/web/src/viewer/components/constants.ts",
+                "packages/web/src/viewer/components/copy-link-button.ts",
+                "packages/web/src/viewer/components/data-display/findings-list.ts",
+                "packages/web/src/viewer/components/data-display/tree-view.ts",
+                "packages/web/src/viewer/components/detail-panel.ts",
+                "packages/web/src/viewer/components/faq.ts",
+                "packages/web/src/viewer/components/favicon.ts",
+                "packages/web/src/viewer/components/logos.ts",
+                "packages/web/src/viewer/components/notion-schema-wizard.ts",
+                "packages/web/src/viewer/components/rex-task-link.ts",
+                "packages/web/src/viewer/components/search-filter.ts",
+                "packages/web/src/viewer/components/sidebar.ts",
+                "packages/web/src/viewer/components/status-indicators.ts",
+                "packages/web/src/viewer/graph/physics.ts",
+                "packages/web/src/viewer/graph/renderer.ts",
+                "packages/web/src/viewer/hooks/use-project-metadata.ts",
+                "packages/web/src/viewer/main.ts",
+                "packages/web/src/viewer/types.ts",
+                "packages/web/src/viewer/utils.ts",
+                "packages/web/src/viewer/views/architecture.ts",
+                "packages/web/src/viewer/views/feature-toggles.ts",
+                "packages/web/src/viewer/views/files.ts",
+                "packages/web/src/viewer/views/graph.ts",
+                "packages/web/src/viewer/views/hench-config.ts",
+                "packages/web/src/viewer/views/hench-runs.ts",
+                "packages/web/src/viewer/views/hench-templates.ts",
+                "packages/web/src/viewer/views/integration-config.ts",
+                "packages/web/src/viewer/views/notion-config.ts",
+                "packages/web/src/viewer/views/problems.ts",
+                "packages/web/src/viewer/views/rex-dashboard.ts",
+                "packages/web/src/viewer/views/routes.ts",
+                "packages/web/src/viewer/views/suggestions.ts",
+                "packages/web/src/viewer/views/task-audit.ts",
+                "packages/web/src/viewer/views/validation.ts",
+                "packages/web/src/viewer/views/workflow-optimization.ts",
+                "packages/web/tests/unit/viewer/copy-link-button.test.ts",
+                "packages/web/tests/unit/viewer/detail-panel.test.ts",
+                "packages/web/tests/unit/viewer/favicon.test.ts",
+                "packages/web/tests/unit/viewer/graph-layout.test.ts",
+                "packages/web/tests/unit/viewer/hench-config.test.ts",
+                "packages/web/tests/unit/viewer/label-utils.test.ts",
+                "packages/web/tests/unit/viewer/sidebar.test.ts",
+                "packages/web/tests/unit/viewer/status-indicators.test.ts",
+                "packages/web/tests/unit/viewer/tree-view.test.ts"
+              ],
+              "entryPoints": [
+                "packages/web/src/viewer/utils.ts",
+                "packages/web/src/viewer/components/logos.ts",
+                "packages/web/src/viewer/types.ts",
+                "packages/web/src/viewer/components/search-filter.ts"
+              ],
+              "cohesion": 0.91,
+              "coupling": 0.09,
+              "depth": 2
+            },
+            {
+              "id": "web-2/web-2/web-2",
+              "name": "Web 2",
+              "description": "7 files, primarily TypeScript",
+              "files": [
+                "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+                "packages/web/src/viewer/hooks/use-file-edges.ts",
+                "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+                "packages/web/src/viewer/hooks/use-zone-drag.ts",
+                "packages/web/src/viewer/views/zone-types.ts",
+                "packages/web/src/viewer/views/zones.ts",
+                "packages/web/tests/unit/viewer/collapsible-section.test.ts"
+              ],
+              "entryPoints": [
+                "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+                "packages/web/src/viewer/views/zones.ts"
+              ],
+              "cohesion": 0.67,
+              "coupling": 0.33,
+              "depth": 2
+            },
+            {
+              "id": "web-2/web-2/web-3",
+              "name": "Web 3",
+              "description": "7 files, primarily TypeScript",
+              "files": [
+                "packages/web/src/viewer/components/data-display/health-gauge.ts",
+                "packages/web/src/viewer/components/data-display/mini-charts.ts",
+                "packages/web/src/viewer/components/data-display/zone-map.ts",
+                "packages/web/src/viewer/views/overview.ts",
+                "packages/web/src/viewer/views/token-usage.ts",
+                "packages/web/tests/unit/viewer/bar-chart.test.ts",
+                "packages/web/tests/unit/viewer/flow-diagram.test.ts"
+              ],
+              "entryPoints": [
+                "packages/web/src/viewer/views/overview.ts",
+                "packages/web/src/viewer/views/token-usage.ts",
+                "packages/web/src/viewer/components/data-display/mini-charts.ts",
+                "packages/web/src/viewer/components/data-display/health-gauge.ts"
+              ],
+              "cohesion": 0.54,
+              "coupling": 0.46,
+              "depth": 2
+            }
+          ]
+        },
+        {
+          "id": "web-2/web-3",
+          "name": "Web 3",
+          "description": "33 files, primarily TypeScript",
+          "files": [
+            "packages/web/src/viewer/components/guide.ts",
+            "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+            "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+            "packages/web/src/viewer/components/prd-tree/compute.ts",
+            "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/index.ts",
+            "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
+            "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+            "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+            "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
+            "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
+            "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
+            "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
+            "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
+            "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+            "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+            "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+            "packages/web/src/viewer/components/prd-tree/types.ts",
+            "packages/web/src/viewer/components/theme-toggle.ts",
+            "packages/web/src/viewer/views/analysis.ts",
+            "packages/web/src/viewer/views/prd.ts",
+            "packages/web/tests/unit/viewer/accessibility.test.ts",
+            "packages/web/tests/unit/viewer/add-item-form.test.ts",
+            "packages/web/tests/unit/viewer/batch-import-panel.test.ts",
+            "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
+            "packages/web/tests/unit/viewer/prd-tree.test.ts",
+            "packages/web/tests/unit/viewer/prune-diff-tree.test.ts",
+            "packages/web/tests/unit/viewer/smart-add-input.test.ts",
+            "packages/web/tests/unit/viewer/status-filter.test.ts",
+            "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
+            "packages/web/tests/unit/viewer/task-detail-requirements.test.ts"
+          ],
+          "entryPoints": [
+            "packages/web/src/viewer/components/theme-toggle.ts",
+            "packages/web/src/viewer/components/guide.ts",
+            "packages/web/src/viewer/views/analysis.ts",
+            "packages/web/src/viewer/views/prd.ts",
+            "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+            "packages/web/src/viewer/components/prd-tree/smart-add-input.ts"
+          ],
+          "cohesion": 0.93,
+          "coupling": 0.07,
+          "depth": 1
+        }
       ],
-      "cohesion": 0.93,
-      "coupling": 0.07,
       "insights": [
-        "High cohesion (0.93) — files are tightly interconnected",
-        "Focused on PRD-specific operations like task management, bulk actions, and execution workflows",
-        "Provides sophisticated UI components for complex domain operations like merge previews and batch imports",
-        "Strong cohesion indicates well-designed separation of PRD-related UI concerns",
-        "High cohesion (0.93) demonstrates focused responsibility for PRD-specific user interactions",
-        "Sophisticated components like merge-preview and batch-import-panel handle complex workflow operations",
-        "Clean bidirectional coupling with dashboard-components supports shared component reuse",
-        "Demonstrates proper domain-specific UI layering by consuming shared components while implementing PRD-specific business logic",
-        "Maintains architectural integrity by not exposing internal PRD operations to the shared component layer",
-        "Proper domain-specific specialization - consumes shared components while maintaining PRD-specific business logic encapsulation",
-        "Sophisticated workflow components like merge-preview.ts and batch-import-panel.ts indicate mature user experience patterns for complex PRD operations",
-        "Execution-panel.ts suggests integration with autonomous execution workflows, bridging UI and automation concerns",
-        "Compute.ts filename suggests performance-critical calculations isolated from UI rendering logic",
-        "The compute.ts filename is ambiguous - consider more descriptive naming like prd-calculations.ts or tree-computations.ts to clarify its specific purpose",
-        "[call graph] 422 internal calls, 1 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "High cohesion (1) — files are tightly interconnected",
+        "Keep schema edits centralized in `packages/web/src/schema/v1.ts` and `validate.ts` so every viewer component consumes identical data contracts.",
+        "Apply shared component utilities (constants, copy-link button, collapsible sections) to enforce consistent UX patterns and reduce ad-hoc styles.",
+        "Introduce automated visual or interaction tests for panels like `active-tasks-panel.ts` and `breadcrumb.ts` to maintain trust in the high-cohesion UI layer.",
+        "Perfect cohesion and zero measured coupling show the schema + viewer stack is self-contained—treat it as the canonical place for UI-facing data contracts.",
+        "Schemas (`v1.ts`, `validate.ts`) already live with the components; documenting how components consume these helpers will keep future imports from leaking to backend internals.",
+        "Viewer panel components are numerous and critical; adopting visual regression checks will preserve quality as the component catalog grows.",
+        "[call graph] 1134 internal calls, 1 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
-      "id": "presentation-gateway",
-      "name": "Presentation Gateway",
-      "description": "Core web server infrastructure providing MCP endpoints, routing, and configuration management.",
+      "id": "vendor-agnostic-llm-adapter",
+      "name": "Vendor-Agnostic LLM Adapter",
+      "description": "A higher-level client that selects Claude or Codex providers and loads unified LLM config for consumers such as hench.",
       "files": [
-        "packages/web/src/cli/index.ts",
-        "packages/web/src/landing/index.html",
-        "packages/web/src/landing/landing.css",
-        "packages/web/src/landing/landing.ts",
-        "packages/web/src/public.ts",
-        "packages/web/src/schema/data-files.ts",
-        "packages/web/src/server/index.ts",
-        "packages/web/src/server/mcp-deps.ts",
-        "packages/web/src/server/port.ts",
-        "packages/web/src/server/routes-adaptive.ts",
-        "packages/web/src/server/routes-config.ts",
-        "packages/web/src/server/routes-data.ts",
-        "packages/web/src/server/routes-hench.ts",
-        "packages/web/src/server/routes-mcp.ts",
-        "packages/web/src/server/routes-project.ts",
-        "packages/web/src/server/routes-rex.ts",
-        "packages/web/src/server/routes-sourcevision.ts",
-        "packages/web/src/server/routes-static.ts",
-        "packages/web/src/server/routes-status.ts",
-        "packages/web/src/server/routes-token-usage.ts",
-        "packages/web/src/server/routes-validation.ts",
-        "packages/web/src/server/routes-workflow.ts",
-        "packages/web/src/server/start.ts",
-        "packages/web/src/server/types.ts",
-        "packages/web/src/server/websocket.ts",
-        "packages/web/tests/unit/server/dev-reload.test.ts",
-        "packages/web/tests/unit/server/port.test.ts",
-        "packages/web/tests/unit/server/routes-adaptive.test.ts",
-        "packages/web/tests/unit/server/routes-config.test.ts",
-        "packages/web/tests/unit/server/routes-data.test.ts",
-        "packages/web/tests/unit/server/routes-hench-config.test.ts",
-        "packages/web/tests/unit/server/routes-hench-execute.test.ts",
-        "packages/web/tests/unit/server/routes-hench-templates.test.ts",
-        "packages/web/tests/unit/server/routes-mcp.test.ts",
-        "packages/web/tests/unit/server/routes-project.test.ts",
-        "packages/web/tests/unit/server/routes-requirements.test.ts",
-        "packages/web/tests/unit/server/routes-rex.test.ts",
-        "packages/web/tests/unit/server/routes-sourcevision.test.ts",
-        "packages/web/tests/unit/server/routes-status.test.ts",
-        "packages/web/tests/unit/server/routes-token-usage.test.ts",
-        "packages/web/tests/unit/server/routes-validation.test.ts",
-        "packages/web/tests/unit/server/routes-workflow.test.ts",
-        "packages/web/tests/unit/server/scope.test.ts",
-        "packages/web/tests/unit/server/type-consistency.test.ts",
-        "packages/web/tests/unit/server/websocket.test.ts"
+        "packages/llm-client/src/api-provider.ts",
+        "packages/llm-client/src/auth.ts",
+        "packages/llm-client/src/cli-provider.ts",
+        "packages/llm-client/src/codex-cli-provider.ts",
+        "packages/llm-client/src/config.ts",
+        "packages/llm-client/src/create-client.ts",
+        "packages/llm-client/src/exec.ts",
+        "packages/llm-client/src/help-format.ts",
+        "packages/llm-client/src/json.ts",
+        "packages/llm-client/src/llm-client.ts",
+        "packages/llm-client/src/llm-config.ts",
+        "packages/llm-client/src/llm-types.ts",
+        "packages/llm-client/src/output.ts",
+        "packages/llm-client/src/project-config.ts",
+        "packages/llm-client/src/project-dirs.ts",
+        "packages/llm-client/src/public.ts",
+        "packages/llm-client/src/suggest.ts",
+        "packages/llm-client/src/token-usage.ts",
+        "packages/llm-client/src/types.ts",
+        "packages/llm-client/tests/unit/api-provider.test.ts",
+        "packages/llm-client/tests/unit/auth.test.ts",
+        "packages/llm-client/tests/unit/cli-provider.test.ts",
+        "packages/llm-client/tests/unit/config.test.ts",
+        "packages/llm-client/tests/unit/create-client.test.ts",
+        "packages/llm-client/tests/unit/exec.test.ts",
+        "packages/llm-client/tests/unit/help-format.test.ts",
+        "packages/llm-client/tests/unit/json.test.ts",
+        "packages/llm-client/tests/unit/llm-client.test.ts",
+        "packages/llm-client/tests/unit/llm-config.test.ts",
+        "packages/llm-client/tests/unit/output.test.ts",
+        "packages/llm-client/tests/unit/project-config.test.ts",
+        "packages/llm-client/tests/unit/suggest.test.ts",
+        "packages/llm-client/tests/unit/token-usage.test.ts",
+        "packages/llm-client/tests/unit/types.test.ts"
       ],
-      "entryPoints": [
-        "packages/web/src/schema/data-files.ts"
-      ],
-      "cohesion": 0.99,
-      "coupling": 0.01,
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
       "insights": [
-        "High cohesion (0.99) — files are tightly interconnected",
-        "Acts as the primary gateway between external clients and internal domain packages",
-        "Implements the gateway pattern with mcp-deps.ts concentrating all cross-package imports",
-        "Provides clean separation between server infrastructure and presentation components",
-        "Excellent cohesion (0.99) indicates a well-focused server infrastructure layer",
-        "Gateway pattern successfully isolates cross-package dependencies in mcp-deps.ts",
-        "Low coupling (0.01) demonstrates clean architectural boundaries with minimal external dependencies",
-        "Serves as the architectural backbone connecting external clients to internal domain logic through well-defined HTTP and MCP endpoints",
-        "Implements the adapter pattern through mcp-deps.ts to translate between web transport protocols and domain package APIs",
-        "Gateway zone successfully implements the adapter pattern, translating between HTTP/MCP protocols and internal domain APIs",
-        "Server infrastructure files follow consistent 'routes-*' naming pattern for HTTP handlers, establishing clear convention for endpoint organization",
-        "Port allocation logic in port.ts demonstrates defensive programming with fallback mechanisms for dynamic port assignment",
-        "Gateway module mcp-deps.ts uses descriptive naming that clearly indicates its role as MCP dependency concentrator",
-        "Consider extracting port allocation logic from port.ts into a reusable utility module that other packages could leverage for dynamic port management",
-        "[call graph] 837 internal calls, 21 outgoing, 1 incoming (cohesion: 0.98, coupling: 0.02)"
-      ]
-    },
-    {
-      "id": "tool-infrastructure",
-      "name": "Tool Infrastructure",
-      "description": "Agent tooling subsystem providing command guards, file operations, shell execution, and tool dispatch mechanisms.",
-      "files": [
-        "packages/hench/src/agent/tools.ts",
-        "packages/hench/src/guard/commands.ts",
-        "packages/hench/src/guard/index.ts",
-        "packages/hench/src/guard/paths.ts",
-        "packages/hench/src/tools/dispatch.ts",
-        "packages/hench/src/tools/files.ts",
-        "packages/hench/src/tools/shell.ts",
-        "packages/hench/tests/unit/guard/commands.test.ts",
-        "packages/hench/tests/unit/guard/paths.test.ts",
-        "packages/hench/tests/unit/tools/files.test.ts",
-        "packages/hench/tests/unit/tools/shell.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/agent/tools.ts",
-        "packages/hench/src/guard/index.ts",
-        "packages/hench/src/tools/dispatch.ts",
-        "packages/hench/src/tools/files.ts",
-        "packages/hench/src/tools/shell.ts"
-      ],
-      "cohesion": 0.68,
-      "coupling": 0.33,
-      "insights": [
-        "Guard system provides safety mechanisms for autonomous agent operations",
-        "Tool dispatch and file operations form the core execution capabilities",
-        "Cohesion (0.68) suggests room for tighter organization around tool categories",
-        "Guard system provides important safety boundaries for autonomous agent file and command operations",
-        "Tool dispatch architecture enables extensible agent capabilities with clean separation of concerns",
-        "Cohesion at 0.68 could benefit from grouping tools by functional domain (file ops, shell ops, guards)",
-        "Provides extensible tool dispatch architecture with safety boundaries through guard system",
-        "Guard system implementation provides appropriate safety boundaries for autonomous operations",
-        "Guard system (commands.ts, paths.ts) implements safety boundaries but lacks runtime policy enforcement mechanisms",
-        "Tool dispatch architecture enables extension but lacks plugin validation or sandboxing for unsafe tools",
-        "Guard system lacks runtime policy enforcement - commands.ts and paths.ts define boundaries but don't actively monitor violations",
-        "Tool dispatch architecture needs plugin validation to prevent unsafe tool registration in autonomous contexts",
-        "[call graph] 170 internal calls, 7 outgoing, 2 incoming (cohesion: 0.96, coupling: 0.04)"
+        "High cohesion (1) — files are tightly interconnected",
+        "Abstracts vendor choice so orchestration layers call one interface regardless of backend.",
+        "Provides Codex parity by adapting its CLI into the shared ClaudeClient contract.",
+        "Vendor-neutral parsing in `packages/llm-client/src/llm-config.ts:1` already merges legacy `claude` settings into the new `llm.*` schema, so route upcoming config migrations through this loader to avoid duplicating parsing logic elsewhere.",
+        "`packages/llm-client/src/llm-client.ts:1` routes requests by vendor and reuses Claude auth detection, which means any future vendor should be plugged in here so upstream callers stay ignorant of per-vendor quirks.",
+        "The Codex CLI provider in `packages/llm-client/src/codex-cli-provider.ts:1` shells out with temp files and retry/backoff; capture telemetry or expose config before tightening timeouts so agents can distinguish Codex issues from guard denials.",
+        "[call graph] 344 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     }
   ],
   "crossings": [
     {
-      "from": "packages/hench/src/agent/analysis/review.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "fromZone": "adaptive-web-services-shell",
+      "toZone": "packages-rex:rex-cli"
     },
     {
-      "from": "packages/hench/src/agent/index.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/index.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "to": "packages/hench/src/tools/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/loop.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/loop.ts",
-      "to": "packages/hench/src/tools/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/agent/planning/brief.ts",
-      "to": "packages/hench/src/prd/ops.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/cli/commands/run.ts",
-      "to": "packages/hench/src/prd/ops.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/cli/commands/run.ts",
-      "to": "packages/hench/src/prd/ops.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/public.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/src/tools/exec-shell.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
-    },
-    {
-      "from": "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "execution-gateway"
+      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "fromZone": "adaptive-web-services-shell",
+      "toZone": "packages-rex:rex-cli"
     },
     {
       "from": "packages/hench/src/agent/lifecycle/loop.ts",
       "to": "packages/hench/src/guard/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "tool-infrastructure"
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
       "from": "packages/hench/src/agent/lifecycle/loop.ts",
       "to": "packages/hench/src/tools/dispatch.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "tool-infrastructure"
-    },
-    {
-      "from": "packages/hench/src/types/index.ts",
-      "to": "packages/hench/src/guard/index.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "tool-infrastructure"
-    },
-    {
-      "from": "packages/hench/tests/unit/agent/task-failure.test.ts",
-      "to": "packages/hench/src/agent/tools.ts",
-      "fromZone": "autonomous-agent",
-      "toZone": "tool-infrastructure"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/analysis.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "prd-management-ui"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/prd.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "prd-management-ui"
-    },
-    {
-      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "prd-management-ui"
-    },
-    {
-      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "prd-management-ui"
-    },
-    {
-      "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "presentation-gateway"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "dashboard-components",
-      "toZone": "presentation-gateway"
-    },
-    {
-      "from": "packages/hench/src/tools/index.ts",
-      "to": "packages/hench/src/tools/git.ts",
-      "fromZone": "execution-gateway",
-      "toZone": "autonomous-agent"
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
       "from": "packages/hench/src/tools/index.ts",
       "to": "packages/hench/src/tools/dispatch.ts",
-      "fromZone": "execution-gateway",
-      "toZone": "tool-infrastructure"
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
       "from": "packages/hench/src/tools/index.ts",
       "to": "packages/hench/src/tools/files.ts",
-      "fromZone": "execution-gateway",
-      "toZone": "tool-infrastructure"
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
+    },
+    {
+      "from": "packages/hench/src/tools/index.ts",
+      "to": "packages/hench/src/tools/git.ts",
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
       "from": "packages/hench/src/tools/index.ts",
       "to": "packages/hench/src/tools/shell.ts",
-      "fromZone": "execution-gateway",
-      "toZone": "tool-infrastructure"
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/export/pdf-report.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
+      "from": "packages/hench/src/types/index.ts",
+      "to": "packages/hench/src/guard/index.ts",
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/export/pdf-report.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/schema/index.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
-      "to": "packages/sourcevision/src/schema/index.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/init.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/init.ts",
-      "to": "packages/sourcevision/src/schema/v1.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/validate.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/validate.ts",
-      "to": "packages/sourcevision/src/schema/data-files.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/validate.ts",
-      "to": "packages/sourcevision/src/schema/index.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/validate.ts",
-      "to": "packages/sourcevision/src/schema/index.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/index.ts",
-      "to": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/index.ts",
-      "to": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/index.ts",
-      "to": "packages/sourcevision/src/cli/mcp.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/index.ts",
-      "to": "packages/sourcevision/src/cli/mcp.ts",
-      "fromZone": "packages-sourcevision:cli",
-      "toZone": "packages-sourcevision:tests"
-    },
-    {
-      "from": "packages/sourcevision/src/analyzers/manifest.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/analyzers/manifest.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/analyzers/workspace.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/analyzers/workspace.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/commands/init.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/commands/init.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/errors.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/errors.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/output.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
-      "to": "packages/sourcevision/src/cli/output.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/mcp.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/sourcevision/src/cli/mcp.ts",
-      "to": "packages/sourcevision/src/cli/commands/constants.ts",
-      "fromZone": "packages-sourcevision:tests",
-      "toZone": "packages-sourcevision:cli"
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
-      "to": "packages/web/src/viewer/utils.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/src/viewer/views/analysis.ts",
-      "to": "packages/web/src/viewer/components/logos.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/logos.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/web/src/viewer/components/guide.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
-      "to": "packages/web/src/viewer/components/theme-toggle.ts",
-      "fromZone": "prd-management-ui",
-      "toZone": "dashboard-components"
-    },
-    {
-      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
-      "to": "packages/rex/src/schema/v1.ts",
-      "fromZone": "presentation-gateway",
-      "toZone": "packages-rex:rex-cli"
-    },
-    {
-      "from": "packages/web/tests/unit/server/type-consistency.test.ts",
-      "to": "packages/rex/src/schema/v1.ts",
-      "fromZone": "presentation-gateway",
-      "toZone": "packages-rex:rex-cli"
+      "from": "packages/hench/tests/unit/agent/task-failure.test.ts",
+      "to": "packages/hench/src/agent/tools.ts",
+      "fromZone": "hench-agent-core",
+      "toZone": "hench-guard-and-tools"
     },
     {
       "from": "packages/hench/src/agent/tools.ts",
       "to": "packages/hench/src/types/index.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
     },
     {
       "from": "packages/hench/src/guard/index.ts",
       "to": "packages/hench/src/schema/index.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
-    },
-    {
-      "from": "packages/hench/src/tools/dispatch.ts",
-      "to": "packages/hench/src/tools/git.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
-    },
-    {
-      "from": "packages/hench/src/tools/dispatch.ts",
-      "to": "packages/hench/src/types/index.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
-    },
-    {
-      "from": "packages/hench/src/tools/shell.ts",
-      "to": "packages/hench/src/tools/exec-shell.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/files.test.ts",
-      "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/shell.test.ts",
-      "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "autonomous-agent"
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
     },
     {
       "from": "packages/hench/src/tools/dispatch.ts",
       "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "tool-infrastructure",
-      "toZone": "execution-gateway"
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/src/tools/dispatch.ts",
+      "to": "packages/hench/src/types/index.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/src/tools/git.ts",
+      "to": "packages/hench/src/process/exec-shell.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/src/tools/shell.ts",
+      "to": "packages/hench/src/process/exec-shell.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/tests/unit/guard/guard-integration.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/files.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/git.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/shell.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-guard-and-tools",
+      "toZone": "hench-agent-core"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/export/pdf-report.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/export/pdf-report.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/init.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/init.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/validate.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/validate.ts",
+      "to": "packages/sourcevision/src/schema/data-files.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/validate.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/validate.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/index.ts",
+      "to": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/index.ts",
+      "to": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/index.ts",
+      "to": "packages/sourcevision/src/cli/mcp.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/index.ts",
+      "to": "packages/sourcevision/src/cli/mcp.ts",
+      "fromZone": "packages-sourcevision:cli",
+      "toZone": "packages-sourcevision:tests"
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/manifest.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/manifest.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/workspace.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/workspace.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/commands/init.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/commands/init.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/errors.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/errors.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/output.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/cli/output.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/mcp.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/sourcevision/src/cli/mcp.ts",
+      "to": "packages/sourcevision/src/cli/commands/constants.ts",
+      "fromZone": "packages-sourcevision:tests",
+      "toZone": "packages-sourcevision:cli"
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "fromZone": "schema-driven-viewer-surface",
+      "toZone": "adaptive-web-services-shell"
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/schema/data-files.ts",
+      "fromZone": "schema-driven-viewer-surface",
+      "toZone": "adaptive-web-services-shell"
     }
   ],
   "unzoned": [
-    ".claude/settings.local.json",
     ".gitignore",
     ".hench/config.json",
     ".npmrc",
@@ -1527,6 +1595,7 @@
     ".rex/prd.json",
     ".rex/workflow.md",
     "CLAUDE.md",
+    "CODEX.md",
     "PACKAGE_GUIDELINES.md",
     "README.md",
     "docs/viewer-architecture.md",
@@ -1544,6 +1613,11 @@
     "packages/hench/package.json",
     "packages/hench/tsconfig.json",
     "packages/hench/vitest.config.ts",
+    "packages/llm-client/package.json",
+    "packages/llm-client/tests/e2e/.gitkeep",
+    "packages/llm-client/tests/integration/.gitkeep",
+    "packages/llm-client/tsconfig.json",
+    "packages/llm-client/vitest.config.ts",
     "packages/web/SourceVision-F.png",
     "packages/web/SourceVision.png",
     "packages/web/build.js",
@@ -1570,141 +1644,136 @@
     "vitest.config.js"
   ],
   "insights": [
-    "Bidirectional coupling: \"autonomous-agent\" ↔ \"execution-gateway\" (14+1 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"autonomous-agent\" ↔ \"tool-infrastructure\" (4+7 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"dashboard-components\" ↔ \"prd-management-ui\" (4+6 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"execution-gateway\" ↔ \"tool-infrastructure\" (3+1 crossings) — consider extracting shared interface",
-    "Size imbalance: largest zone has 92 files vs smallest with 6 — uneven decomposition",
-    "Hench package demonstrates sophisticated modular decomposition with three distinct zones handling core logic, gateway operations, and tool infrastructure",
-    "Cross-zone coupling follows logical patterns: core agent imports from gateway (14), tools integrate with core (7), maintaining clear data flow",
-    "Foundation layer (claude-client) correctly implements zero coupling, while orchestration layer maintains perfect isolation through CLI delegation",
-    "Web package demonstrates excellent three-tier architecture: gateway layer, shared components, and domain-specific UI",
-    "Clean separation between infrastructure (presentation-gateway) and presentation (dashboard/PRD UI) enables independent evolution",
-    "Bidirectional coupling between dashboard-components and PRD-management-UI indicates healthy component sharing without tight coupling",
-    "Architecture successfully implements the four-tier dependency hierarchy with appropriate coupling levels at each layer",
-    "Gateway pattern in execution-gateway zone prevents cross-package import sprawl while enabling necessary integrations",
-    "Hench package's three-zone decomposition creates clear separation between core logic, integration concerns, and tooling infrastructure",
-    "Web package zones show excellent architectural layering with clear separation of concerns across infrastructure, shared components, and domain-specific UI",
-    "All web zones maintain high cohesion (0.93-0.99) and low coupling, indicating well-designed component boundaries",
-    "Cross-zone import patterns show healthy architectural relationships with minimal coupling between major system areas",
-    "Four-tier dependency hierarchy (orchestration → execution → domain → foundation) is correctly implemented with appropriate coupling levels at each tier",
-    "Gateway pattern prevents architectural erosion by centralizing cross-package dependencies in designated modules rather than allowing ad-hoc imports",
-    "Bidirectional coupling between autonomous-agent and execution-gateway indicates potential for shared interface abstraction to reduce tight coupling",
-    "Web package demonstrates textbook three-tier architecture: infrastructure gateway, shared component library, and domain-specific UI specialization",
-    "Cross-zone relationships follow the dependency inversion principle - higher-level zones depend on abstractions provided by lower-level zones",
-    "All three zones maintain unidirectional dependency flow: prd-management-ui → dashboard-components → presentation-gateway, preventing circular dependencies",
-    "The web package's zone architecture serves as an exemplar of clean separation between transport concerns, reusable UI components, and domain-specific functionality",
-    "Architecture successfully implements layered pattern with clean separation: orchestration delegates to CLI, execution bridges domains, foundation provides stable base",
-    "Gateway pattern implementation in execution-gateway serves as architectural firewall, preventing domain package coupling from propagating throughout the system",
-    "Web package zones demonstrate exemplary three-tier architecture with clean unidirectional dependencies and proper separation of concerns",
-    "No circular dependencies detected between any zones - architecture maintains proper acyclic dependency structure",
-    "Cross-zone coupling follows logical data flow patterns: autonomous-agent → execution-gateway (14 imports) and tool-infrastructure → autonomous-agent (7 imports) suggest clear architectural intent",
-    "All cross-zone relationships follow dependency inversion principle - zones depend on abstractions, not concretions",
-    "Gateway pattern implementation shows inconsistent naming conventions: hench uses 'prd/ops.ts' while web uses 'mcp-deps.ts', suggesting need for standardization",
-    "Dynamic imports in CLI commands can circumvent gateway pattern architectural controls, creating potential for import sprawl",
-    "Web package demonstrates complete architectural isolation from other system packages - no cross-package imports at the zone level, only through designated gateway module",
-    "Three-zone web architecture creates natural upgrade path: presentation-gateway handles protocol evolution, dashboard-components enables UI framework migration, prd-management-ui isolates domain changes",
-    "Zone size distribution follows logical complexity: presentation-gateway (45 files) handles broad infrastructure concerns, dashboard-components (92 files) provides comprehensive UI library, prd-management-ui (28 files) focuses on specific domain workflows",
-    "Web package zones exhibit textbook separation of concerns with zero architectural debt - each zone has single responsibility and clean interfaces",
-    "Inconsistent gateway naming pattern: autonomous-agent uses 'prd/ops.ts' while presentation-gateway uses 'mcp-deps.ts', reducing architectural clarity",
-    "Autonomous agent zones exhibit shared pattern of sophisticated internal logic with minimal external safety controls - analysis state machines and tool dispatch lack runtime validation",
-    "Gateway pattern implementation varies in robustness: execution-gateway uses centralized ops.ts successfully while allowing dynamic import bypasses elsewhere",
-    "Process execution patterns across zones lack consistent resource controls - orchestration spawns CLI tools, execution-gateway runs processes, tool-infrastructure dispatches commands, all without unified resource limits",
-    "Error handling patterns diverge across architectural tiers: orchestration handles subprocess failures ad-hoc, foundation propagates errors inconsistently, execution lacks circuit breakers for service calls",
-    "Web package demonstrates consistent architectural patterns across all three zones: each has clear entry points, follows component-based organization, and maintains single responsibility",
-    "Zone size distribution follows complexity hierarchy: infrastructure layer (45 files) handles broad concerns, shared library (92 files) provides comprehensive coverage, domain UI (28 files) focuses on specific workflows",
-    "All three zones exhibit mature software engineering practices: hierarchical exports, descriptive naming conventions, and logical file organization",
-    "Cross-zone relationships demonstrate proper architectural layering with no violations of dependency direction or unexpected coupling patterns",
-    "Autonomous operation safety controls are fragmented across zones - consider unified resource limits and safety policy enforcement across orchestration process spawning, execution-gateway process execution, and tool-infrastructure command dispatch",
-    "Gateway pattern implementation inconsistency creates architectural drift risk - standardize naming (ops.ts vs mcp-deps.ts) and enforce dynamic import restrictions through linting rules",
-    "Consider documenting the established naming conventions across web package zones (routes-* for handlers, *-panel for workflow UIs) to guide future development",
-    "[call graph] 55 calls: \"autonomous-agent\" → \"execution-gateway\"",
-    "[call graph] 21 calls: \"presentation-gateway\" → \"packages-rex:rex-cli\"",
-    "[call graph] 11 calls: \"packages-sourcevision:tests\" → \"packages-sourcevision:cli\""
+    "Bidirectional coupling: \"hench-agent-core\" ↔ \"hench-guard-and-tools\" (8+10 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 137 files vs smallest with 6 — uneven decomposition",
+    "Layering from orchestration → execution → domain → foundation keeps the import graph acyclic and makes it easy to audit boundaries.",
+    "Guard/tool modules form the choke point for hench’s side effects, so safety improvements can focus on that seam to protect the rest of the system.",
+    "Viewer components in `schema-driven-viewer-surface` only touch the backend shell twice, so doubling down on schema-based DTOs can keep that boundary slim even as UI features expand.",
+    "Cross-zone imports show hench-2 → hench (10) and hench → hench-2 (8), so consider introducing thinner interfaces if you ever want the guard/tool layer to be deployable independently of the agent core.",
+    "Web zones only depend on each other twice (web-2 → web), keeping the UI stack modular; maintain that low coupling when adding dashboards so orchestration code stays back-end focused.",
+    "Current cross-zone imports (`schema-driven-viewer-surface` → `adaptive-web-services-shell`) are minimal; enforce that all future UI/server touchpoints flow through the published schema entrypoints to avoid creeping coupling.",
+    "[call graph] 27 calls: \"hench-guard-and-tools\" → \"hench-agent-core\"",
+    "[call graph] 21 calls: \"adaptive-web-services-shell\" → \"packages-rex:rex-cli\"",
+    "[call graph] 12 calls: \"packages-sourcevision:tests\" → \"packages-sourcevision:cli\""
   ],
   "findings": [
     {
       "type": "observation",
       "pass": 0,
-      "scope": "autonomous-agent",
-      "text": "High cohesion (0.93) — files are tightly interconnected",
+      "scope": "adaptive-web-services-shell",
+      "text": "High cohesion (0.99) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "adaptive-web-services-shell",
+      "text": "Extremely high cohesion (0.99) indicates the CLI, HTTP server, and domain gateways belong together—keep new backend utilities inside this shell to preserve that property.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "adaptive-web-services-shell",
+      "text": "Gateway files (`domain-gateway.ts`, `mcp-deps.ts`) already abstract external connectors; adding contract tests before onboarding integrations will keep coupling at its current 0.01 level.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "adaptive-web-services-shell",
+      "text": "`routes-adaptive.ts` centralizes adaptive route wiring; pair it with smoke tests whenever new adaptive surfaces are introduced to avoid regressions.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "dashboard-components",
-      "text": "High cohesion (0.95) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "foundation-layer",
+      "scope": "claude-foundation-client",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
+      "pass": 1,
+      "scope": "claude-foundation-client",
+      "text": "Anthropic SDK integration in `packages/claude-client/src/api-provider.ts:21` exposes retry/backoff knobs; plumb those options through repo-level config before running heavier CI workloads so operators can tune quotas safely.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "claude-foundation-client",
+      "text": "Provider selection logic in `packages/claude-client/src/create-client.ts:1` already encapsulates auto-detect/fallback, so standardize new consumers on this factory rather than instantiating providers directly to preserve consistent behavior.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "claude-foundation-client",
+      "text": "Token-usage normalization in `packages/claude-client/src/token-usage.ts:1` is the single source for billing data, so extend it whenever the SDK ships new usage fields (e.g., cache hits) to keep downstream cost analytics accurate.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "cli-orchestration-surface",
+      "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "cli-orchestration-surface",
+      "text": "Documented four-tier dependency rules in `cli.js:3` keep orchestration decoupled from execution; add an automated import-lint or test so future entrypoints cannot bypass the spawn-only contract.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "cli-orchestration-surface",
+      "text": "Secret-aware config writing in `config.js:49` already chmods `.n-dx.json` when API keys exist, so route any new sensitive settings through this helper instead of ad-hoc package config writers to keep credentials locked down.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "cli-orchestration-surface",
+      "text": "The command registry/search UX in `help.js:83` and its regression coverage in `tests/unit/help.test.js:4` should be treated as required touchpoints whenever commands are added or renamed to keep typo suggestions and docs accurate.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"autonomous-agent\" ↔ \"execution-gateway\" (14+1 crossings) — consider extracting shared interface",
+      "text": "Bidirectional coupling: \"hench-agent-core\" ↔ \"hench-guard-and-tools\" (8+10 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"dashboard-components\" ↔ \"prd-management-ui\" (4+6 crossings) — consider extracting shared interface",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "global",
-      "text": "Size imbalance: largest zone has 92 files vs smallest with 6 — uneven decomposition",
+      "text": "Size imbalance: largest zone has 137 files vs smallest with 6 — uneven decomposition",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "All web zones maintain high cohesion (0.93-0.99) and low coupling, indicating well-designed component boundaries",
+      "text": "Cross-zone imports show hench-2 → hench (10) and hench → hench-2 (8), so consider introducing thinner interfaces if you ever want the guard/tool layer to be deployable independently of the agent core.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "Architecture successfully implements the four-tier dependency hierarchy with appropriate coupling levels at each layer",
+      "text": "Current cross-zone imports (`schema-driven-viewer-surface` → `adaptive-web-services-shell`) are minimal; enforce that all future UI/server touchpoints flow through the published schema entrypoints to avoid creeping coupling.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "Cross-zone import patterns show healthy architectural relationships with minimal coupling between major system areas",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Gateway pattern in execution-gateway zone prevents cross-package import sprawl while enabling necessary integrations",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Hench package's three-zone decomposition creates clear separation between core logic, integration concerns, and tooling infrastructure",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Web package zones show excellent architectural layering with clear separation of concerns across infrastructure, shared components, and domain-specific UI",
+      "text": "Web zones only depend on each other twice (web-2 → web), keeping the UI stack modular; maintain that low coupling when adding dashboards so orchestration code stays back-end focused.",
       "severity": "info"
     },
     {
@@ -1723,65 +1792,117 @@
     {
       "type": "observation",
       "pass": 0,
-      "scope": "orchestration-layer",
+      "scope": "hench-agent-core",
+      "text": "High cohesion (0.95) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-agent-core",
+      "text": "Stuck-task heuristics in `packages/hench/src/agent/analysis/stuck.ts:1` depend on callers to pass a threshold, so document or set a default in the run orchestration to keep failure detection consistent across commands.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-agent-core",
+      "text": "The review gate in `packages/hench/src/agent/analysis/review.ts:1` hardcodes a 30s prompt timeout; expose that through config or CLI flags before enabling unattended review flows, otherwise approvals can block runs.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-agent-core",
+      "text": "Use `packages/hench/src/agent/index.ts:1` as the lone import surface for lifecycle, planning, and analysis primitives so CLI layers don’t deep-import internals and accidentally create cycles.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "schema-driven-viewer-surface",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 0,
-      "scope": "prd-management-ui",
-      "text": "High cohesion (0.93) — files are tightly interconnected",
+      "pass": 1,
+      "scope": "schema-driven-viewer-surface",
+      "text": "Perfect cohesion and zero measured coupling show the schema + viewer stack is self-contained—treat it as the canonical place for UI-facing data contracts.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "schema-driven-viewer-surface",
+      "text": "Schemas (`v1.ts`, `validate.ts`) already live with the components; documenting how components consume these helpers will keep future imports from leaking to backend internals.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "schema-driven-viewer-surface",
+      "text": "Viewer panel components are numerous and critical; adopting visual regression checks will preserve quality as the component catalog grows.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "presentation-gateway",
-      "text": "High cohesion (0.99) — files are tightly interconnected",
+      "scope": "vendor-agnostic-llm-adapter",
+      "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "global",
-      "text": "Architecture successfully implements layered pattern with clean separation: orchestration delegates to CLI, execution bridges domains, foundation provides stable base",
+      "type": "observation",
+      "pass": 1,
+      "scope": "vendor-agnostic-llm-adapter",
+      "text": "The Codex CLI provider in `packages/llm-client/src/codex-cli-provider.ts:1` shells out with temp files and retry/backoff; capture telemetry or expose config before tightening timeouts so agents can distinguish Codex issues from guard denials.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "global",
-      "text": "Gateway pattern implementation in execution-gateway serves as architectural firewall, preventing domain package coupling from propagating throughout the system",
+      "type": "observation",
+      "pass": 1,
+      "scope": "vendor-agnostic-llm-adapter",
+      "text": "Vendor-neutral parsing in `packages/llm-client/src/llm-config.ts:1` already merges legacy `claude` settings into the new `llm.*` schema, so route upcoming config migrations through this loader to avoid duplicating parsing logic elsewhere.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "global",
-      "text": "No circular dependencies detected between any zones - architecture maintains proper acyclic dependency structure",
+      "type": "observation",
+      "pass": 1,
+      "scope": "vendor-agnostic-llm-adapter",
+      "text": "`packages/llm-client/src/llm-client.ts:1` routes requests by vendor and reuses Claude auth detection, which means any future vendor should be plugged in here so upstream callers stay ignorant of per-vendor quirks.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "global",
-      "text": "Web package zones demonstrate exemplary three-tier architecture with clean unidirectional dependencies and proper separation of concerns",
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-guard-and-tools",
+      "text": "Anthropic tool definitions live exclusively in `packages/hench/src/tools/dispatch.ts:1`, so register any new automation there to inherit GuardError handling instead of bypassing the dispatcher.",
       "severity": "info"
     },
     {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "global",
-      "text": "All cross-zone relationships follow dependency inversion principle - zones depend on abstractions, not concretions",
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-guard-and-tools",
+      "text": "GuardRails in `packages/hench/src/guard/index.ts:1` already enforces path, command, and git allowlists, so thread any new tool operations through this facade to keep policy enforcement and auditing centralized.",
       "severity": "info"
     },
     {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "global",
-      "text": "Cross-zone coupling follows logical data flow patterns: autonomous-agent → execution-gateway (14 imports) and tool-infrastructure → autonomous-agent (7 imports) suggest clear architectural intent",
+      "type": "observation",
+      "pass": 1,
+      "scope": "hench-guard-and-tools",
+      "text": "Session-aware limits in `packages/hench/src/guard/policy.ts:1` log every allow/deny decision; review or persist that audit log before raising rate/byte caps so you don’t lose visibility into abusive sequences.",
       "severity": "info"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 0,
+      "scope": "global",
+      "text": "God function: startServer in packages/web/src/server/start.ts calls 50 unique functions — consider decomposing into smaller, focused functions",
+      "severity": "warning",
+      "related": [
+        "packages/web/src/server/start.ts"
+      ]
     },
     {
       "type": "relationship",
@@ -1793,86 +1914,6 @@
         "packages/web/src/server/routes-rex.ts",
         "packages/web/src/server/types.ts"
       ]
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "global",
-      "text": "Inconsistent gateway naming pattern: autonomous-agent uses 'prd/ops.ts' while presentation-gateway uses 'mcp-deps.ts', reducing architectural clarity",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 0,
-      "scope": "global",
-      "text": "God function: handleRexRoute in packages/web/src/server/routes-rex.ts calls 48 unique functions — consider decomposing into smaller, focused functions",
-      "severity": "warning",
-      "related": [
-        "packages/web/src/server/routes-rex.ts"
-      ]
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "autonomous-agent",
-      "text": "Analysis state machine lacks centralized validation - adaptive.ts, review.ts, stuck.ts operate independently without state consistency checks",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "autonomous-agent",
-      "text": "Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation logic to prevent behavior divergence between CLI and programmatic execution",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "dashboard-components",
-      "text": "Consider establishing consistent component naming convention - some use kebab-case (collapsible-section.ts) while others may follow different patterns",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "execution-gateway",
-      "text": "Gateway ops.ts becomes single point of failure - consider circuit breaker pattern for rex service calls",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "execution-gateway",
-      "text": "Process execution in exec.ts lacks timeout and resource controls, creating risk for runaway autonomous operations",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "foundation-layer",
-      "text": "Consider extracting common error handling patterns from utilities into shared error boundary module",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Autonomous operation safety controls are fragmented across zones - consider unified resource limits and safety policy enforcement across orchestration process spawning, execution-gateway process execution, and tool-infrastructure command dispatch",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Consider documenting the established naming conventions across web package zones (routes-* for handlers, *-panel for workflow UIs) to guide future development",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Gateway pattern implementation inconsistency creates architectural drift risk - standardize naming (ops.ts vs mcp-deps.ts) and enforce dynamic import restrictions through linting rules",
-      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -1901,59 +1942,37 @@
       "type": "suggestion",
       "pass": 0,
       "scope": "global",
-      "text": "Potentially unused export: getData in packages/web/src/viewer/loader.ts has no incoming calls — verify if still needed",
+      "text": "2 potentially unused exports in packages/claude-client/src/exec.ts have no incoming calls: getCurrentBranch, isExecutableOnPath",
       "severity": "info",
       "related": [
-        "packages/web/src/viewer/loader.ts"
+        "packages/claude-client/src/exec.ts"
       ]
     },
     {
       "type": "suggestion",
-      "pass": 4,
-      "scope": "orchestration-layer",
-      "text": "Standardize error handling across entry points - currently each handles subprocess failures differently",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "prd-management-ui",
-      "text": "The compute.ts filename is ambiguous - consider more descriptive naming like prd-calculations.ts or tree-computations.ts to clarify its specific purpose",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "presentation-gateway",
-      "text": "Consider extracting port allocation logic from port.ts into a reusable utility module that other packages could leverage for dynamic port management",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "tool-infrastructure",
-      "text": "Guard system lacks runtime policy enforcement - commands.ts and paths.ts define boundaries but don't actively monitor violations",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "tool-infrastructure",
-      "text": "Tool dispatch architecture needs plugin validation to prevent unsafe tool registration in autonomous contexts",
-      "severity": "info"
+      "pass": 0,
+      "scope": "global",
+      "text": "Potentially unused export: getCachedProjectMetadata in packages/web/src/viewer/hooks/use-project-metadata.ts has no incoming calls — verify if still needed",
+      "severity": "info",
+      "related": [
+        "packages/web/src/viewer/hooks/use-project-metadata.ts"
+      ]
     }
   ],
-  "enrichmentPass": 4,
+  "enrichmentPass": 1,
   "metaEvaluationCount": 3,
-  "structureHash": "080cc77c2968b0bd",
+  "structureHash": "7ff2f3d43ac7c52c",
   "zoneContentHashes": {
-    "root": "a585cfd1223e0640",
-    "claude-client": "c9e204001171f986",
-    "hench": "a70d66ca2a384f38",
-    "hench-2": "9b948eb554826ee5",
-    "hench-3": "ac2b0db53d44b849",
-    "web": "ba72bfa3e8bd2409",
-    "web-2": "d56c06af85d5ca21",
-    "web-3": "00ed640385af9e64"
+    "root": "710c1c0e37d6b777",
+    "claude-client": "b7658da9d9682239",
+    "hench": "b731e29521c2d9a9",
+    "hench-2": "c0a9ab63ffaf0ae1",
+    "llm-client": "9d79d633bc8548d1",
+    "web": "5f2f3278408380c4",
+    "web-2": "8954c5c9ec382ec5"
+  },
+  "lastReset": {
+    "from": 4,
+    "to": 1
   }
 }

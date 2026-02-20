@@ -150,6 +150,22 @@ function extractFlags(args) {
 }
 
 /**
+ * Read active LLM vendor from .n-dx.json.
+ * Returns undefined when unset or config file is missing/invalid.
+ */
+function readLLMVendor(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!existsSync(configPath)) return undefined;
+  try {
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const vendor = data?.llm?.vendor;
+    return vendor === "claude" || vendor === "codex" ? vendor : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Check that required directories exist before running orchestration commands.
  * Provides a clear, actionable error message suggesting `ndx init`.
  */
@@ -241,6 +257,19 @@ if (command === "work") {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex", ".hench"]);
   const flags = extractFlags(rest);
+
+  // Require explicit vendor selection for n-dx orchestration.
+  // This avoids implicit use of whichever local CLI session happens to be active.
+  const isDryRun = flags.includes("--dry-run");
+  if (!isDryRun) {
+    const vendor = readLLMVendor(dir);
+    if (!vendor) {
+      console.error("Error: No LLM vendor configured for this project.");
+      console.error("Hint: Run 'n-dx config llm.vendor claude' (or codex when supported).");
+      process.exit(1);
+    }
+  }
+
   await runOrDie(tools.hench, ["run", ...flags, dir]);
   process.exit(0);
 }

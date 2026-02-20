@@ -1,0 +1,18 @@
+{
+  "id": "cli-orchestration-surface",
+  "name": "CLI Orchestration Surface",
+  "description": "Top-level scripts that broker every n-dx workflow by spawning package CLIs and presenting a cohesive developer UX.",
+  "files": [
+    "ci.js",
+    "cli.js",
+    "config.js",
+    "help.js",
+    "tests/unit/help.test.js",
+    "web.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 3103
+}

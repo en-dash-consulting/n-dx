@@ -219,4 +219,4 @@ export function sortCallGraph(data: CallGraph): CallGraph {
 }
 
 // Re-export from the shared foundation to eliminate duplication.
-export { toCanonicalJSON } from "@n-dx/claude-client";
+export { toCanonicalJSON } from "@n-dx/llm-client";

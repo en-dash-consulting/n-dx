@@ -1,0 +1,32 @@
+{
+  "name": "@n-dx/llm-client",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/public.js",
+      "types": "./dist/public.d.ts"
+    },
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "tsc --noEmit && vitest run",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.0"
+  }
+}

@@ -1,4 +1,4 @@
-import { PROJECT_DIRS, formatUsage } from "@n-dx/claude-client";
+import { PROJECT_DIRS, formatUsage } from "@n-dx/llm-client";
 
 export const TOOL_VERSION = "0.1.0";
 export const SV_DIR = PROJECT_DIRS.SOURCEVISION;

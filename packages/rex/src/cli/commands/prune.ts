@@ -148,8 +148,10 @@ export async function cmdPrune(
     let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setClaudeConfig } = await import("../../analyze/reason.js");
-        const { loadClaudeConfig } = await import("../../store/project-config.js");
+        const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+        const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
+        const llmConfig = await loadLLMConfig(rexDir);
+        setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
 
@@ -329,8 +331,10 @@ async function consolidateAfterPrune(
 
   try {
     // Load Claude config
-    const { setClaudeConfig } = await import("../../analyze/reason.js");
-    const { loadClaudeConfig } = await import("../../store/project-config.js");
+    const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+    const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
+    const llmConfig = await loadLLMConfig(rexDir);
+    setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
 
@@ -451,8 +455,10 @@ async function smartPrune(
   }
 
   // Load Claude config
-  const { setClaudeConfig } = await import("../../analyze/reason.js");
-  const { loadClaudeConfig } = await import("../../store/project-config.js");
+  const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+  const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
 

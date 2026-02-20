@@ -1,0 +1,23 @@
+{
+  "id": "hench/process",
+  "name": "Process",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/process/exec-shell.ts",
+    "packages/hench/src/process/exec.ts",
+    "packages/hench/src/process/index.ts",
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/src/tools/index.ts",
+    "packages/hench/src/tools/test-runner.ts",
+    "packages/hench/tests/unit/process/exec.test.ts",
+    "packages/hench/tests/unit/tools/test-runner.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/process/index.ts",
+    "packages/hench/src/tools/index.ts"
+  ],
+  "cohesion": 0.7,
+  "coupling": 0.3,
+  "fileCount": 8,
+  "lineCount": 1019
+}

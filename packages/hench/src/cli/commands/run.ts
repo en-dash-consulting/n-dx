@@ -8,9 +8,9 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
-import { CLIError, EpicNotFoundError, requireClaudeCLI } from "../errors.js";
+import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
-import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
+import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 
 // ---------------------------------------------------------------------------
 // Epic resolution helpers (exported for testing)
@@ -105,6 +105,7 @@ export async function getEpicScopeInfo(
   if (!epic) {
     throw new EpicNotFoundError(epicId, listEpics(doc.items));
   }
+  const resolvedEpicId = epic.id;
 
   // Walk the tree and count tasks belonging to this epic
   const { walkTree } = await import("../../prd/rex-gateway.js");
@@ -116,8 +117,8 @@ export async function getEpicScopeInfo(
   for (const { item, parents } of walkTree(doc.items)) {
     // Check if this item is inside the target epic
     const isInEpic =
-      item.id === epicId ||
-      parents.some((p) => p.id === epicId);
+      item.id === resolvedEpicId ||
+      parents.some((p) => p.id === resolvedEpicId);
 
     if (isInEpic && (item.level === "task" || item.level === "subtask")) {
       // Deleted items are excluded from all counts
@@ -368,6 +369,8 @@ export async function cmdRun(
   const henchDir = join(dir, HENCH_DIR);
   const config = await loadConfig(henchDir);
   const rexDir = join(dir, config.rexDir);
+  const llmConfig = await loadLLMConfig(henchDir);
+  const llmVendor = resolveLLMVendor(llmConfig);
 
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
@@ -376,11 +379,17 @@ export async function cmdRun(
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
 
-  // Fail fast if CLI provider selected but claude binary not available
+  if (llmVendor === "codex" && provider === "api" && !dryRun) {
+    throw new CLIError(
+      "Hench API provider is only supported for vendor=claude.",
+      "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
+    );
+  }
+
+  // Fail fast if CLI provider selected but vendor CLI binary not available
   if (provider === "cli" && !dryRun) {
-    const claudeConfig = await loadClaudeConfig(henchDir);
-    const customPath = claudeConfig.cli_path;
-    requireClaudeCLI(customPath);
+    const customPath = resolveVendorCliPath(llmConfig);
+    requireLLMCLI(llmVendor, customPath);
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;

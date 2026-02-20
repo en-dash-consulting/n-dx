@@ -10,8 +10,8 @@ import { emitZoneOutputs } from "../../analyzers/zone-output.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
-import { loadClaudeConfig } from "@n-dx/claude-client";
-import { setClaudeConfig, getAuthMode } from "../../analyzers/claude-client.js";
+import { loadLLMConfig } from "@n-dx/llm-client";
+import { setLLMConfig, getAuthMode, getLLMVendor } from "../../analyzers/claude-client.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -65,9 +65,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
   }
 
-  // Load unified Claude config
-  const claudeConfig = await loadClaudeConfig(absDir);
-  setClaudeConfig(claudeConfig);
+  // Load unified LLM config (llm.vendor + vendor-specific settings)
+  const llmConfig = await loadLLMConfig(absDir);
+  setLLMConfig(llmConfig);
+  const vendor = getLLMVendor();
+  if (vendor) info(`Using ${vendor} for enrichment.`);
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
   const filter = parsePhaseFilter(extraArgs);

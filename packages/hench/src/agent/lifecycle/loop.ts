@@ -6,7 +6,12 @@ import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
 import { saveRun } from "../../store/index.js";
 import { section, subsection, stream, detail } from "../../types/output.js";
 import type { ToolContext } from "../../types/index.js";
-import { loadClaudeConfig, resolveApiKey } from "../../store/project-config.js";
+import {
+  loadClaudeConfig,
+  loadLLMConfig,
+  resolveApiKey,
+  resolveLLMVendor,
+} from "../../store/project-config.js";
 import { resolveModel } from "@n-dx/claude-client";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
@@ -110,6 +115,15 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await transitionToInProgress(store, taskId, brief.task.status);
 
   // API-specific: resolve API key
+  const llmConfig = await loadLLMConfig(henchDir);
+  const vendor = resolveLLMVendor(llmConfig);
+  if (vendor !== "claude") {
+    throw new Error(
+      `Hench API mode requires llm.vendor=claude. Current vendor: ${vendor}. ` +
+      "Use provider=cli for Codex.",
+    );
+  }
+
   const claudeConfig = await loadClaudeConfig(henchDir);
   const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
   if (!apiKey) {

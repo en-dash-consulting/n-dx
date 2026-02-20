@@ -399,7 +399,7 @@ async function classifyBatchWithLLM(
 
     const prompt = buildLLMClassifyPrompt(filesToClassify, archetypeCatalog, config.includeDescriptions);
     const promptLevel = config.includeDescriptions ? "full" : "compact";
-    console.log(`  [classify]${batchLabel} Calling Claude (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`);
+    console.log(`  [classify]${batchLabel} Calling LLM (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`);
 
     let callText: string;
     try {
@@ -409,7 +409,7 @@ async function classifyBatchWithLLM(
     } catch (err) {
       if (err instanceof ClaudeClientError) {
         if (err.reason === "auth" || err.reason === "not-found") {
-          console.warn(`  [classify] ${err.reason === "auth" ? "Authentication error — run 'claude login' or check API key" : "Claude not found"}`);
+          console.warn(`  [classify] ${err.reason === "auth" ? "Authentication error — run 'ndx config' and verify vendor credentials" : "LLM CLI not found"}`);
           console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
           return "auth-error";
         }

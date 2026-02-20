@@ -7,13 +7,13 @@
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 9530
+Lines: 9562
 
 </zone>
 
 <files>
 
-packages/rex/src/analyze/index.ts (TypeScript, 63 lines, source)
+packages/rex/src/analyze/index.ts (TypeScript, 69 lines, source)
 packages/rex/src/analyze/propose.ts (TypeScript, 307 lines, source)
 packages/rex/src/analyze/reconcile.ts (TypeScript, 124 lines, source)
 packages/rex/src/analyze/scanners.ts (TypeScript, 958 lines, source)
@@ -36,7 +36,7 @@ packages/rex/src/schema/index.ts (TypeScript, 45 lines, source)
 packages/rex/src/schema/v1.ts (TypeScript, 306 lines, source)
 packages/rex/src/schema/validate.ts (TypeScript, 153 lines, source)
 packages/rex/src/store/file-adapter.ts (TypeScript, 152 lines, source)
-packages/rex/src/store/index.ts (TypeScript, 105 lines, source)
+packages/rex/src/store/index.ts (TypeScript, 131 lines, source)
 packages/rex/src/store/types.ts (TypeScript, 177 lines, source)
 packages/rex/src/workflow/default.ts (TypeScript, 20 lines, source)
 packages/rex/tests/integration/store-roundtrip.test.ts (TypeScript, 258 lines, test)
@@ -165,7 +165,7 @@ Internal:
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
 
 Incoming (other zones → this zone):
-  ← presentation-gateway: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
+  ← adaptive-web-services-shell: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
 
 </imports>
 

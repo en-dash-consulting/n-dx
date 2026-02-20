@@ -23,13 +23,15 @@ import {
   emptyAnalyzeTokenUsage,
   formatDiff,
   DEFAULT_MODEL,
+  setLLMConfig,
   setClaudeConfig,
   getAuthMode,
+  getLLMVendor,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type { PRDItem, PRDDocument, AnalyzeTokenUsage } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "./chunked-review.js";
-import { loadClaudeConfig } from "../../store/project-config.js";
+import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 
 const PENDING_FILE = "pending-proposals.json";
 
@@ -198,13 +200,18 @@ export async function cmdAnalyze(
   const accept = flags.accept === "true";
   const noLlm = flags["no-llm"] === "true";
 
-  // Load unified Claude config and initialize the client abstraction layer
+  // Load unified LLM config and initialize the client abstraction layer
   const rexConfigDir = join(dir, REX_DIR);
+  const llmConfig = await loadLLMConfig(rexConfigDir);
+  setLLMConfig(llmConfig);
+  // Backward compatibility for paths still reading claude.* defaults
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
   // Display which authentication method will be used for LLM calls
   if (!noLlm && flags.format !== "json") {
+    const vendor = getLLMVendor();
+    if (vendor) info(`Using ${vendor} for reasoning.`);
     const authMode = getAuthMode();
     if (authMode === "api") {
       info("Using direct API authentication.");

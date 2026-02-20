@@ -8,7 +8,7 @@ Zone: Tests (`packages-sourcevision:tests`)
 Files: 68, Cohesion: 0.94, Coupling: 0.06
 Description: 66 files, primarily TypeScript
 Entry points: packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/schema/v1.ts
-Lines: 23513
+Lines: 23586
 
 </zone>
 
@@ -16,14 +16,14 @@ Lines: 23513
 
 packages/sourcevision/src/analyzers/callgraph-findings.ts (TypeScript, 662 lines, source)
 packages/sourcevision/src/analyzers/callgraph.ts (TypeScript, 808 lines, source)
-packages/sourcevision/src/analyzers/claude-client.ts (TypeScript, 83 lines, source)
+packages/sourcevision/src/analyzers/claude-client.ts (TypeScript, 142 lines, source)
 packages/sourcevision/src/analyzers/components.ts (TypeScript, 787 lines, source)
 packages/sourcevision/src/analyzers/context.ts (TypeScript, 233 lines, source)
 packages/sourcevision/src/analyzers/enrich-batch.ts (TypeScript, 464 lines, source)
 packages/sourcevision/src/analyzers/enrich-config.ts (TypeScript, 240 lines, source)
 packages/sourcevision/src/analyzers/enrich-parsing.ts (TypeScript, 456 lines, source)
 packages/sourcevision/src/analyzers/enrich-per-zone.ts (TypeScript, 370 lines, source)
-packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 258 lines, source)
+packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 270 lines, source)
 packages/sourcevision/src/analyzers/imports.ts (TypeScript, 518 lines, source)
 packages/sourcevision/src/analyzers/index.ts (TypeScript, 28 lines, source)
 packages/sourcevision/src/analyzers/inventory.ts (TypeScript, 677 lines, source)
@@ -36,7 +36,7 @@ packages/sourcevision/src/analyzers/token-usage.ts (TypeScript, 50 lines, source
 packages/sourcevision/src/analyzers/workspace.ts (TypeScript, 282 lines, source)
 packages/sourcevision/src/analyzers/zone-output.ts (TypeScript, 266 lines, source)
 packages/sourcevision/src/analyzers/zones.ts (TypeScript, 1389 lines, source)
-packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 183 lines, source)
+packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 185 lines, source)
 packages/sourcevision/src/cli/mcp.ts (TypeScript, 544 lines, source)
 packages/sourcevision/src/export/pdf-report.ts (TypeScript, 598 lines, source)
 packages/sourcevision/src/public.ts (TypeScript, 107 lines, source)
@@ -111,7 +111,7 @@ Internal:
   packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, extractFindings, deduplicateZoneIds}
   packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage, accumulateTokenUsage}
   packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, Zone, ZoneCrossing, Zones, Finding, ZoneTokenUsage, AnalyzeTokenUsage}
-  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, setClaudeConfig, setClaudeClient, getAuthMode, ClaudeClientError, DEFAULT_MODEL}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, callLLM, setClaudeConfig, setLLMConfig, setClaudeClient, setLLMClient, getAuthMode, getLLMVendor, ClaudeClientError, DEFAULT_MODEL, DEFAULT_CODEX_MODEL}
   packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {CallClaudeResult}
   packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-batch.ts {enrichBatch, runMetaEvaluation, aggregateBatchResults}
   packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-batch.ts {BatchResult}
@@ -162,7 +162,7 @@ Internal:
   packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
   packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, Zone, ZoneCrossing, Zones, Finding, AnalyzeTokenUsage, SubAnalysisRef}
   packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/util/sort.ts {sortZonesData}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/claude-client.ts {setClaudeConfig, getAuthMode}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/claude-client.ts {setLLMConfig, getAuthMode, getLLMVendor}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/context.ts {generateContext}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/llms-txt.ts {generateLlmsTxt}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/manifest.ts {readManifest, writeManifest}
@@ -274,7 +274,7 @@ Incoming (other zones → this zone):
 
 - High cohesion (0.94) — files are tightly interconnected
 - Contains 70% of project files (68/97) — subdivided into 3 sub-zones
-- [call graph] 2160 internal calls, 23 outgoing, 138 incoming (cohesion: 0.99, coupling: 0.01)
+- [call graph] 2168 internal calls, 24 outgoing, 138 incoming (cohesion: 0.99, coupling: 0.01)
 
 </insights>
 

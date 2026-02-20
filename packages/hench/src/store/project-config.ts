@@ -10,13 +10,14 @@
 import { dirname } from "node:path";
 import {
   loadClaudeConfig as loadClaudeConfigFromDir,
+  loadLLMConfig as loadLLMConfigFromDir,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
 } from "@n-dx/claude-client";
-import type { ClaudeConfig } from "@n-dx/claude-client";
+import type { ClaudeConfig, LLMConfig, LLMVendor } from "@n-dx/claude-client";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
-export type { ClaudeConfig } from "@n-dx/claude-client";
+export type { ClaudeConfig, LLMConfig, LLMVendor } from "@n-dx/claude-client";
 
 // Re-export shared project config utilities — previously duplicated here.
 export { loadProjectOverrides, mergeWithOverrides } from "@n-dx/claude-client";
@@ -36,6 +37,35 @@ export async function loadClaudeConfig(
 ): Promise<ClaudeConfig> {
   const projectDir = dirname(configDir);
   return loadClaudeConfigFromDir(projectDir);
+}
+
+/**
+ * Load the vendor-neutral llm section from .n-dx.json.
+ *
+ * @param configDir The package config directory (e.g., /project/.hench)
+ */
+export async function loadLLMConfig(
+  configDir: string,
+): Promise<LLMConfig> {
+  const projectDir = dirname(configDir);
+  return loadLLMConfigFromDir(projectDir);
+}
+
+export function resolveLLMVendor(llmConfig: LLMConfig): LLMVendor {
+  return llmConfig.vendor ?? "claude";
+}
+
+/**
+ * Resolve active vendor CLI binary.
+ * - codex: llm.codex.cli_path or "codex"
+ * - claude: llm.claude.cli_path / legacy claude.cli_path or "claude"
+ */
+export function resolveVendorCliPath(llmConfig: LLMConfig): string {
+  const vendor = resolveLLMVendor(llmConfig);
+  if (vendor === "codex") {
+    return llmConfig.codex?.cli_path ?? "codex";
+  }
+  return sharedResolveCliPath(llmConfig.claude ?? {});
 }
 
 /**

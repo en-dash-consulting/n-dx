@@ -25,6 +25,26 @@ function readStdin(): Promise<string> {
 
 /** Keys that accept multiple values (accumulated into arrays). */
 const MULTI_VALUE_KEYS = new Set(["file"]);
+/** Keys that expect a following value when provided as `--key value`. */
+const VALUE_KEYS = new Set([
+  "model",
+  "format",
+  "parent",
+  "title",
+  "description",
+  "status",
+  "priority",
+  "epic",
+  "chunk",
+  "chunk-size",
+  "acknowledge",
+  "adapter",
+  "direction",
+  "output",
+  "host",
+  "port",
+  ...MULTI_VALUE_KEYS,
+]);
 
 function parseArgs(argv: string[]): {
   command: string | undefined;
@@ -37,7 +57,8 @@ function parseArgs(argv: string[]): {
   const positional: string[] = [];
   let command: string | undefined;
 
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
       if (eq !== -1) {
@@ -48,7 +69,17 @@ function parseArgs(argv: string[]): {
         }
         flags[key] = val;
       } else {
-        flags[arg.slice(2)] = "true";
+        const key = arg.slice(2);
+        const next = argv[i + 1];
+        if (VALUE_KEYS.has(key) && next && !next.startsWith("-")) {
+          if (MULTI_VALUE_KEYS.has(key)) {
+            (multiFlags[key] ??= []).push(next);
+          }
+          flags[key] = next;
+          i++; // consume the value token
+        } else {
+          flags[key] = "true";
+        }
       }
     } else if (arg === "-h") {
       flags.help = "true";

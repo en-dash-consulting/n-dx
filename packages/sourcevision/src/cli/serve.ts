@@ -7,7 +7,7 @@
 
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnTool } from "@n-dx/claude-client";
+import { spawnTool } from "@n-dx/llm-client";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

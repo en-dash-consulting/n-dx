@@ -9275,6 +9275,172 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b3cbf38e-4757-4c5b-9a49-663cc8536533",
+      "title": "Codex Vendor Reliability and Documentation",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "373c6363-4810-416d-9ce8-c38dfd850c96",
+          "title": "Hench Codex Output Parsing Hardening",
+          "status": "completed",
+          "level": "feature",
+          "description": "Make Hench resilient to Codex-mode response variations so task execution state is derived consistently even when tool output shape changes.",
+          "source": "smart-add",
+          "startedAt": "2026-02-20T22:31:32.197Z",
+          "completedAt": "2026-02-20T22:31:32.197Z",
+          "children": [
+            {
+              "id": "6f6112ac-1db6-4a44-a856-c2b616e9409d",
+              "title": "Implement normalized Codex response extraction in Hench run parser",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a dedicated normalization layer that converts Codex-mode responses (including tool calls, partial text blocks, and completion markers) into the internal run event format used by Hench.",
+              "acceptanceCriteria": [
+                "Parser accepts Codex responses with mixed text and tool-use blocks without throwing",
+                "Normalized output always includes status, assistant message text, and tool event metadata when present",
+                "Unknown block types are safely ignored with a warning instead of failing the run"
+              ],
+              "priority": "critical",
+              "tags": [
+                "hench",
+                "codex",
+                "parsing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-20T22:21:30.744Z",
+              "completedAt": "2026-02-20T22:25:52.005Z"
+            },
+            {
+              "id": "c7fd1ec7-b523-44e1-b6ba-81d5925af64e",
+              "title": "Add regression tests for malformed and partial Codex outputs",
+              "status": "completed",
+              "level": "task",
+              "description": "Prevent future breakage by codifying edge cases seen in Codex mode, including truncated payloads and missing optional fields, so parser behavior is stable across vendor updates.",
+              "acceptanceCriteria": [
+                "Test suite includes fixtures for truncated responses, empty content arrays, and missing usage fields",
+                "All malformed fixtures produce deterministic fallback behavior with no uncaught exceptions",
+                "CI passes with new parser tests enabled in the Hench test target"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "tests",
+                "codex"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-20T22:29:23.884Z",
+              "completedAt": "2026-02-20T22:31:32.125Z"
+            }
+          ]
+        },
+        {
+          "id": "05ea54b7-08c2-4134-a051-fa936e7e8c4d",
+          "title": "Codex Token Accounting Accuracy",
+          "status": "completed",
+          "level": "feature",
+          "description": "Ensure Hench records token usage correctly in Codex mode so usage reporting and budget enforcement remain trustworthy.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "43efef27-b698-491c-87ee-d933b3526d20",
+              "title": "Map Codex usage payloads to unified token metrics",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement explicit field mapping from Codex response usage data into the shared token accounting model used by Hench and Rex reports.",
+              "acceptanceCriteria": [
+                "Input, output, and total token counts are populated from Codex usage data when available",
+                "When usage is absent, accounting records zero values plus a non-fatal diagnostic flag",
+                "Token mapping logic is isolated in a reusable function with unit tests"
+              ],
+              "priority": "critical",
+              "tags": [
+                "hench",
+                "tokens",
+                "codex"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-20T22:25:52.101Z",
+              "completedAt": "2026-02-20T22:29:23.777Z"
+            },
+            {
+              "id": "2a84a66e-f407-446f-9ff8-d3e295a68f08",
+              "title": "Validate Codex token totals in run summaries and budget checks",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire mapped token metrics into run persistence and budget logic so Codex-mode runs affect totals identically to existing vendors.",
+              "acceptanceCriteria": [
+                "Run summary output includes Codex-derived token totals",
+                "Budget threshold warnings trigger correctly for Codex-mode runs",
+                "Integration test confirms cumulative token totals increase after a Codex-mode execution"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "usage-reporting",
+                "budget"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-20T22:31:32.263Z",
+              "completedAt": "2026-02-20T22:35:55.298Z"
+            }
+          ],
+          "startedAt": "2026-02-20T22:35:55.356Z",
+          "completedAt": "2026-02-20T22:35:55.356Z"
+        },
+        {
+          "id": "26c7a348-54a8-42e4-b06f-1de63b93764c",
+          "title": "Rex and Hench Vendor Behavior Documentation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Clarify how Rex and Hench behave across vendors, with explicit notes for Codex mode, to reduce operator confusion and support issues.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "4d1d39f0-c539-4ecd-a153-d488c0873667",
+              "title": "Update README vendor matrix for Rex and Hench behavior differences",
+              "status": "pending",
+              "level": "task",
+              "description": "Document per-vendor expectations for parsing, token accounting, and fallback behavior so users can choose providers with clear tradeoffs.",
+              "acceptanceCriteria": [
+                "README includes a Rex/Hench vendor behavior section with Codex and Claude rows",
+                "Matrix explicitly lists token accounting support and known parsing constraints per vendor",
+                "Documentation references the relevant CLI/config options for selecting vendors"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "readme",
+                "rex",
+                "hench"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a16f4e6d-e29d-46a6-b406-2336679a7ce3",
+              "title": "Revise CODEX guidance with troubleshooting for parsing and usage discrepancies",
+              "status": "pending",
+              "level": "task",
+              "description": "Add operational guidance for diagnosing Codex-mode output parsing failures and token mismatches, including expected logs and remediation steps.",
+              "acceptanceCriteria": [
+                "CODEX documentation includes a troubleshooting section for malformed output and missing usage fields",
+                "Each issue includes concrete verification steps and expected command outcomes",
+                "Docs are consistent with implemented parser fallback and token-mapping behavior"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "codex",
+                "troubleshooting"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

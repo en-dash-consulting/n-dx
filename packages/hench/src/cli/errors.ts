@@ -150,24 +150,44 @@ export function handleCLIError(err: unknown): never {
  * Throws a CLIError with install instructions and API-provider fallback if missing.
  */
 export function requireClaudeCLI(customPath?: string): void {
+  requireLLMCLI("claude", customPath);
+}
+
+/**
+ * Check that the selected vendor CLI binary is available.
+ * If a custom path is provided, checks that path; otherwise checks PATH.
+ */
+export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): void {
+  const binary = vendor === "codex" ? "codex" : "claude";
+  const installHint = vendor === "codex"
+    ? "Install Codex CLI and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex"
+    : "Install it with: npm install -g @anthropic-ai/claude-code\n" +
+      "  Set a custom path: n-dx config claude.cli_path /path/to/claude\n" +
+      "  Or switch to the API provider: n-dx config hench.provider api";
+
   if (customPath) {
-    // Custom path from unified config — check that the file exists
-    if (!existsSync(customPath)) {
+    // If config value looks like a command name ("codex", "claude"), resolve on PATH.
+    // If it looks like a filesystem path (absolute/relative with slash), require that path.
+    const looksLikePath =
+      customPath.includes("/") ||
+      customPath.includes("\\") ||
+      customPath.startsWith(".") ||
+      customPath.startsWith("~");
+
+    const exists = looksLikePath ? existsSync(customPath) : isExecutableOnPath(customPath);
+    if (!exists) {
       throw new CLIError(
-        `Claude CLI not found at configured path: ${customPath}`,
-        "Check the path in 'n-dx config claude.cli_path', or remove it to use PATH lookup.\n" +
-          "  Or switch to the API provider: n-dx config hench.provider api",
+        `${vendor === "codex" ? "Codex" : "Claude"} CLI not found at configured path: ${customPath}`,
+        installHint,
       );
     }
     return;
   }
 
-  if (!isExecutableOnPath("claude")) {
+  if (!isExecutableOnPath(binary)) {
     throw new CLIError(
-      "Claude CLI not found.",
-      "Install it with: npm install -g @anthropic-ai/claude-code\n" +
-        "  Set a custom path: n-dx config claude.cli_path /path/to/claude\n" +
-        "  Or switch to the API provider: n-dx config hench.provider api",
+      `${vendor === "codex" ? "Codex" : "Claude"} CLI not found.`,
+      installHint,
     );
   }
 }

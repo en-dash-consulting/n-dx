@@ -5,8 +5,8 @@ import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { reasonForReshape, formatReshapeProposal } from "../../analyze/reshape-reason.js";
-import { setClaudeConfig } from "../../analyze/reason.js";
-import { loadClaudeConfig } from "../../store/project-config.js";
+import { setLLMConfig, setClaudeConfig } from "../../analyze/reason.js";
+import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -54,7 +54,9 @@ export async function cmdReshape(
     );
   }
 
-  // Load Claude config
+  // Load LLM config
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
 

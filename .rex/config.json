@@ -2,5 +2,6 @@
   "schema": "rex/v1",
   "project": "n-dx",
   "adapter": "file",
-  "sourcevision": "auto"
+  "sourcevision": "auto",
+  "model": "gpt-5.3-codex"
 }

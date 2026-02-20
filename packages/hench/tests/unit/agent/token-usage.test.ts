@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseTokenUsage,
   parseStreamTokenUsage,
+  mapCodexUsageToTokenUsage,
   emptyAggregateTokenUsage,
   accumulateTokenUsage,
   formatTokenUsage,
@@ -243,6 +244,74 @@ describe("parseStreamTokenUsage", () => {
     });
 
     expect(usage).toEqual({ input: 0, output: 300 });
+  });
+});
+
+// ── mapCodexUsageToTokenUsage ───────────────────────────────────────────────
+
+describe("mapCodexUsageToTokenUsage", () => {
+  it("maps top-level Codex usage fields", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      usage: {
+        input_tokens: 1200,
+        output_tokens: 300,
+        total_tokens: 1500,
+      },
+    });
+
+    expect(mapped.usage).toEqual({ input: 1200, output: 300 });
+    expect(mapped.total).toBe(1500);
+    expect(mapped.diagnostic).toBeUndefined();
+  });
+
+  it("maps nested response.usage payloads", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      response: {
+        usage: {
+          prompt_tokens: 800,
+          completion_tokens: 200,
+        },
+      },
+    });
+
+    expect(mapped.usage).toEqual({ input: 800, output: 200 });
+    expect(mapped.total).toBe(1000);
+    expect(mapped.diagnostic).toBeUndefined();
+  });
+
+  it("uses top-level usage fields when usage object is absent", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      input_tokens: 55,
+      output_tokens: 45,
+    });
+
+    expect(mapped.usage).toEqual({ input: 55, output: 45 });
+    expect(mapped.total).toBe(100);
+    expect(mapped.diagnostic).toBeUndefined();
+  });
+
+  it("returns zero usage with diagnostic when usage is absent", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      status: "completed",
+      result: "ok",
+    });
+
+    expect(mapped.usage).toEqual({ input: 0, output: 0 });
+    expect(mapped.total).toBe(0);
+    expect(mapped.diagnostic).toBe("codex_usage_missing");
+  });
+
+  it("returns zero usage with diagnostic when usage object exists but is empty", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      response: {
+        usage: {},
+      },
+      status: "completed",
+    });
+
+    expect(mapped.usage).toEqual({ input: 0, output: 0 });
+    expect(mapped.total).toBe(0);
+    expect(mapped.diagnostic).toBe("codex_usage_missing");
   });
 });
 
