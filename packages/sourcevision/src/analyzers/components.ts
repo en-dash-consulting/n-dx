@@ -21,6 +21,7 @@ import type {
   Imports,
 } from "../schema/index.js";
 import { sortComponents } from "../util/sort.js";
+import { toPosix } from "../util/paths.js";
 import {
   ROUTE_EXPORT_NAMES,
   parseFileRoutePattern,
@@ -536,7 +537,7 @@ async function detectRoutes(
         const conventionExports = extractConventionExports(sourceText, file.path);
         const routePattern = parseFileRoutePattern(file.path, routesDir);
 
-        const relToRoutes = relative(routesDir, file.path);
+        const relToRoutes = toPosix(relative(routesDir, file.path));
         const dotSegments = relToRoutes.replace(extname(relToRoutes), "").split(".");
         let parentLayout: string | null = null;
         let isLayout = false;
@@ -547,7 +548,7 @@ async function detectRoutes(
           const layoutPrefix = dotSegments[0];
           if (layoutPrefix.startsWith("_")) {
             const layoutFile = routeFiles.find((f) => {
-              const fRel = relative(routesDir, f.path);
+              const fRel = toPosix(relative(routesDir, f.path));
               const fBase = fRel.replace(extname(fRel), "");
               return fBase === layoutPrefix;
             });

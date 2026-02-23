@@ -508,6 +508,7 @@ export function processStreamLine(
 
 function spawnClaude(
   args: string[],
+  stdinContent: string,
   cwd: string,
   tokenMetadata: TokenEventMetadata,
   cliBinary = "claude",
@@ -515,8 +516,15 @@ function spawnClaude(
   return new Promise((resolve, reject) => {
     const proc = spawn(cliBinary, args, {
       cwd,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: process.platform === "win32",
     });
+
+    // Write prompt (and optionally system prompt) to stdin and close.
+    // This avoids passing long/complex text as CLI args, which breaks on
+    // Windows where shell:true routes through cmd.exe without arg quoting.
+    proc.stdin.write(stdinContent, "utf-8");
+    proc.stdin.end();
 
     const result: CliRunResult = {
       turns: 0,
@@ -789,9 +797,32 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
-      const prompt = attempt === 0
+      const promptText = attempt === 0
         ? briefText
         : briefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulatedTurns);
+
+      // On Windows, cmd.exe (used by shell:true) can't handle multi-line strings
+      // or special chars like ( ) & | in CLI args. Work around by:
+      //   1. Passing the prompt via stdin instead of as a positional arg
+      //   2. Embedding the system prompt in stdin content (no --system-prompt arg)
+      //   3. Joining allowed-tools as a comma-separated string (avoids Bash(cmd:*) parens issue)
+      const isWindows = process.platform === "win32";
+      const stdinContent = isWindows
+        ? `${systemPrompt}\n\n---\n\n${promptText}`
+        : promptText;
+
+      const args = [
+        "-p",  // print mode; prompt is read from stdin
+        "--output-format", "stream-json",
+        "--verbose",
+        // On Windows: system-prompt is embedded in stdin to avoid cmd.exe multiline/escaping issues.
+        // On other platforms: pass normally.
+        ...(isWindows ? [] : ["--system-prompt", systemPrompt]),
+        "--allowed-tools",
+        // On Windows: join as a single comma-separated arg wrapped in cmd.exe quotes.
+        // Bash(cmd:*) patterns contain ( ) which are special to cmd.exe without quoting.
+        ...(isWindows ? [`"${allowedTools.join(",")}"`] : allowedTools),
+      ];
 
       section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
       stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);

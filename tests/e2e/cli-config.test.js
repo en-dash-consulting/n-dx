@@ -678,7 +678,7 @@ describe("n-dx config", () => {
         expect(stderr).toContain("/nonexistent/path/to/claude");
       });
 
-      it("rejects cli_path when file is not executable", async () => {
+      it.skipIf(process.platform === "win32")("rejects cli_path when file is not executable", async () => {
         const nonExecPath = join(tmpDir, "not-executable");
         await writeFile(nonExecPath, "#!/bin/sh\necho hi\n");
         await chmod(nonExecPath, 0o644); // readable but not executable
@@ -766,7 +766,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain("No Claude configuration set");
     });
 
-    it("tests cli_path with configured binary", async () => {
+    it.skipIf(process.platform === "win32")("tests cli_path with configured binary", async () => {
       // Create a fake claude binary that outputs a version
       const fakeClaude = join(tmpDir, "fake-claude");
       await writeFile(fakeClaude, "#!/bin/sh\necho '1.0.0-test'\n");
@@ -902,7 +902,7 @@ describe("n-dx config", () => {
   // ── Secure file permissions ──────────────────────────────────────────────
 
   describe("secure file permissions", () => {
-    it("sets .n-dx.json to 0600 when api_key is present", async () => {
+    it.skipIf(process.platform === "win32")("sets .n-dx.json to 0600 when api_key is present", async () => {
       run(["claude.api_key", "sk-ant-test-key-123", tmpDir]);
 
       const fileStat = await stat(join(tmpDir, ".n-dx.json"));
@@ -920,7 +920,7 @@ describe("n-dx config", () => {
       expect(mode).not.toBe(0o600);
     });
 
-    it("restricts permissions when api_key is added to existing config", async () => {
+    it.skipIf(process.platform === "win32")("restricts permissions when api_key is added to existing config", async () => {
       // First set a non-sensitive value
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
       const beforeStat = await stat(join(tmpDir, ".n-dx.json"));

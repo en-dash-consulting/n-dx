@@ -226,7 +226,10 @@ function emitSingleZoneOutput(
 ): void {
   // Zone ID may contain "/" for nested zones (e.g., "hench/agent")
   // For nested zones, we use just the last segment as the directory name
-  const dirName = zone.id.includes("/") ? zone.id.split("/").pop()! : zone.id;
+  // Zone ID may contain ":" for sub-analysis zones (e.g., "packages-rex:cli")
+  // Replace with "-" since ":" is not valid in Windows paths
+  let dirName = zone.id.includes("/") ? zone.id.split("/").pop()! : zone.id;
+  dirName = dirName.replace(/:/g, "-");
   const zoneDir = join(parentDir, dirName);
   mkdirSync(zoneDir, { recursive: true });
 

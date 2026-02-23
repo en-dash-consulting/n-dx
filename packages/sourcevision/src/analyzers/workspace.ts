@@ -18,6 +18,7 @@ import type {
 } from "../schema/index.js";
 import { SV_DIR } from "../constants.js";
 import { DATA_FILES } from "../schema/data-files.js";
+import { toPosix } from "../util/paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ function loadSubAnalysis(rootDir: string, subDir: string): SubAnalysis | null {
     return null;
   }
 
-  const prefix = relative(rootDir, subDir);
+  const prefix = toPosix(relative(rootDir, subDir));
   const id = pathToId(prefix);
 
   const result: SubAnalysis = {
@@ -202,8 +203,8 @@ export function promoteZones(sub: SubAnalysis): Zone[] {
     id: `${sub.id}:${zone.id}`,
     // File paths in sub-analysis are relative to sub-analysis root
     // Prefix them to make them relative to the parent root
-    files: zone.files.map((f) => join(sub.prefix, f)),
-    entryPoints: zone.entryPoints.map((f) => join(sub.prefix, f)),
+    files: zone.files.map((f) => toPosix(join(sub.prefix, f))),
+    entryPoints: zone.entryPoints.map((f) => toPosix(join(sub.prefix, f))),
     childId: sub.id,
     depth: 1,
   }));
@@ -219,8 +220,8 @@ export function promoteCrossings(sub: SubAnalysis): ZoneCrossing[] {
   }
 
   return sub.zones.crossings.map((c) => ({
-    from: join(sub.prefix, c.from),
-    to: join(sub.prefix, c.to),
+    from: toPosix(join(sub.prefix, c.from)),
+    to: toPosix(join(sub.prefix, c.to)),
     fromZone: `${sub.id}:${c.fromZone}`,
     toZone: `${sub.id}:${c.toZone}`,
   }));
@@ -255,13 +256,13 @@ export function getSubAnalyzedFiles(subAnalyses: SubAnalysis[]): Set<string> {
   for (const sub of subAnalyses) {
     if (sub.inventory?.files) {
       for (const f of sub.inventory.files) {
-        files.add(join(sub.prefix, f.path));
+        files.add(toPosix(join(sub.prefix, f.path)));
       }
     } else if (sub.zones?.zones) {
       // Fallback to zone files if inventory unavailable
       for (const zone of sub.zones.zones) {
         for (const f of zone.files) {
-          files.add(join(sub.prefix, f));
+          files.add(toPosix(join(sub.prefix, f)));
         }
       }
     }
@@ -277,6 +278,6 @@ export function buildSubAnalysisRefs(subAnalyses: SubAnalysis[]): SubAnalysisRef
   return subAnalyses.map((sub) => ({
     id: sub.id,
     prefix: sub.prefix,
-    manifestPath: join(sub.prefix, SV_DIR, DATA_FILES.manifest),
+    manifestPath: toPosix(join(sub.prefix, SV_DIR, DATA_FILES.manifest)),
   }));
 }

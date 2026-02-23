@@ -16,6 +16,7 @@ import type {
 } from "../schema/index.js";
 import { sortImports } from "../util/sort.js";
 import { detectCirculars } from "../util/merge.js";
+import { toPosix } from "../util/paths.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -223,7 +224,7 @@ function createResolver(
       // Relative imports
       if (specifier.startsWith(".")) {
         const fromDir = dirname(fromFile);
-        const resolved = join(fromDir, specifier);
+        const resolved = toPosix(join(fromDir, specifier));
         return probeFile(resolved, fileSet);
       }
 
@@ -235,7 +236,7 @@ function createResolver(
             const rest = specifier.slice(prefix.length);
             for (const target of targets) {
               const targetPrefix = target.replace(/\*$/, "");
-              const candidate = join(targetPrefix, rest);
+              const candidate = toPosix(join(targetPrefix, rest));
               const found = probeFile(candidate, fileSet);
               if (found) return found;
             }

@@ -77,7 +77,7 @@ export function generateLlmsTxt(
       if (zone.entryPoints.length > 0) {
         lines.push(`- Entry points: ${zone.entryPoints.slice(0, 5).join(", ")}${zone.entryPoints.length > 5 ? ` (+${zone.entryPoints.length - 5} more)` : ""}`);
       }
-      lines.push(`- Detail: \`.sourcevision/zones/${zone.id}/context.md\``);
+      lines.push(`- Detail: \`.sourcevision/zones/${zone.id.replace(/:/g, "-")}/context.md\``);
       lines.push("");
     }
   }
