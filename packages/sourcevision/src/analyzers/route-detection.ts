@@ -7,6 +7,7 @@
 import { join, relative, extname } from "node:path";
 import { existsSync } from "node:fs";
 import ts from "typescript";
+import { toPosix } from "../util/paths.js";
 import type {
   RouteExportKind,
   RouteModule,
@@ -34,7 +35,7 @@ export function parseFileRoutePattern(
   routesDir: string
 ): string | null {
   // filePath should be relative to routesDir
-  let rel = relative(routesDir, filePath);
+  let rel = toPosix(relative(routesDir, filePath));
   if (rel.startsWith("..")) return null;
 
   // Remove extension
@@ -229,7 +230,7 @@ export function parseRoutesConfig(sourceText: string, configDir: string): RouteM
   const modules: RouteModule[] = [];
 
   function resolveFilePath(file: string): string {
-    return configDir === "." ? file : join(configDir, file);
+    return configDir === "." ? file : toPosix(join(configDir, file));
   }
 
   function processElements(

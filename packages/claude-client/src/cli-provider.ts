@@ -43,6 +43,16 @@ const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/
 /** Regex patterns for stderr content indicating a rate-limit error. */
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
 
+/**
+ * Regex patterns indicating the binary was not found via the shell.
+ * On Windows with shell:true, cmd.exe reports missing binaries via stderr
+ * rather than triggering an ENOENT error event. Two common forms:
+ *   - Simple names: "'foo' is not recognized as an internal or external command"
+ *   - Path-style:   "The system cannot find the path specified."
+ */
+const SHELL_NOT_FOUND_PATTERNS =
+  /is not recognized as an internal or external command|The system cannot find the (?:path|file) specified/i;
+
 /** Regex patterns in error messages that indicate a transient failure. */
 const TRANSIENT_PATTERNS = [
   /\b500\b/,
@@ -81,12 +91,17 @@ function isTransientError(message: string): boolean {
 /**
  * Classify stderr content into a structured error reason.
  */
-function classifyStderr(stderr: string): { reason: "auth" | "rate-limit" | "unknown"; retryable: boolean } {
+function classifyStderr(stderr: string): { reason: "auth" | "rate-limit" | "not-found" | "unknown"; retryable: boolean } {
   if (AUTH_PATTERNS.test(stderr)) {
     return { reason: "auth", retryable: false };
   }
   if (RATE_LIMIT_PATTERNS.test(stderr)) {
     return { reason: "rate-limit", retryable: true };
+  }
+  // On Windows with shell:true, a missing binary produces a stderr message
+  // from cmd.exe instead of an ENOENT error event.
+  if (SHELL_NOT_FOUND_PATTERNS.test(stderr)) {
+    return { reason: "not-found", retryable: false };
   }
   return { reason: "unknown", retryable: isTransientError(stderr) };
 }
@@ -101,15 +116,22 @@ function spawnOnce(
   return new Promise((resolve, reject) => {
     const format = request.outputFormat ?? "json";
     const args = [
-      "-p", request.prompt,
+      "-p",  // print mode; prompt is read from stdin
       "--output-format", format,
       "--model", request.model,
       ...(request.cliFlags ?? []),
     ];
 
     const proc = spawn(cliBinary, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: process.platform === "win32",
     });
+
+    // Write prompt to stdin and close. This avoids passing potentially long
+    // or special-character-containing prompt text as a CLI arg, which breaks
+    // on Windows where shell:true routes through cmd.exe without proper quoting.
+    proc.stdin.write(request.prompt, "utf-8");
+    proc.stdin.end();
 
     let stdout = "";
     let stderr = "";

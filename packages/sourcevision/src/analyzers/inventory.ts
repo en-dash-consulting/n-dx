@@ -10,6 +10,7 @@ import { PROJECT_DIRS } from "@n-dx/claude-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
+import { toPosix } from "../util/paths.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
 
@@ -536,7 +537,7 @@ async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter): Promise<
     if (SKIP_DIRS.has(entry.name)) continue;
 
     const fullPath = join(dir, entry.name);
-    const relPath = relative(rootDir, fullPath);
+    const relPath = toPosix(relative(rootDir, fullPath));
 
     if (entry.isDirectory()) {
       if (ig.ignores(relPath + "/")) continue;

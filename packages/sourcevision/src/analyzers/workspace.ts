@@ -18,11 +18,7 @@ import type {
 } from "../schema/index.js";
 import { SV_DIR } from "../cli/commands/constants.js";
 import { DATA_FILES } from "../schema/data-files.js";
-
-/** Normalize a path to always use forward slashes (no-op on Unix). */
-function toPosix(p: string): string {
-  return p.replace(/\\/g, "/");
-}
+import { toPosix } from "../util/paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
