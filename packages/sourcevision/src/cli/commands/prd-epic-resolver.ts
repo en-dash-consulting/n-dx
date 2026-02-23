@@ -116,6 +116,19 @@ function findParentEpicTitle(itemId: string, byId: Map<string, IndexedNode>): st
   return null;
 }
 
+function findParentFeatureTitle(itemId: string, byId: Map<string, IndexedNode>): string | null {
+  let current = byId.get(itemId);
+  while (current) {
+    if (current.level === "feature") {
+      if (current.status === "deleted") return null;
+      return current.title;
+    }
+    if (!current.parentId) return null;
+    current = byId.get(current.parentId);
+  }
+  return null;
+}
+
 function resolveEntryBranch(entry: LogEntryLike): string | null {
   const candidate =
     (typeof entry.branch === "string" ? entry.branch : null)
@@ -137,9 +150,12 @@ function resolveCurrentBranch(projectDir: string): string | null {
 
 export interface ResolvedRexWorkItem {
   id: string;
-  level: "epic" | "task" | "subtask";
+  level: "task" | "subtask";
   title: string;
+  status: string;
+  executionState: "completed" | "executed";
   epicTitle: string;
+  featureTitle: string | null;
 }
 
 export type ResolvedBranchScopedRexWork =
@@ -189,23 +205,27 @@ export function resolveBranchScopedCompletedRexWorkFromData(
     if (!item) continue;
 
     if (item.status === "deleted") continue;
-    if (item.status !== "completed") continue;
-    if (item.level !== "epic" && item.level !== "task" && item.level !== "subtask") continue;
+    if (item.level !== "task" && item.level !== "subtask") continue;
 
     const epicTitle = findParentEpicTitle(item.id, byId);
     if (!epicTitle) continue;
+    const featureTitle = findParentFeatureTitle(item.id, byId);
     epicTitles.add(epicTitle);
     completedItemsById.set(item.id, {
       id: item.id,
-      level: item.level as "epic" | "task" | "subtask",
+      level: item.level as "task" | "subtask",
       title: item.title,
+      status: item.status,
+      executionState: item.status === "completed" ? "completed" : "executed",
       epicTitle,
+      featureTitle,
     });
   }
 
   const sortedEpicTitles = [...epicTitles].sort((a, b) => a.localeCompare(b));
   const completedItems = [...completedItemsById.values()].sort((a, b) => {
     if (a.epicTitle !== b.epicTitle) return a.epicTitle.localeCompare(b.epicTitle);
+    if (a.featureTitle !== b.featureTitle) return (a.featureTitle ?? "").localeCompare(b.featureTitle ?? "");
     if (a.level !== b.level) return a.level.localeCompare(b.level);
     return a.title.localeCompare(b.title);
   });

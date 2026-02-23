@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveBranchScopedCompletedRexWorkFromData } from "../../../src/cli/commands/prd-epic-resolver.js";
 
 describe("resolveBranchScopedCompletedRexWorkFromData", () => {
-  it("returns unique parent epic titles for completed branch-scoped tasks", () => {
+  it("returns unique parent epic titles for completed and executed branch-scoped tasks", () => {
     const prd = [
       {
         id: "epic-a",
@@ -50,11 +50,12 @@ describe("resolveBranchScopedCompletedRexWorkFromData", () => {
     expect(result.status).toBe("found");
     expect(result.epicTitles).toEqual(["Epic A", "Epic B"]);
     if (result.status === "found") {
-      expect(result.completedItems.map((item) => item.id)).toEqual(["task-a1", "task-b1"]);
+      expect(result.completedItems.map((item) => item.id)).toEqual(["task-a1", "task-a2", "task-b1"]);
+      expect(result.completedItems.map((item) => item.executionState)).toEqual(["completed", "executed", "completed"]);
     }
   });
 
-  it("excludes non-completed items and entries from other branches", () => {
+  it("excludes deleted items and entries from other branches", () => {
     const prd = [
       {
         id: "epic-main",
@@ -89,8 +90,8 @@ describe("resolveBranchScopedCompletedRexWorkFromData", () => {
     expect(result.status).toBe("found");
     expect(result.epicTitles).toEqual(["Main Epic"]);
     if (result.status === "found") {
-      expect(result.completedItems).toHaveLength(1);
-      expect(result.completedItems[0]?.id).toBe("task-touched-done");
+      expect(result.completedItems).toHaveLength(2);
+      expect(result.completedItems.map((item) => item.id)).toEqual(["task-touched-done", "task-touched-pending"]);
     }
   });
 

@@ -72,6 +72,7 @@ describe("PRMarkdownView", () => {
   beforeEach(() => {
     root = document.createElement("div");
     document.body.appendChild(root);
+    window.sessionStorage.clear();
     clipboardWriteText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: { writeText: clipboardWriteText },
@@ -157,7 +158,7 @@ describe("PRMarkdownView", () => {
     expect(root.textContent).toContain("Base range: unresolved");
   });
 
-  it("shows preview and raw markdown when markdown exists", async () => {
+  it("switches between preview and raw markdown with explicit toggle controls", async () => {
     const fetchMock = createFetchMock(
       { signature: "sig-ready", availability: "ready" },
       "## Summary\n\n- Added tab\n\n```ts\nconsole.log('ok');\n```",
@@ -167,13 +168,75 @@ describe("PRMarkdownView", () => {
     await renderAndWait(root);
 
     expect(root.textContent).toContain("PR markdown ready");
-    expect(root.textContent).toContain("Preview");
-    expect(root.textContent).toContain("Raw Markdown");
+    const previewToggle = root.querySelector('button[aria-controls="pr-markdown-panel-preview"]') as HTMLButtonElement | null;
+    const rawToggle = root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement | null;
+    expect(previewToggle).toBeTruthy();
+    expect(rawToggle).toBeTruthy();
+    expect(previewToggle?.getAttribute("aria-pressed")).toBe("true");
+    expect(rawToggle?.getAttribute("aria-pressed")).toBe("false");
     expect(root.querySelector(".pr-markdown-preview h2")?.textContent).toBe("Summary");
     expect(root.querySelector(".pr-markdown-preview ul li")?.textContent).toBe("Added tab");
     expect(root.querySelector(".pr-markdown-preview code")?.textContent).toContain("console.log('ok');");
+
+    await act(async () => {
+      rawToggle?.click();
+    });
+    await flushUi();
+
+    expect(previewToggle?.getAttribute("aria-pressed")).toBe("false");
+    expect(rawToggle?.getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector(".pr-markdown-preview")).toBeNull();
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("## Summary");
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("```ts");
+  });
+
+  it("persists selected mode across remounts in the same session", async () => {
+    const markdown = "## Snapshot\n\n- Persist mode";
+    const fetchMock = createFetchMock({ signature: "sig-mode", availability: "ready" }, markdown);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await renderAndWait(root);
+    const rawToggle = root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement;
+
+    await act(async () => {
+      rawToggle.click();
+    });
+    await flushUi();
+
+    expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("## Snapshot");
+    expect(window.sessionStorage.getItem("sv:pr-markdown:view-mode")).toBe("raw");
+
+    await act(async () => {
+      render(null, root);
+      render(h(PRMarkdownView, null), root);
+    });
+    await flushUi();
+
+    expect(root.querySelector('button[aria-controls="pr-markdown-panel-preview"]')?.getAttribute("aria-pressed")).toBe("false");
+    expect(root.querySelector('button[aria-controls="pr-markdown-panel-raw"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("## Snapshot");
+  });
+
+  it("exposes keyboard-focusable toggle controls with ARIA pressed states", async () => {
+    const fetchMock = createFetchMock({ signature: "sig-a11y", availability: "ready" }, "## Accessibility");
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await renderAndWait(root);
+    const previewToggle = root.querySelector('button[aria-controls="pr-markdown-panel-preview"]') as HTMLButtonElement;
+    const rawToggle = root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement;
+
+    rawToggle.focus();
+    expect(document.activeElement).toBe(rawToggle);
+    expect(previewToggle.getAttribute("aria-pressed")).toBe("true");
+    expect(rawToggle.getAttribute("aria-pressed")).toBe("false");
+
+    await act(async () => {
+      rawToggle.click();
+    });
+    await flushUi();
+
+    expect(previewToggle.getAttribute("aria-pressed")).toBe("false");
+    expect(rawToggle.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("shows error state when request fails", async () => {
@@ -590,27 +653,40 @@ describe("PRMarkdownView", () => {
 
     await renderAndWait(root);
     await act(async () => {
+      (root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement).click();
+    });
+    await flushUi();
+    await act(async () => {
       (root.querySelector(".pr-markdown-copy-btn") as HTMLButtonElement).click();
     });
     await flushUi();
 
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toBe(markdown);
     expect(clipboardWriteText).toHaveBeenCalledWith(markdown);
-    expect(root.querySelector(".pr-markdown-copy-feedback")).toBeTruthy();
+    expect(root.querySelector(".pr-markdown-copy-feedback")?.textContent).toContain("Copied markdown to clipboard.");
   });
 
-  it("handles copy failure path without breaking UI", async () => {
-    clipboardWriteText.mockRejectedValueOnce(new Error("denied"));
+  it("shows manual guidance when clipboard permission is denied", async () => {
+    const deniedError = new Error("Permission denied");
+    deniedError.name = "NotAllowedError";
+    clipboardWriteText.mockRejectedValueOnce(deniedError);
     const fetchMock = createFetchMock({ signature: "sig-fail-copy", availability: "ready" }, "## Overview");
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     await renderAndWait(root);
+    await act(async () => {
+      (root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement).click();
+    });
+    await flushUi();
     await act(async () => {
       (root.querySelector(".pr-markdown-copy-btn") as HTMLButtonElement).click();
     });
     await flushUi();
 
     expect(clipboardWriteText).toHaveBeenCalledWith("## Overview");
-    expect(root.querySelector(".pr-markdown-copy-feedback")).toBeTruthy();
+    expect(root.querySelector(".pr-markdown-copy-feedback")?.textContent)
+      .toContain("Clipboard access was blocked by browser permissions.");
+    expect(root.querySelector(".pr-markdown-copy-feedback")?.textContent)
+      .toContain("Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).");
   });
 });

@@ -572,6 +572,40 @@ function renderWorkstreamNarrative(workstreams: readonly WorkstreamSummary[]): s
   return strongest.map((summary) => `Workstream \`${summary.workstream}\` had concentrated activity (${formatWorkstreamMix(summary)}).`);
 }
 
+function renderRexBranchWorkNarrative(lines: string[], rexWork: ResolvedBranchScopedRexWork): void {
+  lines.push("## Worked PRD Epics");
+  lines.push("");
+  if (rexWork.status === "empty") {
+    lines.push(`- No completed branch-scoped Rex items found (${rexWork.signal}).`);
+    return;
+  }
+
+  const groupedByEpic = new Map<string, typeof rexWork.completedItems>();
+  for (const item of rexWork.completedItems) {
+    const group = groupedByEpic.get(item.epicTitle) ?? [];
+    group.push(item);
+    groupedByEpic.set(item.epicTitle, group);
+  }
+
+  for (const epicTitle of rexWork.epicTitles) {
+    const items = groupedByEpic.get(epicTitle) ?? [];
+    lines.push(`### ${epicTitle}`);
+    if (items.length === 0) {
+      lines.push("- No completed or executed branch-scoped tasks.");
+      lines.push("");
+      continue;
+    }
+    for (const item of items) {
+      const scope = item.featureTitle ? `feature: ${item.featureTitle}` : "feature: (none)";
+      const state = item.executionState === "completed"
+        ? "completed"
+        : `executed (current status: ${item.status})`;
+      lines.push(`- \`${item.title}\` [${scope}] [${state}]`);
+    }
+    lines.push("");
+  }
+}
+
 function renderPRMarkdown(
   range: string,
   files: readonly GitChangedFile[],
@@ -591,16 +625,7 @@ function renderPRMarkdown(
   lines.push(`- Base comparison: \`${range}\``);
   lines.push(`- Diff footprint: ${files.length} file(s) changed across ${workstreams.length} workstream(s).`);
   lines.push("");
-  lines.push("## Worked PRD Epics");
-  lines.push("");
-  if (rexWork.status === "empty") {
-    lines.push(`- No completed branch-scoped Rex items found (${rexWork.signal}).`);
-  } else {
-    for (const epicTitle of rexWork.epicTitles) {
-      lines.push(`- ${epicTitle}`);
-    }
-  }
-
+  renderRexBranchWorkNarrative(lines, rexWork);
   lines.push("");
   lines.push("## Important Changes");
   lines.push("");

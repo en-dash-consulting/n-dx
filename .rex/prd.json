@@ -12750,9 +12750,11 @@
     {
       "id": "d8b6399f-f670-4018-a9c9-366534f485ae",
       "title": "Git-Independent PR Markdown Generation",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-23T04:50:23.216Z",
+      "completedAt": "2026-02-23T04:50:23.216Z",
       "children": [
         {
           "id": "29180c95-a958-4aac-b903-7af82fdb16e2",
@@ -12842,15 +12844,17 @@
         {
           "id": "1311822b-671e-4fc4-93a0-816540324e25",
           "title": "Work-History Narrative Synthesis",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Generate reviewer-ready PR markdown from completed Rex tasks and corresponding Hench execution history in a consistent structure.",
           "source": "smart-add",
+          "startedAt": "2026-02-23T04:50:23.155Z",
+          "completedAt": "2026-02-23T04:50:23.155Z",
           "children": [
             {
               "id": "ffc5324f-2a02-4ea0-be64-ec22d5441e04",
               "title": "Generate PR sections from executed Rex tasks grouped by epic",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create structured markdown sections that group completed branch work by epic and feature so reviewers can quickly understand scope and intent.",
               "acceptanceCriteria": [
@@ -12864,12 +12868,14 @@
                 "markdown",
                 "rex"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-23T04:46:30.208Z",
+              "completedAt": "2026-02-23T04:50:23.047Z"
             },
             {
               "id": "1a2b9518-e532-4cf1-a69e-d258c7482519",
               "title": "Attach execution evidence badges to summarized tasks",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Annotate summarized tasks with lightweight execution evidence from Hench (for example run status and timestamp) to improve trust in branch-history-based summaries.",
               "acceptanceCriteria": [
@@ -12884,7 +12890,8 @@
                 "ui-data"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-23T04:33:52.017Z"
+              "startedAt": "2026-02-23T04:33:52.017Z",
+              "completedAt": "2026-02-23T04:46:29.959Z"
             }
           ]
         }
@@ -12893,22 +12900,24 @@
     {
       "id": "b59bc8e6-e00d-48cf-a932-2516d126ca4e",
       "title": "PR Markdown View Toggle and Copy UX",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "3d5d8464-5a5d-4b6a-a062-f39146a3191a",
           "title": "Single-Pane Preview/Raw Toggle",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Replace side-by-side rendering with a single-pane mode switch between rendered preview and raw markdown.",
           "source": "smart-add",
+          "startedAt": "2026-02-23T05:00:35.007Z",
+          "completedAt": "2026-02-23T05:00:35.007Z",
           "children": [
             {
               "id": "d8f517bf-f868-45c8-aef8-d304a9c157e9",
               "title": "Refactor PR markdown panel to single-pane mode",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Update the PR markdown tab layout so only one representation is shown at a time, reducing visual clutter and improving focus.",
               "acceptanceCriteria": [
@@ -12922,12 +12931,14 @@
                 "sourcevision",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-23T04:59:16.337Z",
+              "completedAt": "2026-02-23T05:00:34.865Z"
             },
             {
               "id": "cc099982-724b-4155-89d3-9cfa224a58e1",
               "title": "Implement explicit Preview/Raw toggle control with persisted state",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a clear toggle control so users can switch modes quickly, and persist their last-used mode during the session for convenience.",
               "acceptanceCriteria": [
@@ -12941,17 +12952,21 @@
                 "ui-state",
                 "accessibility"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-23T04:50:23.329Z",
+              "completedAt": "2026-02-23T04:59:16.141Z"
             }
           ]
         },
         {
           "id": "b0835e33-c7d9-427e-9d8b-813838d6ee48",
           "title": "Copy-to-Clipboard Workflow",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Provide a reliable one-click copy action for raw PR markdown with clear success and failure feedback.",
           "source": "smart-add",
+          "startedAt": "2026-02-23T05:07:01.629Z",
+          "completedAt": "2026-02-23T05:07:01.629Z",
           "children": [
             {
               "id": "b1adb5cc-eada-42e2-a43b-8d131cd59d3a",
@@ -12977,7 +12992,7 @@
             {
               "id": "10842c9c-4c80-4976-b784-9c9acfdcce47",
               "title": "Render copy status and fallback guidance",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Show immediate success/error feedback for clipboard operations and provide fallback instructions when browser permissions block clipboard access.",
               "acceptanceCriteria": [
@@ -12992,6 +13007,8 @@
                 "error-handling"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-23T05:00:35.139Z",
+              "completedAt": "2026-02-23T05:07:01.487Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -13005,7 +13022,9 @@
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-23T05:07:01.710Z",
+      "completedAt": "2026-02-23T05:07:01.710Z"
     }
   ]
 }

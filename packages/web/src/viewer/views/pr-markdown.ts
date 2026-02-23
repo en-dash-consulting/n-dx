@@ -69,8 +69,34 @@ interface PRMarkdownRefreshResponse extends PRMarkdownStateResponse {
 }
 
 const COPY_FEEDBACK_MS = 2000;
+const PR_MARKDOWN_MODE_STORAGE_KEY = "sv:pr-markdown:view-mode";
+
+type PRMarkdownViewMode = "preview" | "raw";
 
 type CopyState = "idle" | "success" | "error";
+type CopyErrorKind = "permission-denied" | "generic" | null;
+
+function parseStoredViewMode(value: string | null): PRMarkdownViewMode {
+  return value === "raw" ? "raw" : "preview";
+}
+
+function readStoredViewMode(): PRMarkdownViewMode {
+  if (typeof window === "undefined") return "preview";
+  try {
+    return parseStoredViewMode(window.sessionStorage.getItem(PR_MARKDOWN_MODE_STORAGE_KEY));
+  } catch {
+    return "preview";
+  }
+}
+
+function persistViewMode(mode: PRMarkdownViewMode) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(PR_MARKDOWN_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore write errors (e.g. privacy modes) and keep in-memory state.
+  }
+}
 
 function parseMarkdownPayload(markdown: string | null | undefined): string | null {
   if (typeof markdown !== "string") return null;
@@ -180,6 +206,13 @@ function fallbackCopyText(text: string): boolean {
   }
 }
 
+function isPermissionDeniedClipboardError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === "NotAllowedError"
+    || /permission/i.test(error.message)
+    || /denied/i.test(error.message);
+}
+
 function renderMarkdownPreview(markdown: string) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const blocks: ComponentChildren[] = [];
@@ -282,6 +315,8 @@ export function PRMarkdownView() {
   const [latestSignature, setLatestSignature] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [copyErrorKind, setCopyErrorKind] = useState<CopyErrorKind>(null);
+  const [viewMode, setViewMode] = useState<PRMarkdownViewMode>(() => readStoredViewMode());
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshDiagnostics, setRefreshDiagnostics] = useState<Array<{
     code?: string;
@@ -452,13 +487,25 @@ export function PRMarkdownView() {
 
   const handleCopyRawMarkdown = useCallback(async () => {
     if (!markdown) return;
-    setCopyFeedback("success");
     try {
       await navigator.clipboard.writeText(markdown);
-    } catch {
-      setCopyFeedback(fallbackCopyText(markdown) ? "success" : "error");
+      setCopyErrorKind(null);
+      setCopyFeedback("success");
+    } catch (error) {
+      if (fallbackCopyText(markdown)) {
+        setCopyErrorKind(null);
+        setCopyFeedback("success");
+        return;
+      }
+      setCopyErrorKind(isPermissionDeniedClipboardError(error) ? "permission-denied" : "generic");
+      setCopyFeedback("error");
     }
   }, [markdown, setCopyFeedback]);
+
+  const handleModeChange = useCallback((mode: PRMarkdownViewMode) => {
+    setViewMode(mode);
+    persistViewMode(mode);
+  }, []);
 
   useEffect(() => {
     void refreshFromState();
@@ -471,12 +518,15 @@ export function PRMarkdownView() {
 
   useEffect(() => {
     setCopyState("idle");
+    setCopyErrorKind(null);
   }, [markdown]);
 
   const copyFeedbackMessage = copyState === "success"
     ? "Copied markdown to clipboard."
     : copyState === "error"
-      ? "Failed to copy markdown to clipboard."
+      ? copyErrorKind === "permission-denied"
+        ? "Clipboard access was blocked by browser permissions. Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux)."
+        : "Failed to copy markdown to clipboard. Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux)."
       : "";
   const fallbackTitle = availability === "unsupported"
     ? "Git is unavailable"
@@ -651,26 +701,41 @@ export function PRMarkdownView() {
     !loading && !error && markdown
       ? h("div", { class: "card pr-markdown-success", role: "status", "aria-live": "polite" },
           h("h3", { class: "section-header-sm" }, "PR markdown ready"),
-          h("div", { class: "pr-markdown-grid" },
-            h("section", { class: "pr-markdown-panel" },
-              h("h4", { class: "section-header-sm" }, "Preview"),
-              h("div", { class: "pr-markdown-preview" }, renderMarkdownPreview(markdown)),
-            ),
-            h("section", { class: "pr-markdown-panel" },
-              h("div", { class: "pr-markdown-raw-header" },
-                h("h4", { class: "section-header-sm" }, "Raw Markdown"),
-                h("button", {
-                  type: "button",
-                  class: "btn pr-markdown-copy-btn",
-                  onClick: () => { void handleCopyRawMarkdown(); },
-                }, copyState === "success" ? "Copied" : "Copy Markdown"),
-              ),
-              h("pre", { class: "pr-markdown-raw" }, markdown),
-              h("p", { class: "section-sub pr-markdown-copy-feedback", role: "status", "aria-live": "polite" },
-                copyFeedbackMessage,
-              ),
-            ),
+          h("div", { class: "pr-markdown-mode-toggle", role: "group", "aria-label": "PR markdown view mode" },
+            h("button", {
+              type: "button",
+              class: `toggle-btn${viewMode === "preview" ? " active" : ""}`,
+              "aria-pressed": String(viewMode === "preview"),
+              "aria-controls": "pr-markdown-panel-preview",
+              onClick: () => handleModeChange("preview"),
+            }, "Preview"),
+            h("button", {
+              type: "button",
+              class: `toggle-btn${viewMode === "raw" ? " active" : ""}`,
+              "aria-pressed": String(viewMode === "raw"),
+              "aria-controls": "pr-markdown-panel-raw",
+              onClick: () => handleModeChange("raw"),
+            }, "Raw"),
           ),
+          viewMode === "preview"
+            ? h("section", { class: "pr-markdown-panel", id: "pr-markdown-panel-preview" },
+                h("h4", { class: "section-header-sm" }, "Preview"),
+                h("div", { class: "pr-markdown-preview" }, renderMarkdownPreview(markdown)),
+              )
+            : h("section", { class: "pr-markdown-panel", id: "pr-markdown-panel-raw" },
+                h("div", { class: "pr-markdown-raw-header" },
+                  h("h4", { class: "section-header-sm" }, "Raw Markdown"),
+                  h("button", {
+                    type: "button",
+                    class: "btn pr-markdown-copy-btn",
+                    onClick: () => { void handleCopyRawMarkdown(); },
+                  }, copyState === "success" ? "Copied" : "Copy Markdown"),
+                ),
+                h("pre", { class: "pr-markdown-raw" }, markdown),
+                h("p", { class: "section-sub pr-markdown-copy-feedback", role: "status", "aria-live": "polite" },
+                  copyFeedbackMessage,
+                ),
+              ),
         )
       : null,
   );

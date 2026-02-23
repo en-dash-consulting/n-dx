@@ -94,7 +94,7 @@ describe("cmdPrMarkdown", () => {
     expect(markdown).toContain("- No important functional or feature-level changes identified.");
   });
 
-  it("renders worked PRD epic titles in a deduped stable order", () => {
+  it("renders worked PRD tasks grouped by epic with stable ordering", () => {
     mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
     mkdirSync(join(tmpDir, ".rex"), { recursive: true });
 
@@ -163,15 +163,43 @@ describe("cmdPrMarkdown", () => {
 
     const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Worked PRD Epics");
-    expect(markdown).toContain("- Epic Alpha");
-    expect(markdown).toContain("- Epic Zebra");
+    expect(markdown).toContain("### Epic Alpha");
+    expect(markdown).toContain("### Epic Zebra");
+    expect(markdown).toContain("- `Task 1` [feature: Feature 1] [completed]");
+    expect(markdown).toContain("- `Task 2a` [feature: Feature 2] [completed]");
+    expect(markdown).toContain("- `Task 2b` [feature: Feature 2] [executed (current status: in_progress)]");
 
-    const alphaIndex = markdown.indexOf("- Epic Alpha");
-    const zebraIndex = markdown.indexOf("- Epic Zebra");
+    const alphaIndex = markdown.indexOf("### Epic Alpha");
+    const zebraIndex = markdown.indexOf("### Epic Zebra");
     expect(alphaIndex).toBeGreaterThan(-1);
     expect(zebraIndex).toBeGreaterThan(-1);
     expect(alphaIndex).toBeLessThan(zebraIndex);
-    expect(markdown.match(/- Epic Zebra/g)).toHaveLength(1);
+
+    const firstSection = markdown.slice(
+      markdown.indexOf("## Worked PRD Epics"),
+      markdown.indexOf("## Important Changes"),
+    );
+    expect(firstSection).toMatchInlineSnapshot(`
+      "## Worked PRD Epics
+
+      ### Epic Alpha
+      - \`Task 1\` [feature: Feature 1] [completed]
+
+      ### Epic Zebra
+      - \`Task 2a\` [feature: Feature 2] [completed]
+      - \`Task 2b\` [feature: Feature 2] [executed (current status: in_progress)]
+
+
+      "
+    `);
+
+    cmdPrMarkdown(tmpDir);
+    const rerendered = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const secondSection = rerendered.slice(
+      rerendered.indexOf("## Worked PRD Epics"),
+      rerendered.indexOf("## Important Changes"),
+    );
+    expect(secondSection).toBe(firstSection);
   });
 
   it("extracts significant exported-function and feature highlights with rationale", () => {

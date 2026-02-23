@@ -752,6 +752,11 @@ exit 1
     expect(root.textContent).toContain("Failing git subcommand: git diff");
     expect(root.textContent).toContain("Failed to inspect semantic diff details");
     expect(root.textContent).toContain("Cached Summary");
-    expect(root.textContent).toContain("Copy Markdown");
+
+    await act(async () => {
+      (root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement).click();
+    });
+    await waitFor(() => root.textContent?.includes("Copy Markdown") ?? false);
+    expect(root.querySelector(".pr-markdown-copy-btn")).toBeTruthy();
   });
 });
