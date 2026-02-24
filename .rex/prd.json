@@ -13838,7 +13838,7 @@
     {
       "id": "2ad53ca7-841a-4c3e-861a-d7f0eb6301d5",
       "title": "Rex Task and Epic Deletion Functionality",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -13849,6 +13849,8 @@
           "level": "feature",
           "description": "Implement backend functions and CLI commands to support deletion of epics and tasks from the PRD structure",
           "source": "smart-add",
+          "startedAt": "2026-02-24T15:54:29.578Z",
+          "completedAt": "2026-02-24T15:54:29.578Z",
           "children": [
             {
               "id": "b16f5baa-e899-4933-9b57-edaf57e82cf6",
@@ -13943,22 +13945,22 @@
                 "createdAt": "2026-02-24T15:20:05.533Z"
               }
             }
-          ],
-          "startedAt": "2026-02-24T15:54:29.578Z",
-          "completedAt": "2026-02-24T15:54:29.578Z"
+          ]
         },
         {
           "id": "e7080a46-fedc-400c-86db-120e2d8ae2f2",
           "title": "Rex UI Deletion Interface",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Add interactive deletion capabilities to the Rex web UI task tab with proper user confirmation flows",
           "source": "smart-add",
+          "startedAt": "2026-02-24T17:18:27.341Z",
+          "completedAt": "2026-02-24T17:18:27.341Z",
           "children": [
             {
               "id": "d4e21c43-f12d-4c58-8582-af733a94f4fd",
               "title": "Add delete buttons to Rex UI task and epic items",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Integrate delete buttons or context menu options into the Rex UI for both epics and tasks in the task tab view",
               "acceptanceCriteria": [
@@ -13972,12 +13974,14 @@
                 "frontend",
                 "ui"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T15:55:17.981Z",
+              "completedAt": "2026-02-24T16:12:44.056Z"
             },
             {
               "id": "317ee3e3-a436-45f8-a93c-63f1c41072b1",
               "title": "Implement deletion confirmation dialog",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create modal confirmation dialog that warns users about deletion consequences and requires explicit confirmation",
               "acceptanceCriteria": [
@@ -13992,6 +13996,8 @@
                 "ui"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-24T16:12:44.243Z",
+              "completedAt": "2026-02-24T16:22:38.702Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -14006,7 +14012,7 @@
             {
               "id": "04854c70-f1ee-4cda-9ddf-92ffc8446e9f",
               "title": "Update UI state after successful deletions",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure Rex UI refreshes and updates the task tree view in real-time after items are successfully deleted",
               "acceptanceCriteria": [
@@ -14020,22 +14026,26 @@
                 "frontend",
                 "ui"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T16:23:10.059Z",
+              "completedAt": "2026-02-24T17:18:27.227Z"
             }
           ]
         },
         {
           "id": "c2b3377b-5830-4bd3-99f5-992d50e50fcc",
           "title": "Documentation and Help Updates",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Update project documentation to reflect the new deletion capabilities in both CLI and UI",
           "source": "smart-add",
+          "startedAt": "2026-02-24T17:27:43.063Z",
+          "completedAt": "2026-02-24T17:27:43.063Z",
           "children": [
             {
               "id": "cf16901b-f482-423d-8228-c85f7e55096b",
               "title": "Update README with deletion command documentation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add comprehensive documentation for new deletion commands to the project README, including usage examples and safety warnings",
               "acceptanceCriteria": [
@@ -14049,6 +14059,8 @@
                 "documentation"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-24T17:25:26.675Z",
+              "completedAt": "2026-02-24T17:27:42.962Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -14063,7 +14075,7 @@
             {
               "id": "7c7a5fbb-1c98-493b-a03a-21790673dcfc",
               "title": "Update CLI help text for deletion commands",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure rex CLI help system includes comprehensive help text for the new remove commands",
               "acceptanceCriteria": [
@@ -14077,11 +14089,15 @@
                 "documentation",
                 "cli"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T17:19:07.742Z",
+              "completedAt": "2026-02-24T17:25:05.384Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-24T17:27:43.138Z",
+      "completedAt": "2026-02-24T17:27:43.138Z"
     }
   ]
 }
