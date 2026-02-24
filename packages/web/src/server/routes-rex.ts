@@ -622,12 +622,18 @@ function handleItemDelete(
 
   // Broadcast change to connected WebSocket clients
   if (broadcast) {
+    const timestamp = new Date().toISOString();
     broadcast({
       type: "rex:item-deleted",
       itemId,
       level,
       title,
-      timestamp: new Date().toISOString(),
+      timestamp,
+    });
+    // Also broadcast generic prd-changed so sidebar status indicators refresh
+    broadcast({
+      type: "rex:prd-changed",
+      timestamp,
     });
   }
 

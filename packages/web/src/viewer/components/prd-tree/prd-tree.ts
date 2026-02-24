@@ -236,9 +236,11 @@ interface NodeRowProps {
   nodeRef?: (el: HTMLDivElement | null) => void;
   /** Called to remove/delete this item. */
   onRemove?: (item: PRDItemData) => void;
+  /** Whether this item is currently being deleted (API in-flight). */
+  isDeleting?: boolean;
 }
 
-function NodeRow({ item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect, onInlineAdd, isInlineAddActive, isHighlighted, nodeRef, onRemove }: NodeRowProps) {
+function NodeRow({ item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren, isSelected, onToggle, onSelect, isBulkSelected, onToggleBulkSelect, onInlineAdd, isInlineAddActive, isHighlighted, nodeRef, onRemove, isDeleting }: NodeRowProps) {
   const children = item.children ?? [];
   const stats = hasChildren ? computeBranchStats(children) : null;
   const ratio = stats ? completionRatio(stats) : 0;
@@ -328,7 +330,7 @@ function NodeRow({ item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren
   return h(
     "div",
     {
-      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""} prd-level-${item.level}`,
+      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""} prd-level-${item.level}`,
       style: `padding-left: ${indent + 8}px`,
       onClick: handleClick,
       onContextMenu: handleContextMenu,
@@ -465,9 +467,11 @@ interface TreeNodesProps {
   highlightedNodeRef?: (el: HTMLDivElement | null) => void;
   /** Called to remove/delete an item. */
   onRemoveItem?: (item: PRDItemData) => void;
+  /** ID of item currently being deleted (shows loading state). */
+  deletingItemId?: string | null;
 }
 
-function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef, onRemoveItem }: TreeNodesProps) {
+function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef, onRemoveItem, deletingItemId }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -500,6 +504,7 @@ function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, select
             isHighlighted: isHL,
             nodeRef: isHL ? highlightedNodeRef : undefined,
             onRemove: onRemoveItem,
+            isDeleting: deletingItemId === item.id,
           }),
           // Inline add form — rendered below the parent node, above its children
           isInlineAddActive && onInlineAddSubmit && onInlineAddCancel
@@ -534,6 +539,7 @@ function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, select
                   highlightedItemId,
                   highlightedNodeRef,
                   onRemoveItem,
+                  deletingItemId,
                 }),
               )
             : null,
@@ -650,9 +656,11 @@ export interface PRDTreeProps {
   deepLinkExpandIds?: Set<string> | null;
   /** Called to remove/delete an item from the tree. */
   onRemoveItem?: (item: PRDItemData) => void;
+  /** ID of item currently being deleted (shows loading state). */
+  deletingItemId?: string | null;
 }
 
-export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem }: PRDTreeProps) {
+export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId }: PRDTreeProps) {
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -789,6 +797,7 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
         highlightedItemId,
         highlightedNodeRef: deepLinkNodeRef,
         onRemoveItem,
+        deletingItemId,
       }),
     ),
   );

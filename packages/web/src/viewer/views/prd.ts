@@ -20,7 +20,7 @@ import { BrandedHeader } from "../components/prd-tree/shared-imports.js";
 import type { PRDDocumentData, PRDItemData, AddItemInput } from "../components/prd-tree/index.js";
 import type { TaskUsageSummary, WeeklyBudgetResolution, WeeklyBudgetSource } from "../components/prd-tree/types.js";
 import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
-import { findItemById, getAncestorIds } from "../components/prd-tree/tree-utils.js";
+import { findItemById, getAncestorIds, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
 import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
 
@@ -109,8 +109,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   const [addParentId, setAddParentId] = useState<string | null>(null);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  /** When set, applies an error variant style to the toast. */
+  const [toastType, setToastType] = useState<"success" | "error">("success");
   /** Item pending deletion confirmation via modal dialog. */
   const [deleteTarget, setDeleteTarget] = useState<PRDItemData | null>(null);
+  /** ID of item currently being deleted (API in-flight). Used for tree loading state. */
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   // Deep-link state
   const [deepLinkError, setDeepLinkError] = useState<string | null>(null);
@@ -122,6 +126,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   const [deepLinkExpandIds, setDeepLinkExpandIds] = useState<Set<string> | null>(null);
   /** Whether the initial deep-link has been consumed. */
   const deepLinkConsumedRef = useRef(false);
+
+  // Toast helpers — success (green) and error (red) variants
+  const showToast = useCallback((message: string, type: "success" | "error" = "success", duration = 3000) => {
+    setToast(message);
+    setToastType(type);
+    setTimeout(() => setToast(null), duration);
+  }, []);
 
   // Resolve selected items for merge preview
   const selectedItems = useMemo(() => {
@@ -198,6 +209,38 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     const interval = setInterval(fetchTaskUsage, 10_000);
     return () => clearInterval(interval);
   }, [fetchTaskUsage]);
+
+  // WebSocket listener for real-time PRD updates (deletions, edits from other clients)
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    try {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${proto}//${location.host}`);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (
+            msg.type === "rex:item-deleted" ||
+            msg.type === "rex:item-updated" ||
+            msg.type === "rex:prd-changed"
+          ) {
+            // Refresh tree from server to stay in sync
+            fetchPRDData();
+            fetchTaskUsage();
+          }
+        } catch {
+          // Ignore malformed messages
+        }
+      };
+    } catch {
+      // WebSocket not available — polling still works as fallback
+    }
+    return () => {
+      if (ws) {
+        try { ws.close(); } catch { /* ignore */ }
+      }
+    };
+  }, [fetchPRDData, fetchTaskUsage]);
 
   // Handle item update via API
   const handleItemUpdate = useCallback(
@@ -328,14 +371,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       const result = await res.json();
 
       // Show toast
-      setToast(`Created ${result.level}: ${result.title}`);
-      setTimeout(() => setToast(null), 3000);
+      showToast(`Created ${result.level}: ${result.title}`);
 
       // Refresh tree data
       await fetchPRDData();
       await fetchTaskUsage();
     },
-    [fetchPRDData, fetchTaskUsage],
+    [fetchPRDData, fetchTaskUsage, showToast],
   );
 
   // Handle task execution trigger
@@ -350,28 +392,45 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       if (!res.ok) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      setToast(`Hench execution started for task`);
-      setTimeout(() => setToast(null), 3000);
+      showToast(`Hench execution started for task`);
     },
-    [],
+    [showToast],
   );
 
-  // Handle item removal/deletion
+  // Handle item removal/deletion with optimistic UI update.
+  // Immediately removes the item from local state, then reconciles with the server.
+  // On failure, restores state by re-fetching from server.
   const handleRemoveItem = useCallback(
     async (id: string) => {
-      const res = await fetch(`/api/rex/items/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Delete failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-      const result = await res.json();
-      setToast(`Deleted ${result.level}: ${result.title}`);
-      setTimeout(() => setToast(null), 3000);
+      // Resolve the item before removal so we can collect descendant IDs
+      const targetItem = data ? findItemById(data.items, id) : null;
+      const affectedIds = targetItem ? collectSubtreeIds(targetItem) : new Set([id]);
 
-      // Deselect if we just deleted the selected item
-      if (selectedItemId === id) {
+      // Show loading state on the tree node
+      setDeletingItemId(id);
+
+      // Optimistic removal — immediately update local state
+      setData((prev) => {
+        if (!prev) return prev;
+        return { ...prev, items: removeItemById(prev.items, id) };
+      });
+
+      // Clean up bulk selection for the deleted item and its descendants
+      setBulkSelectedIds((prev) => {
+        if (prev.size === 0) return prev;
+        let changed = false;
+        const next = new Set(prev);
+        for (const affectedId of affectedIds) {
+          if (next.has(affectedId)) {
+            next.delete(affectedId);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+
+      // Deselect if the selected item is the deleted item or any of its descendants
+      if (selectedItemId && affectedIds.has(selectedItemId)) {
         setSelectedItemId(null);
         if (onDetailContent) onDetailContent(null);
         // Clean URL back to /prd
@@ -382,11 +441,30 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         );
       }
 
-      // Refresh tree data
-      await fetchPRDData();
-      await fetchTaskUsage();
+      try {
+        const res = await fetch(`/api/rex/items/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({ error: "Delete failed" }));
+          throw new Error(errBody.error || `HTTP ${res.status}`);
+        }
+        const result = await res.json();
+        showToast(`Deleted ${result.level}: ${result.title}`);
+
+        // Reconcile with authoritative server state
+        await fetchPRDData();
+        await fetchTaskUsage();
+      } catch (err) {
+        // Restore tree from server on failure (undo optimistic removal)
+        await fetchPRDData();
+        // Re-throw so callers (modal, detail panel) can handle their own UI state
+        throw err;
+      } finally {
+        setDeletingItemId(null);
+      }
     },
-    [selectedItemId, onDetailContent, fetchPRDData, fetchTaskUsage],
+    [data, selectedItemId, onDetailContent, fetchPRDData, fetchTaskUsage, showToast],
   );
 
   // Handle item removal from tree node (triggered by inline button or context menu)
@@ -403,13 +481,28 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     async (id: string) => {
       try {
         await handleRemoveItem(id);
-      } catch {
-        setToast("Failed to delete item");
-        setTimeout(() => setToast(null), 3000);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Delete failed";
+        showToast(`Failed to delete item: ${msg}`, "error", 4000);
       }
       setDeleteTarget(null);
     },
-    [handleRemoveItem],
+    [handleRemoveItem, showToast],
+  );
+
+  // Wrapper for detail panel deletion — adds error toast since the detail
+  // panel's inline confirmation has no access to the toast system.
+  const handleRemoveFromDetail = useCallback(
+    async (id: string) => {
+      try {
+        await handleRemoveItem(id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Delete failed";
+        showToast(`Failed to delete item: ${msg}`, "error", 4000);
+        throw err; // Re-throw so TaskDetail can reset its removing/confirming state
+      }
+    },
+    [handleRemoveItem, showToast],
   );
 
   // Update detail content when selection or data changes
@@ -440,10 +533,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
           fetchTaskUsage();
         },
         onAddChild: handleAddChild,
-        onRemove: handleRemoveItem,
+        onRemove: handleRemoveFromDetail,
       }),
     );
-  }, [data, selectedItemId, taskUsageById, onDetailContent, handleItemUpdate, handleNavigateToItem, handleExecuteTask, fetchPRDData, fetchTaskUsage, handleAddChild, handleRemoveItem]);
+  }, [data, selectedItemId, taskUsageById, onDetailContent, handleItemUpdate, handleNavigateToItem, handleExecuteTask, fetchPRDData, fetchTaskUsage, handleAddChild, handleRemoveFromDetail]);
 
   // Handle add item submission
   const handleAddItem = useCallback(
@@ -462,8 +555,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       const result = await res.json();
 
       // Show toast
-      setToast(`Created ${result.level}: ${result.title}`);
-      setTimeout(() => setToast(null), 3000);
+      showToast(`Created ${result.level}: ${result.title}`);
 
       // Close form and refresh
       setActiveTab(null);
@@ -471,7 +563,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       await fetchPRDData();
       await fetchTaskUsage();
     },
-    [fetchPRDData, fetchTaskUsage],
+    [fetchPRDData, fetchTaskUsage, showToast],
   );
 
   // Handle inline add item submission (from tree node inline form)
@@ -491,34 +583,31 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       const result = await res.json();
 
       // Show toast
-      setToast(`Created ${result.level}: ${result.title}`);
-      setTimeout(() => setToast(null), 3000);
+      showToast(`Created ${result.level}: ${result.title}`);
 
       // Refresh tree data
       await fetchPRDData();
       await fetchTaskUsage();
     },
-    [fetchPRDData, fetchTaskUsage],
+    [fetchPRDData, fetchTaskUsage, showToast],
   );
 
   // Handle merge completion
   const handleMergeComplete = useCallback(() => {
     setActiveTab(null);
     setBulkSelectedIds(new Set());
-    setToast("Items merged successfully");
-    setTimeout(() => setToast(null), 3000);
+    showToast("Items merged successfully");
     fetchPRDData();
     fetchTaskUsage();
-  }, [fetchPRDData, fetchTaskUsage]);
+  }, [fetchPRDData, fetchTaskUsage, showToast]);
 
   // Handle prune completion
   const handlePruneComplete = useCallback(() => {
     setActiveTab(null);
-    setToast("Completed items pruned and archived");
-    setTimeout(() => setToast(null), 3000);
+    showToast("Completed items pruned and archived");
     fetchPRDData();
     fetchTaskUsage();
-  }, [fetchPRDData, fetchTaskUsage]);
+  }, [fetchPRDData, fetchTaskUsage, showToast]);
 
   // Open merge preview
   const handleOpenMerge = useCallback(() => {
@@ -623,6 +712,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       highlightedItemId: highlightedTaskId,
       deepLinkExpandIds,
       onRemoveItem: handleRemoveItemFromTree,
+      deletingItemId,
     }),
 
     // Bulk actions bar (floating at bottom)
@@ -633,9 +723,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       onMerge: handleOpenMerge,
     }),
 
-    // Toast notification
+    // Toast notification (success = green, error = red)
     toast
-      ? h("div", { class: "rex-toast", role: "status", "aria-live": "polite" }, toast)
+      ? h("div", {
+          class: `rex-toast${toastType === "error" ? " rex-toast-error" : ""}`,
+          role: toastType === "error" ? "alert" : "status",
+          "aria-live": toastType === "error" ? "assertive" : "polite",
+        }, toast)
       : null,
 
     // Delete confirmation modal
