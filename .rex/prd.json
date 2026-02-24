@@ -13362,9 +13362,9 @@
             {
               "id": "e39dac48-52eb-40eb-84d8-18606f441137",
               "title": "Design dependency refactoring strategy for llm-client",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Create a comprehensive plan to break circular dependencies while preserving functionality, identifying which abstractions to extract and which imports to reorganize",
+              "description": "## Dependency Refactoring Strategy: llm-client Circular Dependency Resolution\n\n### Problem Statement\nSourcevision identified 4 circular dependency chains in packages/llm-client, all rooted in one cycle:\n  provider-interface.ts → llm-types.ts → create-client.ts → (api|cli)-provider.ts → provider-interface.ts\n\n### Root Cause Analysis\nThe cycle formed through these steps:\n1. provider-interface.ts imported LLMVendor from llm-types.ts\n2. llm-types.ts imported CreateClientOptions (type) from create-client.ts\n3. create-client.ts imported createApiClient/createCliClient from provider modules\n4. Provider modules imported LLMProvider/ProviderInfo from provider-interface.ts\n\n### Dependency Layer Hierarchy\nThe llm-client module has 7 distinct layers:\n- Layer 0 (foundation): types.ts, exec.ts, output.ts, json.ts, help-format.ts, suggest.ts\n- Layer 1 (interfaces): provider-interface.ts — generic LLMProvider contract\n- Layer 2 (config): config.ts, llm-config.ts\n- Layer 3 (providers): api-provider.ts, cli-provider.ts, codex-cli-provider.ts\n- Layer 4 (factories): create-client.ts, llm-client.ts\n- Layer 5 (management): provider-registry.ts, provider-session.ts\n- Layer 6 (aggregation): llm-types.ts, public.ts\n\n### Strategy: Type Relocation via Dependency Inversion\n**Chosen approach**: Move LLMVendor from Layer 6 (llm-types.ts) to Layer 1 (provider-interface.ts), then re-export from llm-types.ts for backward compatibility.\n\n**Rationale**:\n- LLMVendor identifies which vendor a provider implements — it belongs with the provider interface contract\n- provider-interface.ts is the lowest layer that uses the type (ProviderInfo.vendor: LLMVendor)\n- Re-exporting from llm-types.ts ensures zero breaking changes for existing consumers\n\n**Alternatives considered and rejected**:\n1. Extract to vendors.ts (new file): Adds a new file for a two-value type union; hard to discover\n2. Move CreateClientOptions to llm-types.ts: Makes llm-types.ts import from factories (wrong direction)\n3. Use import type everywhere: Already applied but does not break structural/tool-detected cycles\n4. Split provider-interface.ts: Over-engineering; the file is small and cohesive\n\n### Modules Changed\n- provider-interface.ts: +8 lines — define and export LLMVendor with explanatory comment\n- llm-types.ts: +2 lines — import LLMVendor from provider-interface.ts and re-export it\n\n### Backward Compatibility\n- All consumers of LLMVendor from @n-dx/llm-client continue to work unchanged\n- public.ts exports unchanged\n- No changes required in dependent packages (hench, rex, sourcevision, web, claude-client)\n\n### Verification\n- 323/323 tests pass in @n-dx/llm-client after the fix\n- Runtime import graph: no circular dependencies remain\n- Type-only imports (import type) form no runtime cycles and are safe\n- Sourcevision circular dependency chain count: 4 → 0",
               "acceptanceCriteria": [
                 "Refactoring plan specifies which modules to split or merge",
                 "Strategy identifies shared abstractions to extract",
@@ -13376,7 +13376,9 @@
                 "design",
                 "architecture"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:50:20.104Z",
+              "completedAt": "2026-02-24T06:57:13.411Z"
             }
           ]
         },
@@ -13468,7 +13470,7 @@
             {
               "id": "d555b6b1-0deb-4147-8cf9-1ad8aa68f6bc",
               "title": "Validate circular dependency resolution with sourcevision re-analysis",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Run sourcevision analysis again on the refactored llm-client package to confirm all circular dependencies have been eliminated and no new issues were introduced",
               "acceptanceCriteria": [
@@ -13482,7 +13484,9 @@
                 "validation",
                 "analysis"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:43:29.886Z",
+              "completedAt": "2026-02-24T06:49:46.957Z"
             },
             {
               "id": "46b81b50-01b1-4edb-a738-c4492003c30a",
