@@ -1,0 +1,159 @@
+{
+  "proposals": [
+    {
+      "epic": {
+        "title": "Claude Integration Health Monitoring",
+        "source": "llm"
+      },
+      "features": [
+        {
+          "title": "Claude API Connectivity Validation",
+          "source": "llm",
+          "description": "Implement comprehensive health checks to validate Claude API connectivity and authentication status across all packages",
+          "tasks": [
+            {
+              "title": "Add Claude API connectivity test command",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Create a dedicated command to test Claude API connectivity, validate authentication credentials, and report connection status with detailed error messages for troubleshooting",
+              "acceptanceCriteria": [
+                "Command successfully connects to Claude API and reports status",
+                "Validates both CLI and API key authentication methods",
+                "Returns meaningful error messages for connection failures",
+                "Reports API rate limit status and usage information"
+              ],
+              "priority": "high",
+              "tags": [
+                "claude",
+                "api",
+                "diagnostics"
+              ]
+            },
+            {
+              "title": "Implement Claude API health monitoring in all packages",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Add health check functionality to rex, hench, and sourcevision packages to validate Claude integration before executing operations that require API calls",
+              "acceptanceCriteria": [
+                "Each package validates Claude connectivity before API-dependent operations",
+                "Health checks provide clear pass/fail status with error details",
+                "Packages gracefully handle API unavailability with helpful guidance",
+                "Health status is cached to avoid excessive API calls"
+              ],
+              "priority": "high",
+              "tags": [
+                "claude",
+                "integration",
+                "validation"
+              ]
+            },
+            {
+              "title": "Add Claude credential validation with detailed diagnostics",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Implement comprehensive credential validation that checks API key format, permissions, and account status to provide actionable troubleshooting information",
+              "acceptanceCriteria": [
+                "Validates API key format and structure",
+                "Checks API key permissions for required operations",
+                "Reports account status and usage limits",
+                "Provides specific guidance for credential setup issues"
+              ],
+              "priority": "medium",
+              "tags": [
+                "claude",
+                "auth",
+                "validation"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Claude CLI Health Checks",
+          "source": "llm",
+          "description": "Validate Claude CLI installation and functionality to ensure proper integration with the development workflow",
+          "tasks": [
+            {
+              "title": "Implement Claude CLI installation detection",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Create automated checks to detect if Claude CLI is properly installed, accessible in PATH, and at the correct version for compatibility with n-dx tooling",
+              "acceptanceCriteria": [
+                "Detects Claude CLI installation and reports version",
+                "Validates CLI is accessible from current PATH",
+                "Checks version compatibility with n-dx requirements",
+                "Provides installation guidance when CLI is missing or outdated"
+              ],
+              "priority": "high",
+              "tags": [
+                "claude",
+                "cli",
+                "installation"
+              ]
+            },
+            {
+              "title": "Add Claude CLI functionality validation",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Test core Claude CLI operations to ensure the CLI is properly configured and can execute essential commands needed by n-dx workflows",
+              "acceptanceCriteria": [
+                "Validates Claude CLI can execute basic commands",
+                "Tests authentication status through CLI",
+                "Verifies CLI configuration is compatible with n-dx",
+                "Reports specific CLI issues with resolution steps"
+              ],
+              "priority": "medium",
+              "tags": [
+                "claude",
+                "cli",
+                "functionality"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Integration Diagnostics Dashboard",
+          "source": "llm",
+          "description": "Provide comprehensive diagnostics and monitoring interface for Claude integration health across the entire n-dx toolkit",
+          "tasks": [
+            {
+              "title": "Build Claude integration status dashboard",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Create a unified dashboard that displays Claude integration health across all packages, showing connectivity status, authentication state, and usage metrics in real-time",
+              "acceptanceCriteria": [
+                "Displays real-time Claude API connectivity status",
+                "Shows authentication state for both CLI and API methods",
+                "Reports usage metrics and rate limit status",
+                "Provides quick access to troubleshooting resources"
+              ],
+              "priority": "medium",
+              "tags": [
+                "claude",
+                "dashboard",
+                "monitoring"
+              ]
+            },
+            {
+              "title": "Add comprehensive Claude integration test suite",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "Implement end-to-end testing that validates Claude integration across all n-dx packages and workflows to ensure reliable operation",
+              "acceptanceCriteria": [
+                "Tests Claude integration in rex analyze workflow",
+                "Validates Claude functionality in hench execution",
+                "Tests sourcevision Claude-dependent operations",
+                "Runs integration tests with both authentication methods"
+              ],
+              "priority": "medium",
+              "tags": [
+                "claude",
+                "testing",
+                "integration"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
