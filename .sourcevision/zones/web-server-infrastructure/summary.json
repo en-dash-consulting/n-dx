@@ -1,7 +1,7 @@
 {
   "id": "web-server-infrastructure",
   "name": "Web Server Infrastructure",
-  "description": "Core server components including CLI entry points, MCP endpoints, domain gateways, and HTTP routing infrastructure.",
+  "description": "Core HTTP server foundation providing routing, gateways, and service orchestration for the unified dashboard and MCP endpoints.",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/landing/index.html",
@@ -45,6 +45,7 @@
     "packages/web/tests/unit/server/routes-hench-execute.test.ts",
     "packages/web/tests/unit/server/routes-hench-health.test.ts",
     "packages/web/tests/unit/server/routes-hench-heartbeat.test.ts",
+    "packages/web/tests/unit/server/routes-hench-shutdown.test.ts",
     "packages/web/tests/unit/server/routes-hench-templates.test.ts",
     "packages/web/tests/unit/server/routes-mcp.test.ts",
     "packages/web/tests/unit/server/routes-notion.test.ts",
@@ -58,6 +59,7 @@
     "packages/web/tests/unit/server/routes-validation.test.ts",
     "packages/web/tests/unit/server/routes-workflow.test.ts",
     "packages/web/tests/unit/server/scope.test.ts",
+    "packages/web/tests/unit/server/shutdown-handler.test.ts",
     "packages/web/tests/unit/server/type-consistency.test.ts",
     "packages/web/tests/unit/server/websocket.test.ts"
   ],
@@ -68,6 +70,6 @@
   ],
   "cohesion": 0.98,
   "coupling": 0.02,
-  "fileCount": 57,
-  "lineCount": 23939
+  "fileCount": 59,
+  "lineCount": 25357
 }

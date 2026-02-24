@@ -17445,49 +17445,10 @@
     }
   ],
   "summary": {
-<<<<<<< HEAD
-    "totalEdges": 1800,
-    "totalExternal": 17,
-    "circularCount": 4,
-    "circulars": [
-      {
-        "cycle": [
-          "packages/llm-client/src/api-provider.ts",
-          "packages/llm-client/src/provider-interface.ts",
-          "packages/llm-client/src/llm-types.ts",
-          "packages/llm-client/src/create-client.ts"
-        ]
-      },
-      {
-        "cycle": [
-          "packages/llm-client/src/api-provider.ts",
-          "packages/llm-client/src/provider-interface.ts",
-          "packages/llm-client/src/llm-types.ts",
-          "packages/llm-client/src/create-client.ts"
-        ]
-      },
-      {
-        "cycle": [
-          "packages/llm-client/src/provider-interface.ts",
-          "packages/llm-client/src/llm-types.ts",
-          "packages/llm-client/src/create-client.ts"
-        ]
-      },
-      {
-        "cycle": [
-          "packages/llm-client/src/provider-interface.ts",
-          "packages/llm-client/src/llm-types.ts",
-          "packages/llm-client/src/create-client.ts",
-          "packages/llm-client/src/cli-provider.ts"
-        ]
-      }
-    ],
-=======
-    "totalEdges": 1799,
+    "totalEdges": 1806,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],
->>>>>>> feature/integrate-codex
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
@@ -17570,6 +17531,6 @@
         "count": 9
       }
     ],
-    "avgImportsPerFile": 3.37
+    "avgImportsPerFile": 3.38
   }
 }

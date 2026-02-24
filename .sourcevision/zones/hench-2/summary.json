@@ -1,35 +1,29 @@
 {
   "id": "hench-2",
-  "name": "Guardrails & Tool Interface",
-  "description": "Provides guard policy enforcement plus filesystem, git, and shell tooling layers that the agent core calls into.",
+  "name": "Hench 2",
+  "description": "11 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/tools.ts",
-    "packages/hench/src/guard/commands.ts",
-    "packages/hench/src/guard/index.ts",
-    "packages/hench/src/guard/paths.ts",
-    "packages/hench/src/guard/policy.ts",
+    "packages/hench/src/tools/contracts.ts",
     "packages/hench/src/tools/dispatch.ts",
     "packages/hench/src/tools/files.ts",
     "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/index.ts",
     "packages/hench/src/tools/shell.ts",
-    "packages/hench/tests/unit/guard/commands.test.ts",
-    "packages/hench/tests/unit/guard/guard-integration.test.ts",
-    "packages/hench/tests/unit/guard/paths.test.ts",
-    "packages/hench/tests/unit/guard/policy.test.ts",
+    "packages/hench/src/tools/test-runner.ts",
     "packages/hench/tests/unit/tools/files.test.ts",
     "packages/hench/tests/unit/tools/git.test.ts",
-    "packages/hench/tests/unit/tools/shell.test.ts"
+    "packages/hench/tests/unit/tools/test-runner.test.ts"
   ],
   "entryPoints": [
     "packages/hench/src/agent/tools.ts",
-    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/tools/contracts.ts",
     "packages/hench/src/tools/dispatch.ts",
-    "packages/hench/src/tools/files.ts",
-    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/index.ts",
     "packages/hench/src/tools/shell.ts"
   ],
-  "cohesion": 0.74,
-  "coupling": 0.26,
-  "fileCount": 16,
-  "lineCount": 2518
+  "cohesion": 0.77,
+  "coupling": 0.23,
+  "fileCount": 11,
+  "lineCount": 1689
 }

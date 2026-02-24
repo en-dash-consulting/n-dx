@@ -165,11 +165,7 @@ Internal:
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
 
 Incoming (other zones → this zone):
-<<<<<<< HEAD
-  ← web-infrastructure: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
-=======
   ← web-server-infrastructure: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
->>>>>>> feature/integrate-codex
 
 </imports>
 

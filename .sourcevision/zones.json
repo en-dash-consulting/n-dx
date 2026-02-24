@@ -1,7 +1,6 @@
 {
   "zones": [
     {
-<<<<<<< HEAD
       "id": ".claude-worktrees-strange-volhard:agent-security-layer",
       "name": "Agent Security Layer",
       "description": "Guard system and security contracts that validate and constrain autonomous agent operations to prevent unsafe actions.",
@@ -152,120 +151,14 @@
       "entryPoints": [
         ".claude/worktrees/strange-volhard/packages/hench/src/schema/v1.ts",
         ".claude/worktrees/strange-volhard/packages/hench/src/tools/shell.ts"
-=======
-      "id": "agent-core",
-      "name": "Agent Core",
-      "description": "Main autonomous agent engine handling task execution and Claude API interactions.",
-      "files": [
-        "packages/hench/src/agent/analysis/adaptive.ts",
-        "packages/hench/src/agent/analysis/review.ts",
-        "packages/hench/src/agent/analysis/stuck.ts",
-        "packages/hench/src/agent/analysis/summary.ts",
-        "packages/hench/src/agent/analysis/workflow.ts",
-        "packages/hench/src/agent/completion.ts",
-        "packages/hench/src/agent/index.ts",
-        "packages/hench/src/agent/lifecycle/cli-loop.ts",
-        "packages/hench/src/agent/lifecycle/heartbeat.ts",
-        "packages/hench/src/agent/lifecycle/loop.ts",
-        "packages/hench/src/agent/lifecycle/shared.ts",
-        "packages/hench/src/agent/lifecycle/task-display.ts",
-        "packages/hench/src/agent/lifecycle/token-budget.ts",
-        "packages/hench/src/agent/lifecycle/token-usage.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/agent/planning/prompt.ts",
-        "packages/hench/src/cli/commands/config.ts",
-        "packages/hench/src/cli/commands/constants.ts",
-        "packages/hench/src/cli/commands/init.ts",
-        "packages/hench/src/cli/commands/run.ts",
-        "packages/hench/src/cli/commands/show.ts",
-        "packages/hench/src/cli/commands/status.ts",
-        "packages/hench/src/cli/commands/task-lookup.ts",
-        "packages/hench/src/cli/commands/template.ts",
-        "packages/hench/src/cli/errors.ts",
-        "packages/hench/src/cli/help.ts",
-        "packages/hench/src/cli/index.ts",
-        "packages/hench/src/cli/output.ts",
-        "packages/hench/src/prd/ops.ts",
-        "packages/hench/src/prd/rex-gateway.ts",
-        "packages/hench/src/process/exec-shell.ts",
-        "packages/hench/src/process/exec.ts",
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/public.ts",
-        "packages/hench/src/schema/index.ts",
-        "packages/hench/src/schema/templates.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/schema/validate.ts",
-        "packages/hench/src/shared/glob.ts",
-        "packages/hench/src/store/config.ts",
-        "packages/hench/src/store/index.ts",
-        "packages/hench/src/store/json.ts",
-        "packages/hench/src/store/project-config.ts",
-        "packages/hench/src/store/runs.ts",
-        "packages/hench/src/store/suggestions.ts",
-        "packages/hench/src/store/templates.ts",
-        "packages/hench/src/tools/exec-shell.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/types/index.ts",
-        "packages/hench/src/types/output.ts",
-        "packages/hench/src/validation/completion.ts",
-        "packages/hench/src/validation/index.ts",
-        "packages/hench/tests/e2e/cli-init.test.ts",
-        "packages/hench/tests/integration/codex-token-accounting.test.ts",
-        "packages/hench/tests/integration/store-roundtrip.test.ts",
-        "packages/hench/tests/unit/agent/adaptive.test.ts",
-        "packages/hench/tests/unit/agent/api-auth.test.ts",
-        "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-        "packages/hench/tests/unit/agent/brief.test.ts",
-        "packages/hench/tests/unit/agent/cli-retry.test.ts",
-        "packages/hench/tests/unit/agent/codex-normalization.test.ts",
-        "packages/hench/tests/unit/agent/completion.test.ts",
-        "packages/hench/tests/unit/agent/heartbeat.test.ts",
-        "packages/hench/tests/unit/agent/loop.test.ts",
-        "packages/hench/tests/unit/agent/prompt.test.ts",
-        "packages/hench/tests/unit/agent/review.test.ts",
-        "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
-        "packages/hench/tests/unit/agent/stuck.test.ts",
-        "packages/hench/tests/unit/agent/summary.test.ts",
-        "packages/hench/tests/unit/agent/task-display.test.ts",
-        "packages/hench/tests/unit/agent/task-failure.test.ts",
-        "packages/hench/tests/unit/agent/token-budget.test.ts",
-        "packages/hench/tests/unit/agent/token-tracking.test.ts",
-        "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
-        "packages/hench/tests/unit/agent/token-usage.test.ts",
-        "packages/hench/tests/unit/agent/workflow.test.ts",
-        "packages/hench/tests/unit/cli/commands/config.test.ts",
-        "packages/hench/tests/unit/cli/commands/constants.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
-        "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
-        "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
-        "packages/hench/tests/unit/cli/errors.test.ts",
-        "packages/hench/tests/unit/cli/help.test.ts",
-        "packages/hench/tests/unit/cli/output.test.ts",
-        "packages/hench/tests/unit/process/exec.test.ts",
-        "packages/hench/tests/unit/schema/templates.test.ts",
-        "packages/hench/tests/unit/schema/validate.test.ts",
-        "packages/hench/tests/unit/store/claude-config.test.ts",
-        "packages/hench/tests/unit/store/project-config.test.ts",
-        "packages/hench/tests/unit/store/suggestions.test.ts",
-        "packages/hench/tests/unit/store/templates.test.ts",
-        "packages/hench/tests/unit/tools/completion-validation.test.ts",
-        "packages/hench/tests/unit/tools/rex.test.ts"
       ],
-      "entryPoints": [
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/tools/exec-shell.ts"
->>>>>>> feature/integrate-codex
-      ],
-      "cohesion": 0.97,
-      "coupling": 0.03,
+      "cohesion": 0.99,
+      "coupling": 0.01,
       "subZones": [
         {
           "id": "hench/tests",
           "name": "Tests",
-          "description": "49 files, primarily TypeScript",
+          "description": "73 files, primarily TypeScript",
           "files": [
             "packages/hench/src/agent/analysis/adaptive.ts",
             "packages/hench/src/agent/analysis/review.ts",
@@ -283,94 +176,380 @@
             "packages/hench/src/agent/planning/brief.ts",
             "packages/hench/src/agent/planning/prompt.ts",
             "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/init.ts",
+            "packages/hench/src/cli/commands/run.ts",
             "packages/hench/src/cli/commands/template.ts",
+            "packages/hench/src/prd/ops.ts",
+            "packages/hench/src/prd/rex-gateway.ts",
+            "packages/hench/src/process/exec-shell.ts",
+            "packages/hench/src/process/exec.ts",
+            "packages/hench/src/process/index.ts",
             "packages/hench/src/public.ts",
             "packages/hench/src/schema/index.ts",
             "packages/hench/src/schema/templates.ts",
             "packages/hench/src/schema/v1.ts",
             "packages/hench/src/schema/validate.ts",
+            "packages/hench/src/store/config.ts",
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/store/json.ts",
             "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/store/runs.ts",
             "packages/hench/src/store/templates.ts",
+            "packages/hench/src/tools/exec-shell.ts",
+            "packages/hench/src/tools/rex.ts",
             "packages/hench/src/types/index.ts",
             "packages/hench/src/types/output.ts",
             "packages/hench/tests/e2e/cli-init.test.ts",
+            "packages/hench/tests/integration/codex-token-accounting.test.ts",
+            "packages/hench/tests/integration/store-roundtrip.test.ts",
             "packages/hench/tests/unit/agent/adaptive.test.ts",
             "packages/hench/tests/unit/agent/api-auth.test.ts",
+            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
             "packages/hench/tests/unit/agent/brief.test.ts",
             "packages/hench/tests/unit/agent/cli-retry.test.ts",
             "packages/hench/tests/unit/agent/codex-normalization.test.ts",
             "packages/hench/tests/unit/agent/heartbeat.test.ts",
+            "packages/hench/tests/unit/agent/loop.test.ts",
             "packages/hench/tests/unit/agent/prompt.test.ts",
             "packages/hench/tests/unit/agent/review.test.ts",
             "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
             "packages/hench/tests/unit/agent/stuck.test.ts",
             "packages/hench/tests/unit/agent/summary.test.ts",
             "packages/hench/tests/unit/agent/task-display.test.ts",
+            "packages/hench/tests/unit/agent/task-failure.test.ts",
             "packages/hench/tests/unit/agent/token-budget.test.ts",
             "packages/hench/tests/unit/agent/token-tracking.test.ts",
             "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
             "packages/hench/tests/unit/agent/token-usage.test.ts",
             "packages/hench/tests/unit/agent/workflow.test.ts",
             "packages/hench/tests/unit/cli/commands/config.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
+            "packages/hench/tests/unit/process/exec.test.ts",
             "packages/hench/tests/unit/schema/templates.test.ts",
             "packages/hench/tests/unit/schema/validate.test.ts",
             "packages/hench/tests/unit/store/claude-config.test.ts",
-            "packages/hench/tests/unit/store/templates.test.ts"
+            "packages/hench/tests/unit/store/project-config.test.ts",
+            "packages/hench/tests/unit/store/templates.test.ts",
+            "packages/hench/tests/unit/tools/rex.test.ts"
           ],
           "entryPoints": [
-            "packages/hench/src/agent/analysis/stuck.ts",
-            "packages/hench/src/agent/lifecycle/cli-loop.ts",
-            "packages/hench/src/agent/lifecycle/loop.ts",
-            "packages/hench/src/agent/planning/brief.ts",
-            "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/store/config.ts",
             "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/init.ts",
+            "packages/hench/src/cli/commands/run.ts",
             "packages/hench/src/cli/commands/template.ts",
             "packages/hench/src/types/output.ts",
+            "packages/hench/src/tools/exec-shell.ts",
+            "packages/hench/src/process/index.ts",
             "packages/hench/src/schema/index.ts",
-            "packages/hench/src/schema/v1.ts",
-            "packages/hench/src/schema/validate.ts"
+            "packages/hench/src/store/runs.ts",
+            "packages/hench/src/agent/planning/brief.ts",
+            "packages/hench/src/tools/rex.ts"
           ],
-          "cohesion": 0.82,
-          "coupling": 0.18,
-          "depth": 1
+          "cohesion": 0.9,
+          "coupling": 0.1,
+          "depth": 1,
+          "subZones": [
+            {
+              "id": "hench/tests/unit",
+              "name": "Unit",
+              "description": "60 files, primarily TypeScript",
+              "files": [
+                "packages/hench/src/agent/analysis/adaptive.ts",
+                "packages/hench/src/agent/analysis/review.ts",
+                "packages/hench/src/agent/analysis/stuck.ts",
+                "packages/hench/src/agent/analysis/summary.ts",
+                "packages/hench/src/agent/analysis/workflow.ts",
+                "packages/hench/src/agent/index.ts",
+                "packages/hench/src/agent/lifecycle/cli-loop.ts",
+                "packages/hench/src/agent/lifecycle/heartbeat.ts",
+                "packages/hench/src/agent/lifecycle/loop.ts",
+                "packages/hench/src/agent/lifecycle/shared.ts",
+                "packages/hench/src/agent/lifecycle/task-display.ts",
+                "packages/hench/src/agent/lifecycle/token-budget.ts",
+                "packages/hench/src/agent/lifecycle/token-usage.ts",
+                "packages/hench/src/agent/planning/brief.ts",
+                "packages/hench/src/agent/planning/prompt.ts",
+                "packages/hench/src/cli/commands/config.ts",
+                "packages/hench/src/cli/commands/init.ts",
+                "packages/hench/src/cli/commands/template.ts",
+                "packages/hench/src/public.ts",
+                "packages/hench/src/schema/index.ts",
+                "packages/hench/src/schema/templates.ts",
+                "packages/hench/src/schema/v1.ts",
+                "packages/hench/src/schema/validate.ts",
+                "packages/hench/src/store/config.ts",
+                "packages/hench/src/store/index.ts",
+                "packages/hench/src/store/json.ts",
+                "packages/hench/src/store/project-config.ts",
+                "packages/hench/src/store/runs.ts",
+                "packages/hench/src/store/templates.ts",
+                "packages/hench/src/types/index.ts",
+                "packages/hench/src/types/output.ts",
+                "packages/hench/tests/e2e/cli-init.test.ts",
+                "packages/hench/tests/integration/codex-token-accounting.test.ts",
+                "packages/hench/tests/integration/store-roundtrip.test.ts",
+                "packages/hench/tests/unit/agent/adaptive.test.ts",
+                "packages/hench/tests/unit/agent/api-auth.test.ts",
+                "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+                "packages/hench/tests/unit/agent/brief.test.ts",
+                "packages/hench/tests/unit/agent/cli-retry.test.ts",
+                "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+                "packages/hench/tests/unit/agent/heartbeat.test.ts",
+                "packages/hench/tests/unit/agent/loop.test.ts",
+                "packages/hench/tests/unit/agent/prompt.test.ts",
+                "packages/hench/tests/unit/agent/review.test.ts",
+                "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+                "packages/hench/tests/unit/agent/stuck.test.ts",
+                "packages/hench/tests/unit/agent/summary.test.ts",
+                "packages/hench/tests/unit/agent/task-display.test.ts",
+                "packages/hench/tests/unit/agent/task-failure.test.ts",
+                "packages/hench/tests/unit/agent/token-budget.test.ts",
+                "packages/hench/tests/unit/agent/token-tracking.test.ts",
+                "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+                "packages/hench/tests/unit/agent/token-usage.test.ts",
+                "packages/hench/tests/unit/agent/workflow.test.ts",
+                "packages/hench/tests/unit/cli/commands/config.test.ts",
+                "packages/hench/tests/unit/schema/templates.test.ts",
+                "packages/hench/tests/unit/schema/validate.test.ts",
+                "packages/hench/tests/unit/store/claude-config.test.ts",
+                "packages/hench/tests/unit/store/project-config.test.ts",
+                "packages/hench/tests/unit/store/templates.test.ts"
+              ],
+              "entryPoints": [
+                "packages/hench/src/agent/analysis/stuck.ts",
+                "packages/hench/src/agent/lifecycle/cli-loop.ts",
+                "packages/hench/src/agent/lifecycle/loop.ts",
+                "packages/hench/src/agent/planning/brief.ts",
+                "packages/hench/src/store/index.ts",
+                "packages/hench/src/store/project-config.ts",
+                "packages/hench/src/schema/v1.ts",
+                "packages/hench/src/schema/validate.ts",
+                "packages/hench/src/store/config.ts"
+              ],
+              "cohesion": 0.94,
+              "coupling": 0.06,
+              "depth": 2,
+              "subZones": [
+                {
+                  "id": "hench/tests/unit/agent",
+                  "name": "Agent",
+                  "description": "30 files, primarily TypeScript",
+                  "files": [
+                    "packages/hench/src/agent/analysis/adaptive.ts",
+                    "packages/hench/src/agent/analysis/review.ts",
+                    "packages/hench/src/agent/analysis/stuck.ts",
+                    "packages/hench/src/agent/analysis/summary.ts",
+                    "packages/hench/src/agent/analysis/workflow.ts",
+                    "packages/hench/src/agent/index.ts",
+                    "packages/hench/src/agent/lifecycle/token-budget.ts",
+                    "packages/hench/src/agent/planning/brief.ts",
+                    "packages/hench/src/agent/planning/prompt.ts",
+                    "packages/hench/src/cli/commands/config.ts",
+                    "packages/hench/src/cli/commands/template.ts",
+                    "packages/hench/src/public.ts",
+                    "packages/hench/src/schema/index.ts",
+                    "packages/hench/src/schema/templates.ts",
+                    "packages/hench/src/schema/v1.ts",
+                    "packages/hench/src/schema/validate.ts",
+                    "packages/hench/src/store/templates.ts",
+                    "packages/hench/tests/e2e/cli-init.test.ts",
+                    "packages/hench/tests/unit/agent/adaptive.test.ts",
+                    "packages/hench/tests/unit/agent/brief.test.ts",
+                    "packages/hench/tests/unit/agent/prompt.test.ts",
+                    "packages/hench/tests/unit/agent/review.test.ts",
+                    "packages/hench/tests/unit/agent/stuck.test.ts",
+                    "packages/hench/tests/unit/agent/summary.test.ts",
+                    "packages/hench/tests/unit/agent/token-budget.test.ts",
+                    "packages/hench/tests/unit/agent/workflow.test.ts",
+                    "packages/hench/tests/unit/cli/commands/config.test.ts",
+                    "packages/hench/tests/unit/schema/templates.test.ts",
+                    "packages/hench/tests/unit/schema/validate.test.ts",
+                    "packages/hench/tests/unit/store/templates.test.ts"
+                  ],
+                  "entryPoints": [
+                    "packages/hench/src/agent/lifecycle/token-budget.ts",
+                    "packages/hench/src/schema/index.ts",
+                    "packages/hench/src/agent/analysis/review.ts",
+                    "packages/hench/src/agent/analysis/summary.ts",
+                    "packages/hench/src/agent/planning/brief.ts",
+                    "packages/hench/src/agent/planning/prompt.ts",
+                    "packages/hench/src/schema/v1.ts"
+                  ],
+                  "cohesion": 0.79,
+                  "coupling": 0.21,
+                  "depth": 3
+                },
+                {
+                  "id": "hench/tests/unit/agent-2",
+                  "name": "Agent 2",
+                  "description": "23 files, primarily TypeScript",
+                  "files": [
+                    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+                    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+                    "packages/hench/src/agent/lifecycle/loop.ts",
+                    "packages/hench/src/agent/lifecycle/shared.ts",
+                    "packages/hench/src/cli/commands/init.ts",
+                    "packages/hench/src/store/config.ts",
+                    "packages/hench/src/store/index.ts",
+                    "packages/hench/src/store/json.ts",
+                    "packages/hench/src/store/project-config.ts",
+                    "packages/hench/src/store/runs.ts",
+                    "packages/hench/tests/integration/codex-token-accounting.test.ts",
+                    "packages/hench/tests/integration/store-roundtrip.test.ts",
+                    "packages/hench/tests/unit/agent/api-auth.test.ts",
+                    "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+                    "packages/hench/tests/unit/agent/cli-retry.test.ts",
+                    "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+                    "packages/hench/tests/unit/agent/heartbeat.test.ts",
+                    "packages/hench/tests/unit/agent/loop.test.ts",
+                    "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+                    "packages/hench/tests/unit/agent/task-failure.test.ts",
+                    "packages/hench/tests/unit/agent/token-tracking.test.ts",
+                    "packages/hench/tests/unit/store/claude-config.test.ts",
+                    "packages/hench/tests/unit/store/project-config.test.ts"
+                  ],
+                  "entryPoints": [
+                    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+                    "packages/hench/src/agent/lifecycle/loop.ts",
+                    "packages/hench/src/store/config.ts",
+                    "packages/hench/src/store/json.ts"
+                  ],
+                  "cohesion": 0.75,
+                  "coupling": 0.25,
+                  "depth": 3
+                },
+                {
+                  "id": "hench/tests/unit/agent-3",
+                  "name": "Agent 3",
+                  "description": "4 files, primarily TypeScript",
+                  "files": [
+                    "packages/hench/src/agent/lifecycle/task-display.ts",
+                    "packages/hench/src/types/index.ts",
+                    "packages/hench/src/types/output.ts",
+                    "packages/hench/tests/unit/agent/task-display.test.ts"
+                  ],
+                  "entryPoints": [
+                    "packages/hench/src/types/output.ts",
+                    "packages/hench/src/agent/lifecycle/task-display.ts"
+                  ],
+                  "cohesion": 0.46,
+                  "coupling": 0.54,
+                  "depth": 3
+                },
+                {
+                  "id": "hench/tests/unit/agent-4",
+                  "name": "Agent 4",
+                  "description": "3 files, primarily TypeScript",
+                  "files": [
+                    "packages/hench/src/agent/lifecycle/token-usage.ts",
+                    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+                    "packages/hench/tests/unit/agent/token-usage.test.ts"
+                  ],
+                  "entryPoints": [
+                    "packages/hench/src/agent/lifecycle/token-usage.ts"
+                  ],
+                  "cohesion": 0.5,
+                  "coupling": 0.5,
+                  "depth": 3
+                }
+              ]
+            },
+            {
+              "id": "hench/tests/unit-2",
+              "name": "Unit 2",
+              "description": "4 files, primarily TypeScript",
+              "files": [
+                "packages/hench/src/cli/commands/run.ts",
+                "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+                "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+                "packages/hench/tests/unit/cli/commands/run-loop.test.ts"
+              ],
+              "entryPoints": [],
+              "cohesion": 0.38,
+              "coupling": 0.63,
+              "depth": 2
+            },
+            {
+              "id": "hench/tests/process",
+              "name": "Process",
+              "description": "9 files, primarily TypeScript",
+              "files": [
+                "packages/hench/src/prd/ops.ts",
+                "packages/hench/src/prd/rex-gateway.ts",
+                "packages/hench/src/process/exec-shell.ts",
+                "packages/hench/src/process/exec.ts",
+                "packages/hench/src/process/index.ts",
+                "packages/hench/src/tools/exec-shell.ts",
+                "packages/hench/src/tools/rex.ts",
+                "packages/hench/tests/unit/process/exec.test.ts",
+                "packages/hench/tests/unit/tools/rex.test.ts"
+              ],
+              "entryPoints": [
+                "packages/hench/src/process/index.ts",
+                "packages/hench/src/tools/rex.ts",
+                "packages/hench/src/prd/rex-gateway.ts"
+              ],
+              "cohesion": 0.69,
+              "coupling": 0.31,
+              "depth": 2
+            }
+          ]
         },
         {
           "id": "hench/tests-2",
           "name": "Tests 2",
-          "description": "14 files, primarily TypeScript",
+          "description": "5 files, primarily TypeScript",
           "files": [
             "packages/hench/src/agent/completion.ts",
-            "packages/hench/src/prd/ops.ts",
-            "packages/hench/src/prd/rex-gateway.ts",
-            "packages/hench/src/process/exec-shell.ts",
-            "packages/hench/src/process/exec.ts",
-            "packages/hench/src/process/index.ts",
-            "packages/hench/src/tools/exec-shell.ts",
-            "packages/hench/src/tools/rex.ts",
             "packages/hench/src/validation/completion.ts",
             "packages/hench/src/validation/index.ts",
             "packages/hench/tests/unit/agent/completion.test.ts",
-            "packages/hench/tests/unit/process/exec.test.ts",
-            "packages/hench/tests/unit/tools/completion-validation.test.ts",
-            "packages/hench/tests/unit/tools/rex.test.ts"
+            "packages/hench/tests/unit/tools/completion-validation.test.ts"
           ],
           "entryPoints": [
-            "packages/hench/src/process/index.ts",
-            "packages/hench/src/validation/completion.ts",
-            "packages/hench/src/tools/rex.ts",
-            "packages/hench/src/prd/rex-gateway.ts"
+            "packages/hench/src/validation/completion.ts"
           ],
-          "cohesion": 0.74,
-          "coupling": 0.26,
+          "cohesion": 0.57,
+          "coupling": 0.43,
           "depth": 1
         },
         {
-          "id": "hench/tests-3",
-          "name": "Tests 3",
-          "description": "25 files, primarily TypeScript",
+          "id": "hench/tools",
+          "name": "Tools",
+          "description": "11 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/agent/tools.ts",
+            "packages/hench/src/tools/contracts.ts",
+            "packages/hench/src/tools/dispatch.ts",
+            "packages/hench/src/tools/files.ts",
+            "packages/hench/src/tools/git.ts",
+            "packages/hench/src/tools/index.ts",
+            "packages/hench/src/tools/shell.ts",
+            "packages/hench/src/tools/test-runner.ts",
+            "packages/hench/tests/unit/tools/files.test.ts",
+            "packages/hench/tests/unit/tools/git.test.ts",
+            "packages/hench/tests/unit/tools/test-runner.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/tools/contracts.ts",
+            "packages/hench/src/tools/dispatch.ts",
+            "packages/hench/src/tools/index.ts",
+            "packages/hench/src/agent/tools.ts"
+          ],
+          "cohesion": 0.83,
+          "coupling": 0.17,
+          "depth": 1
+        },
+        {
+          "id": "hench/cli",
+          "name": "Cli",
+          "description": "14 files, primarily TypeScript",
           "files": [
             "packages/hench/src/cli/commands/constants.ts",
-            "packages/hench/src/cli/commands/init.ts",
             "packages/hench/src/cli/commands/show.ts",
             "packages/hench/src/cli/commands/status.ts",
             "packages/hench/src/cli/commands/task-lookup.ts",
@@ -378,50 +557,20 @@
             "packages/hench/src/cli/help.ts",
             "packages/hench/src/cli/index.ts",
             "packages/hench/src/cli/output.ts",
-            "packages/hench/src/store/config.ts",
-            "packages/hench/src/store/index.ts",
-            "packages/hench/src/store/json.ts",
-            "packages/hench/src/store/runs.ts",
-            "packages/hench/tests/integration/codex-token-accounting.test.ts",
-            "packages/hench/tests/integration/store-roundtrip.test.ts",
-            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-            "packages/hench/tests/unit/agent/loop.test.ts",
-            "packages/hench/tests/unit/agent/task-failure.test.ts",
             "packages/hench/tests/unit/cli/commands/constants.test.ts",
             "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
             "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
             "packages/hench/tests/unit/cli/errors.test.ts",
             "packages/hench/tests/unit/cli/help.test.ts",
-            "packages/hench/tests/unit/cli/output.test.ts",
-            "packages/hench/tests/unit/store/project-config.test.ts"
+            "packages/hench/tests/unit/cli/output.test.ts"
           ],
           "entryPoints": [
-            "packages/hench/src/store/index.ts",
             "packages/hench/src/cli/errors.ts",
             "packages/hench/src/cli/output.ts",
-            "packages/hench/src/store/config.ts",
-            "packages/hench/src/cli/commands/constants.ts",
-            "packages/hench/src/store/json.ts"
+            "packages/hench/src/cli/commands/constants.ts"
           ],
-          "cohesion": 0.7,
-          "coupling": 0.3,
-          "depth": 1
-        },
-        {
-          "id": "hench/tests-4",
-          "name": "Tests 4",
-          "description": "4 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/cli/commands/run.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-loop.test.ts"
-          ],
-          "entryPoints": [
-            "packages/hench/src/cli/commands/run.ts"
-          ],
-          "cohesion": 0.29,
-          "coupling": 0.71,
+          "cohesion": 0.67,
+          "coupling": 0.33,
           "depth": 1
         },
         {
@@ -439,7 +588,6 @@
         }
       ],
       "insights": [
-<<<<<<< HEAD
         "High cohesion (0.99) — files are tightly interconnected",
         "Near-perfect cohesion (0.99) with minimal coupling (0.01) shows strong architectural discipline",
         "Large size (106 files) indicates comprehensive agent capabilities",
@@ -1309,608 +1457,9 @@
       "depth": 1
     },
     {
-      "id": "agent-engine",
-      "name": "Agent Engine",
-      "description": "Autonomous agent execution engine handling task analysis, lifecycle management, and tool dispatch with adaptive workflow capabilities.",
-      "files": [
-        "packages/hench/src/agent/analysis/adaptive.ts",
-        "packages/hench/src/agent/analysis/review.ts",
-        "packages/hench/src/agent/analysis/stuck.ts",
-        "packages/hench/src/agent/analysis/summary.ts",
-        "packages/hench/src/agent/analysis/workflow.ts",
-        "packages/hench/src/agent/index.ts",
-        "packages/hench/src/agent/lifecycle/cli-loop.ts",
-        "packages/hench/src/agent/lifecycle/heartbeat.ts",
-        "packages/hench/src/agent/lifecycle/loop.ts",
-        "packages/hench/src/agent/lifecycle/shared.ts",
-        "packages/hench/src/agent/lifecycle/task-display.ts",
-        "packages/hench/src/agent/lifecycle/token-budget.ts",
-        "packages/hench/src/agent/lifecycle/token-usage.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/agent/planning/prompt.ts",
-        "packages/hench/src/agent/tools.ts",
-        "packages/hench/src/cli/commands/config.ts",
-        "packages/hench/src/cli/commands/constants.ts",
-        "packages/hench/src/cli/commands/init.ts",
-        "packages/hench/src/cli/commands/run.ts",
-        "packages/hench/src/cli/commands/show.ts",
-        "packages/hench/src/cli/commands/status.ts",
-        "packages/hench/src/cli/commands/task-lookup.ts",
-        "packages/hench/src/cli/commands/template.ts",
-        "packages/hench/src/cli/errors.ts",
-        "packages/hench/src/cli/help.ts",
-        "packages/hench/src/cli/index.ts",
-        "packages/hench/src/cli/output.ts",
-        "packages/hench/src/guard/commands.ts",
-        "packages/hench/src/guard/contracts.ts",
-        "packages/hench/src/guard/index.ts",
-        "packages/hench/src/guard/paths.ts",
-        "packages/hench/src/guard/policy.ts",
-        "packages/hench/src/prd/ops.ts",
-        "packages/hench/src/prd/rex-gateway.ts",
-        "packages/hench/src/process/exec-shell.ts",
-        "packages/hench/src/process/exec.ts",
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/public.ts",
-        "packages/hench/src/schema/index.ts",
-        "packages/hench/src/schema/templates.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/schema/validate.ts",
-        "packages/hench/src/shared/glob.ts",
-        "packages/hench/src/store/config.ts",
-        "packages/hench/src/store/index.ts",
-        "packages/hench/src/store/json.ts",
-        "packages/hench/src/store/project-config.ts",
-        "packages/hench/src/store/runs.ts",
-        "packages/hench/src/store/templates.ts",
-        "packages/hench/src/tools/contracts.ts",
-        "packages/hench/src/tools/dispatch.ts",
-        "packages/hench/src/tools/exec-shell.ts",
-        "packages/hench/src/tools/files.ts",
-        "packages/hench/src/tools/git.ts",
-        "packages/hench/src/tools/index.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/tools/shell.ts",
-        "packages/hench/src/tools/test-runner.ts",
-        "packages/hench/src/types/index.ts",
-        "packages/hench/src/types/output.ts",
-        "packages/hench/tests/e2e/cli-init.test.ts",
-        "packages/hench/tests/integration/codex-token-accounting.test.ts",
-        "packages/hench/tests/integration/store-roundtrip.test.ts",
-        "packages/hench/tests/unit/agent/adaptive.test.ts",
-        "packages/hench/tests/unit/agent/api-auth.test.ts",
-        "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-        "packages/hench/tests/unit/agent/brief.test.ts",
-        "packages/hench/tests/unit/agent/cli-retry.test.ts",
-        "packages/hench/tests/unit/agent/codex-normalization.test.ts",
-        "packages/hench/tests/unit/agent/heartbeat.test.ts",
-        "packages/hench/tests/unit/agent/loop.test.ts",
-        "packages/hench/tests/unit/agent/prompt.test.ts",
-        "packages/hench/tests/unit/agent/review.test.ts",
-        "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
-        "packages/hench/tests/unit/agent/stuck.test.ts",
-        "packages/hench/tests/unit/agent/summary.test.ts",
-        "packages/hench/tests/unit/agent/task-display.test.ts",
-        "packages/hench/tests/unit/agent/task-failure.test.ts",
-        "packages/hench/tests/unit/agent/token-budget.test.ts",
-        "packages/hench/tests/unit/agent/token-tracking.test.ts",
-        "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
-        "packages/hench/tests/unit/agent/token-usage.test.ts",
-        "packages/hench/tests/unit/agent/workflow.test.ts",
-        "packages/hench/tests/unit/cli/commands/config.test.ts",
-        "packages/hench/tests/unit/cli/commands/constants.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-        "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
-        "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
-        "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
-        "packages/hench/tests/unit/cli/errors.test.ts",
-        "packages/hench/tests/unit/cli/help.test.ts",
-        "packages/hench/tests/unit/cli/output.test.ts",
-        "packages/hench/tests/unit/guard/commands.test.ts",
-        "packages/hench/tests/unit/guard/guard-integration.test.ts",
-        "packages/hench/tests/unit/guard/paths.test.ts",
-        "packages/hench/tests/unit/guard/policy.test.ts",
-        "packages/hench/tests/unit/process/exec.test.ts",
-        "packages/hench/tests/unit/schema/templates.test.ts",
-        "packages/hench/tests/unit/schema/validate.test.ts",
-        "packages/hench/tests/unit/store/claude-config.test.ts",
-        "packages/hench/tests/unit/store/project-config.test.ts",
-        "packages/hench/tests/unit/store/templates.test.ts",
-        "packages/hench/tests/unit/tools/files.test.ts",
-        "packages/hench/tests/unit/tools/git.test.ts",
-        "packages/hench/tests/unit/tools/rex.test.ts",
-        "packages/hench/tests/unit/tools/shell.test.ts",
-        "packages/hench/tests/unit/tools/test-runner.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/process/index.ts",
-        "packages/hench/src/tools/rex.ts"
-      ],
-      "cohesion": 0.99,
-      "coupling": 0.01,
-      "subZones": [
-        {
-          "id": "hench/tests",
-          "name": "Tests",
-          "description": "73 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/agent/analysis/adaptive.ts",
-            "packages/hench/src/agent/analysis/review.ts",
-            "packages/hench/src/agent/analysis/stuck.ts",
-            "packages/hench/src/agent/analysis/summary.ts",
-            "packages/hench/src/agent/analysis/workflow.ts",
-            "packages/hench/src/agent/index.ts",
-            "packages/hench/src/agent/lifecycle/cli-loop.ts",
-            "packages/hench/src/agent/lifecycle/heartbeat.ts",
-            "packages/hench/src/agent/lifecycle/loop.ts",
-            "packages/hench/src/agent/lifecycle/shared.ts",
-            "packages/hench/src/agent/lifecycle/task-display.ts",
-            "packages/hench/src/agent/lifecycle/token-budget.ts",
-            "packages/hench/src/agent/lifecycle/token-usage.ts",
-            "packages/hench/src/agent/planning/brief.ts",
-            "packages/hench/src/agent/planning/prompt.ts",
-            "packages/hench/src/cli/commands/config.ts",
-            "packages/hench/src/cli/commands/init.ts",
-            "packages/hench/src/cli/commands/run.ts",
-            "packages/hench/src/cli/commands/template.ts",
-            "packages/hench/src/prd/ops.ts",
-            "packages/hench/src/prd/rex-gateway.ts",
-            "packages/hench/src/process/exec-shell.ts",
-            "packages/hench/src/process/exec.ts",
-            "packages/hench/src/process/index.ts",
-            "packages/hench/src/public.ts",
-            "packages/hench/src/schema/index.ts",
-            "packages/hench/src/schema/templates.ts",
-            "packages/hench/src/schema/v1.ts",
-            "packages/hench/src/schema/validate.ts",
-            "packages/hench/src/store/config.ts",
-            "packages/hench/src/store/index.ts",
-            "packages/hench/src/store/json.ts",
-            "packages/hench/src/store/project-config.ts",
-            "packages/hench/src/store/runs.ts",
-            "packages/hench/src/store/templates.ts",
-            "packages/hench/src/tools/exec-shell.ts",
-            "packages/hench/src/tools/rex.ts",
-            "packages/hench/src/types/index.ts",
-            "packages/hench/src/types/output.ts",
-            "packages/hench/tests/e2e/cli-init.test.ts",
-            "packages/hench/tests/integration/codex-token-accounting.test.ts",
-            "packages/hench/tests/integration/store-roundtrip.test.ts",
-            "packages/hench/tests/unit/agent/adaptive.test.ts",
-            "packages/hench/tests/unit/agent/api-auth.test.ts",
-            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-            "packages/hench/tests/unit/agent/brief.test.ts",
-            "packages/hench/tests/unit/agent/cli-retry.test.ts",
-            "packages/hench/tests/unit/agent/codex-normalization.test.ts",
-            "packages/hench/tests/unit/agent/heartbeat.test.ts",
-            "packages/hench/tests/unit/agent/loop.test.ts",
-            "packages/hench/tests/unit/agent/prompt.test.ts",
-            "packages/hench/tests/unit/agent/review.test.ts",
-            "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
-            "packages/hench/tests/unit/agent/stuck.test.ts",
-            "packages/hench/tests/unit/agent/summary.test.ts",
-            "packages/hench/tests/unit/agent/task-display.test.ts",
-            "packages/hench/tests/unit/agent/task-failure.test.ts",
-            "packages/hench/tests/unit/agent/token-budget.test.ts",
-            "packages/hench/tests/unit/agent/token-tracking.test.ts",
-            "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
-            "packages/hench/tests/unit/agent/token-usage.test.ts",
-            "packages/hench/tests/unit/agent/workflow.test.ts",
-            "packages/hench/tests/unit/cli/commands/config.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-            "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
-            "packages/hench/tests/unit/process/exec.test.ts",
-            "packages/hench/tests/unit/schema/templates.test.ts",
-            "packages/hench/tests/unit/schema/validate.test.ts",
-            "packages/hench/tests/unit/store/claude-config.test.ts",
-            "packages/hench/tests/unit/store/project-config.test.ts",
-            "packages/hench/tests/unit/store/templates.test.ts",
-            "packages/hench/tests/unit/tools/rex.test.ts"
-          ],
-          "entryPoints": [
-            "packages/hench/src/store/index.ts",
-            "packages/hench/src/store/config.ts",
-            "packages/hench/src/cli/commands/config.ts",
-            "packages/hench/src/cli/commands/init.ts",
-            "packages/hench/src/cli/commands/run.ts",
-            "packages/hench/src/cli/commands/template.ts",
-            "packages/hench/src/types/output.ts",
-            "packages/hench/src/tools/exec-shell.ts",
-            "packages/hench/src/process/index.ts",
-            "packages/hench/src/schema/index.ts",
-            "packages/hench/src/store/runs.ts",
-            "packages/hench/src/agent/planning/brief.ts",
-            "packages/hench/src/schema/v1.ts"
-          ],
-          "cohesion": 0.91,
-          "coupling": 0.09,
-          "depth": 1,
-          "subZones": [
-            {
-              "id": "hench/tests/unit",
-              "name": "Unit",
-              "description": "60 files, primarily TypeScript",
-              "files": [
-                "packages/hench/src/agent/analysis/adaptive.ts",
-                "packages/hench/src/agent/analysis/review.ts",
-                "packages/hench/src/agent/analysis/stuck.ts",
-                "packages/hench/src/agent/analysis/summary.ts",
-                "packages/hench/src/agent/analysis/workflow.ts",
-                "packages/hench/src/agent/index.ts",
-                "packages/hench/src/agent/lifecycle/cli-loop.ts",
-                "packages/hench/src/agent/lifecycle/heartbeat.ts",
-                "packages/hench/src/agent/lifecycle/loop.ts",
-                "packages/hench/src/agent/lifecycle/shared.ts",
-                "packages/hench/src/agent/lifecycle/task-display.ts",
-                "packages/hench/src/agent/lifecycle/token-budget.ts",
-                "packages/hench/src/agent/lifecycle/token-usage.ts",
-                "packages/hench/src/agent/planning/brief.ts",
-                "packages/hench/src/agent/planning/prompt.ts",
-                "packages/hench/src/cli/commands/config.ts",
-                "packages/hench/src/cli/commands/init.ts",
-                "packages/hench/src/cli/commands/template.ts",
-                "packages/hench/src/public.ts",
-                "packages/hench/src/schema/index.ts",
-                "packages/hench/src/schema/templates.ts",
-                "packages/hench/src/schema/v1.ts",
-                "packages/hench/src/schema/validate.ts",
-                "packages/hench/src/store/config.ts",
-                "packages/hench/src/store/index.ts",
-                "packages/hench/src/store/json.ts",
-                "packages/hench/src/store/project-config.ts",
-                "packages/hench/src/store/runs.ts",
-                "packages/hench/src/store/templates.ts",
-                "packages/hench/src/types/index.ts",
-                "packages/hench/src/types/output.ts",
-                "packages/hench/tests/e2e/cli-init.test.ts",
-                "packages/hench/tests/integration/codex-token-accounting.test.ts",
-                "packages/hench/tests/integration/store-roundtrip.test.ts",
-                "packages/hench/tests/unit/agent/adaptive.test.ts",
-                "packages/hench/tests/unit/agent/api-auth.test.ts",
-                "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-                "packages/hench/tests/unit/agent/brief.test.ts",
-                "packages/hench/tests/unit/agent/cli-retry.test.ts",
-                "packages/hench/tests/unit/agent/codex-normalization.test.ts",
-                "packages/hench/tests/unit/agent/heartbeat.test.ts",
-                "packages/hench/tests/unit/agent/loop.test.ts",
-                "packages/hench/tests/unit/agent/prompt.test.ts",
-                "packages/hench/tests/unit/agent/review.test.ts",
-                "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
-                "packages/hench/tests/unit/agent/stuck.test.ts",
-                "packages/hench/tests/unit/agent/summary.test.ts",
-                "packages/hench/tests/unit/agent/task-display.test.ts",
-                "packages/hench/tests/unit/agent/task-failure.test.ts",
-                "packages/hench/tests/unit/agent/token-budget.test.ts",
-                "packages/hench/tests/unit/agent/token-tracking.test.ts",
-                "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
-                "packages/hench/tests/unit/agent/token-usage.test.ts",
-                "packages/hench/tests/unit/agent/workflow.test.ts",
-                "packages/hench/tests/unit/cli/commands/config.test.ts",
-                "packages/hench/tests/unit/schema/templates.test.ts",
-                "packages/hench/tests/unit/schema/validate.test.ts",
-                "packages/hench/tests/unit/store/claude-config.test.ts",
-                "packages/hench/tests/unit/store/project-config.test.ts",
-                "packages/hench/tests/unit/store/templates.test.ts"
-              ],
-              "entryPoints": [
-                "packages/hench/src/agent/analysis/stuck.ts",
-                "packages/hench/src/agent/lifecycle/cli-loop.ts",
-                "packages/hench/src/agent/lifecycle/loop.ts",
-                "packages/hench/src/agent/planning/brief.ts",
-                "packages/hench/src/store/index.ts",
-                "packages/hench/src/store/project-config.ts",
-                "packages/hench/src/schema/v1.ts",
-                "packages/hench/src/schema/validate.ts",
-                "packages/hench/src/store/config.ts"
-              ],
-              "cohesion": 0.94,
-              "coupling": 0.06,
-              "depth": 2,
-              "subZones": [
-                {
-                  "id": "hench/tests/unit/agent",
-                  "name": "Agent",
-                  "description": "30 files, primarily TypeScript",
-                  "files": [
-                    "packages/hench/src/agent/analysis/adaptive.ts",
-                    "packages/hench/src/agent/analysis/review.ts",
-                    "packages/hench/src/agent/analysis/stuck.ts",
-                    "packages/hench/src/agent/analysis/summary.ts",
-                    "packages/hench/src/agent/analysis/workflow.ts",
-                    "packages/hench/src/agent/index.ts",
-                    "packages/hench/src/agent/lifecycle/token-budget.ts",
-                    "packages/hench/src/agent/planning/brief.ts",
-                    "packages/hench/src/agent/planning/prompt.ts",
-                    "packages/hench/src/cli/commands/config.ts",
-                    "packages/hench/src/cli/commands/template.ts",
-                    "packages/hench/src/public.ts",
-                    "packages/hench/src/schema/index.ts",
-                    "packages/hench/src/schema/templates.ts",
-                    "packages/hench/src/schema/v1.ts",
-                    "packages/hench/src/schema/validate.ts",
-                    "packages/hench/src/store/templates.ts",
-                    "packages/hench/tests/e2e/cli-init.test.ts",
-                    "packages/hench/tests/unit/agent/adaptive.test.ts",
-                    "packages/hench/tests/unit/agent/brief.test.ts",
-                    "packages/hench/tests/unit/agent/prompt.test.ts",
-                    "packages/hench/tests/unit/agent/review.test.ts",
-                    "packages/hench/tests/unit/agent/stuck.test.ts",
-                    "packages/hench/tests/unit/agent/summary.test.ts",
-                    "packages/hench/tests/unit/agent/token-budget.test.ts",
-                    "packages/hench/tests/unit/agent/workflow.test.ts",
-                    "packages/hench/tests/unit/cli/commands/config.test.ts",
-                    "packages/hench/tests/unit/schema/templates.test.ts",
-                    "packages/hench/tests/unit/schema/validate.test.ts",
-                    "packages/hench/tests/unit/store/templates.test.ts"
-                  ],
-                  "entryPoints": [
-                    "packages/hench/src/agent/lifecycle/token-budget.ts",
-                    "packages/hench/src/schema/index.ts",
-                    "packages/hench/src/agent/analysis/review.ts",
-                    "packages/hench/src/agent/analysis/summary.ts",
-                    "packages/hench/src/agent/planning/brief.ts",
-                    "packages/hench/src/agent/planning/prompt.ts",
-                    "packages/hench/src/schema/v1.ts"
-                  ],
-                  "cohesion": 0.79,
-                  "coupling": 0.21,
-                  "depth": 3
-                },
-                {
-                  "id": "hench/tests/unit/agent-2",
-                  "name": "Agent 2",
-                  "description": "23 files, primarily TypeScript",
-                  "files": [
-                    "packages/hench/src/agent/lifecycle/cli-loop.ts",
-                    "packages/hench/src/agent/lifecycle/heartbeat.ts",
-                    "packages/hench/src/agent/lifecycle/loop.ts",
-                    "packages/hench/src/agent/lifecycle/shared.ts",
-                    "packages/hench/src/cli/commands/init.ts",
-                    "packages/hench/src/store/config.ts",
-                    "packages/hench/src/store/index.ts",
-                    "packages/hench/src/store/json.ts",
-                    "packages/hench/src/store/project-config.ts",
-                    "packages/hench/src/store/runs.ts",
-                    "packages/hench/tests/integration/codex-token-accounting.test.ts",
-                    "packages/hench/tests/integration/store-roundtrip.test.ts",
-                    "packages/hench/tests/unit/agent/api-auth.test.ts",
-                    "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-                    "packages/hench/tests/unit/agent/cli-retry.test.ts",
-                    "packages/hench/tests/unit/agent/codex-normalization.test.ts",
-                    "packages/hench/tests/unit/agent/heartbeat.test.ts",
-                    "packages/hench/tests/unit/agent/loop.test.ts",
-                    "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
-                    "packages/hench/tests/unit/agent/task-failure.test.ts",
-                    "packages/hench/tests/unit/agent/token-tracking.test.ts",
-                    "packages/hench/tests/unit/store/claude-config.test.ts",
-                    "packages/hench/tests/unit/store/project-config.test.ts"
-                  ],
-                  "entryPoints": [
-                    "packages/hench/src/agent/lifecycle/cli-loop.ts",
-                    "packages/hench/src/agent/lifecycle/loop.ts",
-                    "packages/hench/src/store/config.ts",
-                    "packages/hench/src/store/json.ts"
-                  ],
-                  "cohesion": 0.75,
-                  "coupling": 0.25,
-                  "depth": 3
-                },
-                {
-                  "id": "hench/tests/unit/agent-3",
-                  "name": "Agent 3",
-                  "description": "4 files, primarily TypeScript",
-                  "files": [
-                    "packages/hench/src/agent/lifecycle/task-display.ts",
-                    "packages/hench/src/types/index.ts",
-                    "packages/hench/src/types/output.ts",
-                    "packages/hench/tests/unit/agent/task-display.test.ts"
-                  ],
-                  "entryPoints": [
-                    "packages/hench/src/types/output.ts",
-                    "packages/hench/src/agent/lifecycle/task-display.ts"
-                  ],
-                  "cohesion": 0.46,
-                  "coupling": 0.54,
-                  "depth": 3
-                },
-                {
-                  "id": "hench/tests/unit/agent-4",
-                  "name": "Agent 4",
-                  "description": "3 files, primarily TypeScript",
-                  "files": [
-                    "packages/hench/src/agent/lifecycle/token-usage.ts",
-                    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
-                    "packages/hench/tests/unit/agent/token-usage.test.ts"
-                  ],
-                  "entryPoints": [
-                    "packages/hench/src/agent/lifecycle/token-usage.ts"
-                  ],
-                  "cohesion": 0.5,
-                  "coupling": 0.5,
-                  "depth": 3
-                }
-              ]
-            },
-            {
-              "id": "hench/tests/unit-2",
-              "name": "Unit 2",
-              "description": "4 files, primarily TypeScript",
-              "files": [
-                "packages/hench/src/cli/commands/run.ts",
-                "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
-                "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-                "packages/hench/tests/unit/cli/commands/run-loop.test.ts"
-              ],
-              "entryPoints": [],
-              "cohesion": 0.38,
-              "coupling": 0.63,
-              "depth": 2
-            },
-            {
-              "id": "hench/tests/process",
-              "name": "Process",
-              "description": "9 files, primarily TypeScript",
-              "files": [
-                "packages/hench/src/prd/ops.ts",
-                "packages/hench/src/prd/rex-gateway.ts",
-                "packages/hench/src/process/exec-shell.ts",
-                "packages/hench/src/process/exec.ts",
-                "packages/hench/src/process/index.ts",
-                "packages/hench/src/tools/exec-shell.ts",
-                "packages/hench/src/tools/rex.ts",
-                "packages/hench/tests/unit/process/exec.test.ts",
-                "packages/hench/tests/unit/tools/rex.test.ts"
-              ],
-              "entryPoints": [
-                "packages/hench/src/process/index.ts",
-                "packages/hench/src/tools/rex.ts",
-                "packages/hench/src/prd/rex-gateway.ts"
-              ],
-              "cohesion": 0.69,
-              "coupling": 0.31,
-              "depth": 2
-            }
-          ]
-        },
-        {
-          "id": "hench/tools",
-          "name": "Tools",
-          "description": "11 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/agent/tools.ts",
-            "packages/hench/src/tools/contracts.ts",
-            "packages/hench/src/tools/dispatch.ts",
-            "packages/hench/src/tools/files.ts",
-            "packages/hench/src/tools/git.ts",
-            "packages/hench/src/tools/index.ts",
-            "packages/hench/src/tools/shell.ts",
-            "packages/hench/src/tools/test-runner.ts",
-            "packages/hench/tests/unit/tools/files.test.ts",
-            "packages/hench/tests/unit/tools/git.test.ts",
-            "packages/hench/tests/unit/tools/test-runner.test.ts"
-          ],
-          "entryPoints": [
-            "packages/hench/src/tools/contracts.ts",
-            "packages/hench/src/tools/dispatch.ts",
-            "packages/hench/src/tools/index.ts",
-            "packages/hench/src/agent/tools.ts",
-            "packages/hench/src/tools/shell.ts"
-          ],
-          "cohesion": 0.79,
-          "coupling": 0.21,
-          "depth": 1
-        },
-        {
-          "id": "hench/cli",
-          "name": "Cli",
-          "description": "14 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/cli/commands/constants.ts",
-            "packages/hench/src/cli/commands/show.ts",
-            "packages/hench/src/cli/commands/status.ts",
-            "packages/hench/src/cli/commands/task-lookup.ts",
-            "packages/hench/src/cli/errors.ts",
-            "packages/hench/src/cli/help.ts",
-            "packages/hench/src/cli/index.ts",
-            "packages/hench/src/cli/output.ts",
-            "packages/hench/tests/unit/cli/commands/constants.test.ts",
-            "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
-            "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
-            "packages/hench/tests/unit/cli/errors.test.ts",
-            "packages/hench/tests/unit/cli/help.test.ts",
-            "packages/hench/tests/unit/cli/output.test.ts"
-          ],
-          "entryPoints": [
-            "packages/hench/src/cli/errors.ts",
-            "packages/hench/src/cli/output.ts",
-            "packages/hench/src/cli/commands/constants.ts"
-          ],
-          "cohesion": 0.67,
-          "coupling": 0.33,
-          "depth": 1
-        },
-        {
-          "id": "hench/guard",
-          "name": "Guard",
-          "description": "10 files, primarily TypeScript",
-          "files": [
-            "packages/hench/src/guard/commands.ts",
-            "packages/hench/src/guard/contracts.ts",
-            "packages/hench/src/guard/index.ts",
-            "packages/hench/src/guard/paths.ts",
-            "packages/hench/src/guard/policy.ts",
-            "packages/hench/tests/unit/guard/commands.test.ts",
-            "packages/hench/tests/unit/guard/guard-integration.test.ts",
-            "packages/hench/tests/unit/guard/paths.test.ts",
-            "packages/hench/tests/unit/guard/policy.test.ts",
-            "packages/hench/tests/unit/tools/shell.test.ts"
-          ],
-          "entryPoints": [
-            "packages/hench/src/guard/index.ts",
-            "packages/hench/src/guard/paths.ts"
-          ],
-          "cohesion": 0.84,
-          "coupling": 0.16,
-          "depth": 1
-        }
-      ],
-      "insights": [
-        "High cohesion (0.99) — files are tightly interconnected",
-        "Largest zone (109 files) with excellent cohesion (0.99) indicates well-organized complex domain logic",
-        "Comprehensive agent analysis modules (adaptive.ts, review.ts, stuck.ts) suggest sophisticated task handling",
-        "Multiple entry points (process/index.ts, tools/rex.ts) provide flexible integration options",
-        "Strong domain organization with clear separation between analysis, lifecycle, and tool concerns",
-        "Sophisticated agent capabilities with adaptive analysis and workflow management",
-        "Bidirectional coupling with hench-2 zone suggests potential architectural refinement opportunity",
-        "[call graph] 2040 internal calls, 5 outgoing, 13 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "claude-integration",
-      "name": "Claude Integration",
-      "description": "Claude API client abstraction layer providing authentication, request handling, and CLI/API provider implementations.",
-=======
-        "High cohesion (0.97) — files are tightly interconnected",
-        "[call graph] 1837 internal calls, 3 outgoing, 22 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "agent-infrastructure",
-      "name": "Agent Infrastructure",
-      "description": "Supporting utilities and configuration for the autonomous agent system.",
-      "files": [
-        "packages/hench/src/agent/tools.ts",
-        "packages/hench/src/tools/contracts.ts",
-        "packages/hench/src/tools/dispatch.ts",
-        "packages/hench/src/tools/files.ts",
-        "packages/hench/src/tools/git.ts",
-        "packages/hench/src/tools/index.ts",
-        "packages/hench/src/tools/shell.ts",
-        "packages/hench/src/tools/test-runner.ts",
-        "packages/hench/tests/unit/tools/files.test.ts",
-        "packages/hench/tests/unit/tools/git.test.ts",
-        "packages/hench/tests/unit/tools/test-runner.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/agent/tools.ts",
-        "packages/hench/src/tools/contracts.ts",
-        "packages/hench/src/tools/dispatch.ts",
-        "packages/hench/src/tools/index.ts",
-        "packages/hench/src/tools/shell.ts"
-      ],
-      "cohesion": 0.77,
-      "coupling": 0.23,
-      "insights": [
-        "[call graph] 112 internal calls, 4 outgoing, 37 incoming (cohesion: 0.97, coupling: 0.03)"
-      ]
-    },
-    {
-      "id": "claude-client-bridge",
-      "name": "Claude Client Bridge",
-      "description": "Compatibility bridge providing Claude API access to the llm-client foundation.",
->>>>>>> feature/integrate-codex
+      "id": "claude-client",
+      "name": "Claude Client",
+      "description": "26 files, primarily TypeScript",
       "files": [
         "packages/claude-client/src/api-provider.ts",
         "packages/claude-client/src/auth.ts",
@@ -1946,53 +1495,13 @@
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-<<<<<<< HEAD
-        "Perfect isolation (cohesion 1.0, coupling 0) demonstrates effective API adapter pattern",
-        "Clean separation between API and CLI providers allows flexible client instantiation",
-        "Utility modules (auth.ts, json.ts, help-format.ts) support both provider types",
-        "Well-structured adapter pattern with clear separation between API and CLI providers",
-        "Comprehensive utility support for authentication, JSON handling, and help formatting",
-=======
->>>>>>> feature/integrate-codex
         "[call graph] 317 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
-<<<<<<< HEAD
-      "id": "completion-validation",
-      "name": "Completion Validation",
-      "description": "Task completion validation logic separated from the main agent engine, handling completion criteria and validation workflows.",
-      "files": [
-        "packages/hench/src/agent/completion.ts",
-        "packages/hench/src/validation/completion.ts",
-        "packages/hench/src/validation/index.ts",
-        "packages/hench/tests/unit/agent/completion.test.ts",
-        "packages/hench/tests/unit/tools/completion-validation.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/validation/completion.ts"
-      ],
-      "cohesion": 0.55,
-      "coupling": 0.45,
-      "insights": [
-        "Lower cohesion (0.55) and higher coupling (0.45) suggest this zone may benefit from architectural review",
-        "Bidirectional imports with main hench zone (5 in, 2 out) indicate tight coupling that could be simplified",
-        "Small focused scope (5 files) makes refactoring feasible if architectural improvements are needed",
-        "Cohesion of 0.55 suggests mixed responsibilities within completion validation logic",
-        "Bidirectional coupling with agent-engine creates circular dependency pattern",
-        "Small zone size makes it a good candidate for refactoring or merging back into main agent engine",
-        "[call graph] 51 internal calls, 13 outgoing, 5 incoming (cohesion: 0.8, coupling: 0.2)"
-      ]
-    },
-    {
-      "id": "llm-foundation",
-      "name": "LLM Foundation",
-      "description": "Vendor-neutral LLM client foundation providing unified API abstraction across different LLM providers.",
-=======
-      "id": "dashboard-ui-components",
-      "name": "Dashboard UI Components",
-      "description": "Reusable frontend components including schemas, validation, data display, and common UI elements for the web dashboard.",
->>>>>>> feature/integrate-codex
+      "id": "dashboard-ui-foundation",
+      "name": "Dashboard UI Foundation",
+      "description": "Reusable viewer framework providing core dashboard components, theming, navigation, and data display primitives.",
       "files": [
         "packages/web/src/schema/v1.ts",
         "packages/web/src/schema/validate.ts",
@@ -2264,40 +1773,360 @@
         }
       ],
       "insights": [
-<<<<<<< HEAD
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect isolation with zero coupling demonstrates excellent architectural separation as a true foundation layer",
-        "Complete cohesion suggests all LLM client functionality is properly co-located without feature bleed",
-        "Clean abstraction layer enables vendor switching without affecting downstream packages",
-        "Exemplary foundation layer architecture with perfect cohesion and zero coupling, serving as the vendor-neutral base for all LLM operations",
-        "[call graph] 492 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "High cohesion (0.97) — files are tightly interconnected",
+        "Strong cohesion (0.97) indicates well-organized UI component library with consistent patterns",
+        "Bidirectional dependency with PRD interface suggests unclear component ownership boundaries",
+        "Rich component catalog (119 files) provides comprehensive dashboard building blocks",
+        "Bidirectional imports with PRD interface (4 imports each way) suggest architectural boundary confusion",
+        "Comprehensive component library with strong cohesion provides solid foundation for dashboard views",
+        "[call graph] 919 internal calls, 2 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
-      "id": "orchestration-layer",
-      "name": "Orchestration Layer",
-      "description": "Top-level command orchestration and configuration management that coordinates between domain packages without importing their internals.",
+      "id": "hench",
+      "name": "Hench",
+      "description": "94 files, primarily TypeScript",
       "files": [
-        "ci.js",
-        "cli.js",
-        "config.js",
-        "help.js",
-        "refresh-artifacts.js",
-        "refresh-plan.js",
-        "refresh-validate.js",
-        "tests/unit/help.test.js",
-        "tests/unit/refresh-artifacts.test.js",
-        "tests/unit/refresh-plan.test.js",
-        "tests/unit/refresh-validate.test.js",
-        "web.js"
-=======
+        "packages/hench/src/agent/analysis/adaptive.ts",
+        "packages/hench/src/agent/analysis/review.ts",
+        "packages/hench/src/agent/analysis/stuck.ts",
+        "packages/hench/src/agent/analysis/summary.ts",
+        "packages/hench/src/agent/analysis/workflow.ts",
+        "packages/hench/src/agent/completion.ts",
+        "packages/hench/src/agent/index.ts",
+        "packages/hench/src/agent/lifecycle/cli-loop.ts",
+        "packages/hench/src/agent/lifecycle/heartbeat.ts",
+        "packages/hench/src/agent/lifecycle/loop.ts",
+        "packages/hench/src/agent/lifecycle/shared.ts",
+        "packages/hench/src/agent/lifecycle/task-display.ts",
+        "packages/hench/src/agent/lifecycle/token-budget.ts",
+        "packages/hench/src/agent/lifecycle/token-usage.ts",
+        "packages/hench/src/agent/planning/brief.ts",
+        "packages/hench/src/agent/planning/prompt.ts",
+        "packages/hench/src/cli/commands/config.ts",
+        "packages/hench/src/cli/commands/constants.ts",
+        "packages/hench/src/cli/commands/init.ts",
+        "packages/hench/src/cli/commands/run.ts",
+        "packages/hench/src/cli/commands/show.ts",
+        "packages/hench/src/cli/commands/status.ts",
+        "packages/hench/src/cli/commands/task-lookup.ts",
+        "packages/hench/src/cli/commands/template.ts",
+        "packages/hench/src/cli/errors.ts",
+        "packages/hench/src/cli/help.ts",
+        "packages/hench/src/cli/index.ts",
+        "packages/hench/src/cli/output.ts",
+        "packages/hench/src/prd/ops.ts",
+        "packages/hench/src/prd/rex-gateway.ts",
+        "packages/hench/src/process/exec-shell.ts",
+        "packages/hench/src/process/exec.ts",
+        "packages/hench/src/process/index.ts",
+        "packages/hench/src/public.ts",
+        "packages/hench/src/schema/index.ts",
+        "packages/hench/src/schema/templates.ts",
+        "packages/hench/src/schema/v1.ts",
+        "packages/hench/src/schema/validate.ts",
+        "packages/hench/src/shared/glob.ts",
+        "packages/hench/src/store/config.ts",
+        "packages/hench/src/store/index.ts",
+        "packages/hench/src/store/json.ts",
+        "packages/hench/src/store/project-config.ts",
+        "packages/hench/src/store/runs.ts",
+        "packages/hench/src/store/suggestions.ts",
+        "packages/hench/src/store/templates.ts",
+        "packages/hench/src/tools/exec-shell.ts",
+        "packages/hench/src/tools/rex.ts",
+        "packages/hench/src/types/index.ts",
+        "packages/hench/src/types/output.ts",
+        "packages/hench/src/validation/completion.ts",
+        "packages/hench/src/validation/index.ts",
+        "packages/hench/tests/e2e/cli-init.test.ts",
+        "packages/hench/tests/integration/codex-token-accounting.test.ts",
+        "packages/hench/tests/integration/store-roundtrip.test.ts",
+        "packages/hench/tests/unit/agent/adaptive.test.ts",
+        "packages/hench/tests/unit/agent/api-auth.test.ts",
+        "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+        "packages/hench/tests/unit/agent/brief.test.ts",
+        "packages/hench/tests/unit/agent/cli-retry.test.ts",
+        "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+        "packages/hench/tests/unit/agent/completion.test.ts",
+        "packages/hench/tests/unit/agent/heartbeat.test.ts",
+        "packages/hench/tests/unit/agent/loop.test.ts",
+        "packages/hench/tests/unit/agent/prompt.test.ts",
+        "packages/hench/tests/unit/agent/review.test.ts",
+        "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+        "packages/hench/tests/unit/agent/stuck.test.ts",
+        "packages/hench/tests/unit/agent/summary.test.ts",
+        "packages/hench/tests/unit/agent/task-display.test.ts",
+        "packages/hench/tests/unit/agent/task-failure.test.ts",
+        "packages/hench/tests/unit/agent/token-budget.test.ts",
+        "packages/hench/tests/unit/agent/token-tracking.test.ts",
+        "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+        "packages/hench/tests/unit/agent/token-usage.test.ts",
+        "packages/hench/tests/unit/agent/workflow.test.ts",
+        "packages/hench/tests/unit/cli/commands/config.test.ts",
+        "packages/hench/tests/unit/cli/commands/constants.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+        "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
+        "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+        "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
+        "packages/hench/tests/unit/cli/errors.test.ts",
+        "packages/hench/tests/unit/cli/help.test.ts",
+        "packages/hench/tests/unit/cli/output.test.ts",
+        "packages/hench/tests/unit/process/exec.test.ts",
+        "packages/hench/tests/unit/schema/templates.test.ts",
+        "packages/hench/tests/unit/schema/validate.test.ts",
+        "packages/hench/tests/unit/store/claude-config.test.ts",
+        "packages/hench/tests/unit/store/project-config.test.ts",
+        "packages/hench/tests/unit/store/suggestions.test.ts",
+        "packages/hench/tests/unit/store/templates.test.ts",
+        "packages/hench/tests/unit/tools/completion-validation.test.ts",
+        "packages/hench/tests/unit/tools/rex.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/process/index.ts",
+        "packages/hench/src/schema/v1.ts",
+        "packages/hench/src/tools/exec-shell.ts"
+      ],
+      "cohesion": 0.97,
+      "coupling": 0.03,
+      "subZones": [
+        {
+          "id": "hench/tests",
+          "name": "Tests",
+          "description": "49 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/agent/analysis/adaptive.ts",
+            "packages/hench/src/agent/analysis/review.ts",
+            "packages/hench/src/agent/analysis/stuck.ts",
+            "packages/hench/src/agent/analysis/summary.ts",
+            "packages/hench/src/agent/analysis/workflow.ts",
+            "packages/hench/src/agent/index.ts",
+            "packages/hench/src/agent/lifecycle/cli-loop.ts",
+            "packages/hench/src/agent/lifecycle/heartbeat.ts",
+            "packages/hench/src/agent/lifecycle/loop.ts",
+            "packages/hench/src/agent/lifecycle/shared.ts",
+            "packages/hench/src/agent/lifecycle/task-display.ts",
+            "packages/hench/src/agent/lifecycle/token-budget.ts",
+            "packages/hench/src/agent/lifecycle/token-usage.ts",
+            "packages/hench/src/agent/planning/brief.ts",
+            "packages/hench/src/agent/planning/prompt.ts",
+            "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/template.ts",
+            "packages/hench/src/public.ts",
+            "packages/hench/src/schema/index.ts",
+            "packages/hench/src/schema/templates.ts",
+            "packages/hench/src/schema/v1.ts",
+            "packages/hench/src/schema/validate.ts",
+            "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/store/templates.ts",
+            "packages/hench/src/types/index.ts",
+            "packages/hench/src/types/output.ts",
+            "packages/hench/tests/e2e/cli-init.test.ts",
+            "packages/hench/tests/unit/agent/adaptive.test.ts",
+            "packages/hench/tests/unit/agent/api-auth.test.ts",
+            "packages/hench/tests/unit/agent/brief.test.ts",
+            "packages/hench/tests/unit/agent/cli-retry.test.ts",
+            "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+            "packages/hench/tests/unit/agent/heartbeat.test.ts",
+            "packages/hench/tests/unit/agent/prompt.test.ts",
+            "packages/hench/tests/unit/agent/review.test.ts",
+            "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+            "packages/hench/tests/unit/agent/stuck.test.ts",
+            "packages/hench/tests/unit/agent/summary.test.ts",
+            "packages/hench/tests/unit/agent/task-display.test.ts",
+            "packages/hench/tests/unit/agent/token-budget.test.ts",
+            "packages/hench/tests/unit/agent/token-tracking.test.ts",
+            "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+            "packages/hench/tests/unit/agent/token-usage.test.ts",
+            "packages/hench/tests/unit/agent/workflow.test.ts",
+            "packages/hench/tests/unit/cli/commands/config.test.ts",
+            "packages/hench/tests/unit/schema/templates.test.ts",
+            "packages/hench/tests/unit/schema/validate.test.ts",
+            "packages/hench/tests/unit/store/claude-config.test.ts",
+            "packages/hench/tests/unit/store/templates.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/agent/analysis/stuck.ts",
+            "packages/hench/src/agent/lifecycle/cli-loop.ts",
+            "packages/hench/src/agent/lifecycle/loop.ts",
+            "packages/hench/src/agent/planning/brief.ts",
+            "packages/hench/src/store/project-config.ts",
+            "packages/hench/src/cli/commands/config.ts",
+            "packages/hench/src/cli/commands/template.ts",
+            "packages/hench/src/types/output.ts",
+            "packages/hench/src/schema/index.ts",
+            "packages/hench/src/schema/v1.ts",
+            "packages/hench/src/schema/validate.ts"
+          ],
+          "cohesion": 0.82,
+          "coupling": 0.18,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-2",
+          "name": "Tests 2",
+          "description": "14 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/agent/completion.ts",
+            "packages/hench/src/prd/ops.ts",
+            "packages/hench/src/prd/rex-gateway.ts",
+            "packages/hench/src/process/exec-shell.ts",
+            "packages/hench/src/process/exec.ts",
+            "packages/hench/src/process/index.ts",
+            "packages/hench/src/tools/exec-shell.ts",
+            "packages/hench/src/tools/rex.ts",
+            "packages/hench/src/validation/completion.ts",
+            "packages/hench/src/validation/index.ts",
+            "packages/hench/tests/unit/agent/completion.test.ts",
+            "packages/hench/tests/unit/process/exec.test.ts",
+            "packages/hench/tests/unit/tools/completion-validation.test.ts",
+            "packages/hench/tests/unit/tools/rex.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/process/index.ts",
+            "packages/hench/src/validation/completion.ts",
+            "packages/hench/src/tools/rex.ts",
+            "packages/hench/src/prd/rex-gateway.ts"
+          ],
+          "cohesion": 0.74,
+          "coupling": 0.26,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-3",
+          "name": "Tests 3",
+          "description": "25 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/cli/commands/constants.ts",
+            "packages/hench/src/cli/commands/init.ts",
+            "packages/hench/src/cli/commands/show.ts",
+            "packages/hench/src/cli/commands/status.ts",
+            "packages/hench/src/cli/commands/task-lookup.ts",
+            "packages/hench/src/cli/errors.ts",
+            "packages/hench/src/cli/help.ts",
+            "packages/hench/src/cli/index.ts",
+            "packages/hench/src/cli/output.ts",
+            "packages/hench/src/store/config.ts",
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/store/json.ts",
+            "packages/hench/src/store/runs.ts",
+            "packages/hench/tests/integration/codex-token-accounting.test.ts",
+            "packages/hench/tests/integration/store-roundtrip.test.ts",
+            "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+            "packages/hench/tests/unit/agent/loop.test.ts",
+            "packages/hench/tests/unit/agent/task-failure.test.ts",
+            "packages/hench/tests/unit/cli/commands/constants.test.ts",
+            "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+            "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
+            "packages/hench/tests/unit/cli/errors.test.ts",
+            "packages/hench/tests/unit/cli/help.test.ts",
+            "packages/hench/tests/unit/cli/output.test.ts",
+            "packages/hench/tests/unit/store/project-config.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/store/index.ts",
+            "packages/hench/src/cli/errors.ts",
+            "packages/hench/src/cli/output.ts",
+            "packages/hench/src/store/config.ts",
+            "packages/hench/src/cli/commands/constants.ts",
+            "packages/hench/src/store/json.ts"
+          ],
+          "cohesion": 0.7,
+          "coupling": 0.3,
+          "depth": 1
+        },
+        {
+          "id": "hench/tests-4",
+          "name": "Tests 4",
+          "description": "4 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/cli/commands/run.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
+            "packages/hench/tests/unit/cli/commands/run-loop.test.ts"
+          ],
+          "entryPoints": [
+            "packages/hench/src/cli/commands/run.ts"
+          ],
+          "cohesion": 0.29,
+          "coupling": 0.71,
+          "depth": 1
+        },
+        {
+          "id": "hench/store",
+          "name": "Store",
+          "description": "2 files, primarily TypeScript",
+          "files": [
+            "packages/hench/src/store/suggestions.ts",
+            "packages/hench/tests/unit/store/suggestions.test.ts"
+          ],
+          "entryPoints": [],
+          "cohesion": 1,
+          "coupling": 0,
+          "depth": 1
+        }
+      ],
+      "insights": [
         "High cohesion (0.97) — files are tightly interconnected",
-        "Large component library (119 files) suggests comprehensive UI coverage",
-        "Schema validation co-located with UI components for tight data binding",
-        "Strong cohesion (0.97) indicates logical component grouping",
-        "Well-structured component hierarchy with clear separation between generic and specialized UI elements",
-        "Bidirectional imports with PRD tree zone (4 each way) suggest some coupling that could be reduced",
-        "[call graph] 919 internal calls, 2 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "[call graph] 1837 internal calls, 3 outgoing, 22 incoming (cohesion: 1, coupling: 0)"
+      ]
+    },
+    {
+      "id": "hench-2",
+      "name": "Hench 2",
+      "description": "11 files, primarily TypeScript",
+      "files": [
+        "packages/hench/src/agent/tools.ts",
+        "packages/hench/src/tools/contracts.ts",
+        "packages/hench/src/tools/dispatch.ts",
+        "packages/hench/src/tools/files.ts",
+        "packages/hench/src/tools/git.ts",
+        "packages/hench/src/tools/index.ts",
+        "packages/hench/src/tools/shell.ts",
+        "packages/hench/src/tools/test-runner.ts",
+        "packages/hench/tests/unit/tools/files.test.ts",
+        "packages/hench/tests/unit/tools/git.test.ts",
+        "packages/hench/tests/unit/tools/test-runner.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/agent/tools.ts",
+        "packages/hench/src/tools/contracts.ts",
+        "packages/hench/src/tools/dispatch.ts",
+        "packages/hench/src/tools/index.ts",
+        "packages/hench/src/tools/shell.ts"
+      ],
+      "cohesion": 0.77,
+      "coupling": 0.23,
+      "insights": [
+        "[call graph] 112 internal calls, 4 outgoing, 37 incoming (cohesion: 0.97, coupling: 0.03)"
+      ]
+    },
+    {
+      "id": "hench-3",
+      "name": "Hench 3",
+      "description": "10 files, primarily TypeScript",
+      "files": [
+        "packages/hench/src/guard/commands.ts",
+        "packages/hench/src/guard/contracts.ts",
+        "packages/hench/src/guard/index.ts",
+        "packages/hench/src/guard/paths.ts",
+        "packages/hench/src/guard/policy.ts",
+        "packages/hench/tests/unit/guard/commands.test.ts",
+        "packages/hench/tests/unit/guard/guard-integration.test.ts",
+        "packages/hench/tests/unit/guard/paths.test.ts",
+        "packages/hench/tests/unit/guard/policy.test.ts",
+        "packages/hench/tests/unit/tools/shell.test.ts"
+      ],
+      "entryPoints": [
+        "packages/hench/src/guard/index.ts",
+        "packages/hench/src/guard/paths.ts"
+      ],
+      "cohesion": 0.9,
+      "coupling": 0.1,
+      "insights": [
+        "High cohesion (0.9) — files are tightly interconnected",
+        "[call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)"
       ]
     },
     {
@@ -2345,23 +2174,12 @@
         "packages/llm-client/tests/unit/output.test.ts",
         "packages/llm-client/tests/unit/project-config.test.ts",
         "packages/llm-client/tests/unit/suggest.test.ts"
->>>>>>> feature/integrate-codex
       ],
       "entryPoints": [],
       "cohesion": 0.63,
       "coupling": 0.38,
       "insights": [
-<<<<<<< HEAD
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect cohesion (1.0) demonstrates clean separation between orchestration logic and domain implementation",
-        "Zero coupling confirms the architectural principle of orchestration delegating to CLIs rather than importing libraries",
-        "Entry point concentration (ci.js, cli.js) provides clear command surface area",
-        "Excellent architectural separation with refresh-* services handling cross-package coordination",
-        "Clean delegation pattern where orchestration spawns CLIs rather than importing domain logic",
-        "[call graph] 386 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ]
-=======
-        "[call graph] 237 internal calls, 4 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)"
+        "[call graph] 249 internal calls, 4 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)"
       ],
       "childId": "packages-llm-client",
       "depth": 1
@@ -2432,7 +2250,6 @@
       ],
       "childId": "packages-llm-client",
       "depth": 1
->>>>>>> feature/integrate-codex
     },
     {
       "id": "packages-rex:rex-cli",
@@ -2735,24 +2552,15 @@
       "insights": [
         "High cohesion (0.94) — files are tightly interconnected",
         "Contains 70% of project files (68/97) — subdivided into 3 sub-zones",
-<<<<<<< HEAD
-        "[call graph] 2183 internal calls, 39 outgoing, 145 incoming (cohesion: 0.98, coupling: 0.02)"
-=======
         "[call graph] 2183 internal calls, 42 outgoing, 145 incoming (cohesion: 0.98, coupling: 0.02)"
->>>>>>> feature/integrate-codex
       ],
       "childId": "packages-sourcevision",
       "depth": 1
     },
     {
-<<<<<<< HEAD
-      "id": "prd-ui-components",
-      "name": "PRD UI Components",
-      "description": "Specialized user interface components for PRD tree manipulation including forms, panels, and interactive elements.",
-=======
-      "id": "prd-tree-interface",
-      "name": "PRD Tree Interface",
-      "description": "Specialized UI components for PRD tree management including forms, panels, bulk operations, and execution controls.",
+      "id": "prd-management-interface",
+      "name": "PRD Management Interface",
+      "description": "Specialized UI components for PRD tree manipulation, task execution, and project analysis workflows.",
       "files": [
         "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
         "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
@@ -2798,18 +2606,18 @@
       "coupling": 0.05,
       "insights": [
         "High cohesion (0.95) — files are tightly interconnected",
-        "Domain-specific component cluster focused on PRD tree functionality",
-        "Smaller, focused zone (33 files) with clear bounded context",
-        "Good cohesion (0.95) for specialized feature set",
-        "Well-scoped feature zone with clear responsibility boundaries for PRD tree operations",
-        "Heavy dependency on base UI components (5 imports to dashboard-ui-components) shows proper layering",
+        "Domain-focused components (33 files) show clear specialization for PRD workflows",
+        "Higher coupling (0.05) reflects complex interactions with foundation layer but remains acceptable",
+        "Bidirectional dependency with UI foundation indicates potential component misplacement",
+        "All components focus on PRD domain showing excellent functional cohesion",
+        "Reverse imports to UI foundation suggest some components may belong in the foundation layer",
         "[call graph] 462 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
-      "id": "project-root",
-      "name": "Project Root",
-      "description": "Core orchestration files and configuration at the repository root level.",
+      "id": "root",
+      "name": "Root",
+      "description": "12 files, primarily JavaScript",
       "files": [
         "ci.js",
         "cli.js",
@@ -2817,9 +2625,11 @@
         "help.js",
         "refresh-artifacts.js",
         "refresh-plan.js",
+        "refresh-validate.js",
         "tests/unit/help.test.js",
         "tests/unit/refresh-artifacts.test.js",
         "tests/unit/refresh-plan.test.js",
+        "tests/unit/refresh-validate.test.js",
         "web.js"
       ],
       "entryPoints": [],
@@ -2827,402 +2637,13 @@
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "[call graph] 338 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "run-management",
-      "name": "Run Management",
-      "description": "Task run recording, history tracking, and execution state management.",
-      "files": [
-        "packages/hench/src/guard/commands.ts",
-        "packages/hench/src/guard/contracts.ts",
-        "packages/hench/src/guard/index.ts",
-        "packages/hench/src/guard/paths.ts",
-        "packages/hench/src/guard/policy.ts",
-        "packages/hench/tests/unit/guard/commands.test.ts",
-        "packages/hench/tests/unit/guard/guard-integration.test.ts",
-        "packages/hench/tests/unit/guard/paths.test.ts",
-        "packages/hench/tests/unit/guard/policy.test.ts",
-        "packages/hench/tests/unit/tools/shell.test.ts"
-      ],
-      "entryPoints": [
-        "packages/hench/src/guard/index.ts",
-        "packages/hench/src/guard/paths.ts"
-      ],
-      "cohesion": 0.9,
-      "coupling": 0.1,
-      "insights": [
-        "High cohesion (0.9) — files are tightly interconnected",
-        "[call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)"
+        "[call graph] 386 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
     {
       "id": "web-server-infrastructure",
       "name": "Web Server Infrastructure",
-      "description": "Core server components including CLI entry points, MCP endpoints, domain gateways, and HTTP routing infrastructure.",
->>>>>>> feature/integrate-codex
-      "files": [
-        "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
-        "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
-        "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
-        "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
-        "packages/web/src/viewer/components/prd-tree/compute.ts",
-        "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-        "packages/web/src/viewer/components/prd-tree/index.ts",
-        "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
-        "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
-        "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
-        "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
-        "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
-        "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
-        "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
-        "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-        "packages/web/src/viewer/components/prd-tree/status-filter.ts",
-        "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-        "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
-        "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-        "packages/web/src/viewer/components/prd-tree/types.ts",
-        "packages/web/src/viewer/views/analysis.ts",
-        "packages/web/src/viewer/views/prd.ts",
-        "packages/web/tests/unit/viewer/accessibility.test.ts",
-        "packages/web/tests/unit/viewer/add-item-form.test.ts",
-        "packages/web/tests/unit/viewer/batch-import-panel.test.ts",
-        "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
-        "packages/web/tests/unit/viewer/prd-tree.test.ts",
-        "packages/web/tests/unit/viewer/prune-diff-tree.test.ts",
-        "packages/web/tests/unit/viewer/smart-add-input.test.ts",
-        "packages/web/tests/unit/viewer/status-filter.test.ts",
-        "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
-        "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
-        "packages/web/tests/unit/viewer/task-detail-usage.test.ts"
-      ],
-      "entryPoints": [
-        "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-        "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-        "packages/web/src/viewer/views/analysis.ts",
-        "packages/web/src/viewer/views/prd.ts"
-      ],
-      "cohesion": 0.95,
-      "coupling": 0.05,
-      "insights": [
-<<<<<<< HEAD
-        "High cohesion (0.95) — files are tightly interconnected",
-        "Domain-specific component grouping shows clear separation between PRD UI and general viewer infrastructure",
-        "Bidirectional coupling with viewer platform suggests these components are tightly integrated with the core viewer system",
-        "Focused on PRD tree operations (add-item-form, analyze-panel) indicates good feature-based organization",
-        "Well-focused PRD-specific UI components with good cohesion (0.95) and appropriate specialization for tree manipulation features",
-        "[call graph] 462 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "suggestion-store",
-      "name": "Suggestion Store",
-      "description": "Isolated state management for agent suggestions with minimal dependencies and focused responsibility.",
-      "files": [
-        "packages/hench/src/store/suggestions.ts",
-        "packages/hench/tests/unit/store/suggestions.test.ts"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect metrics (cohesion 1.0, coupling 0) demonstrate effective single-responsibility design",
-        "Small size (2 files) with focused scope suggests appropriate module granularity",
-        "Clean isolation indicates good separation of state management concerns",
-        "Excellent example of single-responsibility module with perfect isolation metrics",
-        "Appropriate granularity for specialized state management functionality",
-        "[call graph] 14 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "viewer-platform",
-      "name": "Viewer Platform",
-      "description": "Schema validation engine and viewer component infrastructure supporting the dashboard's data display and interaction capabilities.",
-      "files": [
-        "packages/web/src/schema/v1.ts",
-        "packages/web/src/schema/validate.ts",
-        "packages/web/src/viewer/components/active-tasks-panel.ts",
-        "packages/web/src/viewer/components/breadcrumb.ts",
-        "packages/web/src/viewer/components/config-footer.ts",
-        "packages/web/src/viewer/components/constants.ts",
-        "packages/web/src/viewer/components/copy-link-button.ts",
-        "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-        "packages/web/src/viewer/components/data-display/findings-list.ts",
-        "packages/web/src/viewer/components/data-display/health-gauge.ts",
-        "packages/web/src/viewer/components/data-display/mini-charts.ts",
-        "packages/web/src/viewer/components/data-display/tree-view.ts",
-        "packages/web/src/viewer/components/data-display/zone-map.ts",
-        "packages/web/src/viewer/components/detail-panel.ts",
-        "packages/web/src/viewer/components/faq.ts",
-        "packages/web/src/viewer/components/favicon.ts",
-        "packages/web/src/viewer/components/guide.ts",
-        "packages/web/src/viewer/components/logos.ts",
-        "packages/web/src/viewer/components/notion-schema-wizard.ts",
-        "packages/web/src/viewer/components/rex-task-link.ts",
-        "packages/web/src/viewer/components/search-filter.ts",
-        "packages/web/src/viewer/components/sidebar.ts",
-        "packages/web/src/viewer/components/status-indicators.ts",
-        "packages/web/src/viewer/components/theme-toggle.ts",
-        "packages/web/src/viewer/darkmode_logo.png",
-        "packages/web/src/viewer/graph/physics.ts",
-        "packages/web/src/viewer/graph/renderer.ts",
-        "packages/web/src/viewer/hooks/use-app-data.ts",
-        "packages/web/src/viewer/hooks/use-file-edges.ts",
-        "packages/web/src/viewer/hooks/use-pan-zoom.ts",
-        "packages/web/src/viewer/hooks/use-project-metadata.ts",
-        "packages/web/src/viewer/hooks/use-route-state.ts",
-        "packages/web/src/viewer/hooks/use-zone-drag.ts",
-        "packages/web/src/viewer/index.html",
-        "packages/web/src/viewer/lightmode_logo.png",
-        "packages/web/src/viewer/loader.ts",
-        "packages/web/src/viewer/main.ts",
-        "packages/web/src/viewer/route-state.ts",
-        "packages/web/src/viewer/schema-compat.ts",
-        "packages/web/src/viewer/sourcevision-tabs.ts",
-        "packages/web/src/viewer/styles/a11y.css",
-        "packages/web/src/viewer/styles/analysis.css",
-        "packages/web/src/viewer/styles/base.css",
-        "packages/web/src/viewer/styles/branding.css",
-        "packages/web/src/viewer/styles/breadcrumb.css",
-        "packages/web/src/viewer/styles/call-graph-explorer.css",
-        "packages/web/src/viewer/styles/cards.css",
-        "packages/web/src/viewer/styles/components.css",
-        "packages/web/src/viewer/styles/copy-link.css",
-        "packages/web/src/viewer/styles/detail.css",
-        "packages/web/src/viewer/styles/faq.css",
-        "packages/web/src/viewer/styles/feature-toggles.css",
-        "packages/web/src/viewer/styles/forms.css",
-        "packages/web/src/viewer/styles/graph.css",
-        "packages/web/src/viewer/styles/hench-config.css",
-        "packages/web/src/viewer/styles/hench-runs.css",
-        "packages/web/src/viewer/styles/hench-templates.css",
-        "packages/web/src/viewer/styles/index.css",
-        "packages/web/src/viewer/styles/integration-config.css",
-        "packages/web/src/viewer/styles/layout.css",
-        "packages/web/src/viewer/styles/notion-config.css",
-        "packages/web/src/viewer/styles/overview.css",
-        "packages/web/src/viewer/styles/pr-markdown.css",
-        "packages/web/src/viewer/styles/prd-tree.css",
-        "packages/web/src/viewer/styles/responsive.css",
-        "packages/web/src/viewer/styles/rex-dashboard.css",
-        "packages/web/src/viewer/styles/routes.css",
-        "packages/web/src/viewer/styles/tables.css",
-        "packages/web/src/viewer/styles/task-audit.css",
-        "packages/web/src/viewer/styles/task-link.css",
-        "packages/web/src/viewer/styles/token-usage.css",
-        "packages/web/src/viewer/styles/tokens.css",
-        "packages/web/src/viewer/styles/utils.css",
-        "packages/web/src/viewer/styles/validation.css",
-        "packages/web/src/viewer/styles/zone-map.css",
-        "packages/web/src/viewer/types.ts",
-        "packages/web/src/viewer/utils.ts",
-        "packages/web/src/viewer/views/architecture.ts",
-        "packages/web/src/viewer/views/feature-toggles.ts",
-        "packages/web/src/viewer/views/files.ts",
-        "packages/web/src/viewer/views/graph.ts",
-        "packages/web/src/viewer/views/hench-config.ts",
-        "packages/web/src/viewer/views/hench-runs.ts",
-        "packages/web/src/viewer/views/hench-templates.ts",
-        "packages/web/src/viewer/views/integration-config.ts",
-        "packages/web/src/viewer/views/notion-config.ts",
-        "packages/web/src/viewer/views/overview.ts",
-        "packages/web/src/viewer/views/pr-markdown.ts",
-        "packages/web/src/viewer/views/problems.ts",
-        "packages/web/src/viewer/views/rex-dashboard.ts",
-        "packages/web/src/viewer/views/routes.ts",
-        "packages/web/src/viewer/views/suggestions.ts",
-        "packages/web/src/viewer/views/task-audit.ts",
-        "packages/web/src/viewer/views/token-usage.ts",
-        "packages/web/src/viewer/views/validation.ts",
-        "packages/web/src/viewer/views/workflow-optimization.ts",
-        "packages/web/src/viewer/views/zone-types.ts",
-        "packages/web/src/viewer/views/zones.ts",
-        "packages/web/tests/integration/.gitkeep",
-        "packages/web/tests/integration/pr-markdown-refresh.test.ts",
-        "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
-        "packages/web/tests/integration/token-usage-route-regression.test.ts",
-        "packages/web/tests/unit/viewer/bar-chart.test.ts",
-        "packages/web/tests/unit/viewer/collapsible-section.test.ts",
-        "packages/web/tests/unit/viewer/copy-link-button.test.ts",
-        "packages/web/tests/unit/viewer/detail-panel.test.ts",
-        "packages/web/tests/unit/viewer/favicon.test.ts",
-        "packages/web/tests/unit/viewer/flow-diagram.test.ts",
-        "packages/web/tests/unit/viewer/graph-interaction.test.ts",
-        "packages/web/tests/unit/viewer/graph-layout.test.ts",
-        "packages/web/tests/unit/viewer/graph-zoom.test.ts",
-        "packages/web/tests/unit/viewer/hench-config.test.ts",
-        "packages/web/tests/unit/viewer/label-utils.test.ts",
-        "packages/web/tests/unit/viewer/pr-markdown.test.ts",
-        "packages/web/tests/unit/viewer/route-state.test.ts",
-        "packages/web/tests/unit/viewer/sidebar.test.ts",
-        "packages/web/tests/unit/viewer/status-indicators.test.ts",
-        "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
-        "packages/web/tests/unit/viewer/tree-view.test.ts"
-      ],
-      "entryPoints": [
-        "packages/web/src/viewer/components/copy-link-button.ts",
-        "packages/web/src/viewer/components/guide.ts",
-        "packages/web/src/viewer/components/logos.ts",
-        "packages/web/src/viewer/components/theme-toggle.ts",
-        "packages/web/src/viewer/types.ts"
-      ],
-      "cohesion": 0.97,
-      "coupling": 0.03,
-      "subZones": [
-        {
-          "id": "web-2/web",
-          "name": "Web",
-          "description": "61 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/schema/v1.ts",
-            "packages/web/src/schema/validate.ts",
-            "packages/web/src/viewer/components/active-tasks-panel.ts",
-            "packages/web/src/viewer/components/breadcrumb.ts",
-            "packages/web/src/viewer/components/config-footer.ts",
-            "packages/web/src/viewer/components/constants.ts",
-            "packages/web/src/viewer/components/copy-link-button.ts",
-            "packages/web/src/viewer/components/data-display/findings-list.ts",
-            "packages/web/src/viewer/components/data-display/tree-view.ts",
-            "packages/web/src/viewer/components/detail-panel.ts",
-            "packages/web/src/viewer/components/faq.ts",
-            "packages/web/src/viewer/components/favicon.ts",
-            "packages/web/src/viewer/components/guide.ts",
-            "packages/web/src/viewer/components/logos.ts",
-            "packages/web/src/viewer/components/notion-schema-wizard.ts",
-            "packages/web/src/viewer/components/rex-task-link.ts",
-            "packages/web/src/viewer/components/search-filter.ts",
-            "packages/web/src/viewer/components/sidebar.ts",
-            "packages/web/src/viewer/components/status-indicators.ts",
-            "packages/web/src/viewer/components/theme-toggle.ts",
-            "packages/web/src/viewer/graph/physics.ts",
-            "packages/web/src/viewer/graph/renderer.ts",
-            "packages/web/src/viewer/hooks/use-app-data.ts",
-            "packages/web/src/viewer/hooks/use-project-metadata.ts",
-            "packages/web/src/viewer/hooks/use-route-state.ts",
-            "packages/web/src/viewer/loader.ts",
-            "packages/web/src/viewer/main.ts",
-            "packages/web/src/viewer/route-state.ts",
-            "packages/web/src/viewer/schema-compat.ts",
-            "packages/web/src/viewer/sourcevision-tabs.ts",
-            "packages/web/src/viewer/types.ts",
-            "packages/web/src/viewer/utils.ts",
-            "packages/web/src/viewer/views/architecture.ts",
-            "packages/web/src/viewer/views/feature-toggles.ts",
-            "packages/web/src/viewer/views/files.ts",
-            "packages/web/src/viewer/views/graph.ts",
-            "packages/web/src/viewer/views/hench-config.ts",
-            "packages/web/src/viewer/views/hench-runs.ts",
-            "packages/web/src/viewer/views/hench-templates.ts",
-            "packages/web/src/viewer/views/integration-config.ts",
-            "packages/web/src/viewer/views/notion-config.ts",
-            "packages/web/src/viewer/views/problems.ts",
-            "packages/web/src/viewer/views/rex-dashboard.ts",
-            "packages/web/src/viewer/views/routes.ts",
-            "packages/web/src/viewer/views/suggestions.ts",
-            "packages/web/src/viewer/views/task-audit.ts",
-            "packages/web/src/viewer/views/validation.ts",
-            "packages/web/src/viewer/views/workflow-optimization.ts",
-            "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
-            "packages/web/tests/integration/token-usage-route-regression.test.ts",
-            "packages/web/tests/unit/viewer/copy-link-button.test.ts",
-            "packages/web/tests/unit/viewer/detail-panel.test.ts",
-            "packages/web/tests/unit/viewer/favicon.test.ts",
-            "packages/web/tests/unit/viewer/graph-layout.test.ts",
-            "packages/web/tests/unit/viewer/hench-config.test.ts",
-            "packages/web/tests/unit/viewer/label-utils.test.ts",
-            "packages/web/tests/unit/viewer/route-state.test.ts",
-            "packages/web/tests/unit/viewer/sidebar.test.ts",
-            "packages/web/tests/unit/viewer/status-indicators.test.ts",
-            "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
-            "packages/web/tests/unit/viewer/tree-view.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/schema/v1.ts",
-            "packages/web/src/viewer/utils.ts",
-            "packages/web/src/viewer/components/logos.ts",
-            "packages/web/src/viewer/types.ts",
-            "packages/web/src/viewer/components/search-filter.ts"
-          ],
-          "cohesion": 0.92,
-          "coupling": 0.08,
-          "depth": 1
-        },
-        {
-          "id": "web-2/web-2",
-          "name": "Web 2",
-          "description": "7 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-            "packages/web/src/viewer/hooks/use-file-edges.ts",
-            "packages/web/src/viewer/hooks/use-pan-zoom.ts",
-            "packages/web/src/viewer/hooks/use-zone-drag.ts",
-            "packages/web/src/viewer/views/zone-types.ts",
-            "packages/web/src/viewer/views/zones.ts",
-            "packages/web/tests/unit/viewer/collapsible-section.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-            "packages/web/src/viewer/views/zones.ts"
-          ],
-          "cohesion": 0.64,
-          "coupling": 0.36,
-          "depth": 1
-        },
-        {
-          "id": "web-2/web-3",
-          "name": "Web 3",
-          "description": "7 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/viewer/components/data-display/health-gauge.ts",
-            "packages/web/src/viewer/components/data-display/mini-charts.ts",
-            "packages/web/src/viewer/components/data-display/zone-map.ts",
-            "packages/web/src/viewer/views/overview.ts",
-            "packages/web/src/viewer/views/token-usage.ts",
-            "packages/web/tests/unit/viewer/bar-chart.test.ts",
-            "packages/web/tests/unit/viewer/flow-diagram.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/viewer/views/overview.ts",
-            "packages/web/src/viewer/views/token-usage.ts",
-            "packages/web/src/viewer/components/data-display/mini-charts.ts",
-            "packages/web/src/viewer/components/data-display/health-gauge.ts"
-          ],
-          "cohesion": 0.5,
-          "coupling": 0.5,
-          "depth": 1
-        },
-        {
-          "id": "web-2/web-4",
-          "name": "Web 4",
-          "description": "3 files, primarily TypeScript",
-          "files": [
-            "packages/web/src/viewer/views/pr-markdown.ts",
-            "packages/web/tests/integration/pr-markdown-refresh.test.ts",
-            "packages/web/tests/unit/viewer/pr-markdown.test.ts"
-          ],
-          "entryPoints": [
-            "packages/web/src/viewer/views/pr-markdown.ts"
-          ],
-          "cohesion": 0.67,
-          "coupling": 0.33,
-          "depth": 1
-        }
-      ],
-      "insights": [
-        "High cohesion (0.97) — files are tightly interconnected",
-        "Largest zone in web package suggests this is the core application logic layer",
-        "Bidirectional imports with web-3 indicate tight integration between viewer platform and PRD components",
-        "Strong cohesion with schema validation and viewer components co-located suggests good domain boundaries",
-        "Robust viewer infrastructure with high cohesion (0.97) effectively centralizing schema validation and component framework",
-        "[call graph] 919 internal calls, 2 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ]
-    },
-    {
-      "id": "web-infrastructure",
-      "name": "Web Infrastructure",
-      "description": "Core web platform infrastructure providing CLI entry points, public APIs, and foundational schema definitions.",
+      "description": "Core HTTP server foundation providing routing, gateways, and service orchestration for the unified dashboard and MCP endpoints.",
       "files": [
         "packages/web/src/cli/index.ts",
         "packages/web/src/landing/index.html",
@@ -3379,27 +2800,17 @@
       ],
       "insights": [
         "High cohesion (0.98) — files are tightly interconnected",
-        "High cohesion indicates well-defined core responsibilities without feature sprawl",
-        "Minimal coupling suggests clean separation between infrastructure and application logic",
-        "Central position in web package import graph makes it a stable foundation for higher-level web components",
-        "Strong architectural foundation with excellent cohesion (0.98) and minimal coupling (0.02), properly isolating core web infrastructure concerns",
+        "Excellent architectural isolation with 0.02 coupling indicates clean server abstraction",
+        "Gateway pattern concentrates cross-package imports into dedicated modules for maintainable dependencies",
+        "High cohesion (0.98) shows well-organized server concerns with clear separation between routing, services, and utilities",
+        "Exemplary low coupling (0.02) demonstrates clean architectural boundaries",
+        "Gateway modules successfully isolate cross-package dependencies for rex and sourcevision integration",
         "[call graph] 1292 internal calls, 21 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)"
       ]
-=======
-        "High cohesion (0.98) — files are tightly interconnected",
-        "Gateway pattern isolates cross-package dependencies into dedicated modules",
-        "Clean separation between server infrastructure and UI components",
-        "High cohesion (0.98) indicates well-organized server architecture",
-        "Excellent architectural isolation with gateway modules containing all cross-package imports",
-        "Very low coupling (0.02) demonstrates clean API boundaries between server and client zones",
-        "[call graph] 1198 internal calls, 21 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)"
-      ]
->>>>>>> feature/integrate-codex
     }
   ],
   "crossings": [
     {
-<<<<<<< HEAD
       "from": ".claude/worktrees/strange-volhard/packages/hench/tests/unit/guard/guard-integration.test.ts",
       "to": ".claude/worktrees/strange-volhard/packages/hench/src/schema/v1.ts",
       "fromZone": ".claude-worktrees-strange-volhard:agent-security-layer",
@@ -3688,155 +3099,132 @@
       "toZone": ".claude-worktrees-strange-volhard:web-mcp-server"
     },
     {
-      "from": "packages/hench/src/agent/index.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "agent-engine",
-      "toZone": "completion-validation"
-    },
-    {
-      "from": "packages/hench/src/agent/index.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "agent-engine",
-      "toZone": "completion-validation"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "agent-engine",
-      "toZone": "completion-validation"
-    },
-    {
-      "from": "packages/hench/src/public.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "agent-engine",
-      "toZone": "completion-validation"
-    },
-    {
-      "from": "packages/hench/src/tools/rex.ts",
-      "to": "packages/hench/src/validation/completion.ts",
-      "fromZone": "agent-engine",
-      "toZone": "completion-validation"
-    },
-    {
-      "from": "packages/hench/src/validation/completion.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "completion-validation",
-      "toZone": "agent-engine"
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/completion-validation.test.ts",
-      "to": "packages/hench/src/tools/rex.ts",
-      "fromZone": "completion-validation",
-      "toZone": "agent-engine"
-=======
-      "from": "packages/hench/src/agent/lifecycle/loop.ts",
-      "to": "packages/hench/src/tools/contracts.ts",
-      "fromZone": "agent-core",
-      "toZone": "agent-infrastructure"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/loop.ts",
-      "to": "packages/hench/src/tools/dispatch.ts",
-      "fromZone": "agent-core",
-      "toZone": "agent-infrastructure"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/shared.ts",
-      "to": "packages/hench/src/tools/index.ts",
-      "fromZone": "agent-core",
-      "toZone": "agent-infrastructure"
-    },
-    {
-      "from": "packages/hench/src/tools/rex.ts",
-      "to": "packages/hench/src/tools/contracts.ts",
-      "fromZone": "agent-core",
-      "toZone": "agent-infrastructure"
-    },
-    {
-      "from": "packages/hench/tests/unit/agent/task-failure.test.ts",
-      "to": "packages/hench/src/agent/tools.ts",
-      "fromZone": "agent-core",
-      "toZone": "agent-infrastructure"
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/loop.ts",
-      "to": "packages/hench/src/guard/index.ts",
-      "fromZone": "agent-core",
-      "toZone": "run-management"
-    },
-    {
-      "from": "packages/hench/src/tools/git.ts",
-      "to": "packages/hench/src/tools/exec-shell.ts",
-      "fromZone": "agent-infrastructure",
-      "toZone": "agent-core"
-    },
-    {
-      "from": "packages/hench/src/tools/shell.ts",
-      "to": "packages/hench/src/tools/exec-shell.ts",
-      "fromZone": "agent-infrastructure",
-      "toZone": "agent-core"
-    },
-    {
-      "from": "packages/hench/src/tools/test-runner.ts",
-      "to": "packages/hench/src/process/index.ts",
-      "fromZone": "agent-infrastructure",
-      "toZone": "agent-core"
-    },
-    {
-      "from": "packages/hench/src/tools/files.ts",
-      "to": "packages/hench/src/guard/paths.ts",
-      "fromZone": "agent-infrastructure",
-      "toZone": "run-management"
-    },
-    {
       "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/views/analysis.ts",
-      "fromZone": "dashboard-ui-components",
-      "toZone": "prd-tree-interface"
+      "fromZone": "dashboard-ui-foundation",
+      "toZone": "prd-management-interface"
     },
     {
       "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/views/prd.ts",
-      "fromZone": "dashboard-ui-components",
-      "toZone": "prd-tree-interface"
+      "fromZone": "dashboard-ui-foundation",
+      "toZone": "prd-management-interface"
     },
     {
       "from": "packages/web/src/viewer/views/rex-dashboard.ts",
       "to": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "fromZone": "dashboard-ui-components",
-      "toZone": "prd-tree-interface"
+      "fromZone": "dashboard-ui-foundation",
+      "toZone": "prd-management-interface"
     },
     {
       "from": "packages/web/src/viewer/views/rex-dashboard.ts",
       "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-      "fromZone": "dashboard-ui-components",
-      "toZone": "prd-tree-interface"
+      "fromZone": "dashboard-ui-foundation",
+      "toZone": "prd-management-interface"
     },
     {
       "from": "packages/web/src/viewer/loader.ts",
       "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "dashboard-ui-components",
+      "fromZone": "dashboard-ui-foundation",
       "toZone": "web-server-infrastructure"
     },
     {
       "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "dashboard-ui-components",
+      "fromZone": "dashboard-ui-foundation",
       "toZone": "web-server-infrastructure"
     },
     {
       "from": "packages/web/tests/integration/pr-markdown-refresh.test.ts",
       "to": "packages/web/src/server/routes-sourcevision.ts",
-      "fromZone": "dashboard-ui-components",
+      "fromZone": "dashboard-ui-foundation",
       "toZone": "web-server-infrastructure"
     },
     {
       "from": "packages/web/tests/integration/pr-markdown-refresh.test.ts",
       "to": "packages/web/src/server/types.ts",
-      "fromZone": "dashboard-ui-components",
+      "fromZone": "dashboard-ui-foundation",
       "toZone": "web-server-infrastructure"
     },
     {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/tools/contracts.ts",
+      "fromZone": "hench",
+      "toZone": "hench-2"
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/tools/dispatch.ts",
+      "fromZone": "hench",
+      "toZone": "hench-2"
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/shared.ts",
+      "to": "packages/hench/src/tools/index.ts",
+      "fromZone": "hench",
+      "toZone": "hench-2"
+    },
+    {
+      "from": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/tools/contracts.ts",
+      "fromZone": "hench",
+      "toZone": "hench-2"
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/task-failure.test.ts",
+      "to": "packages/hench/src/agent/tools.ts",
+      "fromZone": "hench",
+      "toZone": "hench-2"
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/guard/index.ts",
+      "fromZone": "hench",
+      "toZone": "hench-3"
+    },
+    {
+      "from": "packages/hench/src/tools/git.ts",
+      "to": "packages/hench/src/tools/exec-shell.ts",
+      "fromZone": "hench-2",
+      "toZone": "hench"
+    },
+    {
+      "from": "packages/hench/src/tools/shell.ts",
+      "to": "packages/hench/src/tools/exec-shell.ts",
+      "fromZone": "hench-2",
+      "toZone": "hench"
+    },
+    {
+      "from": "packages/hench/src/tools/test-runner.ts",
+      "to": "packages/hench/src/process/index.ts",
+      "fromZone": "hench-2",
+      "toZone": "hench"
+    },
+    {
+      "from": "packages/hench/src/tools/files.ts",
+      "to": "packages/hench/src/guard/paths.ts",
+      "fromZone": "hench-2",
+      "toZone": "hench-3"
+    },
+    {
+      "from": "packages/hench/tests/unit/guard/guard-integration.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-3",
+      "toZone": "hench"
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/shell.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "fromZone": "hench-3",
+      "toZone": "hench"
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/shell.test.ts",
+      "to": "packages/hench/src/tools/shell.ts",
+      "fromZone": "hench-3",
+      "toZone": "hench-2"
+    },
+    {
       "from": "packages/llm-client/src/api-provider.ts",
       "to": "packages/llm-client/src/provider-interface.ts",
       "fromZone": "packages-llm-client:src",
@@ -4363,7 +3751,6 @@
       "to": "packages/llm-client/src/types.ts",
       "fromZone": "packages-llm-client:src-4",
       "toZone": "packages-llm-client:src-3"
->>>>>>> feature/integrate-codex
     },
     {
       "from": "packages/sourcevision/src/cli/commands/export-pdf.ts",
@@ -4536,142 +3923,43 @@
     {
       "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
       "to": "packages/web/src/viewer/components/copy-link-button.ts",
-<<<<<<< HEAD
-      "fromZone": "prd-ui-components",
-      "toZone": "viewer-platform"
-=======
-      "fromZone": "prd-tree-interface",
-      "toZone": "dashboard-ui-components"
->>>>>>> feature/integrate-codex
+      "fromZone": "prd-management-interface",
+      "toZone": "dashboard-ui-foundation"
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
-<<<<<<< HEAD
-      "fromZone": "prd-ui-components",
-      "toZone": "viewer-platform"
-=======
-      "fromZone": "prd-tree-interface",
-      "toZone": "dashboard-ui-components"
->>>>>>> feature/integrate-codex
+      "fromZone": "prd-management-interface",
+      "toZone": "dashboard-ui-foundation"
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
       "to": "packages/web/src/viewer/types.ts",
-<<<<<<< HEAD
-      "fromZone": "prd-ui-components",
-      "toZone": "viewer-platform"
-=======
-      "fromZone": "prd-tree-interface",
-      "toZone": "dashboard-ui-components"
->>>>>>> feature/integrate-codex
+      "fromZone": "prd-management-interface",
+      "toZone": "dashboard-ui-foundation"
     },
     {
       "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
       "to": "packages/web/src/viewer/components/guide.ts",
-<<<<<<< HEAD
-      "fromZone": "prd-ui-components",
-      "toZone": "viewer-platform"
-=======
-      "fromZone": "prd-tree-interface",
-      "toZone": "dashboard-ui-components"
->>>>>>> feature/integrate-codex
+      "fromZone": "prd-management-interface",
+      "toZone": "dashboard-ui-foundation"
     },
     {
       "from": "packages/web/tests/unit/viewer/accessibility.test.ts",
       "to": "packages/web/src/viewer/components/theme-toggle.ts",
-<<<<<<< HEAD
-      "fromZone": "prd-ui-components",
-      "toZone": "viewer-platform"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/analysis.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "prd-ui-components"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/prd.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "prd-ui-components"
-    },
-    {
-      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "prd-ui-components"
-    },
-    {
-      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "prd-ui-components"
-    },
-    {
-      "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "web-infrastructure"
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "web-infrastructure"
-    },
-    {
-      "from": "packages/web/tests/integration/pr-markdown-refresh.test.ts",
-      "to": "packages/web/src/server/routes-sourcevision.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "web-infrastructure"
-    },
-    {
-      "from": "packages/web/tests/integration/pr-markdown-refresh.test.ts",
-      "to": "packages/web/src/server/types.ts",
-      "fromZone": "viewer-platform",
-      "toZone": "web-infrastructure"
-=======
-      "fromZone": "prd-tree-interface",
-      "toZone": "dashboard-ui-components"
-    },
-    {
-      "from": "packages/hench/tests/unit/guard/guard-integration.test.ts",
-      "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "run-management",
-      "toZone": "agent-core"
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/shell.test.ts",
-      "to": "packages/hench/src/schema/v1.ts",
-      "fromZone": "run-management",
-      "toZone": "agent-core"
-    },
-    {
-      "from": "packages/hench/tests/unit/tools/shell.test.ts",
-      "to": "packages/hench/src/tools/shell.ts",
-      "fromZone": "run-management",
-      "toZone": "agent-infrastructure"
->>>>>>> feature/integrate-codex
+      "fromZone": "prd-management-interface",
+      "toZone": "dashboard-ui-foundation"
     },
     {
       "from": "packages/web/tests/unit/server/type-consistency.test.ts",
       "to": "packages/rex/src/schema/v1.ts",
-<<<<<<< HEAD
-      "fromZone": "web-infrastructure",
-=======
       "fromZone": "web-server-infrastructure",
->>>>>>> feature/integrate-codex
       "toZone": "packages-rex:rex-cli"
     },
     {
       "from": "packages/web/tests/unit/server/type-consistency.test.ts",
       "to": "packages/rex/src/schema/v1.ts",
-<<<<<<< HEAD
-      "fromZone": "web-infrastructure",
-=======
       "fromZone": "web-server-infrastructure",
->>>>>>> feature/integrate-codex
       "toZone": "packages-rex:rex-cli"
     }
   ],
@@ -4737,184 +4025,91 @@
     "vitest.config.js"
   ],
   "insights": [
-<<<<<<< HEAD
-    "Bidirectional coupling: \"prd-ui-components\" ↔ \"viewer-platform\" (5+4 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"agent-engine\" ↔ \"completion-validation\" (5+2 crossings) — consider extracting shared interface",
-    "Size imbalance: largest zone has 119 files vs smallest with 2 — uneven decomposition",
-    "4 circular dependency chains detected — see imports.json for details",
-    "Strong architectural separation with most zones achieving excellent cohesion (>0.95) and minimal coupling",
-    "Bidirectional coupling between hench and hench-2 zones suggests opportunity for architectural refinement",
-    "Clean layering evident with orchestration layer maintaining zero coupling to domain implementations",
-    "Web package exhibits layered architecture with infrastructure → platform → components dependency flow",
-    "Bidirectional imports between viewer-platform and PRD components suggest potential for architectural refinement",
-    "LLM Foundation serves as exemplary foundation layer with perfect isolation from all other zones",
-    "Excellent overall architecture with 4 of 5 zones achieving near-perfect cohesion and isolation",
-    "Hench domain split into 3 zones may indicate over-segmentation of related functionality",
-    "Web package architecture shows clear separation of concerns with infrastructure, platform, and component layers, though bidirectional coupling between viewer-platform and PRD components suggests potential for cleaner boundaries",
-    "LLM Foundation demonstrates ideal foundation layer characteristics with perfect cohesion and zero coupling, serving as architectural template for other foundation components",
-    "[call graph] 21 calls: \"web-infrastructure\" → \"packages-rex:rex-cli\"",
-    "[call graph] 13 calls: \"completion-validation\" → \"agent-engine\"",
-    "[call graph] 12 calls: \"packages-sourcevision:tests\" → \"packages-sourcevision:cli\"",
-    "[call graph] 5 calls: \"agent-engine\" → \"completion-validation\""
-=======
-    "Bidirectional coupling: \"dashboard-ui-components\" ↔ \"prd-tree-interface\" (4+5 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"agent-core\" ↔ \"agent-infrastructure\" (5+3 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"agent-core\" ↔ \"run-management\" (1+2 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"agent-infrastructure\" ↔ \"run-management\" (1+1 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"dashboard-ui-foundation\" ↔ \"prd-management-interface\" (4+5 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"hench\" ↔ \"hench-2\" (5+3 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"hench\" ↔ \"hench-3\" (1+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"hench-2\" ↔ \"hench-3\" (1+1 crossings) — consider extracting shared interface",
     "Size imbalance: largest zone has 119 files vs smallest with 10 — uneven decomposition",
-    "Web package demonstrates excellent three-tier architecture: server infrastructure → base UI components → specialized feature components",
-    "All web zones maintain high cohesion (>0.95) with minimal coupling, indicating clean architectural boundaries",
-    "Gateway pattern in server infrastructure provides clear dependency management for cross-package imports",
-    "Web package zones show exemplary architectural layering with clear separation of concerns across server, base UI, and specialized components",
-    "[call graph] 34 calls: \"run-management\" → \"agent-infrastructure\"",
+    "Clear three-tier architecture emerges: server infrastructure → UI foundation → domain-specific interfaces",
+    "Progressive coupling increase (0.02 → 0.03 → 0.05) follows expected layering pattern",
+    "Bidirectional dependencies between UI layers indicate potential architectural refinement opportunities",
+    "Excellent cohesion scores (0.95+) across all web zones indicate well-organized functional groupings",
+    "Bidirectional imports between dashboard foundation and PRD interface suggest component ownership boundaries need clarification",
+    "Clean layered architecture with server, UI foundation, and domain-specific tiers demonstrates solid separation of concerns",
+    "[call graph] 34 calls: \"hench-3\" → \"hench-2\"",
     "[call graph] 21 calls: \"web-server-infrastructure\" → \"packages-rex:rex-cli\"",
-    "[call graph] 19 calls: \"run-management\" → \"agent-core\"",
+    "[call graph] 19 calls: \"hench-3\" → \"hench\"",
     "[call graph] 15 calls: \"packages-sourcevision:tests\" → \"packages-sourcevision:cli\""
->>>>>>> feature/integrate-codex
   ],
   "findings": [
     {
       "type": "observation",
       "pass": 0,
-<<<<<<< HEAD
-      "scope": "agent-engine",
-      "text": "High cohesion (0.99) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "agent-engine",
-      "text": "Bidirectional coupling with hench-2 zone suggests potential architectural refinement opportunity",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "agent-engine",
-      "text": "Sophisticated agent capabilities with adaptive analysis and workflow management",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "agent-engine",
-      "text": "Strong domain organization with clear separation between analysis, lifecycle, and tool concerns",
-=======
-      "scope": "agent-core",
-      "text": "High cohesion (0.97) — files are tightly interconnected",
->>>>>>> feature/integrate-codex
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-<<<<<<< HEAD
-      "scope": "claude-integration",
-=======
-      "scope": "claude-client-bridge",
->>>>>>> feature/integrate-codex
+      "scope": "claude-client",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-<<<<<<< HEAD
-      "pass": 1,
-      "scope": "claude-integration",
-      "text": "Comprehensive utility support for authentication, JSON handling, and help formatting",
-=======
       "pass": 0,
-      "scope": "dashboard-ui-components",
+      "scope": "dashboard-ui-foundation",
       "text": "High cohesion (0.97) — files are tightly interconnected",
->>>>>>> feature/integrate-codex
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-<<<<<<< HEAD
-      "scope": "claude-integration",
-      "text": "Well-structured adapter pattern with clear separation between API and CLI providers",
-=======
-      "scope": "dashboard-ui-components",
-      "text": "Bidirectional imports with PRD tree zone (4 each way) suggest some coupling that could be reduced",
-      "severity": "info"
+      "scope": "dashboard-ui-foundation",
+      "text": "Bidirectional imports with PRD interface (4 imports each way) suggest architectural boundary confusion",
+      "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 1,
-      "scope": "dashboard-ui-components",
-      "text": "Well-structured component hierarchy with clear separation between generic and specialized UI elements",
->>>>>>> feature/integrate-codex
+      "scope": "dashboard-ui-foundation",
+      "text": "Comprehensive component library with strong cohesion provides solid foundation for dashboard views",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"agent-core\" ↔ \"agent-infrastructure\" (5+3 crossings) — consider extracting shared interface",
+      "text": "Bidirectional coupling: \"dashboard-ui-foundation\" ↔ \"prd-management-interface\" (4+5 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-<<<<<<< HEAD
-      "text": "Bidirectional coupling: \"agent-engine\" ↔ \"completion-validation\" (5+2 crossings) — consider extracting shared interface",
-=======
-      "text": "Bidirectional coupling: \"dashboard-ui-components\" ↔ \"prd-tree-interface\" (4+5 crossings) — consider extracting shared interface",
->>>>>>> feature/integrate-codex
+      "text": "Bidirectional coupling: \"hench\" ↔ \"hench-2\" (5+3 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-<<<<<<< HEAD
-      "text": "Bidirectional coupling: \"prd-ui-components\" ↔ \"viewer-platform\" (5+4 crossings) — consider extracting shared interface",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "global",
-      "text": "Size imbalance: largest zone has 119 files vs smallest with 2 — uneven decomposition",
-=======
       "text": "Size imbalance: largest zone has 119 files vs smallest with 10 — uneven decomposition",
->>>>>>> feature/integrate-codex
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-<<<<<<< HEAD
-      "text": "Excellent overall architecture with 4 of 5 zones achieving near-perfect cohesion and isolation",
+      "text": "Bidirectional imports between dashboard foundation and PRD interface suggest component ownership boundaries need clarification",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "Clean layered architecture with server, UI foundation, and domain-specific tiers demonstrates solid separation of concerns",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
       "scope": "global",
-      "text": "Hench domain split into 3 zones may indicate over-segmentation of related functionality",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "LLM Foundation demonstrates ideal foundation layer characteristics with perfect cohesion and zero coupling, serving as architectural template for other foundation components",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Web package architecture shows clear separation of concerns with infrastructure, platform, and component layers, though bidirectional coupling between viewer-platform and PRD components suggests potential for cleaner boundaries",
-=======
-      "text": "Web package zones show exemplary architectural layering with clear separation of concerns across server, base UI, and specialized components",
->>>>>>> feature/integrate-codex
+      "text": "Excellent cohesion scores (0.95+) across all web zones indicate well-organized functional groupings",
       "severity": "info"
     },
     {
@@ -4933,167 +4128,74 @@
     {
       "type": "observation",
       "pass": 0,
-<<<<<<< HEAD
-      "scope": "llm-foundation",
-      "text": "High cohesion (1) — files are tightly interconnected",
-=======
-      "scope": "prd-tree-interface",
-      "text": "High cohesion (0.95) — files are tightly interconnected",
->>>>>>> feature/integrate-codex
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-<<<<<<< HEAD
-      "scope": "llm-foundation",
-      "text": "Exemplary foundation layer architecture with perfect cohesion and zero coupling, serving as the vendor-neutral base for all LLM operations",
-=======
-      "scope": "prd-tree-interface",
-      "text": "Heavy dependency on base UI components (5 imports to dashboard-ui-components) shows proper layering",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-tree-interface",
-      "text": "Well-scoped feature zone with clear responsibility boundaries for PRD tree operations",
->>>>>>> feature/integrate-codex
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "project-root",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-<<<<<<< HEAD
-      "pass": 1,
-      "scope": "orchestration-layer",
-      "text": "Clean delegation pattern where orchestration spawns CLIs rather than importing domain logic",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "orchestration-layer",
-      "text": "Excellent architectural separation with refresh-* services handling cross-package coordination",
-=======
-      "pass": 0,
-      "scope": "run-management",
-      "text": "High cohesion (0.9) — files are tightly interconnected",
->>>>>>> feature/integrate-codex
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-<<<<<<< HEAD
-      "scope": "prd-ui-components",
-      "text": "High cohesion (0.95) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-ui-components",
-      "text": "Well-focused PRD-specific UI components with good cohesion (0.95) and appropriate specialization for tree manipulation features",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "suggestion-store",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "suggestion-store",
-      "text": "Appropriate granularity for specialized state management functionality",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "suggestion-store",
-      "text": "Excellent example of single-responsibility module with perfect isolation metrics",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "viewer-platform",
+      "scope": "hench",
       "text": "High cohesion (0.97) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "viewer-platform",
-      "text": "Robust viewer infrastructure with high cohesion (0.97) effectively centralizing schema validation and component framework",
+      "pass": 0,
+      "scope": "hench-3",
+      "text": "High cohesion (0.9) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "web-infrastructure",
-=======
+      "scope": "prd-management-interface",
+      "text": "High cohesion (0.95) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "prd-management-interface",
+      "text": "All components focus on PRD domain showing excellent functional cohesion",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "prd-management-interface",
+      "text": "Reverse imports to UI foundation suggest some components may belong in the foundation layer",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "root",
+      "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
       "scope": "web-server-infrastructure",
->>>>>>> feature/integrate-codex
       "text": "High cohesion (0.98) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-<<<<<<< HEAD
-      "scope": "web-infrastructure",
-      "text": "Strong architectural foundation with excellent cohesion (0.98) and minimal coupling (0.02), properly isolating core web infrastructure concerns",
-=======
       "scope": "web-server-infrastructure",
-      "text": "Excellent architectural isolation with gateway modules containing all cross-package imports",
->>>>>>> feature/integrate-codex
+      "text": "Exemplary low coupling (0.02) demonstrates clean architectural boundaries",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 1,
-<<<<<<< HEAD
-      "scope": "completion-validation",
-      "text": "Bidirectional coupling with agent-engine creates circular dependency pattern",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "completion-validation",
-      "text": "Cohesion of 0.55 suggests mixed responsibilities within completion validation logic",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "completion-validation",
-      "text": "Small zone size makes it a good candidate for refactoring or merging back into main agent engine",
-=======
       "scope": "web-server-infrastructure",
-      "text": "Very low coupling (0.02) demonstrates clean API boundaries between server and client zones",
->>>>>>> feature/integrate-codex
+      "text": "Gateway modules successfully isolate cross-package dependencies for rex and sourcevision integration",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 0,
       "scope": "global",
-      "text": "God function: main in packages/rex/src/cli/index.ts calls 40 unique functions — consider decomposing into smaller, focused functions",
+      "text": "God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions",
       "severity": "warning",
       "related": [
-        "packages/rex/src/cli/index.ts"
+        "packages/web/src/viewer/graph/renderer.ts"
       ]
     },
     {
@@ -5162,32 +4264,15 @@
     }
   ],
   "enrichmentPass": 1,
-  "metaEvaluationCount": 3,
-<<<<<<< HEAD
-  "structureHash": "e33bb7ae3b7d90c0",
+  "structureHash": "fefd59476a10cdf1",
   "zoneContentHashes": {
     "root": "b1b6cef4af64326f",
-    "claude-client": "05bf1e468e77ddbf",
-    "hench": "65de528cc90ed8ec",
-    "hench-2": "bd11abe6a9a20536",
-    "hench-3": "2ffae3a0df429251",
-    "llm-client": "ad7d3bcf0ba12977",
-    "web": "bce865c999dd5f43",
-=======
-  "structureHash": "1e541f7d4024f279",
-  "zoneContentHashes": {
-    "root": "fbca93590a6a3d34",
     "claude-client": "05bf1e468e77ddbf",
     "hench": "8740d544d8f623f5",
     "hench-2": "d8af8dfd65139f66",
     "hench-3": "e5a212008c361eb4",
-    "web": "0113eff24ad65716",
->>>>>>> feature/integrate-codex
+    "web": "7849550aac417f98",
     "web-2": "61eb2cd2678f6b6b",
     "web-3": "c4883b8b2aa68416"
-  },
-  "lastReset": {
-    "from": 1,
-    "to": 1
   }
 }

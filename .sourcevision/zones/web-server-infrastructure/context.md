@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Server Infrastructure (`web-server-infrastructure`)
-Files: 57, Cohesion: 0.98, Coupling: 0.02
-Description: Core server components including CLI entry points, MCP endpoints, domain gateways, and HTTP routing infrastructure.
+Files: 59, Cohesion: 0.98, Coupling: 0.02
+Description: Core HTTP server foundation providing routing, gateways, and service orchestration for the unified dashboard and MCP endpoints.
 Entry points: packages/web/src/schema/data-files.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts
-Lines: 23939
+Lines: 25357
 
 </zone>
 
@@ -23,30 +23,30 @@ packages/web/src/schema/data-files.ts (TypeScript, 12 lines, source)
 packages/web/src/server/domain-gateway.ts (TypeScript, 19 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
 packages/web/src/server/mcp-deps.ts (TypeScript, 6 lines, source)
-packages/web/src/server/port.ts (TypeScript, 119 lines, source)
+packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
 packages/web/src/server/rex-gateway.ts (TypeScript, 72 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
 packages/web/src/server/routes-data.ts (TypeScript, 140 lines, source)
 packages/web/src/server/routes-features.ts (TypeScript, 293 lines, source)
-packages/web/src/server/routes-hench.ts (TypeScript, 1393 lines, source)
+packages/web/src/server/routes-hench.ts (TypeScript, 1465 lines, source)
 packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
 packages/web/src/server/routes-mcp.ts (TypeScript, 179 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 2791 lines, source)
+packages/web/src/server/routes-rex.ts (TypeScript, 2850 lines, source)
 packages/web/src/server/routes-sourcevision.ts (TypeScript, 1231 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
 packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
 packages/web/src/server/routes-token-usage.ts (TypeScript, 931 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
-packages/web/src/server/start.ts (TypeScript, 408 lines, source)
+packages/web/src/server/start.ts (TypeScript, 557 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
 packages/web/src/server/websocket.ts (TypeScript, 274 lines, source)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
-packages/web/tests/unit/server/port.test.ts (TypeScript, 173 lines, test)
+packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
 packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
 packages/web/tests/unit/server/routes-adaptive.test.ts (TypeScript, 446 lines, test)
 packages/web/tests/unit/server/routes-config.test.ts (TypeScript, 234 lines, test)
@@ -56,6 +56,7 @@ packages/web/tests/unit/server/routes-hench-config.test.ts (TypeScript, 305 line
 packages/web/tests/unit/server/routes-hench-execute.test.ts (TypeScript, 398 lines, test)
 packages/web/tests/unit/server/routes-hench-health.test.ts (TypeScript, 230 lines, test)
 packages/web/tests/unit/server/routes-hench-heartbeat.test.ts (TypeScript, 218 lines, test)
+packages/web/tests/unit/server/routes-hench-shutdown.test.ts (TypeScript, 425 lines, test)
 packages/web/tests/unit/server/routes-hench-templates.test.ts (TypeScript, 332 lines, test)
 packages/web/tests/unit/server/routes-mcp.test.ts (TypeScript, 230 lines, test)
 packages/web/tests/unit/server/routes-notion.test.ts (TypeScript, 255 lines, test)
@@ -69,6 +70,7 @@ packages/web/tests/unit/server/routes-token-usage.test.ts (TypeScript, 582 lines
 packages/web/tests/unit/server/routes-validation.test.ts (TypeScript, 416 lines, test)
 packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, test)
 packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
+packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, test)
 packages/web/tests/unit/server/websocket.test.ts (TypeScript, 212 lines, test)
 
@@ -79,14 +81,14 @@ packages/web/tests/unit/server/websocket.test.ts (TypeScript, 212 lines, test)
 Internal:
   packages/web/src/cli/index.ts → packages/web/src/server/start.ts {startServer}
   packages/web/src/cli/index.ts → packages/web/src/server/types.ts {ViewerScope}
-  packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, findAvailablePort}
-  packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult}
+  packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
+  packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
   packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
   packages/web/src/public.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, findAvailablePort}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult}
+  packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
+  packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
@@ -144,12 +146,12 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor}
+  packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor, shutdownActiveExecutions}
   packages/web/src/server/start.ts → packages/web/src/server/routes-integrations.ts {handleIntegrationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-project.ts {handleProjectRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
+  packages/web/src/server/start.ts → packages/web/src/server/routes-rex.ts {handleRexRoute, shutdownRexExecution}
   packages/web/src/server/start.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute, isProjectInitialized}
   packages/web/src/server/start.ts → packages/web/src/server/routes-status.ts {handleStatusRoute, clearStatusCache}
@@ -160,7 +162,7 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/websocket.ts {createWebSocketManager}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
+  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
   packages/web/tests/unit/server/port.test.ts → packages/web/src/server/start.ts {PORT_FILE}
   packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {buildPRMarkdownRefreshFailure, classifyPRMarkdownRefreshFailureCode, classifyPRMarkdownRefreshPreflightCode, GIT_CREDENTIAL_HELPER_COMMAND, getPRMarkdownRefreshRemediationHints, resolvePRMarkdownRefreshPreflightErrorContract, resolvePRMarkdownRefreshGuidance, shouldUsePRMarkdownFallback, shouldUsePRMarkdownFallbackForCode, validatePRMarkdownRefreshPreflightErrorContract}
   packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
@@ -179,6 +181,8 @@ Internal:
   packages/web/tests/unit/server/routes-hench-health.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-heartbeat.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/routes-hench-heartbeat.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions, handleHenchRoute}
+  packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute, closeAllMcpSessions}
@@ -207,6 +211,9 @@ Internal:
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
+  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions}
+  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex.ts {shutdownRexExecution}
+  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_PRIORITY_ORDER, GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_LEVELS, GATEWAY_VALID_STATUSES, GATEWAY_VALID_PRIORITIES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
   packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager}
 
@@ -214,26 +221,37 @@ Outgoing (this zone → other zones):
   → packages-rex:rex-cli: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
 
 Incoming (other zones → this zone):
-  ← dashboard-ui-components: packages/web/src/viewer/loader.ts → packages/web/src/schema/data-files.ts; packages/web/src/viewer/main.ts → packages/web/src/schema/data-files.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/routes-sourcevision.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/types.ts
+  ← dashboard-ui-foundation: packages/web/src/viewer/loader.ts → packages/web/src/schema/data-files.ts; packages/web/src/viewer/main.ts → packages/web/src/schema/data-files.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/routes-sourcevision.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/types.ts
 
 </imports>
 
 <findings>
 
 [observation] [info] High cohesion (0.98) — files are tightly interconnected
-[observation] [info] Excellent architectural isolation with gateway modules containing all cross-package imports
-[observation] [info] Very low coupling (0.02) demonstrates clean API boundaries between server and client zones
+[observation] [info] Exemplary low coupling (0.02) demonstrates clean architectural boundaries
+[observation] [info] Gateway modules successfully isolate cross-package dependencies for rex and sourcevision integration
 
 </findings>
 
 <insights>
 
 - High cohesion (0.98) — files are tightly interconnected
-- Gateway pattern isolates cross-package dependencies into dedicated modules
-- Clean separation between server infrastructure and UI components
-- High cohesion (0.98) indicates well-organized server architecture
-- Excellent architectural isolation with gateway modules containing all cross-package imports
-- Very low coupling (0.02) demonstrates clean API boundaries between server and client zones
-- [call graph] 1198 internal calls, 21 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)
+- Excellent architectural isolation with 0.02 coupling indicates clean server abstraction
+- Gateway pattern concentrates cross-package imports into dedicated modules for maintainable dependencies
+- High cohesion (0.98) shows well-organized server concerns with clear separation between routing, services, and utilities
+- Exemplary low coupling (0.02) demonstrates clean architectural boundaries
+- Gateway modules successfully isolate cross-package dependencies for rex and sourcevision integration
+- [call graph] 1292 internal calls, 21 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>
+
+<sub-zones>
+
+This zone has 2 sub-zone(s):
+
+- **Tests** (`web/tests`): 50 files, cohesion 0.96, coupling 0.04
+- **Server** (`web/server`): 6 files, cohesion 0.57, coupling 0.43
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

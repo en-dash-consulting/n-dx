@@ -6,25 +6,16 @@
 <architecture>
 
 Project: n-dx
-Git: feature/from-recommend @ 536ec50
-<<<<<<< HEAD
-Files: 768, Lines: 235338
-Languages: TypeScript(633) CSS(36) JSON(27) JavaScript(27) Other(22)
-Zones: 23, Described: 23
-Import edges: 1800, External packages: 17
-Circulars: 4
-=======
-Files: 768, Lines: 244113
-Languages: TypeScript(632) CSS(36) JSON(33) JavaScript(25) Other(22)
-Zones: 15, Described: 15
-Import edges: 1799, External packages: 18
->>>>>>> feature/integrate-codex
+Git: feature/integrate-codex @ 21786d2
+Files: 774, Lines: 247667
+Languages: TypeScript(634) CSS(36) JSON(32) JavaScript(27) Other(22)
+Zones: 26, Described: 26
+Import edges: 1806, External packages: 18
 
 </architecture>
 
 <zones>
 
-<<<<<<< HEAD
 [.claude-worktrees-strange-volhard:agent-security-layer] Agent Security Layer (10 files, coh=0.86 coup=0.14)
   Guard system and security contracts that validate and constrain autonomous agent operations to prevent unsafe actions.
   files: .claude/worktrees/strange-volhard/packages/hench/src/guard/commands.ts, .claude/worktrees/strange-volhard/packages/hench/src/guard/contracts.ts, .claude/worktrees/strange-volhard/packages/hench/src/guard/index.ts, .claude/worktrees/strange-volhard/packages/hench/src/guard/paths.ts, .claude/worktrees/strange-volhard/packages/hench/src/guard/policy.ts, .claude/worktrees/strange-volhard/packages/hench/tests/unit/guard/commands.test.ts, .claude/worktrees/strange-volhard/packages/hench/tests/unit/guard/guard-integration.test.ts, .claude/worktrees/strange-volhard/packages/hench/tests/unit/guard/paths.test.ts, .claude/worktrees/strange-volhard/packages/hench/tests/unit/guard/policy.test.ts, .claude/worktrees/strange-volhard/packages/hench/tests/unit/tools/shell.test.ts
@@ -58,47 +49,33 @@ Import edges: 1799, External packages: 18
 [.claude-worktrees-strange-volhard:web-shared-utilities] Web Shared Utilities (34 files, coh=0.94 coup=0.06)
   Shared web utilities, middleware, and supporting infrastructure components.
   files: .claude/worktrees/strange-volhard/packages/web/src/viewer/components/guide.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/add-item-form.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/analyze-panel.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/batch-import-panel.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/bulk-actions.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/compute.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/execution-panel.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/index.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/inline-add-form.ts, .claude/worktrees/strange-volhard/packages/web/src/viewer/components/prd-tree/merge-preview.ts +24
-[agent-engine] Agent Engine (109 files, coh=0.99 coup=0.01)
-  Autonomous agent execution engine handling task analysis, lifecycle management, and tool dispatch with adaptive workflow capabilities.
-  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/heartbeat.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service], packages/hench/src/agent/lifecycle/shared.ts [service] +99
-[claude-integration] Claude Integration (28 files, coh=1.00 coup=0.00)
-  Claude API client abstraction layer providing authentication, request handling, and CLI/API provider implementations.
-  files: packages/claude-client/src/api-provider.ts [service], packages/claude-client/src/auth.ts [utility], packages/claude-client/src/cli-provider.ts [service], packages/claude-client/src/config.ts [config], packages/claude-client/src/create-client.ts [utility], packages/claude-client/src/exec.ts [utility], packages/claude-client/src/help-format.ts [utility], packages/claude-client/src/json.ts [utility], packages/claude-client/src/output.ts [utility], packages/claude-client/src/project-config.ts [config] +18
-[completion-validation] Completion Validation (5 files, coh=0.55 coup=0.45)
-  Task completion validation logic separated from the main agent engine, handling completion criteria and validation workflows.
-  files: packages/hench/src/agent/completion.ts [service], packages/hench/src/validation/completion.ts [utility], packages/hench/src/validation/index.ts [entrypoint], packages/hench/tests/unit/agent/completion.test.ts, packages/hench/tests/unit/tools/completion-validation.test.ts
-[llm-foundation] LLM Foundation (40 files, coh=1.00 coup=0.00)
-  Vendor-neutral LLM client foundation providing unified API abstraction across different LLM providers.
-  files: packages/llm-client/src/api-provider.ts [service], packages/llm-client/src/auth.ts [service], packages/llm-client/src/cli-provider.ts [service], packages/llm-client/src/codex-cli-provider.ts [service], packages/llm-client/src/config.ts [config], packages/llm-client/src/create-client.ts [service], packages/llm-client/src/exec.ts [service], packages/llm-client/src/help-format.ts [utility], packages/llm-client/src/json.ts [utility], packages/llm-client/src/llm-client.ts [service] +30
-[orchestration-layer] Orchestration Layer (12 files, coh=1.00 coup=0.00)
-  Top-level command orchestration and configuration management that coordinates between domain packages without importing their internals.
-  files: ci.js [entrypoint], cli.js [entrypoint], config.js [config], help.js [cli-command], refresh-artifacts.js [service], refresh-plan.js [service], refresh-validate.js [utility], tests/unit/help.test.js, tests/unit/refresh-artifacts.test.js, tests/unit/refresh-plan.test.js +2
-=======
-[agent-core] Agent Core (95 files, coh=0.97 coup=0.03)
-  Main autonomous agent engine handling task execution and Claude API interactions.
-  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/completion.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/heartbeat.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service] +85
-[agent-infrastructure] Agent Infrastructure (11 files, coh=0.77 coup=0.23)
-  Supporting utilities and configuration for the autonomous agent system.
-  files: packages/hench/src/agent/tools.ts [gateway], packages/hench/src/tools/contracts.ts [types], packages/hench/src/tools/dispatch.ts [utility], packages/hench/src/tools/files.ts [service], packages/hench/src/tools/git.ts [service], packages/hench/src/tools/index.ts [entrypoint], packages/hench/src/tools/shell.ts [service], packages/hench/src/tools/test-runner.ts [utility], packages/hench/tests/unit/tools/files.test.ts, packages/hench/tests/unit/tools/git.test.ts +1
-[claude-client-bridge] Claude Client Bridge (28 files, coh=1.00 coup=0.00)
-  Compatibility bridge providing Claude API access to the llm-client foundation.
-  files: packages/claude-client/src/api-provider.ts [service], packages/claude-client/src/auth.ts [utility], packages/claude-client/src/cli-provider.ts [service], packages/claude-client/src/config.ts [config], packages/claude-client/src/create-client.ts [utility], packages/claude-client/src/exec.ts [utility], packages/claude-client/src/help-format.ts [utility], packages/claude-client/src/json.ts [utility], packages/claude-client/src/output.ts [utility], packages/claude-client/src/project-config.ts [config] +18
-[dashboard-ui-components] Dashboard UI Components (119 files, coh=0.97 coup=0.03)
-  Reusable frontend components including schemas, validation, data display, and common UI elements for the web dashboard.
+[claude-client] Claude Client (28 files, coh=1.00 coup=0.00)
+  26 files, primarily TypeScript
+  files: packages/claude-client/src/api-provider.ts [service], packages/claude-client/src/auth.ts [service], packages/claude-client/src/cli-provider.ts [service], packages/claude-client/src/config.ts [config], packages/claude-client/src/create-client.ts [service], packages/claude-client/src/exec.ts [utility], packages/claude-client/src/help-format.ts [utility], packages/claude-client/src/json.ts [utility], packages/claude-client/src/output.ts [utility], packages/claude-client/src/project-config.ts [config] +18
+[dashboard-ui-foundation] Dashboard UI Foundation (119 files, coh=0.97 coup=0.03)
+  Reusable viewer framework providing core dashboard components, theming, navigation, and data display primitives.
   files: packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/viewer/components/active-tasks-panel.ts [component], packages/web/src/viewer/components/breadcrumb.ts [component], packages/web/src/viewer/components/config-footer.ts [component], packages/web/src/viewer/components/constants.ts [types], packages/web/src/viewer/components/copy-link-button.ts [component], packages/web/src/viewer/components/data-display/collapsible-section.ts [component], packages/web/src/viewer/components/data-display/findings-list.ts [component], packages/web/src/viewer/components/data-display/health-gauge.ts [component] +109
+[hench] Hench (95 files, coh=0.97 coup=0.03)
+  94 files, primarily TypeScript
+  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service], packages/hench/src/agent/analysis/workflow.ts [service], packages/hench/src/agent/completion.ts [service], packages/hench/src/agent/index.ts [entrypoint], packages/hench/src/agent/lifecycle/cli-loop.ts [service], packages/hench/src/agent/lifecycle/heartbeat.ts [service], packages/hench/src/agent/lifecycle/loop.ts [service] +85
+[hench-2] Hench 2 (11 files, coh=0.77 coup=0.23)
+  11 files, primarily TypeScript
+  files: packages/hench/src/agent/tools.ts [service], packages/hench/src/tools/contracts.ts [types], packages/hench/src/tools/dispatch.ts [service], packages/hench/src/tools/files.ts [utility], packages/hench/src/tools/git.ts [utility], packages/hench/src/tools/index.ts [entrypoint], packages/hench/src/tools/shell.ts [utility], packages/hench/src/tools/test-runner.ts [utility], packages/hench/tests/unit/tools/files.test.ts, packages/hench/tests/unit/tools/git.test.ts +1
+[hench-3] Hench 3 (10 files, coh=0.90 coup=0.10)
+  10 files, primarily TypeScript
+  files: packages/hench/src/guard/commands.ts [utility], packages/hench/src/guard/contracts.ts [types], packages/hench/src/guard/index.ts [entrypoint], packages/hench/src/guard/paths.ts [utility], packages/hench/src/guard/policy.ts [utility], packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/guard-integration.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/guard/policy.test.ts, packages/hench/tests/unit/tools/shell.test.ts
 [packages-llm-client:src] Src (4 files, coh=0.29 coup=0.71)
   4 files, primarily TypeScript
   files: packages/llm-client/src/api-provider.ts [service], packages/llm-client/src/config.ts [config], packages/llm-client/tests/unit/api-provider.test.ts, packages/llm-client/tests/unit/config.test.ts
 [packages-llm-client:src-2] Src 2 (16 files, coh=0.63 coup=0.38)
   16 files, primarily TypeScript
-  files: packages/llm-client/src/auth.ts [service], packages/llm-client/src/exec.ts [utility], packages/llm-client/src/help-format.ts [utility], packages/llm-client/src/json.ts [utility], packages/llm-client/src/output.ts [utility], packages/llm-client/src/project-config.ts [config], packages/llm-client/src/project-dirs.ts [types], packages/llm-client/src/public.ts [entrypoint], packages/llm-client/src/suggest.ts [utility], packages/llm-client/tests/unit/auth.test.ts +6
+  files: packages/llm-client/src/auth.ts [utility], packages/llm-client/src/exec.ts [utility], packages/llm-client/src/help-format.ts [utility], packages/llm-client/src/json.ts [utility], packages/llm-client/src/output.ts [utility], packages/llm-client/src/project-config.ts [config], packages/llm-client/src/project-dirs.ts [utility], packages/llm-client/src/public.ts [entrypoint], packages/llm-client/src/suggest.ts [service], packages/llm-client/tests/unit/auth.test.ts +6
 [packages-llm-client:src-3] Src 3 (17 files, coh=0.65 coup=0.35)
   17 files, primarily TypeScript
-  files: packages/llm-client/src/cli-provider.ts [service], packages/llm-client/src/codex-cli-provider.ts [service], packages/llm-client/src/create-client.ts [service], packages/llm-client/src/llm-client.ts [service], packages/llm-client/src/provider-interface.ts [types], packages/llm-client/src/provider-registry.ts [service], packages/llm-client/src/provider-session.ts [service], packages/llm-client/src/token-usage.ts [utility], packages/llm-client/src/types.ts [types], packages/llm-client/tests/unit/cli-provider.test.ts +7
+  files: packages/llm-client/src/cli-provider.ts [service], packages/llm-client/src/codex-cli-provider.ts [service], packages/llm-client/src/create-client.ts [service], packages/llm-client/src/llm-client.ts [service], packages/llm-client/src/provider-interface.ts [types], packages/llm-client/src/provider-registry.ts [service], packages/llm-client/src/provider-session.ts [service], packages/llm-client/src/token-usage.ts [service], packages/llm-client/src/types.ts [types], packages/llm-client/tests/unit/cli-provider.test.ts +7
 [packages-llm-client:src-4] Src 4 (3 files, coh=0.20 coup=0.80)
   3 files, primarily TypeScript
   files: packages/llm-client/src/llm-config.ts [config], packages/llm-client/src/llm-types.ts [types], packages/llm-client/tests/unit/llm-config.test.ts
->>>>>>> feature/integrate-codex
 [packages-rex:rex-cli] Rex PRD Management CLI (36 files, coh=1.00 coup=0.00)
   A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
   files: packages/rex/src/analyze/index.ts [entrypoint], packages/rex/src/analyze/propose.ts [service], packages/rex/src/analyze/reconcile.ts [utility], packages/rex/src/analyze/scanners.ts [service], packages/rex/src/cli/commands/add.ts [cli-command], packages/rex/src/cli/commands/analyze.ts [cli-command], packages/rex/src/cli/commands/constants.ts [types], packages/rex/src/cli/commands/init.ts [cli-command], packages/rex/src/cli/commands/next.ts [cli-command], packages/rex/src/cli/commands/recommend.ts [cli-command] +26
@@ -107,36 +84,17 @@ Import edges: 1799, External packages: 18
   files: packages/sourcevision/src/cli/commands/constants.ts [types], packages/sourcevision/src/cli/commands/export-pdf.ts [cli-command], packages/sourcevision/src/cli/commands/init.ts [cli-command], packages/sourcevision/src/cli/commands/reset.ts [cli-command], packages/sourcevision/src/cli/commands/validate.ts [cli-command], packages/sourcevision/src/cli/errors.ts [utility], packages/sourcevision/src/cli/index.ts [entrypoint], packages/sourcevision/src/cli/output.ts [utility], packages/sourcevision/src/cli/serve.ts [cli-command], packages/sourcevision/tests/unit/cli/errors.test.ts +2
 [packages-sourcevision:tests] Tests (68 files, coh=0.94 coup=0.06)
   66 files, primarily TypeScript
-  files: packages/sourcevision/src/analyzers/callgraph-findings.ts [utility], packages/sourcevision/src/analyzers/callgraph.ts [service], packages/sourcevision/src/analyzers/claude-client.ts [service], packages/sourcevision/src/analyzers/components.ts [service], packages/sourcevision/src/analyzers/context.ts [service], packages/sourcevision/src/analyzers/enrich-batch.ts [service], packages/sourcevision/src/analyzers/enrich-config.ts [service], packages/sourcevision/src/analyzers/enrich-parsing.ts [service], packages/sourcevision/src/analyzers/enrich-per-zone.ts [service], packages/sourcevision/src/analyzers/enrich.ts [service] +58
-<<<<<<< HEAD
-[prd-ui-components] PRD UI Components (33 files, coh=0.95 coup=0.05)
-  Specialized user interface components for PRD tree manipulation including forms, panels, and interactive elements.
+  files: packages/sourcevision/src/analyzers/callgraph-findings.ts [service], packages/sourcevision/src/analyzers/callgraph.ts [service], packages/sourcevision/src/analyzers/claude-client.ts [service], packages/sourcevision/src/analyzers/components.ts [service], packages/sourcevision/src/analyzers/context.ts [service], packages/sourcevision/src/analyzers/enrich-batch.ts [service], packages/sourcevision/src/analyzers/enrich-config.ts [service], packages/sourcevision/src/analyzers/enrich-parsing.ts [service], packages/sourcevision/src/analyzers/enrich-per-zone.ts [service], packages/sourcevision/src/analyzers/enrich.ts [service] +58
+[prd-management-interface] PRD Management Interface (33 files, coh=0.95 coup=0.05)
+  Specialized UI components for PRD tree manipulation, task execution, and project analysis workflows.
   files: packages/web/src/viewer/components/prd-tree/add-item-form.ts [component], packages/web/src/viewer/components/prd-tree/analyze-panel.ts [component], packages/web/src/viewer/components/prd-tree/batch-import-panel.ts [component], packages/web/src/viewer/components/prd-tree/bulk-actions.ts [component], packages/web/src/viewer/components/prd-tree/compute.ts [component], packages/web/src/viewer/components/prd-tree/execution-panel.ts [component], packages/web/src/viewer/components/prd-tree/index.ts [entrypoint], packages/web/src/viewer/components/prd-tree/inline-add-form.ts [component], packages/web/src/viewer/components/prd-tree/merge-preview.ts [component], packages/web/src/viewer/components/prd-tree/prd-tree.ts [component] +23
-[suggestion-store] Suggestion Store (2 files, coh=1.00 coup=0.00)
-  Isolated state management for agent suggestions with minimal dependencies and focused responsibility.
-  files: packages/hench/src/store/suggestions.ts [store], packages/hench/tests/unit/store/suggestions.test.ts
-[viewer-platform] Viewer Platform (119 files, coh=0.97 coup=0.03)
-  Schema validation engine and viewer component infrastructure supporting the dashboard's data display and interaction capabilities.
-  files: packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/viewer/components/active-tasks-panel.ts [component], packages/web/src/viewer/components/breadcrumb.ts [component], packages/web/src/viewer/components/config-footer.ts [component], packages/web/src/viewer/components/constants.ts [types], packages/web/src/viewer/components/copy-link-button.ts [component], packages/web/src/viewer/components/data-display/collapsible-section.ts [component], packages/web/src/viewer/components/data-display/findings-list.ts [component], packages/web/src/viewer/components/data-display/health-gauge.ts [component] +109
-[web-infrastructure] Web Infrastructure (59 files, coh=0.98 coup=0.02)
-  Core web platform infrastructure providing CLI entry points, public APIs, and foundational schema definitions.
-  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [page], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility] +49
-[unzoned] 62 files: .gitignore, .hench/config.json, .npmrc, .rex/archive.json, .rex/config.json ...
-=======
-[prd-tree-interface] PRD Tree Interface (33 files, coh=0.95 coup=0.05)
-  Specialized UI components for PRD tree management including forms, panels, bulk operations, and execution controls.
-  files: packages/web/src/viewer/components/prd-tree/add-item-form.ts [component], packages/web/src/viewer/components/prd-tree/analyze-panel.ts [component], packages/web/src/viewer/components/prd-tree/batch-import-panel.ts [component], packages/web/src/viewer/components/prd-tree/bulk-actions.ts [component], packages/web/src/viewer/components/prd-tree/compute.ts [component], packages/web/src/viewer/components/prd-tree/execution-panel.ts [component], packages/web/src/viewer/components/prd-tree/index.ts [entrypoint], packages/web/src/viewer/components/prd-tree/inline-add-form.ts [component], packages/web/src/viewer/components/prd-tree/merge-preview.ts [component], packages/web/src/viewer/components/prd-tree/prd-tree.ts [component] +23
-[project-root] Project Root (10 files, coh=1.00 coup=0.00)
-  Core orchestration files and configuration at the repository root level.
-  files: ci.js [entrypoint], cli.js [entrypoint], config.js [config], help.js [cli-command], refresh-artifacts.js [service], refresh-plan.js [service], tests/unit/help.test.js, tests/unit/refresh-artifacts.test.js, tests/unit/refresh-plan.test.js, web.js [entrypoint]
-[run-management] Run Management (10 files, coh=0.90 coup=0.10)
-  Task run recording, history tracking, and execution state management.
-  files: packages/hench/src/guard/commands.ts [utility], packages/hench/src/guard/contracts.ts [types], packages/hench/src/guard/index.ts [entrypoint], packages/hench/src/guard/paths.ts [utility], packages/hench/src/guard/policy.ts [service], packages/hench/tests/unit/guard/commands.test.ts, packages/hench/tests/unit/guard/guard-integration.test.ts, packages/hench/tests/unit/guard/paths.test.ts, packages/hench/tests/unit/guard/policy.test.ts, packages/hench/tests/unit/tools/shell.test.ts
-[web-server-infrastructure] Web Server Infrastructure (57 files, coh=0.98 coup=0.02)
-  Core server components including CLI entry points, MCP endpoints, domain gateways, and HTTP routing infrastructure.
-  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [page], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility] +47
-[unzoned] 56 files: .gitignore, .hench/config.json, .npmrc, .rex/archive.json, .rex/config.json ...
->>>>>>> feature/integrate-codex
+[root] Root (12 files, coh=1.00 coup=0.00)
+  12 files, primarily JavaScript
+  files: ci.js [entrypoint], cli.js [entrypoint], config.js [config], help.js [utility], refresh-artifacts.js [cli-command], refresh-plan.js [cli-command], refresh-validate.js [cli-command], tests/unit/help.test.js, tests/unit/refresh-artifacts.test.js, tests/unit/refresh-plan.test.js +2
+[web-server-infrastructure] Web Server Infrastructure (59 files, coh=0.98 coup=0.02)
+  Core HTTP server foundation providing routing, gateways, and service orchestration for the unified dashboard and MCP endpoints.
+  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [page], packages/web/src/public.ts [entrypoint], packages/web/src/schema/data-files.ts [schema], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [utility], packages/web/src/server/port.ts [utility] +49
+[unzoned] 59 files: .gitignore, .hench/config.json, .npmrc, .rex/archive.json, .rex/config.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -271,42 +229,31 @@ Server routes: 91 endpoints in 13 handler(s)
 
 <findings>
 
-<<<<<<< HEAD
-[warning] 4 circular dependency chains detected — see imports.json for details
-[warning] Bidirectional coupling: "agent-engine" ↔ "completion-validation" (5+2 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "prd-ui-components" ↔ "viewer-platform" (5+4 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling with agent-engine creates circular dependency pattern [completion-validation]
-[warning] Cohesion of 0.55 suggests mixed responsibilities within completion validation logic [completion-validation]
-=======
-[warning] Bidirectional coupling: "agent-core" ↔ "agent-infrastructure" (5+3 crossings) — consider extracting shared interface
-[warning] Bidirectional coupling: "dashboard-ui-components" ↔ "prd-tree-interface" (4+5 crossings) — consider extracting shared interface
->>>>>>> feature/integrate-codex
-[warning] God function: main in packages/rex/src/cli/index.ts calls 40 unique functions — consider decomposing into smaller, focused functions
+[warning] Bidirectional imports with PRD interface (4 imports each way) suggest architectural boundary confusion [dashboard-ui-foundation]
+[warning] Bidirectional coupling: "dashboard-ui-foundation" ↔ "prd-management-interface" (4+5 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "hench" ↔ "hench-2" (5+3 crossings) — consider extracting shared interface
+[warning] Bidirectional imports between dashboard foundation and PRD interface suggest component ownership boundaries need clarification
+[warning] Reverse imports to UI foundation suggest some components may belong in the foundation layer [prd-management-interface]
+[warning] God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions
 [warning] God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions
 
 </findings>
 
 <next-steps>
 
-[medium] God function: main in packages/rex/src/cli/index.ts calls 4… (+1 related)
+[medium] God function: GraphRenderer.constructor in packages/web/src… (+1 related)
   category: refactor
-<<<<<<< HEAD
-[medium] Bidirectional coupling with agent-engine creates circular dependency pattern
-  files: packages/hench/src/agent/completion.ts, packages/hench/src/validation/completion.ts, packages/hench/src/validation/index.ts
+[medium] Reverse imports to UI foundation suggest some components may belong in the foun…
+  files: packages/web/src/viewer/components/prd-tree/add-item-form.ts, packages/web/src/viewer/components/prd-tree/analyze-panel.ts, packages/web/src/viewer/components/prd-tree/batch-import-panel.ts
   category: refactor
-[medium] Cohesion of 0.55 suggests mixed responsibilities within completion validation l…
-  files: packages/hench/src/agent/completion.ts, packages/hench/src/validation/completion.ts, packages/hench/src/validation/index.ts
+[medium] Bidirectional imports with PRD interface (4 imports each way) suggest architect…
+  files: packages/web/src/schema/v1.ts, packages/web/src/schema/validate.ts, packages/web/src/viewer/components/active-tasks-panel.ts
   category: refactor
-[medium] 4 circular dependency chains detected — see imports.json for details
+[medium] Bidirectional coupling: "dashboard-ui-foundation" ↔ "prd-management-interface" …
   category: refactor
-[medium] Bidirectional coupling: "agent-engine" ↔ "completion-validation" (5+2 crossings…
+[medium] Bidirectional coupling: "hench" ↔ "hench-2" (5+3 crossings) — consider extracti…
   category: refactor
-[medium] Bidirectional coupling: "prd-ui-components" ↔ "viewer-platform" (5+4 crossings)…
-=======
-[medium] Bidirectional coupling: "agent-core" ↔ "agent-infrastructure" (5+3 crossings) —…
-  category: refactor
-[medium] Bidirectional coupling: "dashboard-ui-components" ↔ "prd-tree-interface" (4+5 c…
->>>>>>> feature/integrate-codex
+[medium] Bidirectional imports between dashboard foundation and PRD interface suggest co…
   category: refactor
 
 </next-steps>

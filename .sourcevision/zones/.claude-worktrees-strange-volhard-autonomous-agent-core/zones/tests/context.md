@@ -8,7 +8,7 @@ Zone: Tests (`hench/tests`)
 Files: 73, Cohesion: 0.90, Coupling: 0.10
 Description: 73 files, primarily TypeScript
 Entry points: packages/hench/src/store/index.ts, packages/hench/src/store/config.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/commands/template.ts, packages/hench/src/types/output.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/process/index.ts, packages/hench/src/schema/index.ts, packages/hench/src/store/runs.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/tools/rex.ts
-Lines: 16790
+Lines: 16792
 
 </zone>
 
@@ -34,7 +34,7 @@ packages/hench/src/cli/commands/init.ts (TypeScript, 28 lines, source)
 packages/hench/src/cli/commands/run.ts (TypeScript, 879 lines, source)
 packages/hench/src/cli/commands/template.ts (TypeScript, 310 lines, source)
 packages/hench/src/prd/ops.ts (TypeScript, 5 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 58 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 60 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
 packages/hench/src/process/index.ts (TypeScript, 22 lines, source)

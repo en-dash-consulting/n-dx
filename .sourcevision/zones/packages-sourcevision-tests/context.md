@@ -8,11 +8,7 @@ Zone: Tests (`packages-sourcevision:tests`)
 Files: 68, Cohesion: 0.94, Coupling: 0.06
 Description: 66 files, primarily TypeScript
 Entry points: packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/schema/v1.ts
-<<<<<<< HEAD
-Lines: 23628
-=======
 Lines: 23649
->>>>>>> feature/integrate-codex
 
 </zone>
 
@@ -278,11 +274,7 @@ Incoming (other zones → this zone):
 
 - High cohesion (0.94) — files are tightly interconnected
 - Contains 70% of project files (68/97) — subdivided into 3 sub-zones
-<<<<<<< HEAD
-- [call graph] 2183 internal calls, 39 outgoing, 145 incoming (cohesion: 0.98, coupling: 0.02)
-=======
 - [call graph] 2183 internal calls, 42 outgoing, 145 incoming (cohesion: 0.98, coupling: 0.02)
->>>>>>> feature/integrate-codex
 
 </insights>
 

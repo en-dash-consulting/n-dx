@@ -7,23 +7,23 @@
 Zone: Src 2 (`packages-llm-client:src-2`)
 Files: 16, Cohesion: 0.63, Coupling: 0.38
 Description: 16 files, primarily TypeScript
-Lines: 3534
+Lines: 3691
 
 </zone>
 
 <files>
 
 packages/llm-client/src/auth.ts (TypeScript, 230 lines, source)
-packages/llm-client/src/exec.ts (TypeScript, 525 lines, source)
+packages/llm-client/src/exec.ts (TypeScript, 589 lines, source)
 packages/llm-client/src/help-format.ts (TypeScript, 406 lines, source)
 packages/llm-client/src/json.ts (TypeScript, 18 lines, source)
 packages/llm-client/src/output.ts (TypeScript, 41 lines, source)
 packages/llm-client/src/project-config.ts (TypeScript, 84 lines, source)
 packages/llm-client/src/project-dirs.ts (TypeScript, 36 lines, source)
-packages/llm-client/src/public.ts (TypeScript, 258 lines, source)
+packages/llm-client/src/public.ts (TypeScript, 259 lines, source)
 packages/llm-client/src/suggest.ts (TypeScript, 75 lines, source)
 packages/llm-client/tests/unit/auth.test.ts (TypeScript, 511 lines, test)
-packages/llm-client/tests/unit/exec.test.ts (TypeScript, 614 lines, test)
+packages/llm-client/tests/unit/exec.test.ts (TypeScript, 706 lines, test)
 packages/llm-client/tests/unit/help-format.test.ts (TypeScript, 434 lines, test)
 packages/llm-client/tests/unit/json.test.ts (TypeScript, 25 lines, test)
 packages/llm-client/tests/unit/output.test.ts (TypeScript, 59 lines, test)
@@ -38,7 +38,7 @@ Internal:
   packages/llm-client/src/auth.ts → packages/llm-client/src/exec.ts {exec}
   packages/llm-client/src/public.ts → packages/llm-client/src/auth.ts {detectCliAvailability, validateApiKey, detectAvailableAuth, diagnoseAuth}
   packages/llm-client/src/public.ts → packages/llm-client/src/auth.ts {AuthDetectionResult, AuthDiagnostics}
-  packages/llm-client/src/public.ts → packages/llm-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, getCurrentBranch, isExecutableOnPath, spawnTool, spawnManaged, ProcessPool, ProcessLimitError}
+  packages/llm-client/src/public.ts → packages/llm-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, getCurrentBranch, isExecutableOnPath, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError}
   packages/llm-client/src/public.ts → packages/llm-client/src/exec.ts {ExecResult, ExecOptions, SpawnToolOptions, SpawnToolResult, ManagedChild}
   packages/llm-client/src/public.ts → packages/llm-client/src/help-format.ts {isColorEnabled, resetColorCache, bold, dim, cyan, yellow, cmd, flag, sectionHeader, requiredParam, optionalParam, formatHelp, formatUsage}
   packages/llm-client/src/public.ts → packages/llm-client/src/help-format.ts {HelpOption, HelpExample, HelpDefinition, UsageSection, UsageDefinition}
@@ -49,7 +49,7 @@ Internal:
   packages/llm-client/src/public.ts → packages/llm-client/src/project-dirs.ts {ProjectDir}
   packages/llm-client/src/public.ts → packages/llm-client/src/suggest.ts {editDistance, suggestCommands, formatTypoSuggestion}
   packages/llm-client/tests/unit/auth.test.ts → packages/llm-client/src/auth.ts {detectCliAvailability, validateApiKey, detectAvailableAuth, diagnoseAuth}
-  packages/llm-client/tests/unit/exec.test.ts → packages/llm-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, ProcessPool, ProcessLimitError}
+  packages/llm-client/tests/unit/exec.test.ts → packages/llm-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError}
   packages/llm-client/tests/unit/help-format.test.ts → packages/llm-client/src/help-format.ts {isColorEnabled, resetColorCache, bold, dim, cyan, yellow, cmd, flag, sectionHeader, requiredParam, optionalParam, formatHelp, formatUsage}
   packages/llm-client/tests/unit/help-format.test.ts → packages/llm-client/src/help-format.ts {HelpDefinition, UsageDefinition}
   packages/llm-client/tests/unit/json.test.ts → packages/llm-client/src/json.ts {toCanonicalJSON}
@@ -66,6 +66,6 @@ Outgoing (this zone → other zones):
 
 <insights>
 
-- [call graph] 237 internal calls, 4 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)
+- [call graph] 249 internal calls, 4 outgoing, 2 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>

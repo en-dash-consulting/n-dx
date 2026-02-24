@@ -8,7 +8,7 @@ Zone: Tests 3 (`hench/tests-3`)
 Files: 25, Cohesion: 0.70, Coupling: 0.30
 Description: 25 files, primarily TypeScript
 Entry points: packages/hench/src/store/index.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/store/config.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/store/json.ts
-Lines: 2855
+Lines: 2859
 
 </zone>
 
@@ -27,7 +27,7 @@ packages/hench/src/store/config.ts (TypeScript, 49 lines, source)
 packages/hench/src/store/index.ts (TypeScript, 9 lines, source)
 packages/hench/src/store/json.ts (TypeScript, 2 lines, source)
 packages/hench/src/store/runs.ts (TypeScript, 63 lines, source)
-packages/hench/tests/integration/codex-token-accounting.test.ts (TypeScript, 179 lines, test)
+packages/hench/tests/integration/codex-token-accounting.test.ts (TypeScript, 183 lines, test)
 packages/hench/tests/integration/store-roundtrip.test.ts (TypeScript, 126 lines, test)
 packages/hench/tests/unit/agent/atomic-transition.test.ts (TypeScript, 381 lines, test)
 packages/hench/tests/unit/agent/loop.test.ts (TypeScript, 109 lines, test)

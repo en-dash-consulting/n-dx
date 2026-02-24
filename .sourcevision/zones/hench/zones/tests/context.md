@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests (`hench/tests`)
-Files: 48, Cohesion: 0.82, Coupling: 0.18
-Description: 48 files, primarily TypeScript
+Files: 49, Cohesion: 0.82, Coupling: 0.18
+Description: 49 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/store/project-config.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/template.ts, packages/hench/src/types/output.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/schema/validate.ts
-Lines: 12637
+Lines: 12828
 
 </zone>
 
@@ -20,10 +20,10 @@ packages/hench/src/agent/analysis/stuck.ts (TypeScript, 70 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
 packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 924 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 985 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 71 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 323 lines, source)
-packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 339 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 327 lines, source)
+packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 340 lines, source)
 packages/hench/src/agent/lifecycle/task-display.ts (TypeScript, 27 lines, source)
 packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
 packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 141 lines, source)
@@ -34,11 +34,11 @@ packages/hench/src/cli/commands/template.ts (TypeScript, 310 lines, source)
 packages/hench/src/public.ts (TypeScript, 91 lines, source)
 packages/hench/src/schema/index.ts (TypeScript, 43 lines, source)
 packages/hench/src/schema/templates.ts (TypeScript, 178 lines, source)
-packages/hench/src/schema/v1.ts (TypeScript, 243 lines, source)
-packages/hench/src/schema/validate.ts (TypeScript, 167 lines, source)
-packages/hench/src/store/project-config.ts (TypeScript, 94 lines, source)
+packages/hench/src/schema/v1.ts (TypeScript, 264 lines, source)
+packages/hench/src/schema/validate.ts (TypeScript, 169 lines, source)
+packages/hench/src/store/project-config.ts (TypeScript, 120 lines, source)
 packages/hench/src/store/templates.ts (TypeScript, 153 lines, source)
-packages/hench/src/types/index.ts (TypeScript, 41 lines, source)
+packages/hench/src/types/index.ts (TypeScript, 15 lines, source)
 packages/hench/src/types/output.ts (TypeScript, 77 lines, source)
 packages/hench/tests/e2e/cli-init.test.ts (TypeScript, 135 lines, test)
 packages/hench/tests/unit/agent/adaptive.test.ts (TypeScript, 531 lines, test)
@@ -54,12 +54,13 @@ packages/hench/tests/unit/agent/stuck.test.ts (TypeScript, 203 lines, test)
 packages/hench/tests/unit/agent/summary.test.ts (TypeScript, 241 lines, test)
 packages/hench/tests/unit/agent/task-display.test.ts (TypeScript, 107 lines, test)
 packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
-packages/hench/tests/unit/agent/token-tracking.test.ts (TypeScript, 279 lines, test)
+packages/hench/tests/unit/agent/token-tracking.test.ts (TypeScript, 301 lines, test)
+packages/hench/tests/unit/agent/token-usage-regression.test.ts (TypeScript, 65 lines, test)
 packages/hench/tests/unit/agent/token-usage.test.ts (TypeScript, 451 lines, test)
 packages/hench/tests/unit/agent/workflow.test.ts (TypeScript, 388 lines, test)
 packages/hench/tests/unit/cli/commands/config.test.ts (TypeScript, 211 lines, test)
 packages/hench/tests/unit/schema/templates.test.ts (TypeScript, 64 lines, test)
-packages/hench/tests/unit/schema/validate.test.ts (TypeScript, 528 lines, test)
+packages/hench/tests/unit/schema/validate.test.ts (TypeScript, 543 lines, test)
 packages/hench/tests/unit/store/claude-config.test.ts (TypeScript, 184 lines, test)
 packages/hench/tests/unit/store/templates.test.ts (TypeScript, 356 lines, test)
 
@@ -94,7 +95,8 @@ Internal:
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {mapCodexUsageToTokenUsage, parseTokenUsage, parseStreamTokenUsage}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {LLMVendor}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/types/output.ts {section, stream, info}
   packages/hench/src/agent/lifecycle/heartbeat.ts → packages/hench/src/schema/index.ts {RunRecord}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
@@ -104,7 +106,6 @@ Internal:
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RunRecord, TurnTokenUsage}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, loadLLMConfig, resolveApiKey, resolveLLMVendor}
-  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/types/index.ts {ToolContext}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/types/output.ts {section, subsection, stream, detail}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
@@ -179,6 +180,7 @@ Internal:
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {processStreamLine}
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliRunResult}
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/schema/v1.ts {TurnTokenUsage}
+  packages/hench/tests/unit/agent/token-usage-regression.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage}
   packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
   packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats, _resetIdCounter}

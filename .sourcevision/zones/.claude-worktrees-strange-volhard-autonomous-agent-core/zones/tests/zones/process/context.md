@@ -8,14 +8,14 @@ Zone: Process (`hench/tests/process`)
 Files: 9, Cohesion: 0.69, Coupling: 0.31
 Description: 9 files, primarily TypeScript
 Entry points: packages/hench/src/process/index.ts, packages/hench/src/tools/rex.ts, packages/hench/src/prd/rex-gateway.ts
-Lines: 791
+Lines: 793
 
 </zone>
 
 <files>
 
 packages/hench/src/prd/ops.ts (TypeScript, 5 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 58 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 60 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
 packages/hench/src/process/index.ts (TypeScript, 22 lines, source)

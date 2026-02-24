@@ -1,87 +1,52 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-<<<<<<< HEAD
-  "analyzedAt": "2026-02-24T14:38:13.741Z",
-=======
-  "analyzedAt": "2026-02-24T14:12:25.376Z",
->>>>>>> feature/integrate-codex
-  "gitSha": "536ec50ff193a0dc0578a424bb0af0803716d28b",
-  "gitBranch": "feature/from-recommend",
-  "targetPath": "/Users/nick/development/endash/n-dx",
+  "analyzedAt": "2026-02-24T15:04:07.364Z",
+  "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2",
+  "gitBranch": "feature/integrate-codex",
+  "targetPath": "/Users/ryankeith/work-internal/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-<<<<<<< HEAD
-      "startedAt": "2026-02-24T14:35:57.290Z",
-      "completedAt": "2026-02-24T14:35:57.348Z"
+      "startedAt": "2026-02-24T14:58:58.124Z",
+      "completedAt": "2026-02-24T14:58:58.283Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-24T14:35:57.348Z",
-      "completedAt": "2026-02-24T14:35:57.902Z"
+      "startedAt": "2026-02-24T14:58:58.283Z",
+      "completedAt": "2026-02-24T14:58:58.755Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-02-24T14:35:57.902Z",
-      "completedAt": "2026-02-24T14:36:14.393Z"
+      "startedAt": "2026-02-24T14:58:58.755Z",
+      "completedAt": "2026-02-24T15:01:31.915Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-24T14:36:14.394Z",
-      "completedAt": "2026-02-24T14:38:11.721Z"
+      "startedAt": "2026-02-24T15:01:31.915Z",
+      "completedAt": "2026-02-24T15:04:05.295Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-24T14:38:11.722Z",
-      "completedAt": "2026-02-24T14:38:11.875Z"
+      "startedAt": "2026-02-24T15:04:05.296Z",
+      "completedAt": "2026-02-24T15:04:05.459Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-02-24T14:38:11.876Z",
-      "completedAt": "2026-02-24T14:38:13.741Z"
-=======
-      "startedAt": "2026-02-24T14:09:48.134Z",
-      "completedAt": "2026-02-24T14:09:48.261Z"
-    },
-    "imports": {
-      "status": "complete",
-      "startedAt": "2026-02-24T14:09:48.261Z",
-      "completedAt": "2026-02-24T14:09:48.714Z"
-    },
-    "classifications": {
-      "status": "complete",
-      "startedAt": "2026-02-24T14:09:48.714Z",
-      "completedAt": "2026-02-24T14:10:08.326Z"
-    },
-    "zones": {
-      "status": "complete",
-      "startedAt": "2026-02-24T14:10:08.327Z",
-      "completedAt": "2026-02-24T14:12:23.457Z"
-    },
-    "components": {
-      "status": "complete",
-      "startedAt": "2026-02-24T14:12:23.458Z",
-      "completedAt": "2026-02-24T14:12:23.600Z"
-    },
-    "callgraph": {
-      "status": "complete",
-      "startedAt": "2026-02-24T14:12:23.601Z",
-      "completedAt": "2026-02-24T14:12:25.376Z"
->>>>>>> feature/integrate-codex
+      "startedAt": "2026-02-24T15:04:05.460Z",
+      "completedAt": "2026-02-24T15:04:07.364Z"
     }
   },
   "children": [
     {
-<<<<<<< HEAD
       "id": ".claude-worktrees-strange-volhard",
       "prefix": ".claude/worktrees/strange-volhard",
       "manifestPath": ".claude/worktrees/strange-volhard/.sourcevision/manifest.json"
-=======
+    },
+    {
       "id": "packages-llm-client",
       "prefix": "packages/llm-client",
       "manifestPath": "packages/llm-client/.sourcevision/manifest.json"
->>>>>>> feature/integrate-codex
     },
     {
       "id": "packages-rex",
@@ -96,11 +61,7 @@
   ],
   "zoneOutputs": true,
   "tokenUsage": {
-<<<<<<< HEAD
-    "calls": 4,
-=======
-    "calls": 5,
->>>>>>> feature/integrate-codex
+    "calls": 6,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",

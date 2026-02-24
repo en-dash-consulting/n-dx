@@ -1,7 +1,7 @@
 {
   "id": "hench/tests",
   "name": "Tests",
-  "description": "48 files, primarily TypeScript",
+  "description": "49 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/review.ts",
@@ -44,6 +44,7 @@
     "packages/hench/tests/unit/agent/task-display.test.ts",
     "packages/hench/tests/unit/agent/token-budget.test.ts",
     "packages/hench/tests/unit/agent/token-tracking.test.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
     "packages/hench/tests/unit/agent/token-usage.test.ts",
     "packages/hench/tests/unit/agent/workflow.test.ts",
     "packages/hench/tests/unit/cli/commands/config.test.ts",
@@ -67,6 +68,6 @@
   ],
   "cohesion": 0.82,
   "coupling": 0.18,
-  "fileCount": 48,
-  "lineCount": 12637
+  "fileCount": 49,
+  "lineCount": 12828
 }

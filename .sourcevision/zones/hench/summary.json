@@ -1,7 +1,7 @@
 {
   "id": "hench",
-  "name": "Agent Workflow Engine",
-  "description": "Houses the core agent lifecycle, schema definitions, analysis routines, and process execution paths that drive the automation platform.",
+  "name": "Hench",
+  "description": "94 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/review.ts",
@@ -41,6 +41,7 @@
     "packages/hench/src/schema/templates.ts",
     "packages/hench/src/schema/v1.ts",
     "packages/hench/src/schema/validate.ts",
+    "packages/hench/src/shared/glob.ts",
     "packages/hench/src/store/config.ts",
     "packages/hench/src/store/index.ts",
     "packages/hench/src/store/json.ts",
@@ -49,9 +50,7 @@
     "packages/hench/src/store/suggestions.ts",
     "packages/hench/src/store/templates.ts",
     "packages/hench/src/tools/exec-shell.ts",
-    "packages/hench/src/tools/index.ts",
     "packages/hench/src/tools/rex.ts",
-    "packages/hench/src/tools/test-runner.ts",
     "packages/hench/src/types/index.ts",
     "packages/hench/src/types/output.ts",
     "packages/hench/src/validation/completion.ts",
@@ -77,6 +76,7 @@
     "packages/hench/tests/unit/agent/task-failure.test.ts",
     "packages/hench/tests/unit/agent/token-budget.test.ts",
     "packages/hench/tests/unit/agent/token-tracking.test.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
     "packages/hench/tests/unit/agent/token-usage.test.ts",
     "packages/hench/tests/unit/agent/workflow.test.ts",
     "packages/hench/tests/unit/cli/commands/config.test.ts",
@@ -97,18 +97,15 @@
     "packages/hench/tests/unit/store/suggestions.test.ts",
     "packages/hench/tests/unit/store/templates.test.ts",
     "packages/hench/tests/unit/tools/completion-validation.test.ts",
-    "packages/hench/tests/unit/tools/rex.test.ts",
-    "packages/hench/tests/unit/tools/test-runner.test.ts"
+    "packages/hench/tests/unit/tools/rex.test.ts"
   ],
   "entryPoints": [
-    "packages/hench/src/process/exec-shell.ts",
-    "packages/hench/src/schema/index.ts",
+    "packages/hench/src/process/index.ts",
     "packages/hench/src/schema/v1.ts",
-    "packages/hench/src/tools/rex.ts",
-    "packages/hench/src/types/index.ts"
+    "packages/hench/src/tools/exec-shell.ts"
   ],
-  "cohesion": 0.95,
-  "coupling": 0.05,
-  "fileCount": 96,
-  "lineCount": 20078
+  "cohesion": 0.97,
+  "coupling": 0.03,
+  "fileCount": 95,
+  "lineCount": 19561
 }
