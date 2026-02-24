@@ -116,6 +116,8 @@ export type { TreeStats } from "./core/stats.js";
 // ---- Core: deletion ---------------------------------------------------------
 
 export { deleteItem, cleanBlockedByRefs } from "./core/delete.js";
+export { removeEpic } from "./core/remove-epic.js";
+export type { RemoveEpicResult } from "./core/remove-epic.js";
 
 // ---- Core: task selection ---------------------------------------------------
 
