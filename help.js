@@ -553,18 +553,20 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
+      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
     ],
     examples: [
-      { command: "ndx init", description: "Initialize in current directory" },
-      { command: "ndx init ./my-project", description: "Initialize in a specific directory" },
+      { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
+      { command: "ndx init --provider=claude .", description: "Initialize with Claude (skips vendor prompt)" },
+      { command: "ndx init --provider=codex .", description: "Initialize with Codex (skips vendor prompt)" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
     ],
-    related: ["plan", "status"],
+    related: ["plan", "status", "config"],
   },
   plan: {
     summary: "analyze codebase and generate PRD proposals",
@@ -609,7 +611,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   work: {
     summary: "execute the next task autonomously",
-    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: 'n-dx config llm.vendor claude'.",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude'\nor 'ndx config llm.vendor codex' before using this command.",
     usage: "ndx work [options] [dir]",
     options: [
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },

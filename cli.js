@@ -561,7 +561,7 @@ if (command === "work") {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'n-dx config llm.vendor claude' (or codex when supported).");
+      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
       process.exit(1);
     }
   }

@@ -637,7 +637,11 @@ Examples:
                                                Set custom API endpoint
   n-dx config claude.model claude-opus-4-20250514
                                                Set default model for API calls
-  n-dx config llm.vendor claude                Set active LLM vendor
+  n-dx config llm.vendor claude                Set active LLM vendor to Claude
+  n-dx config llm.vendor codex                 Set active LLM vendor to Codex
+  n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
+  n-dx config llm.claude.model claude-opus-4-20250514
+                                               Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
   n-dx config --test-connection                Test API key and/or CLI path
@@ -851,7 +855,7 @@ Examples:
           if (preflight.detail) {
             console.error(`Details: ${preflight.detail}`);
           }
-          console.error(`Next step: run '${loginCommand}', then retry 'n-dx config llm.vendor ${coerced}'.`);
+          console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
           process.exit(1);
         }
       }
