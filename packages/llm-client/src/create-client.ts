@@ -32,6 +32,7 @@ import { ClaudeClientError } from "./types.js";
 import { resolveApiKey } from "./config.js";
 import { createApiClient, type ApiProviderOptions } from "./api-provider.js";
 import { createCliClient, type CliProviderOptions } from "./cli-provider.js";
+import type { LLMProvider } from "./provider-interface.js";
 
 /** Extended options for createClient with provider selection. */
 export interface CreateClientOptions extends ClaudeClientOptions {
@@ -66,10 +67,13 @@ export function detectAuthMode(options: ClaudeClientOptions): AuthMode {
  * - If an API key is available → API provider
  * - Otherwise → CLI provider (graceful fallback)
  *
+ * The returned client implements both {@link ClaudeClient} (backward compat)
+ * and {@link LLMProvider} (generic interface).
+ *
  * @throws {ClaudeClientError} if the selected mode can't be initialized
  *   (e.g. API mode without an API key).
  */
-export function createClient(options: CreateClientOptions): ClaudeClient {
+export function createClient(options: CreateClientOptions): ClaudeClient & LLMProvider {
   const mode = options.mode ?? detectAuthMode(options);
 
   if (mode === "api") {

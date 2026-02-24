@@ -35,6 +35,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import { resolveApiKey, resolveModel } from "./config.js";
 import { parseApiTokenUsage } from "./token-usage.js";
+import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -52,14 +53,15 @@ export interface ApiProviderOptions extends ClaudeClientOptions {
 }
 
 /**
- * Create an API-based Claude client.
+ * Create an API-based Claude client that implements both the legacy
+ * {@link ClaudeClient} interface and the generic {@link LLMProvider} interface.
  *
  * Uses the Anthropic SDK to make direct API calls. The API key is resolved
  * from the unified config or environment variable.
  *
  * @throws {ClaudeClientError} with reason "auth" if no API key is available.
  */
-export function createApiClient(options: ApiProviderOptions): ClaudeClient {
+export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLMProvider {
   const apiKeyEnv = options.apiKeyEnv ?? "ANTHROPIC_API_KEY";
   const apiKey = resolveApiKey(options.claudeConfig, apiKeyEnv);
 
@@ -81,7 +83,35 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient {
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
+  const info: ProviderInfo = {
+    vendor: "claude",
+    mode: "api",
+    ...(options.claudeConfig.model ? { model: options.claudeConfig.model } : {}),
+    capabilities: [],
+  };
+
   return {
+    // ── LLMProvider ──────────────────────────────────────────────────────
+    info,
+
+    async validateAuth(): Promise<boolean> {
+      try {
+        await client.models.list();
+        return true;
+      } catch (err) {
+        const status = (err as { status?: number }).status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
+        throw new ClaudeClientError(
+          (err as Error).message,
+          "unknown",
+          false,
+        );
+      }
+    },
+
+    // ── ClaudeClient (backward compat) ───────────────────────────────────
     mode: "api",
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {

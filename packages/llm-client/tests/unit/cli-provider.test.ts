@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createCliClient } from "../../src/cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
+import type { LLMProvider } from "../../src/provider-interface.js";
 
 describe("createCliClient", () => {
   it("creates a client with CLI mode", () => {
@@ -64,5 +65,51 @@ describe("createCliClient", () => {
 
     // Should fail immediately, not wait for retries
     expect(elapsed).toBeLessThan(2000);
+  });
+});
+
+describe("createCliClient — LLMProvider interface", () => {
+  it("returns an object satisfying the LLMProvider interface", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    // TypeScript compile-time check: assignment must satisfy LLMProvider
+    const provider: LLMProvider = client;
+    expect(provider).toBeDefined();
+  });
+
+  it("exposes info.vendor as 'claude'", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(client.info.vendor).toBe("claude");
+  });
+
+  it("exposes info.mode as 'cli'", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(client.info.mode).toBe("cli");
+  });
+
+  it("exposes info.capabilities as an array", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(Array.isArray(client.info.capabilities)).toBe(true);
+  });
+
+  it("omits info.model when no model is configured", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(client.info.model).toBeUndefined();
+  });
+
+  it("sets info.model when model is configured", () => {
+    const client = createCliClient({
+      claudeConfig: { model: "claude-sonnet-4-20250514" },
+    });
+    expect(client.info.model).toBe("claude-sonnet-4-20250514");
+  });
+
+  it("does not expose validateAuth (CLI auth cannot be probed)", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(client.validateAuth).toBeUndefined();
+  });
+
+  it("does not expose stream (not implemented)", () => {
+    const client = createCliClient({ claudeConfig: {} });
+    expect(client.stream).toBeUndefined();
   });
 });

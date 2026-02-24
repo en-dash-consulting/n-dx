@@ -36,6 +36,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
+import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
@@ -188,18 +189,34 @@ function parseStreamOutput(stdout: string): CompletionResult {
 }
 
 /**
- * Create a CLI-based Claude client.
+ * Create a CLI-based Claude client that implements both the legacy
+ * {@link ClaudeClient} interface and the generic {@link LLMProvider} interface.
  *
  * Spawns the `claude` binary for each completion request, with automatic
  * retry on transient failures and exponential backoff.
+ *
+ * Note: The CLI provider does not implement `validateAuth()` because the
+ * Claude CLI authenticates through a browser session that cannot be probed
+ * programmatically without making a real completion request.
  */
-export function createCliClient(options: CliProviderOptions): ClaudeClient {
+export function createCliClient(options: CliProviderOptions): ClaudeClient & LLMProvider {
   const cliBinary = resolveCliPath(options.claudeConfig);
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
 
+  const info: ProviderInfo = {
+    vendor: "claude",
+    mode: "cli",
+    ...(options.claudeConfig.model ? { model: options.claudeConfig.model } : {}),
+    capabilities: [],
+  };
+
   return {
+    // ── LLMProvider ──────────────────────────────────────────────────────
+    info,
+
+    // ── ClaudeClient (backward compat) ───────────────────────────────────
     mode: "cli",
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {

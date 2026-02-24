@@ -12903,6 +12903,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-23T05:07:01.710Z",
+      "completedAt": "2026-02-23T05:07:01.710Z",
       "children": [
         {
           "id": "3d5d8464-5a5d-4b6a-a062-f39146a3191a",
@@ -13022,9 +13024,271 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-23T05:07:01.710Z",
-      "completedAt": "2026-02-23T05:07:01.710Z"
+      ]
+    },
+    {
+      "id": "08b111a4-a196-4053-8c9d-14bc61b5ff01",
+      "title": "LLM Client Package Consolidation",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "7abd7295-1cd1-4283-8991-68def0b14eaa",
+          "title": "Claude-client package migration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Consolidate the claude-client compatibility bridge package into the main llm-client package to eliminate redundancy and simplify the architecture",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "b09c1316-009b-4bf9-992e-18ccc4f27ed5",
+              "title": "Analyze claude-client functionality and dependencies",
+              "status": "completed",
+              "level": "task",
+              "description": "Audit the current claude-client package to understand all functionality, exports, and dependencies that need to be migrated into llm-client",
+              "acceptanceCriteria": [
+                "Complete inventory of claude-client exports and their usage across packages",
+                "Dependency analysis shows all required external packages",
+                "Documentation of current API surface and compatibility requirements"
+              ],
+              "priority": "high",
+              "tags": [
+                "architecture",
+                "analysis"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T03:55:54.031Z",
+              "completedAt": "2026-02-24T03:57:46.268Z"
+            },
+            {
+              "id": "6ae206a6-0993-4511-9b38-31e95ef08c51",
+              "title": "Migrate claude-client code into llm-client package structure",
+              "status": "completed",
+              "level": "task",
+              "description": "Move all claude-client functionality into the llm-client package while maintaining the existing API surface for backward compatibility",
+              "acceptanceCriteria": [
+                "All claude-client code is relocated to llm-client with proper module organization",
+                "Existing API surface is preserved through llm-client exports",
+                "No functionality is lost in the migration process"
+              ],
+              "priority": "high",
+              "tags": [
+                "migration",
+                "refactor"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T03:58:52.175Z",
+              "completedAt": "2026-02-24T04:05:26.979Z"
+            },
+            {
+              "id": "d3c8631a-b4be-46f3-bd2e-5acfc279e7a5",
+              "title": "Update all package imports across the monorepo",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace all imports from claude-client with equivalent imports from llm-client throughout the codebase",
+              "acceptanceCriteria": [
+                "No remaining imports from claude-client package anywhere in the monorepo",
+                "All existing functionality continues to work with new import paths",
+                "TypeScript compilation succeeds without errors"
+              ],
+              "priority": "critical",
+              "tags": [
+                "refactor",
+                "imports"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T03:51:38.291Z",
+              "completedAt": "2026-02-24T03:55:38.095Z"
+            },
+            {
+              "id": "6101acf9-2699-4570-9c64-f481503be9b8",
+              "title": "Remove claude-client package and update build configuration",
+              "status": "pending",
+              "level": "task",
+              "description": "Delete the claude-client package directory and update all build, test, and package configuration files to reflect the removal",
+              "acceptanceCriteria": [
+                "Claude-client package directory is completely removed",
+                "Package.json workspaces configuration no longer references claude-client",
+                "Build scripts and CI configuration work without claude-client package"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cleanup",
+                "build"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "ebe9a6ab-e808-49df-b2c6-9f4fd05d8609",
+          "title": "Multi-vendor provider architecture enhancement",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enhance llm-client to support multiple LLM vendor providers with a unified interface, preparing for future vendor integrations beyond Claude",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c20536d5-976d-47db-860d-24f8b1444270",
+              "title": "Design generic provider interface for multiple LLM vendors",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a vendor-agnostic interface that can accommodate different LLM providers while maintaining consistent functionality across the n-dx toolkit",
+              "acceptanceCriteria": [
+                "Generic provider interface supports authentication, completion, and streaming",
+                "Interface design accommodates vendor-specific capabilities and constraints",
+                "Interface is extensible for future vendor additions"
+              ],
+              "priority": "high",
+              "tags": [
+                "architecture",
+                "interface"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T04:05:58.036Z",
+              "completedAt": "2026-02-24T04:12:00.926Z"
+            },
+            {
+              "id": "8c85433b-e0cf-4675-8991-5340a2cb68b1",
+              "title": "Refactor existing claude adapter to use generic interface",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Update the current claude implementation to conform to the new generic provider interface while maintaining all existing functionality",
+              "acceptanceCriteria": [
+                "Claude adapter implements the generic provider interface completely",
+                "All existing claude functionality remains available through the interface",
+                "No breaking changes to consumer packages (rex, hench, sourcevision)"
+              ],
+              "priority": "high",
+              "tags": [
+                "refactor",
+                "claude"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T04:12:21.934Z"
+            },
+            {
+              "id": "fd7d0d82-cf90-4779-b392-8d369d2f1747",
+              "title": "Implement provider registration and selection system",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a system for registering multiple LLM providers and selecting the active provider based on configuration",
+              "acceptanceCriteria": [
+                "Providers can be registered dynamically with the llm-client",
+                "Active provider selection works through configuration system",
+                "Provider switching maintains session state appropriately"
+              ],
+              "priority": "medium",
+              "tags": [
+                "providers",
+                "configuration"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a649464f-7fb1-4e2d-a63e-d5ff3cc631c7",
+              "title": "Add vendor-specific configuration management",
+              "status": "pending",
+              "level": "task",
+              "description": "Extend the configuration system to handle vendor-specific settings like API keys, endpoints, and provider-specific options",
+              "acceptanceCriteria": [
+                "Configuration system supports vendor-scoped settings",
+                "Vendor configurations are validated appropriately",
+                "Configuration migration handles existing claude settings"
+              ],
+              "priority": "medium",
+              "tags": [
+                "configuration",
+                "validation"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "005821ae-9c0d-49d6-8d24-d31342e19372",
+          "title": "Documentation and startup examples",
+          "status": "pending",
+          "level": "feature",
+          "description": "Update documentation and examples to reflect the consolidated package structure and provide claude examples alongside existing codex examples",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "6e200d28-d7ea-4874-b0ae-b73cc6836ebe",
+              "title": "Update README startup directions with consolidated package structure",
+              "status": "pending",
+              "level": "task",
+              "description": "Revise the README to reflect the new package structure without claude-client and update all setup instructions accordingly",
+              "acceptanceCriteria": [
+                "README no longer references claude-client package",
+                "Package structure documentation reflects the consolidation",
+                "Setup instructions work with the new structure"
+              ],
+              "priority": "medium",
+              "tags": [
+                "documentation",
+                "readme"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9e6d288c-8640-4d4d-948d-39644a55dc0f",
+              "title": "Add claude examples alongside existing codex examples",
+              "status": "pending",
+              "level": "task",
+              "description": "Wherever the documentation shows codex usage examples, add equivalent claude examples to demonstrate both provider options",
+              "acceptanceCriteria": [
+                "Every codex example in documentation has a corresponding claude example",
+                "Examples show proper configuration for claude provider",
+                "Examples demonstrate claude-specific features and limitations"
+              ],
+              "priority": "medium",
+              "tags": [
+                "documentation",
+                "examples"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "181e9776-fd9b-4a58-8243-e959f422b463",
+              "title": "Update CLI documentation for vendor selection",
+              "status": "pending",
+              "level": "task",
+              "description": "Update CLI help text and documentation to reflect the new provider selection system and configuration options",
+              "acceptanceCriteria": [
+                "CLI help shows current vendor selection commands and options",
+                "Documentation explains how to switch between providers",
+                "Help text includes examples for both claude and codex configuration"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "documentation"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "250a4865-145a-4500-bdec-9485d160a6a7",
+              "title": "Add migration guide for existing claude-client users",
+              "status": "deleted",
+              "level": "task",
+              "description": "Create a migration guide for users who have existing setups using claude-client directly, explaining how to update their configuration",
+              "acceptanceCriteria": [
+                "Migration guide covers all common claude-client usage patterns",
+                "Guide provides step-by-step instructions for updating imports",
+                "Guide explains any configuration changes required"
+              ],
+              "priority": "low",
+              "tags": [
+                "documentation",
+                "migration"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
