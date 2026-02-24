@@ -31,4 +31,5 @@
 @import "./integration-config.css";
 @import "./feature-toggles.css";
 @import "./pr-markdown.css";
+@import "./memory-warning.css";
 @import "./responsive.css";
