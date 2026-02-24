@@ -38,7 +38,7 @@ ndx work .
 ndx status .
 ```
 
-## Beginner Workflow (Codex Example)
+## Beginner Workflow
 
 Use this as the default day-to-day loop in a project root.
 
@@ -50,8 +50,28 @@ npm link
 
 # 1) Initialize project folders (.sourcevision/.rex/.hench)
 ndx init .
+```
 
-# 2) Configure vendor/model (Codex)
+**2) Configure your LLM vendor (choose one):**
+
+**Claude (recommended)**
+
+```sh
+ndx config llm.vendor claude .
+
+# Option A: API mode (recommended — best token accounting and reliability)
+ndx config llm.claude.api_key sk-ant-... .   # or: export ANTHROPIC_API_KEY=sk-ant-...
+# Optionally pin a model (default: claude-sonnet-4-20250514)
+ndx config llm.claude.model claude-opus-4-20250514 .
+
+# Option B: CLI mode (no API key required)
+ndx config llm.claude.cli_path claude .       # omit if `claude` is already on PATH
+claude login
+```
+
+**Codex**
+
+```sh
 ndx config llm.vendor codex .
 ndx config llm.codex.cli_path codex .
 ndx config rex.model gpt-5.3-codex .
@@ -124,6 +144,28 @@ Audit visibility:
 - `ndx rex status --format=json` includes per-item `overrideMarker` plus a top-level `overrideMarkers` summary.
 
 ### D. Execute PRD tasks autonomously (Hench via ndx work)
+
+**Claude:**
+
+```sh
+# Safe first run: one task (uses default model; API key auto-detected from env or config)
+ndx work --auto --iterations=1 .
+
+# Specify model explicitly
+ndx work --auto --iterations=1 --model=claude-opus-4-20250514 .
+
+# Scale up
+ndx work --auto --iterations=4 .
+
+# Scope execution to one epic
+ndx work --epic="Your Epic Title" --auto --iterations=2 .
+
+# Force API mode (requires llm.claude.api_key or ANTHROPIC_API_KEY)
+ndx config hench.provider api .
+ndx work --auto --iterations=1 .
+```
+
+**Codex:**
 
 ```sh
 # Safe first run: one task
