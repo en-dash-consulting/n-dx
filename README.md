@@ -143,7 +143,44 @@ Audit visibility:
 - `ndx rex status` shows `[override: <reason>]` next to items with override markers.
 - `ndx rex status --format=json` includes per-item `overrideMarker` plus a top-level `overrideMarkers` summary.
 
-### D. Execute PRD tasks autonomously (Hench via ndx work)
+### D. Remove PRD items (Rex Remove)
+
+Remove epics or tasks that are cancelled, obsolete, or added by mistake:
+
+```sh
+# Remove an epic and its entire subtree (features, tasks, subtasks)
+rex remove epic <id> .
+
+# Remove a task and its subtasks only (parent feature/epic stays)
+rex remove task <id> .
+
+# Auto-detect level from the item ID
+rex remove <id> .
+```
+
+> **⚠️ WARNING:** Removal is irreversible. Deleted items and all their descendants are permanently erased from `prd.json`. Use `rex status` to review the subtree before removing.
+
+Confirmation behavior:
+
+```sh
+# Interactive confirmation prompt (default)
+rex remove epic abc123 .
+#   Remove epic "My Epic" and 12 descendant(s)? [y/N]
+
+# Skip confirmation for scripting
+rex remove task def456 --yes .
+
+# Machine-readable output
+rex remove epic abc123 --yes --format=json .
+```
+
+Behavior notes:
+- **Epic removal** deletes the epic and its entire subtree (features, tasks, and subtasks). Use when an initiative is cancelled or obsolete.
+- **Task removal** deletes the task and its subtasks only. The parent feature and epic remain intact. If removing the task causes all remaining siblings to be completed, the parent is auto-completed.
+- **Features and subtasks** cannot be removed directly. Remove the parent epic or task instead.
+- All `blockedBy` references pointing to deleted items are automatically cleaned up.
+
+### E. Execute PRD tasks autonomously (Hench via ndx work)
 
 **Claude:**
 
@@ -178,7 +215,7 @@ ndx work --auto --iterations=4 --model=gpt-5.3-codex .
 ndx work --epic="Your Epic Title" --auto --iterations=2 --model=gpt-5.3-codex .
 ```
 
-### E. Inspect progress and repeat
+### F. Inspect progress and repeat
 
 ```sh
 ndx status .

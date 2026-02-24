@@ -115,7 +115,7 @@ sv <command> [args]               # alias for sourcevision
 
 ### Rex commands
 
-`init`, `status`, `next`, `add`, `update`, `validate`, `analyze`, `recommend`, `mcp`
+`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
 
 ### Sourcevision commands
 
