@@ -1,0 +1,484 @@
+{
+  "files": [
+    {
+      "path": "package-lock.json",
+      "size": 63846,
+      "language": "JSON",
+      "lineCount": 1919,
+      "hash": "8994119612c8a5abb87e2fc4b21d3c8af69b8cc157ef22314314fb9f46062da8",
+      "role": "generated",
+      "category": "root",
+      "lastModified": 1771914708069
+    },
+    {
+      "path": "package.json",
+      "size": 640,
+      "language": "JSON",
+      "lineCount": 32,
+      "hash": "5b9000c8730cf76f9e07597a6286a1741df95b3c22cc0d39aa246e2e0ac9789b",
+      "role": "config",
+      "category": "root",
+      "lastModified": 1771913888777
+    },
+    {
+      "path": "src/api-provider.ts",
+      "size": 6137,
+      "language": "TypeScript",
+      "lineCount": 187,
+      "hash": "27234c0583568997697eb1cf40f1bfacfd68127604b6b9c8d0388aa4ba455e9a",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888777
+    },
+    {
+      "path": "src/auth.ts",
+      "size": 8220,
+      "language": "TypeScript",
+      "lineCount": 230,
+      "hash": "4c93e7fe0a2ac313e52d2e14b2e4ea84a24f99ea89516a0bf3013b712846a5b0",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888778
+    },
+    {
+      "path": "src/cli-provider.ts",
+      "size": 8123,
+      "language": "TypeScript",
+      "lineCount": 247,
+      "hash": "82d43bb3e51d556160d9af6ef7adb9a60a80ab544ebcfa91547636b7198fdce4",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888778
+    },
+    {
+      "path": "src/codex-cli-provider.ts",
+      "size": 8681,
+      "language": "TypeScript",
+      "lineCount": 245,
+      "hash": "5a072d5d292798c15bc8d51e33526b788a9b97b9a9a9221bfaa8ae2d0687c548",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888779
+    },
+    {
+      "path": "src/config.ts",
+      "size": 3108,
+      "language": "TypeScript",
+      "lineCount": 94,
+      "hash": "a0f72661c7e451e1e39260aef292a8f3da22f64867e0b37d4e59127a2d096b71",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888779
+    },
+    {
+      "path": "src/create-client.ts",
+      "size": 3405,
+      "language": "TypeScript",
+      "lineCount": 90,
+      "hash": "373567dc9726545d8a395bb1912b3303e613b250790700cfee88d9fddae4e664",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888779
+    },
+    {
+      "path": "src/exec.ts",
+      "size": 15537,
+      "language": "TypeScript",
+      "lineCount": 525,
+      "hash": "de624f77f713a4b5a2b329f56d75143f95d3d7c4f5d06c4b550ad011437e6338",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888779
+    },
+    {
+      "path": "src/help-format.ts",
+      "size": 12215,
+      "language": "TypeScript",
+      "lineCount": 406,
+      "hash": "c6f8868ee0c7636815a5bfbf9a4c7623725e3cfb04135d915eecabdd0ebb2ab1",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888779
+    },
+    {
+      "path": "src/json.ts",
+      "size": 608,
+      "language": "TypeScript",
+      "lineCount": 18,
+      "hash": "313360e152653f167e762ca47942e424d0ca5ccb1e4cf382e78b74591042e37e",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/llm-client.ts",
+      "size": 1642,
+      "language": "TypeScript",
+      "lineCount": 55,
+      "hash": "f0dea5b582198ecf88b921a760fcce1a3f20dd4e2b7ae0811b758a7fddb37c29",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/llm-config.ts",
+      "size": 2861,
+      "language": "TypeScript",
+      "lineCount": 78,
+      "hash": "92d586e93143ae54f4ee8c1218a4e1eb877031397648400daa654d89ba7e9161",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/llm-types.ts",
+      "size": 1991,
+      "language": "TypeScript",
+      "lineCount": 54,
+      "hash": "5884f77a4eed91cb9763f0f47388a462f747d09efcc051796e2b0a715a72579d",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771915702507
+    },
+    {
+      "path": "src/output.ts",
+      "size": 1227,
+      "language": "TypeScript",
+      "lineCount": 41,
+      "hash": "fcfb152f061c8a8d8199877bee1b08d2121da555b7ee81452d57498df8f48b20",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/project-config.ts",
+      "size": 2430,
+      "language": "TypeScript",
+      "lineCount": 84,
+      "hash": "d25a15607eacca67ea2b9a6a9f7f57a5c138531e2079401b9894017596b0b58e",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/project-dirs.ts",
+      "size": 1281,
+      "language": "TypeScript",
+      "lineCount": 36,
+      "hash": "082180b26b11c19361143829be6c1a0d25d474ac03cf5d18f9c848935749d422",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888780
+    },
+    {
+      "path": "src/provider-interface.ts",
+      "size": 8802,
+      "language": "TypeScript",
+      "lineCount": 223,
+      "hash": "be59cd031f7f9d1caf8c53647ad8db34ec35d414f012dded74d9e18c8fca4fa1",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771915604416
+    },
+    {
+      "path": "src/provider-registry.ts",
+      "size": 7381,
+      "language": "TypeScript",
+      "lineCount": 213,
+      "hash": "5739b4c5faa60b165e326c9bf10cb150f4876e8db8f551e4c97782572b3cd088",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "src/provider-session.ts",
+      "size": 7112,
+      "language": "TypeScript",
+      "lineCount": 192,
+      "hash": "e5bfc587ea6efc2fb47d66acff8bf8381073edce46537cddcb35473a29721d95",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "src/public.ts",
+      "size": 6100,
+      "language": "TypeScript",
+      "lineCount": 240,
+      "hash": "dd5027f16cd42cfadc8a7054e04425d16613976a9acd671b44fdc83aa89f901d",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "src/suggest.ts",
+      "size": 2057,
+      "language": "TypeScript",
+      "lineCount": 75,
+      "hash": "1b91e39e1a8b130d9caefe6fec87efa76fc7b8d5684638399983d4dce405eb29",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "src/token-usage.ts",
+      "size": 4334,
+      "language": "TypeScript",
+      "lineCount": 131,
+      "hash": "91698c96659fa800af3ba5c7350d39f4962f03b3d8367def74e2682003213bba",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "src/types.ts",
+      "size": 5117,
+      "language": "TypeScript",
+      "lineCount": 136,
+      "hash": "b73c2c9629929c11ba21b8945d647b1962ef6e0e74d14005779604d30b477ed1",
+      "role": "source",
+      "category": "src",
+      "lastModified": 1771913888782
+    },
+    {
+      "path": "tests/e2e/.gitkeep",
+      "size": 0,
+      "language": "Other",
+      "lineCount": 0,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/integration/.gitkeep",
+      "size": 0,
+      "language": "Other",
+      "lineCount": 0,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/api-provider.test.ts",
+      "size": 3887,
+      "language": "TypeScript",
+      "lineCount": 124,
+      "hash": "adc70862f724b094467c0afaa88f58f7a97ba74559632e52f406c2bbefa00ad7",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/auth.test.ts",
+      "size": 16019,
+      "language": "TypeScript",
+      "lineCount": 511,
+      "hash": "c7aad5a8d755fff2ce5af4e341abe6b8c98f4ccf947747bf98670adf8fe3c513",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/cli-provider.test.ts",
+      "size": 3510,
+      "language": "TypeScript",
+      "lineCount": 115,
+      "hash": "b0ad21fb1ec068d4fcff13f504d6e3df7fbb85bc279e812a6a8a75d8c079771c",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/config.test.ts",
+      "size": 4304,
+      "language": "TypeScript",
+      "lineCount": 147,
+      "hash": "1dfa9d44cff8f3ee03b38ac7dd79ee161975fe9ecdbd0d20c11239238defbdf9",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/create-client.test.ts",
+      "size": 2686,
+      "language": "TypeScript",
+      "lineCount": 107,
+      "hash": "7046d6516bceada38c00eb7f63be613611d442c2d58c2c0a20f3c4f13ef8af7d",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/exec.test.ts",
+      "size": 18759,
+      "language": "TypeScript",
+      "lineCount": 614,
+      "hash": "260ca84a97e5ec4e50c4da84b67e54b5838cf6ad4f6aacb77d9c490e16d73971",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888783
+    },
+    {
+      "path": "tests/unit/help-format.test.ts",
+      "size": 13291,
+      "language": "TypeScript",
+      "lineCount": 434,
+      "hash": "3cc8742ebce68a8cb39b982e9bfd81053613b0ad1f4e45bf1f6efbb4ae32f904",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/json.test.ts",
+      "size": 698,
+      "language": "TypeScript",
+      "lineCount": 25,
+      "hash": "e02a786d669dc8f9f22c4dd57d338c17ced41139cb861c46943e1b552fb1fbbc",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/llm-client.test.ts",
+      "size": 1081,
+      "language": "TypeScript",
+      "lineCount": 41,
+      "hash": "6a496efb4f0735168666666fac047e0372b93273aff89112c1a22650dee05d36",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/llm-config.test.ts",
+      "size": 1619,
+      "language": "TypeScript",
+      "lineCount": 55,
+      "hash": "9f2a293456ba802d01cdfd0a5f3e1c50ce720520b7eec6bb4847293c56bf572e",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/output.test.ts",
+      "size": 1554,
+      "language": "TypeScript",
+      "lineCount": 59,
+      "hash": "2f9060e1780f4a8369a573091a7aa73f714a27be6dcb250614297bea86e01c32",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/project-config.test.ts",
+      "size": 3183,
+      "language": "TypeScript",
+      "lineCount": 102,
+      "hash": "71bee7bfdd9165c8e95de6d56e503b22a53ee10798bd18112fb42e84d40c17a5",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/provider-interface.test.ts",
+      "size": 12241,
+      "language": "TypeScript",
+      "lineCount": 345,
+      "hash": "534b491268c6d49bb0dc5907f2161e0a7e24d49ef265e889de92a4db45f8baa5",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/provider-registry.test.ts",
+      "size": 10112,
+      "language": "TypeScript",
+      "lineCount": 298,
+      "hash": "9e58c02cc6d32140751f4e915121ec08c039ebec2a64b8803923280f6c106f3d",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/provider-session.test.ts",
+      "size": 11374,
+      "language": "TypeScript",
+      "lineCount": 305,
+      "hash": "04e2668dad8fca2365ae5c477b14feef5811b31001d3870c019efa1e14c4a32f",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888784
+    },
+    {
+      "path": "tests/unit/suggest.test.ts",
+      "size": 3936,
+      "language": "TypeScript",
+      "lineCount": 116,
+      "hash": "bd2ab8d26402a2feeef35652e7fd6f93c2792926e021f011aae1e4b783dae359",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888785
+    },
+    {
+      "path": "tests/unit/token-usage.test.ts",
+      "size": 7109,
+      "language": "TypeScript",
+      "lineCount": 264,
+      "hash": "9cf0b0bf8c89d0403927c0faf6a488ba7854b93fdcb13a89a87aff2144726555",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888785
+    },
+    {
+      "path": "tests/unit/types.test.ts",
+      "size": 1986,
+      "language": "TypeScript",
+      "lineCount": 61,
+      "hash": "e2317739b5570322caa693a0116c25cac33b37082756571db6f43acc2b1be7a8",
+      "role": "test",
+      "category": "tests",
+      "lastModified": 1771913888785
+    },
+    {
+      "path": "tsconfig.json",
+      "size": 137,
+      "language": "JSON",
+      "lineCount": 8,
+      "hash": "1a9f0873fec04475a675b9b11b9402a9eca94c930c65a199019538b9f521b861",
+      "role": "config",
+      "category": "root",
+      "lastModified": 1771913888785
+    },
+    {
+      "path": "vitest.config.ts",
+      "size": 262,
+      "language": "TypeScript",
+      "lineCount": 11,
+      "hash": "7f74cb1ac6af0cc8bf6a20322977ad0c0f4e3d99b4f8472d81d417890cef91f6",
+      "role": "config",
+      "category": "root",
+      "lastModified": 1771913888785
+    }
+  ],
+  "summary": {
+    "totalFiles": 46,
+    "totalLines": 9293,
+    "byLanguage": {
+      "JSON": 3,
+      "TypeScript": 41,
+      "Other": 2
+    },
+    "byRole": {
+      "generated": 1,
+      "config": 3,
+      "source": 22,
+      "test": 20
+    },
+    "byCategory": {
+      "root": 4,
+      "src": 22,
+      "tests": 20
+    }
+  }
+}

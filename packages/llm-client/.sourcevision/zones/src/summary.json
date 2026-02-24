@@ -1,0 +1,19 @@
+{
+  "id": "src",
+  "name": "Src",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "src/api-provider.ts",
+    "src/config.ts",
+    "tests/unit/api-provider.test.ts",
+    "tests/unit/config.test.ts"
+  ],
+  "entryPoints": [
+    "src/api-provider.ts",
+    "src/config.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 4,
+  "lineCount": 552
+}

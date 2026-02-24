@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "toolVersion": "0.1.0",
+  "analyzedAt": "2026-02-24T06:49:19.756Z",
+  "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad",
+  "gitBranch": "feature/integrate-codex",
+  "targetPath": "/Users/ryankeith/work-internal/bravo/packages/llm-client",
+  "modules": {
+    "inventory": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.383Z",
+      "completedAt": "2026-02-24T06:49:19.390Z"
+    },
+    "imports": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.391Z",
+      "completedAt": "2026-02-24T06:49:19.397Z"
+    },
+    "classifications": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.397Z",
+      "completedAt": "2026-02-24T06:49:19.568Z"
+    },
+    "zones": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.568Z",
+      "completedAt": "2026-02-24T06:49:19.747Z"
+    },
+    "components": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.747Z",
+      "completedAt": "2026-02-24T06:49:19.748Z"
+    },
+    "callgraph": {
+      "status": "complete",
+      "startedAt": "2026-02-24T06:49:19.748Z",
+      "completedAt": "2026-02-24T06:49:19.756Z"
+    }
+  },
+  "zoneOutputs": true,
+  "tokenUsage": {
+    "calls": 3,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "vendor": "claude",
+    "model": "claude-sonnet-4-20250514"
+  }
+}

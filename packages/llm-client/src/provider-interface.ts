@@ -47,8 +47,18 @@
  * ```
  */
 
-import type { LLMVendor } from "./llm-types.js";
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
+
+/**
+ * Supported LLM vendors.
+ *
+ * Defined here (rather than `llm-types.ts`) so that `provider-interface.ts`
+ * has no upstream dependency on `llm-types.ts`, breaking a circular chain:
+ *   provider-interface → llm-types → create-client → api/cli-provider → provider-interface
+ *
+ * `llm-types.ts` re-exports this type so all existing consumers are unaffected.
+ */
+export type LLMVendor = "claude" | "codex";
 
 // ── Auth mode ─────────────────────────────────────────────────────────────
 

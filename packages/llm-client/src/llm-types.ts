@@ -9,8 +9,11 @@
 import type { CreateClientOptions } from "./create-client.js";
 import type { ClaudeClient, ClaudeConfig } from "./types.js";
 
-/** Supported LLM vendors. */
-export type LLMVendor = "claude" | "codex";
+// LLMVendor lives in provider-interface.ts to break the circular dependency:
+//   provider-interface → llm-types → create-client → api/cli-provider → provider-interface
+// Imported for local use and re-exported so all existing consumers are unaffected.
+import type { LLMVendor } from "./provider-interface.js";
+export type { LLMVendor };
 
 /** Optional Codex-specific config section in `.n-dx.json`. */
 export interface CodexConfig {
