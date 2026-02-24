@@ -13029,7 +13029,7 @@
     {
       "id": "08b111a4-a196-4053-8c9d-14bc61b5ff01",
       "title": "LLM Client Package Consolidation",
-      "status": "pending",
+      "status": "deleted",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -13325,6 +13325,251 @@
       "source": "sourcevision",
       "startedAt": "2026-02-24T05:13:10.253Z",
       "completedAt": "2026-02-24T05:28:13.108Z"
+    },
+    {
+      "id": "f95ede7e-3b79-4370-9c8b-0174c83ead4c",
+      "title": "Process Lifecycle Management and Graceful Shutdown",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "d60d8d39-5e77-42c5-a4ea-b027e266befd",
+          "title": "Lingering Process Investigation and Root Cause Analysis",
+          "status": "pending",
+          "level": "feature",
+          "description": "Systematically investigate and diagnose the root causes of lingering processes that remain active after dashboard termination or refresh commands",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d788c225-e163-44f8-b74e-ca445971078a",
+              "title": "Audit current dashboard process spawning and lifecycle management",
+              "status": "pending",
+              "level": "task",
+              "description": "Analyze all process creation points in the dashboard startup flow, including child processes, worker threads, and port bindings to understand the current architecture",
+              "acceptanceCriteria": [
+                "Complete inventory of all processes spawned during dashboard startup",
+                "Documentation of current cleanup procedures and signal handlers",
+                "Identification of processes that lack proper cleanup"
+              ],
+              "priority": "high",
+              "tags": [
+                "investigation",
+                "processes"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "d8d4d862-f7a5-4bc1-bed0-a31269bfa843",
+              "title": "Identify and catalog all port bindings and resource allocations",
+              "status": "pending",
+              "level": "task",
+              "description": "Map all network ports, file handles, and system resources allocated during dashboard operation to understand what needs cleanup",
+              "acceptanceCriteria": [
+                "Complete list of all ports bound during dashboard operation",
+                "Inventory of file handles and system resources allocated",
+                "Documentation of current resource cleanup procedures"
+              ],
+              "priority": "high",
+              "tags": [
+                "investigation",
+                "ports",
+                "resources"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "6de57b7c-db77-450a-98d3-ca0fe66e0621",
+              "title": "Analyze signal handling and termination procedures across all packages",
+              "status": "pending",
+              "level": "task",
+              "description": "Review current SIGINT, SIGTERM, and other signal handling implementations across web, hench, rex, and sourcevision packages",
+              "acceptanceCriteria": [
+                "Audit of all existing signal handlers in the codebase",
+                "Documentation of cleanup procedures triggered by signals",
+                "Identification of packages lacking proper signal handling"
+              ],
+              "priority": "high",
+              "tags": [
+                "investigation",
+                "signals"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "a766ff1d-115a-4e48-8e5b-5122e39f9cee",
+          "title": "Graceful Shutdown Implementation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement comprehensive graceful shutdown procedures that properly clean up all processes, ports, and resources when dashboard is terminated",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "6b7341f2-8fe5-419e-b6c1-949f7e3e9a66",
+              "title": "Implement unified signal handler with cascading cleanup",
+              "status": "completed",
+              "level": "task",
+              "description": "Implemented unified signal handler with cascading cleanup (commit cb60d1c). Changes: (1) packages/web/src/server/start.ts: extracted registerShutdownHandlers() as an exported testable function with 30s overall timeout (configurable via N_DX_SHUTDOWN_TIMEOUT_MS env var), double-signal handling (second SIGINT/SIGTERM forces immediate exit(1) while graceful shutdown is still running), signal name in logs, and injectable exit dep for testing. The function runs cleanup in dependency order: hench child processes first then WebSocket connections then HTTP server then port file. (2) packages/web/tests/unit/server/shutdown-handler.test.ts: 13 new unit tests covering signal handler registration, cleanup ordering, SIGINT/SIGTERM name logging, double-signal force-exit, timeout force-exit, timeout error message, port file removal, and completion log.",
+              "acceptanceCriteria": [
+                "Single signal handler coordinates shutdown across all processes",
+                "Cleanup procedures execute in proper dependency order",
+                "Timeout mechanisms prevent indefinite shutdown hangs"
+              ],
+              "priority": "critical",
+              "tags": [
+                "shutdown",
+                "signals",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:38:15.799Z",
+              "completedAt": "2026-02-24T06:49:04.268Z"
+            },
+            {
+              "id": "8ab0669a-0484-46e6-b0b3-7f60ede95546",
+              "title": "Add process tree cleanup with force termination fallback",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement comprehensive child process cleanup that gracefully terminates processes with force-kill fallback for unresponsive processes",
+              "acceptanceCriteria": [
+                "All child processes are gracefully terminated on shutdown",
+                "Force termination kicks in after configurable timeout",
+                "Process tree is fully cleaned up before main process exits"
+              ],
+              "priority": "critical",
+              "tags": [
+                "processes",
+                "cleanup",
+                "termination"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:04:01.950Z",
+              "completedAt": "2026-02-24T06:30:36.776Z"
+            },
+            {
+              "id": "64591036-76ff-42a4-9600-964552721da1",
+              "title": "Implement port cleanup and resource release procedures",
+              "status": "completed",
+              "level": "task",
+              "description": "Add explicit port unbinding and resource cleanup procedures that execute during graceful shutdown to prevent port conflicts",
+              "acceptanceCriteria": [
+                "All bound ports are explicitly released on shutdown",
+                "File handles and system resources are properly closed",
+                "Cleanup procedures log success/failure status"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ports",
+                "resources",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:30:36.959Z",
+              "completedAt": "2026-02-24T06:36:02.348Z"
+            },
+            {
+              "id": "fe88522a-c322-4c01-a4a1-a2b1b2cd699e",
+              "title": "Add shutdown status reporting and verification",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement status reporting during shutdown process and verification that cleanup completed successfully",
+              "acceptanceCriteria": [
+                "Shutdown progress is logged with component-specific status",
+                "Cleanup verification confirms all processes terminated",
+                "Failed cleanup attempts are logged with diagnostic information"
+              ],
+              "priority": "medium",
+              "tags": [
+                "logging",
+                "verification",
+                "diagnostics"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "9ac4a684-2100-4520-868a-b7d33d4818dd",
+          "title": "Refresh Command Process Management",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enhance the ndx refresh command to properly detect and clean up existing dashboard processes before starting refresh operations",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "979b4a53-459b-43e7-98fc-94723f88698f",
+              "title": "Add pre-refresh process conflict detection and resolution",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement detection of existing dashboard processes during refresh and provide automated cleanup before proceeding with refresh operations",
+              "acceptanceCriteria": [
+                "Existing dashboard processes are detected before refresh starts",
+                "Automated cleanup procedures terminate conflicting processes",
+                "Refresh proceeds only after successful cleanup verification"
+              ],
+              "priority": "high",
+              "tags": [
+                "refresh",
+                "conflict-detection",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T06:49:55.082Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:a3f2ac13-f411-4435-b01c-bde40b7a97cb",
+                "matchedItemId": "a3f2ac13-f411-4435-b01c-bde40b7a97cb",
+                "matchedItemTitle": "Add timeout and resource controls to process execution",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-24T06:03:02.905Z"
+              },
+              "completedAt": "2026-02-24T07:03:27.822Z"
+            },
+            {
+              "id": "6192cf7b-0582-40e6-9136-856894ce453c",
+              "title": "Implement robust port availability checking with retry logic",
+              "status": "pending",
+              "level": "task",
+              "description": "Add comprehensive port availability verification with retry mechanisms to handle timing issues during process cleanup and restart",
+              "acceptanceCriteria": [
+                "Port availability is verified before attempting to bind",
+                "Retry logic handles timing issues during process transitions",
+                "Clear error messages provided when ports remain unavailable"
+              ],
+              "priority": "high",
+              "tags": [
+                "ports",
+                "retry",
+                "availability"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "64720ae2-dae3-4a2c-b4b8-34d743d7f720",
+              "title": "Add refresh operation cleanup validation and rollback",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement validation procedures that verify successful refresh completion and provide rollback mechanisms for failed refresh attempts",
+              "acceptanceCriteria": [
+                "Refresh success is validated before marking operation complete",
+                "Rollback procedures restore previous state on failure",
+                "Clear status reporting throughout refresh lifecycle"
+              ],
+              "priority": "medium",
+              "tags": [
+                "validation",
+                "rollback",
+                "refresh"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
