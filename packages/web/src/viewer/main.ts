@@ -36,7 +36,9 @@ import { SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
 import { useRouteState } from "./hooks/use-route-state.js";
 import { useAppData } from "./hooks/use-app-data.js";
 import { useMemoryMonitor } from "./hooks/use-memory-monitor.js";
+import { useCrashRecovery } from "./hooks/use-crash-recovery.js";
 import { MemoryWarningBanner } from "./components/memory-warning.js";
+import { CrashRecoveryBanner } from "./components/crash-recovery-banner.js";
 
 initTheme();
 
@@ -166,11 +168,31 @@ function App({ scope }: { scope: string | null }) {
 
   const { data, loading, refreshToast, showDrop } = useAppData();
   const { snapshot: memorySnapshot, level: memoryLevel, showWarning: showMemoryWarning, dismiss: dismissMemoryWarning } = useMemoryMonitor();
+  const {
+    showRecovery,
+    crashLoop,
+    recentCrashCount,
+    recoveredState,
+    dismiss: dismissRecovery,
+    restore: restoreCrashState,
+  } = useCrashRecovery({ view, selectedFile, selectedZone, selectedRunId, selectedTaskId });
 
   const [detail, setDetail] = useState<DetailItem | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prdDetailContent, setPrdDetailContent] = useState<VNode<any> | null>(null);
+
+  const handleRestore = () => {
+    const state = restoreCrashState();
+    if (state) {
+      navigateTo(state.view, {
+        file: state.selectedFile ?? undefined,
+        zone: state.selectedZone ?? undefined,
+        runId: state.selectedRunId ?? undefined,
+        taskId: state.selectedTaskId ?? undefined,
+      });
+    }
+  };
 
   const handleToggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -193,6 +215,7 @@ function App({ scope }: { scope: string | null }) {
   const hasData = data.manifest || data.inventory || data.imports || data.zones;
 
   return h(Fragment, null,
+    h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),

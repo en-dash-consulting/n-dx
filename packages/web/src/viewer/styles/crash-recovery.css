@@ -1,0 +1,152 @@
+/* Crash recovery banner styles.
+ *
+ * Displayed after the page recovers from a crash. Positioned at the top
+ * of the viewport, similar to the memory warning banner. Uses CSS variables
+ * from tokens.css for theme compatibility.
+ */
+
+.crash-recovery-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  background: var(--color-info-bg, #1a2a3a);
+  border-bottom: 2px solid var(--color-info, #4dabf7);
+  color: var(--color-info-text, #74c0fc);
+  animation: crash-recovery-slide-in 0.3s ease-out;
+}
+
+.crash-recovery-loop {
+  background: var(--color-warning-bg, #3a2d00);
+  border-bottom-color: var(--color-warning, #f0ad4e);
+  color: var(--color-warning-text, #ffc107);
+}
+
+[data-theme="light"] .crash-recovery-banner {
+  background: #d0ebff;
+  border-bottom-color: #339af0;
+  color: #1864ab;
+}
+
+[data-theme="light"] .crash-recovery-loop {
+  background: #fff3cd;
+  border-bottom-color: #ffc107;
+  color: #664d03;
+}
+
+.crash-recovery-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.crash-recovery-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.crash-recovery-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.crash-recovery-text strong {
+  font-weight: 600;
+}
+
+.crash-recovery-description {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.crash-recovery-state-info {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  font-style: italic;
+}
+
+.crash-recovery-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.crash-recovery-restore {
+  background: var(--color-info, #4dabf7);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.crash-recovery-loop .crash-recovery-restore {
+  background: var(--color-warning, #f0ad4e);
+  color: #000;
+}
+
+[data-theme="light"] .crash-recovery-restore {
+  background: #339af0;
+}
+
+.crash-recovery-restore:hover {
+  opacity: 0.85;
+}
+
+.crash-recovery-restore:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.crash-recovery-dismiss {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 4px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.crash-recovery-dismiss:hover {
+  opacity: 1;
+}
+
+.crash-recovery-dismiss:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@keyframes crash-recovery-slide-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .crash-recovery-banner {
+    animation: none;
+  }
+}

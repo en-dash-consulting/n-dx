@@ -32,4 +32,5 @@
 @import "./feature-toggles.css";
 @import "./pr-markdown.css";
 @import "./memory-warning.css";
+@import "./crash-recovery.css";
 @import "./responsive.css";
