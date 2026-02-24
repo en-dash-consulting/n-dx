@@ -38,7 +38,7 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdtempSync, r
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { exec as foundationExec, spawnManaged, type ManagedChild } from "@n-dx/llm-client";
+import { exec as foundationExec, spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -2280,6 +2280,44 @@ function handleExecutionResume(
   });
 
   return true;
+}
+
+/**
+ * Terminate any active rex epic-by-epic hench process.
+ *
+ * Called during server graceful shutdown to ensure the hench child spawned
+ * by the rex execution engine is cleaned up alongside the hench-route
+ * executions. Mirrors the pattern used by `shutdownActiveExecutions` in
+ * routes-hench.ts.
+ *
+ * @param gracePeriodMs  How long to wait for graceful SIGTERM before
+ *                       sending SIGKILL (default: HENCH_SHUTDOWN_TIMEOUT_MS
+ *                       env var, or 5 000 ms).
+ */
+export async function shutdownRexExecution(
+  gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
+): Promise<void> {
+  if (!henchProcess) return;
+
+  console.log("[shutdown] terminating rex epic-by-epic execution");
+
+  const handle = henchProcess;
+  henchProcess = null;
+
+  try {
+    await killWithFallback(handle, gracePeriodMs);
+    console.log("[shutdown] rex epic-by-epic execution terminated");
+  } catch (err) {
+    console.error(`[shutdown] rex epic-by-epic execution failed to terminate: ${(err as Error).message}`);
+  }
+
+  // Mark execution as failed so callers (status endpoint, WebSocket) see a
+  // clean terminal state rather than a stale "running" after restart.
+  if (executionState.status === "running" || executionState.status === "paused") {
+    executionState.status = "failed";
+    executionState.error = "Server shutting down";
+    executionState.finishedAt = new Date().toISOString();
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
-import { handleRexRoute } from "./routes-rex.js";
+import { handleRexRoute, shutdownRexExecution } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
@@ -101,7 +101,8 @@ export function registerShutdownHandlers(
     timer.unref();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
-    await shutdownActiveExecutions();
+    // Covers both hench-route executions and the rex epic-by-epic execution engine.
+    await Promise.all([shutdownActiveExecutions(), shutdownRexExecution()]);
 
     // Step 2 — close WebSocket connections (sends close frames, frees sockets)
     ws.shutdown();
