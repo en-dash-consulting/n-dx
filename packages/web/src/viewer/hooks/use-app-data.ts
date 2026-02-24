@@ -12,6 +12,7 @@ import {
   loadFromFiles,
   detectMode,
   onDataChange,
+  clearOnChange,
   startPolling,
   stopPolling,
 } from "../loader.js";
@@ -41,6 +42,7 @@ export function useAppData(): AppDataState {
   const [refreshToast, setRefreshToast] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
   const initialLoad = useRef(true);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Data change listener + mode detection
   useEffect(() => {
@@ -48,7 +50,12 @@ export function useAppData(): AppDataState {
       setData(newData);
       if (!initialLoad.current) {
         setRefreshToast(true);
-        setTimeout(() => setRefreshToast(false), 3000);
+        // Clear any pending toast dismiss timer before setting a new one
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+          setRefreshToast(false);
+          toastTimerRef.current = null;
+        }, 3000);
       }
     });
 
@@ -67,6 +74,11 @@ export function useAppData(): AppDataState {
 
     return () => {
       stopPolling();
+      clearOnChange();
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
     };
   }, []);
 

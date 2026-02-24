@@ -40,6 +40,11 @@ export function onDataChange(handler: DataChangeHandler): void {
   onChange = handler;
 }
 
+/** Remove the current data-change handler (for cleanup on unmount). */
+export function clearOnChange(): void {
+  onChange = null;
+}
+
 function notifyChange(): void {
   if (onChange) onChange(currentData);
 }

@@ -34,11 +34,50 @@ const MCP_SV_PATH = "/mcp/sourcevision";
 interface McpSession {
   transport: StreamableHTTPServerTransport;
   server: McpServer;
+  /** Timestamp of last activity (Date.now()), used for TTL-based cleanup. */
+  lastActivityAt: number;
 }
 
 /** Session maps keyed by session ID. */
 const rexSessions = new Map<string, McpSession>();
 const svSessions = new Map<string, McpSession>();
+
+// ── Session TTL cleanup ──────────────────────────────────────────────────────
+
+/** Maximum session idle time before automatic cleanup (15 minutes). */
+const SESSION_TTL_MS = 15 * 60 * 1000;
+
+/** How often to sweep for stale sessions (5 minutes). */
+const SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Sweep a session map, closing sessions idle longer than SESSION_TTL_MS. */
+function sweepStaleSessions(sessions: Map<string, McpSession>): void {
+  const now = Date.now();
+  for (const [sid, session] of sessions) {
+    if (now - session.lastActivityAt > SESSION_TTL_MS) {
+      session.transport.close().catch(() => {});
+      sessions.delete(sid);
+    }
+  }
+}
+
+/** Periodic sweep timer (started lazily on first session creation). */
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+function ensureSweepTimer(): void {
+  if (sweepTimer) return;
+  sweepTimer = setInterval(() => {
+    sweepStaleSessions(rexSessions);
+    sweepStaleSessions(svSessions);
+    // Stop the timer if no sessions remain — avoid holding the process open
+    if (rexSessions.size === 0 && svSessions.size === 0 && sweepTimer) {
+      clearInterval(sweepTimer);
+      sweepTimer = null;
+    }
+  }, SESSION_SWEEP_INTERVAL_MS);
+  // Don't prevent process exit
+  if (sweepTimer.unref) sweepTimer.unref();
+}
 
 type McpServerFactory = (ctx: ServerContext) => McpServer | Promise<McpServer>;
 
@@ -69,7 +108,8 @@ async function createSession(
     if (sid) sessions.delete(sid);
   };
   await server.connect(transport);
-  return { transport, server };
+  ensureSweepTimer();
+  return { transport, server, lastActivityAt: Date.now() };
 }
 
 /**
@@ -105,6 +145,7 @@ async function handleMcpRequest(
   if (method === "POST") {
     const existing = findSession(req, sessions);
     if (existing) {
+      existing.lastActivityAt = Date.now();
       await existing.transport.handleRequest(req, res);
       return true;
     }
@@ -126,6 +167,7 @@ async function handleMcpRequest(
       res.end(JSON.stringify({ error: "No valid session. Send an initialization request first." }));
       return true;
     }
+    existing.lastActivityAt = Date.now();
     await existing.transport.handleRequest(req, res);
     return true;
   }
@@ -163,9 +205,14 @@ export async function handleMcpRoute(
 }
 
 /**
- * Close all active MCP sessions. Used for graceful shutdown.
+ * Close all active MCP sessions and stop the sweep timer.
+ * Used for graceful shutdown.
  */
 export async function closeAllMcpSessions(): Promise<void> {
+  if (sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
   const closers: Promise<void>[] = [];
   for (const session of rexSessions.values()) {
     closers.push(session.transport.close());

@@ -109,6 +109,7 @@ function useProjectStatus(): ProjectStatus | null {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
           // Refresh status on any event that could affect counts

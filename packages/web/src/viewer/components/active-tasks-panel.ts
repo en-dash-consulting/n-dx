@@ -212,18 +212,20 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
 
   // WebSocket + polling
   useEffect(() => {
+    let mounted = true;
     fetchExecutions();
 
     // Connect to WebSocket for real-time updates
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}`;
-    let ws: WebSocket;
+    let ws: WebSocket | null = null;
 
     try {
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
+        if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "hench:task-execution-progress" && msg.state) {
@@ -257,11 +259,13 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     const interval = setInterval(fetchExecutions, 5000);
 
     return () => {
+      mounted = false;
       clearInterval(interval);
-      if (wsRef.current) {
-        try { wsRef.current.close(); } catch { /* ignore */ }
-        wsRef.current = null;
+      // Close WS using local reference (wsRef.current may already be null from onclose)
+      if (ws) {
+        try { ws.close(); } catch { /* ignore */ }
       }
+      wsRef.current = null;
     };
   }, [fetchExecutions]);
 

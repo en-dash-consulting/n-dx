@@ -3,7 +3,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, watch } from "node:fs";
+import { existsSync, watch, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
@@ -76,6 +76,7 @@ export function registerShutdownHandlers(
   actualPort: number,
   timeoutMs: number = Number(process.env["N_DX_SHUTDOWN_TIMEOUT_MS"] ?? DEFAULT_SHUTDOWN_TIMEOUT_MS),
   deps: ShutdownDeps = {},
+  watcherHandles?: WatcherHandles,
 ): void {
   const doExit = deps.exit ?? ((code: number) => process.exit(code));
 
@@ -102,6 +103,11 @@ export function registerShutdownHandlers(
 
     // Track per-component status for the final verification summary.
     const componentStatus: { component: string; ok: boolean }[] = [];
+
+    // Step 0 — close file system watchers (release OS file descriptors)
+    if (watcherHandles) {
+      closeWatchers(watcherHandles);
+    }
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -193,6 +199,25 @@ export interface ServerOptions {
 
 type RouteResult = boolean | Promise<boolean>;
 
+// ── File watcher debouncing ──────────────────────────────────────────────────
+// During builds, fs.watch fires many events in rapid succession. Debouncing
+// batches them into a single refresh + broadcast, preventing memory spikes
+// from concurrent fetch storms.
+
+const WATCHER_DEBOUNCE_MS = 500;
+
+/**
+ * Create a debounced version of a callback. Multiple calls within `delayMs`
+ * are collapsed into a single trailing invocation.
+ */
+function debounce<T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return ((...args: unknown[]) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; fn(...args); }, delayMs);
+  }) as T;
+}
+
 function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
 }
@@ -206,21 +231,24 @@ function registerSourcevisionWatcher(
   svDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
-): void {
-  if (!isInScope(scope, "sourcevision") || !existsSync(svDir)) return;
+): FSWatcher | null {
+  if (!isInScope(scope, "sourcevision") || !existsSync(svDir)) return null;
+  const debouncedRefresh = debounce(() => {
+    watcher.refresh();
+    ws.broadcast({
+      type: "sv:data-changed",
+      timestamp: new Date().toISOString(),
+    });
+  }, WATCHER_DEBOUNCE_MS);
   try {
-    watch(svDir, (_eventType, filename) => {
+    return watch(svDir, (_eventType, filename) => {
       if (filename && (ALL_DATA_FILES as readonly string[]).includes(String(filename))) {
-        watcher.refresh();
-        ws.broadcast({
-          type: "sv:data-changed",
-          file: String(filename),
-          timestamp: new Date().toISOString(),
-        });
+        debouncedRefresh();
       }
     });
   } catch {
     // fs.watch may not be supported everywhere
+    return null;
   }
 }
 
@@ -229,20 +257,24 @@ function registerRexWatcher(
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
-): void {
-  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return;
+): FSWatcher | null {
+  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return null;
+  const debouncedRefresh = debounce(() => {
+    watcher.refresh();
+    ws.broadcast({
+      type: "rex:prd-changed",
+      timestamp: new Date().toISOString(),
+    });
+  }, WATCHER_DEBOUNCE_MS);
   try {
-    watch(rexDir, (_eventType, filename) => {
+    return watch(rexDir, (_eventType, filename) => {
       if (filename === "prd.json") {
-        watcher.refresh();
-        ws.broadcast({
-          type: "rex:prd-changed",
-          timestamp: new Date().toISOString(),
-        });
+        debouncedRefresh();
       }
     });
   } catch {
     // ignore
+    return null;
   }
 }
 
@@ -250,21 +282,24 @@ function registerHenchWatcher(
   scope: ViewerScope | undefined,
   henchRunsDir: string,
   ws: ReturnType<typeof createWebSocketManager>,
-): void {
-  if (!isInScope(scope, "hench") || !existsSync(henchRunsDir)) return;
+): FSWatcher | null {
+  if (!isInScope(scope, "hench") || !existsSync(henchRunsDir)) return null;
+  const debouncedBroadcast = debounce(() => {
+    clearStatusCache();
+    ws.broadcast({
+      type: "hench:run-changed",
+      timestamp: new Date().toISOString(),
+    });
+  }, WATCHER_DEBOUNCE_MS);
   try {
-    watch(henchRunsDir, (_eventType, filename) => {
+    return watch(henchRunsDir, (_eventType, filename) => {
       if (filename && String(filename).endsWith(".json")) {
-        clearStatusCache();
-        ws.broadcast({
-          type: "hench:run-changed",
-          file: String(filename),
-          timestamp: new Date().toISOString(),
-        });
+        debouncedBroadcast();
       }
     });
   } catch {
     // ignore
+    return null;
   }
 }
 
@@ -273,21 +308,31 @@ function registerDevViewerWatcher(
   viewerPath: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
-): void {
-  if (!dev || !viewerPath) return;
+): FSWatcher | null {
+  if (!dev || !viewerPath) return null;
+  const debouncedRefresh = debounce(() => {
+    watcher.refresh();
+    ws.broadcast({
+      type: "viewer:reload",
+      timestamp: new Date().toISOString(),
+    });
+  }, WATCHER_DEBOUNCE_MS);
   try {
-    watch(dirname(viewerPath), (_eventType, filename) => {
+    return watch(dirname(viewerPath), (_eventType, filename) => {
       if (filename === "index.html") {
-        watcher.refresh();
-        ws.broadcast({
-          type: "viewer:reload",
-          timestamp: new Date().toISOString(),
-        });
+        debouncedRefresh();
       }
     });
   } catch {
     // ignore
+    return null;
   }
+}
+
+/** Collected file system watchers for cleanup during shutdown. */
+interface WatcherHandles {
+  watchers: FSWatcher[];
+  henchRunsDir: string;
 }
 
 function registerWatchers(
@@ -295,13 +340,26 @@ function registerWatchers(
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
   viewerPath: string,
-): string {
+): WatcherHandles {
   const henchRunsDir = join(ctx.projectDir, ".hench", "runs");
-  registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
-  registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws);
-  registerHenchWatcher(ctx.scope, henchRunsDir, ws);
-  registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
-  return henchRunsDir;
+  const watchers: FSWatcher[] = [];
+  const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
+  if (sv) watchers.push(sv);
+  const rex = registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws);
+  if (rex) watchers.push(rex);
+  const hench = registerHenchWatcher(ctx.scope, henchRunsDir, ws);
+  if (hench) watchers.push(hench);
+  const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
+  if (dev) watchers.push(dev);
+  return { watchers, henchRunsDir };
+}
+
+/** Close all file system watchers to release OS file descriptors. */
+function closeWatchers(handles: WatcherHandles): void {
+  for (const w of handles.watchers) {
+    try { w.close(); } catch { /* ignore */ }
+  }
+  handles.watchers.length = 0;
 }
 
 function setCorsHeaders(res: ServerResponse): void {
@@ -499,12 +557,12 @@ export async function startServer(
 
   const watcher = createDataWatcher(ctx, assets.viewerPath);
   const ws = createWebSocketManager();
-  const henchRunsDir = registerWatchers(ctx, watcher, ws, assets.viewerPath);
+  const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
   // broadcasts alerts via WebSocket.
   if (isInScope(scope, "hench")) {
-    startHeartbeatMonitor(henchRunsDir, ws.broadcast);
+    startHeartbeatMonitor(watcherHandles.henchRunsDir, ws.broadcast);
   }
 
   const server = createHttpServer(ctx, watcher, ws, assets);
@@ -537,16 +595,17 @@ export async function startServer(
         // Non-fatal: port file is a convenience, not a requirement
       }
 
-      logStartup(actualPort, ctx, henchRunsDir);
+      logStartup(actualPort, ctx, watcherHandles.henchRunsDir);
 
       // ── Graceful shutdown ───────────────────────────────────────────────
       // Single handler coordinates cleanup in dependency order:
+      //   0. File watchers          (release OS file descriptors)
       //   1. Hench child processes  (avoid orphaned agents)
       //   2. WebSocket connections  (clean close frames)
       //   3. HTTP server            (drain in-flight requests)
       //   4. Port file              (orchestrator discovery)
       // A second signal forces immediate exit; overall timeout prevents hangs.
-      registerShutdownHandlers(server, ws, portFilePath, actualPort);
+      registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles);
 
       resolvePromise({
         port: actualPort,
