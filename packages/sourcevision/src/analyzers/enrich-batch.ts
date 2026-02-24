@@ -22,6 +22,7 @@ import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
+import { startSpinner } from "../cli/output.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,9 @@ export async function runMetaEvaluation(
   passNumber: number,
   passConfig: PassConfig,
 ): Promise<MetaEvalResult | null> {
-  console.log(`  [enrich] Meta-evaluation pass (reviewing ${existingFindings.length} existing findings)...`);
+  const metaSpinner = startSpinner(
+    `  [enrich] Meta-evaluation pass (reviewing ${existingFindings.length} existing findings)...`,
+  );
   const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings);
   const metaTokenUsage = emptyAnalyzeTokenUsage();
 
@@ -66,6 +69,7 @@ export async function runMetaEvaluation(
     accumulateTokenUsage(metaTokenUsage, callResult.tokenUsage);
     metaText = callResult.text;
   } catch (err) {
+    metaSpinner.stop();
     if (err instanceof ClaudeClientError) {
       if (err.reason === "auth" || err.reason === "not-found") {
         console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error" : "LLM CLI not found"} — using algorithmic names`);
@@ -77,6 +81,7 @@ export async function runMetaEvaluation(
     }
     throw err;
   }
+  metaSpinner.stop();
 
   const parsed = tryParseJSON(metaText);
   if (!parsed) {
@@ -193,7 +198,9 @@ export async function enrichBatch(
       : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
-    console.log(`  [enrich]${batchLabel} Calling LLM (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
+    const spinner = startSpinner(
+      `  [enrich]${batchLabel} Calling LLM (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`,
+    );
 
     let callText: string;
     try {
@@ -201,6 +208,7 @@ export async function enrichBatch(
       accumulateTokenUsage(batchTokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {
+      spinner.stop();
       if (err instanceof ClaudeClientError) {
         if (err.reason === "auth" || err.reason === "not-found") {
           console.warn(`  [enrich] ${err.reason === "auth" ? "Authentication error — run 'ndx config' and verify vendor credentials" : "LLM CLI not found"}`);
@@ -215,6 +223,7 @@ export async function enrichBatch(
       }
       throw err;
     }
+    spinner.stop();
 
     const candidate = tryParseJSON(callText);
     if (!candidate) {

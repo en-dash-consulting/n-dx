@@ -27,6 +27,7 @@ import { BUILTIN_ARCHETYPES } from "./archetypes.js";
 import { sortClassifications } from "../util/sort.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
+import { startSpinner } from "../cli/output.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -399,7 +400,9 @@ async function classifyBatchWithLLM(
 
     const prompt = buildLLMClassifyPrompt(filesToClassify, archetypeCatalog, config.includeDescriptions);
     const promptLevel = config.includeDescriptions ? "full" : "compact";
-    console.log(`  [classify]${batchLabel} Calling LLM (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`);
+    const spinner = startSpinner(
+      `  [classify]${batchLabel} Calling LLM (attempt ${attempt + 1}/${attempts.length}, ${promptLevel} prompt, ${filesToClassify.length} files)...`,
+    );
 
     let callText: string;
     try {
@@ -407,6 +410,7 @@ async function classifyBatchWithLLM(
       accumulateTokenUsage(tokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {
+      spinner.stop();
       if (err instanceof ClaudeClientError) {
         if (err.reason === "auth" || err.reason === "not-found") {
           console.warn(`  [classify] ${err.reason === "auth" ? "Authentication error — run 'ndx config' and verify vendor credentials" : "LLM CLI not found"}`);
@@ -420,6 +424,7 @@ async function classifyBatchWithLLM(
       }
       throw err;
     }
+    spinner.stop();
 
     // Parse JSON array response
     const parsed = tryParseClassifyResponse(callText);

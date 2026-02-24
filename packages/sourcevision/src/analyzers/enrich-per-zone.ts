@@ -29,6 +29,7 @@ import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
+import { startSpinner } from "../cli/output.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
 
@@ -311,18 +312,29 @@ export async function enrichZonesPerZone(
   // Process zones with limited concurrency
   const totalTokenUsage = emptyAnalyzeTokenUsage();
   const results: SingleZoneResult[] = [];
+  const totalBatches = Math.ceil(zonesToEnrich.length / MAX_CONCURRENT_ZONES);
 
   // Process in batches of MAX_CONCURRENT_ZONES
   for (let i = 0; i < zonesToEnrich.length; i += MAX_CONCURRENT_ZONES) {
     const batch = zonesToEnrich.slice(i, i + MAX_CONCURRENT_ZONES);
-    const batchResults = await Promise.all(
-      batch.map((zone) => {
-        const prevZone = previousZones?.zones.find(
-          (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
-        );
-        return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes);
-      })
+    const batchIndex = Math.floor(i / MAX_CONCURRENT_ZONES);
+    const batchLabel = totalBatches > 1 ? ` batch ${batchIndex + 1}/${totalBatches}` : "";
+    const spinner = startSpinner(
+      `  [enrich] Enriching ${batch.length} zone${batch.length === 1 ? "" : "s"}${batchLabel}...`,
     );
+    let batchResults: SingleZoneResult[];
+    try {
+      batchResults = await Promise.all(
+        batch.map((zone) => {
+          const prevZone = previousZones?.zones.find(
+            (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
+          );
+          return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes);
+        })
+      );
+    } finally {
+      spinner.stop();
+    }
     results.push(...batchResults);
   }
 
