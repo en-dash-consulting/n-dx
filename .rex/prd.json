@@ -13827,6 +13827,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-24T18:08:30.754Z",
+      "completedAt": "2026-02-24T18:08:30.754Z",
       "children": [
         {
           "id": "47e2c9a4-b85d-498a-b5fa-a9903738ceb7",
@@ -13950,9 +13952,255 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-24T18:08:30.754Z",
-      "completedAt": "2026-02-24T18:08:30.754Z"
+      ]
+    },
+    {
+      "id": "0344cef0-f17f-47ed-a52b-b6ba601f983e",
+      "title": "Web UI Memory Management and Crash Resolution",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "0cf188b5-61e7-4aab-8ba5-d101a5e0a582",
+          "title": "OOM Crash Investigation and Root Cause Analysis",
+          "status": "pending",
+          "level": "feature",
+          "description": "Investigate and diagnose the recurring out-of-memory crashes that cause 'aw snap error code 5' in the web UI",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "255e92f3-db5f-4151-ae4c-6feb67c32541",
+              "title": "Profile memory usage patterns during web UI load and refresh cycles",
+              "status": "completed",
+              "level": "task",
+              "description": "Use browser dev tools and memory profiling to identify memory allocation patterns, leaks, and peak usage during initial load and subsequent refresh operations",
+              "acceptanceCriteria": [
+                "Memory usage baseline established for normal UI operations",
+                "Memory spikes during refresh operations identified and quantified",
+                "Specific components or operations causing excessive memory allocation documented"
+              ],
+              "priority": "critical",
+              "tags": [
+                "web",
+                "debugging",
+                "memory"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T19:00:38.872Z",
+              "completedAt": "2026-02-24T19:06:59.532Z"
+            },
+            {
+              "id": "7bdfa843-b611-4d44-a831-4e735ec5dfdb",
+              "title": "Analyze refresh task orchestration for memory-intensive operations",
+              "status": "deferred",
+              "level": "task",
+              "description": "Examine the ndx refresh command and related web UI refresh behaviors to identify operations that may be loading excessive data into memory",
+              "acceptanceCriteria": [
+                "All refresh tasks and their memory footprint catalogued",
+                "Data loading patterns in dashboard refresh operations analyzed",
+                "Refresh orchestration flow documented with memory impact assessment"
+              ],
+              "priority": "critical",
+              "tags": [
+                "web",
+                "refresh",
+                "debugging"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-24T18:39:16.849Z"
+            },
+            {
+              "id": "0b87a119-c6a2-498a-ad5f-050e70f3b664",
+              "title": "Investigate browser error code 5 triggers and recovery scenarios",
+              "status": "pending",
+              "level": "task",
+              "description": "Research Chrome/browser error code 5 specifics and analyze crash dump data to understand the exact failure conditions and memory thresholds",
+              "acceptanceCriteria": [
+                "Error code 5 trigger conditions documented",
+                "Memory thresholds that cause crashes identified",
+                "Browser-specific behavior differences catalogued"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "browser",
+                "debugging"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:d60d8d39-5e77-42c5-a4ea-b027e266befd",
+            "matchedItemId": "d60d8d39-5e77-42c5-a4ea-b027e266befd",
+            "matchedItemTitle": "Lingering Process Investigation and Root Cause Analysis",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-24T18:39:02.997Z"
+          }
+        },
+        {
+          "id": "3eda1cdc-8a1f-4d09-984b-570c1e3edf2a",
+          "title": "Memory Optimization and Leak Prevention",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement fixes to prevent memory leaks and reduce memory usage in web UI operations",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "eff2a091-30bc-4434-8d2c-13e25e60b2c0",
+              "title": "Implement memory-efficient data loading strategies for large datasets",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace bulk data loading with pagination, lazy loading, or streaming approaches for dashboard components that handle large amounts of data",
+              "acceptanceCriteria": [
+                "Large dataset loading operations use pagination or chunking",
+                "Memory usage during data loading stays within acceptable thresholds",
+                "UI responsiveness maintained during data loading operations"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "optimization",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "adb4c3db-9fd8-44c1-b6d6-b0595ba8c734",
+              "title": "Fix memory leaks in refresh orchestration and component lifecycle",
+              "status": "pending",
+              "level": "task",
+              "description": "Identify and resolve memory leaks in React components, event listeners, timers, and refresh orchestration that prevent proper garbage collection",
+              "acceptanceCriteria": [
+                "Event listeners properly cleaned up on component unmount",
+                "Timer and interval references cleared appropriately",
+                "Refresh operations release memory after completion",
+                "Component memory usage returns to baseline after operations"
+              ],
+              "priority": "critical",
+              "tags": [
+                "web",
+                "memory",
+                "react"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "d5a5f03a-bd51-4484-aa4f-509fc8b5dbdb",
+              "title": "Implement memory usage monitoring and early warning system",
+              "status": "pending",
+              "level": "task",
+              "description": "Add client-side memory monitoring to detect approaching memory limits and provide early warnings before crashes occur",
+              "acceptanceCriteria": [
+                "Memory usage tracked and reported in real-time",
+                "Warning thresholds configured based on browser capabilities",
+                "Graceful degradation triggered before memory exhaustion",
+                "Memory usage data available for debugging and optimization"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "monitoring",
+                "memory"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:20bdeb0a-32fa-47db-8ea5-cd3bdb747a99",
+                "matchedItemId": "20bdeb0a-32fa-47db-8ea5-cd3bdb747a99",
+                "matchedItemTitle": "Implement task heartbeat monitoring system",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-24T18:39:02.997Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "8786c4b2-2eaf-4cfb-af07-8d4e60509916",
+          "title": "Crash Recovery and User Experience",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement crash detection, recovery mechanisms, and improved user experience during memory-related issues",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "9e7f4093-d2f7-4591-bfb3-6f4c00468255",
+              "title": "Implement graceful degradation when approaching memory limits",
+              "status": "pending",
+              "level": "task",
+              "description": "Add mechanisms to reduce functionality or disable resource-intensive features when memory usage approaches critical thresholds",
+              "acceptanceCriteria": [
+                "Memory threshold detection triggers graceful degradation",
+                "Non-essential features disabled automatically under memory pressure",
+                "User informed of reduced functionality with clear explanations",
+                "Core functionality remains available during degraded mode"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "ux",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "80cd6462-2460-4757-aad3-fb6b67e5323d",
+              "title": "Add crash detection and automatic recovery workflow",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement client-side crash detection and automatic page recovery with state preservation to improve user experience during memory-related crashes",
+              "acceptanceCriteria": [
+                "Crash detection mechanism identifies memory-related failures",
+                "Automatic page reload triggered after crash detection",
+                "User navigation state preserved and restored after recovery",
+                "Clear user messaging explains what happened and recovery actions"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "ux",
+                "recovery"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:7ff4f6b5-031e-45a8-8678-728f5caa7b8a",
+                "matchedItemId": "7ff4f6b5-031e-45a8-8678-728f5caa7b8a",
+                "matchedItemTitle": "Add interactive workflow demo and animations",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-24T18:39:02.997Z"
+              }
+            },
+            {
+              "id": "9b6da46d-6f39-4c8b-b59d-f978a2c3aeed",
+              "title": "Implement memory-aware refresh throttling and queuing",
+              "status": "pending",
+              "level": "task",
+              "description": "Add intelligent refresh scheduling that considers current memory usage and queues or delays refresh operations when memory pressure is high",
+              "acceptanceCriteria": [
+                "Refresh operations queued when memory usage exceeds safe thresholds",
+                "Automatic refresh intervals adjusted based on memory availability",
+                "Manual refresh requests show memory status and estimated completion time",
+                "Refresh queue management prevents memory exhaustion during bulk operations"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "refresh",
+                "memory"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
