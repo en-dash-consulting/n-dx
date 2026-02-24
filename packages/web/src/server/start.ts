@@ -13,7 +13,7 @@ import { handleRexRoute } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
-import { handleHenchRoute, startHeartbeatMonitor } from "./routes-hench.js";
+import { handleHenchRoute, startHeartbeatMonitor, shutdownActiveExecutions } from "./routes-hench.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute } from "./routes-mcp.js";
@@ -391,13 +391,20 @@ export async function startServer(
 
       logStartup(actualPort, ctx, henchRunsDir);
 
-      // Clean up port file on process exit
-      const removePortFile = () => {
+      // ── Graceful shutdown ───────────────────────────────────────────────
+      // On SIGINT/SIGTERM: terminate all active hench child processes (with
+      // force-kill fallback), close the HTTP server, then remove the port
+      // file and exit.  The `exit` handler is a last-resort safety net that
+      // removes the port file even if we crash before the graceful path runs.
+      const gracefulShutdown = async () => {
+        await shutdownActiveExecutions();
+        server.close();
         unlink(portFilePath).catch(() => {});
+        process.exit(0);
       };
-      process.once("SIGINT", removePortFile);
-      process.once("SIGTERM", removePortFile);
-      process.once("exit", removePortFile);
+      process.once("SIGINT", gracefulShutdown);
+      process.once("SIGTERM", gracefulShutdown);
+      process.once("exit", () => { unlink(portFilePath).catch(() => {}); });
 
       resolvePromise({
         port: actualPort,

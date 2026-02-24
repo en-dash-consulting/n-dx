@@ -423,6 +423,70 @@ export function spawnManaged(
 }
 
 // ---------------------------------------------------------------------------
+// Graceful termination with force-kill fallback
+// ---------------------------------------------------------------------------
+
+/** Grace period before escalating SIGTERM → SIGKILL during graceful shutdown. */
+const SHUTDOWN_KILL_ESCALATION_MS = 1_000;
+
+/**
+ * Gracefully terminate a managed child process, escalating to SIGKILL if needed.
+ *
+ * 1. Sends `SIGTERM` to the child.
+ * 2. Waits up to `gracePeriodMs` for the child to exit naturally.
+ * 3. If the child is still alive after the grace period, sends `SIGKILL`.
+ * 4. Waits up to {@link SHUTDOWN_KILL_ESCALATION_MS} for SIGKILL to take effect.
+ *
+ * Resolves once the child has exited or all signals have been delivered.
+ * Never rejects — errors during kill are silently swallowed.
+ *
+ * @param handle       Managed child handle returned by {@link spawnManaged}.
+ * @param gracePeriodMs  How long to wait for graceful exit before SIGKILL.
+ *                       Defaults to 5 seconds.
+ */
+export async function killWithFallback(
+  handle: ManagedChild,
+  gracePeriodMs: number = 5_000,
+): Promise<void> {
+  if (handle.pid === undefined) return;
+
+  // Send graceful signal — catch in case the process has already exited and
+  // the underlying `child.kill()` throws ESRCH.
+  try {
+    handle.kill("SIGTERM");
+  } catch {
+    return; // already gone
+  }
+
+  let timedOut = false;
+  await Promise.race([
+    handle.done.then(() => {}),
+    new Promise<void>((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, gracePeriodMs);
+    }),
+  ]);
+
+  if (timedOut) {
+    // Force-kill the unresponsive process
+    try {
+      handle.kill("SIGKILL");
+    } catch {
+      // Ignore — process may have exited between the timeout check and the kill
+    }
+    // Give SIGKILL a moment to take effect before returning
+    await Promise.race([
+      handle.done.then(() => {}),
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, SHUTDOWN_KILL_ESCALATION_MS),
+      ),
+    ]);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Concurrent process limiting
 // ---------------------------------------------------------------------------
 

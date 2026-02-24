@@ -173,6 +173,7 @@ export {
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
+  killWithFallback,
   ProcessPool,
   ProcessLimitError,
 } from "./exec.js";

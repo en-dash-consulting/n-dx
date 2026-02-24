@@ -178,9 +178,38 @@ function isProcessRunning(pid) {
 // ── Subcommands ──────────────────────────────────────────────────────────────
 
 /**
- * Stop a running background server.
+ * Poll until a process exits or the deadline is reached.
+ *
+ * @param {number} pid          Process ID to watch.
+ * @param {number} timeoutMs    Maximum wait time in milliseconds.
+ * @param {number} [intervalMs] Polling interval. Defaults to 100 ms.
+ * @returns {Promise<boolean>}  `true` if the process exited, `false` if timeout.
  */
-async function stopServer(dir, label = "n-dx server") {
+async function waitForProcessExit(pid, timeoutMs, intervalMs = 100) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(pid)) return true;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+/**
+ * Stop a running background server.
+ *
+ * Sends SIGTERM and waits up to `gracePeriodMs` for the server to exit
+ * cleanly.  If the server is still alive after the grace period, SIGKILL
+ * is sent as a force-kill fallback.
+ *
+ * The default grace period is intentionally short (2 s) so the CLI stop
+ * command stays responsive.  For servers that need longer, pass gracePeriodMs
+ * explicitly or set N_DX_STOP_GRACE_MS in the environment.
+ *
+ * @param {string} dir
+ * @param {string} [label]
+ * @param {number} [gracePeriodMs]  Grace period before SIGKILL. Default: 2 000 ms.
+ */
+async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000)) {
   const info = await readPidFile(dir);
   if (!info) {
     log("No background server found.");
@@ -196,14 +225,30 @@ async function stopServer(dir, label = "n-dx server") {
 
   try {
     process.kill(info.pid, "SIGTERM");
-    log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);
-    await removePidFile(dir);
-    await removePortFile(dir);
-    return true;
   } catch (err) {
-    console.error(`Failed to stop server (PID ${info.pid}): ${err.message}`);
+    console.error(`Failed to send SIGTERM to server (PID ${info.pid}): ${err.message}`);
     return false;
   }
+
+  // Wait for graceful exit
+  const exited = await waitForProcessExit(info.pid, gracePeriodMs);
+
+  if (!exited) {
+    // Force-kill unresponsive server
+    log(`Server (PID ${info.pid}) did not exit within ${gracePeriodMs} ms — sending SIGKILL.`);
+    try {
+      process.kill(info.pid, "SIGKILL");
+    } catch {
+      // Process may have exited between the check and the kill — that's fine
+    }
+    // Give SIGKILL a moment to take effect
+    await waitForProcessExit(info.pid, 2_000);
+  }
+
+  log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);
+  await removePidFile(dir);
+  await removePortFile(dir);
+  return true;
 }
 
 /**

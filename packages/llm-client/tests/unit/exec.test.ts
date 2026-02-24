@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, ProcessPool, ProcessLimitError } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError } from "../../src/exec.js";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -610,5 +610,97 @@ describe("ProcessPool", () => {
     expect(pool.active).toBe(1);
     child2.emit("close", 0);
     await p2;
+  });
+});
+
+describe("killWithFallback", () => {
+  it("sends SIGTERM and resolves when process exits within grace period", async () => {
+    vi.useFakeTimers();
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn().mockReturnValue(true);
+    mockSpawn.mockReturnValue(child as never);
+
+    const handle = spawnManaged("node", ["script.js"]);
+    const shutdownPromise = killWithFallback(handle, 5_000);
+
+    // SIGTERM should be sent immediately
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    // Process exits cleanly before grace period
+    child.emit("close", 0);
+
+    await shutdownPromise;
+
+    // SIGKILL should NOT have been sent
+    expect(child.kill).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("sends SIGKILL after grace period if process does not exit", async () => {
+    vi.useFakeTimers();
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn().mockReturnValue(true);
+    mockSpawn.mockReturnValue(child as never);
+
+    const handle = spawnManaged("node", ["stuck.js"]);
+    const shutdownPromise = killWithFallback(handle, 2_000);
+
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    // Advance past the grace period — process still running
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    // SIGKILL should have been sent
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+
+    // Process finally exits (after SIGKILL)
+    child.emit("close", null);
+    await shutdownPromise;
+
+    vi.useRealTimers();
+  });
+
+  it("resolves immediately when pid is undefined", async () => {
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn();
+    child.pid = undefined as unknown as number;
+    mockSpawn.mockReturnValue(child as never);
+
+    const handle = spawnManaged("node", ["script.js"]);
+    // Should resolve without sending any signals
+    await killWithFallback(handle, 5_000);
+
+    expect(child.kill).not.toHaveBeenCalled();
+  });
+
+  it("does not send SIGKILL when process exits right at grace period boundary", async () => {
+    vi.useFakeTimers();
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn().mockReturnValue(true);
+    mockSpawn.mockReturnValue(child as never);
+
+    const handle = spawnManaged("node", ["script.js"]);
+    const shutdownPromise = killWithFallback(handle, 1_000);
+
+    // Process exits just before the grace period
+    child.emit("close", 0);
+    await vi.advanceTimersByTimeAsync(500);
+
+    await shutdownPromise;
+
+    // Only SIGTERM, no SIGKILL
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    vi.useRealTimers();
   });
 });

@@ -25,7 +25,7 @@ import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, type ManagedChild } from "@n-dx/llm-client";
+import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -1390,4 +1390,40 @@ function handleTerminate(
     message: "Process terminated",
   });
   return true;
+}
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────
+
+/**
+ * Gracefully terminate all active hench executions on server shutdown.
+ *
+ * Iterates over all entries in `activeExecutions`, sends SIGTERM to each
+ * managed child, and waits up to `gracePeriodMs` for them to exit.  Any
+ * process that does not exit within the grace period receives SIGKILL.
+ *
+ * This must be called before the HTTP server closes so that child processes
+ * are not orphaned.  The function resolves only after all processes have
+ * been signalled and (best-effort) waited for.
+ *
+ * @param gracePeriodMs  How long to wait for each process to exit gracefully
+ *                       before force-killing it.  Defaults to 5 000 ms.
+ *                       Can be overridden via the `HENCH_SHUTDOWN_TIMEOUT_MS`
+ *                       environment variable.
+ */
+export async function shutdownActiveExecutions(
+  gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
+): Promise<void> {
+  if (activeExecutions.size === 0) return;
+
+  const terminations = Array.from(activeExecutions.entries()).map(
+    async ([taskId, entry]) => {
+      try {
+        await killWithFallback(entry.handle, gracePeriodMs);
+      } finally {
+        activeExecutions.delete(taskId);
+      }
+    },
+  );
+
+  await Promise.all(terminations);
 }
