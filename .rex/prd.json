@@ -13336,15 +13336,17 @@
         {
           "id": "d60d8d39-5e77-42c5-a4ea-b027e266befd",
           "title": "Lingering Process Investigation and Root Cause Analysis",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Systematically investigate and diagnose the root causes of lingering processes that remain active after dashboard termination or refresh commands",
           "source": "smart-add",
+          "startedAt": "2026-02-24T07:30:33.185Z",
+          "completedAt": "2026-02-24T07:30:33.185Z",
           "children": [
             {
               "id": "d788c225-e163-44f8-b74e-ca445971078a",
               "title": "Audit current dashboard process spawning and lifecycle management",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Analyze all process creation points in the dashboard startup flow, including child processes, worker threads, and port bindings to understand the current architecture",
               "acceptanceCriteria": [
@@ -13357,12 +13359,14 @@
                 "investigation",
                 "processes"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T07:21:54.768Z",
+              "completedAt": "2026-02-24T07:25:41.243Z"
             },
             {
               "id": "d8d4d862-f7a5-4bc1-bed0-a31269bfa843",
               "title": "Identify and catalog all port bindings and resource allocations",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Map all network ports, file handles, and system resources allocated during dashboard operation to understand what needs cleanup",
               "acceptanceCriteria": [
@@ -13376,7 +13380,9 @@
                 "ports",
                 "resources"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T07:26:35.301Z",
+              "completedAt": "2026-02-24T07:30:33.092Z"
             },
             {
               "id": "6de57b7c-db77-450a-98d3-ca0fe66e0621",
@@ -13396,23 +13402,25 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-24T07:14:18.194Z",
+              "completedAt": "2026-02-24T07:18:14.193Z",
               "children": [
                 {
                   "id": "ead56978-df3b-4c2b-b409-2ec91a69f222",
                   "title": "Fix GAP-1: export shutdownRexExecution from routes-rex.ts and wire into start.ts gracefulShutdown",
-                  "status": "pending",
+                  "status": "completed",
                   "level": "subtask",
-                  "priority": "high"
+                  "priority": "high",
+                  "startedAt": "2026-02-24T07:18:41.310Z",
+                  "completedAt": "2026-02-24T07:21:30.168Z"
                 }
-              ],
-              "completedAt": "2026-02-24T07:18:14.193Z"
+              ]
             }
           ]
         },
         {
           "id": "a766ff1d-115a-4e48-8e5b-5122e39f9cee",
           "title": "Graceful Shutdown Implementation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Implement comprehensive graceful shutdown procedures that properly clean up all processes, ports, and resources when dashboard is terminated",
           "source": "smart-add",
@@ -13483,7 +13491,7 @@
             {
               "id": "fe88522a-c322-4c01-a4a1-a2b1b2cd699e",
               "title": "Add shutdown status reporting and verification",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement status reporting during shutdown process and verification that cleanup completed successfully",
               "acceptanceCriteria": [
@@ -13497,9 +13505,13 @@
                 "verification",
                 "diagnostics"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T07:31:01.125Z",
+              "completedAt": "2026-02-24T07:43:12.167Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-24T07:43:12.260Z",
+          "completedAt": "2026-02-24T07:43:12.260Z"
         },
         {
           "id": "9ac4a684-2100-4520-868a-b7d33d4818dd",
