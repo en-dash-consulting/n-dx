@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";

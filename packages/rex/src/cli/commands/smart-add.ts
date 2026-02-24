@@ -28,7 +28,7 @@ import {
   buildDuplicateOverrideMarkerIndex,
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
-import type { LLMVendor } from "@n-dx/claude-client";
+import type { LLMVendor } from "@n-dx/llm-client";
 
 const PENDING_FILE = "pending-smart-proposals.json";
 

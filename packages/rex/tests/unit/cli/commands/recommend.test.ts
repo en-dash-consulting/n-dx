@@ -66,7 +66,7 @@ describe("cmdRecommend --accept indexed selection", () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock("@n-dx/claude-client", () => ({
+    vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",
@@ -85,7 +85,7 @@ describe("cmdRecommend --accept indexed selection", () => {
   });
 
   afterEach(async () => {
-    vi.doUnmock("@n-dx/claude-client");
+    vi.doUnmock("@n-dx/llm-client");
     if (tmpDir) {
       await rm(tmpDir, { recursive: true, force: true });
     }

@@ -2,7 +2,7 @@
  * CLI output control — supports --quiet mode for scripting.
  *
  * Core primitives (setQuiet, isQuiet, info, result) are shared from
- * @n-dx/claude-client. Rex-specific extensions (warn, startSpinner)
+ * @n-dx/llm-client. Rex-specific extensions (warn, startSpinner)
  * are defined here and use the shared isQuiet() state.
  *
  * In quiet mode, only essential output is emitted:
@@ -14,9 +14,9 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "@n-dx/claude-client";
+export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
 
-import { isQuiet, info } from "@n-dx/claude-client";
+import { isQuiet, info } from "@n-dx/llm-client";
 
 /**
  * Print warning output. Suppressed in quiet mode.

@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
-    "@n-dx/claude-client": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

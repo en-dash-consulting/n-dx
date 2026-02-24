@@ -11,11 +11,11 @@ import type {
   AuthMode,
   LLMConfig,
   LLMVendor,
-} from "@n-dx/claude-client";
+} from "@n-dx/llm-client";
 import {
   createLLMClient,
   detectLLMAuthMode,
-} from "@n-dx/claude-client";
+} from "@n-dx/llm-client";
 
 export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 export const DEFAULT_CODEX_MODEL = "gpt-5-codex";

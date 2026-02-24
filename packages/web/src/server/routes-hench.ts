@@ -25,7 +25,7 @@ import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, type ManagedChild } from "@n-dx/claude-client";
+import { spawnManaged, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";

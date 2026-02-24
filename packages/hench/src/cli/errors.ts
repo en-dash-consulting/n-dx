@@ -1,13 +1,13 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
  *
- * Hench's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * Hench's CLIError extends the foundation CLIError from @n-dx/llm-client,
  * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/claude-client";
+import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/llm-client";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
@@ -111,7 +111,7 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
  */
 export function formatCLIError(err: unknown): string {
   // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
-  // (which extends foundation CLIError from @n-dx/claude-client)
+  // (which extends foundation CLIError from @n-dx/llm-client)
   if (err instanceof BaseCLIError) {
     let msg = `Error: ${err.message}`;
     if (err.suggestion) {

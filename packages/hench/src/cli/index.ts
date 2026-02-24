@@ -24,7 +24,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/claude-client";
+import { formatTypoSuggestion } from "@n-dx/llm-client";
 
 function parseArgs(argv: string[]): {
   command: string | undefined;

@@ -7,7 +7,7 @@ import { initConfig } from "../../../src/store/config.js";
 
 /**
  * Tests that the API agentLoop correctly handles authentication configuration:
- * - Uses API key from .n-dx.json (via @n-dx/claude-client)
+ * - Uses API key from .n-dx.json (via @n-dx/llm-client)
  * - Passes custom api_endpoint as baseURL to Anthropic client
  * - Uses model override from .n-dx.json
  */
@@ -328,7 +328,7 @@ describe("CLI loop claude-client integration", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("resolves cli_path from .n-dx.json via @n-dx/claude-client", async () => {
+  it("resolves cli_path from .n-dx.json via @n-dx/llm-client", async () => {
     await writeFile(
       join(projectDir, ".n-dx.json"),
       JSON.stringify({

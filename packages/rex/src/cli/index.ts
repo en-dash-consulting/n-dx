@@ -6,7 +6,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/claude-client";
+import { formatTypoSuggestion } from "@n-dx/llm-client";
 
 /**
  * Read all data from stdin when input is piped (not a TTY).

@@ -20,7 +20,7 @@ export interface ExecShellOptions {
  * to avoid duplicating the exec / output-formatting / timeout-guard
  * boilerplate.
  *
- * Uses the foundation exec abstraction from @n-dx/claude-client under
+ * Uses the foundation exec abstraction from @n-dx/llm-client under
  * the hood, adding hench-specific output formatting on top.
  */
 export async function execShell(opts: ExecShellOptions): Promise<string> {

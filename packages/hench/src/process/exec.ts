@@ -2,7 +2,7 @@
  * Centralized process execution abstraction.
  *
  * All child-process spawning within hench routes through this module.
- * The actual implementation lives in @n-dx/claude-client (foundation layer);
+ * The actual implementation lives in @n-dx/llm-client (foundation layer);
  * this file re-exports those helpers so existing hench consumers continue
  * to import from their familiar `../process/exec.js` path.
  *
@@ -20,7 +20,7 @@ export {
   spawnManaged,
   ProcessPool,
   ProcessLimitError,
-} from "@n-dx/claude-client";
+} from "@n-dx/llm-client";
 
 export type {
   ExecResult,
@@ -28,4 +28,4 @@ export type {
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
-} from "@n-dx/claude-client";
+} from "@n-dx/llm-client";

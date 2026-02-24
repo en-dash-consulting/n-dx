@@ -18,7 +18,7 @@
  *        ↓
  *   Domain          rex · sourcevision      (independent, never import each other)
  *        ↓
- *   Foundation      @n-dx/claude-client     (shared types, API client)
+ *   Foundation      @n-dx/llm-client     (shared types, API client)
  * ```
  *
  * ## Coupling strategy — filesystem-first, gateway-gated

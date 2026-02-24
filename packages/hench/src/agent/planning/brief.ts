@@ -16,7 +16,7 @@ import type {
   TaskBriefLogEntry,
   TaskBriefRequirement,
 } from "../../schema/index.js";
-import { CLIError } from "@n-dx/claude-client";
+import { CLIError } from "@n-dx/llm-client";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */

@@ -6,14 +6,14 @@
  *   - Relevant flags only (not the full global options list)
  *   - 2–3 practical examples
  *
- * Uses the shared formatHelp() from @n-dx/claude-client for consistent
+ * Uses the shared formatHelp() from @n-dx/llm-client for consistent
  * presentation with semantic color coding across all n-dx packages.
  *
  * @module rex/cli/help
  */
 
-import { formatHelp } from "@n-dx/claude-client";
-import type { HelpDefinition } from "@n-dx/claude-client";
+import { formatHelp } from "@n-dx/llm-client";
+import type { HelpDefinition } from "@n-dx/llm-client";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {

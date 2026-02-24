@@ -147,7 +147,7 @@ export function buildExternalImportEdges(
 ): Array<{ from: string; to: string; weight: number }> {
   // Map package names to zone IDs by finding which zone owns files in that package dir.
   // E.g. "rex" → packages/rex/ → zone whose files start with packages/rex/src/
-  // "@n-dx/claude-client" → packages/claude-client/ → claude-client zone
+  // "@n-dx/llm-client" → packages/claude-client/ → claude-client zone
   const pkgToZone = new Map<string, string>();
 
   // Build directory prefix → zone mapping from zone file lists.

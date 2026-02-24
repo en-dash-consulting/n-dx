@@ -19,7 +19,7 @@
  *
  * ## Architectural isolation
  *
- * Rex depends only on `@n-dx/claude-client` (the shared foundation)
+ * Rex depends only on `@n-dx/llm-client` (the shared foundation)
  * and has **no dependency on hench or sourcevision**. This strict
  * one-way dependency ensures the monorepo's DAG remains acyclic:
  *

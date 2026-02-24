@@ -9,7 +9,7 @@
 
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import type { LogEntry } from "../schema/index.js";
 
 // ---------------------------------------------------------------------------

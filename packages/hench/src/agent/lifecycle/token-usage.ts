@@ -2,9 +2,9 @@ import type { TokenUsage } from "../../schema/index.js";
 import {
   parseApiTokenUsage as parseTokenUsage,
   parseStreamTokenUsage,
-} from "@n-dx/claude-client";
+} from "@n-dx/llm-client";
 
-// Re-export parsing functions from the canonical source (@n-dx/claude-client).
+// Re-export parsing functions from the canonical source (@n-dx/llm-client).
 // `parseTokenUsage` is an alias for `parseApiTokenUsage` — same function,
 // kept here for backward-compatible imports within hench.
 export { parseTokenUsage, parseStreamTokenUsage };

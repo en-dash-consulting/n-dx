@@ -38,7 +38,7 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdtempSync, r
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { exec as foundationExec, spawnManaged, type ManagedChild } from "@n-dx/claude-client";
+import { exec as foundationExec, spawnManaged, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";

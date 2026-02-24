@@ -7,7 +7,7 @@ const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 export default defineConfig({
   resolve: {
     alias: [
-      // Map @n-dx/claude-client to source public.ts for vitest
+      // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },

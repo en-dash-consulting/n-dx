@@ -1,4 +1,4 @@
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import type { GuardConfig, PolicyLimitsConfig } from "../guard/contracts.js";
 
 export const HENCH_SCHEMA_VERSION = "hench/v1";

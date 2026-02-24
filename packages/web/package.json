@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
-    "@n-dx/claude-client": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "preact": "^10.19.0",

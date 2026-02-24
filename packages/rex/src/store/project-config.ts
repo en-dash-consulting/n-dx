@@ -2,7 +2,7 @@
  * Project-level configuration loading for rex.
  *
  * Core utilities (deepMerge, loadProjectOverrides, mergeWithOverrides) are
- * shared from @n-dx/claude-client. This module re-exports them and adds
+ * shared from @n-dx/llm-client. This module re-exports them and adds
  * the thin configDir→projectDir adapter for Claude config that rex consumers
  * expect.
  */
@@ -13,20 +13,20 @@ import {
   loadLLMConfig as loadLLMConfigFromDir,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
-} from "@n-dx/claude-client";
-import type { ClaudeConfig, LLMConfig } from "@n-dx/claude-client";
+} from "@n-dx/llm-client";
+import type { ClaudeConfig, LLMConfig } from "@n-dx/llm-client";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
-export type { ClaudeConfig, LLMConfig } from "@n-dx/claude-client";
+export type { ClaudeConfig, LLMConfig } from "@n-dx/llm-client";
 
 // Re-export shared project config utilities — previously duplicated here.
-export { loadProjectOverrides, mergeWithOverrides } from "@n-dx/claude-client";
+export { loadProjectOverrides, mergeWithOverrides } from "@n-dx/llm-client";
 
 /**
  * Load the "claude" section from .n-dx.json.
  * Returns an empty object if the file doesn't exist, is invalid, or has no claude section.
  *
- * Delegates to @n-dx/claude-client's loadClaudeConfig, adapting the rex
+ * Delegates to @n-dx/llm-client's loadClaudeConfig, adapting the rex
  * convention of passing a configDir (e.g., /project/.rex) instead of the
  * project root directory.
  *
