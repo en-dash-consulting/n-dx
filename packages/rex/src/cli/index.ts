@@ -128,7 +128,7 @@ async function main(): Promise<void> {
     // init creates it; analyze handles its own graceful fallback.
     // Commands whose first positional arg is an ID (not a dir) must handle
     // their own dir resolution and requireRexDir check inside the case block.
-    const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move", "add", "reshape"]);
+    const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move", "add", "reshape", "remove"]);
     if (!SKIP_DIR_CHECK.has(command)) {
       requireRexDir(resolveDir());
     }
@@ -248,6 +248,42 @@ async function main(): Promise<void> {
         await cmdMove(dir, id, flags);
         break;
       }
+      case "remove": {
+        const REMOVABLE_LEVELS = new Set(["epic", "task"]);
+        const firstArg = positional[0];
+        let removeLevel: string | undefined;
+        let removeId: string;
+
+        if (firstArg && REMOVABLE_LEVELS.has(firstArg)) {
+          // rex remove epic <id> [dir]  or  rex remove task <id> [dir]
+          removeLevel = firstArg;
+          removeId = positional[1];
+          if (!removeId) {
+            throw new CLIError(
+              `Missing ${removeLevel} ID.`,
+              `Usage: rex remove ${removeLevel} <id>`,
+            );
+          }
+        } else if (firstArg) {
+          // rex remove <id> [dir]  — auto-detect level
+          removeId = firstArg;
+        } else {
+          throw new CLIError(
+            "Missing item ID.",
+            "Usage: rex remove <epic|task> <id> or rex remove <id>",
+          );
+        }
+
+        const removeDir =
+          positional.length > (removeLevel ? 2 : 1)
+            ? resolve(positional[positional.length - 1])
+            : process.cwd();
+        requireRexDir(removeDir);
+
+        const { cmdRemove } = await import("./commands/remove.js");
+        await cmdRemove(removeDir, removeId, removeLevel, flags);
+        break;
+      }
       case "reshape": {
         const { cmdReshape } = await import("./commands/reshape.js");
         await cmdReshape(resolveDir(), flags);
@@ -325,7 +361,7 @@ async function main(): Promise<void> {
       }
       default: {
         const REX_COMMANDS = [
-          "init", "status", "next", "add", "update", "move", "reshape",
+          "init", "status", "next", "add", "update", "move", "remove", "reshape",
           "prune", "validate", "fix", "sync", "usage", "report", "verify",
           "recommend", "analyze", "import", "adapter", "mcp",
         ];
