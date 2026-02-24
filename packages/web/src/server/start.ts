@@ -432,9 +432,14 @@ export async function startServer(
   const scope = opts.scope;
 
   // ── Dynamic port allocation ───────────────────────────────────────────────
-  // Try the requested port first; fall back to the next available port in
-  // range 3117–3200 if it's already in use.
-  const allocation = await findAvailablePort(port);
+  // Try the requested port first (with retries to handle the TIME_WAIT window
+  // that follows a recent server shutdown), then fall back to the next
+  // available port in range 3117–3200 if the preferred port remains occupied.
+  const allocation = await findAvailablePort(port, undefined, undefined, {
+    maxRetries: 5,
+    retryDelayMs: 100,
+    backoffFactor: 2,
+  });
   const actualPort = allocation.port;
 
   if (!allocation.isOriginal) {

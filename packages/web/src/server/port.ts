@@ -34,6 +34,30 @@ export interface PortAllocationResult {
 }
 
 /**
+ * Options controlling the retry behaviour of {@link checkPortWithRetry}
+ * and the preferred-port phase of {@link findAvailablePort}.
+ */
+export interface PortRetryOptions {
+  /**
+   * Maximum number of retries after the first failure.
+   * @default 5
+   */
+  maxRetries?: number;
+  /**
+   * Initial delay between retries in milliseconds.
+   * Subsequent delays grow by `backoffFactor` (exponential backoff).
+   * @default 100
+   */
+  retryDelayMs?: number;
+  /**
+   * Multiplier applied to the delay after each retry attempt.
+   * A value of `2` doubles the delay each time.
+   * @default 2
+   */
+  backoffFactor?: number;
+}
+
+/**
  * Check if a specific port is available for binding.
  *
  * Uses a two-phase approach:
@@ -73,11 +97,60 @@ export function checkPort(port: number): Promise<PortCheckResult> {
 }
 
 /**
+ * Check if a port is available, retrying on transient failures.
+ *
+ * Wraps {@link checkPort} with a configurable retry loop to handle timing
+ * issues during process transitions.  When a server has just been stopped, its
+ * port may remain in OS TIME_WAIT state for a short period and appear
+ * unavailable even though no process is actively listening.  Retrying with
+ * exponential back-off gives the OS time to release the port without forcing
+ * the caller to fall back to a different port number.
+ *
+ * Retries are skipped immediately for non-transient errors such as `EACCES`
+ * (permission denied), since those require external intervention and will
+ * not resolve on their own.
+ *
+ * @param port  TCP port number to check.
+ * @param opts  Retry configuration.  Defaults suit most startup scenarios.
+ */
+export async function checkPortWithRetry(
+  port: number,
+  opts: PortRetryOptions = {},
+): Promise<PortCheckResult> {
+  const maxRetries = opts.maxRetries ?? 5;
+  const initialDelayMs = opts.retryDelayMs ?? 100;
+  const backoffFactor = opts.backoffFactor ?? 2;
+
+  let result = await checkPort(port);
+  if (result.available) return result;
+
+  // Permission errors won't resolve with retries — fail fast.
+  if (result.error === "EACCES") return result;
+
+  let delay = initialDelayMs;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    await new Promise<void>((r) => setTimeout(r, delay));
+    result = await checkPort(port);
+    if (result.available) return result;
+    // Stop retrying if we hit a non-transient error.
+    if (result.error === "EACCES") return result;
+    delay = Math.round(delay * backoffFactor);
+  }
+
+  return result;
+}
+
+/**
  * Find the next available port in a range.
  *
- * Tries the `preferred` port first, then scans sequentially from
- * `rangeStart` to `rangeEnd` (inclusive). Skips the preferred port
- * during the scan since it was already tried.
+ * Tries the `preferred` port first (with optional retries to handle transient
+ * unavailability during process transitions), then scans sequentially from
+ * `rangeStart` to `rangeEnd` (inclusive). Skips the preferred port during the
+ * scan since it was already tried.
+ *
+ * Pass `retryOpts` to give the preferred port several retry attempts before
+ * falling back to the range scan.  This is useful when the preferred port was
+ * just released by a recently stopped server (TIME_WAIT state).
  *
  * @throws {Error} If no port is available in the entire range.
  */
@@ -85,9 +158,12 @@ export async function findAvailablePort(
   preferred: number,
   rangeStart: number = PORT_RANGE_START,
   rangeEnd: number = PORT_RANGE_END,
+  retryOpts?: PortRetryOptions,
 ): Promise<PortAllocationResult> {
-  // Try the preferred port first
-  const check = await checkPort(preferred);
+  // Try the preferred port first (with retries if opts provided)
+  const check = retryOpts !== undefined
+    ? await checkPortWithRetry(preferred, retryOpts)
+    : await checkPort(preferred);
 
   if (check.available) {
     return { port: preferred, isOriginal: true, requestedPort: preferred };
