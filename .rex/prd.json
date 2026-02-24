@@ -13381,7 +13381,7 @@
             {
               "id": "6de57b7c-db77-450a-98d3-ca0fe66e0621",
               "title": "Analyze signal handling and termination procedures across all packages",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Review current SIGINT, SIGTERM, and other signal handling implementations across web, hench, rex, and sourcevision packages",
               "acceptanceCriteria": [
@@ -13394,7 +13394,18 @@
                 "investigation",
                 "signals"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T07:14:18.194Z",
+              "children": [
+                {
+                  "id": "ead56978-df3b-4c2b-b409-2ec91a69f222",
+                  "title": "Fix GAP-1: export shutdownRexExecution from routes-rex.ts and wire into start.ts gracefulShutdown",
+                  "status": "pending",
+                  "level": "subtask",
+                  "priority": "high"
+                }
+              ],
+              "completedAt": "2026-02-24T07:18:14.193Z"
             }
           ]
         },
@@ -13517,6 +13528,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-24T06:49:55.082Z",
+              "completedAt": "2026-02-24T07:03:27.822Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -13526,15 +13538,14 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-24T06:03:02.905Z"
-              },
-              "completedAt": "2026-02-24T07:03:27.822Z"
+              }
             },
             {
               "id": "6192cf7b-0582-40e6-9136-856894ce453c",
               "title": "Implement robust port availability checking with retry logic",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Add comprehensive port availability verification with retry mechanisms to handle timing issues during process cleanup and restart",
+              "description": "Implemented robust port availability checking with retry logic (commit d955530). Added checkPortWithRetry() to packages/web/src/server/port.ts with configurable exponential backoff (maxRetries, retryDelayMs, backoffFactor). Updated findAvailablePort() to accept optional retryOpts parameter (backward compatible). Wired retry options into startServer() in start.ts (maxRetries=5, retryDelayMs=100, backoffFactor=2) so recently stopped server ports get up to ~3s to clear before fallback. Exported new API from server/index.ts and public.ts. Added 6 new tests covering: immediate success, retry-and-succeed on port release, exhausted retries, maxRetries=0 edge case, findAvailablePort with retryOpts recovering preferred port, and fallback after exhausted retries. All 15 port tests pass. Pre-existing failures noted: sidebar.test.ts (localStorage mock env issue) and routes-hench.ts TS error (killWithFallback import) are both pre-existing.",
               "acceptanceCriteria": [
                 "Port availability is verified before attempting to bind",
                 "Retry logic handles timing issues during process transitions",
@@ -13546,7 +13557,9 @@
                 "retry",
                 "availability"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T07:04:57.845Z",
+              "completedAt": "2026-02-24T07:13:38.885Z"
             },
             {
               "id": "64720ae2-dae3-4a2c-b4b8-34d743d7f720",
