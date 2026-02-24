@@ -13957,7 +13957,7 @@
     {
       "id": "0344cef0-f17f-47ed-a52b-b6ba601f983e",
       "title": "Web UI Memory Management and Crash Resolution",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -14135,10 +14135,12 @@
         {
           "id": "8786c4b2-2eaf-4cfb-af07-8d4e60509916",
           "title": "Crash Recovery and User Experience",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Implement crash detection, recovery mechanisms, and improved user experience during memory-related issues",
           "source": "smart-add",
+          "startedAt": "2026-02-24T20:25:22.995Z",
+          "completedAt": "2026-02-24T20:25:22.995Z",
           "children": [
             {
               "id": "9e7f4093-d2f7-4591-bfb3-6f4c00468255",
@@ -14197,7 +14199,7 @@
             {
               "id": "9b6da46d-6f39-4c8b-b59d-f978a2c3aeed",
               "title": "Implement memory-aware refresh throttling and queuing",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add intelligent refresh scheduling that considers current memory usage and queues or delays refresh operations when memory pressure is high",
               "acceptanceCriteria": [
@@ -14212,11 +14214,15 @@
                 "refresh",
                 "memory"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-24T20:16:04.155Z",
+              "completedAt": "2026-02-24T20:25:22.893Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-02-24T20:25:23.092Z",
+      "completedAt": "2026-02-24T20:25:23.092Z"
     }
   ]
 }
