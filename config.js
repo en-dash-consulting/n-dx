@@ -432,7 +432,13 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
     const stdout = typeof err?.stdout === "string"
       ? err.stdout
       : Buffer.isBuffer(err?.stdout) ? err.stdout.toString("utf-8") : "";
-    const detail = (stderr || stdout || err?.message || "unknown error").trim();
+    const combined = stderr || stdout || err?.message || "";
+    // Claude Code refuses to run nested inside another Claude Code session.
+    // This error means the binary is present and the user is authenticated.
+    if (combined.includes("cannot be launched inside another Claude Code session")) {
+      return { ok: true, binary, args };
+    }
+    const detail = combined.trim() || "unknown error";
     return { ok: false, binary, args, detail };
   }
 }
