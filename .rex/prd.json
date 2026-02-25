@@ -14168,6 +14168,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-25T05:14:47.909Z",
+      "completedAt": "2026-02-25T05:14:47.909Z",
       "children": [
         {
           "id": "1d377d59-dd17-4914-886f-0c24fb36950e",
@@ -14348,9 +14350,269 @@
         "matchedItemLevel": "epic",
         "matchedItemStatus": "completed",
         "createdAt": "2026-02-25T03:25:22.943Z"
-      },
-      "startedAt": "2026-02-25T05:14:47.909Z",
-      "completedAt": "2026-02-25T05:14:47.909Z"
+      }
+    },
+    {
+      "id": "1d50fba3-561b-4901-aaec-91b76a0e0580",
+      "title": "Enhanced Rex Recommend Selective PRD Creation",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "a251427e-a782-4ec2-86f3-85e3cf42df72",
+          "title": "Extended Selector Syntax Parsing",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the existing equals-prefixed index selector to support comma-separated lists and period wildcard for all items",
+          "source": "smart-add",
+          "startedAt": "2026-02-25T15:28:31.160Z",
+          "completedAt": "2026-02-25T15:28:31.160Z",
+          "children": [
+            {
+              "id": "3a435965-821f-4604-b120-c708ae290fb9",
+              "title": "Implement comma-separated index list parsing for recommend --accept",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend the existing `=index` syntax to support `=1,3,5` format for selecting multiple specific recommendations by index",
+              "acceptanceCriteria": [
+                "Parses `--accept=1,3,5` to select recommendations at indices 1, 3, and 5",
+                "Validates all indices are within bounds of available recommendations",
+                "Returns meaningful error for invalid index formats or out-of-range indices"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "parsing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T15:19:01.096Z",
+              "completedAt": "2026-02-25T15:22:32.274Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:5842771b-a09a-4c03-969b-87d4d8be4ad0",
+                "matchedItemId": "5842771b-a09a-4c03-969b-87d4d8be4ad0",
+                "matchedItemTitle": "Implement equals-prefixed index selector parsing for `recommend --accept`",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T14:55:39.403Z"
+              }
+            },
+            {
+              "id": "962251f0-fe07-4e26-a043-25469341d9ca",
+              "title": "Implement period wildcard syntax for accepting all recommendations",
+              "status": "completed",
+              "level": "task",
+              "description": "Add support for `=.` syntax to accept all available recommendations at once without listing individual indices",
+              "acceptanceCriteria": [
+                "Parses `--accept=.` to select all available recommendations",
+                "Works correctly when no recommendations are available (no-op behavior)",
+                "Provides clear confirmation message showing total count of selected items"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "parsing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T15:22:56.815Z",
+              "completedAt": "2026-02-25T15:28:31.037Z"
+            }
+          ]
+        },
+        {
+          "id": "716780a3-1db0-47c2-9725-5bf9bd8363c1",
+          "title": "PRD Creation Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement the actual PRD creation workflow for selected recommendations, going beyond the existing acknowledge functionality",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "842e10e1-1226-426a-82d1-c7f8d34ccfb7",
+              "title": "Implement selective PRD creation from selected recommendations",
+              "status": "completed",
+              "level": "task",
+              "description": "Create PRD items from the selected recommendations using the existing rex add pipeline, replacing the acknowledge-only behavior",
+              "acceptanceCriteria": [
+                "Creates actual PRD items (epics/features/tasks) from selected recommendations",
+                "Uses existing rex add validation and creation logic",
+                "Preserves recommendation metadata and quality scores in created items",
+                "Updates PRD state atomically to prevent partial creation on errors"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "creation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T14:55:54.385Z",
+              "completedAt": "2026-02-25T15:08:42.480Z"
+            },
+            {
+              "id": "e64950a9-5bf3-4de9-9342-18caccd5c341",
+              "title": "Add creation confirmation and summary output",
+              "status": "pending",
+              "level": "task",
+              "description": "Provide clear feedback showing which recommendations were selected and successfully created as PRD items",
+              "acceptanceCriteria": [
+                "Shows summary of selected recommendations before creation",
+                "Displays creation results with success/failure status per item",
+                "Includes PRD item IDs and hierarchy placement for created items",
+                "Shows total count of created vs selected items"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:49e08812-0d9b-457c-bad3-0ffb680460de",
+            "matchedItemId": "49e08812-0d9b-457c-bad3-0ffb680460de",
+            "matchedItemTitle": "Rex completion data integration",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-25T14:55:39.403Z"
+          }
+        },
+        {
+          "id": "bd9043b5-1958-4bc7-85e3-f6e3265a9384",
+          "title": "Enhanced Validation and Error Handling",
+          "status": "pending",
+          "level": "feature",
+          "description": "Robust validation for the extended selector syntax and PRD creation workflow",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "e348ff22-c578-47ce-bc01-4614e035adad",
+              "title": "Implement comprehensive selector validation with detailed error messages",
+              "status": "completed",
+              "level": "task",
+              "description": "Validate selector format, index bounds, and recommendation availability with actionable error messages",
+              "acceptanceCriteria": [
+                "Validates selector format matches expected patterns (=index, =1,3,5, or =.)",
+                "Checks all specified indices exist in current recommendations",
+                "Provides specific error messages for malformed selectors with correction hints",
+                "Handles edge cases like empty recommendation lists gracefully"
+              ],
+              "priority": "high",
+              "tags": [
+                "validation",
+                "error-handling"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T15:28:31.316Z",
+              "completedAt": "2026-02-25T15:36:40.617Z"
+            },
+            {
+              "id": "735a60c9-85c0-463a-837e-58e93367e0c3",
+              "title": "Add PRD creation conflict detection and resolution",
+              "status": "pending",
+              "level": "task",
+              "description": "Detect and handle conflicts when selected recommendations would create duplicate or conflicting PRD items",
+              "acceptanceCriteria": [
+                "Detects duplicate PRD items that would be created from recommendations",
+                "Provides merge options for conflicting recommendations",
+                "Allows user to skip conflicting items and proceed with non-conflicting ones",
+                "Maintains PRD consistency when handling partial creation scenarios"
+              ],
+              "priority": "medium",
+              "tags": [
+                "conflict-resolution",
+                "prd"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:979b4a53-459b-43e7-98fc-94723f88698f",
+                "matchedItemId": "979b4a53-459b-43e7-98fc-94723f88698f",
+                "matchedItemTitle": "Add pre-refresh process conflict detection and resolution",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T14:55:39.403Z"
+              }
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:4b2f9165-0f17-4060-b439-41e7ee7c4c33",
+            "matchedItemId": "4b2f9165-0f17-4060-b439-41e7ee7c4c33",
+            "matchedItemTitle": "Improve CLI error handling and validation",
+            "matchedItemLevel": "task",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-25T14:55:39.403Z"
+          }
+        },
+        {
+          "id": "bc2e4c15-7544-4464-8330-2c073ef3ec4d",
+          "title": "Documentation and Testing",
+          "status": "pending",
+          "level": "feature",
+          "description": "Comprehensive documentation and test coverage for the enhanced recommendation acceptance workflow",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "96413554-abbc-4ea0-afe6-4f66a5ba3cb0",
+              "title": "Update CLI help and documentation for enhanced recommend --accept syntax",
+              "status": "pending",
+              "level": "task",
+              "description": "Document the new selector syntax options and provide clear usage examples for selective PRD creation",
+              "acceptanceCriteria": [
+                "Updates `rex recommend --help` with new selector syntax examples",
+                "Documents difference between acknowledge and accept workflows",
+                "Includes examples for single index, comma-separated, and wildcard selectors",
+                "Explains PRD creation behavior vs acknowledgment-only behavior"
+              ],
+              "priority": "medium",
+              "tags": [
+                "documentation",
+                "help"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "d69a37f4-275c-4f4c-b7d8-a4e5011c8d69",
+              "title": "Add comprehensive test coverage for enhanced recommend acceptance",
+              "status": "completed",
+              "level": "task",
+              "description": "Test all selector syntax variations, PRD creation workflows, and error scenarios to ensure robustness",
+              "acceptanceCriteria": [
+                "Tests comma-separated index parsing and validation",
+                "Tests period wildcard syntax and edge cases",
+                "Tests PRD creation from selected recommendations",
+                "Tests conflict detection and resolution workflows",
+                "Tests error handling for malformed selectors and invalid indices"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "quality-assurance"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T15:08:42.685Z",
+              "completedAt": "2026-02-25T15:18:41.417Z"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:c2b3377b-5830-4bd3-99f5-992d50e50fcc",
+            "matchedItemId": "c2b3377b-5830-4bd3-99f5-992d50e50fcc",
+            "matchedItemTitle": "Documentation and Help Updates",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-25T14:55:39.403Z"
+          }
+        }
+      ]
     }
   ]
 }

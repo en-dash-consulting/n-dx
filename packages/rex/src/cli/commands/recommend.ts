@@ -42,17 +42,80 @@ function selectorFormatError(detail: string): Error {
   return new Error(`${detail}\nExample: rex recommend --accept='=1,4,5' .`);
 }
 
+/**
+ * Suggest a correction for a selector missing the '=' prefix.
+ * Returns empty string if no suggestion can be inferred.
+ */
+function suggestSelectorFix(raw: string): string {
+  if (/^\d[\d,\s]*$/.test(raw)) {
+    const cleaned = raw.replace(/\s+/g, ",").replace(/,+/g, ",").replace(/(^,|,$)/g, "");
+    return `\nDid you mean '--accept==${cleaned}'?`;
+  }
+  return "";
+}
+
+/**
+ * Detect range syntax like "1-3" in a token and throw with an expansion hint.
+ * Returns without throwing if the token is not a range.
+ */
+function checkRangeSyntax(token: string, context: "full" | "token"): void {
+  if (!/^\d+-\d+$/.test(token)) return;
+
+  const [s, e] = token.split("-").map(Number);
+  if (s > e) {
+    throw selectorFormatError(
+      `Invalid range '${token}' (start must be ≤ end). Use comma-separated indices like '=1,4,5'.`,
+    );
+  }
+  const count = e - s + 1;
+  if (count <= 20) {
+    const expanded = Array.from({ length: count }, (_, i) => s + i).join(",");
+    const hint = context === "full"
+      ? `Did you mean '=${expanded}'?`
+      : `Replace '${token}' with '${expanded}'.`;
+    throw selectorFormatError(
+      `Range syntax '${token}' is not supported. Use comma-separated indices instead.\n${hint}`,
+    );
+  }
+  throw selectorFormatError(
+    `Range syntax '${token}' is not supported. Use comma-separated indices like '=1,2,3' or '=all' for all.`,
+  );
+}
+
 export function parseSelectionIndices(input: string, total: number): number[] {
   const raw = input.trim();
   if (!raw.startsWith("=")) {
-    throw selectorFormatError("Invalid --accept selector format. Expected '=N[,M,...]'.");
+    const hint = suggestSelectorFix(raw);
+    throw selectorFormatError(
+      `Invalid --accept selector format. Expected '=N[,M,...]'.${hint}`,
+    );
   }
 
   const normalized = raw.slice(1).trim();
   if (!normalized) {
     throw selectorFormatError("Invalid --accept selector format. Expected one or more indices after '='.");
   }
-  if (normalized === "all" || normalized === ".") return [];
+
+  // Wildcard patterns (case-insensitive for "all")
+  if (normalized.toLowerCase() === "all" || normalized === ".") return [];
+
+  // Detect near-misspellings of "all" (e.g., "al", "alll", "aall")
+  if (/^a{1,2}l{1,3}$/i.test(normalized)) {
+    throw selectorFormatError(
+      `Unknown selector keyword '${normalized}'. Did you mean '=all'?`,
+    );
+  }
+
+  // No recommendations to select from
+  if (total === 0) {
+    throw new Error(
+      "No recommendations available to select from. " +
+      "Run 'rex recommend' without --accept to see current recommendations.",
+    );
+  }
+
+  // Detect range syntax (e.g., "1-3") before splitting
+  checkRangeSyntax(normalized, "full");
 
   const values = normalized
     .split(/[\s,]+/)
@@ -65,6 +128,9 @@ export function parseSelectionIndices(input: string, total: number): number[] {
 
   const selected = new Set<number>();
   for (const value of values) {
+    // Detect range within a multi-token context (e.g., "1,2-4,5")
+    checkRangeSyntax(value, "token");
+
     if (!/^\d+$/.test(value)) {
       throw selectorFormatError(
         `Invalid --accept selector token '${value}'. Expected numeric indices like '=1,4,5'.`,
@@ -72,8 +138,11 @@ export function parseSelectionIndices(input: string, total: number): number[] {
     }
     const parsed = Number.parseInt(value, 10);
     if (parsed < 1 || parsed > total) {
+      const hint = total === 1
+        ? " Only 1 recommendation is available (use '=1')."
+        : ` Available indices: 1–${total}.`;
       throw new Error(
-        `Invalid --accept selector index ${parsed}. Index must be between 1 and ${total}.`,
+        `Invalid --accept selector index ${parsed}. Index must be between 1 and ${total}.${hint}`,
       );
     }
     selected.add(parsed - 1);
@@ -277,12 +346,14 @@ export async function cmdRecommend(
     const acceptFlag = flags.accept.trim();
     const usesSelectorMode = acceptFlag !== "true";
     if (usesSelectorMode && !acceptFlag.startsWith("=")) {
+      const hint = suggestSelectorFix(acceptFlag);
       throw selectorFormatError(
-        "Invalid --accept selector format. Expected '=N[,M,...]' when passing a selector.",
+        `Invalid --accept selector format. Expected '=N[,M,...]' when passing a selector.${hint}`,
       );
     }
 
-    const isWildcard = acceptFlag === "=all" || acceptFlag === "=.";
+    const lowerFlag = acceptFlag.toLowerCase();
+    const isWildcard = lowerFlag === "=all" || acceptFlag === "=.";
     const selectedIndices = usesSelectorMode
       ? (isWildcard ? null : parseSelectionIndices(acceptFlag, recommendations.length))
       : null;
@@ -291,7 +362,9 @@ export async function cmdRecommend(
       : selectedIndices.map((i) => recommendations[i]).filter(Boolean);
 
     if (acceptedRecommendations.length === 0) {
-      info("No recommendations matched the selected indices.");
+      info(selectedIndices !== null
+        ? "No recommendations matched the selected indices."
+        : "No recommendations available to accept.");
       return;
     }
 

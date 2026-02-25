@@ -500,5 +500,190 @@ describe("cmdRecommend --accept indexed selection", () => {
         /Example: rex recommend --accept='=1,4,5'/,
       );
     });
+
+    // ── Correction hints ─────────────────────────────────────────────
+
+    it("suggests corrected form when = prefix is missing and input looks like indices", () => {
+      expect(() => parseSelectionIndices("1,3,5", 5)).toThrowError(
+        /Did you mean '--accept==1,3,5'/,
+      );
+    });
+
+    it("suggests corrected form with cleaned whitespace", () => {
+      expect(() => parseSelectionIndices("1 3 5", 5)).toThrowError(
+        /Did you mean '--accept==1,3,5'/,
+      );
+    });
+
+    it("does not suggest correction for non-numeric missing-prefix input", () => {
+      try {
+        parseSelectionIndices("abc", 5);
+      } catch (err) {
+        expect((err as Error).message).not.toContain("Did you mean");
+        expect((err as Error).message).toContain("Invalid --accept selector format");
+      }
+    });
+
+    // ── Case-insensitive =all ────────────────────────────────────────
+
+    it("accepts =ALL (uppercase) as wildcard", () => {
+      expect(parseSelectionIndices("=ALL", 5)).toEqual([]);
+    });
+
+    it("accepts =All (mixed case) as wildcard", () => {
+      expect(parseSelectionIndices("=All", 5)).toEqual([]);
+    });
+
+    it("accepts =aLl (mixed case) as wildcard", () => {
+      expect(parseSelectionIndices("=aLl", 5)).toEqual([]);
+    });
+
+    // ── Near-misspelling detection ──────────────────────────────────
+
+    it("detects 'al' as near-misspelling of 'all' and suggests correction", () => {
+      expect(() => parseSelectionIndices("=al", 5)).toThrowError(
+        /Did you mean '=all'/,
+      );
+    });
+
+    it("detects 'alll' as near-misspelling of 'all' and suggests correction", () => {
+      expect(() => parseSelectionIndices("=alll", 5)).toThrowError(
+        /Did you mean '=all'/,
+      );
+    });
+
+    it("detects 'aall' as near-misspelling of 'all' and suggests correction", () => {
+      expect(() => parseSelectionIndices("=aall", 5)).toThrowError(
+        /Did you mean '=all'/,
+      );
+    });
+
+    it("detects 'AL' as near-misspelling of 'all' and suggests correction", () => {
+      expect(() => parseSelectionIndices("=AL", 5)).toThrowError(
+        /Did you mean '=all'/,
+      );
+    });
+
+    it("includes the misspelled keyword in the error", () => {
+      expect(() => parseSelectionIndices("=alll", 5)).toThrowError(
+        /Unknown selector keyword 'alll'/,
+      );
+    });
+
+    // ── Empty recommendation list (total=0) ─────────────────────────
+
+    it("throws specific error when total is 0 with index selector", () => {
+      expect(() => parseSelectionIndices("=1", 0)).toThrowError(
+        /No recommendations available to select from/,
+      );
+    });
+
+    it("does not mention 'between 1 and 0' when total is 0", () => {
+      try {
+        parseSelectionIndices("=1", 0);
+      } catch (err) {
+        expect((err as Error).message).not.toContain("between 1 and 0");
+      }
+    });
+
+    it("suggests running without --accept when total is 0", () => {
+      expect(() => parseSelectionIndices("=1", 0)).toThrowError(
+        /Run 'rex recommend' without --accept/,
+      );
+    });
+
+    it("wildcards still work with total=0 (=all)", () => {
+      expect(parseSelectionIndices("=all", 0)).toEqual([]);
+    });
+
+    it("wildcards still work with total=0 (=.)", () => {
+      expect(parseSelectionIndices("=.", 0)).toEqual([]);
+    });
+
+    // ── Range syntax detection ──────────────────────────────────────
+
+    it("detects range syntax '=1-3' and suggests expansion", () => {
+      expect(() => parseSelectionIndices("=1-3", 5)).toThrowError(
+        /Range syntax '1-3' is not supported/,
+      );
+    });
+
+    it("suggests comma-separated expansion for range", () => {
+      expect(() => parseSelectionIndices("=1-3", 5)).toThrowError(
+        /Did you mean '=1,2,3'/,
+      );
+    });
+
+    it("detects range syntax in multi-token context", () => {
+      expect(() => parseSelectionIndices("=1,2-4,5", 5)).toThrowError(
+        /Range syntax '2-4' is not supported/,
+      );
+    });
+
+    it("suggests replacement for range in multi-token context", () => {
+      expect(() => parseSelectionIndices("=1,2-4,5", 5)).toThrowError(
+        /Replace '2-4' with '2,3,4'/,
+      );
+    });
+
+    it("detects reversed range and explains the constraint", () => {
+      expect(() => parseSelectionIndices("=5-1", 5)).toThrowError(
+        /start must be ≤ end/,
+      );
+    });
+
+    it("handles large range without expansion", () => {
+      expect(() => parseSelectionIndices("=1-25", 30)).toThrowError(
+        /Range syntax '1-25' is not supported.*=all/s,
+      );
+    });
+
+    // ── Out-of-range with available indices hint ─────────────────────
+
+    it("includes available indices hint when total > 1", () => {
+      expect(() => parseSelectionIndices("=10", 5)).toThrowError(
+        /Available indices: 1–5/,
+      );
+    });
+
+    it("includes single-recommendation hint when total = 1", () => {
+      expect(() => parseSelectionIndices("=5", 1)).toThrowError(
+        /Only 1 recommendation is available \(use '=1'\)/,
+      );
+    });
+  });
+
+  // ── cmdRecommend edge cases ──────────────────────────────────────────
+
+  describe("cmdRecommend accept edge cases", () => {
+    it("accepts =ALL (uppercase) via cmdRecommend", async () => {
+      await cmdRecommend(tmpDir, { accept: "=ALL" });
+
+      const items = await readPrdItems(tmpDir);
+      expect(items).toHaveLength(3);
+    });
+
+    it("provides correction hint when = prefix missing and input looks like indices", async () => {
+      await expect(cmdRecommend(tmpDir, { accept: "1,3" })).rejects.toThrowError(
+        /Did you mean '--accept==1,3'/,
+      );
+    });
+
+    it("handles empty findings list with accept flag gracefully", async () => {
+      await writeFindings(tmpDir, []);
+
+      // Should return early with no error
+      await cmdRecommend(tmpDir, { accept: "true" });
+      const items = await readPrdItems(tmpDir);
+      expect(items).toHaveLength(0);
+    });
+
+    it("handles empty findings list with =. wildcard gracefully", async () => {
+      await writeFindings(tmpDir, []);
+
+      await cmdRecommend(tmpDir, { accept: "=." });
+      const items = await readPrdItems(tmpDir);
+      expect(items).toHaveLength(0);
+    });
   });
 });
