@@ -4,14 +4,9 @@
   gap: 12px;
 }
 
-.pr-markdown-refreshed-at {
-  margin-top: -4px;
-}
-
 .pr-markdown-empty,
 .pr-markdown-success,
-.pr-markdown-warning,
-.pr-markdown-refresh-error {
+.pr-markdown-warning {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -21,70 +16,9 @@
   border-left: 3px solid var(--orange);
 }
 
-.pr-markdown-degraded-banner {
-  border-left-width: 4px;
-}
-
-.pr-markdown-refresh-error {
-  border-left: 3px solid var(--red);
-}
-
 .pr-markdown-warning-meta {
   font-family: var(--mono);
   font-size: 12px;
-}
-
-.pr-markdown-diagnostics {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pr-markdown-diagnostic-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pr-markdown-diagnostic-code {
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.pr-markdown-diagnostic-message {
-  margin: 0;
-}
-
-.pr-markdown-diagnostic-hints {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.pr-markdown-failure-details {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 2px 0;
-}
-
-.pr-markdown-failure-details-heading,
-.pr-markdown-failure-command {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.pr-markdown-failure-stderr {
-  margin: 0;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--panel2) 85%, black 15%);
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .pr-markdown-mode-toggle {

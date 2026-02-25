@@ -36,9 +36,8 @@ async function flushUi() {
 }
 
 function createFetchMock(state: StatePayload, markdown: string | null = null) {
-  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    const method = init?.method ?? "GET";
     if (url === "/api/sv/pr-markdown/state") {
       return {
         ok: true,
@@ -49,12 +48,6 @@ function createFetchMock(state: StatePayload, markdown: string | null = null) {
       return {
         ok: true,
         json: async () => ({ markdown }),
-      };
-    }
-    if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({ ...state, markdown, ok: true }),
       };
     }
     return {
@@ -92,9 +85,8 @@ describe("PRMarkdownView", () => {
 
     await renderAndWait(root);
 
-    expect(root.textContent).toContain("PR markdown has not been generated yet");
-    expect(root.textContent).toContain("Click Refresh to generate and cache PR markdown.");
-    expect(root.textContent).toContain("Refresh");
+    expect(root.textContent).toContain("No PR markdown available");
+    expect(root.textContent).toContain("sourcevision analyze");
   });
 
   it("shows stale state guidance when cached markdown exceeds threshold", async () => {
@@ -110,7 +102,7 @@ describe("PRMarkdownView", () => {
     await renderAndWait(root);
 
     expect(root.textContent).toContain("Cached PR markdown is stale");
-    expect(root.textContent).toContain("Use Refresh to regenerate");
+    expect(root.textContent).toContain("sourcevision analyze");
   });
 
   it("shows unsupported-state messaging when git is unavailable", async () => {
@@ -249,369 +241,6 @@ describe("PRMarkdownView", () => {
     expect(root.textContent).toContain("network down");
   });
 
-  it("shows refresh error and keeps last successful output visible", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({ signature: "sig-ready", availability: "ready", cacheStatus: "fresh" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown") {
-        return {
-          ok: true,
-          json: async () => ({ markdown: "## Working snapshot" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        throw new Error("refresh command failed");
-      }
-      return {
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-    expect(root.textContent).toContain("Working snapshot");
-
-    await act(async () => {
-      (root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement).click();
-    });
-    await flushUi();
-
-    expect(root.textContent).toContain("Refresh failed");
-    expect(root.textContent).toContain("refresh command failed");
-    expect(root.textContent).toContain("Last successful PR markdown is still shown below.");
-    expect(root.textContent).toContain("Working snapshot");
-  });
-
-  it("shows degraded diagnostics without generic refresh failure copy", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({ signature: "sig-ready", availability: "ready", cacheStatus: "fresh" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown") {
-        return {
-          ok: true,
-          json: async () => ({ markdown: "## Cached summary\n\n- Keep this" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({
-            ok: false,
-            status: "degraded",
-            signature: "sig-degraded",
-            availability: "ready",
-            cacheStatus: "fresh",
-            markdown: "## Cached summary\n\n- Keep this",
-            diagnostics: [{
-              code: "fetch_failed",
-              message: "Failure for fetch_failed",
-              hints: ["Run `git fetch origin main` manually and verify remote connectivity."],
-              guidance: {
-                category: "fetch_retry",
-                summary: "Remote fetch failed. Resolve connectivity/credentials, then retry refresh.",
-                commands: ["git fetch origin main", "sourcevision pr-markdown <project-dir>"],
-              },
-            }],
-          }),
-        };
-      }
-      return {
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-    expect(root.textContent).toContain("Cached summary");
-
-    await act(async () => {
-      (root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement).click();
-    });
-    await flushUi();
-
-    expect(root.textContent).toContain("Refresh diagnostics");
-    expect(root.textContent).toContain("Fetching base branch failed");
-    expect(root.textContent).toContain("Failure for fetch_failed");
-    expect(root.textContent).toContain("Retry guidance: remote fetch");
-    expect(root.textContent).toContain("git fetch origin main");
-    expect(root.textContent).not.toContain("Refresh failed");
-    expect(root.textContent).toContain("Cached summary");
-  });
-
-  it("renders remediation hints in server order when diagnostics are hint-only", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({ signature: "sig-ready", availability: "ready", cacheStatus: "fresh" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown") {
-        return {
-          ok: true,
-          json: async () => ({ markdown: "## Cached summary\n\n- Keep this" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({
-            ok: false,
-            status: "degraded",
-            signature: "sig-degraded",
-            availability: "ready",
-            cacheStatus: "fresh",
-            markdown: "## Cached summary\n\n- Keep this",
-            diagnostics: [{
-              hints: ["First remediation step", "Second remediation step", "Third remediation step"],
-            }],
-          }),
-        };
-      }
-      return {
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-
-    await act(async () => {
-      (root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement).click();
-    });
-    await flushUi();
-
-    const hintItems = Array.from(root.querySelectorAll(".pr-markdown-diagnostic-hints li"))
-      .map((node) => node.textContent);
-    expect(hintItems).toEqual(["First remediation step", "Second remediation step", "Third remediation step"]);
-  });
-
-  it("hides remediation hints list when degraded diagnostics include no hints", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({ signature: "sig-ready", availability: "ready", cacheStatus: "fresh" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown") {
-        return {
-          ok: true,
-          json: async () => ({ markdown: "## Cached summary\n\n- Keep this" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({
-            ok: false,
-            status: "degraded",
-            signature: "sig-degraded",
-            availability: "ready",
-            cacheStatus: "fresh",
-            markdown: "## Cached summary\n\n- Keep this",
-            diagnostics: [{
-              code: "fetch_failed",
-              message: "Failure for fetch_failed",
-            }],
-          }),
-        };
-      }
-      return {
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-
-    await act(async () => {
-      (root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement).click();
-    });
-    await flushUi();
-
-    expect(root.querySelector(".pr-markdown-diagnostic-hints")).toBeNull();
-  });
-
-  it("refreshes markdown only when refresh action is invoked", async () => {
-    let stateSignature = "sig-1";
-    let markdown = "## First";
-    const generatedAt = "2026-02-21T13:04:05.000Z";
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({
-            signature: stateSignature,
-            availability: "ready",
-            generatedAt,
-            cacheStatus: "fresh",
-          }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({
-            signature: stateSignature,
-            availability: "ready",
-            generatedAt,
-            cacheStatus: "fresh",
-            markdown,
-          }),
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({ markdown }),
-      };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-
-    const markdownCallsAfterInitial = fetchMock.mock.calls
-      .filter(([url]) => String(url) === "/api/sv/pr-markdown").length;
-    expect(markdownCallsAfterInitial).toBe(1);
-    expect(root.textContent).toContain("First");
-
-    stateSignature = "sig-2";
-    markdown = "## Second";
-    await flushUi();
-
-    const markdownCallsBeforeManualRefresh = fetchMock.mock.calls
-      .filter(([url]) => String(url) === "/api/sv/pr-markdown").length;
-    expect(markdownCallsBeforeManualRefresh).toBe(1);
-    const refreshCallsBeforeManualRefresh = fetchMock.mock.calls
-      .filter(([url, init]) => String(url) === "/api/sv/pr-markdown/refresh" && (init as RequestInit | undefined)?.method === "POST").length;
-    expect(refreshCallsBeforeManualRefresh).toBe(0);
-    expect(root.textContent).not.toContain("Second");
-
-    await act(async () => {
-      (root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement).click();
-    });
-    await flushUi();
-
-    const refreshCalls = fetchMock.mock.calls
-      .filter(([url, init]) => String(url) === "/api/sv/pr-markdown/refresh" && (init as RequestInit | undefined)?.method === "POST").length;
-    expect(refreshCalls).toBe(1);
-
-    const markdownCallsAfterManualRefresh = fetchMock.mock.calls
-      .filter(([url]) => String(url) === "/api/sv/pr-markdown").length;
-    expect(markdownCallsAfterManualRefresh).toBe(1);
-    expect(root.textContent).toContain("Second");
-    expect(root.textContent).toContain("Last refreshed: Feb 21, 2026, 13:04:05 UTC");
-  });
-
-  it("keeps last refreshed timestamp text stable across remounts", async () => {
-    const generatedAt = "2026-02-21T13:04:05.000Z";
-    const fetchMock = createFetchMock({
-      signature: "sig-stable",
-      availability: "ready",
-      cacheStatus: "fresh",
-      generatedAt,
-    }, "## Snapshot");
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-    const firstText = root.querySelector(".pr-markdown-refreshed-at")?.textContent;
-    expect(firstText).toBe("Last refreshed: Feb 21, 2026, 13:04:05 UTC");
-
-    await act(async () => {
-      render(null, root);
-      render(h(PRMarkdownView, null), root);
-    });
-    await flushUi();
-
-    const secondText = root.querySelector(".pr-markdown-refreshed-at")?.textContent;
-    expect(secondText).toBe(firstText);
-  });
-
-  it("disables refresh button and prevents duplicate clicks while refresh is running", async () => {
-    let resolveRefresh: (() => void) | null = null;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? "GET";
-      if (url === "/api/sv/pr-markdown/state") {
-        return {
-          ok: true,
-          json: async () => ({ signature: "sig-1", availability: "ready", cacheStatus: "fresh" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown") {
-        return {
-          ok: true,
-          json: async () => ({ markdown: "## Initial" }),
-        };
-      }
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        await new Promise<void>((resolve) => { resolveRefresh = resolve; });
-        return {
-          ok: true,
-          json: async () => ({
-            signature: "sig-2",
-            availability: "ready",
-            cacheStatus: "fresh",
-            generatedAt: "2026-02-21T01:00:00.000Z",
-            markdown: "## Updated",
-          }),
-        };
-      }
-      return { ok: false, status: 404, json: async () => ({}) };
-    });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-    await renderAndWait(root);
-    const refreshButton = root.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement;
-    expect(refreshButton.disabled).toBe(false);
-
-    await act(async () => {
-      refreshButton.click();
-    });
-    expect(refreshButton.disabled).toBe(true);
-    expect(refreshButton.textContent).toBe("Refreshing...");
-
-    await act(async () => {
-      refreshButton.click();
-    });
-
-    const refreshCallsWhilePending = fetchMock.mock.calls
-      .filter(([url, reqInit]) => String(url) === "/api/sv/pr-markdown/refresh" && (reqInit as RequestInit | undefined)?.method === "POST").length;
-    expect(refreshCallsWhilePending).toBe(1);
-
-    resolveRefresh?.();
-    await flushUi();
-
-    expect(refreshButton.disabled).toBe(false);
-    expect(root.textContent).toContain("Updated");
-  });
-
   it("does not fetch markdown while availability is unavailable", async () => {
     vi.useFakeTimers();
     const fetchMock = createFetchMock({
@@ -688,5 +317,25 @@ describe("PRMarkdownView", () => {
       .toContain("Clipboard access was blocked by browser permissions.");
     expect(root.querySelector(".pr-markdown-copy-feedback")?.textContent)
       .toContain("Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).");
+  });
+
+  it("does not render a refresh button", async () => {
+    const fetchMock = createFetchMock({ signature: "sig-1", availability: "ready" }, "## Ready");
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await renderAndWait(root);
+
+    expect(root.querySelector(".pr-markdown-refresh-btn")).toBeNull();
+    expect(root.textContent).not.toContain("Refreshing...");
+  });
+
+  it("shows analyze guidance in empty state instead of refresh prompt", async () => {
+    const fetchMock = createFetchMock({ signature: "sig-1", availability: "ready" }, null);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await renderAndWait(root);
+
+    expect(root.textContent).toContain("sourcevision analyze");
+    expect(root.textContent).not.toContain("Click Refresh");
   });
 });

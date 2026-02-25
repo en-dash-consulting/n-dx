@@ -226,43 +226,11 @@ describe("PR Markdown tab parity integration", () => {
     await waitFor(() => document.body.textContent?.includes("Unable to load PR markdown") ?? false);
   });
 
-  it("refreshes displayed PR markdown only after manual refresh action", async () => {
-    let signature = "sig-1";
-    let markdown = "## First";
+  it("does not render a manual refresh button", async () => {
+    await bootViewer("/pr-markdown", createMockApi());
+    await waitFor(() => document.body.textContent?.includes("PR markdown ready") ?? false);
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = (init?.method ?? "GET").toUpperCase();
-      if (url === "/api/config") return jsonResponse({ scope: "sourcevision" });
-      if (url === "/api/project") return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory" });
-      if (url === "/api/status") {
-        return jsonResponse({
-          sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
-          rex: { exists: false, percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
-          hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
-        });
-      }
-      if (url === "/data") return jsonResponse({}, 404);
-      if (url === "/api/sv/pr-markdown/state") return jsonResponse({ signature, availability: "ready" });
-      if (url === "/api/sv/pr-markdown/refresh" && method === "POST") {
-        return jsonResponse({ signature, availability: "ready", markdown, ok: true });
-      }
-      if (url === "/api/sv/pr-markdown") return jsonResponse({ markdown });
-      return jsonResponse({}, 404);
-    }) as unknown as typeof fetch;
-
-    await bootViewer("/pr-markdown", fetchMock);
-    await waitFor(() => document.body.textContent?.includes("First") ?? false);
-
-    signature = "sig-2";
-    markdown = "## Second";
-    await new Promise<void>((resolve) => setTimeout(resolve, 1_200));
-    expect(document.body.textContent).toContain("First");
-    expect(document.body.textContent).not.toContain("Second");
-
-    const refreshButton = document.body.querySelector(".pr-markdown-refresh-btn") as HTMLButtonElement | null;
-    expect(refreshButton).not.toBeNull();
-    refreshButton?.click();
-    await waitFor(() => document.body.textContent?.includes("Second") ?? false);
+    expect(document.body.querySelector(".pr-markdown-refresh-btn")).toBeNull();
+    expect(document.body.textContent).toContain("sourcevision analyze");
   });
 });
