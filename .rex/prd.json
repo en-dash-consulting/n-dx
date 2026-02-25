@@ -9228,17 +9228,6 @@
       ]
     },
     {
-      "id": "ceacf683-5a61-4218-80cf-bc01a56e1d7a",
-      "title": "Address pattern issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- hench-2 behaves like a partial utility zone but its seven back-imports into hench reveal leaky abstractions that stop it from acting as a clean shared library.",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-21T01:56:57.300Z",
-      "completedAt": "2026-02-21T02:02:01.023Z"
-    },
-    {
       "id": "421a6860-70c1-4f5c-879b-da51dc45599a",
       "title": "Selective Recommendation Acceptance Syntax",
       "status": "completed",
@@ -12725,17 +12714,6 @@
           ]
         }
       ]
-    },
-    {
-      "id": "2876cc14-e422-465d-88bd-2c78511d5160",
-      "title": "Address observation issues (5 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Coupling of 0.14 with bidirectional imports to agent core suggests necessary but potentially improvable integration\n- 4 circular dependency chains detected — see imports.json for details\n- Bidirectional coupling: \"agent-security-layer\" ↔ \"autonomous-agent-core\" (3+3 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-mcp-server\" ↔ \"web-shared-utilities\" (5+5 crossings) — consider extracting shared interface\n- Bidirectional imports between hench and hench-2 zones indicate tight coupling that might benefit from consolidation",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-24T05:28:39.133Z",
-      "completedAt": "2026-02-24T05:44:07.765Z"
     },
     {
       "id": "f95ede7e-3b79-4370-9c8b-0174c83ead4c",
