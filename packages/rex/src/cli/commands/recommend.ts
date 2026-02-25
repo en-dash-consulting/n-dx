@@ -368,14 +368,42 @@ export async function cmdRecommend(
       return;
     }
 
-    // Convert to enriched recommendations and create atomically
-    const enriched = acceptedRecommendations.map(toEnrichedRecommendation);
-    const { created } = await createItemsFromRecommendations(store, enriched);
-
-    for (const item of created) {
-      result(`Added: ${item.title} (${item.id})`);
+    // ── Pre-creation summary ────────────────────────────────────────
+    const isSubset = acceptedRecommendations.length < recommendations.length;
+    info(
+      isSubset
+        ? `\nCreating ${acceptedRecommendations.length} of ${recommendations.length} recommendations:\n`
+        : `\nCreating ${acceptedRecommendations.length} recommendation${acceptedRecommendations.length === 1 ? "" : "s"}:\n`,
+    );
+    for (let i = 0; i < acceptedRecommendations.length; i++) {
+      const rec = acceptedRecommendations[i];
+      info(`  ${i + 1}. [${rec.priority}] ${rec.title} (${rec.level})`);
     }
-    result(`\nAccepted ${created.length} recommendation${created.length === 1 ? "" : "s"}.`);
+    info("");
+
+    // ── Create items atomically ─────────────────────────────────────
+    const enriched = acceptedRecommendations.map(toEnrichedRecommendation);
+    let created: Awaited<ReturnType<typeof createItemsFromRecommendations>>["created"];
+    try {
+      ({ created } = await createItemsFromRecommendations(store, enriched));
+    } catch (err) {
+      result(`\n✗ Creation failed: ${(err as Error).message}`);
+      result(`\n  0/${acceptedRecommendations.length} selected recommendation${acceptedRecommendations.length === 1 ? "" : "s"} created.`);
+      throw err;
+    }
+
+    // ── Post-creation results ───────────────────────────────────────
+    result("");
+    for (const item of created) {
+      const placement = item.parentId ? `under ${item.parentId}` : "root";
+      result(`  ✓ ${item.title} → ${item.level} ${item.id} (${placement})`);
+    }
+
+    const total = acceptedRecommendations.length;
+    const createdCount = created.length;
+    result(
+      `\n  ${createdCount}/${total} selected recommendation${total === 1 ? "" : "s"} created.`,
+    );
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
     info("Run with --acknowledge=1,2 to acknowledge specific findings.");

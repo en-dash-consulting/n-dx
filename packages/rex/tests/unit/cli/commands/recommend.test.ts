@@ -687,3 +687,168 @@ describe("cmdRecommend --accept indexed selection", () => {
     });
   });
 });
+
+// ── Creation confirmation and summary output ──────────────────────────────
+
+describe("cmdRecommend --accept creation summary output", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+  let resultCalls: string[];
+  let infoCalls: string[];
+
+  beforeEach(async () => {
+    resultCalls = [];
+    infoCalls = [];
+
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", () => ({
+      PROJECT_DIRS: {
+        REX: ".rex",
+        SOURCEVISION: ".sourcevision",
+      },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: (...args: unknown[]) => { resultCalls.push(args.map(String).join(" ")); },
+      info: (...args: unknown[]) => { infoCalls.push(args.map(String).join(" ")); },
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-summary-"));
+    await writeFixtureProject(tmpDir);
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("@n-dx/llm-client");
+    if (tmpDir) {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  // ── Pre-creation summary ─────────────────────────────────────────────
+
+  it("shows pre-creation summary listing selected recommendations", async () => {
+    await cmdRecommend(tmpDir, { accept: "=1,3" });
+
+    const summaryHeader = infoCalls.find((c) => c.includes("Creating 2 of 3 recommendations:"));
+    expect(summaryHeader).toBeDefined();
+  });
+
+  it("shows pre-creation summary with each recommendation's priority, title, and level", async () => {
+    await cmdRecommend(tmpDir, { accept: "=2" });
+
+    const itemLine = infoCalls.find((c) => c.includes("[high]") && c.includes("Address perf issues") && c.includes("(feature)"));
+    expect(itemLine).toBeDefined();
+  });
+
+  it("uses singular form for single recommendation", async () => {
+    await writeFindings(tmpDir, [
+      { severity: "warning", category: "auth", message: "Auth finding" },
+    ]);
+
+    await cmdRecommend(tmpDir, { accept: "=1" });
+
+    const header = infoCalls.find((c) => c.includes("Creating 1 recommendation:"));
+    expect(header).toBeDefined();
+  });
+
+  it("shows 'N of M' when accepting a subset", async () => {
+    await cmdRecommend(tmpDir, { accept: "=1" });
+
+    const header = infoCalls.find((c) => c.includes("Creating 1 of 3 recommendations:"));
+    expect(header).toBeDefined();
+  });
+
+  it("omits 'of M' when accepting all", async () => {
+    await cmdRecommend(tmpDir, { accept: "true" });
+
+    // Should show "Creating 3 recommendations:" without "of 3"
+    const header = infoCalls.find((c) => /Creating 3 recommendations:/.test(c));
+    expect(header).toBeDefined();
+    // Should NOT say "of 3" since all are selected
+    const subsetHeader = infoCalls.find((c) => c.includes("of 3 recommendations:"));
+    expect(subsetHeader).toBeUndefined();
+  });
+
+  // ── Post-creation results ────────────────────────────────────────────
+
+  it("shows success marker and PRD item ID for each created item", async () => {
+    await cmdRecommend(tmpDir, { accept: "=2" });
+
+    const items = await readPrdItems(tmpDir);
+    const successLine = resultCalls.find(
+      (c) => c.includes("✓") && c.includes(items[0].id) && c.includes("Address perf issues"),
+    );
+    expect(successLine).toBeDefined();
+  });
+
+  it("shows hierarchy level in creation results", async () => {
+    await cmdRecommend(tmpDir, { accept: "=1" });
+
+    const items = await readPrdItems(tmpDir);
+    const successLine = resultCalls.find(
+      (c) => c.includes("✓") && c.includes("feature") && c.includes(items[0].id),
+    );
+    expect(successLine).toBeDefined();
+  });
+
+  it("shows root placement when no parent is specified", async () => {
+    await cmdRecommend(tmpDir, { accept: "=1" });
+
+    const rootLine = resultCalls.find((c) => c.includes("(root)"));
+    expect(rootLine).toBeDefined();
+  });
+
+  it("shows total count of created vs selected items", async () => {
+    await cmdRecommend(tmpDir, { accept: "=1,3" });
+
+    const countLine = resultCalls.find((c) => c.includes("2/2 selected recommendations created."));
+    expect(countLine).toBeDefined();
+  });
+
+  it("shows singular form for single item in count", async () => {
+    await writeFindings(tmpDir, [
+      { severity: "warning", category: "auth", message: "Auth finding" },
+    ]);
+
+    await cmdRecommend(tmpDir, { accept: "=1" });
+
+    const countLine = resultCalls.find((c) => c.includes("1/1 selected recommendation created."));
+    expect(countLine).toBeDefined();
+  });
+
+  it("shows all created items with their IDs for multi-item accept", async () => {
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const items = await readPrdItems(tmpDir);
+    expect(items).toHaveLength(3);
+
+    // Each created item should have a success line with its ID
+    for (const item of items) {
+      const successLine = resultCalls.find((c) => c.includes(item.id));
+      expect(successLine).toBeDefined();
+    }
+  });
+
+  it("shows 3/3 count when accepting all 3 recommendations", async () => {
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const countLine = resultCalls.find((c) => c.includes("3/3 selected recommendations created."));
+    expect(countLine).toBeDefined();
+  });
+
+  // ── Pre-creation summary lists correct items for selective accept ───
+
+  it("lists only selected recommendations in pre-creation summary", async () => {
+    await cmdRecommend(tmpDir, { accept: "=2" });
+
+    // Should have a numbered list entry for perf
+    const perfLine = infoCalls.find((c) => c.includes("1.") && c.includes("Address perf issues"));
+    expect(perfLine).toBeDefined();
+
+    // Should NOT list auth or security in the pre-creation summary lines
+    const authLine = infoCalls.find((c) => /^\s+\d+\./.test(c) && c.includes("Address auth issues"));
+    expect(authLine).toBeUndefined();
+  });
+});
