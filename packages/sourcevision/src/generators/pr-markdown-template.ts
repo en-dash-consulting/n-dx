@@ -5,6 +5,10 @@
  * structured around completed epics, features, and significant changes
  * rather than raw git diffs.
  *
+ * Content is prioritized by significance: breaking changes appear first
+ * (high-visibility), followed by major changes, then the full completed
+ * work listing sorted by significance within each feature group.
+ *
  * All functions are pure — no I/O, no side effects.
  *
  * @module sourcevision/generators/pr-markdown-template
@@ -13,7 +17,19 @@
 import type {
   BranchWorkRecord,
   BranchWorkRecordItem,
+  ChangeSignificance,
 } from "../schema/v1.js";
+
+// ── Significance ordering ───────────────────────────────────────────────────
+
+const SIGNIFICANCE_ORDER: Record<ChangeSignificance, number> = {
+  major: 0,
+  minor: 1,
+  patch: 2,
+};
+
+/** Default significance for items without explicit classification. */
+const DEFAULT_SIGNIFICANCE: ChangeSignificance = "patch";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +67,30 @@ export function extractMajorChanges(
   return items.filter((item) => item.changeSignificance === "major");
 }
 
+/** Returns items with `changeSignificance === "minor"`. */
+export function extractMinorChanges(
+  items: readonly BranchWorkRecordItem[],
+): BranchWorkRecordItem[] {
+  return items.filter((item) => item.changeSignificance === "minor");
+}
+
+/**
+ * Sort items by change significance (major → minor → patch).
+ * Items without explicit significance default to "patch".
+ * Preserves relative order within the same significance level (stable sort).
+ */
+export function sortItemsBySignificance(
+  items: readonly BranchWorkRecordItem[],
+): BranchWorkRecordItem[] {
+  return [...items].sort((a, b) => {
+    const aOrder =
+      SIGNIFICANCE_ORDER[a.changeSignificance ?? DEFAULT_SIGNIFICANCE];
+    const bOrder =
+      SIGNIFICANCE_ORDER[b.changeSignificance ?? DEFAULT_SIGNIFICANCE];
+    return aOrder - bOrder;
+  });
+}
+
 // ── Feature grouping within an epic ─────────────────────────────────────────
 
 function getFeatureTitle(item: BranchWorkRecordItem): string {
@@ -71,6 +111,58 @@ function groupItemsByFeature(
   }
 
   return grouped;
+}
+
+// ── Item rendering ──────────────────────────────────────────────────────────
+
+/**
+ * Whether an item's significance warrants inline context
+ * (description + acceptance criteria) in the completed work section.
+ */
+function isSignificant(item: BranchWorkRecordItem): boolean {
+  return (
+    item.changeSignificance === "major" ||
+    item.changeSignificance === "minor"
+  );
+}
+
+/**
+ * Render a single item line with optional significance indicator and context.
+ *
+ * - Breaking items get ⚠️ prefix and bold title
+ * - Major items get 🔶 prefix and bold title
+ * - Significant items (major/minor) include description and acceptance criteria
+ * - Patch/unclassified items render as plain list items
+ */
+function renderItemLines(item: BranchWorkRecordItem): string[] {
+  const lines: string[] = [];
+  const levelTag = item.level !== "task" ? ` *(${item.level})*` : "";
+
+  // Title line with significance indicator
+  if (item.breakingChange) {
+    lines.push(`- ⚠️ **${item.title}**${levelTag}`);
+  } else if (item.changeSignificance === "major") {
+    lines.push(`- 🔶 **${item.title}**${levelTag}`);
+  } else {
+    lines.push(`- ${item.title}${levelTag}`);
+  }
+
+  // Inline context for significant items (minor+)
+  if (isSignificant(item) && item.description) {
+    lines.push(`  ${item.description}`);
+  }
+
+  if (
+    isSignificant(item) &&
+    item.acceptanceCriteria &&
+    item.acceptanceCriteria.length > 0
+  ) {
+    for (const criterion of item.acceptanceCriteria) {
+      lines.push(`  - ${criterion}`);
+    }
+  }
+
+  return lines;
 }
 
 // ── Section renderers ───────────────────────────────────────────────────────
@@ -96,7 +188,10 @@ export function renderSummarySection(record: BranchWorkRecord): string {
   return lines.join("\n");
 }
 
-/** Renders a single epic section with items grouped by feature. */
+/**
+ * Renders a single epic section with items grouped by feature.
+ * Items within each feature group are sorted by significance (major first).
+ */
 export function renderEpicSection(
   epicTitle: string,
   items: readonly BranchWorkRecordItem[],
@@ -115,14 +210,14 @@ export function renderEpicSection(
 
   for (const featureTitle of featureKeys) {
     const featureItems = byFeature.get(featureTitle) ?? [];
+    const sorted = sortItemsBySignificance(featureItems);
 
     if (featureTitle !== "(Other)") {
       lines.push(`**${featureTitle}**`);
     }
 
-    for (const item of featureItems) {
-      const levelTag = item.level !== "task" ? ` *(${item.level})*` : "";
-      lines.push(`- ${item.title}${levelTag}`);
+    for (const item of sorted) {
+      lines.push(...renderItemLines(item));
     }
 
     lines.push("");
@@ -138,11 +233,11 @@ export function renderBreakingChangesSection(
   if (items.length === 0) return "";
 
   const lines: string[] = [];
-  lines.push("## Breaking Changes");
+  lines.push("## ⚠️ Breaking Changes");
   lines.push("");
 
   for (const item of items) {
-    lines.push(`- ⚠️ **${item.title}**`);
+    lines.push(`- **${item.title}**`);
 
     if (item.description) {
       lines.push(`  ${item.description}`);
@@ -185,11 +280,13 @@ export function renderMajorChangesSection(
 /**
  * Generates a complete PR markdown document from a branch work record.
  *
- * Sections:
+ * Content is organized in reviewer-friendly priority order:
+ *
  * 1. **Summary** — branch, base, item counts, epic table
- * 2. **Completed Work** — items grouped by epic → feature
- * 3. **Breaking Changes** — ⚠️ indicators (only when present)
- * 4. **Major Changes** — significant items (only when present)
+ * 2. **Breaking Changes** — ⚠️ high-visibility section (only when present)
+ * 3. **Major Changes** — non-breaking major items (only when present)
+ * 4. **Completed Work** — all items grouped by epic → feature,
+ *    sorted by significance within each group
  */
 export function renderPRMarkdownFromRecord(record: BranchWorkRecord): string {
   const sections: string[] = [];
@@ -197,25 +294,27 @@ export function renderPRMarkdownFromRecord(record: BranchWorkRecord): string {
   // 1. Summary
   sections.push(renderSummarySection(record));
 
-  // 2. Completed work grouped by epic
-  if (record.items.length === 0) {
-    sections.push("## Completed Work\n\nNo completed work items on this branch.");
-  } else {
-    sections.push(renderCompletedWorkSection(record.items));
-  }
-
-  // 3. Breaking changes (conditional)
+  // 2. Breaking changes — high-visibility, immediately after summary
   const breakingItems = extractBreakingChanges(record.items);
   const breakingSection = renderBreakingChangesSection(breakingItems);
   if (breakingSection) {
     sections.push(breakingSection);
   }
 
-  // 4. Major changes (conditional)
-  const majorItems = extractMajorChanges(record.items);
-  const majorSection = renderMajorChangesSection(majorItems);
+  // 3. Major changes — non-breaking major items (breaking ones already shown above)
+  const majorNonBreaking = extractMajorChanges(record.items).filter(
+    (item) => !item.breakingChange,
+  );
+  const majorSection = renderMajorChangesSection(majorNonBreaking);
   if (majorSection) {
     sections.push(majorSection);
+  }
+
+  // 4. Completed work grouped by epic, sorted by significance within groups
+  if (record.items.length === 0) {
+    sections.push("## Completed Work\n\nNo completed work items on this branch.");
+  } else {
+    sections.push(renderCompletedWorkSection(record.items));
   }
 
   return sections.join("\n\n") + "\n";

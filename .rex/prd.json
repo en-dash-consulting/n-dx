@@ -13992,10 +13992,12 @@
         {
           "id": "98e69d5c-e589-45fa-8e3d-5af4211d8906",
           "title": "JSON-based branch work tracking infrastructure",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create a persistent JSON-based system within sourcevision to track completed epics, features, and tasks on the current branch",
           "source": "smart-add",
+          "startedAt": "2026-02-25T04:30:49.301Z",
+          "completedAt": "2026-02-25T04:30:49.301Z",
           "children": [
             {
               "id": "d1389dda-9ce8-43b8-86cc-dcafd5ce7287",
@@ -14052,7 +14054,7 @@
             {
               "id": "5c55bb68-c312-42b3-99cc-b45e409a85ca",
               "title": "Implement change significance classification",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add logic to classify completed work items by significance level (major changes, breaking changes, important functions) based on rex metadata and task descriptions",
               "acceptanceCriteria": [
@@ -14066,7 +14068,9 @@
                 "classification",
                 "analysis"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-25T04:23:57.124Z",
+              "completedAt": "2026-02-25T04:30:49.182Z"
             }
           ]
         },
@@ -14097,6 +14101,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-25T03:44:36.842Z",
+              "completedAt": "2026-02-25T03:55:53.106Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -14106,8 +14111,7 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-25T03:25:22.943Z"
-              },
-              "completedAt": "2026-02-25T03:55:53.106Z"
+              }
             },
             {
               "id": "93c67767-1c4e-40ca-a6e0-5a7528b359f0",
@@ -14170,7 +14174,7 @@
             {
               "id": "bd399848-2634-4f1d-ab82-0fc6e1aa0901",
               "title": "Integrate PR markdown generation into sourcevision analyze command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Modify the sourcevision analyze command to automatically generate PR markdown as part of its standard execution flow using the branch work record",
               "acceptanceCriteria": [
@@ -14185,6 +14189,8 @@
                 "cli"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-25T04:16:20.718Z",
+              "completedAt": "2026-02-25T04:23:46.425Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -14249,7 +14255,7 @@
         {
           "id": "31100b02-1ef5-4e85-86b2-b44eb26008a2",
           "title": "Rex-based content generation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Generate PR markdown content from rex completion data rather than git differences, focusing on completed work items and their significance",
           "source": "smart-add",
@@ -14257,7 +14263,7 @@
             {
               "id": "2d6166ac-fd1a-49a1-bee9-c7a59145b298",
               "title": "Implement rex-based PR markdown template",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a new PR markdown template that generates content from branch work record data, emphasizing completed epics, features, and significant changes",
               "acceptanceCriteria": [
@@ -14271,12 +14277,14 @@
                 "template",
                 "markdown"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-25T03:56:50.609Z",
+              "completedAt": "2026-02-25T04:03:40.160Z"
             },
             {
               "id": "150e5c3a-ab21-4e0e-97bf-114418bd05d5",
               "title": "Replace git-diff dependency with rex completion data",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Remove reliance on git diff output for PR content generation, using rex completion status and branch work record as the authoritative source",
               "acceptanceCriteria": [
@@ -14290,12 +14298,14 @@
                 "refactor",
                 "git"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-25T04:03:40.368Z",
+              "completedAt": "2026-02-25T04:15:46.869Z"
             },
             {
               "id": "eb66aff8-bb31-4931-8ccc-11babbd30c3a",
               "title": "Implement significance-based content prioritization",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Structure generated PR markdown to prioritize content by significance level, featuring breaking changes and major updates prominently",
               "acceptanceCriteria": [
@@ -14309,9 +14319,13 @@
                 "prioritization",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-25T04:30:49.469Z",
+              "completedAt": "2026-02-25T04:38:47.936Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-25T04:38:48.030Z",
+          "completedAt": "2026-02-25T04:38:48.030Z"
         }
       ],
       "overrideMarker": {

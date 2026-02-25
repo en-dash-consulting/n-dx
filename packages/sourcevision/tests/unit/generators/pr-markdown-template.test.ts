@@ -5,6 +5,8 @@ import {
   groupItemsByEpic,
   extractBreakingChanges,
   extractMajorChanges,
+  extractMinorChanges,
+  sortItemsBySignificance,
   renderEpicSection,
   renderBreakingChangesSection,
   renderMajorChangesSection,
@@ -179,6 +181,94 @@ describe("extractMajorChanges", () => {
 });
 
 // ---------------------------------------------------------------------------
+// extractMinorChanges
+// ---------------------------------------------------------------------------
+
+describe("extractMinorChanges", () => {
+  it("returns only items with changeSignificance=minor", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", title: "Major change", changeSignificance: "major" }),
+      makeItem({ id: "t2", title: "Minor change", changeSignificance: "minor" }),
+      makeItem({ id: "t3", title: "Patch change", changeSignificance: "patch" }),
+      makeItem({ id: "t4", title: "No significance" }),
+    ];
+
+    const minor = extractMinorChanges(items);
+    expect(minor).toHaveLength(1);
+    expect(minor[0].id).toBe("t2");
+  });
+
+  it("returns empty array when no minor changes exist", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", changeSignificance: "major" }),
+      makeItem({ id: "t2", changeSignificance: "patch" }),
+    ];
+
+    const minor = extractMinorChanges(items);
+    expect(minor).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sortItemsBySignificance
+// ---------------------------------------------------------------------------
+
+describe("sortItemsBySignificance", () => {
+  it("sorts major before minor before patch", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", title: "Patch", changeSignificance: "patch" }),
+      makeItem({ id: "t2", title: "Major", changeSignificance: "major" }),
+      makeItem({ id: "t3", title: "Minor", changeSignificance: "minor" }),
+    ];
+
+    const sorted = sortItemsBySignificance(items);
+    expect(sorted[0].id).toBe("t2"); // major
+    expect(sorted[1].id).toBe("t3"); // minor
+    expect(sorted[2].id).toBe("t1"); // patch
+  });
+
+  it("treats undefined significance as patch", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", title: "No significance" }),
+      makeItem({ id: "t2", title: "Minor", changeSignificance: "minor" }),
+    ];
+
+    const sorted = sortItemsBySignificance(items);
+    expect(sorted[0].id).toBe("t2"); // minor first
+    expect(sorted[1].id).toBe("t1"); // undefined = patch last
+  });
+
+  it("preserves relative order within same significance", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", title: "First patch", changeSignificance: "patch" }),
+      makeItem({ id: "t2", title: "Second patch", changeSignificance: "patch" }),
+      makeItem({ id: "t3", title: "Third patch", changeSignificance: "patch" }),
+    ];
+
+    const sorted = sortItemsBySignificance(items);
+    expect(sorted[0].id).toBe("t1");
+    expect(sorted[1].id).toBe("t2");
+    expect(sorted[2].id).toBe("t3");
+  });
+
+  it("returns empty array for empty input", () => {
+    const sorted = sortItemsBySignificance([]);
+    expect(sorted).toHaveLength(0);
+  });
+
+  it("does not mutate the original array", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({ id: "t1", changeSignificance: "patch" }),
+      makeItem({ id: "t2", changeSignificance: "major" }),
+    ];
+
+    const sorted = sortItemsBySignificance(items);
+    expect(items[0].id).toBe("t1"); // original unchanged
+    expect(sorted[0].id).toBe("t2"); // sorted copy
+  });
+});
+
+// ---------------------------------------------------------------------------
 // renderSummarySection
 // ---------------------------------------------------------------------------
 
@@ -278,6 +368,123 @@ describe("renderEpicSection", () => {
     expect(section).toContain("feature");
     expect(section).toContain("Completed feature");
   });
+
+  it("sorts items within feature groups by significance", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "Patch task",
+        changeSignificance: "patch",
+        parentChain: [
+          { id: "e1", title: "Epic", level: "epic" },
+          { id: "f1", title: "Feature", level: "feature" },
+        ],
+      }),
+      makeItem({
+        id: "t2",
+        title: "Major task",
+        changeSignificance: "major",
+        parentChain: [
+          { id: "e1", title: "Epic", level: "epic" },
+          { id: "f1", title: "Feature", level: "feature" },
+        ],
+      }),
+      makeItem({
+        id: "t3",
+        title: "Minor task",
+        changeSignificance: "minor",
+        parentChain: [
+          { id: "e1", title: "Epic", level: "epic" },
+          { id: "f1", title: "Feature", level: "feature" },
+        ],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    const majorIdx = section.indexOf("Major task");
+    const minorIdx = section.indexOf("Minor task");
+    const patchIdx = section.indexOf("Patch task");
+    expect(majorIdx).toBeLessThan(minorIdx);
+    expect(minorIdx).toBeLessThan(patchIdx);
+  });
+
+  it("renders ⚠️ indicator for breaking items", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "Breaking change",
+        breakingChange: true,
+        changeSignificance: "major",
+        parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    expect(section).toContain("⚠️");
+    expect(section).toContain("**Breaking change**");
+  });
+
+  it("renders 🔶 indicator for non-breaking major items", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "Major change",
+        changeSignificance: "major",
+        parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    expect(section).toContain("🔶");
+    expect(section).toContain("**Major change**");
+  });
+
+  it("includes description for significant items", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "Important task",
+        changeSignificance: "minor",
+        description: "This rewrites the validation layer",
+        parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    expect(section).toContain("This rewrites the validation layer");
+  });
+
+  it("includes acceptance criteria for significant items", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "API change",
+        changeSignificance: "major",
+        acceptanceCriteria: ["New endpoint returns 200", "Old endpoint deprecated"],
+        parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    expect(section).toContain("New endpoint returns 200");
+    expect(section).toContain("Old endpoint deprecated");
+  });
+
+  it("does not include description for patch items", () => {
+    const items: BranchWorkRecordItem[] = [
+      makeItem({
+        id: "t1",
+        title: "Minor fix",
+        changeSignificance: "patch",
+        description: "Fixes a tiny typo",
+        parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+      }),
+    ];
+
+    const section = renderEpicSection("Epic", items);
+    expect(section).toContain("Minor fix");
+    expect(section).not.toContain("Fixes a tiny typo");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -285,7 +492,7 @@ describe("renderEpicSection", () => {
 // ---------------------------------------------------------------------------
 
 describe("renderBreakingChangesSection", () => {
-  it("renders warning indicator for each breaking change", () => {
+  it("renders warning indicator in heading", () => {
     const items: BranchWorkRecordItem[] = [
       makeItem({
         id: "t1",
@@ -296,7 +503,7 @@ describe("renderBreakingChangesSection", () => {
     ];
 
     const section = renderBreakingChangesSection(items);
-    expect(section).toContain("⚠️");
+    expect(section).toContain("⚠️ Breaking Changes");
     expect(section).toContain("Remove legacy API");
   });
 
@@ -364,7 +571,7 @@ describe("renderMajorChangesSection", () => {
 // ---------------------------------------------------------------------------
 
 describe("renderPRMarkdownFromRecord", () => {
-  it("generates complete markdown with all sections", () => {
+  it("generates complete markdown with all sections in priority order", () => {
     const record = makeRecord({
       branch: "feature/auth-system",
       items: [
@@ -389,9 +596,20 @@ describe("renderPRMarkdownFromRecord", () => {
             { id: "feat-2", title: "Endpoint Cleanup", level: "feature" },
           ],
         }),
+        makeItem({
+          id: "task-3",
+          title: "New auth system",
+          level: "task",
+          changeSignificance: "major",
+          description: "Complete auth overhaul",
+          parentChain: [
+            { id: "epic-1", title: "Authentication", level: "epic" },
+            { id: "feat-3", title: "Auth Revamp", level: "feature" },
+          ],
+        }),
       ],
       epicSummaries: [
-        { id: "epic-1", title: "Authentication", completedCount: 1 },
+        { id: "epic-1", title: "Authentication", completedCount: 2 },
         { id: "epic-2", title: "API Migration", completedCount: 1 },
       ],
     });
@@ -402,21 +620,74 @@ describe("renderPRMarkdownFromRecord", () => {
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("feature/auth-system");
 
-    // Epic/feature sections
+    // Breaking changes section (high-visibility)
+    expect(markdown).toContain("⚠️ Breaking Changes");
+    expect(markdown).toContain("Remove v1 endpoints");
+
+    // Major changes section (non-breaking major items only)
+    expect(markdown).toContain("## Major Changes");
+    expect(markdown).toContain("New auth system");
+
+    // Completed work section
     expect(markdown).toContain("### Authentication");
     expect(markdown).toContain("Login form");
     expect(markdown).toContain("### API Migration");
-    expect(markdown).toContain("Remove v1 endpoints");
+  });
 
-    // Breaking changes section
-    expect(markdown).toContain("## Breaking Changes");
-    expect(markdown).toContain("⚠️");
-    expect(markdown).toContain("Remove v1 endpoints");
+  it("places breaking changes before major changes before completed work", () => {
+    const record = makeRecord({
+      items: [
+        makeItem({
+          id: "t1",
+          title: "Normal task",
+          changeSignificance: "patch",
+          parentChain: [{ id: "e1", title: "Epic A", level: "epic" }],
+        }),
+        makeItem({
+          id: "t2",
+          title: "Breaking task",
+          breakingChange: true,
+          changeSignificance: "major",
+          parentChain: [{ id: "e1", title: "Epic A", level: "epic" }],
+        }),
+        makeItem({
+          id: "t3",
+          title: "Major non-breaking task",
+          changeSignificance: "major",
+          parentChain: [{ id: "e1", title: "Epic A", level: "epic" }],
+        }),
+      ],
+    });
 
-    // Major changes section
-    expect(markdown).toContain("## Major Changes");
-    expect(markdown).toContain("Remove v1 endpoints");
-    expect(markdown).toContain("Removes deprecated v1 API");
+    const markdown = renderPRMarkdownFromRecord(record);
+    const summaryIdx = markdown.indexOf("## Summary");
+    const breakingIdx = markdown.indexOf("⚠️ Breaking Changes");
+    const majorIdx = markdown.indexOf("## Major Changes");
+    const completedIdx = markdown.indexOf("## Completed Work");
+
+    expect(summaryIdx).toBeLessThan(breakingIdx);
+    expect(breakingIdx).toBeLessThan(majorIdx);
+    expect(majorIdx).toBeLessThan(completedIdx);
+  });
+
+  it("excludes breaking items from major changes section", () => {
+    const record = makeRecord({
+      items: [
+        makeItem({
+          id: "t1",
+          title: "Breaking and major",
+          breakingChange: true,
+          changeSignificance: "major",
+          description: "This is breaking",
+        }),
+      ],
+    });
+
+    const markdown = renderPRMarkdownFromRecord(record);
+    // Breaking section should exist
+    expect(markdown).toContain("⚠️ Breaking Changes");
+    // Major section should NOT exist (only major item is also breaking)
+    expect(markdown).not.toContain("## Major Changes");
   });
 
   it("omits breaking changes section when none exist", () => {
@@ -425,7 +696,7 @@ describe("renderPRMarkdownFromRecord", () => {
     });
 
     const markdown = renderPRMarkdownFromRecord(record);
-    expect(markdown).not.toContain("## Breaking Changes");
+    expect(markdown).not.toContain("Breaking Changes");
   });
 
   it("omits major changes section when none exist", () => {
@@ -535,7 +806,7 @@ describe("renderPRMarkdownFromRecord", () => {
     expect(first).toBe(second);
   });
 
-  it("includes priority and tags for high-priority items", () => {
+  it("includes priority for high-priority items in major section", () => {
     const record = makeRecord({
       items: [
         makeItem({
@@ -551,8 +822,107 @@ describe("renderPRMarkdownFromRecord", () => {
 
     const markdown = renderPRMarkdownFromRecord(record);
     expect(markdown).toContain("Critical task");
-    // Tags and priority should be visible in the major changes section
+    // Priority should be visible in the major changes section
     expect(markdown).toContain("high");
+  });
+
+  it("shows significance indicators in completed work section", () => {
+    const record = makeRecord({
+      items: [
+        makeItem({
+          id: "t1",
+          title: "Breaking item",
+          breakingChange: true,
+          changeSignificance: "major",
+          parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+        }),
+        makeItem({
+          id: "t2",
+          title: "Major item",
+          changeSignificance: "major",
+          parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+        }),
+        makeItem({
+          id: "t3",
+          title: "Patch item",
+          changeSignificance: "patch",
+          parentChain: [{ id: "e1", title: "Epic", level: "epic" }],
+        }),
+      ],
+    });
+
+    const markdown = renderPRMarkdownFromRecord(record);
+    // Completed work section should have indicators
+    const completedSection = markdown.slice(markdown.indexOf("## Completed Work"));
+    expect(completedSection).toContain("⚠️ **Breaking item**");
+    expect(completedSection).toContain("🔶 **Major item**");
+    // Patch items have no indicator
+    expect(completedSection).toContain("- Patch item");
+    expect(completedSection).not.toContain("🔶 **Patch item**");
+  });
+
+  it("shows inline context for significant items in completed work", () => {
+    const record = makeRecord({
+      items: [
+        makeItem({
+          id: "t1",
+          title: "Important change",
+          changeSignificance: "minor",
+          description: "Rewrites the validation pipeline",
+          acceptanceCriteria: ["Validates all input fields", "Returns structured errors"],
+          parentChain: [{ id: "e1", title: "Validation", level: "epic" }],
+        }),
+        makeItem({
+          id: "t2",
+          title: "Trivial fix",
+          changeSignificance: "patch",
+          description: "Fixes a typo in comments",
+          parentChain: [{ id: "e1", title: "Validation", level: "epic" }],
+        }),
+      ],
+    });
+
+    const markdown = renderPRMarkdownFromRecord(record);
+    const completedSection = markdown.slice(markdown.indexOf("## Completed Work"));
+
+    // Significant item should have context
+    expect(completedSection).toContain("Rewrites the validation pipeline");
+    expect(completedSection).toContain("Validates all input fields");
+    expect(completedSection).toContain("Returns structured errors");
+
+    // Patch item should NOT have description in completed work
+    expect(completedSection).not.toContain("Fixes a typo in comments");
+  });
+
+  it("sorts items by significance within completed work feature groups", () => {
+    const record = makeRecord({
+      items: [
+        makeItem({
+          id: "t1",
+          title: "Patch task",
+          changeSignificance: "patch",
+          parentChain: [
+            { id: "e1", title: "Epic", level: "epic" },
+            { id: "f1", title: "Feature", level: "feature" },
+          ],
+        }),
+        makeItem({
+          id: "t2",
+          title: "Major task",
+          changeSignificance: "major",
+          parentChain: [
+            { id: "e1", title: "Epic", level: "epic" },
+            { id: "f1", title: "Feature", level: "feature" },
+          ],
+        }),
+      ],
+    });
+
+    const markdown = renderPRMarkdownFromRecord(record);
+    const completedSection = markdown.slice(markdown.indexOf("## Completed Work"));
+    const majorIdx = completedSection.indexOf("Major task");
+    const patchIdx = completedSection.indexOf("Patch task");
+    expect(majorIdx).toBeLessThan(patchIdx);
   });
 
   it("ends with a trailing newline", () => {
