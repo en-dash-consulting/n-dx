@@ -18,7 +18,12 @@ import {
 import type {
   EnrichedRecommendation,
   RecommendationMeta,
+  ConflictStrategy,
 } from "../../recommend/create-from-recommendations.js";
+import {
+  formatConflict,
+  formatIntraBatchDuplicate,
+} from "../../recommend/conflict-detection.js";
 
 interface Finding {
   severity: string;
@@ -381,15 +386,40 @@ export async function cmdRecommend(
     }
     info("");
 
-    // ── Create items atomically ─────────────────────────────────────
+    // ── Determine conflict strategy ──────────────────────────────────
+    const conflictStrategy: ConflictStrategy =
+      flags.force !== undefined ? "force" : "skip";
+
+    // ── Create items with conflict detection ────────────────────────
     const enriched = acceptedRecommendations.map(toEnrichedRecommendation);
-    let created: Awaited<ReturnType<typeof createItemsFromRecommendations>>["created"];
+    let creationResult: Awaited<ReturnType<typeof createItemsFromRecommendations>>;
     try {
-      ({ created } = await createItemsFromRecommendations(store, enriched));
+      creationResult = await createItemsFromRecommendations(
+        store,
+        enriched,
+        { conflictStrategy },
+      );
     } catch (err) {
       result(`\n✗ Creation failed: ${(err as Error).message}`);
       result(`\n  0/${acceptedRecommendations.length} selected recommendation${acceptedRecommendations.length === 1 ? "" : "s"} created.`);
       throw err;
+    }
+
+    const { created, skipped, conflictReport } = creationResult;
+
+    // ── Conflict summary (when items were skipped) ──────────────────
+    if (conflictReport?.hasConflicts && skipped && skipped.length > 0) {
+      info("");
+      info(`⚠ ${skipped.length} conflicting recommendation${skipped.length === 1 ? "" : "s"} skipped:`);
+      for (const conflict of conflictReport.conflicts) {
+        info(`  ⊘ ${formatConflict(conflict)}`);
+      }
+      for (const dup of conflictReport.intraBatchDuplicates) {
+        info(`  ⊘ ${formatIntraBatchDuplicate(dup)}`);
+      }
+      if (conflictStrategy !== "force") {
+        info(`  Use --force to create items regardless of conflicts.`);
+      }
     }
 
     // ── Post-creation results ───────────────────────────────────────
@@ -401,9 +431,17 @@ export async function cmdRecommend(
 
     const total = acceptedRecommendations.length;
     const createdCount = created.length;
-    result(
-      `\n  ${createdCount}/${total} selected recommendation${total === 1 ? "" : "s"} created.`,
-    );
+    const skippedCount = skipped?.length ?? 0;
+    const countSuffix = total === 1 ? "" : "s";
+    if (skippedCount > 0) {
+      result(
+        `\n  ${createdCount}/${total} selected recommendation${countSuffix} created, ${skippedCount} skipped (conflicts).`,
+      );
+    } else {
+      result(
+        `\n  ${createdCount}/${total} selected recommendation${countSuffix} created.`,
+      );
+    }
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
     info("Run with --acknowledge=1,2 to acknowledge specific findings.");

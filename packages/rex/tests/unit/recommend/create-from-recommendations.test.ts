@@ -1348,4 +1348,436 @@ describe("createItemsFromRecommendations", () => {
     expect(result.created[0].level).toBe("epic");
     expect(result.created[1].level).toBe("feature");
   });
+
+  // ── Conflict detection: skip strategy ──────────────────────────────
+
+  describe("conflict strategy: skip", () => {
+    it("skips recommendations that conflict with existing items", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "existing-auth",
+          title: "Address auth issues (3 findings)",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Address auth issues (3 findings)",
+            level: "feature",
+            description: "Duplicate",
+            priority: "high",
+            source: "sourcevision",
+          },
+          {
+            title: "Implement dark mode",
+            level: "feature",
+            description: "New feature",
+            priority: "medium",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.created).toHaveLength(1);
+      expect(result.created[0].title).toBe("Implement dark mode");
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped![0].title).toBe("Address auth issues (3 findings)");
+      expect(result.conflictReport).toBeDefined();
+      expect(result.conflictReport!.hasConflicts).toBe(true);
+
+      const doc = await readPrd(tmpDir);
+      // Original + 1 new (the non-conflicting one)
+      expect(doc.items).toHaveLength(2);
+      expect(doc.items[0].title).toBe("Address auth issues (3 findings)"); // existing
+      expect(doc.items[1].title).toBe("Implement dark mode"); // new
+    });
+
+    it("creates all items when no conflicts exist", async () => {
+      await writeFixtureProject(tmpDir);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "New feature A",
+            level: "feature",
+            description: "A",
+            priority: "high",
+            source: "sourcevision",
+          },
+          {
+            title: "New feature B",
+            level: "feature",
+            description: "B",
+            priority: "medium",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.created).toHaveLength(2);
+      expect(result.skipped).toBeUndefined();
+    });
+
+    it("returns empty created list when all recommendations conflict", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Address auth issues",
+          status: "pending",
+          level: "feature",
+        },
+        {
+          id: "e2",
+          title: "Fix performance problems",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Address auth issues",
+            level: "feature",
+            description: "Dup 1",
+            priority: "high",
+            source: "sourcevision",
+          },
+          {
+            title: "Fix performance problems",
+            level: "feature",
+            description: "Dup 2",
+            priority: "medium",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.created).toHaveLength(0);
+      expect(result.skipped).toHaveLength(2);
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(2); // Only original items
+    });
+
+    it("does not write log entries for skipped items", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Existing feature",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Existing feature",
+            level: "feature",
+            description: "Dup",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      const logLines = await readLog(tmpDir);
+      expect(logLines).toHaveLength(0);
+    });
+
+    it("includes skip reason referencing the matched item", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Auth security fix",
+          status: "completed",
+          level: "task",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Auth security fix",
+            level: "task",
+            description: "Same thing",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped![0].reason).toContain("Auth security fix");
+      expect(result.skipped![0].reason).toContain("task");
+    });
+  });
+
+  // ── Conflict detection: error strategy ─────────────────────────────
+
+  describe("conflict strategy: error", () => {
+    it("throws when conflicts are detected", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Address auth issues",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      await expect(
+        createItemsFromRecommendations(
+          store,
+          [
+            {
+              title: "Address auth issues",
+              level: "feature",
+              description: "Duplicate",
+              priority: "high",
+              source: "sourcevision",
+            },
+          ],
+          { conflictStrategy: "error" },
+        ),
+      ).rejects.toThrow(/Conflict detection found 1 conflicting/);
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(1); // Only original
+    });
+
+    it("includes match details in error message", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Fix auth bug",
+          status: "pending",
+          level: "task",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      await expect(
+        createItemsFromRecommendations(
+          store,
+          [
+            {
+              title: "Fix auth bug",
+              level: "task",
+              description: "Same",
+              priority: "high",
+              source: "sourcevision",
+            },
+          ],
+          { conflictStrategy: "error" },
+        ),
+      ).rejects.toThrow(/Fix auth bug.*conflicts with existing.*task.*Fix auth bug/);
+    });
+
+    it("does not throw when no conflicts exist", async () => {
+      await writeFixtureProject(tmpDir);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Brand new feature",
+            level: "feature",
+            description: "No conflict",
+            priority: "medium",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "error" },
+      );
+
+      expect(result.created).toHaveLength(1);
+    });
+  });
+
+  // ── Conflict detection: force strategy ─────────────────────────────
+
+  describe("conflict strategy: force", () => {
+    it("creates all items regardless of conflicts (default behavior)", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Address auth issues",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Address auth issues",
+            level: "feature",
+            description: "Duplicate but forced",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "force" },
+      );
+
+      expect(result.created).toHaveLength(1);
+      expect(result.skipped).toBeUndefined();
+      expect(result.conflictReport).toBeUndefined();
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(2); // Both exist
+    });
+
+    it("default strategy is force (backwards compatible)", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "e1",
+          title: "Address auth issues",
+          status: "pending",
+          level: "feature",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      // No options = force strategy (backwards compat)
+      const result = await createItemsFromRecommendations(store, [
+        {
+          title: "Address auth issues",
+          level: "feature",
+          description: "Duplicate but no options passed",
+          priority: "high",
+          source: "sourcevision",
+        },
+      ]);
+
+      expect(result.created).toHaveLength(1);
+      expect(result.skipped).toBeUndefined();
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(2);
+    });
+  });
+
+  // ── PRD consistency with partial creation ──────────────────────────
+
+  describe("PRD consistency with partial creation", () => {
+    it("maintains valid PRD state when some items are skipped", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "epic-1",
+          title: "Existing Epic",
+          status: "in_progress",
+          level: "epic",
+          children: [
+            {
+              id: "feature-1",
+              title: "Address auth issues",
+              status: "completed",
+              level: "feature",
+            },
+          ],
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Address auth issues",
+            level: "feature",
+            description: "Conflicts with existing",
+            priority: "high",
+            source: "sourcevision",
+          },
+          {
+            title: "New perf feature",
+            level: "feature",
+            description: "No conflict",
+            priority: "medium",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.created).toHaveLength(1);
+      expect(result.created[0].title).toBe("New perf feature");
+
+      const doc = await readPrd(tmpDir);
+      // Original epic (with child) + new root feature
+      expect(doc.items).toHaveLength(2);
+      expect(doc.items[0].id).toBe("epic-1");
+      expect(doc.items[0].children).toHaveLength(1);
+      expect(doc.items[0].status).toBe("in_progress");
+      expect(doc.items[1].title).toBe("New perf feature");
+    });
+
+    it("preserves existing item relationships when all recommendations are skipped", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "epic-1",
+          title: "Epic A",
+          status: "pending",
+          level: "epic",
+          children: [
+            {
+              id: "feature-1",
+              title: "Feature A",
+              status: "pending",
+              level: "feature",
+            },
+          ],
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Feature A",
+            level: "feature",
+            description: "Same as existing",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      expect(result.created).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+
+      // PRD should be completely unchanged
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(1);
+      expect(doc.items[0].children).toHaveLength(1);
+      expect(doc.items[0].children![0].title).toBe("Feature A");
+    });
+  });
 });

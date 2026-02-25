@@ -852,3 +852,181 @@ describe("cmdRecommend --accept creation summary output", () => {
     expect(authLine).toBeUndefined();
   });
 });
+
+// ── Conflict detection in cmdRecommend ──────────────────────────────────
+
+describe("cmdRecommend --accept conflict detection", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+  let resultCalls: string[];
+  let infoCalls: string[];
+
+  beforeEach(async () => {
+    resultCalls = [];
+    infoCalls = [];
+
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", () => ({
+      PROJECT_DIRS: {
+        REX: ".rex",
+        SOURCEVISION: ".sourcevision",
+      },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: (...args: unknown[]) => { resultCalls.push(args.map(String).join(" ")); },
+      info: (...args: unknown[]) => { infoCalls.push(args.map(String).join(" ")); },
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-conflict-"));
+    await writeFixtureProject(tmpDir);
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("@n-dx/llm-client");
+    if (tmpDir) {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips conflicting recommendations and creates non-conflicting ones", async () => {
+    // Pre-populate PRD with an item that matches one recommendation
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({
+        schema: "rex/v1",
+        title: "test-project",
+        items: [
+          {
+            id: "existing-auth",
+            title: "Address auth issues (2 findings)",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const items = await readPrdItems(tmpDir);
+    // Auth should be skipped (conflicts), perf and security should be created
+    expect(items.length).toBeGreaterThanOrEqual(2); // existing + new non-conflicting
+    // The existing auth item should be preserved
+    expect(items.find((i: PRDDocument["items"][0]) => i.id === "existing-auth")).toBeDefined();
+  });
+
+  it("shows conflict warning when items are skipped", async () => {
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({
+        schema: "rex/v1",
+        title: "test-project",
+        items: [
+          {
+            id: "existing-auth",
+            title: "Address auth issues (2 findings)",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const warningLine = infoCalls.find((c) => c.includes("conflicting") && c.includes("skipped"));
+    expect(warningLine).toBeDefined();
+  });
+
+  it("shows hint to use --force when conflicts are skipped", async () => {
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({
+        schema: "rex/v1",
+        title: "test-project",
+        items: [
+          {
+            id: "existing-auth",
+            title: "Address auth issues (2 findings)",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const forceLine = infoCalls.find((c) => c.includes("--force"));
+    expect(forceLine).toBeDefined();
+  });
+
+  it("creates all items when --force is used despite conflicts", async () => {
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({
+        schema: "rex/v1",
+        title: "test-project",
+        items: [
+          {
+            id: "existing-auth",
+            title: "Address auth issues (2 findings)",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { accept: "=all", force: "" });
+
+    const items = await readPrdItems(tmpDir);
+    // Should have original + all 3 recommendations (no skipping)
+    expect(items).toHaveLength(4); // 1 existing + 3 new
+  });
+
+  it("shows created/skipped count in summary", async () => {
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({
+        schema: "rex/v1",
+        title: "test-project",
+        items: [
+          {
+            id: "existing-auth",
+            title: "Address auth issues (2 findings)",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const countLine = resultCalls.find((c) => c.includes("skipped") && c.includes("conflicts"));
+    expect(countLine).toBeDefined();
+  });
+
+  it("creates all items with no conflicts and no skipped count", async () => {
+    // Default fixture has empty PRD - no conflicts possible
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const items = await readPrdItems(tmpDir);
+    expect(items).toHaveLength(3); // All 3 recommendations
+
+    // Should show standard count without "skipped"
+    const countLine = resultCalls.find((c) => c.includes("3/3") && c.includes("created"));
+    expect(countLine).toBeDefined();
+    const skippedLine = resultCalls.find((c) => c.includes("skipped"));
+    expect(skippedLine).toBeUndefined();
+  });
+});

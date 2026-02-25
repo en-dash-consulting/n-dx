@@ -19,6 +19,10 @@ import type { PRDItem, ItemLevel, Priority } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
 import { findItem, insertChild } from "../core/tree.js";
 import { validateDAG } from "../core/dag.js";
+import {
+  detectRecommendationConflicts,
+} from "./conflict-detection.js";
+import type { ConflictReport } from "./conflict-detection.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -64,6 +68,39 @@ export interface EnrichedRecommendation {
 }
 
 /**
+ * How to handle conflicting recommendations during creation.
+ *
+ * - `"skip"` — silently skip conflicting items; create only non-conflicting ones.
+ * - `"force"` — ignore conflicts; create all items regardless.
+ * - `"error"` — throw if any conflicts are detected (default for backwards compat).
+ */
+export type ConflictStrategy = "skip" | "force" | "error";
+
+/**
+ * Options for {@link createItemsFromRecommendations}.
+ */
+export interface CreationOptions {
+  /**
+   * How to handle recommendations that conflict with existing PRD items
+   * or with each other. Defaults to `"force"` (no conflict checking)
+   * for backwards compatibility.
+   */
+  conflictStrategy?: ConflictStrategy;
+}
+
+/**
+ * A recommendation that was skipped due to a conflict.
+ */
+export interface SkippedRecommendation {
+  /** Index of the recommendation in the original input array. */
+  index: number;
+  /** Title of the skipped recommendation. */
+  title: string;
+  /** Reason the recommendation was skipped. */
+  reason: string;
+}
+
+/**
  * Result of a successful batch creation.
  */
 export interface CreationResult {
@@ -74,6 +111,10 @@ export interface CreationResult {
     level: ItemLevel;
     parentId?: string;
   }>;
+  /** Recommendations that were skipped due to conflicts (only with skip strategy). */
+  skipped?: SkippedRecommendation[];
+  /** Full conflict report when conflict detection was run. */
+  conflictReport?: ConflictReport;
 }
 
 // ── Validation ───────────────────────────────────────────────────────
@@ -153,20 +194,81 @@ function validatePlacement(
  *
  * @param store - The PRD store to read from and write to.
  * @param recommendations - Enriched recommendations to create items from.
+ * @param options - Optional creation options including conflict strategy.
  * @returns Creation result with IDs and metadata of created items.
  * @throws If validation fails for any item (atomic: zero items are created).
+ * @throws If conflict strategy is "error" and conflicts are detected.
  */
 export async function createItemsFromRecommendations(
   store: PRDStore,
   recommendations: readonly EnrichedRecommendation[],
+  options?: CreationOptions,
 ): Promise<CreationResult> {
   if (recommendations.length === 0) {
     return { created: [] };
   }
 
-  // 1. Build PRDItems from recommendations
+  const strategy = options?.conflictStrategy ?? "force";
+
+  // 1. Load current document for validation and conflict detection
+  const doc = await store.loadDocument();
+
+  // 2. Run conflict detection when strategy is not "force"
+  let conflictReport: ConflictReport | undefined;
+  let effectiveRecommendations = recommendations;
+  const skipped: SkippedRecommendation[] = [];
+
+  if (strategy !== "force") {
+    conflictReport = detectRecommendationConflicts(recommendations, doc.items);
+
+    if (conflictReport.hasConflicts) {
+      if (strategy === "error") {
+        const messages: string[] = [];
+        for (const c of conflictReport.conflicts) {
+          messages.push(
+            `"${c.recommendationTitle}" conflicts with existing ${c.matchedItem.level} "${c.matchedItem.title}" (${c.reason}, ${Math.round(c.score * 100)}% match)`,
+          );
+        }
+        for (const d of conflictReport.intraBatchDuplicates) {
+          messages.push(
+            `Recommendations "${d.titleA}" and "${d.titleB}" are intra-batch duplicates (${Math.round(d.score * 100)}% match)`,
+          );
+        }
+        throw new Error(
+          `Conflict detection found ${conflictReport.conflictingIndices.length} conflicting recommendation(s):\n${messages.join("\n")}`,
+        );
+      }
+
+      // strategy === "skip": filter down to safe recommendations
+      for (const idx of conflictReport.conflictingIndices) {
+        const rec = recommendations[idx];
+        const conflict = conflictReport.conflicts.find(
+          (c) => c.recommendationIndex === idx,
+        );
+        const intraDup = conflictReport.intraBatchDuplicates.find(
+          (d) => d.indexB === idx,
+        );
+        const reason = conflict
+          ? `Conflicts with existing ${conflict.matchedItem.level} "${conflict.matchedItem.title}"`
+          : intraDup
+            ? `Duplicate of recommendation "${intraDup.titleA}"`
+            : "Detected as conflicting";
+        skipped.push({ index: idx, title: rec.title, reason });
+      }
+
+      effectiveRecommendations = conflictReport.safeIndices.map(
+        (i) => recommendations[i],
+      );
+
+      if (effectiveRecommendations.length === 0) {
+        return { created: [], skipped, conflictReport };
+      }
+    }
+  }
+
+  // 3. Build PRDItems from effective recommendations
   const pending: Array<{ item: PRDItem; parentId?: string }> = [];
-  for (const rec of recommendations) {
+  for (const rec of effectiveRecommendations) {
     const item: PRDItem = {
       id: randomUUID(),
       title: rec.title,
@@ -189,10 +291,7 @@ export async function createItemsFromRecommendations(
     pending.push({ item, parentId: rec.parentId });
   }
 
-  // 2. Load current document for validation
-  const doc = await store.loadDocument();
-
-  // 3. Validate placement (level hierarchy) for each item
+  // 4. Validate placement (level hierarchy) for each item
   const placementErrors: string[] = [];
   for (const { item, parentId } of pending) {
     const err = validatePlacement(item, parentId, doc.items);
@@ -204,7 +303,7 @@ export async function createItemsFromRecommendations(
     );
   }
 
-  // 4. Add all items to the in-memory document
+  // 5. Add all items to the in-memory document
   for (const { item, parentId } of pending) {
     if (parentId) {
       const inserted = insertChild(doc.items, parentId, item);
@@ -218,7 +317,7 @@ export async function createItemsFromRecommendations(
     }
   }
 
-  // 5. Validate DAG integrity with all new items in place
+  // 6. Validate DAG integrity with all new items in place
   const dagResult = validateDAG(doc.items);
   if (!dagResult.valid) {
     throw new Error(
@@ -226,10 +325,10 @@ export async function createItemsFromRecommendations(
     );
   }
 
-  // 6. Persist atomically — single write for all items
+  // 7. Persist atomically — single write for all items
   await store.saveDocument(doc);
 
-  // 7. Log creation events
+  // 8. Log creation events
   const created: CreationResult["created"] = [];
   for (const { item, parentId } of pending) {
     await store.appendLog({
@@ -246,5 +345,8 @@ export async function createItemsFromRecommendations(
     });
   }
 
-  return { created };
+  const result: CreationResult = { created };
+  if (skipped.length > 0) result.skipped = skipped;
+  if (conflictReport) result.conflictReport = conflictReport;
+  return result;
 }
