@@ -14000,7 +14000,7 @@
             {
               "id": "d1389dda-9ce8-43b8-86cc-dcafd5ce7287",
               "title": "Implement branch work record JSON schema and storage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Define a JSON schema for tracking branch-specific work completion and implement file-based storage within the sourcevision package directory structure",
               "acceptanceCriteria": [
@@ -14014,7 +14014,9 @@
                 "schema",
                 "storage"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-25T03:36:36.348Z",
+              "completedAt": "2026-02-25T03:44:36.622Z"
             },
             {
               "id": "39e39bf0-e71d-4869-9a0a-78d3dc86d01f",
@@ -14035,6 +14037,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-02-25T03:25:34.846Z",
+              "completedAt": "2026-02-25T03:35:31.197Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -14044,8 +14047,7 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-25T03:25:22.943Z"
-              },
-              "completedAt": "2026-02-25T03:35:31.197Z"
+              }
             },
             {
               "id": "5c55bb68-c312-42b3-99cc-b45e409a85ca",
@@ -14079,7 +14081,7 @@
             {
               "id": "84621aa2-51c6-472e-848b-e54f1ffed9b3",
               "title": "Implement rex PRD completion status reader",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a reader service that extracts completion status, timestamps, and metadata from rex PRD data for work items associated with the current branch",
               "acceptanceCriteria": [
@@ -14094,6 +14096,7 @@
                 "integration"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-25T03:44:36.842Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -14103,7 +14106,8 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-25T03:25:22.943Z"
-              }
+              },
+              "completedAt": "2026-02-25T03:55:53.106Z"
             },
             {
               "id": "93c67767-1c4e-40ca-a6e0-5a7528b359f0",
