@@ -5888,229 +5888,6 @@
       ]
     },
     {
-      "id": "bed84e5c-7906-4788-86bc-4d7a9955c4c2",
-      "title": "Address SourceVision anti-pattern findings",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Type imports from Rex (PRDStore, PRDItem, ItemStatus) create compile-time coupling despite dynamic runtime imports - the zone boundary is violated at the type level even though runtime coupling is avoided\n- Cross-zone type imports create compile-time coupling that defeats runtime decoupling strategies - zones appear independent at runtime but are tightly coupled during TypeScript compilation\n- PRIORITY_ORDER constants duplicated across multiple zones with inconsistent typing - shared constants should be extracted to a common location to prevent type drift and maintenance burden\n- PRIORITY_ORDER constant duplicated with different type signatures (Record<Priority,number> vs Record<string,number>) across core/canonical.ts, core/next-task.ts, and analyze/propose.ts creating type safety gaps and maintenance burden\n- Schema index.ts barrel export creates hidden bidirectional coupling by re-exporting from both viewer zone (v1.ts) and test-suite zone (validate.ts) - every analyzer importing schema creates transitive dependencies across three zones\n- Direct import of schema/validate.ts from test-suite zone violates zone boundaries and forces Zod bundling into browser code where validation could be optional\n- schema/validate.ts is misplaced in test-suite zone despite being imported by production CLI and viewer code - this file should be in analysis-engine zone based on its actual usage patterns\n- Architecture forces choice between runtime coupling and maintenance burden - current solution chooses duplication over dependency, creating divergence risk that outweighs benefits of runtime independence for core domain types\n- Systematic duplication of business logic constants (PRIORITY_ORDER) across 4 locations with inconsistent typing creates multiple sources of truth that risk diverging during maintenance - refactor to single shared constant in packages/rex/src/schema/v1.ts and import consistently\n- Type system fragmentation where identical Priority union is defined in both packages/rex/src/schema/v1.ts:7 and packages/sourcevision/src/viewer/components/prd-tree/types.ts:17 - consolidate to single exported type to prevent drift and ensure consistency",
-      "priority": "critical",
-      "source": "sourcevision",
-      "startedAt": "2026-02-10T01:41:04.875Z",
-      "completedAt": "2026-02-10T01:47:29.521Z",
-      "children": [
-        {
-          "id": "68a4a2f3-5b87-4a72-bbcb-67c3ecbe19c0",
-          "title": "Extract PRIORITY_ORDER to shared constant in rex schema/v1.ts and consolidate all consumers",
-          "status": "completed",
-          "level": "task",
-          "description": "Export PRIORITY_ORDER from packages/rex/src/schema/v1.ts with type Record<Priority, number>. Update all consumers in rex (core/canonical.ts, core/next-task.ts, analyze/propose.ts) to import from schema. Remove all local definitions. This consolidates 3 identical constants into 1 canonical source.",
-          "acceptanceCriteria": [
-            "PRIORITY_ORDER exported from packages/rex/src/schema/v1.ts with type Record<Priority, number>",
-            "core/canonical.ts imports PRIORITY_ORDER from schema instead of defining locally",
-            "core/next-task.ts imports PRIORITY_ORDER from schema instead of defining locally",
-            "analyze/propose.ts imports PRIORITY_ORDER from schema instead of defining locally (with correct Record<Priority, number> type)",
-            "schema/index.ts re-exports PRIORITY_ORDER",
-            "All tests pass",
-            "Build succeeds"
-          ],
-          "priority": "critical",
-          "startedAt": "2026-02-10T01:44:03.535Z",
-          "completedAt": "2026-02-10T01:45:44.739Z"
-        },
-        {
-          "id": "d258eafb-a303-4804-93b9-4be57a0bc48f",
-          "title": "Fix sourcevision routes-rex.ts PRIORITY_ORDER duplication",
-          "status": "completed",
-          "level": "task",
-          "description": "The sourcevision routes-rex.ts has its own PRIORITY_ORDER, LEVEL_HIERARCHY, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES constants that duplicate Rex domain logic. Since sourcevision intentionally avoids depending on Rex as a package (to maintain package independence), the best approach is to add a clear comment documenting the duplication and marking it as intentional, plus ensuring the type signature is consistent.",
-          "acceptanceCriteria": [
-            "PRIORITY_ORDER in routes-rex.ts has clear comment explaining it's intentionally duplicated from Rex schema/v1.ts",
-            "Type consistency maintained (values match Rex canonical source)",
-            "No runtime regression"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-10T01:45:46.055Z",
-          "completedAt": "2026-02-10T01:46:14.899Z"
-        },
-        {
-          "id": "2fad84a1-7b9f-4b0e-8065-3d8ce1810e15",
-          "title": "Document intentional type duplication in sourcevision viewer types.ts",
-          "status": "completed",
-          "level": "task",
-          "description": "The viewer types.ts already has a comment explaining why types are mirrored from Rex. Enhance the documentation to reference the canonical source (packages/rex/src/schema/v1.ts) and add a note about keeping in sync. The Priority type duplication is intentional because the viewer is bundled as standalone browser code via esbuild and cannot import from Rex at runtime.",
-          "acceptanceCriteria": [
-            "types.ts has clear reference to canonical source (rex/schema/v1.ts)",
-            "Comment explains why duplication is necessary (browser bundle, no Rex dependency)",
-            "No functional changes"
-          ],
-          "priority": "medium",
-          "startedAt": "2026-02-10T01:46:16.430Z",
-          "completedAt": "2026-02-10T01:47:29.478Z"
-        },
-        {
-          "id": "302aabf9-0383-407d-86c7-ca5e0d6a664e",
-          "title": "Decompose analyzeZones god function into focused helpers",
-          "status": "completed",
-          "level": "task",
-          "description": "Extract logical sub-sections of analyzeZones() (553 lines) into focused helper functions: Louvain setup, zone creation with metrics, enrichment/preservation, insight merging, and findings assembly.",
-          "acceptanceCriteria": [
-            "analyzeZones() is under 200 lines and delegates to well-named helpers",
-            "Each extracted helper has a clear single responsibility",
-            "All existing tests pass without modification",
-            "No functional behavior changes"
-          ],
-          "priority": "critical",
-          "startedAt": "2026-02-11T14:07:37.608Z",
-          "completedAt": "2026-02-11T14:10:54.327Z"
-        },
-        {
-          "id": "7eba2695-065c-4057-8b51-f58661f738a3",
-          "title": "Split Rex MCP server into tool modules",
-          "status": "completed",
-          "level": "task",
-          "description": "Split rex MCP server (806 lines) by extracting tool handler functions into separate modules (status tools, item operations, sync/log tools, resources).",
-          "acceptanceCriteria": [
-            "mcp.ts is under 200 lines and imports tool handlers from dedicated modules",
-            "Tool behavior is identical (no functional changes)",
-            "All existing tests pass"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-11T14:11:01.427Z",
-          "completedAt": "2026-02-11T14:14:14.364Z"
-        },
-        {
-          "id": "98693d1e-6550-40f9-9af3-8d74f9acc731",
-          "title": "Split enrich.ts orchestration functions into focused modules",
-          "status": "completed",
-          "level": "task",
-          "description": "Split enrich.ts (624 lines) by extracting enrichBatch() and enrichZonesWithAI() sub-sections into focused modules: prompt construction, meta-evaluation, result merging.",
-          "acceptanceCriteria": [
-            "enrich.ts is under 200 lines",
-            "Each extracted module has a single responsibility",
-            "All existing tests pass"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-11T14:14:20.145Z",
-          "completedAt": "2026-02-11T14:17:15.350Z"
-        },
-        {
-          "id": "8c23ba99-ab41-469f-b22b-cd6833ef4360",
-          "title": "Remove verified dead exports from integration layers",
-          "status": "completed",
-          "level": "task",
-          "description": "Audit the 91 reported unused exports in adapter, validation, and UI component modules. Remove genuinely unused exports after verifying with grep. Leave exports that are part of public API contracts.",
-          "acceptanceCriteria": [
-            "Dead exports verified by grep are removed",
-            "Public API exports are preserved",
-            "Build and tests pass"
-          ],
-          "priority": "medium",
-          "startedAt": "2026-02-11T14:17:23.158Z",
-          "completedAt": "2026-02-11T14:24:15.025Z"
-        },
-        {
-          "id": "673d1237-b34c-4b3c-b045-725765338c69",
-          "title": "Replace console.log with structured output in orchestration files",
-          "status": "completed",
-          "level": "task",
-          "description": "Migrate orchestration files (cli.js, web.js, ci.js, config.js) from raw console.log/console.error to the structured output utilities from @n-dx/claude-client (info, result from output.ts). This ensures --quiet mode works consistently and provides a single logging abstraction. Note: many console.log calls are legitimate user-facing output, so the migration should use info() for status messages and result() for data output.",
-          "acceptanceCriteria": [
-            "Orchestration files use info() and result() from @n-dx/claude-client output.ts instead of raw console.log",
-            "console.error calls for user-facing errors are preserved (error output should always show)",
-            "--quiet flag suppresses info() messages in orchestration files",
-            "All existing tests continue to pass"
-          ],
-          "priority": "medium",
-          "startedAt": "2026-02-11T14:49:06.326Z",
-          "completedAt": "2026-02-11T14:54:52.839Z"
-        },
-        {
-          "id": "8328aa27-dd94-4380-8294-cbf96b44ec2d",
-          "title": "Remove unused exports from hench adjustments.ts",
-          "status": "completed",
-          "level": "task",
-          "description": "The adaptive workflow infrastructure in packages/hench/src/store/adjustments.ts has 9 exported functions/types with no incoming calls (loadAdaptiveStateAsync, saveAdaptiveStateAsync, recordAdjustment, updateSettings, lockKey, etc.). Remove exports or mark as internal for functions that are not part of the public API and have no callers.",
-          "acceptanceCriteria": [
-            "Unused exports in adjustments.ts are either removed or marked as internal",
-            "No breaking changes to public API",
-            "All tests pass"
-          ],
-          "priority": "medium",
-          "startedAt": "2026-02-11T14:54:54.013Z",
-          "completedAt": "2026-02-11T14:54:54.013Z"
-        },
-        {
-          "id": "670d5834-6f6c-4de8-b020-adc49cbf6be0",
-          "title": "Document false-positive unused export findings and close remaining suggestions",
-          "status": "completed",
-          "level": "task",
-          "description": "Several findings are false positives or already addressed: (1) renderer.ts, logos.ts, validate.ts - browser components/class methods not detected by static import analysis, (2) notion-adapter.ts - class methods are part of AdapterRegistry interface contract, (3) v1.ts type guards - used via public.ts re-exports, (4) walkTree hub function - already decomposed in prior task, (5) shared utility extraction - already consolidated in claude-client, (6) tree traversal consolidation - gateway pattern is architecturally correct per CLAUDE.md. Add @internal JSDoc tags where appropriate to indicate intended audience.",
-          "acceptanceCriteria": [
-            "@internal JSDoc tags added to exports that are implementation details but must remain exported for structural reasons",
-            "No behavioral changes"
-          ],
-          "priority": "low",
-          "startedAt": "2026-02-11T14:54:55.356Z",
-          "completedAt": "2026-02-11T14:54:55.356Z"
-        },
-        {
-          "id": "c0d068a4-e2fb-4ee0-ab6d-ad672ad512aa",
-          "title": "Document security guard multi-layered protection architecture",
-          "status": "completed",
-          "level": "task",
-          "description": "Add module-level documentation to the guard system (index.ts, paths.ts, commands.ts) explaining the multi-layered security approach: command allowlisting, shell operator blocking, dangerous pattern detection, null-byte defense, directory escape prevention, and glob-based path blocking. Document how GuardConfig makes policies configurable.",
-          "acceptanceCriteria": [
-            "Guard module files have module-level JSDoc explaining the security architecture",
-            "Each security layer is documented with its purpose",
-            "Configuration surface (GuardConfig) is documented"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-10T01:52:28.847Z",
-          "completedAt": "2026-02-10T01:53:17.998Z"
-        },
-        {
-          "id": "ca390e8e-309e-46fd-a2b4-4cf636b6ade7",
-          "title": "Document dual provider architecture with fallback strategy",
-          "status": "completed",
-          "level": "task",
-          "description": "Add architectural documentation to claude-client explaining the dual provider pattern: CLI provider for local development with Claude Code, API provider for direct Anthropic API calls. Document the automatic detection and fallback strategy in createClient.",
-          "acceptanceCriteria": [
-            "Provider files document their execution contexts and use cases",
-            "create-client.ts documents the provider selection and fallback strategy",
-            "Package index.ts module comment explains the dual provider architecture"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-10T01:53:19.439Z",
-          "completedAt": "2026-02-10T01:54:10.743Z"
-        },
-        {
-          "id": "078e13cc-f5e3-4c29-9dcd-9e189e1081d6",
-          "title": "Document zone cohesion design and architectural boundaries",
-          "status": "completed",
-          "level": "task",
-          "description": "Document in the Louvain zone detection code how perfect cohesion (1.0) and zero coupling (0.0) are achieved. Add inline docs explaining the community detection approach and why the architecture naturally forms clean boundaries. Add a note to the cohesion/coupling calculation explaining the metric semantics.",
-          "acceptanceCriteria": [
-            "Zone analyzer has doc comments explaining cohesion/coupling metric semantics",
-            "Louvain algorithm usage is documented with architectural rationale",
-            "Comment on generateStructuralInsights explains what the metrics mean for architecture"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-10T01:54:12.348Z",
-          "completedAt": "2026-02-10T01:55:00.521Z"
-        }
-      ]
-    },
-    {
-      "id": "cbc09cb4-d975-4c17-8254-0c97f11c8da2",
-      "title": "Address SourceVision pattern findings",
-      "status": "deferred",
-      "level": "feature",
-      "description": "- Zone architecture achieves perfect runtime decoupling (no cross-zone imports) but creates maintenance burden through systematic type and constant duplication - suggests need for shared foundation package or reconsideration of zone boundaries for common business logic\n- Zone architecture creates artificial boundaries that fragment natural business domain concepts - Priority and PRIORITY_ORDER are core domain concepts that transcend individual packages and should be centrally managed rather than duplicated",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-10T05:07:03.240Z"
-    },
-    {
       "id": "e96db771-5ed0-4ba8-a70b-74a30f462f65",
       "title": "Unified Server Architecture: HTTP MCP and ndx start",
       "status": "completed",
@@ -6603,16 +6380,6 @@
       ]
     },
     {
-      "id": "7d194bf1-472f-4680-81e2-6ee15f1c2033",
-      "title": "Address observation issues (1 findings)",
-      "status": "deferred",
-      "level": "feature",
-      "description": "- Hardcoded tool paths in cli.js create brittle coupling to dist/ structure - consider using package.json bin field resolution",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-10T05:02:21.023Z"
-    },
-    {
       "id": "1d4105c1-0d27-48a9-b5a8-6dbcf2a43b5f",
       "title": "Rex Prune & Status UX Improvements",
       "status": "completed",
@@ -6829,16 +6596,6 @@
           ]
         }
       ]
-    },
-    {
-      "id": "afe6598d-b9d8-464f-9247-0837bce17e42",
-      "title": "Address SourceVision relationship findings",
-      "status": "deferred",
-      "level": "feature",
-      "description": "- Two controlled coupling points: hench imports rex for task management, web imports all packages for unified interface",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-10T16:44:02.991Z"
     },
     {
       "id": "e3aa5235-b63b-4298-bbcf-b78c72638387",
@@ -8421,91 +8178,6 @@
       ]
     },
     {
-      "id": "55951f82-e673-4fdf-b891-1cd2558bc4bd",
-      "title": "Address observation issues (2 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Bidirectional coupling: \"autonomous-agent\" ↔ \"execution-gateway\" (14+1 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"dashboard-components\" ↔ \"prd-management-ui\" (4+6 crossings) — consider extracting shared interface",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-18T06:59:13.384Z",
-      "completedAt": "2026-02-18T07:09:02.395Z"
-    },
-    {
-      "id": "70d9bc2e-a736-4170-a3cc-2039da7f53fb",
-      "title": "Address anti-pattern issues (2 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Inconsistent gateway naming pattern: autonomous-agent uses 'prd/ops.ts' while presentation-gateway uses 'mcp-deps.ts', reducing architectural clarity\n- God function: handleRexRoute in packages/web/src/server/routes-rex.ts calls 48 unique functions — consider decomposing into smaller, focused functions",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-18T06:47:38.069Z",
-      "completedAt": "2026-02-18T06:58:33.614Z"
-    },
-    {
-      "id": "fc2ee90a-c6ac-4267-bcab-00e2778e7066",
-      "title": "Address suggestion issues (4 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Lifecycle entry points (cli-loop.ts vs loop.ts) should share common validation logic to prevent behavior divergence between CLI and programmatic execution\n- Process execution in exec.ts lacks timeout and resource controls, creating risk for runaway autonomous operations\n- Autonomous operation safety controls are fragmented across zones - consider unified resource limits and safety policy enforcement across orchestration process spawning, execution-gateway process execution, and tool-infrastructure command dispatch\n- Guard system lacks runtime policy enforcement - commands.ts and paths.ts define boundaries but don't actively monitor violations",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-18T07:09:51.894Z",
-      "completedAt": "2026-02-18T07:21:20.659Z",
-      "children": [
-        {
-          "id": "c1e50f76-b9cc-42db-8555-2c068163b1ef",
-          "title": "Extract shared lifecycle validation into common module",
-          "status": "completed",
-          "level": "task",
-          "description": "Extract the duplicated validation logic from cli-loop.ts and loop.ts into a shared lifecycle module. Both entry points duplicate: brief assembly, dry run handling, task status transitions, run record management, review gate, post-task tests, and run finalization. Create a common module that both loops delegate to, keeping only the provider-specific execution mechanism in each.",
-          "acceptanceCriteria": [
-            "Common lifecycle module exists with shared validation logic",
-            "cli-loop.ts and loop.ts delegate to common module for non-provider-specific operations",
-            "Both entry points produce identical behavior for shared operations",
-            "Existing tests pass without modification"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-18T07:12:09.640Z",
-          "completedAt": "2026-02-18T07:20:01.315Z"
-        },
-        {
-          "id": "a3f2ac13-f411-4435-b01c-bde40b7a97cb",
-          "title": "Add timeout and resource controls to process execution",
-          "status": "completed",
-          "level": "task",
-          "description": "Add missing timeout and resource controls to process execution paths that currently lack them. The exec function in foundation supports timeout/maxBuffer, but spawnTool and spawnManaged have no timeout protection. Add configurable timeout to spawn-based execution paths and add a concurrent process limit to prevent runaway process spawning.",
-          "acceptanceCriteria": [
-            "spawnTool and spawnManaged support configurable timeout",
-            "Concurrent process limit prevents unbounded process spawning",
-            "Timeout values are configurable through guard config",
-            "Tests verify timeout and resource control behavior"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-18T07:21:20.899Z",
-          "completedAt": "2026-02-18T07:29:40.229Z"
-        },
-        {
-          "id": "9fc5718e-1c12-45ae-8daf-0378ab04898c",
-          "title": "Unify safety controls with centralized policy enforcement",
-          "status": "completed",
-          "level": "task",
-          "description": "Address findings 3 and 4 together: unify the fragmented safety controls and add runtime policy enforcement. Currently safety is split across guard/ (command+path validation), tools/git.ts (independent allowlist), cli-loop.ts (CLI tool translation), and individual tools (timeout/size enforcement). GuardRails is stateless and doesn't track cumulative usage. Add session-aware policy tracking with cumulative resource tracking, rate limiting, and an audit trail of guard decisions.",
-          "acceptanceCriteria": [
-            "GuardRails tracks session state: cumulative commands run, bytes written, operations per minute",
-            "Rate limiting prevents excessive operations within a time window",
-            "Guard decisions are logged for audit trail",
-            "git.ts subcommand allowlist is integrated into the guard system",
-            "New tools automatically benefit from guard protections without manual integration",
-            "Tests verify rate limiting and cumulative tracking behavior"
-          ],
-          "priority": "high",
-          "startedAt": "2026-02-18T07:30:16.459Z",
-          "completedAt": "2026-02-18T07:42:56.017Z"
-        }
-      ]
-    },
-    {
       "id": "573c20ed-3795-4801-af87-4d036116d3e1",
       "title": "Hench Run Count Display Accuracy",
       "status": "completed",
@@ -9556,61 +9228,6 @@
       ]
     },
     {
-      "id": "221d849c-3b43-469c-9713-eb097228fff8",
-      "title": "Address observation issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-2\" (8+10 crossings) — consider extracting shared interface",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-20T23:04:46.050Z",
-      "completedAt": "2026-02-20T23:08:13.965Z"
-    },
-    {
-      "id": "bd579e03-b217-4303-80eb-8fd67d15bce5",
-      "title": "Address anti-pattern issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- God function: startServer in packages/web/src/server/start.ts calls 50 unique functions — consider decomposing into smaller, focused functions",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-20T22:59:40.358Z",
-      "completedAt": "2026-02-20T23:04:45.936Z"
-    },
-    {
-      "id": "b8aabffe-6d2f-48f8-88ce-f3ed7cca0856",
-      "title": "Address observation issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Bidirectional coupling: \"hench-agent-core\" ↔ \"hench-tooling-process\" (11+7 crossings) — consider extracting shared interface",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-21T01:50:20.483Z",
-      "completedAt": "2026-02-21T01:54:26.048Z"
-    },
-    {
-      "id": "9034e8a0-95aa-4f31-9c8b-54a1898d60a4",
-      "title": "Address anti-pattern issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- God function: cmdSmartAdd in packages/rex/src/cli/commands/smart-add.ts calls 46 unique functions — consider decomposing into smaller, focused functions",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-20T23:47:23.552Z",
-      "completedAt": "2026-02-20T23:52:02.400Z"
-    },
-    {
-      "id": "9bc0bc34-b5a6-4dd0-bd30-5e3e0285f527",
-      "title": "Address observation issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Bidirectional coupling: \"hench-agent-core\" ↔ \"hench-tooling-process\" (11+7 crossings) — consider extracting shared interface",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-21T01:54:26.164Z",
-      "completedAt": "2026-02-21T01:56:57.210Z"
-    },
-    {
       "id": "ceacf683-5a61-4218-80cf-bc01a56e1d7a",
       "title": "Address pattern issues (1 findings)",
       "status": "completed",
@@ -9620,28 +9237,6 @@
       "source": "sourcevision",
       "startedAt": "2026-02-21T01:56:57.300Z",
       "completedAt": "2026-02-21T02:02:01.023Z"
-    },
-    {
-      "id": "d1833695-01d2-4847-bba1-a2f78655c4c2",
-      "title": "Address relationship issues (5 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- Layered-but-leaky relationship with hench-tooling-process: heavy downstream invocation combined with reverse callbacks keeps the dependency cycle alive.\n- Service-provider boundary with hench-agent-core still leaks upward responsibilities via the remaining callbacks, preventing a clean tools-only layer.\n- Residual reverse hooks (6 calls) from hench-tooling-process back into hench-agent-core keep the ostensibly layered relationship from becoming separable.\n- 12 calls from Sourcevision tests into the CLI zone mean the suites bypass public boundaries and depend on CLI internals, raising refactor cost.\n- web-runtime-gateway currently hosts the rex CLI integration (21 outgoing calls) without a boundary, exposing the runtime zone to rex implementation changes.",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-21T03:45:05.584Z",
-      "completedAt": "2026-02-21T03:52:20.827Z"
-    },
-    {
-      "id": "b4b7a141-fa6e-4030-ad3b-866762a973ba",
-      "title": "Address anti-pattern issues (1 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- God function: createSourcevisionMcpServer in packages/sourcevision/src/cli/mcp.ts calls 44 unique functions — consider decomposing into smaller, focused functions",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-21T01:46:59.878Z",
-      "completedAt": "2026-02-21T01:50:20.366Z"
     },
     {
       "id": "421a6860-70c1-4f5c-879b-da51dc45599a",
@@ -13143,17 +12738,6 @@
       "completedAt": "2026-02-24T05:44:07.765Z"
     },
     {
-      "id": "530c8d1d-6e05-4b3f-945c-50914dd8b513",
-      "title": "Address anti-pattern issues (3 findings)",
-      "status": "completed",
-      "level": "feature",
-      "description": "- God function: <module> in cli.js calls 45 unique functions — consider decomposing into smaller, focused functions\n- God function: App in packages/web/src/viewer/main.ts calls 42 unique functions — consider decomposing into smaller, focused functions\n- God function: generatePdfReport in packages/sourcevision/src/export/pdf-report.ts calls 38 unique functions — consider decomposing into smaller, focused functions",
-      "priority": "high",
-      "source": "sourcevision",
-      "startedAt": "2026-02-24T05:13:10.253Z",
-      "completedAt": "2026-02-24T05:28:13.108Z"
-    },
-    {
       "id": "f95ede7e-3b79-4370-9c8b-0174c83ead4c",
       "title": "Process Lifecycle Management and Graceful Shutdown",
       "status": "completed",
@@ -14335,6 +13919,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-24T21:13:45.978Z",
+      "completedAt": "2026-02-24T21:13:45.978Z",
       "children": [
         {
           "id": "0f1065fb-1549-49f6-aa03-991d7e6eadee",
@@ -14416,9 +14002,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-24T21:13:45.978Z",
-      "completedAt": "2026-02-24T21:13:45.978Z"
+      ]
     }
   ]
 }

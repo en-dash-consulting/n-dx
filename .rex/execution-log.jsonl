@@ -3179,3 +3179,4 @@
 {"timestamp":"2026-02-24T21:13:45.954Z","event":"auto_completed","itemId":"0f1065fb-1549-49f6-aa03-991d7e6eadee","detail":"Auto-completed feature: Interactive parent-child inconsistency resolution (all children done)"}
 {"timestamp":"2026-02-24T21:13:46.027Z","event":"auto_completed","itemId":"e8eb20b9-7712-4a8d-8fd7-2bf2321d5857","detail":"Auto-completed epic: Interactive PRD Validation and Consistency Resolution (all children done)"}
 {"timestamp":"2026-02-24T21:13:46.027Z","event":"task_failed","itemId":"b5dfa9b2-ad8a-4dcd-b871-7c6308a378e5","detail":"You've hit your limit · resets 7pm (America/New_York)"}
+{"timestamp":"2026-02-25T01:12:07.698Z","event":"validate_interactive_fix","detail":"Resolved 15 epicless features during interactive validation"}
