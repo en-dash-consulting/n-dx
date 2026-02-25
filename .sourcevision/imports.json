@@ -5296,10 +5296,36 @@
     },
     {
       "from": "packages/rex/src/cli/commands/recommend.ts",
+      "to": "packages/rex/src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "formatConflict",
+        "formatIntraBatchDuplicate"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/recommend.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "static",
+      "symbols": [
+        "createItemsFromRecommendations"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/recommend.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "ConflictStrategy"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/recommend.ts",
       "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
-        "PRDItem",
         "ItemLevel"
       ]
     },
@@ -7578,6 +7604,24 @@
     },
     {
       "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "reexport",
+      "symbols": [
+        "createItemsFromRecommendations"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "CreationResult"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
       "to": "packages/rex/src/schema/v1.ts",
       "type": "reexport",
       "symbols": [
@@ -7675,6 +7719,99 @@
     },
     {
       "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/store/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/conflict-detection.ts",
+      "to": "packages/rex/src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/conflict-detection.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/conflict-detection.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/conflict-detection.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "insertChild"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "detectRecommendationConflicts"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/recommend/conflict-detection.ts",
+      "type": "type",
+      "symbols": [
+        "ConflictReport"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
       "to": "packages/rex/src/store/types.ts",
       "type": "type",
       "symbols": [
@@ -9938,6 +10075,58 @@
       "type": "type",
       "symbols": [
         "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
+      "to": "packages/rex/src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "detectRecommendationConflicts",
+        "formatConflict",
+        "formatIntraBatchDuplicate",
+        "CONFLICT_THRESHOLD"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
       ]
     },
     {
@@ -18284,6 +18473,8 @@
         "packages/rex/tests/unit/core/tree-hardened.test.ts",
         "packages/rex/tests/unit/core/tree.test.ts",
         "packages/rex/tests/unit/core/verify.test.ts",
+        "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
+        "packages/rex/tests/unit/recommend/create-from-recommendations.test.ts",
         "packages/rex/tests/unit/schema/validate.test.ts",
         "packages/rex/tests/unit/store/adapter-registry.test.ts",
         "packages/rex/tests/unit/store/file-adapter.test.ts",
@@ -18461,18 +18652,25 @@
     }
   ],
   "summary": {
-    "totalEdges": 1917,
+    "totalEdges": 1939,
     "totalExternal": 18,
-    "circularCount": 0,
-    "circulars": [],
+    "circularCount": 1,
+    "circulars": [
+      {
+        "cycle": [
+          "packages/rex/src/recommend/create-from-recommendations.ts",
+          "packages/rex/src/recommend/conflict-detection.ts"
+        ]
+      }
+    ],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
-        "count": 39
+        "count": 41
       },
       {
         "path": "packages/rex/src/store/index.ts",
-        "count": 27
+        "count": 28
       },
       {
         "path": "packages/rex/src/cli/commands/constants.ts",
@@ -18488,7 +18686,7 @@
       },
       {
         "path": "packages/rex/src/schema/index.ts",
-        "count": 23
+        "count": 24
       },
       {
         "path": "packages/web/src/viewer/components/logos.ts",
@@ -18547,6 +18745,6 @@
         "count": 9
       }
     ],
-    "avgImportsPerFile": 3.4
+    "avgImportsPerFile": 3.41
   }
 }

@@ -173,7 +173,6 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.95) — files are tightly interconnected
-[observation] [info] Clean separation of PRD-specific functionality from general UI framework
 
 </findings>
 

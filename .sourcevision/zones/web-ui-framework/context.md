@@ -403,7 +403,6 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.97) — files are tightly interconnected
-[observation] [info] Exceptional cohesion-to-size ratio demonstrates mature modular design patterns
 
 </findings>
 

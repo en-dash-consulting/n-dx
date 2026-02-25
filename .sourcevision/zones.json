@@ -1504,6 +1504,8 @@
         "Low coupling (0.1) with clean boundaries ensures guard mechanisms don't interfere with core logic",
         "Dedicated safety zone reflects proper architectural consideration for autonomous agent risks",
         "Well-isolated safety guards with strong cohesion ensure reliable agent execution boundaries",
+        "Unidirectional dependencies into both core and tools suggest monitoring/oversight pattern rather than circular coupling",
+        "Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture",
         "[call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)"
       ]
     },
@@ -1538,6 +1540,8 @@
         "Higher coupling (0.23) indicates necessary dependencies on agent core for tool integration",
         "Clear architectural separation of tool concerns from core agent logic maintains system modularity",
         "Moderate cohesion (0.77) suggests potential for further separation of tool dispatch concerns",
+        "Higher coupling (0.23) reflects necessary integration boundary between agent logic and external tool systems",
+        "Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs",
         "[call graph] 112 internal calls, 4 outgoing, 37 incoming (cohesion: 0.97, coupling: 0.03)"
       ]
     },
@@ -1832,6 +1836,8 @@
         "Very low coupling (0.03) demonstrates good isolation despite the zone's size and complexity",
         "Adaptive analysis and review systems suggest sophisticated agent reasoning capabilities",
         "High cohesion across 95 files indicates excellent architectural focus for complex agent logic",
+        "Acts as the central hub in agent subsystem with moderate coupling allowing controlled integration",
+        "Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic",
         "[call graph] 1837 internal calls, 3 outgoing, 22 incoming (cohesion: 1, coupling: 0)"
       ]
     },
@@ -1854,6 +1860,8 @@
         "Very small zone (3 files) mixing implementation and test files indicates possible misclassification",
         "Graph physics functionality appears isolated from other graph-related features",
         "Low cohesion and high coupling ratios suggest this zone may need restructuring or merging",
+        "Zone isolation suggests potential dead code or experimental feature",
+        "Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature",
         "[call graph] 68 internal calls, 0 outgoing, 3 incoming (cohesion: 1, coupling: 0)"
       ]
     },
@@ -1884,6 +1892,8 @@
         "Centralized configuration management through config.js provides consistent settings across all packages",
         "Entry point consolidation (ci.js, cli.js) creates a clean interface layer for the entire system",
         "Perfect cohesion (1.0) and zero coupling (0.0) demonstrates exemplary architectural isolation",
+        "Demonstrates pure orchestration pattern with zero dependencies while maintaining perfect internal cohesion",
+        "Perfect isolation pattern (coupling: 0) enables clean coordination without tight coupling to domain logic",
         "[call graph] 386 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ]
     },
@@ -2077,7 +2087,7 @@
         "The adapter field in RexConfig is dead configuration — all 8 createStore() call sites hardcode the literal string \"file\" instead of reading config.adapter, making alternative adapters unreachable",
         "Log event names for the same semantic operation differ between CLI and MCP: update.ts:68 emits \"item_updated\" while mcp.ts:129 emits \"status_changed\" for status changes, with no shared event-name constants",
         "init.ts and validate.ts both bypass the store abstraction layer, using raw fs readFile/writeFile directly, making them incompatible with any non-file adapter",
-        "[call graph] 730 internal calls, 197 outgoing, 536 incoming (cohesion: 0.79, coupling: 0.21)"
+        "[call graph] 738 internal calls, 213 outgoing, 540 incoming (cohesion: 0.78, coupling: 0.22)"
       ],
       "childId": "packages-rex",
       "depth": 1
@@ -2540,6 +2550,8 @@
         "Very low coupling (0.02) demonstrates strong isolation and minimal external dependencies",
         "Foundation role with CLI, public API, and schema suggests well-structured service layer",
         "Exceptional cohesion (0.98) and minimal coupling (0.02) exemplify clean service architecture",
+        "Demonstrates clean external integration pattern with 21 calls to rex-cli showing well-defined service boundaries",
+        "External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation",
         "[call graph] 1250 internal calls, 21 outgoing, 3 incoming (cohesion: 0.98, coupling: 0.02)"
       ]
     },
@@ -4685,6 +4697,7 @@
     ".gitignore",
     ".hench/config.json",
     ".npmrc",
+    ".rex/acknowledged-findings.json",
     ".rex/archive.json",
     ".rex/config.json",
     ".rex/execution-log.jsonl",
@@ -4748,6 +4761,7 @@
     "Bidirectional coupling: \"agent-safety-guards\" ↔ \"autonomous-agent-core\" (2+1 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"agent-safety-guards\" ↔ \"agent-tool-infrastructure\" (1+1 crossings) — consider extracting shared interface",
     "Size imbalance: largest zone has 141 files vs smallest with 3 — uneven decomposition",
+    "1 circular dependency chain detected — see imports.json for details",
     "Bidirectional coupling between agent core and tool infrastructure (hench ↔ hench-2) indicates tight but necessary integration",
     "The three-tier hench architecture (core, tools, guards) demonstrates proper separation of agent concerns",
     "Root orchestration layer achieves perfect isolation while web foundation maintains excellent boundaries",
@@ -4756,6 +4770,16 @@
     "Agent zones show circular dependency patterns that may indicate architectural debt requiring refactoring",
     "Agent subsystem shows thoughtful architectural separation with core logic, tool infrastructure, and safety guards as distinct zones",
     "Circular dependencies between agent zones (hench, hench-2, hench-3) suggest need for dependency inversion or interface extraction",
+    "Agent subsystem shows balanced zone sizing (95, 11, 10 files) indicating appropriate concern separation",
+    "Triangular relationship pattern in agent zones (core ↔ tools, guards → core, guards → tools) creates proper oversight without circular dependencies",
+    "Clear domain isolation between web service zones and autonomous agent zones prevents cross-contamination of concerns",
+    "Clean domain boundary separation between web UI subsystem and agent (hench) subsystem with zero cross-domain imports",
+    "Dual architectural patterns coexist: layered architecture in web subsystem vs distributed circular dependencies in agent subsystem",
+    "Zone naming inconsistency between descriptive names (web-ui-framework, prd-management-interface) and generic identifiers (web, web-2, hench) suggests evolution or tooling limitations",
+    "Orchestration layer achieves coordination without coupling while domain zones maintain appropriate coupling levels for their integration needs",
+    "Perfect domain isolation between web and hench subsystems demonstrates excellent architectural boundaries",
+    "Inconsistent zone naming conventions may indicate incomplete zone identification or architectural evolution",
+    "Agent zone coupling gradient (core: 0.03 → guards: 0.1 → tools: 0.23) reflects increasing external integration responsibility",
     "[call graph] 34 calls: \"agent-safety-guards\" → \"agent-tool-infrastructure\"",
     "[call graph] 21 calls: \"web-service-foundation\" → \"packages-rex:rex-cli\"",
     "[call graph] 19 calls: \"agent-safety-guards\" → \"autonomous-agent-core\"",
@@ -4771,13 +4795,6 @@
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "agent-safety-guards",
-      "text": "Well-isolated safety guards with strong cohesion ensure reliable agent execution boundaries",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
       "pass": 0,
       "scope": "autonomous-agent-core",
       "text": "High cohesion (0.97) — files are tightly interconnected",
@@ -4785,10 +4802,10 @@
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "autonomous-agent-core",
-      "text": "High cohesion across 95 files indicates excellent architectural focus for complex agent logic",
-      "severity": "info"
+      "pass": 0,
+      "scope": "global",
+      "text": "1 circular dependency chain detected — see imports.json for details",
+      "severity": "warning"
     },
     {
       "type": "observation",
@@ -4829,7 +4846,7 @@
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Fan-in hotspot: packages/rex/src/core/tree.ts receives calls from 35 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects",
+      "text": "Fan-in hotspot: packages/rex/src/core/tree.ts receives calls from 37 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects",
       "severity": "info",
       "related": [
         "packages/rex/src/core/tree.ts",
@@ -4847,23 +4864,9 @@
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "orchestration-layer",
-      "text": "Perfect cohesion (1.0) and zero coupling (0.0) demonstrates exemplary architectural isolation",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
       "pass": 0,
       "scope": "prd-management-interface",
       "text": "High cohesion (0.95) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-management-interface",
-      "text": "Clean separation of PRD-specific functionality from general UI framework",
       "severity": "info"
     },
     {
@@ -4875,38 +4878,91 @@
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "web-service-foundation",
-      "text": "Exceptional cohesion (0.98) and minimal coupling (0.02) exemplify clean service architecture",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
       "pass": 0,
       "scope": "web-ui-framework",
       "text": "High cohesion (0.97) — files are tightly interconnected",
       "severity": "info"
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "web-ui-framework",
-      "text": "Exceptional cohesion-to-size ratio demonstrates mature modular design patterns",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "agent-safety-guards",
+      "text": "Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture",
       "severity": "info"
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "agent-tool-infrastructure",
-      "text": "Moderate cohesion (0.77) suggests potential for further separation of tool dispatch concerns",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "global",
+      "text": "Inconsistent zone naming conventions may indicate incomplete zone identification or architectural evolution",
       "severity": "info"
     },
     {
-      "type": "observation",
-      "pass": 1,
+      "type": "pattern",
+      "pass": 2,
+      "scope": "global",
+      "text": "Orchestration layer achieves coordination without coupling while domain zones maintain appropriate coupling levels for their integration needs",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "global",
+      "text": "Perfect domain isolation between web and hench subsystems demonstrates excellent architectural boundaries",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
       "scope": "graph-visualization-engine",
-      "text": "Low cohesion and high coupling ratios suggest this zone may need restructuring or merging",
+      "text": "Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature",
       "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "orchestration-layer",
+      "text": "Perfect isolation pattern (coupling: 0) enables clean coordination without tight coupling to domain logic",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "agent-tool-infrastructure",
+      "text": "Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "autonomous-agent-core",
+      "text": "Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "global",
+      "text": "Agent zone coupling gradient (core: 0.03 → guards: 0.1 → tools: 0.23) reflects increasing external integration responsibility",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 0,
+      "scope": "global",
+      "text": "Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 133 cross-file calls (unidirectional). Consider extracting shared interface or merging",
+      "severity": "info",
+      "related": [
+        "packages/web/src/server/routes-rex.ts",
+        "packages/web/src/server/types.ts"
+      ]
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "web-service-foundation",
+      "text": "External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation",
+      "severity": "info"
     },
     {
       "type": "anti-pattern",
@@ -4929,21 +4985,10 @@
       ]
     },
     {
-      "type": "relationship",
-      "pass": 0,
-      "scope": "global",
-      "text": "Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 133 cross-file calls (unidirectional). Consider extracting shared interface or merging",
-      "severity": "info",
-      "related": [
-        "packages/web/src/server/routes-rex.ts",
-        "packages/web/src/server/types.ts"
-      ]
-    },
-    {
       "type": "suggestion",
       "pass": 0,
       "scope": "global",
-      "text": "Hub function: walkTree in packages/rex/src/core/tree.ts is called from 22 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
+      "text": "Hub function: walkTree in packages/rex/src/core/tree.ts is called from 23 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
       "severity": "info",
       "related": [
         "packages/rex/src/core/tree.ts",
@@ -5013,7 +5058,7 @@
       ]
     }
   ],
-  "enrichmentPass": 1,
+  "enrichmentPass": 2,
   "structureHash": "6bd2b0b1bbae3cc9",
   "zoneContentHashes": {
     "root": "b1b6cef4af64326f",
@@ -5024,9 +5069,5 @@
     "web-2": "a32582d769384063",
     "web-3": "9f73b5b3ae71b503",
     "web-4": "6e30555121ee5c90"
-  },
-  "lastReset": {
-    "from": 1,
-    "to": 1
   }
 }

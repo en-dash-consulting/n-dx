@@ -237,7 +237,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.98) — files are tightly interconnected
-[observation] [info] Exceptional cohesion (0.98) and minimal coupling (0.02) exemplify clean service architecture
+[relationship] [info] External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation
 
 </findings>
 
@@ -248,6 +248,8 @@ Incoming (other zones → this zone):
 - Very low coupling (0.02) demonstrates strong isolation and minimal external dependencies
 - Foundation role with CLI, public API, and schema suggests well-structured service layer
 - Exceptional cohesion (0.98) and minimal coupling (0.02) exemplify clean service architecture
+- Demonstrates clean external integration pattern with 21 calls to rex-cli showing well-defined service boundaries
+- External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation
 - [call graph] 1250 internal calls, 21 outgoing, 3 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>

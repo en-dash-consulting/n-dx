@@ -64,7 +64,7 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [info] Moderate cohesion (0.77) suggests potential for further separation of tool dispatch concerns
+[relationship] [info] Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs
 
 </findings>
 
@@ -74,6 +74,8 @@ Incoming (other zones → this zone):
 - Higher coupling (0.23) indicates necessary dependencies on agent core for tool integration
 - Clear architectural separation of tool concerns from core agent logic maintains system modularity
 - Moderate cohesion (0.77) suggests potential for further separation of tool dispatch concerns
+- Higher coupling (0.23) reflects necessary integration boundary between agent logic and external tool systems
+- Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs
 - [call graph] 112 internal calls, 4 outgoing, 37 incoming (cohesion: 0.97, coupling: 0.03)
 
 </insights>

@@ -2,7 +2,7 @@
 
 **Branch:** `feature/integrate-codex`
 **Base:** `main`
-**Completed items:** 280
+**Completed items:** 293
 
 | Epic | Completed |
 |------|-----------|
@@ -36,6 +36,7 @@
 | Interactive PRD Validation and Consistency Resolution | 3 |
 | Branch Work System of Record | 7 |
 | Automatic PR Markdown Generation | 7 |
+| Enhanced Rex Recommend Selective PRD Creation | 12 |
 
 ## ⚠️ Breaking Changes
 
@@ -355,6 +356,9 @@ The llm-client module has 7 distinct layers:
 - **Interactive PRD Validation and Consistency Resolution**
 - **Branch Work System of Record**
 - **Automatic PR Markdown Generation**
+- **Enhanced Rex Recommend Selective PRD Creation**
+- **Implement selective PRD creation from selected recommendations** [critical]
+  Create PRD items from the selected recommendations using the existing rex add pipeline, replacing the acknowledge-only behavior
 
 ## Completed Work
 
@@ -631,6 +635,72 @@ The llm-client module has 7 distinct layers:
   Persist and expose override markers so intentionally duplicated items can be traced later in CLI output and downstream tools.
 - Documentation and Test Coverage for Duplicate Overrides *(feature)*
   Document the new behavior and lock it in with regression tests across detection, prompt decisions, and persistence.
+
+### Enhanced Rex Recommend Selective PRD Creation
+
+**Documentation and Testing**
+- Update CLI help and documentation for enhanced recommend --accept syntax
+  Document the new selector syntax options and provide clear usage examples for selective PRD creation
+  - Updates `rex recommend --help` with new selector syntax examples
+  - Documents difference between acknowledge and accept workflows
+  - Includes examples for single index, comma-separated, and wildcard selectors
+  - Explains PRD creation behavior vs acknowledgment-only behavior
+- Add comprehensive test coverage for enhanced recommend acceptance
+  Test all selector syntax variations, PRD creation workflows, and error scenarios to ensure robustness
+  - Tests comma-separated index parsing and validation
+  - Tests period wildcard syntax and edge cases
+  - Tests PRD creation from selected recommendations
+  - Tests conflict detection and resolution workflows
+  - Tests error handling for malformed selectors and invalid indices
+
+**Enhanced Validation and Error Handling**
+- Implement comprehensive selector validation with detailed error messages
+  Validate selector format, index bounds, and recommendation availability with actionable error messages
+  - Validates selector format matches expected patterns (=index, =1,3,5, or =.)
+  - Checks all specified indices exist in current recommendations
+  - Provides specific error messages for malformed selectors with correction hints
+  - Handles edge cases like empty recommendation lists gracefully
+- Add PRD creation conflict detection and resolution
+  Detect and handle conflicts when selected recommendations would create duplicate or conflicting PRD items
+  - Detects duplicate PRD items that would be created from recommendations
+  - Provides merge options for conflicting recommendations
+  - Allows user to skip conflicting items and proceed with non-conflicting ones
+  - Maintains PRD consistency when handling partial creation scenarios
+
+**Extended Selector Syntax Parsing**
+- Implement comma-separated index list parsing for recommend --accept
+  Extend the existing `=index` syntax to support `=1,3,5` format for selecting multiple specific recommendations by index
+  - Parses `--accept=1,3,5` to select recommendations at indices 1, 3, and 5
+  - Validates all indices are within bounds of available recommendations
+  - Returns meaningful error for invalid index formats or out-of-range indices
+- Implement period wildcard syntax for accepting all recommendations
+  Add support for `=.` syntax to accept all available recommendations at once without listing individual indices
+  - Parses `--accept=.` to select all available recommendations
+  - Works correctly when no recommendations are available (no-op behavior)
+  - Provides clear confirmation message showing total count of selected items
+
+**PRD Creation Integration**
+- 🔶 **Implement selective PRD creation from selected recommendations**
+  Create PRD items from the selected recommendations using the existing rex add pipeline, replacing the acknowledge-only behavior
+  - Creates actual PRD items (epics/features/tasks) from selected recommendations
+  - Uses existing rex add validation and creation logic
+  - Preserves recommendation metadata and quality scores in created items
+  - Updates PRD state atomically to prevent partial creation on errors
+- Add creation confirmation and summary output
+  Provide clear feedback showing which recommendations were selected and successfully created as PRD items
+  - Shows summary of selected recommendations before creation
+  - Displays creation results with success/failure status per item
+  - Includes PRD item IDs and hierarchy placement for created items
+  - Shows total count of created vs selected items
+
+- Extended Selector Syntax Parsing *(feature)*
+  Extend the existing equals-prefixed index selector to support comma-separated lists and period wildcard for all items
+- PRD Creation Integration *(feature)*
+  Implement the actual PRD creation workflow for selected recommendations, going beyond the existing acknowledge functionality
+- Enhanced Validation and Error Handling *(feature)*
+  Robust validation for the extended selector syntax and PRD creation workflow
+- Documentation and Testing *(feature)*
+  Comprehensive documentation and test coverage for the enhanced recommendation acceptance workflow
 
 ### Git Credential Helper Opt-In Recovery
 
@@ -1806,4 +1876,5 @@ The llm-client module has 7 distinct layers:
 - 🔶 **Interactive PRD Validation and Consistency Resolution** *(epic)*
 - 🔶 **Branch Work System of Record** *(epic)*
 - 🔶 **Automatic PR Markdown Generation** *(epic)*
+- 🔶 **Enhanced Rex Recommend Selective PRD Creation** *(epic)*
 

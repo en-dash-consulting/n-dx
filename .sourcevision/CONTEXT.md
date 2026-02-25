@@ -7,10 +7,11 @@
 
 Project: n-dx
 Git: feature/integrate-codex @ 21786d2
-Files: 800, Lines: 257598
-Languages: TypeScript(656) CSS(40) JSON(29) JavaScript(29) Other(20)
+Files: 805, Lines: 261854
+Languages: TypeScript(660) CSS(40) JSON(30) JavaScript(29) Other(20)
 Zones: 30, Described: 30
-Import edges: 1917, External packages: 18
+Import edges: 1939, External packages: 18
+Circulars: 1
 
 </architecture>
 
@@ -106,7 +107,7 @@ Import edges: 1917, External packages: 18
 [web-ui-framework] Web UI Framework (141 files, coh=0.97 coup=0.03)
   Core frontend components, schema validation, and shared UI infrastructure that powers the web dashboard interface.
   files: packages/web/src/schema/v1.ts [schema], packages/web/src/schema/validate.ts [schema], packages/web/src/viewer/components/active-tasks-panel.ts [component], packages/web/src/viewer/components/breadcrumb.ts [component], packages/web/src/viewer/components/config-footer.ts [component], packages/web/src/viewer/components/constants.ts [types], packages/web/src/viewer/components/copy-link-button.ts [component], packages/web/src/viewer/components/crash-recovery-banner.ts [component], packages/web/src/viewer/components/data-display/collapsible-section.ts [component], packages/web/src/viewer/components/data-display/findings-list.ts [component] +131
-[unzoned] 58 files: .gitignore, .hench/config.json, .npmrc, .rex/archive.json, .rex/config.json ...
+[unzoned] 59 files: .gitignore, .hench/config.json, .npmrc, .rex/acknowledged-findings.json, .rex/archive.json ...
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -115,16 +116,19 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 <imports>
 
 Most imported:
-  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add.ts +36
-  packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts +26
+  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add.ts +38
+  packages/rex/src/store/index.ts ← packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/move.ts +27
   packages/rex/src/cli/commands/constants.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/init.ts +20
   packages/rex/src/cli/errors.ts ← packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/move.ts, packages/rex/src/cli/commands/prune.ts +20
   packages/rex/src/cli/output.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/cli/commands/adapter.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/chunked-review.ts +19
-  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/modify-reason.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts +116
+  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/modify-reason.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts +121
   packages/web/src/viewer/components/logos.ts ← packages/web/src/viewer/components/prd-tree/shared-imports.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/files.ts +17
   packages/hench/src/store/config.ts ← packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/task-lookup.ts, packages/hench/src/cli/commands/template.ts, packages/hench/src/store/index.ts, packages/hench/tests/integration/codex-token-accounting.test.ts +15
   packages/rex/src/analyze/reason.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/index.ts, packages/rex/src/analyze/modify-reason.ts +16
   packages/rex/src/core/canonical.ts ← packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/prune.ts, packages/rex/src/cli/commands/reshape.ts, packages/rex/src/store/adapter-registry.ts, packages/rex/src/store/file-adapter.ts +11
+
+Circular chains:
+  packages/rex/src/recommend/create-from-recommendations.ts → packages/rex/src/recommend/conflict-detection.ts
 
 </imports>
 
@@ -242,10 +246,11 @@ Server routes: 92 endpoints in 13 handler(s)
 
 <findings>
 
+[warning] 1 circular dependency chain detected — see imports.json for details
 [warning] Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (3+5 crossings) — consider extracting shared interface
 [warning] Bidirectional coupling: "prd-management-interface" ↔ "web-ui-framework" (6+4 crossings) — consider extracting shared interface
 [warning] Circular dependencies between agent zones (hench, hench-2, hench-3) suggest need for dependency inversion or interface extraction
-[warning] Low cohesion and high coupling ratios suggest this zone may need restructuring or merging [graph-visualization-engine]
+[warning] Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature [graph-visualization-engine]
 [warning] God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions
 [warning] God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions
 
@@ -255,8 +260,10 @@ Server routes: 92 endpoints in 13 handler(s)
 
 [medium] God function: GraphRenderer.constructor in packages/web/src… (+1 related)
   category: refactor
-[medium] Low cohesion and high coupling ratios suggest this zone may need restructuring …
+[medium] Mixed implementation and test files with minimal cross-zone integration suggest…
   files: packages/web/src/viewer/graph/physics.ts, packages/web/tests/unit/viewer/graph-destroy.test.ts, packages/web/tests/unit/viewer/graph-layout.test.ts
+  category: extract
+[medium] 1 circular dependency chain detected — see imports.json for details
   category: refactor
 [medium] Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (…
   category: refactor

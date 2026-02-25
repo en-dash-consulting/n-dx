@@ -2875,6 +2875,34 @@
       ]
     },
     {
+      "path": "packages/rex/src/recommend/conflict-detection.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Business logic for recommendation conflict detection",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Business logic for creating items from recommendations",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
       "path": "packages/rex/src/schema/index.ts",
       "archetype": "entrypoint",
       "secondaryArchetypes": [
@@ -5844,13 +5872,13 @@
     }
   ],
   "summary": {
-    "totalClassified": 367,
+    "totalClassified": 369,
     "totalUnclassified": 0,
     "byArchetype": {
       "entrypoint": 33,
       "config": 5,
       "utility": 78,
-      "service": 62,
+      "service": 64,
       "cli-command": 49,
       "types": 14,
       "gateway": 3,
@@ -5862,7 +5890,7 @@
       "hook": 10
     },
     "bySource": {
-      "llm": 132,
+      "llm": 134,
       "algorithmic": 235
     }
   }

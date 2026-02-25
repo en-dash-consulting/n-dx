@@ -61,7 +61,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.9) — files are tightly interconnected
-[observation] [info] Well-isolated safety guards with strong cohesion ensure reliable agent execution boundaries
+[pattern] [info] Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture
 
 </findings>
 
@@ -72,6 +72,8 @@ Incoming (other zones → this zone):
 - Low coupling (0.1) with clean boundaries ensures guard mechanisms don't interfere with core logic
 - Dedicated safety zone reflects proper architectural consideration for autonomous agent risks
 - Well-isolated safety guards with strong cohesion ensure reliable agent execution boundaries
+- Unidirectional dependencies into both core and tools suggest monitoring/oversight pattern rather than circular coupling
+- Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture
 - [call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)
 
 </insights>

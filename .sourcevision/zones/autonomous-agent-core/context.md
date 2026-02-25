@@ -395,7 +395,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.97) — files are tightly interconnected
-[observation] [info] High cohesion across 95 files indicates excellent architectural focus for complex agent logic
+[relationship] [info] Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic
 
 </findings>
 
@@ -406,6 +406,8 @@ Incoming (other zones → this zone):
 - Very low coupling (0.03) demonstrates good isolation despite the zone's size and complexity
 - Adaptive analysis and review systems suggest sophisticated agent reasoning capabilities
 - High cohesion across 95 files indicates excellent architectural focus for complex agent logic
+- Acts as the central hub in agent subsystem with moderate coupling allowing controlled integration
+- Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic
 - [call graph] 1837 internal calls, 3 outgoing, 22 incoming (cohesion: 1, coupling: 0)
 
 </insights>

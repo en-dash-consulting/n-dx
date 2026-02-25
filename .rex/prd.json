@@ -14358,6 +14358,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-25T16:21:53.578Z",
+      "completedAt": "2026-02-25T16:21:53.578Z",
       "children": [
         {
           "id": "a251427e-a782-4ec2-86f3-85e3cf42df72",
@@ -14624,9 +14626,7 @@
             "createdAt": "2026-02-25T14:55:39.403Z"
           }
         }
-      ],
-      "startedAt": "2026-02-25T16:21:53.578Z",
-      "completedAt": "2026-02-25T16:21:53.578Z"
+      ]
     }
   ]
 }

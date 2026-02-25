@@ -5,12 +5,12 @@
 
 ## Project Overview
 
-- **Files**: 800
-- **Lines of code**: 257,598
-- **Languages**: TypeScript (656), CSS (40), JSON (29), JavaScript (29), Other (20)
+- **Files**: 805
+- **Lines of code**: 261,854
+- **Languages**: TypeScript (660), CSS (40), JSON (30), JavaScript (29), Other (20)
 - **Zones**: 30 (30 with descriptions)
 - **Git**: feature/integrate-codex @ 21786d2
-- **Analyzed**: 2026-02-25T14:43:18.006Z
+- **Analyzed**: 2026-02-25T16:29:11.964Z
 
 ## Architecture Zones
 
@@ -282,12 +282,12 @@ Core frontend components, schema validation, and shared UI infrastructure that p
 
 ### Most-Imported Files
 
-- `packages/rex/src/core/tree.ts` (39 imports)
-- `packages/rex/src/store/index.ts` (27 imports)
+- `packages/rex/src/core/tree.ts` (41 imports)
+- `packages/rex/src/store/index.ts` (28 imports)
 - `packages/rex/src/cli/commands/constants.ts` (25 imports)
 - `packages/rex/src/cli/errors.ts` (25 imports)
 - `packages/rex/src/cli/output.ts` (24 imports)
-- `packages/rex/src/schema/index.ts` (23 imports)
+- `packages/rex/src/schema/index.ts` (24 imports)
 - `packages/web/src/viewer/components/logos.ts` (22 imports)
 - `packages/hench/src/store/config.ts` (20 imports)
 - `packages/rex/src/analyze/reason.ts` (16 imports)
@@ -295,7 +295,7 @@ Core frontend components, schema validation, and shared UI infrastructure that p
 
 ### External Packages
 
-- `vitest` (used by 305 files)
+- `vitest` (used by 307 files)
 - `preact` (used by 97 files)
 - `@n-dx/llm-client` (used by 53 files)
 - `rex` (used by 21 files)
@@ -305,6 +305,12 @@ Core frontend components, schema validation, and shared UI infrastructure that p
 - `fs` (used by 6 files)
 - `path` (used by 6 files)
 - `typescript` (used by 5 files)
+
+### Circular Dependencies
+
+Found 1 circular dependency chain(s):
+
+- `packages/rex/src/recommend/create-from-recommendations.ts` → `packages/rex/src/recommend/conflict-detection.ts`
 
 ## Route Structure
 
@@ -476,27 +482,40 @@ POST    /api/hench/workflow/suggestions/:id
 - God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions [warning]
 - God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
 
+### Patterns
+
+- Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture [info] (agent-safety-guards)
+- Inconsistent zone naming conventions may indicate incomplete zone identification or architectural evolution [info]
+- Orchestration layer achieves coordination without coupling while domain zones maintain appropriate coupling levels for their integration needs [info]
+- Perfect domain isolation between web and hench subsystems demonstrates excellent architectural boundaries [info]
+- Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature [warning] (graph-visualization-engine)
+- Perfect isolation pattern (coupling: 0) enables clean coordination without tight coupling to domain logic [info] (orchestration-layer)
+
 ### Relationships
 
+- Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs [info] (agent-tool-infrastructure)
+- Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic [info] (autonomous-agent-core)
+- Agent zone coupling gradient (core: 0.03 → guards: 0.1 → tools: 0.23) reflects increasing external integration responsibility [info]
 - Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 133 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
+- External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation [info] (web-service-foundation)
 
 ### Observations
 
 - High cohesion (0.9) — files are tightly interconnected [info] (agent-safety-guards)
-- Well-isolated safety guards with strong cohesion ensure reliable agent execution boundaries [info] (agent-safety-guards)
 - High cohesion (0.97) — files are tightly interconnected [info] (autonomous-agent-core)
-- High cohesion across 95 files indicates excellent architectural focus for complex agent logic [info] (autonomous-agent-core)
+- 1 circular dependency chain detected — see imports.json for details [warning]
 - Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (3+5 crossings) — consider extracting shared interface [warning]
 - Bidirectional coupling: "prd-management-interface" ↔ "web-ui-framework" (6+4 crossings) — consider extracting shared interface [warning]
 - Size imbalance: largest zone has 141 files vs smallest with 3 — uneven decomposition [info]
 - Agent subsystem shows thoughtful architectural separation with core logic, tool infrastructure, and safety guards as distinct zones [info]
 - Circular dependencies between agent zones (hench, hench-2, hench-3) suggest need for dependency inversion or interface extraction [warning]
-- Fan-in hotspot: packages/rex/src/core/tree.ts receives calls from 35 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects [info]
-- ... and 10 more
+- Fan-in hotspot: packages/rex/src/core/tree.ts receives calls from 37 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects [info]
+- High cohesion (1) — files are tightly interconnected [info] (orchestration-layer)
+- ... and 3 more
 
 ### Suggestions
 
-- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 22 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
+- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 23 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - 3 potentially unused exports in packages/web/src/viewer/utils.ts have no incoming calls: getZoneColor, buildFlowEdges, buildFlowNodes [info]
 - 2 potentially unused exports in packages/web/src/viewer/loader.ts have no incoming calls: loadModule, loadFromServer [info]
 - Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts has no incoming calls — verify if still needed [info]
@@ -512,8 +531,10 @@ Prioritized work items derived from analysis:
 
 1. **God function: GraphRenderer.constructor in packages/web/src… (+1 related)**
 
-1. **Low cohesion and high coupling ratios suggest this zone may need restructuring …**
+1. **Mixed implementation and test files with minimal cross-zone integration suggest…**
    Files: `packages/web/src/viewer/graph/physics.ts`, `packages/web/tests/unit/viewer/graph-destroy.test.ts`, `packages/web/tests/unit/viewer/graph-layout.test.ts`
+
+1. **1 circular dependency chain detected — see imports.json for details**
 
 1. **Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (…**
 
@@ -523,7 +544,7 @@ Prioritized work items derived from analysis:
 
 ### Low Priority
 
-1. **Hub function: walkTree in packages/rex/src/core/tree.ts is called from 22 files…**
+1. **Hub function: walkTree in packages/rex/src/core/tree.ts is called from 23 files…**
 
 1. **3 potentially unused exports in packages/web/src/viewer/utils.ts have no incomi…**
 
@@ -544,6 +565,7 @@ Prioritized work items derived from analysis:
 | `.gitignore` | config |  |  |
 | `.hench/config.json` | other |  |  |
 | `.npmrc` | config |  |  |
+| `.rex/acknowledged-findings.json` | other |  |  |
 | `.rex/archive.json` | other |  |  |
 | `.rex/config.json` | other |  |  |
 | `.rex/execution-log.jsonl` | other |  |  |
@@ -821,6 +843,8 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/core/tree.ts` | source | utility | packages-rex:rex-cli |
 | `packages/rex/src/core/verify.ts` | source | utility |  |
 | `packages/rex/src/public.ts` | source | entrypoint |  |
+| `packages/rex/src/recommend/conflict-detection.ts` | source | service |  |
+| `packages/rex/src/recommend/create-from-recommendations.ts` | source | service |  |
 | `packages/rex/src/schema/index.ts` | source | entrypoint | packages-rex:rex-cli |
 | `packages/rex/src/schema/v1.ts` | source | schema | packages-rex:rex-cli |
 | `packages/rex/src/schema/validate.ts` | source | schema | packages-rex:rex-cli |
@@ -928,6 +952,8 @@ Prioritized work items derived from analysis:
 | `packages/rex/tests/unit/core/tree-hardened.test.ts` | test |  |  |
 | `packages/rex/tests/unit/core/tree.test.ts` | test |  | packages-rex:rex-cli |
 | `packages/rex/tests/unit/core/verify.test.ts` | test |  |  |
+| `packages/rex/tests/unit/recommend/conflict-detection.test.ts` | test |  |  |
+| `packages/rex/tests/unit/recommend/create-from-recommendations.test.ts` | test |  |  |
 | `packages/rex/tests/unit/schema/validate.test.ts` | test |  | packages-rex:rex-cli |
 | `packages/rex/tests/unit/store/adapter-registry.test.ts` | test |  |  |
 | `packages/rex/tests/unit/store/file-adapter.test.ts` | test |  | packages-rex:rex-cli |

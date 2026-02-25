@@ -35,7 +35,7 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [warning] Low cohesion and high coupling ratios suggest this zone may need restructuring or merging
+[pattern] [warning] Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature
 
 </findings>
 
@@ -45,6 +45,8 @@ Incoming (other zones → this zone):
 - Very small zone (3 files) mixing implementation and test files indicates possible misclassification
 - Graph physics functionality appears isolated from other graph-related features
 - Low cohesion and high coupling ratios suggest this zone may need restructuring or merging
+- Zone isolation suggests potential dead code or experimental feature
+- Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature
 - [call graph] 68 internal calls, 0 outgoing, 3 incoming (cohesion: 1, coupling: 0)
 
 </insights>
