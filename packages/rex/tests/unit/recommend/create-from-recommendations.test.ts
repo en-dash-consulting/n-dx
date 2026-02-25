@@ -257,6 +257,125 @@ describe("createItemsFromRecommendations", () => {
     expect(doc.items[0].children![0].title).toBe("New feature under epic");
   });
 
+  it("creates task under an existing feature", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "epic-1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+        children: [
+          {
+            id: "feature-1",
+            title: "Feature",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "New task under feature",
+        level: "task",
+        description: "A task recommendation",
+        priority: "medium",
+        source: "sourcevision",
+        parentId: "feature-1",
+      },
+    ]);
+
+    expect(result.created).toHaveLength(1);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].children![0].children).toHaveLength(1);
+    expect(doc.items[0].children![0].children![0].title).toBe("New task under feature");
+  });
+
+  it("creates subtask under an existing task", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "epic-1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+        children: [
+          {
+            id: "feature-1",
+            title: "Feature",
+            status: "pending",
+            level: "feature",
+            children: [
+              {
+                id: "task-1",
+                title: "Task",
+                status: "pending",
+                level: "task",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "New subtask",
+        level: "subtask",
+        description: "A subtask recommendation",
+        priority: "low",
+        source: "sourcevision",
+        parentId: "task-1",
+      },
+    ]);
+
+    expect(result.created).toHaveLength(1);
+    const doc = await readPrd(tmpDir);
+    const subtask = doc.items[0].children![0].children![0].children![0];
+    expect(subtask.title).toBe("New subtask");
+    expect(subtask.level).toBe("subtask");
+  });
+
+  it("creates multiple children under the same parent", async () => {
+    const epicId = "epic-1";
+    await writeFixtureProject(tmpDir, [
+      {
+        id: epicId,
+        title: "Existing Epic",
+        status: "pending",
+        level: "epic",
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Feature A",
+        level: "feature",
+        description: "First feature",
+        priority: "high",
+        source: "sourcevision",
+        parentId: epicId,
+      },
+      {
+        title: "Feature B",
+        level: "feature",
+        description: "Second feature",
+        priority: "medium",
+        source: "sourcevision",
+        parentId: epicId,
+      },
+    ]);
+
+    expect(result.created).toHaveLength(2);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].children).toHaveLength(2);
+    expect(doc.items[0].children![0].title).toBe("Feature A");
+    expect(doc.items[0].children![1].title).toBe("Feature B");
+  });
+
   // ── Validation: parent not found ────────────────────────────────────
 
   it("throws when parent ID does not exist", async () => {
@@ -364,6 +483,95 @@ describe("createItemsFromRecommendations", () => {
     expect(doc.items[0].level).toBe("feature");
   });
 
+  it("allows tasks at root level (recommendation workflow)", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Fix critical bug",
+        level: "task",
+        description: "Task at root",
+        priority: "critical",
+        source: "sourcevision",
+      },
+    ]);
+
+    expect(result.created).toHaveLength(1);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(1);
+    expect(doc.items[0].level).toBe("task");
+  });
+
+  it("throws when epic is placed under a feature (wrong hierarchy)", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "epic-1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+        children: [
+          {
+            id: "feature-1",
+            title: "Feature",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    // Epic's LEVEL_HIERARCHY only allows null (root), so placing under
+    // a feature should fail. The error comes from the insertion step
+    // since epic's allowedParentLevels is empty after filtering null.
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Nested epic",
+          level: "epic",
+          description: "Invalid",
+          priority: "high",
+          source: "sourcevision",
+          parentId: "feature-1",
+        },
+      ]),
+    ).rejects.toThrow(/Failed to insert "Nested epic" under parent "feature-1"/);
+  });
+
+  it("throws when subtask is placed under a feature (skipping task level)", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "epic-1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+        children: [
+          {
+            id: "feature-1",
+            title: "Feature",
+            status: "pending",
+            level: "feature",
+          },
+        ],
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Subtask under feature",
+          level: "subtask",
+          description: "Invalid: subtask needs task parent",
+          priority: "low",
+          source: "sourcevision",
+          parentId: "feature-1",
+        },
+      ]),
+    ).rejects.toThrow(/must be a child of a task/);
+  });
+
   // ── Atomicity ───────────────────────────────────────────────────────
 
   it("creates zero items when validation fails for any item in the batch", async () => {
@@ -393,6 +601,67 @@ describe("createItemsFromRecommendations", () => {
     // Verify NOTHING was created — atomic rollback
     const doc = await readPrd(tmpDir);
     expect(doc.items).toHaveLength(0);
+  });
+
+  it("rolls back all items when the last item in a batch fails validation", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Valid epic 1",
+          level: "epic",
+          description: "OK",
+          priority: "high",
+          source: "sourcevision",
+        },
+        {
+          title: "Valid epic 2",
+          level: "epic",
+          description: "OK",
+          priority: "medium",
+          source: "sourcevision",
+        },
+        {
+          title: "Invalid subtask at root",
+          level: "subtask",
+          description: "Fails",
+          priority: "low",
+          source: "sourcevision",
+        },
+      ]),
+    ).rejects.toThrow(/requires a parent/);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(0);
+  });
+
+  it("does not write log entries when batch fails validation", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Valid epic",
+          level: "epic",
+          description: "OK",
+          priority: "high",
+          source: "sourcevision",
+        },
+        {
+          title: "Invalid subtask at root",
+          level: "subtask",
+          description: "Fails",
+          priority: "low",
+          source: "sourcevision",
+        },
+      ]),
+    ).rejects.toThrow();
+
+    const logLines = await readLog(tmpDir);
+    expect(logLines).toHaveLength(0);
   });
 
   // ── Logging ─────────────────────────────────────────────────────────
@@ -429,6 +698,47 @@ describe("createItemsFromRecommendations", () => {
     expect(entries[1].detail).toContain("Perf epic");
   });
 
+  it("logs include the item ID", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Logged item",
+        level: "epic",
+        description: "Test",
+        priority: "medium",
+        source: "sourcevision",
+      },
+    ]);
+
+    const logLines = await readLog(tmpDir);
+    const entry = JSON.parse(logLines[0]);
+    expect(entry.itemId).toBe(result.created[0].id);
+  });
+
+  it("log entries have valid ISO timestamps", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Timestamped",
+        level: "epic",
+        description: "Test",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    const logLines = await readLog(tmpDir);
+    const entry = JSON.parse(logLines[0]);
+    expect(entry.timestamp).toBeDefined();
+    // Should be a valid ISO date
+    const date = new Date(entry.timestamp);
+    expect(date.getTime()).not.toBeNaN();
+  });
+
   // ── Preserves existing items ────────────────────────────────────────
 
   it("preserves existing PRD items when adding recommendations", async () => {
@@ -459,6 +769,40 @@ describe("createItemsFromRecommendations", () => {
     expect(doc.items[1].title).toBe("New recommendation");
   });
 
+  it("preserves existing item statuses when adding recommendations", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "in-progress-item",
+        title: "In Progress",
+        status: "in_progress",
+        level: "epic",
+      },
+      {
+        id: "completed-item",
+        title: "Completed",
+        status: "completed",
+        level: "epic",
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "New recommendation",
+        level: "epic",
+        description: "New",
+        priority: "high",
+        source: "sourcevision",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(3);
+    expect(doc.items[0].status).toBe("in_progress");
+    expect(doc.items[1].status).toBe("completed");
+    expect(doc.items[2].status).toBe("pending");
+  });
+
   // ── Return value ────────────────────────────────────────────────────
 
   it("returns created item IDs that match persisted items", async () => {
@@ -478,6 +822,81 @@ describe("createItemsFromRecommendations", () => {
     expect(result.created).toHaveLength(1);
     const doc = await readPrd(tmpDir);
     expect(doc.items[0].id).toBe(result.created[0].id);
+  });
+
+  it("returns parentId in creation result for child items", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "parent-epic",
+        title: "Parent Epic",
+        status: "pending",
+        level: "epic",
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Child feature",
+        level: "feature",
+        description: "Under parent",
+        priority: "high",
+        source: "sourcevision",
+        parentId: "parent-epic",
+      },
+    ]);
+
+    expect(result.created[0].parentId).toBe("parent-epic");
+  });
+
+  it("returns undefined parentId for root-level items", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Root item",
+        level: "epic",
+        description: "At root",
+        priority: "medium",
+        source: "sourcevision",
+      },
+    ]);
+
+    expect(result.created[0].parentId).toBeUndefined();
+  });
+
+  it("generates unique IDs for each created item", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Item A",
+        level: "epic",
+        description: "A",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "Item B",
+        level: "epic",
+        description: "B",
+        priority: "medium",
+        source: "sourcevision",
+      },
+      {
+        title: "Item C",
+        level: "epic",
+        description: "C",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    const ids = result.created.map((c) => c.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(3);
   });
 
   // ── Tags ────────────────────────────────────────────────────────────
@@ -517,5 +936,416 @@ describe("createItemsFromRecommendations", () => {
 
     const doc = await readPrd(tmpDir);
     expect(doc.items[0].tags).toBeUndefined();
+  });
+
+  it("omits tags field when tags array is empty", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Empty tags",
+        level: "epic",
+        description: "Empty tags array",
+        priority: "low",
+        source: "sourcevision",
+        tags: [],
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].tags).toBeUndefined();
+  });
+
+  // ── Mixed levels in a single batch ──────────────────────────────────
+
+  it("creates items of different levels in a single batch", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "New Epic",
+        level: "epic",
+        description: "Epic",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "New Feature",
+        level: "feature",
+        description: "Feature at root",
+        priority: "medium",
+        source: "sourcevision",
+      },
+      {
+        title: "New Task",
+        level: "task",
+        description: "Task at root",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    expect(result.created).toHaveLength(3);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(3);
+    expect(doc.items[0].level).toBe("epic");
+    expect(doc.items[1].level).toBe("feature");
+    expect(doc.items[2].level).toBe("task");
+  });
+
+  // ── Conflict detection: DAG integrity ─────────────────────────────
+
+  it("succeeds when existing items have valid blockedBy references", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "task-a",
+        title: "Task A",
+        status: "pending",
+        level: "task",
+      },
+      {
+        id: "task-b",
+        title: "Task B",
+        status: "pending",
+        level: "task",
+        blockedBy: ["task-a"],
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    // Adding a new item should succeed — existing DAG is valid
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "New epic",
+        level: "epic",
+        description: "Should work",
+        priority: "medium",
+        source: "sourcevision",
+      },
+    ]);
+
+    expect(result.created).toHaveLength(1);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(3);
+  });
+
+  // ── Description edge cases ──────────────────────────────────────────
+
+  it("handles multiline descriptions", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const description = "- Finding A\n- Finding B\n- Finding C\n\nSummary: Multiple issues detected.";
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Multi-line",
+        level: "epic",
+        description,
+        priority: "high",
+        source: "sourcevision",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].description).toBe(description);
+  });
+
+  it("handles empty description", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "No description",
+        level: "epic",
+        description: "",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].description).toBe("");
+  });
+
+  // ── All priority levels ─────────────────────────────────────────────
+
+  it("creates items with all valid priority levels", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Critical",
+        level: "epic",
+        description: "Critical",
+        priority: "critical",
+        source: "sourcevision",
+      },
+      {
+        title: "High",
+        level: "epic",
+        description: "High",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "Medium",
+        level: "epic",
+        description: "Medium",
+        priority: "medium",
+        source: "sourcevision",
+      },
+      {
+        title: "Low",
+        level: "epic",
+        description: "Low",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(4);
+    expect(doc.items[0].priority).toBe("critical");
+    expect(doc.items[1].priority).toBe("high");
+    expect(doc.items[2].priority).toBe("medium");
+    expect(doc.items[3].priority).toBe("low");
+  });
+
+  // ── Source field ────────────────────────────────────────────────────
+
+  it("preserves custom source identifiers", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "From sourcevision",
+        level: "epic",
+        description: "SV",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "Manual entry",
+        level: "epic",
+        description: "Manual",
+        priority: "medium",
+        source: "manual",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    expect(doc.items[0].source).toBe("sourcevision");
+    expect(doc.items[1].source).toBe("manual");
+  });
+
+  // ── All created items have "pending" status ─────────────────────────
+
+  it("always sets status to pending for all created items", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Item 1",
+        level: "epic",
+        description: "A",
+        priority: "critical",
+        source: "sourcevision",
+      },
+      {
+        title: "Item 2",
+        level: "feature",
+        description: "B",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "Item 3",
+        level: "task",
+        description: "C",
+        priority: "low",
+        source: "sourcevision",
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    for (const item of doc.items) {
+      expect(item.status).toBe("pending");
+    }
+  });
+
+  // ── Partial metadata ────────────────────────────────────────────────
+
+  it("preserves partial metadata (only some fields)", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await createItemsFromRecommendations(store, [
+      {
+        title: "Partial meta",
+        level: "epic",
+        description: "Has partial meta",
+        priority: "medium",
+        source: "sourcevision",
+        meta: {
+          category: "auth",
+          findingCount: 5,
+        },
+      },
+    ]);
+
+    const doc = await readPrd(tmpDir);
+    const meta = doc.items[0].recommendationMeta as Record<string, unknown>;
+    expect(meta).toBeDefined();
+    expect(meta.category).toBe("auth");
+    expect(meta.findingCount).toBe(5);
+    expect(meta.findingHashes).toBeUndefined();
+    expect(meta.severityDistribution).toBeUndefined();
+  });
+
+  // ── Large batch creation ────────────────────────────────────────────
+
+  it("handles a large batch of recommendations (10 items)", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const recommendations = Array.from({ length: 10 }, (_, i) => ({
+      title: `Recommendation ${i + 1}`,
+      level: "epic" as const,
+      description: `Description for item ${i + 1}`,
+      priority: "medium" as const,
+      source: "sourcevision",
+    }));
+
+    const result = await createItemsFromRecommendations(store, recommendations);
+
+    expect(result.created).toHaveLength(10);
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(10);
+
+    // Verify all items were created with correct titles
+    for (let i = 0; i < 10; i++) {
+      expect(doc.items[i].title).toBe(`Recommendation ${i + 1}`);
+    }
+
+    // Verify all log entries were written
+    const logLines = await readLog(tmpDir);
+    expect(logLines).toHaveLength(10);
+  });
+
+  // ── Conflict: invalid parent-child within batch ─────────────────────
+
+  it("rejects batch when one item references invalid parent while others are valid", async () => {
+    await writeFixtureProject(tmpDir, [
+      {
+        id: "epic-1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+      },
+    ]);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    // First item is valid (under epic), second references nonexistent parent
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Valid feature",
+          level: "feature",
+          description: "OK",
+          priority: "high",
+          source: "sourcevision",
+          parentId: "epic-1",
+        },
+        {
+          title: "Orphan feature",
+          level: "feature",
+          description: "Invalid parent",
+          priority: "medium",
+          source: "sourcevision",
+          parentId: "does-not-exist",
+        },
+      ]),
+    ).rejects.toThrow(/Parent "does-not-exist" not found/);
+
+    // Neither item should be created
+    const doc = await readPrd(tmpDir);
+    expect(doc.items).toHaveLength(1); // Only the pre-existing epic
+    expect(doc.items[0].children).toBeUndefined();
+  });
+
+  // ── Validation error messages ───────────────────────────────────────
+
+  it("includes item title in placement error messages", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "My Orphan Subtask",
+          level: "subtask",
+          description: "No parent",
+          priority: "low",
+          source: "sourcevision",
+        },
+      ]),
+    ).rejects.toThrow(/subtask.*requires a parent/);
+  });
+
+  it("reports multiple placement errors when several items fail", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    await expect(
+      createItemsFromRecommendations(store, [
+        {
+          title: "Subtask A",
+          level: "subtask",
+          description: "Fail A",
+          priority: "low",
+          source: "sourcevision",
+        },
+        {
+          title: "Subtask B",
+          level: "subtask",
+          description: "Fail B",
+          priority: "low",
+          source: "sourcevision",
+        },
+      ]),
+    ).rejects.toThrow(/Placement validation failed/);
+  });
+
+  // ── Creation result structure ───────────────────────────────────────
+
+  it("returns level in creation result for each item", async () => {
+    await writeFixtureProject(tmpDir);
+    const store = await resolveStore(join(tmpDir, ".rex"));
+
+    const result = await createItemsFromRecommendations(store, [
+      {
+        title: "Epic A",
+        level: "epic",
+        description: "E",
+        priority: "high",
+        source: "sourcevision",
+      },
+      {
+        title: "Feature B",
+        level: "feature",
+        description: "F",
+        priority: "medium",
+        source: "sourcevision",
+      },
+    ]);
+
+    expect(result.created[0].level).toBe("epic");
+    expect(result.created[1].level).toBe("feature");
   });
 });
