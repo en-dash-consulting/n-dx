@@ -91,3 +91,16 @@ export type {
   LeakReport,
   LeakDetectionSummary,
 } from "./process-memory-tracker.js";
+
+export {
+  ConcurrentExecutionMetrics,
+  DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG,
+} from "./concurrent-execution-metrics.js";
+
+export type {
+  ConcurrentExecutionMetricsConfig,
+  ExecutionMetricsSnapshot,
+  TaskResourceMetrics,
+  UtilizationPatterns,
+  ExecutionMetricsSummary,
+} from "./concurrent-execution-metrics.js";

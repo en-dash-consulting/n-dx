@@ -9,6 +9,8 @@
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
+ * GET    /api/hench/metrics              — concurrent execution metrics and resource utilization
+ * GET    /api/hench/metrics/snapshots    — time-series execution metrics snapshots
  * GET    /api/hench/memory               — system memory, per-process memory, and resource health
  * GET    /api/hench/memory/history        — per-process memory history (all tracked processes)
  * GET    /api/hench/memory/history/:taskId — memory history for a specific task
@@ -45,6 +47,7 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { clearStatusCache } from "./routes-status.js";
 import { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
+import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -70,6 +73,15 @@ function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
  * and provides historical data + leak detection via the API.
  */
 const processMemoryTracker = new ProcessMemoryTracker();
+
+/**
+ * Module-level concurrent execution metrics singleton.
+ *
+ * Records time-series snapshots of concurrent process counts, total memory
+ * utilization, and per-task resource metrics during each monitoring cycle.
+ * Provides aggregate patterns (peak, average) for dashboard consumption.
+ */
+const executionMetrics = new ConcurrentExecutionMetrics();
 
 /** Minimal run shape for listing (avoids loading full toolCalls/transcript). */
 interface RunSummary {
@@ -310,6 +322,16 @@ export function handleHenchRoute(
   // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
   if (path === "audit" && method === "GET") {
     return handleAudit(res, runsDir);
+  }
+
+  // GET /api/hench/metrics/snapshots — time-series execution metrics snapshots
+  if (path === "metrics/snapshots" && method === "GET") {
+    return handleMetricsSnapshots(res);
+  }
+
+  // GET /api/hench/metrics — concurrent execution metrics and resource utilization
+  if (path === "metrics" && method === "GET") {
+    return handleMetrics(res);
   }
 
   // GET /api/hench/memory — system memory, per-process memory, and resource health
@@ -1023,6 +1045,9 @@ async function handleExecute(
   // Track active execution
   activeExecutions.set(taskId, { runId, handle, state: execState });
 
+  // Register with execution metrics (uses PID when available, 0 until spawned)
+  executionMetrics.taskStarted(taskId, taskTitle, handle.pid ?? 0);
+
   // Broadcast initial state
   broadcastExecState(broadcast, execState);
 
@@ -1053,6 +1078,7 @@ async function handleExecute(
         broadcastExecState(broadcast, { ...entry.state });
       }
       processMemoryTracker.markCompleted(taskId);
+      executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
     })
     .catch((err) => {
@@ -1064,6 +1090,7 @@ async function handleExecute(
         broadcastExecState(broadcast, { ...entry.state });
       }
       processMemoryTracker.markCompleted(taskId);
+      executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
     });
 
@@ -1546,6 +1573,25 @@ function collectMemoryStatus(): MemoryStatus {
   };
 }
 
+/** GET /api/hench/metrics — concurrent execution metrics and resource utilization. */
+function handleMetrics(res: ServerResponse): boolean {
+  const summary = executionMetrics.getSummary();
+  jsonResponse(res, 200, summary);
+  return true;
+}
+
+/** GET /api/hench/metrics/snapshots — time-series execution metrics snapshots. */
+function handleMetricsSnapshots(res: ServerResponse): boolean {
+  const snapshots = executionMetrics.getSnapshots();
+  jsonResponse(res, 200, {
+    snapshots,
+    count: snapshots.length,
+    maxSnapshots: executionMetrics.config.maxSnapshots,
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
 /** GET /api/hench/memory — system memory, per-process memory, and resource health. */
 function handleMemory(res: ServerResponse): boolean {
   const status = collectMemoryStatus();
@@ -1609,6 +1655,19 @@ export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
       );
     }
 
+    // Record execution metrics snapshot (concurrent count, total RSS, per-task)
+    const totalRssBytes = status.processes.reduce((sum, p) => sum + p.rssBytes, 0);
+    executionMetrics.recordSnapshot({
+      concurrentCount: status.processes.length,
+      totalRssBytes,
+      systemMemoryPercent: status.system.usedPercent,
+      loadAvg1m: status.loadAvg[0],
+      perTaskRss: status.processes.map((p) => ({
+        taskId: p.taskId,
+        rssBytes: p.rssBytes,
+      })),
+    });
+
     // Prune tracker entries for processes that are no longer active
     // (the activeExecutions map is the source of truth)
     for (const history of processMemoryTracker.getActiveHistories()) {
@@ -1620,10 +1679,14 @@ export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
     // Include leak alerts in the broadcast when detected
     const leakAlerts = processMemoryTracker.getLeakAlerts();
 
+    // Include execution metrics summary in the broadcast
+    const metricsSummary = executionMetrics.getSummary();
+
     broadcast({
       type: "hench:memory-status",
       ...status,
       ...(leakAlerts.length > 0 ? { leakAlerts } : {}),
+      executionMetrics: metricsSummary,
     });
   }, MEMORY_BROADCAST_MS);
 
@@ -2032,6 +2095,7 @@ function handleTerminate(
 
   broadcastExecState(broadcast, { ...entry.state });
   processMemoryTracker.markCompleted(taskId);
+  executionMetrics.taskCompleted(taskId);
   activeExecutions.delete(taskId);
   clearStatusCache();
 
@@ -2104,6 +2168,7 @@ export async function shutdownActiveExecutions(
         failed++;
       } finally {
         processMemoryTracker.markCompleted(taskId);
+        executionMetrics.taskCompleted(taskId);
         activeExecutions.delete(taskId);
       }
     },
@@ -2317,6 +2382,7 @@ async function handleEmergencyStop(
         entry.state.error = "Terminated via emergency stop";
         broadcastExecState(broadcast, { ...entry.state });
         processMemoryTracker.markCompleted(taskId);
+        executionMetrics.taskCompleted(taskId);
         activeExecutions.delete(taskId);
       }
     },

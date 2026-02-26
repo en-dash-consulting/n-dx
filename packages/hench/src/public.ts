@@ -179,6 +179,21 @@ export type {
   LeakDetectionSummary,
 } from "./process/process-memory-tracker.js";
 
+// ---- Concurrent execution metrics -------------------------------------------
+
+export {
+  ConcurrentExecutionMetrics,
+  DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG,
+} from "./process/concurrent-execution-metrics.js";
+
+export type {
+  ConcurrentExecutionMetricsConfig,
+  ExecutionMetricsSnapshot,
+  TaskResourceMetrics,
+  UtilizationPatterns,
+  ExecutionMetricsSummary,
+} from "./process/concurrent-execution-metrics.js";
+
 // ---- Run file change detection ----------------------------------------------
 
 export { RunChangeDetector } from "./store/run-change-detector.js";
