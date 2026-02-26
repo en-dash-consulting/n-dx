@@ -14,6 +14,10 @@
  * the Preact hook (`useTick`) is provided separately.
  */
 
+import {
+  registerPollingSource,
+} from "./polling-state.js";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Callback invoked on each tick with the current timestamp (Date.now()). */
@@ -32,10 +36,14 @@ export interface TickTimerState {
 /** Tick interval in milliseconds. */
 const TICK_INTERVAL_MS = 1000;
 
+/** Key used to register with the centralized polling state manager. */
+const POLLING_STATE_KEY = "tick-timer";
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
 let listeners: TickListener[] = [];
 let timerId: ReturnType<typeof setInterval> | null = null;
+let stateUnsub: (() => void) | null = null;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -43,13 +51,45 @@ let timerId: ReturnType<typeof setInterval> | null = null;
 function startTimer(): void {
   if (timerId !== null) return;
   timerId = setInterval(tick, TICK_INTERVAL_MS);
+
+  // Register with centralized polling state when the timer starts.
+  if (stateUnsub === null) {
+    stateUnsub = registerPollingSource(
+      POLLING_STATE_KEY,
+      {
+        suspend: () => clearTimer(),
+        resume: () => {
+          if (timerId === null && listeners.length > 0) {
+            timerId = setInterval(tick, TICK_INTERVAL_MS);
+          }
+        },
+        dispose: () => {
+          clearTimer();
+          stateUnsub = null;
+        },
+        getStatus: () => (timerId !== null ? "active" : "idle"),
+      },
+    );
+  }
 }
 
-/** Stop the shared interval. */
-function stopTimer(): void {
+/** Clear the interval timer without touching polling-state registration. */
+function clearTimer(): void {
   if (timerId === null) return;
   clearInterval(timerId);
   timerId = null;
+}
+
+/** Stop the shared interval and deregister from polling-state. */
+function stopTimer(): void {
+  clearTimer();
+
+  // Deregister from centralized polling state when no subscribers remain.
+  if (stateUnsub) {
+    const unsub = stateUnsub;
+    stateUnsub = null;
+    unsub();
+  }
 }
 
 /** Fire a tick event to all current listeners. */
@@ -122,4 +162,5 @@ export function getTickTimerState(): TickTimerState {
 export function resetTickTimer(): void {
   stopTimer();
   listeners = [];
+  stateUnsub = null;
 }

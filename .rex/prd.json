@@ -14739,7 +14739,7 @@
             {
               "id": "2497cbfc-79ac-402d-a799-85b33978b38c",
               "title": "Add polling state management and cleanup",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement centralized polling state management to prevent orphaned intervals and ensure clean suspension/restart cycles",
               "acceptanceCriteria": [
@@ -14753,7 +14753,9 @@
                 "polling",
                 "cleanup"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T21:51:32.268Z",
+              "completedAt": "2026-02-26T22:15:59.666Z"
             }
           ],
           "overrideMarker": {
@@ -15375,7 +15377,7 @@
             {
               "id": "d762e20a-fceb-4314-923a-19437c4f9282",
               "title": "Implement batched state updates for elapsed time displays",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Group multiple elapsed time state updates into batched operations to reduce the frequency of component re-renders when many task cards are visible simultaneously",
               "acceptanceCriteria": [
@@ -15390,7 +15392,9 @@
                 "frontend",
                 "optimization"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T21:40:52.678Z",
+              "completedAt": "2026-02-26T21:51:32.034Z"
             },
             {
               "id": "6cd4ccaf-cbf9-4b8f-ba92-63e48785117f",

@@ -96,6 +96,10 @@ export interface DOMPerformanceConfig {
 /** Callback invoked when a new DOM snapshot is taken. */
 export type DOMSnapshotHandler = (snapshot: DOMNodeSnapshot) => void;
 
+import {
+  registerPollingSource,
+} from "./polling-state.js";
+
 // ─── Chrome-specific type augmentation ───────────────────────────────────────
 
 interface PerformanceMemory {
@@ -115,6 +119,9 @@ const DEFAULT_MAX_SNAPSHOTS = 120;
 const DEFAULT_MAX_TIMINGS = 200;
 const DEFAULT_MAX_COMPARISONS = 100;
 
+/** Key used to register with the centralized polling state manager. */
+const POLLING_STATE_KEY = "dom-performance-monitor";
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
 let config: DOMPerformanceConfig = {
@@ -125,6 +132,7 @@ let config: DOMPerformanceConfig = {
 };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let stateUnsub: (() => void) | null = null;
 let observedContainer: Element | null = null;
 let latestSnapshot: DOMNodeSnapshot | null = null;
 let snapshotHistory: DOMNodeSnapshot[] = [];
@@ -412,13 +420,44 @@ export function startDOMPerformanceMonitor(
   poll();
 
   pollTimer = setInterval(poll, config.intervalMs);
+
+  // Register with centralized polling state for coordinated lifecycle.
+  stateUnsub = registerPollingSource(
+    POLLING_STATE_KEY,
+    {
+      suspend: () => stopPollTimer(),
+      resume: () => {
+        if (pollTimer === null && observedContainer) {
+          pollTimer = setInterval(poll, config.intervalMs);
+        }
+      },
+      dispose: () => {
+        stopPollTimer();
+        stateUnsub = null;
+      },
+      getStatus: () => (pollTimer !== null ? "active" : "idle"),
+    },
+  );
+}
+
+/** Stop the poll interval timer without touching polling-state registration. */
+function stopPollTimer(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
 }
 
 /** Stop the DOM performance monitor and clean up polling. */
 export function stopDOMPerformanceMonitor(): void {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+  stopPollTimer();
+
+  // Deregister from centralized polling state. Nullify first to
+  // prevent re-entrant dispose.
+  if (stateUnsub) {
+    const unsub = stateUnsub;
+    stateUnsub = null;
+    unsub();
   }
 }
 
@@ -451,6 +490,7 @@ export function getObservedContainer(): Element | null {
 export function resetDOMPerformanceMonitor(): void {
   stopDOMPerformanceMonitor();
   observedContainer = null;
+  stateUnsub = null;
   latestSnapshot = null;
   snapshotHistory = [];
   renderTimings = [];

@@ -60,6 +60,10 @@ export interface MemoryMonitorConfig {
   onLevelChange: MemoryLevelChangeHandler | null;
 }
 
+import {
+  registerPollingSource,
+} from "./polling-state.js";
+
 // ─── Chrome-specific type augmentation ───────────────────────────────────────
 
 interface PerformanceMemory {
@@ -82,6 +86,9 @@ const DEFAULT_THRESHOLDS: MemoryThresholds = {
 
 const DEFAULT_INTERVAL_MS = 5000;
 
+/** Key used to register with the centralized polling state manager. */
+const POLLING_STATE_KEY = "memory-monitor";
+
 /** Heuristic heap limit for browsers without performance.memory (2 GB). */
 const FALLBACK_HEAP_LIMIT = 2 * 1024 * 1024 * 1024;
 
@@ -97,6 +104,7 @@ let config: MemoryMonitorConfig = {
 };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let stateUnsub: (() => void) | null = null;
 let currentLevel: MemoryLevel = "normal";
 let latestSnapshot: MemorySnapshot | null = null;
 let snapshotHistory: MemorySnapshot[] = [];
@@ -241,13 +249,46 @@ export function startMemoryMonitor(
   poll();
 
   pollTimer = setInterval(poll, config.intervalMs);
+
+  // Register with centralized polling state as ESSENTIAL — the memory
+  // monitor must keep running during memory pressure to detect recovery.
+  stateUnsub = registerPollingSource(
+    POLLING_STATE_KEY,
+    {
+      suspend: () => stopPollTimer(),
+      resume: () => {
+        if (pollTimer === null) {
+          pollTimer = setInterval(poll, config.intervalMs);
+        }
+      },
+      dispose: () => {
+        stopPollTimer();
+        stateUnsub = null;
+      },
+      getStatus: () => (pollTimer !== null ? "active" : "idle"),
+    },
+    { essential: true },
+  );
+}
+
+/** Stop the poll interval timer without touching polling-state registration. */
+function stopPollTimer(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
 }
 
 /** Stop the memory monitor and clean up. */
 export function stopMemoryMonitor(): void {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+  stopPollTimer();
+
+  // Deregister from centralized polling state. Nullify first to
+  // prevent re-entrant dispose.
+  if (stateUnsub) {
+    const unsub = stateUnsub;
+    stateUnsub = null;
+    unsub();
   }
 }
 
@@ -273,6 +314,7 @@ export function resetMemoryMonitor(): void {
   latestSnapshot = null;
   snapshotHistory = [];
   changeListeners = [];
+  stateUnsub = null;
   config = {
     intervalMs: DEFAULT_INTERVAL_MS,
     thresholds: { ...DEFAULT_THRESHOLDS },

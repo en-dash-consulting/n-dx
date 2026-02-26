@@ -18,6 +18,10 @@ import {
   isTabVisible,
   type TabVisibilitySnapshot,
 } from "./tab-visibility.js";
+import {
+  registerPollingSource,
+  unregisterPollingSource,
+} from "./polling-state.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,15 +53,36 @@ export interface PollerInfo {
  */
 const RESUME_DEBOUNCE_MS = 100;
 
+// ─── Constants (polling-state integration) ───────────────────────────────────
+
+const POLLING_STATE_KEY = "polling-manager";
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
 const pollers = new Map<string, PollerEntry>();
 let visibilityUnsub: (() => void) | null = null;
+let stateUnsub: (() => void) | null = null;
 let started = false;
 let suspended = false;
 let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
+
+/**
+ * Clean up the polling manager's own resources (visibility subscription,
+ * debounce timer, poller intervals). Does NOT touch polling-state
+ * registration — callers are responsible for that coordination.
+ */
+function cleanupOwnResources(): void {
+  if (visibilityUnsub) {
+    visibilityUnsub();
+    visibilityUnsub = null;
+  }
+  if (resumeDebounceTimer !== null) {
+    clearTimeout(resumeDebounceTimer);
+    resumeDebounceTimer = null;
+  }
+}
 
 /** Start a poller's interval timer. */
 function activatePoller(entry: PollerEntry): void {
@@ -115,6 +140,30 @@ export function startPollingManager(): void {
   if (!isTabVisible()) {
     suspended = true;
   }
+
+  // Register with centralized polling state for coordinated lifecycle.
+  // The dispose callback cleans up own resources without calling
+  // stopPollingManager (which would re-entrantly unregister from
+  // polling-state, causing a loop).
+  stateUnsub = registerPollingSource(
+    POLLING_STATE_KEY,
+    {
+      suspend: () => suspendAll(),
+      resume: () => resumeAll(),
+      dispose: () => {
+        for (const entry of pollers.values()) {
+          deactivatePoller(entry);
+        }
+        cleanupOwnResources();
+        started = false;
+        stateUnsub = null; // Already being disposed by polling-state.
+      },
+      getStatus: () => {
+        if (!started) return "idle";
+        return suspended ? "suspended" : "active";
+      },
+    },
+  );
 }
 
 /**
@@ -122,17 +171,17 @@ export function startPollingManager(): void {
  * but does NOT clear registered pollers or their timers.
  */
 export function stopPollingManager(): void {
-  if (visibilityUnsub) {
-    visibilityUnsub();
-    visibilityUnsub = null;
-  }
-
-  if (resumeDebounceTimer !== null) {
-    clearTimeout(resumeDebounceTimer);
-    resumeDebounceTimer = null;
-  }
-
+  cleanupOwnResources();
   started = false;
+
+  // Deregister from centralized polling state. Nullify stateUnsub first
+  // to prevent re-entrant dispose (unregisterPollingSource calls dispose,
+  // which would otherwise try to call stateUnsub again).
+  if (stateUnsub) {
+    const unsub = stateUnsub;
+    stateUnsub = null;
+    unsub();
+  }
 }
 
 /**
