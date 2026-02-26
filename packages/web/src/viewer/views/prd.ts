@@ -26,6 +26,7 @@ import { diffDocument, applyItemUpdate } from "../components/prd-tree/tree-diffe
 import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
 import { usePolling } from "../hooks/use-polling.js";
 import { createMessageCoalescer } from "../message-coalescer.js";
+import { createMessageThrottle } from "../message-throttle.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -201,21 +202,27 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // Visibility-aware polling via polling manager
   usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
-  // WebSocket listener for real-time PRD updates with message coalescing.
+  // WebSocket listener for real-time PRD updates with per-type throttling
+  // and message coalescing.
   //
-  // Incremental strategy: rex:item-updated messages include the changed
-  // fields, so we apply them directly to local state (O(path-to-node))
-  // via the immediate onMessage callback. rex:item-deleted uses the
-  // existing removeItemById for instant local removal.
+  // Two-layer pipeline:
   //
-  // The coalescer batches rapid sequential messages within a 150ms
-  // trailing-edge window. The onFlush callback fires once per window
-  // to trigger a single reconciliation (fetchPRDData + fetchTaskUsage)
-  // instead of N calls. This prevents redundant fetches when e.g. a
-  // bulk status update generates 10+ rex:item-updated messages.
+  //   raw WS → throttle (per-type debounce) → coalescer (batch + flush)
   //
-  // Batch size limit (50) prevents unbounded memory growth during
-  // sustained bursts.
+  // 1. The throttle debounces high-frequency message types independently:
+  //    - rex:prd-changed, rex:item-updated, rex:item-deleted each get
+  //      their own trailing-edge timer (configurable per type, default 250ms).
+  //    - Other message types pass through immediately.
+  //    - maxPendingPerType caps memory during sustained bursts.
+  //
+  // 2. The coalescer batches throttled output into a single flush per
+  //    window, triggering one reconciliation (fetchPRDData + fetchTaskUsage)
+  //    instead of N calls.
+  //
+  // The coalescer's immediate onMessage callback still fires for every
+  // message the throttle emits — optimistic UI updates (item patches,
+  // local deletions) happen with at most the throttle delay, not the
+  // coalescer's additional window.
   useEffect(() => {
     let ws: WebSocket | null = null;
 
@@ -262,13 +269,28 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       },
     });
 
+    // Per-type throttle sits in front of the coalescer.
+    // Debounces the three high-frequency rex message types independently,
+    // letting other types pass through to the coalescer immediately.
+    const throttle = createMessageThrottle({
+      onMessage: (msg) => coalescer.push(msg),
+      defaultDelayMs: 250,
+      delays: {
+        "rex:prd-changed": 300,     // heavier — full tree reconciliation
+        "rex:item-updated": 200,    // lighter — targeted node patch
+        "rex:item-deleted": 200,    // lighter — targeted node removal
+      },
+      throttledTypes: ["rex:prd-changed", "rex:item-updated", "rex:item-deleted"],
+      maxPendingPerType: 20,
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          coalescer.push(msg);
+          throttle.push(msg);
         } catch {
           // Ignore malformed messages
         }
@@ -278,6 +300,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     }
 
     return () => {
+      throttle.dispose();
       coalescer.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }

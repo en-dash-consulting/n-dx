@@ -13,6 +13,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../hooks/use-polling.js";
 import { createMessageCoalescer } from "../message-coalescer.js";
+import { createMessageThrottle } from "../message-throttle.js";
 import type { ViewId } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -106,8 +107,11 @@ function useProjectStatus(): ProjectStatus | null {
     refresh();
 
     // Connect to WebSocket for instant status updates when runs/PRD change.
-    // Uses message coalescing to batch rapid sequential events into a single
-    // refresh call (e.g. multiple hench:task-execution-progress during a run).
+    // Two-layer pipeline: per-type throttle → coalescer → single refresh.
+    //
+    // The throttle debounces high-frequency message types (rex:prd-changed,
+    // hench:task-execution-progress) independently before they reach the
+    // coalescer. Other types pass through immediately.
     let ws: WebSocket | null = null;
 
     const coalescer = createMessageCoalescer({
@@ -123,6 +127,17 @@ function useProjectStatus(): ProjectStatus | null {
       },
     });
 
+    const throttle = createMessageThrottle({
+      onMessage: (msg) => coalescer.push(msg),
+      defaultDelayMs: 250,
+      delays: {
+        "rex:prd-changed": 300,
+        "hench:task-execution-progress": 200,
+      },
+      throttledTypes: ["rex:prd-changed", "hench:task-execution-progress"],
+      maxPendingPerType: 20,
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
@@ -130,7 +145,7 @@ function useProjectStatus(): ProjectStatus | null {
         if (!mountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
-          coalescer.push(msg);
+          throttle.push(msg);
         } catch {
           // ignore malformed messages
         }
@@ -141,6 +156,7 @@ function useProjectStatus(): ProjectStatus | null {
 
     return () => {
       mountedRef.current = false;
+      throttle.dispose();
       coalescer.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
