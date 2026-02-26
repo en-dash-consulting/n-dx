@@ -16335,7 +16335,7 @@
             {
               "id": "04f31c24-d431-4fb8-89d3-4d5cad4aa6c9",
               "title": "Implement immediate WebSocket disconnect detection",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Replace the 30-second ping/pong cycle with immediate connection state monitoring to detect client disconnections as soon as they occur",
               "acceptanceCriteria": [
@@ -16349,12 +16349,14 @@
                 "performance",
                 "backend"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T05:22:54.647Z",
+              "completedAt": "2026-02-26T05:29:50.387Z"
             },
             {
               "id": "5c42e669-1179-476a-a90b-7ff5d76576d9",
               "title": "Remove dead clients from broadcast set immediately",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Automatically prune disconnected clients from the active broadcast list to prevent wasted serialization and write operations",
               "acceptanceCriteria": [
@@ -16368,7 +16370,8 @@
                 "memory",
                 "cleanup"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T05:30:15.486Z"
             },
             {
               "id": "4b039d14-58a7-4de0-85ea-e15762fdeb45",
