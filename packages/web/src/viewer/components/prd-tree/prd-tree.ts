@@ -29,6 +29,7 @@ import { resolveTaskUtilization } from "./task-utilization.js";
 import { NodeCuller } from "./node-culler.js";
 import { LazyChildren } from "./lazy-children.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
+import { countVisibleNodes, sliceVisibleTree, useProgressiveLoader, LoadMoreIndicator, DEFAULT_CHUNK_SIZE } from "./progressive-loader.js";
 
 /** Levels that can have children added via inline form. */
 const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
@@ -705,6 +706,13 @@ export interface PRDTreeProps {
   onRemoveItem?: (item: PRDItemData) => void;
   /** ID of item currently being deleted (shows loading state). */
   deletingItemId?: string | null;
+  /**
+   * Number of nodes per progressive loading chunk.
+   * When the visible node count exceeds this value, the tree renders
+   * incrementally with a "Load More" indicator.
+   * Defaults to DEFAULT_CHUNK_SIZE (50).
+   */
+  chunkSize?: number;
 }
 
 // ── Item lookup helper ──────────────────────────────────────────────
@@ -722,7 +730,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId }: PRDTreeProps) {
+export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId, chunkSize = DEFAULT_CHUNK_SIZE }: PRDTreeProps) {
   // ── Node culler lifecycle ─────────────────────────────────────────
   // Create a shared NodeCuller on mount and dispose on unmount.
   // The culler uses IntersectionObserver to track which nodes are within
@@ -786,6 +794,24 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
 
   const [activeStatuses, setActiveStatuses] = useState<Set<ItemStatus>>(() =>
     defaultStatusFilter(),
+  );
+
+  // ── Progressive tree loading ────────────────────────────────────────
+  // Count visible nodes and manage chunk-based rendering for large trees.
+  // The full tree is always available for filtering/searching — progressive
+  // loading only limits how many nodes are rendered at once.
+  const totalVisibleNodes = useMemo(
+    () => countVisibleNodes(doc.items, activeStatuses),
+    [doc.items, activeStatuses],
+  );
+  const progressive = useProgressiveLoader(totalVisibleNodes, chunkSize);
+
+  // Slice the tree to the current progressive limit.
+  // When progressive loading is not active (small tree), sliceVisibleTree
+  // returns the original items reference unchanged (structural sharing).
+  const progressiveSlice = useMemo(
+    () => sliceVisibleTree(doc.items, activeStatuses, progressive.limit),
+    [doc.items, activeStatuses, progressive.limit],
   );
 
   // Inline add form state — tracks which parent node has its form open
@@ -891,7 +917,7 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
         onKeyDown: treeHandlers.onKeyDown,
       },
       h(TreeNodes, {
-        items: doc.items,
+        items: progressiveSlice.items,
         taskUsageById,
         weeklyBudget,
         depth: 0,
@@ -921,5 +947,17 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
           })
         : null,
     ),
+    // Progressive loading indicator — shown below the tree when there are
+    // more nodes beyond the current rendering limit.
+    progressive.hasMore
+      ? h(LoadMoreIndicator, {
+          renderedCount: progressiveSlice.renderedCount,
+          totalCount: progressiveSlice.totalCount,
+          chunkSize,
+          isLoading: progressive.isLoading,
+          onLoadMore: progressive.loadMore,
+          onLoadAll: progressive.loadAll,
+        })
+      : null,
   );
 }

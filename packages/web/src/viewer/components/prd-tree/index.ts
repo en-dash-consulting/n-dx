@@ -45,3 +45,11 @@ export {
   filterTree,
 } from "./compute.js";
 export { findItemById, countDescendants } from "./tree-utils.js";
+export {
+  countVisibleNodes,
+  sliceVisibleTree,
+  LoadMoreIndicator,
+  DEFAULT_CHUNK_SIZE,
+  PROGRESSIVE_THRESHOLD,
+} from "./progressive-loader.js";
+export type { ProgressiveSlice, LoadMoreIndicatorProps } from "./progressive-loader.js";
