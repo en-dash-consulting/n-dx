@@ -28,6 +28,7 @@ import { usePolling } from "../hooks/use-polling.js";
 import { createMessageCoalescer } from "../message-coalescer.js";
 import { createMessageThrottle } from "../message-throttle.js";
 import { createRequestDedup } from "../request-dedup.js";
+import { createCallRateLimiter } from "../call-rate-limiter.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -166,12 +167,23 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     }),
   );
 
+  // Rate limiter sits in front of the dedup: controls *when* calls fire
+  // (max 2/sec by default), while the dedup handles concurrent in-flight sharing.
+  const prdRateLimiter = useRef(
+    createCallRateLimiter(
+      async () => {
+        try {
+          await prdDedup.current.execute();
+        } catch (_err) {
+          setError("Could not fetch PRD data. Is the server running?");
+        }
+      },
+      { minIntervalMs: 500 },
+    ),
+  );
+
   const fetchPRDData = useCallback(async () => {
-    try {
-      await prdDedup.current.execute();
-    } catch (_err) {
-      setError("Could not fetch PRD data. Is the server running?");
-    }
+    await prdRateLimiter.current.execute();
   }, []);
 
   // Task usage fetch with request deduplication: concurrent callers (e.g.
@@ -210,12 +222,22 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     }),
   );
 
+  // Rate limiter for task usage — same pattern as PRD data.
+  const usageRateLimiter = useRef(
+    createCallRateLimiter(
+      async () => {
+        try {
+          await usageDedup.current.execute();
+        } catch {
+          // Usage fetch failures are non-critical — keep existing state.
+        }
+      },
+      { minIntervalMs: 500 },
+    ),
+  );
+
   const fetchTaskUsage = useCallback(async () => {
-    try {
-      await usageDedup.current.execute();
-    } catch {
-      // Usage fetch failures are non-critical — keep existing state.
-    }
+    await usageRateLimiter.current.execute();
   }, []);
 
   useEffect(() => {
@@ -338,6 +360,16 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       }
     };
   }, [fetchPRDData, fetchTaskUsage]);
+
+  // Dispose rate limiters on unmount to clear pending timers.
+  useEffect(() => {
+    const prdLimiter = prdRateLimiter.current;
+    const usageLimiter = usageRateLimiter.current;
+    return () => {
+      prdLimiter.dispose();
+      usageLimiter.dispose();
+    };
+  }, []);
 
   // Handle item update via API — applies update optimistically for instant
   // UI feedback, then reconciles with the server via structural sharing.
