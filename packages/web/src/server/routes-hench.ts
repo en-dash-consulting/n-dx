@@ -7,6 +7,7 @@
  * GET    /api/hench/runs/:id              — full run detail with transcript
  * GET    /api/hench/runs/health           — staleness health check for running runs
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
  * POST   /api/hench/execute/:taskId/terminate — terminate a running task
  * GET    /api/hench/config                — current workflow configuration with field metadata
@@ -30,8 +31,24 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { clearStatusCache } from "./routes-status.js";
+import { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 
 const HENCH_PREFIX = "/api/hench/";
+
+/**
+ * Per-project aggregator singletons. Keyed by runsDir so each project
+ * gets its own incremental cache that persists across requests.
+ */
+const aggregatorCache = new Map<string, IncrementalTaskUsageAggregator>();
+
+function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
+  let aggregator = aggregatorCache.get(runsDir);
+  if (!aggregator) {
+    aggregator = new IncrementalTaskUsageAggregator(runsDir);
+    aggregatorCache.set(runsDir, aggregator);
+  }
+  return aggregator;
+}
 
 /** Minimal run shape for listing (avoids loading full toolCalls/transcript). */
 interface RunSummary {
@@ -258,6 +275,16 @@ export function handleHenchRoute(
   const path = qIdx === -1 ? fullPath : fullPath.slice(0, qIdx);
 
   const runsDir = join(ctx.projectDir, ".hench", "runs");
+
+  // GET /api/hench/task-usage — incremental per-task token usage aggregation
+  if (path === "task-usage" && method === "GET") {
+    return getAggregator(runsDir)
+      .getTaskUsage()
+      .then((taskUsage) => {
+        jsonResponse(res, 200, { taskUsage });
+        return true as const;
+      });
+  }
 
   // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
   if (path === "audit" && method === "GET") {

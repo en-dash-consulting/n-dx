@@ -41,14 +41,10 @@ export interface PRDViewProps {
 /** Active tab in the command bar. */
 type CommandTab = null | "add" | "merge" | "prune";
 
-interface HenchRunSummary {
-  taskId: string;
-  tokenUsage?: {
-    input?: number;
-    output?: number;
-    cacheCreationInput?: number;
-    cacheReadInput?: number;
-  };
+/** Shape returned by the incremental /api/hench/task-usage endpoint. */
+interface ServerTaskUsage {
+  totalTokens: number;
+  runCount: number;
 }
 
 function normalizeWeeklyBudgetResolution(value: unknown): WeeklyBudgetResolution {
@@ -60,27 +56,20 @@ function normalizeWeeklyBudgetResolution(value: unknown): WeeklyBudgetResolution
   };
 }
 
-function aggregateTaskUsage(
-  runs: HenchRunSummary[],
+/**
+ * Convert server-side incremental task usage into client-side summaries
+ * with utilization metadata applied.
+ */
+function applyUtilizationToTaskUsage(
+  serverUsage: Record<string, ServerTaskUsage>,
   weeklyBudget: WeeklyBudgetResolution | null,
 ): Record<string, TaskUsageSummary> {
   const byTask: Record<string, TaskUsageSummary> = {};
-  for (const run of runs) {
-    if (!run.taskId) continue;
-    const total = (run.tokenUsage?.input ?? 0)
-      + (run.tokenUsage?.output ?? 0)
-      + (run.tokenUsage?.cacheCreationInput ?? 0)
-      + (run.tokenUsage?.cacheReadInput ?? 0);
-    const current = byTask[run.taskId] ?? {
-      totalTokens: 0,
-      runCount: 0,
-      utilization: resolveTaskUtilization(0, weeklyBudget),
-    };
-    const totalTokens = current.totalTokens + total;
-    byTask[run.taskId] = {
-      totalTokens,
-      runCount: current.runCount + 1,
-      utilization: resolveTaskUtilization(totalTokens, weeklyBudget),
+  for (const [taskId, usage] of Object.entries(serverUsage)) {
+    byTask[taskId] = {
+      totalTokens: usage.totalTokens,
+      runCount: usage.runCount,
+      utilization: resolveTaskUtilization(usage.totalTokens, weeklyBudget),
     };
   }
   return byTask;
@@ -166,8 +155,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   }, []);
 
   const fetchTaskUsage = useCallback(async () => {
-    const [runsResult, utilizationResult] = await Promise.allSettled([
-      fetch("/api/hench/runs"),
+    const [taskUsageResult, utilizationResult] = await Promise.allSettled([
+      fetch("/api/hench/task-usage"),
       fetch("/api/token/utilization"),
     ]);
 
@@ -183,10 +172,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       }
     }
 
-    if (runsResult.status === "fulfilled" && runsResult.value.ok) {
+    if (taskUsageResult.status === "fulfilled" && taskUsageResult.value.ok) {
       try {
-        const json = await runsResult.value.json() as { runs?: HenchRunSummary[] };
-        setTaskUsageById(aggregateTaskUsage(json.runs ?? [], resolvedWeeklyBudget));
+        const json = await taskUsageResult.value.json() as { taskUsage?: Record<string, ServerTaskUsage> };
+        setTaskUsageById(applyUtilizationToTaskUsage(json.taskUsage ?? {}, resolvedWeeklyBudget));
       } catch {
         // Keep existing values on parse errors.
       }
