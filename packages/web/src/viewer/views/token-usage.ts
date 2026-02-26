@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import { MetricCard } from "../components/data-display/health-gauge.js";
 import { BarChart } from "../components/data-display/mini-charts.js";
 import { BrandedHeader } from "../components/logos.js";
+import { usePolling } from "../hooks/use-polling.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -122,6 +123,9 @@ function fmtWindow(since: string | null, until: string | null): string {
   const to = until ? new Date(until).toLocaleDateString() : "now";
   return `${from} → ${to}`;
 }
+
+/** Polling interval for automatic usage data refresh (ms). */
+const USAGE_POLL_INTERVAL_MS = 10_000;
 
 const PKG_COLORS: Record<string, string> = {
   hench: "var(--brand-teal)",
@@ -459,6 +463,11 @@ export function TokenUsageView() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refresh usage data on a 10-second polling interval.
+  // Automatically suspended when the tab is backgrounded via the
+  // centralized polling manager.
+  usePolling("token-usage", fetchData, USAGE_POLL_INTERVAL_MS);
 
   // Filter commands by package
   const filteredCommands = useMemo(() => {
