@@ -20,3 +20,5 @@ export type {
 
 export { execShell } from "./exec-shell.js";
 export type { ExecShellOptions } from "./exec-shell.js";
+
+export { ProcessLimiter, ProcessLimitReachedError } from "./limiter.js";

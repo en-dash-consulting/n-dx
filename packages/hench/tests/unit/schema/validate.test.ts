@@ -191,13 +191,13 @@ describe("validateConfig", () => {
   });
 
   describe("guard.maxConcurrentProcesses defaults and validation", () => {
-    it("is optional in schema and defaults to 4", () => {
+    it("is optional in schema and defaults to 3", () => {
       const config = DEFAULT_HENCH_CONFIG();
       const { maxConcurrentProcesses, ...guardWithout } = config.guard;
       const result = validateConfig({ ...config, guard: guardWithout });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.guard.maxConcurrentProcesses).toBe(4);
+        expect(result.data.guard.maxConcurrentProcesses).toBe(3);
       }
     });
 

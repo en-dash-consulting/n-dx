@@ -12,6 +12,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { ExecutionQueue, formatQueueStatus } from "../../queue/index.js";
+import { ProcessLimiter } from "../../process/limiter.js";
 
 // ---------------------------------------------------------------------------
 // Epic resolution helpers (exported for testing)
@@ -217,9 +218,9 @@ export async function loadStuckTaskIds(
  * Create an ExecutionQueue sized from the hench guard config.
  *
  * The queue limits concurrent task executions to
- * `guard.maxConcurrentProcesses` (default 4). This is the same
- * limit used for child process concurrency, applied here at the
- * task-run level.
+ * `guard.maxConcurrentProcesses` (default 3). This is the same
+ * limit used for cross-process concurrency, applied here at the
+ * in-process task-run level.
  */
 export function createExecutionQueue(maxConcurrent: number): ExecutionQueue {
   return new ExecutionQueue(maxConcurrent);
@@ -463,28 +464,38 @@ export async function cmdRun(
     );
   }
 
-  // Create execution queue for concurrency control.
-  // The queue limits concurrent task runs to guard.maxConcurrentProcesses.
-  const queue = createExecutionQueue(config.guard.maxConcurrentProcesses);
+  // Enforce cross-process concurrency limit.
+  // Prevents multiple `hench run` invocations from exhausting memory.
+  const limiter = new ProcessLimiter(henchDir, config.guard.maxConcurrentProcesses);
+  await limiter.acquire(flags.task);
 
-  if (epicByEpic) {
-    await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue);
-    return;
-  }
+  try {
+    // Create execution queue for in-process concurrency control.
+    // The queue limits concurrent task runs within this process
+    // (loop mode, epic-by-epic).
+    const queue = createExecutionQueue(config.guard.maxConcurrentProcesses);
 
-  let taskId = flags.task;
+    if (epicByEpic) {
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue);
+      return;
+    }
 
-  // Task selection: --task > interactive (TTY) > autoselect
-  // In loop mode, always autoselect (skip interactive)
-  if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-    taskId = await selectTask(dir, rexDir, epicId);
-  }
-  // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
+    let taskId = flags.task;
 
-  if (loop) {
-    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue);
-  } else {
-    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
+    // Task selection: --task > interactive (TTY) > autoselect
+    // In loop mode, always autoselect (skip interactive)
+    if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
+      taskId = await selectTask(dir, rexDir, epicId);
+    }
+    // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
+
+    if (loop) {
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue);
+    } else {
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
+    }
+  } finally {
+    await limiter.release();
   }
 }
 

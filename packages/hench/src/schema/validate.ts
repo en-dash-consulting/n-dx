@@ -17,7 +17,7 @@ const GuardConfigSchema = z.object({
   commandTimeout: z.number().positive(),
   maxFileSize: z.number().positive(),
   spawnTimeout: z.number().nonnegative().optional().default(300000),
-  maxConcurrentProcesses: z.number().int().positive().optional().default(4),
+  maxConcurrentProcesses: z.number().int().positive().optional().default(3),
   allowedGitSubcommands: z.array(z.string()).optional().default([
     "status", "add", "commit", "diff", "log",
     "branch", "checkout", "stash", "show", "rev-parse",

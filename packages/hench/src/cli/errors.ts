@@ -54,6 +54,12 @@ export class EpicNotFoundError extends CLIError {
  */
 const ERROR_HINTS: Array<[RegExp, string, string]> = [
   [
+    /Concurrent process limit reached/,
+    "",  // Use original message (already user-friendly)
+    "Active hench processes will release their locks when they finish.\n" +
+    "       To change the limit: hench config guard.maxConcurrentProcesses <number>",
+  ],
+  [
     /ENOENT.*\.hench/,
     "Hench directory not found.",
     "Run 'n-dx init' to set up the project.",

@@ -93,6 +93,10 @@ export type {
   QueueStatus,
 } from "./queue/index.js";
 
+// ---- Process concurrency limiter -------------------------------------------
+
+export { ProcessLimiter, ProcessLimitReachedError } from "./process/limiter.js";
+
 // ---- Agent lifecycle types -------------------------------------------------
 
 export type { AgentLoopOptions, AgentLoopResult } from "./agent/lifecycle/loop.js";

@@ -86,7 +86,7 @@ export function DEFAULT_HENCH_CONFIG(): HenchConfig {
       commandTimeout: 30000,
       maxFileSize: 1048576,
       spawnTimeout: 300000,          // 5 minutes
-      maxConcurrentProcesses: 4,
+      maxConcurrentProcesses: 3,
       allowedGitSubcommands: [
         "status", "add", "commit", "diff", "log",
         "branch", "checkout", "stash", "show", "rev-parse",
