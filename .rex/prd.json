@@ -15784,7 +15784,7 @@
             {
               "id": "1d3cd284-dbee-4585-9c73-c01518dd6943",
               "title": "Suspend loader polling (5s interval) when tab is backgrounded",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Halt the 5-second loader polling interval when tab becomes inactive to prevent unnecessary API calls",
               "acceptanceCriteria": [
@@ -15798,7 +15798,9 @@
                 "loader",
                 "performance"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T06:59:26.522Z",
+              "completedAt": "2026-02-26T07:03:04.494Z"
             },
             {
               "id": "fa6768f5-58d0-44ff-8cff-5502c10983aa",
