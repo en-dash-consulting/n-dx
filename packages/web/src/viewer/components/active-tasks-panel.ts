@@ -16,7 +16,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
-import { useTick } from "../hooks/use-tick.js";
+import { ElapsedTime } from "./elapsed-time.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -83,7 +83,6 @@ function formatStartTime(iso: string): string {
 // ── Active task card ─────────────────────────────────────────────────
 
 function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: NavigateTo }) {
-  const elapsed = useTick(run.startedAt, formatElapsed);
   const stale = isStale(run);
 
   return h("div", {
@@ -116,11 +115,12 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
           : null,
       ),
 
-      // Metadata row
+      // Metadata row — elapsed time is isolated in its own component to
+      // prevent the entire card from re-rendering on every 1-second tick.
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          elapsed,
+          h(ElapsedTime, { startedAt: run.startedAt, formatter: formatElapsed }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(run.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),
@@ -141,8 +141,6 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
 // ── Execution state card (for dashboard-triggered executions) ────────
 
 function ExecutionCard({ exec }: { exec: ExecutionState }) {
-  const elapsed = useTick(exec.startedAt, formatElapsed);
-
   const isStarting = exec.status === "starting";
 
   return h("div", {
@@ -161,7 +159,7 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          elapsed,
+          h(ElapsedTime, { startedAt: exec.startedAt, formatter: formatElapsed }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(exec.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),

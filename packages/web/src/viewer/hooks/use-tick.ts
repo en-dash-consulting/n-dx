@@ -27,6 +27,10 @@ import { onTick } from "../tick-timer.js";
  * Subscribe to the shared 1-second tick timer and return a formatted
  * elapsed-time string that updates every second.
  *
+ * Includes an equality check to skip redundant re-renders when the
+ * formatted value hasn't changed (e.g. timer precision edge cases,
+ * or formatters that produce the same string across consecutive ticks).
+ *
  * @param startedAt - ISO 8601 timestamp of when the timer began.
  * @param formatter - Pure function that converts a start timestamp to a
  *                    display string. Called once per tick.
@@ -52,15 +56,28 @@ export function useTick(
 
   const [display, setDisplay] = useState(compute);
 
+  // Track the last emitted value so we can skip redundant setState calls.
+  // Using a ref avoids depending on the display state in the tick callback,
+  // which would require resubscribing on every change.
+  const lastValueRef = useRef(display);
+
   // Re-compute immediately when startedAt changes.
   useEffect(() => {
-    setDisplay(compute());
+    const next = compute();
+    if (next !== lastValueRef.current) {
+      lastValueRef.current = next;
+      setDisplay(next);
+    }
   }, [startedAt, compute]);
 
   // Subscribe to the shared tick timer.
   useEffect(() => {
     const unsub = onTick(() => {
-      setDisplay(compute());
+      const next = compute();
+      if (next !== lastValueRef.current) {
+        lastValueRef.current = next;
+        setDisplay(next);
+      }
     });
     return unsub;
   }, [compute]);

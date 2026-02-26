@@ -14,7 +14,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
-import { useTick } from "../hooks/use-tick.js";
+import { ElapsedTime } from "../components/elapsed-time.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -193,8 +193,6 @@ function AuditTaskCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const elapsed = useTick(entry.startedAt, formatElapsedFromStart);
-
   const cardClass = entry.heartbeatStatus === "unresponsive"
     ? "audit-task-card audit-task-unresponsive"
     : entry.stale
@@ -251,7 +249,7 @@ function AuditTaskCard({
               ),
           h("span", { class: "audit-chip", title: "Elapsed time" },
             h("span", { class: "audit-chip-icon" }, "⏱"),
-            elapsed,
+            h(ElapsedTime, { startedAt: entry.startedAt, formatter: formatElapsedFromStart }),
           ),
           h("span", { class: "audit-chip", title: "Run ID" },
             h("span", { class: "audit-chip-icon" }, "▶"),
