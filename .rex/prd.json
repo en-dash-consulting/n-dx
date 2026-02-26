@@ -14837,7 +14837,7 @@
         {
           "id": "4a39248e-94d2-4bca-a1eb-0bb06ac724fb",
           "title": "Message Throttling and Coalescing",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Implement intelligent throttling and batching mechanisms to handle high-frequency WebSocket messages without overwhelming the UI",
           "source": "smart-add",
@@ -14889,7 +14889,7 @@
             {
               "id": "997995fe-43df-431b-8a31-b255feb84b24",
               "title": "Add rate limiting for fetchPRDData and fetchTaskUsage calls",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement call-level rate limiting to prevent these expensive operations from being invoked more frequently than necessary",
               "acceptanceCriteria": [
@@ -14904,9 +14904,13 @@
                 "rate-limiting",
                 "performance"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T16:06:27.701Z",
+              "completedAt": "2026-02-26T16:13:44.180Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-26T16:13:44.287Z",
+          "completedAt": "2026-02-26T16:13:44.287Z"
         },
         {
           "id": "0258aa8d-c25e-4351-91f1-2f2e41ff39ef",
@@ -15941,6 +15945,8 @@
           "level": "feature",
           "description": "Restore polling and synchronize data when tab becomes active again",
           "source": "smart-add",
+          "startedAt": "2026-02-26T16:06:02.365Z",
+          "completedAt": "2026-02-26T16:06:02.365Z",
           "children": [
             {
               "id": "83511931-c245-4938-8ccf-eef5e4d025b5",
@@ -16014,9 +16020,7 @@
                 "createdAt": "2026-02-25T19:52:45.612Z"
               }
             }
-          ],
-          "startedAt": "2026-02-26T16:06:02.365Z",
-          "completedAt": "2026-02-26T16:06:02.365Z"
+          ]
         }
       ]
     },
