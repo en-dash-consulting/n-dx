@@ -15305,7 +15305,7 @@
             {
               "id": "cb8190ed-2768-4121-8b3b-765015d3fdd3",
               "title": "Refactor active-tasks-panel.ts to use shared timer service",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Replace individual setInterval calls in active-tasks-panel.ts with subscriptions to the shared timer service, reducing timer overhead for the active tasks display",
               "acceptanceCriteria": [
@@ -15321,7 +15321,8 @@
                 "refactor"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-26T06:44:57.702Z"
+              "startedAt": "2026-02-26T06:44:57.702Z",
+              "completedAt": "2026-02-26T06:49:07.798Z"
             }
           ]
         },
