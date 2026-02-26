@@ -95,6 +95,14 @@ export type {
   QueueStatus,
 } from "./queue/index.js";
 
+// ---- Priority scheduling ---------------------------------------------------
+
+export { resolveSchedulingPriority, extractPriorityFromTags } from "./queue/index.js";
+
+export type {
+  TaskPriorityMetadata,
+} from "./queue/index.js";
+
 // ---- Process concurrency limiter -------------------------------------------
 
 export { ProcessLimiter, ProcessLimitReachedError } from "./process/limiter.js";

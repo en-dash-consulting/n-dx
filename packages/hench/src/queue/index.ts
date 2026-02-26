@@ -13,3 +13,12 @@ export {
   formatQueueStatus,
   formatQueueStatusJson,
 } from "./format.js";
+
+export {
+  resolveSchedulingPriority,
+  extractPriorityFromTags,
+} from "./priority-scheduler.js";
+
+export type {
+  TaskPriorityMetadata,
+} from "./priority-scheduler.js";
