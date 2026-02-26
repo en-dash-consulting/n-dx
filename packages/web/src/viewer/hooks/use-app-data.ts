@@ -8,6 +8,12 @@
  * 1. Load manifest + zones first (small, needed for sidebar/shell)
  * 2. Load remaining modules in the background without blocking the UI
  * 3. Polling uses selective refresh — only reloads files whose mtime changed
+ *
+ * Polling is automatically suspended when memory pressure disables the
+ * `autoRefresh` feature (elevated tier, ≥50% heap usage). The hook
+ * subscribes to degradation changes internally so the suspension is
+ * self-contained — callers do not need to pass `pausePolling` for
+ * memory-pressure protection.
  */
 
 import { useState, useEffect, useRef } from "preact/hooks";
@@ -21,6 +27,7 @@ import {
   startPolling,
   stopPolling,
 } from "../loader.js";
+import { isFeatureDisabled, onDegradationChange } from "../graceful-degradation.js";
 
 export interface AppDataState {
   data: LoadedData;
@@ -62,6 +69,19 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
   const [showDrop, setShowDrop] = useState(false);
   const initialLoad = useRef(true);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track memory-pressure state reactively so the polling effect
+  // responds to degradation tier changes (mirrors status-indicators pattern).
+  const [autoRefreshDisabled, setAutoRefreshDisabled] = useState(
+    () => isFeatureDisabled("autoRefresh")
+  );
+
+  useEffect(() => {
+    const unsubscribe = onDegradationChange((state) => {
+      setAutoRefreshDisabled(state.disabledFeatures.has("autoRefresh"));
+    });
+    return unsubscribe;
+  }, []);
 
   // Data change listener + mode detection
   useEffect(() => {
@@ -114,15 +134,19 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
   }, []);
 
   // Pause or resume polling in response to degradation signals.
+  // Combines the external pausePolling prop with the internal
+  // autoRefreshDisabled state so that either source can suspend polling.
+  const shouldPause = pausePolling || autoRefreshDisabled;
+
   useEffect(() => {
     if (mode !== "server") return;
-    if (pausePolling) {
+    if (shouldPause) {
       stopPolling();
     } else if (!initialLoad.current) {
       // Only resume if we've already completed the initial load.
       startPolling(5000);
     }
-  }, [pausePolling, mode]);
+  }, [shouldPause, mode]);
 
   // Drag-and-drop (only active in static mode)
   useEffect(() => {
