@@ -97,6 +97,19 @@ export type {
 
 export { ProcessLimiter, ProcessLimitReachedError } from "./process/limiter.js";
 
+// ---- Process lifecycle validation ------------------------------------------
+
+export { ProcessLifecycleValidator, LifecycleAuditTrail } from "./process/lifecycle.js";
+
+export type {
+  LifecycleEvent,
+  TerminationReport,
+  OrphanReport,
+  ResourceSnapshot,
+  ResourceThresholds,
+  ProcessLifecycleValidatorOptions,
+} from "./process/lifecycle.js";
+
 // ---- Agent lifecycle types -------------------------------------------------
 
 export type { AgentLoopOptions, AgentLoopResult } from "./agent/lifecycle/loop.js";

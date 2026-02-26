@@ -22,3 +22,17 @@ export { execShell } from "./exec-shell.js";
 export type { ExecShellOptions } from "./exec-shell.js";
 
 export { ProcessLimiter, ProcessLimitReachedError } from "./limiter.js";
+
+export {
+  ProcessLifecycleValidator,
+  LifecycleAuditTrail,
+} from "./lifecycle.js";
+
+export type {
+  LifecycleEvent,
+  TerminationReport,
+  OrphanReport,
+  ResourceSnapshot,
+  ResourceThresholds,
+  ProcessLifecycleValidatorOptions,
+} from "./lifecycle.js";
