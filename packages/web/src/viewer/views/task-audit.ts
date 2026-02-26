@@ -14,6 +14,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
+import { useTick } from "../hooks/use-tick.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -121,6 +122,11 @@ function fmtTimeSince(isoString: string): string {
   return `${hours}h ago`;
 }
 
+/** Formatter for useTick: computes elapsed time from an ISO start timestamp. */
+function formatElapsedFromStart(startedAt: string): string {
+  return fmtElapsed(Date.now() - new Date(startedAt).getTime());
+}
+
 function heartbeatLabel(status?: HeartbeatStatus): string {
   switch (status) {
     case "healthy": return "Healthy";
@@ -187,17 +193,7 @@ function AuditTaskCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const [elapsed, setElapsed] = useState(() => fmtElapsed(entry.elapsedMs));
-
-  // Live-tick elapsed time
-  useEffect(() => {
-    const startMs = new Date(entry.startedAt).getTime();
-    setElapsed(fmtElapsed(Date.now() - startMs));
-    const timer = setInterval(() => {
-      setElapsed(fmtElapsed(Date.now() - startMs));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [entry.startedAt]);
+  const elapsed = useTick(entry.startedAt, formatElapsedFromStart);
 
   const cardClass = entry.heartbeatStatus === "unresponsive"
     ? "audit-task-card audit-task-unresponsive"
