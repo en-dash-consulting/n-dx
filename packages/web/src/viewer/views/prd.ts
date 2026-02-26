@@ -121,6 +121,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   /** Whether the initial deep-link has been consumed. */
   const deepLinkConsumedRef = useRef(false);
 
+  /** Mutable ref so the dedup-wrapped fetchTaskUsage always reads the latest budget. */
+  const weeklyBudgetRef = useRef(weeklyBudget);
+  weeklyBudgetRef.current = weeklyBudget;
+
   // Toast helpers — success (green) and error (red) variants
   const showToast = useCallback((message: string, type: "success" | "error" = "success", duration = 3000) => {
     setToast(message);
@@ -170,33 +174,49 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     }
   }, []);
 
+  // Task usage fetch with request deduplication: concurrent callers (e.g.
+  // WebSocket flush arriving during a polling fetch) share a single in-flight
+  // request instead of triggering duplicate API calls.
+  //
+  // Uses weeklyBudgetRef (mutable ref) to read the latest budget without
+  // recreating the wrapper, keeping the callback reference stable.
+  const usageDedup = useRef(
+    createRequestDedup(async () => {
+      const [taskUsageResult, utilizationResult] = await Promise.allSettled([
+        fetch("/api/hench/task-usage"),
+        fetch("/api/token/utilization"),
+      ]);
+
+      let resolvedWeeklyBudget = weeklyBudgetRef.current;
+      if (utilizationResult.status === "fulfilled" && utilizationResult.value.ok) {
+        try {
+          const json = await utilizationResult.value.json() as { weeklyBudget?: WeeklyBudgetResolution };
+          resolvedWeeklyBudget = normalizeWeeklyBudgetResolution(json.weeklyBudget);
+          setWeeklyBudget(resolvedWeeklyBudget);
+          setTaskUsageById((prev) => applyWeeklyBudget(prev, resolvedWeeklyBudget));
+        } catch {
+          // Keep prior budget state on parse errors.
+        }
+      }
+
+      if (taskUsageResult.status === "fulfilled" && taskUsageResult.value.ok) {
+        try {
+          const json = await taskUsageResult.value.json() as { taskUsage?: Record<string, ServerTaskUsage> };
+          setTaskUsageById(applyUtilizationToTaskUsage(json.taskUsage ?? {}, resolvedWeeklyBudget));
+        } catch {
+          // Keep existing values on parse errors.
+        }
+      }
+    }),
+  );
+
   const fetchTaskUsage = useCallback(async () => {
-    const [taskUsageResult, utilizationResult] = await Promise.allSettled([
-      fetch("/api/hench/task-usage"),
-      fetch("/api/token/utilization"),
-    ]);
-
-    let resolvedWeeklyBudget = weeklyBudget;
-    if (utilizationResult.status === "fulfilled" && utilizationResult.value.ok) {
-      try {
-        const json = await utilizationResult.value.json() as { weeklyBudget?: WeeklyBudgetResolution };
-        resolvedWeeklyBudget = normalizeWeeklyBudgetResolution(json.weeklyBudget);
-        setWeeklyBudget(resolvedWeeklyBudget);
-        setTaskUsageById((prev) => applyWeeklyBudget(prev, resolvedWeeklyBudget));
-      } catch {
-        // Keep prior budget state on parse errors.
-      }
+    try {
+      await usageDedup.current.execute();
+    } catch {
+      // Usage fetch failures are non-critical — keep existing state.
     }
-
-    if (taskUsageResult.status === "fulfilled" && taskUsageResult.value.ok) {
-      try {
-        const json = await taskUsageResult.value.json() as { taskUsage?: Record<string, ServerTaskUsage> };
-        setTaskUsageById(applyUtilizationToTaskUsage(json.taskUsage ?? {}, resolvedWeeklyBudget));
-      } catch {
-        // Keep existing values on parse errors.
-      }
-    }
-  }, [weeklyBudget]);
+  }, []);
 
   useEffect(() => {
     if (prdData) {
