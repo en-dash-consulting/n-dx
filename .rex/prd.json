@@ -14665,7 +14665,7 @@
             {
               "id": "f397d10d-bc45-4afb-9c6c-5470ccfc6c34",
               "title": "Suspend execution panel polling during memory pressure",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Stop the 3s execution-panel polling loop when memory pressure flag is active to reduce background resource consumption",
               "acceptanceCriteria": [
@@ -14679,12 +14679,13 @@
                 "polling",
                 "execution"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T07:12:40.183Z"
             },
             {
               "id": "f1072210-2117-4456-9326-7659a755921c",
               "title": "Suspend status indicator polling during memory pressure",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Stop the 10s status-indicator polling loop when memory pressure is detected to minimize background processing",
               "acceptanceCriteria": [
@@ -14698,7 +14699,9 @@
                 "polling",
                 "status"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T15:42:43.638Z",
+              "completedAt": "2026-02-26T15:49:11.475Z"
             }
           ]
         },
@@ -15780,6 +15783,8 @@
           "level": "feature",
           "description": "Suspend all polling intervals when browser tab is backgrounded to reduce resource consumption",
           "source": "smart-add",
+          "startedAt": "2026-02-26T07:12:18.010Z",
+          "completedAt": "2026-02-26T07:12:18.010Z",
           "children": [
             {
               "id": "1d3cd284-dbee-4585-9c73-c01518dd6943",
@@ -15865,9 +15870,7 @@
               "startedAt": "2026-02-26T07:07:47.653Z",
               "completedAt": "2026-02-26T07:12:17.901Z"
             }
-          ],
-          "startedAt": "2026-02-26T07:12:18.010Z",
-          "completedAt": "2026-02-26T07:12:18.010Z"
+          ]
         },
         {
           "id": "b7889f93-f610-4742-9be7-86c0d2da52bb",
