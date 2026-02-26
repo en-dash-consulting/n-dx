@@ -15255,7 +15255,7 @@
         {
           "id": "bf969580-2a1c-43da-a518-17e38e904b3b",
           "title": "Centralized Timer Management",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Replace individual per-component timers with a shared timer service to reduce CPU overhead and coordinate updates",
           "source": "smart-add",
@@ -15285,7 +15285,7 @@
             {
               "id": "4e51785f-d87a-4e26-82dd-da51f659ed34",
               "title": "Refactor task-audit.ts to use shared timer service",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Replace individual setInterval calls in task-audit.ts with subscriptions to the shared timer service, reducing timer overhead for multiple visible task cards",
               "acceptanceCriteria": [
@@ -15300,7 +15300,9 @@
                 "frontend",
                 "refactor"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T06:49:41.946Z",
+              "completedAt": "2026-02-26T06:53:49.532Z"
             },
             {
               "id": "cb8190ed-2768-4121-8b3b-765015d3fdd3",
@@ -15324,7 +15326,9 @@
               "startedAt": "2026-02-26T06:44:57.702Z",
               "completedAt": "2026-02-26T06:49:07.798Z"
             }
-          ]
+          ],
+          "startedAt": "2026-02-26T06:53:49.640Z",
+          "completedAt": "2026-02-26T06:53:49.640Z"
         },
         {
           "id": "26c67014-a21a-4e08-bcc6-989f4c338dbd",
