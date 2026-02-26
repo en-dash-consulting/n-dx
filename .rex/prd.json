@@ -15826,7 +15826,7 @@
             {
               "id": "d4bef0a2-79bb-4d5e-8127-59266cdb0219",
               "title": "Suspend status polling (10s interval) when tab is backgrounded",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Halt the 10-second status polling when tab is inactive to prevent unnecessary status updates",
               "acceptanceCriteria": [
@@ -15840,7 +15840,9 @@
                 "status",
                 "performance"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T07:03:27.463Z",
+              "completedAt": "2026-02-26T07:07:00.606Z"
             },
             {
               "id": "9ae2ed51-e1d0-4ffa-9c21-2acca1e855e9",
