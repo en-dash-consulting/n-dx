@@ -14908,7 +14908,7 @@
             {
               "id": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
               "title": "Implement intelligent tree re-render optimization",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Replace full tree re-renders with targeted updates that only modify changed nodes, reducing CPU load and improving UI responsiveness",
               "acceptanceCriteria": [
@@ -14923,7 +14923,8 @@
                 "rendering",
                 "performance"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T05:35:41.732Z"
             },
             {
               "id": "561a77de-29fe-49e9-b64e-460de3baf57f",
@@ -16356,7 +16357,7 @@
             {
               "id": "5c42e669-1179-476a-a90b-7ff5d76576d9",
               "title": "Remove dead clients from broadcast set immediately",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Automatically prune disconnected clients from the active broadcast list to prevent wasted serialization and write operations",
               "acceptanceCriteria": [
@@ -16371,7 +16372,8 @@
                 "cleanup"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-26T05:30:15.486Z"
+              "startedAt": "2026-02-26T05:30:15.486Z",
+              "completedAt": "2026-02-26T05:35:41.504Z"
             },
             {
               "id": "4b039d14-58a7-4de0-85ea-e15762fdeb45",

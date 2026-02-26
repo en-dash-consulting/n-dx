@@ -17,7 +17,8 @@
  * @see ./tree-event-delegate.ts — delegated event handling hook
  */
 
-import { h, Fragment, VNode } from "preact";
+import { h, Fragment, Component } from "preact";
+import type { VNode } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import { computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter } from "./compute.js";
@@ -264,123 +265,162 @@ interface NodeRowProps {
   isDeleting?: boolean;
 }
 
-function NodeRow({ item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren, isSelected, isBulkSelected, onToggleBulkSelect, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting }: NodeRowProps) {
-  const children = item.children ?? [];
-  const stats = hasChildren ? computeBranchStats(children) : null;
-  const ratio = stats ? completionRatio(stats) : 0;
-  const canAddChild = ADDABLE_LEVELS.has(item.level);
-  const usage = taskUsage ?? {
-    totalTokens: 0,
-    runCount: 0,
-    utilization: resolveTaskUtilization(0, weeklyBudget),
-  };
-  const utilization = usage.utilization ?? resolveTaskUtilization(usage.totalTokens, weeklyBudget);
+/**
+ * Memoized single tree node.
+ *
+ * Structural sharing (tree-differ.ts) ensures unchanged items keep their
+ * object reference across data updates. The `shouldComponentUpdate` check
+ * leverages this: when `item` is the same reference AND all UI-state props
+ * match, the node skips its entire render cycle — no VDOM diffing, no
+ * `computeBranchStats`, no string concatenation.
+ *
+ * Uses Preact's native class component `shouldComponentUpdate` (no
+ * preact/compat dependency) for maximum compatibility with the existing
+ * test infrastructure and esbuild configuration.
+ */
+class NodeRow extends Component<NodeRowProps> {
+  shouldComponentUpdate(nextProps: NodeRowProps): boolean {
+    const p = this.props;
+    // Reference equality for the item object — structural sharing makes
+    // this cheap and sufficient when items haven't changed.
+    if (p.item !== nextProps.item) return true;
+    // UI state props — these are primitives so === works.
+    if (p.isExpanded !== nextProps.isExpanded) return true;
+    if (p.isSelected !== nextProps.isSelected) return true;
+    if (p.isBulkSelected !== nextProps.isBulkSelected) return true;
+    if (p.isInlineAddActive !== nextProps.isInlineAddActive) return true;
+    if (p.isHighlighted !== nextProps.isHighlighted) return true;
+    if (p.isDeleting !== nextProps.isDeleting) return true;
+    if (p.depth !== nextProps.depth) return true;
+    if (p.hasChildren !== nextProps.hasChildren) return true;
+    if (p.canInlineAdd !== nextProps.canInlineAdd) return true;
+    if (p.canDelete !== nextProps.canDelete) return true;
+    // taskUsage is an object — reference check (new object ⇒ re-render)
+    if (p.taskUsage !== nextProps.taskUsage) return true;
+    if (p.weeklyBudget !== nextProps.weeklyBudget) return true;
+    // All props match — skip render
+    return false;
+  }
 
-  const indent = depth * 24;
+  render() {
+    const { item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren, isSelected, isBulkSelected, onToggleBulkSelect, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting } = this.props;
+    const children = item.children ?? [];
+    const stats = hasChildren ? computeBranchStats(children) : null;
+    const ratio = stats ? completionRatio(stats) : 0;
+    const canAddChild = ADDABLE_LEVELS.has(item.level);
+    const usage = taskUsage ?? {
+      totalTokens: 0,
+      runCount: 0,
+      utilization: resolveTaskUtilization(0, weeklyBudget),
+    };
+    const utilization = usage.utilization ?? resolveTaskUtilization(usage.totalTokens, weeklyBudget);
 
-  // Checkbox change is the only per-node listener. It must stay on the
-  // <input> for Preact's controlled-input diffing to work correctly.
-  const handleCheckboxChange = (e: Event) => {
-    e.stopPropagation();
-    if (onToggleBulkSelect) {
-      onToggleBulkSelect(item);
-    }
-  };
+    const indent = depth * 24;
 
-  return h(
-    "div",
-    {
-      class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""} prd-level-${item.level}`,
-      style: `padding-left: ${indent + 8}px`,
-      // Data attributes for delegated event handling
-      "data-node-id": item.id,
-      ...(hasChildren ? { "data-has-children": "" } : {}),
-      role: "treeitem",
-      "aria-expanded": hasChildren ? String(isExpanded) : undefined,
-      "aria-selected": String(isSelected),
-      tabIndex: 0,
-      ref: nodeRef,
-    },
-    // Bulk selection checkbox
-    onToggleBulkSelect
-      ? h("span", { class: "prd-bulk-checkbox-wrapper" },
-          h("input", {
-            type: "checkbox",
-            class: "prd-bulk-checkbox",
-            checked: isBulkSelected,
-            onChange: handleCheckboxChange,
-            "aria-label": `Select ${item.title} for bulk action`,
-          }),
-        )
-      : null,
-    // Chevron
-    h(
-      "span",
+    // Checkbox change is the only per-node listener. It must stay on the
+    // <input> for Preact's controlled-input diffing to work correctly.
+    const handleCheckboxChange = (e: Event) => {
+      e.stopPropagation();
+      if (onToggleBulkSelect) {
+        onToggleBulkSelect(item);
+      }
+    };
+
+    return h(
+      "div",
       {
-        class: `prd-chevron${hasChildren && isExpanded ? " prd-chevron-open" : ""}`,
-        "aria-hidden": "true",
+        class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""} prd-level-${item.level}`,
+        style: `padding-left: ${indent + 8}px`,
+        // Data attributes for delegated event handling
+        "data-node-id": item.id,
+        ...(hasChildren ? { "data-has-children": "" } : {}),
+        role: "treeitem",
+        "aria-expanded": hasChildren ? String(isExpanded) : undefined,
+        "aria-selected": String(isSelected),
+        tabIndex: 0,
+        ref: nodeRef,
       },
-      hasChildren ? "\u25B6" : "",
-    ),
-    // Status icon
-    h(StatusIndicator, { status: item.status }),
-    // Level badge
-    h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
-    // Title
-    h("span", { class: "prd-node-title" }, item.title),
-    // Priority
-    item.priority
-      ? h(PriorityBadge, { priority: item.priority })
-      : null,
-    // Progress bar (for nodes with children)
-    stats && stats.total > 0
-      ? h(Fragment, null,
-          h(ProgressBar, { ratio }),
-          h(
+      // Bulk selection checkbox
+      onToggleBulkSelect
+        ? h("span", { class: "prd-bulk-checkbox-wrapper" },
+            h("input", {
+              type: "checkbox",
+              class: "prd-bulk-checkbox",
+              checked: isBulkSelected,
+              onChange: handleCheckboxChange,
+              "aria-label": `Select ${item.title} for bulk action`,
+            }),
+          )
+        : null,
+      // Chevron
+      h(
+        "span",
+        {
+          class: `prd-chevron${hasChildren && isExpanded ? " prd-chevron-open" : ""}`,
+          "aria-hidden": "true",
+        },
+        hasChildren ? "\u25B6" : "",
+      ),
+      // Status icon
+      h(StatusIndicator, { status: item.status }),
+      // Level badge
+      h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
+      // Title
+      h("span", { class: "prd-node-title" }, item.title),
+      // Priority
+      item.priority
+        ? h(PriorityBadge, { priority: item.priority })
+        : null,
+      // Progress bar (for nodes with children)
+      stats && stats.total > 0
+        ? h(Fragment, null,
+            h(ProgressBar, { ratio }),
+            h(
+              "span",
+              { class: "prd-count" },
+              `${stats.completed}/${stats.total}`,
+            ),
+          )
+        : null,
+      // Tags
+      item.tags && item.tags.length > 0
+        ? h(TagList, { tags: item.tags })
+        : null,
+      // Aggregated task token usage
+      item.level === "task" || item.level === "subtask"
+        ? h(
             "span",
-            { class: "prd-count" },
-            `${stats.completed}/${stats.total}`,
-          ),
-        )
-      : null,
-    // Tags
-    item.tags && item.tags.length > 0
-      ? h(TagList, { tags: item.tags })
-      : null,
-    // Aggregated task token usage
-    item.level === "task" || item.level === "subtask"
-      ? h(
-          "span",
-          {
-            class: "prd-usage-chip",
-            "data-utilization-reason": utilization.reason,
-            title: `${usage.runCount} associated run${usage.runCount === 1 ? "" : "s"} | ${utilization.label} weekly utilization`,
-          },
-          `${formatTokenCount(usage.totalTokens)} tokens | ${utilization.label}`,
-        )
-      : null,
-    // Timestamp
-    h(TimestampSuffix, { item }),
-    // Inline add child button (appears on hover, only for addable levels)
-    // No onClick — handled by delegated click on tree container.
-    canAddChild && canInlineAdd
-      ? h("button", {
-          class: `prd-inline-add-btn${isInlineAddActive ? " active" : ""}`,
-          title: `Add child to ${item.title}`,
-          "aria-label": `Add child item to ${item.title}`,
-        }, "+")
-      : null,
-    // Inline delete button (appears on hover)
-    // No onClick — handled by delegated click on tree container.
-    canDelete
-      ? h("button", {
-          class: "prd-inline-delete-btn",
-          title: `Delete ${LEVEL_LABELS[item.level]} "${item.title}"`,
-          "aria-label": `Delete ${item.title}`,
-        }, "\u2717")
-      : null,
-    // Context menu rendering moved to PRDTree (tree-level state)
-  );
+            {
+              class: "prd-usage-chip",
+              "data-utilization-reason": utilization.reason,
+              title: `${usage.runCount} associated run${usage.runCount === 1 ? "" : "s"} | ${utilization.label} weekly utilization`,
+            },
+            `${formatTokenCount(usage.totalTokens)} tokens | ${utilization.label}`,
+          )
+        : null,
+      // Timestamp
+      h(TimestampSuffix, { item }),
+      // Inline add child button (appears on hover, only for addable levels)
+      // No onClick — handled by delegated click on tree container.
+      canAddChild && canInlineAdd
+        ? h("button", {
+            class: `prd-inline-add-btn${isInlineAddActive ? " active" : ""}`,
+            title: `Add child to ${item.title}`,
+            "aria-label": `Add child item to ${item.title}`,
+          }, "+")
+        : null,
+      // Inline delete button (appears on hover)
+      // No onClick — handled by delegated click on tree container.
+      canDelete
+        ? h("button", {
+            class: "prd-inline-delete-btn",
+            title: `Delete ${LEVEL_LABELS[item.level]} "${item.title}"`,
+            "aria-label": `Delete ${item.title}`,
+          }, "\u2717")
+        : null,
+      // Context menu rendering moved to PRDTree (tree-level state)
+    );
+  }
 }
 
 // ── Off-screen node culling ──────────────────────────────────────────

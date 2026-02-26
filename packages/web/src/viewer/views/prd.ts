@@ -22,6 +22,7 @@ import type { TaskUsageSummary, WeeklyBudgetResolution, WeeklyBudgetSource } fro
 import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
 import { findItemById, getAncestorIds, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
+import { diffDocument, applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
 import { usePolling } from "../hooks/use-polling.js";
 
@@ -135,7 +136,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     return items;
   }, [data, bulkSelectedIds]);
 
-  // Fetch PRD data
+  // Fetch PRD data with structural sharing — unchanged items keep their
+  // reference identity so memoized tree nodes skip re-rendering.
   const fetchPRDData = useCallback(async () => {
     try {
       const res = await fetch("/data/prd.json");
@@ -148,7 +150,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         return;
       }
       const json = await res.json();
-      setData(json);
+      setData((prev) => diffDocument(prev, json));
       setError(null);
     } catch (_err) {
       setError("Could not fetch PRD data. Is the server running?");
@@ -198,7 +200,18 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // Visibility-aware polling via polling manager
   usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
-  // WebSocket listener for real-time PRD updates (deletions, edits from other clients)
+  // WebSocket listener for real-time PRD updates.
+  //
+  // Incremental strategy: rex:item-updated messages include the changed
+  // fields, so we apply them directly to local state (O(path-to-node))
+  // instead of re-fetching the entire PRD tree. rex:item-deleted uses
+  // the existing removeItemById for instant local removal. Both
+  // operations are followed by a background reconciliation fetch that
+  // uses structural sharing (diffDocument) to correct any drift without
+  // triggering unnecessary re-renders.
+  //
+  // rex:prd-changed (structural changes like adds, merges, prune)
+  // still triggers a full fetch since the local tree shape changed.
   useEffect(() => {
     let ws: WebSocket | null = null;
     try {
@@ -207,12 +220,38 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (
-            msg.type === "rex:item-deleted" ||
-            msg.type === "rex:item-updated" ||
-            msg.type === "rex:prd-changed"
-          ) {
-            // Refresh tree from server to stay in sync
+
+          if (msg.type === "rex:item-updated" && msg.itemId && msg.updates) {
+            // Targeted update — only the changed node and its ancestors
+            // get new object references. Memoized NodeRow components for
+            // all other nodes skip their render cycle entirely.
+            setData((prev) => {
+              if (!prev) return prev;
+              const newItems = applyItemUpdate(prev.items, msg.itemId, msg.updates);
+              return newItems === prev.items ? prev : { ...prev, items: newItems };
+            });
+            // Background reconciliation with structural sharing
+            fetchPRDData();
+            fetchTaskUsage();
+            return;
+          }
+
+          if (msg.type === "rex:item-deleted" && msg.itemId) {
+            // Optimistic local removal — instant UI feedback
+            setData((prev) => {
+              if (!prev) return prev;
+              const newItems = removeItemById(prev.items, msg.itemId);
+              return newItems === prev.items ? prev : { ...prev, items: newItems };
+            });
+            // Background reconciliation
+            fetchPRDData();
+            fetchTaskUsage();
+            return;
+          }
+
+          if (msg.type === "rex:prd-changed") {
+            // Structural changes (adds, merges, prune) — full refetch
+            // with structural sharing to minimize re-renders.
             fetchPRDData();
             fetchTaskUsage();
           }
@@ -230,9 +269,17 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     };
   }, [fetchPRDData, fetchTaskUsage]);
 
-  // Handle item update via API
+  // Handle item update via API — applies update optimistically for instant
+  // UI feedback, then reconciles with the server via structural sharing.
   const handleItemUpdate = useCallback(
     async (id: string, updates: Partial<PRDItemData>) => {
+      // Optimistic local update — only the changed node path gets new refs
+      setData((prev) => {
+        if (!prev) return prev;
+        const newItems = applyItemUpdate(prev.items, id, updates);
+        return newItems === prev.items ? prev : { ...prev, items: newItems };
+      });
+
       try {
         const res = await fetch(`/api/rex/items/${id}`, {
           method: "PATCH",
@@ -241,13 +288,17 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         });
         if (!res.ok) {
           console.error("Failed to update item:", await res.text());
+          // Revert optimistic update by reconciling with server
+          await fetchPRDData();
           return;
         }
-        // Refresh PRD data
+        // Reconcile with server (structural sharing avoids unnecessary re-renders)
         await fetchPRDData();
         await fetchTaskUsage();
       } catch (err) {
         console.error("Failed to update item:", err);
+        // Revert optimistic update
+        await fetchPRDData();
       }
     },
     [fetchPRDData, fetchTaskUsage],
