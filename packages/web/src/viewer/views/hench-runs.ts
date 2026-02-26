@@ -19,6 +19,7 @@ import { CopyLinkButton } from "../components/copy-link-button.js";
 import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
 import type { ActiveRun } from "../components/active-tasks-panel.js";
 import { ConcurrencyPanel } from "../components/concurrency-panel.js";
+import { MemoryPanel } from "../components/memory-panel.js";
 import { ThrottleControlsPanel } from "../components/throttle-controls.js";
 import type { NavigateTo } from "../types.js";
 
@@ -697,6 +698,9 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
     // Concurrency status — shows process count, limits, and utilization
     h(ConcurrencyPanel, null),
+
+    // Memory and resource health — system memory, per-task memory, health indicators
+    h(MemoryPanel, null),
 
     // Throttle controls — manual concurrency adjustment, pause/resume, emergency stop
     h(ThrottleControlsPanel, null),

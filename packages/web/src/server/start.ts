@@ -13,7 +13,7 @@ import { handleRexRoute, shutdownRexExecution } from "./routes-rex.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
-import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, shutdownActiveExecutions } from "./routes-hench.js";
+import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions } from "./routes-hench.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute } from "./routes-mcp.js";
@@ -564,6 +564,7 @@ export async function startServer(
   if (isInScope(scope, "hench")) {
     startHeartbeatMonitor(watcherHandles.henchRunsDir, ws.broadcast);
     startConcurrencyMonitor(ctx, ws.broadcast);
+    startMemoryMonitor(ws.broadcast);
   }
 
   const server = createHttpServer(ctx, watcher, ws, assets);

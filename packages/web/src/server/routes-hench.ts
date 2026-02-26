@@ -9,6 +9,7 @@
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
+ * GET    /api/hench/memory               — system memory, per-process memory, and resource health
  * GET    /api/hench/concurrency           — concurrent execution count, limits, and queue status
  * POST   /api/hench/execute/:taskId/terminate — terminate a running task
  * GET    /api/hench/config                — current workflow configuration with field metadata
@@ -31,6 +32,8 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -295,6 +298,11 @@ export function handleHenchRoute(
   // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
   if (path === "audit" && method === "GET") {
     return handleAudit(res, runsDir);
+  }
+
+  // GET /api/hench/memory — system memory, per-process memory, and resource health
+  if (path === "memory" && method === "GET") {
+    return handleMemory(res);
   }
 
   // GET /api/hench/concurrency — concurrent execution count, limits, and queue status
@@ -1375,6 +1383,160 @@ export function startConcurrencyMonitor(
       timestamp: new Date().toISOString(),
     });
   }, CONCURRENCY_BROADCAST_MS);
+
+  if (timer.unref) {
+    timer.unref();
+  }
+}
+
+// ── Memory / resource monitoring ──────────────────────────────────────
+
+/** Memory health level for UI indicators. */
+type MemoryHealthLevel = "healthy" | "warning" | "critical";
+
+/** Per-process memory snapshot. */
+interface ProcessMemoryEntry {
+  taskId: string;
+  taskTitle: string;
+  pid: number;
+  rssBytes: number;
+  source: "dashboard" | "disk";
+}
+
+/** Full memory status response shape. */
+interface MemoryStatus {
+  system: {
+    totalBytes: number;
+    freeBytes: number;
+    usedBytes: number;
+    usedPercent: number;
+  };
+  server: {
+    pid: number;
+    rssBytes: number;
+    heapUsedBytes: number;
+    heapTotalBytes: number;
+    externalBytes: number;
+  };
+  processes: ProcessMemoryEntry[];
+  health: MemoryHealthLevel;
+  loadAvg: [number, number, number];
+  cpuCount: number;
+  timestamp: string;
+}
+
+/**
+ * Determine memory health level based on system memory usage percentage.
+ *
+ * - healthy: < 75% used (green)
+ * - warning: 75–90% used (yellow/orange)
+ * - critical: ≥ 90% used (red)
+ */
+function computeMemoryHealth(usedPercent: number): MemoryHealthLevel {
+  if (usedPercent >= 90) return "critical";
+  if (usedPercent >= 75) return "warning";
+  return "healthy";
+}
+
+/**
+ * Attempt to read RSS (resident set size) for a given PID.
+ *
+ * Uses /proc/<pid>/statm on Linux and `ps` on macOS/other.
+ * Returns null if the PID is unreachable or the read fails.
+ */
+function getProcessRss(pid: number): number | null {
+  try {
+    // Linux: read from /proc filesystem (no child process needed)
+    try {
+      const statm = readFileSync(`/proc/${pid}/statm`, "utf-8");
+      const pages = parseInt(statm.split(" ")[1]!, 10);
+      if (!isNaN(pages)) {
+        // Page size is typically 4096 bytes
+        return pages * 4096;
+      }
+    } catch {
+      // Not Linux or PID gone — fall through to ps
+    }
+
+    // macOS / other: use ps command
+    const out = execFileSync("ps", ["-o", "rss=", "-p", String(pid)], {
+      timeout: 2000,
+      encoding: "utf-8",
+    });
+    const kb = parseInt(out.trim(), 10);
+    if (!isNaN(kb)) return kb * 1024;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Collect full memory status snapshot. */
+function collectMemoryStatus(): MemoryStatus {
+  const totalBytes = totalmem();
+  const freeBytes = freemem();
+  const usedBytes = totalBytes - freeBytes;
+  const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+
+  const mem = process.memoryUsage();
+  const load = loadavg() as [number, number, number];
+  const cpuCount = cpus().length;
+
+  // Collect per-process memory for active executions
+  const processes: ProcessMemoryEntry[] = [];
+  for (const [taskId, entry] of activeExecutions.entries()) {
+    const pid = entry.handle.pid;
+    if (pid == null) continue;
+    const rssBytes = getProcessRss(pid);
+    if (rssBytes != null) {
+      processes.push({
+        taskId,
+        taskTitle: entry.state.taskTitle,
+        pid,
+        rssBytes,
+        source: "dashboard",
+      });
+    }
+  }
+
+  return {
+    system: { totalBytes, freeBytes, usedBytes, usedPercent },
+    server: {
+      pid: process.pid,
+      rssBytes: mem.rss,
+      heapUsedBytes: mem.heapUsed,
+      heapTotalBytes: mem.heapTotal,
+      externalBytes: mem.external,
+    },
+    processes,
+    health: computeMemoryHealth(usedPercent),
+    loadAvg: load,
+    cpuCount,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** GET /api/hench/memory — system memory, per-process memory, and resource health. */
+function handleMemory(res: ServerResponse): boolean {
+  const status = collectMemoryStatus();
+  jsonResponse(res, 200, status);
+  return true;
+}
+
+/**
+ * Periodically broadcast memory + resource health via WebSocket.
+ * Runs every 10 seconds so the memory panel stays live.
+ */
+export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
+  const MEMORY_BROADCAST_MS = 10_000;
+
+  const timer = setInterval(() => {
+    const status = collectMemoryStatus();
+    broadcast({
+      type: "hench:memory-status",
+      ...status,
+    });
+  }, MEMORY_BROADCAST_MS);
 
   if (timer.unref) {
     timer.unref();
