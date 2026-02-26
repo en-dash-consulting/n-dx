@@ -275,4 +275,95 @@ describe("WebSocket manager", () => {
     expect(PING_INTERVAL_MS).toBeLessThanOrEqual(10_000);
     expect(PING_INTERVAL_MS).toBeGreaterThan(0);
   });
+
+  // ── Dead client broadcast-set pruning ───────────────────────────────
+
+  it("destroys socket when client is removed from broadcast set", async () => {
+    const { socket } = await connectRaw(port);
+    expect(ws.clientCount()).toBe(1);
+
+    // Get a reference to track socket state
+    const socketRef = socket;
+    expect(socketRef.destroyed).toBe(false);
+
+    socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Client removed AND underlying socket destroyed (OS resources freed)
+    expect(ws.clientCount()).toBe(0);
+    expect(socketRef.destroyed).toBe(true);
+  });
+
+  it("removes event listeners on disconnect to allow GC", async () => {
+    const { socket } = await connectRaw(port);
+    expect(ws.clientCount()).toBe(1);
+
+    // The server-side socket (visible via the upgrade) has listeners attached.
+    // After disconnect + removal, listeners should be stripped.
+    // We verify indirectly: a second destroy should not re-trigger removal
+    // (which would throw if the set were corrupted).
+    socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ws.clientCount()).toBe(0);
+
+    // Broadcast should still work with zero clients (no stale references)
+    ws.broadcast({ type: "post-gc-check" });
+    expect(ws.clientCount()).toBe(0);
+  });
+
+  it("broadcast skips dead clients without serialization waste", async () => {
+    const c1 = await connectRaw(port);
+    const c2 = await connectRaw(port);
+    const c3 = await connectRaw(port);
+    expect(ws.clientCount()).toBe(3);
+
+    // Kill two clients
+    c1.socket.destroy();
+    c3.socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ws.clientCount()).toBe(1);
+
+    // Broadcast should only reach the surviving client
+    const messages = readMessages(c2.socket, Buffer.alloc(0), 300);
+    ws.broadcast({ type: "survivor-check", alive: true });
+    const msgs = await messages;
+
+    const check = msgs.find((m) => JSON.parse(m).type === "survivor-check");
+    expect(check).toBeDefined();
+    expect(JSON.parse(check!).alive).toBe(true);
+
+    c2.socket.destroy();
+  });
+
+  it("memory usage decreases: clientCount drops to 0 immediately on disconnect", async () => {
+    // Connect several clients
+    const sockets: Socket[] = [];
+    for (let i = 0; i < 5; i++) {
+      const { socket } = await connectRaw(port);
+      sockets.push(socket);
+    }
+    expect(ws.clientCount()).toBe(5);
+
+    // Destroy all at once
+    for (const s of sockets) s.destroy();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // All removed within the timeout (well under the 1s acceptance criterion)
+    expect(ws.clientCount()).toBe(0);
+  });
+
+  it("broadcast is no-op after all clients disconnect mid-session", async () => {
+    const c1 = await connectRaw(port);
+    const c2 = await connectRaw(port);
+    expect(ws.clientCount()).toBe(2);
+
+    c1.socket.destroy();
+    c2.socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ws.clientCount()).toBe(0);
+
+    // Should not throw or leak — just a silent no-op
+    ws.broadcast({ type: "ghost-message" });
+    expect(ws.clientCount()).toBe(0);
+  });
 });

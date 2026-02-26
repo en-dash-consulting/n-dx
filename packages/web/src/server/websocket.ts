@@ -117,20 +117,40 @@ export function createWebSocketManager(): {
   const clients = new Set<WSClient>();
   let pingInterval: ReturnType<typeof setInterval> | null = null;
 
-  /** Idempotent client removal — safe to call from multiple event handlers. */
+  /**
+   * Idempotent client removal — safe to call from multiple event handlers.
+   *
+   * Performs full cleanup in a single call:
+   *  1. Removes from the broadcast set (stops future broadcasts immediately)
+   *  2. Strips event listeners (breaks closure references for GC)
+   *  3. Destroys the underlying socket (releases OS resources)
+   *
+   * Because listeners are removed before the socket is destroyed, the
+   * destroy → close → removeClient chain cannot recurse.
+   */
   function removeClient(client: WSClient): void {
-    clients.delete(client);
+    if (!clients.delete(client)) return; // already removed — nothing to do
+
+    // Break closure references so the client + socket can be GC'd immediately.
+    client.socket.removeAllListeners();
+
+    // Release the OS socket if still open.
+    if (!client.socket.destroyed) {
+      client.socket.destroy();
+    }
   }
 
   /**
    * Remove clients whose underlying socket is no longer writable.
    * Called before each broadcast to catch connections that died between
    * event-loop ticks without emitting a socket event.
+   *
+   * Uses removeClient() for full cleanup (listener removal + socket destroy).
    */
   function pruneDeadClients(): void {
     for (const client of clients) {
       if (client.socket.destroyed || !client.socket.writable) {
-        clients.delete(client);
+        removeClient(client);
       }
     }
   }
@@ -142,16 +162,15 @@ export function createWebSocketManager(): {
     pingInterval = setInterval(() => {
       for (const client of clients) {
         if (!client.alive) {
-          // Missed last ping — disconnect
-          client.socket.destroy();
-          clients.delete(client);
+          // Missed last ping — full cleanup via removeClient
+          removeClient(client);
           continue;
         }
         client.alive = false;
         try {
           client.socket.write(encodePingFrame());
         } catch {
-          clients.delete(client);
+          removeClient(client);
         }
       }
     }, PING_INTERVAL_MS);
@@ -263,8 +282,7 @@ export function createWebSocketManager(): {
         break;
       case 0x08: // Close
         try { client.socket.write(encodeCloseFrame()); } catch { /* ignore */ }
-        client.socket.destroy();
-        clients.delete(client);
+        removeClient(client);
         break;
       case 0x09: // Ping
         client.alive = true;
@@ -289,7 +307,7 @@ export function createWebSocketManager(): {
       try {
         client.socket.write(msg);
       } catch {
-        clients.delete(client);
+        removeClient(client);
       }
     }
   }
