@@ -27,6 +27,7 @@ import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-impor
 import { usePolling } from "../hooks/use-polling.js";
 import { createMessageCoalescer } from "../message-coalescer.js";
 import { createMessageThrottle } from "../message-throttle.js";
+import { createRequestDedup } from "../request-dedup.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -140,8 +141,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // Fetch PRD data with structural sharing — unchanged items keep their
   // reference identity so memoized tree nodes skip re-rendering.
-  const fetchPRDData = useCallback(async () => {
-    try {
+  //
+  // Wrapped with request deduplication: concurrent callers (e.g. WebSocket
+  // flush arriving during a polling fetch) share a single in-flight request
+  // instead of triggering duplicate API calls.
+  const prdDedup = useRef(
+    createRequestDedup(async () => {
       const res = await fetch("/data/prd.json");
       if (!res.ok) {
         if (res.status === 404) {
@@ -154,6 +159,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       const json = await res.json();
       setData((prev) => diffDocument(prev, json));
       setError(null);
+    }),
+  );
+
+  const fetchPRDData = useCallback(async () => {
+    try {
+      await prdDedup.current.execute();
     } catch (_err) {
       setError("Could not fetch PRD data. Is the server running?");
     }
