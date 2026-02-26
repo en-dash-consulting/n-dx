@@ -8,6 +8,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { usePolling } from "../../hooks/use-polling.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -118,19 +119,16 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
       // WebSocket not available — fall back to polling
     }
 
-    // Poll as fallback (every 3s when active, 10s when idle)
-    const interval = setInterval(() => {
-      fetchStatus();
-    }, 3000);
-
     return () => {
-      clearInterval(interval);
       if (wsRef.current) {
         try { wsRef.current.close(); } catch { /* ignore */ }
         wsRef.current = null;
       }
     };
   }, [fetchStatus, onPrdChanged]);
+
+  // Poll as fallback (every 3s) — visibility-aware via polling manager
+  usePolling("execution-panel", fetchStatus, 3000);
 
   // ── Handlers ───────────────────────────────────────────────────────
 

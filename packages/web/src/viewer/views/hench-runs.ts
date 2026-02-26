@@ -13,6 +13,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { MetricCard } from "../components/data-display/health-gauge.js";
 import { BrandedHeader } from "../components/logos.js";
+import { usePolling } from "../hooks/use-polling.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { CopyLinkButton } from "../components/copy-link-button.js";
 import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
@@ -480,9 +481,10 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   useEffect(() => {
     fetchRuns().then(() => setLoading(false));
-    const interval = setInterval(fetchRuns, 10_000);
-    return () => clearInterval(interval);
   }, [fetchRuns]);
+
+  // Visibility-aware polling via polling manager
+  usePolling("hench-runs", fetchRuns, 10_000);
 
   // Deep-link: auto-select the target run once runs are loaded
   useEffect(() => {

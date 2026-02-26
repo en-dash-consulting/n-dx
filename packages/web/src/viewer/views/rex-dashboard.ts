@@ -13,6 +13,7 @@ import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
+import { usePolling } from "../hooks/use-polling.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -259,11 +260,10 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
 
   useEffect(() => {
     fetchDashboard().then(() => setLoading(false));
-
-    // Poll for updates every 10 seconds
-    const interval = setInterval(fetchDashboard, 10_000);
-    return () => clearInterval(interval);
   }, [fetchDashboard]);
+
+  // Visibility-aware polling via polling manager
+  usePolling("rex-dashboard", fetchDashboard, 10_000);
 
   if (loading) {
     return h("div", { class: "loading" }, "Loading PRD dashboard...");

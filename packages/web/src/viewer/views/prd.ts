@@ -23,6 +23,7 @@ import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
 import { findItemById, getAncestorIds, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
 import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
+import { usePolling } from "../hooks/use-polling.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -194,10 +195,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     fetchTaskUsage();
   }, [prdData, fetchPRDData, fetchTaskUsage]);
 
-  useEffect(() => {
-    const interval = setInterval(fetchTaskUsage, 10_000);
-    return () => clearInterval(interval);
-  }, [fetchTaskUsage]);
+  // Visibility-aware polling via polling manager
+  usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
   // WebSocket listener for real-time PRD updates (deletions, edits from other clients)
   useEffect(() => {

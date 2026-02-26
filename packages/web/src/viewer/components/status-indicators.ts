@@ -11,6 +11,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { usePolling } from "../hooks/use-polling.js";
 import type { ViewId } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -92,16 +93,16 @@ function useProjectStatus(): ProjectStatus | null {
   const [status, setStatus] = useState<ProjectStatus | null>(cachedStatus);
   const mountedRef = useRef(true);
 
+  const refresh = useCallback(async () => {
+    const data = await fetchStatus();
+    if (mountedRef.current) setStatus(data);
+  }, []);
+
+  // Initial fetch + WebSocket for instant updates
   useEffect(() => {
     mountedRef.current = true;
 
-    const refresh = async () => {
-      const data = await fetchStatus();
-      if (mountedRef.current) setStatus(data);
-    };
-
     refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL_MS);
 
     // Connect to WebSocket for instant status updates when runs/PRD change
     let ws: WebSocket | null = null;
@@ -130,12 +131,14 @@ function useProjectStatus(): ProjectStatus | null {
 
     return () => {
       mountedRef.current = false;
-      clearInterval(timer);
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }
     };
-  }, []);
+  }, [refresh]);
+
+  // Visibility-aware polling via polling manager
+  usePolling("status-indicators", refresh, POLL_INTERVAL_MS);
 
   return status;
 }

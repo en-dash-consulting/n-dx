@@ -20,6 +20,7 @@ import {
 import { DATA_FILES } from "../schema/data-files.js";
 import { migrateData } from "./schema-compat.js";
 import type { LoadedData } from "./types.js";
+import { registerPoller, unregisterPoller } from "./polling-manager.js";
 
 type DataChangeHandler = (data: LoadedData) => void;
 
@@ -55,7 +56,7 @@ let currentData: LoadedData = {
 };
 
 let onChange: DataChangeHandler | null = null;
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollingActive = false;
 let lastMtimes: Record<string, number> = {};
 
 export function getData(): LoadedData {
@@ -204,38 +205,44 @@ async function refreshChangedModules(newMtimes: Record<string, number>): Promise
   }
 }
 
-/** Start polling for data changes (selective refresh — only changed files). */
-export function startPolling(intervalMs: number = 5000): void {
-  if (pollTimer) return;
+/** The polling callback, extracted for registration with the polling manager. */
+async function pollForChanges(): Promise<void> {
+  try {
+    const res = await fetch("/data/status");
+    if (!res.ok) return;
+    const status: { mtimes: Record<string, number> } = await res.json();
 
-  pollTimer = setInterval(async () => {
-    try {
-      const res = await fetch("/data/status");
-      if (!res.ok) return;
-      const status: { mtimes: Record<string, number> } = await res.json();
-
-      // Check if any file changed
-      let changed = false;
-      for (const [file, mtime] of Object.entries(status.mtimes)) {
-        if (lastMtimes[file] !== mtime) {
-          changed = true;
-          break;
-        }
+    // Check if any file changed
+    let changed = false;
+    for (const [file, mtime] of Object.entries(status.mtimes)) {
+      if (lastMtimes[file] !== mtime) {
+        changed = true;
+        break;
       }
-
-      if (changed) {
-        await refreshChangedModules(status.mtimes);
-      }
-    } catch {
-      // Server may be down — ignore
     }
-  }, intervalMs);
+
+    if (changed) {
+      await refreshChangedModules(status.mtimes);
+    }
+  } catch {
+    // Server may be down — ignore
+  }
+}
+
+/**
+ * Start polling for data changes (selective refresh — only changed files).
+ * Registers with the centralized polling manager for automatic
+ * suspend/resume based on tab visibility.
+ */
+export function startPolling(intervalMs: number = 5000): void {
+  if (pollingActive) return;
+  pollingActive = true;
+  registerPoller("loader:data-status", pollForChanges, intervalMs);
 }
 
 /** Stop polling for data changes */
 export function stopPolling(): void {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  if (!pollingActive) return;
+  pollingActive = false;
+  unregisterPoller("loader:data-status");
 }

@@ -44,8 +44,17 @@ import { DegradationBanner } from "./components/degradation-banner.js";
 import { RefreshQueueStatus } from "./components/refresh-queue-status.js";
 import { useRefreshThrottle } from "./hooks/use-refresh-throttle.js";
 import type { DegradableFeature } from "./graceful-degradation.js";
+import { startTabVisibilityMonitor, stopTabVisibilityMonitor } from "./tab-visibility.js";
+import { startPollingManager, stopPollingManager } from "./polling-manager.js";
 
 initTheme();
+
+// Start tab visibility and polling manager at module level so they're
+// available before the first render.  The polling manager subscribes to
+// visibility changes and automatically suspends / resumes all registered
+// pollers when the tab is backgrounded / foregrounded.
+startTabVisibilityMonitor();
+startPollingManager();
 
 /** All known views grouped by product scope. */
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
