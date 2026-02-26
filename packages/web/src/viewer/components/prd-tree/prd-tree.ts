@@ -4,6 +4,14 @@
  * Renders a collapsible/expandable tree of epics → features → tasks → subtasks
  * with status indicators, progress bars, completion percentages, and optional
  * multi-select checkboxes for bulk operations (status update, merge).
+ *
+ * Off-screen nodes are automatically culled via IntersectionObserver to prevent
+ * DOM bloat and memory leaks during extended scrolling. Culled nodes are replaced
+ * with height-preserving placeholders and re-created when scrolled back into view.
+ * Event listeners are cleaned up when nodes are culled (Preact removes them when
+ * the children unmount) and re-attached when nodes become visible again.
+ *
+ * @see ./node-culler.ts — IntersectionObserver-based culling engine
  */
 
 import { h, Fragment, VNode } from "preact";
@@ -14,6 +22,7 @@ import { StatusFilter, defaultStatusFilter } from "./status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
+import { NodeCuller } from "./node-culler.js";
 
 /** Levels that can have children added via inline form. */
 const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
@@ -439,6 +448,65 @@ function NodeRow({ item, taskUsage, weeklyBudget, depth, isExpanded, hasChildren
   );
 }
 
+// ── Off-screen node culling ──────────────────────────────────────────
+
+/** Default height for placeholder nodes before actual height is recorded. */
+const CULLED_PLACEHOLDER_HEIGHT = 40;
+
+/**
+ * Wrapper component that culls off-screen tree nodes.
+ *
+ * Uses a shared NodeCuller (IntersectionObserver) to detect when this node
+ * leaves the viewport buffer. When culled:
+ * - Children are not rendered (freeing DOM nodes and event listeners)
+ * - A height-preserving placeholder div maintains scroll position
+ *
+ * When the node scrolls back into view, full content is re-rendered.
+ * The wrapper div always stays in the DOM so the observer can track it.
+ *
+ * Highlighted nodes (deep-link targets) are never culled to ensure
+ * scrollIntoView works correctly.
+ */
+interface CulledNodeProps {
+  /** Shared culler instance, or null to disable culling. */
+  culler: NodeCuller | null;
+  /** Whether this node should never be culled (e.g. deep-link target). */
+  neverCull?: boolean;
+  /** Child VNodes to render when visible. */
+  children: (VNode | null)[];
+}
+
+function CulledNode({ culler, neverCull, children }: CulledNodeProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(true);
+  const heightRef = useRef(CULLED_PLACEHOLDER_HEIGHT);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !culler || neverCull) return;
+
+    return culler.observe(el, (isVisible) => {
+      if (!isVisible) {
+        // Record height before culling so the placeholder preserves scroll position.
+        const recordedHeight = culler.getLastHeight(el);
+        if (recordedHeight > 0) heightRef.current = recordedHeight;
+      }
+      setVisible(isVisible);
+    });
+  }, [culler, neverCull]);
+
+  if (!visible && !neverCull) {
+    return h("div", {
+      ref,
+      class: "prd-node prd-node-culled",
+      style: `height: ${heightRef.current}px`,
+      "aria-hidden": "true",
+    });
+  }
+
+  return h("div", { ref, class: "prd-node" }, ...children);
+}
+
 // ── Recursive tree renderer ─────────────────────────────────────────
 
 interface TreeNodesProps {
@@ -469,9 +537,11 @@ interface TreeNodesProps {
   onRemoveItem?: (item: PRDItemData) => void;
   /** ID of item currently being deleted (shows loading state). */
   deletingItemId?: string | null;
+  /** Shared NodeCuller instance for off-screen node culling. */
+  culler?: NodeCuller | null;
 }
 
-function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef, onRemoveItem, deletingItemId }: TreeNodesProps) {
+function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, selectedItemId, activeStatuses, onToggle, onSelectItem, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, onInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef, onRemoveItem, deletingItemId, culler }: TreeNodesProps) {
   return h(
     Fragment,
     null,
@@ -485,8 +555,12 @@ function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, select
         const isHL = highlightedItemId === item.id;
 
         return h(
-          "div",
-          { key: item.id, class: "prd-node" },
+          CulledNode,
+          {
+            key: item.id,
+            culler: culler ?? null,
+            neverCull: isHL || isInlineAddActive,
+          },
           h(NodeRow, {
             item,
             taskUsage: taskUsageById?.[item.id],
@@ -540,6 +614,7 @@ function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, select
                   highlightedNodeRef,
                   onRemoveItem,
                   deletingItemId,
+                  culler,
                 }),
               )
             : null,
@@ -661,6 +736,22 @@ export interface PRDTreeProps {
 }
 
 export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId }: PRDTreeProps) {
+  // ── Node culler lifecycle ─────────────────────────────────────────
+  // Create a shared NodeCuller on mount and dispose on unmount.
+  // The culler uses IntersectionObserver to track which nodes are within
+  // the viewport buffer and notifies CulledNode wrappers to swap between
+  // full content and lightweight placeholders.
+  const cullerRef = useRef<NodeCuller | null>(null);
+  if (!cullerRef.current && typeof IntersectionObserver !== "undefined") {
+    cullerRef.current = new NodeCuller({ bufferPx: 200 });
+  }
+  useEffect(() => {
+    return () => {
+      cullerRef.current?.dispose();
+      cullerRef.current = null;
+    };
+  }, []);
+
   // Collect all IDs for expand-all
   const allIds = useMemo(() => {
     const ids = new Set<string>();
@@ -798,6 +889,7 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
         highlightedNodeRef: deepLinkNodeRef,
         onRemoveItem,
         deletingItemId,
+        culler: cullerRef.current,
       }),
     ),
   );

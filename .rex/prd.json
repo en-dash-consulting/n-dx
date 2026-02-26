@@ -14627,6 +14627,1779 @@
           }
         }
       ]
+    },
+    {
+      "id": "6923ff61-6f80-4eab-a875-3b4af1de2bd2",
+      "title": "Memory-Aware Polling Loop Management",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "e385d455-1c95-41d4-b468-b6102ed4477c",
+          "title": "Memory Pressure Polling Suspension",
+          "status": "pending",
+          "level": "feature",
+          "description": "Integrate memory pressure detection with active polling loops to prevent resource consumption during high memory usage",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "daea3910-e952-408e-91a9-b2084903fa68",
+              "title": "Wire memory pressure flag to loader polling suspension",
+              "status": "pending",
+              "level": "task",
+              "description": "Connect the existing isFeatureDisabled(autoRefresh) flag to call stopPolling() in loader.ts when memory pressure reaches 50% threshold",
+              "acceptanceCriteria": [
+                "Loader 5s polling stops when isFeatureDisabled(autoRefresh) returns true",
+                "stopPolling() function is invoked from memory degradation system",
+                "Loader polling remains stopped until memory pressure subsides"
+              ],
+              "priority": "high",
+              "tags": [
+                "memory",
+                "polling",
+                "ui"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f397d10d-bc45-4afb-9c6c-5470ccfc6c34",
+              "title": "Suspend execution panel polling during memory pressure",
+              "status": "pending",
+              "level": "task",
+              "description": "Stop the 3s execution-panel polling loop when memory pressure flag is active to reduce background resource consumption",
+              "acceptanceCriteria": [
+                "Execution panel polling stops when memory pressure flag is set",
+                "No execution panel requests made during memory degradation",
+                "Existing execution state remains visible without updates"
+              ],
+              "priority": "high",
+              "tags": [
+                "memory",
+                "polling",
+                "execution"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f1072210-2117-4456-9326-7659a755921c",
+              "title": "Suspend status indicator polling during memory pressure",
+              "status": "pending",
+              "level": "task",
+              "description": "Stop the 10s status-indicator polling loop when memory pressure is detected to minimize background processing",
+              "acceptanceCriteria": [
+                "Status indicator polling stops when isFeatureDisabled(autoRefresh) is true",
+                "No status update requests during memory pressure",
+                "Status indicator shows last known state without updates"
+              ],
+              "priority": "high",
+              "tags": [
+                "memory",
+                "polling",
+                "status"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "2b20bb70-66cb-48ca-b249-b54729b03427",
+          "title": "Polling Restart and Recovery Logic",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement automatic polling restart when memory pressure subsides to restore normal UI functionality",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5198ec1d-e5a0-4e82-a4e4-e6efbcd8271b",
+              "title": "Implement polling restart when memory pressure subsides",
+              "status": "pending",
+              "level": "task",
+              "description": "Automatically restart all suspended polling loops when memory usage drops below pressure threshold and autoRefresh is re-enabled",
+              "acceptanceCriteria": [
+                "All polling loops restart when memory pressure flag clears",
+                "Polling intervals resume at original frequencies (5s, 3s, 10s)",
+                "No duplicate polling loops created during restart"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "polling",
+                "recovery"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "2497cbfc-79ac-402d-a799-85b33978b38c",
+              "title": "Add polling state management and cleanup",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement centralized polling state management to prevent orphaned intervals and ensure clean suspension/restart cycles",
+              "acceptanceCriteria": [
+                "All polling intervals are tracked and can be cleanly stopped",
+                "No memory leaks from orphaned polling intervals",
+                "Polling state persists across component remounts during memory pressure"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "polling",
+                "cleanup"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:6d3d8a74-c84d-4615-a418-11ac553c4f8c",
+            "matchedItemId": "6d3d8a74-c84d-4615-a418-11ac553c4f8c",
+            "matchedItemTitle": "Log",
+            "matchedItemLevel": "subtask",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-25T19:43:48.688Z"
+          }
+        },
+        {
+          "id": "2351e3d1-6135-48c2-bd8f-9b6ad9fc221a",
+          "title": "Memory-Aware Polling Validation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add testing and monitoring to ensure polling suspension works correctly under memory pressure scenarios",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "1e3a6a48-70d9-4d16-a5f6-dd70da38ce5d",
+              "title": "Add integration tests for memory-aware polling suspension",
+              "status": "pending",
+              "level": "task",
+              "description": "Create tests that simulate memory pressure conditions and verify all polling loops are properly suspended and restarted",
+              "acceptanceCriteria": [
+                "Tests verify all three polling loops stop under simulated memory pressure",
+                "Tests confirm polling restart when memory pressure clears",
+                "Tests validate no resource leaks during suspension/restart cycles"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "polling",
+                "testing"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "20be81d5-b692-4d57-a6b9-94d5cecd2212",
+              "title": "Add polling suspension status indicators",
+              "status": "pending",
+              "level": "task",
+              "description": "Display UI indicators when polling is suspended due to memory pressure to inform users of degraded functionality",
+              "acceptanceCriteria": [
+                "Visual indicator shows when polling is suspended due to memory pressure",
+                "Indicator explains why auto-refresh is disabled",
+                "Manual refresh options remain available during suspension"
+              ],
+              "priority": "low",
+              "tags": [
+                "memory",
+                "ui",
+                "indicators"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:7a896b26-b14a-42d2-8e6b-4903a409af5c",
+                "matchedItemId": "7a896b26-b14a-42d2-8e6b-4903a409af5c",
+                "matchedItemTitle": "Add project status indicators to sidebar",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:43:48.688Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "000ab316-d0d4-497f-9485-e9ee706acb24",
+      "title": "WebSocket Message Performance Optimization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "4a39248e-94d2-4bca-a1eb-0bb06ac724fb",
+          "title": "Message Throttling and Coalescing",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement intelligent throttling and batching mechanisms to handle high-frequency WebSocket messages without overwhelming the UI",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "e8facee3-b5a7-4553-9b65-3ec91b969001",
+              "title": "Implement throttled WebSocket message handler with configurable debounce",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace direct message handlers with throttled versions that can handle rapid message sequences without triggering excessive API calls",
+              "acceptanceCriteria": [
+                "WebSocket messages are debounced with configurable delay (default 250ms)",
+                "Throttling applies to rex:prd-changed, rex:item-updated, and rex:item-deleted messages",
+                "Configuration allows per-message-type throttle intervals",
+                "Memory footprint remains stable during message bursts"
+              ],
+              "priority": "high",
+              "tags": [
+                "websocket",
+                "performance",
+                "ui"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a357c727-5187-43f0-b279-e9ae82394fb1",
+              "title": "Implement message coalescing for rapid sequential updates",
+              "status": "pending",
+              "level": "task",
+              "description": "Batch multiple WebSocket messages that arrive in quick succession to reduce redundant fetchPRDData and fetchTaskUsage calls",
+              "acceptanceCriteria": [
+                "Sequential messages of same type are coalesced within throttle window",
+                "Mixed message types are batched appropriately without data loss",
+                "Coalescing preserves message ordering semantics",
+                "Batch size limits prevent unbounded memory growth"
+              ],
+              "priority": "high",
+              "tags": [
+                "websocket",
+                "performance",
+                "batching"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "997995fe-43df-431b-8a31-b255feb84b24",
+              "title": "Add rate limiting for fetchPRDData and fetchTaskUsage calls",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement call-level rate limiting to prevent these expensive operations from being invoked more frequently than necessary",
+              "acceptanceCriteria": [
+                "fetchPRDData calls are rate-limited to maximum 2 per second",
+                "fetchTaskUsage calls are rate-limited to maximum 2 per second",
+                "Rate limits are configurable via application settings",
+                "Queued calls are deduplicated to prevent redundant requests"
+              ],
+              "priority": "medium",
+              "tags": [
+                "api",
+                "rate-limiting",
+                "performance"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "0258aa8d-c25e-4351-91f1-2f2e41ff39ef",
+          "title": "UI Update Optimization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Optimize rendering pipeline to minimize unnecessary DOM updates and improve responsiveness during high-frequency data changes",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
+              "title": "Implement intelligent tree re-render optimization",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace full tree re-renders with targeted updates that only modify changed nodes, reducing CPU load and improving UI responsiveness",
+              "acceptanceCriteria": [
+                "Tree updates use virtual DOM diffing to minimize DOM manipulation",
+                "Only changed nodes and their ancestors are re-rendered",
+                "Re-render performance scales sub-linearly with tree size",
+                "UI remains responsive during rapid update sequences"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "rendering",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "561a77de-29fe-49e9-b64e-460de3baf57f",
+              "title": "Add update batching for rapid WebSocket message sequences",
+              "status": "pending",
+              "level": "task",
+              "description": "Batch UI updates within animation frames to ensure smooth rendering and prevent UI blocking during message bursts",
+              "acceptanceCriteria": [
+                "UI updates are batched using requestAnimationFrame",
+                "Maximum one UI update per animation frame",
+                "Update batching preserves final state consistency",
+                "Batching can be disabled via debug configuration"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "batching",
+                "rendering"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e93f313b-dc70-41b1-8e14-63b220123347",
+      "title": "TreeNodes DOM Performance Optimization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "2d8059e8-d266-4b1d-ae28-51a519e2ba98",
+          "title": "Virtual Scrolling and Windowing Implementation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Implement viewport-based rendering to only create DOM nodes for visible tree items",
+          "source": "smart-add",
+          "startedAt": "2026-02-25T23:06:34.516Z",
+          "completedAt": "2026-02-25T23:06:34.516Z",
+          "children": [
+            {
+              "id": "10dc3d4a-0c7c-4a82-8564-c7406c6b091b",
+              "title": "Implement virtual scrolling container for TreeNodes component",
+              "status": "deferred",
+              "level": "task",
+              "description": "Replace full tree rendering with a virtual scrolling container that only renders items within the viewport plus a configurable buffer zone",
+              "acceptanceCriteria": [
+                "TreeNodes only renders visible items plus buffer zone",
+                "Scroll position accurately reflects virtual tree height",
+                "Tree expansion/collapse works correctly with virtual scrolling",
+                "Performance improvement measurable on 500+ item trees"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ui",
+                "performance",
+                "virtualization"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:04:34.884Z"
+            },
+            {
+              "id": "7a4147b5-4841-48b1-8b52-8b9d18f85e6b",
+              "title": "Add viewport intersection detection for tree nodes",
+              "status": "deferred",
+              "level": "task",
+              "description": "Implement efficient intersection observer-based detection to determine which tree nodes should be rendered based on viewport visibility",
+              "acceptanceCriteria": [
+                "Uses IntersectionObserver API for efficient visibility detection",
+                "Handles nested tree item visibility correctly",
+                "Includes configurable margins for pre-rendering buffer",
+                "Works correctly with dynamic tree height changes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ui",
+                "performance",
+                "viewport"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:03:38.306Z"
+            },
+            {
+              "id": "4482fa07-daf2-427b-b7db-43dfd54596a1",
+              "title": "Implement dynamic tree height calculation",
+              "status": "deferred",
+              "level": "task",
+              "description": "Calculate and maintain accurate virtual tree height for scrolling while only rendering visible nodes",
+              "acceptanceCriteria": [
+                "Accurately calculates total virtual height for collapsed and expanded states",
+                "Updates height dynamically when nodes are expanded/collapsed",
+                "Maintains scroll position accuracy during height changes",
+                "Handles variable node heights correctly"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "performance",
+                "calculation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:06:31.700Z"
+            }
+          ]
+        },
+        {
+          "id": "f8b985a1-3c7e-4b22-bad3-dead0c200e05",
+          "title": "Lazy Rendering and Node Culling",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement lazy rendering strategies to defer DOM creation until nodes are actually needed",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "aeb4fc99-9663-49d9-913c-36ac3c5fec53",
+              "title": "Implement lazy rendering for collapsed tree branches",
+              "status": "pending",
+              "level": "task",
+              "description": "Defer DOM creation for child nodes under collapsed parents until the parent is expanded by the user",
+              "acceptanceCriteria": [
+                "Child nodes under collapsed parents are not rendered to DOM",
+                "Child nodes render on-demand when parent is expanded",
+                "State is preserved correctly across expand/collapse cycles",
+                "No visual flickering during expand/collapse operations"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "performance",
+                "lazy-loading"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a5487c58-8579-4ee4-8aa7-886989c1d4f8",
+              "title": "Add off-screen node culling with cleanup",
+              "status": "completed",
+              "level": "task",
+              "description": "Remove DOM nodes that scroll out of viewport and clean up associated event listeners to prevent memory bloat",
+              "acceptanceCriteria": [
+                "DOM nodes removed when scrolled out of viewport buffer",
+                "Event listeners cleaned up when nodes are culled",
+                "Nodes re-created correctly when scrolled back into view",
+                "Memory usage remains stable during extended scrolling"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "performance",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-26T00:49:45.178Z",
+              "completedAt": "2026-02-26T01:02:06.874Z"
+            },
+            {
+              "id": "159162ed-86f9-426e-bc33-cbac93b77571",
+              "title": "Implement progressive tree loading for large datasets",
+              "status": "pending",
+              "level": "task",
+              "description": "Load and render tree nodes in chunks rather than all at once for very large PRD trees",
+              "acceptanceCriteria": [
+                "Tree loads in configurable chunks (e.g., 50 nodes at a time)",
+                "Loading indicator shown while chunks are being processed",
+                "User can trigger loading of additional chunks on demand",
+                "Search and filter operations work across all loaded chunks"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "performance",
+                "progressive-loading"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:eff2a091-30bc-4434-8d2c-13e25e60b2c0",
+                "matchedItemId": "eff2a091-30bc-4434-8d2c-13e25e60b2c0",
+                "matchedItemTitle": "Implement memory-efficient data loading strategies for large datasets",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:47:45.671Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "9b281847-53ac-4c09-8600-60eba87fbefb",
+          "title": "Event Listener Optimization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Optimize event listener management to handle large trees efficiently without creating thousands of individual listeners",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "3896d4bd-4c71-476b-8a52-6444341e73ee",
+              "title": "Implement event delegation for tree node interactions",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace individual event listeners on each tree node with delegated event handling on the tree container to reduce listener count",
+              "acceptanceCriteria": [
+                "Single delegated event listener handles all tree node clicks",
+                "Event delegation correctly identifies target tree nodes",
+                "All existing tree interactions work identically",
+                "Dramatic reduction in total event listener count"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "performance",
+                "event-handling"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:39144f79-e12e-46ff-979b-2a95359091bc",
+                "matchedItemId": "39144f79-e12e-46ff-979b-2a95359091bc",
+                "matchedItemTitle": "Implement interactive node manipulation",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:47:45.671Z"
+              }
+            },
+            {
+              "id": "d9909ba1-7393-46b9-be0f-4fa8d89c3af1",
+              "title": "Add event listener lifecycle management",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement proper cleanup and management of event listeners during node creation and destruction cycles",
+              "acceptanceCriteria": [
+                "Event listeners removed when nodes are destroyed",
+                "No memory leaks from orphaned event listeners",
+                "Event listener count remains proportional to visible nodes",
+                "Memory profiling shows stable listener count during scrolling"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "performance",
+                "memory-management"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:2497cbfc-79ac-402d-a799-85b33978b38c",
+                "matchedItemId": "2497cbfc-79ac-402d-a799-85b33978b38c",
+                "matchedItemTitle": "Add polling state management and cleanup",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "pending",
+                "createdAt": "2026-02-25T19:47:45.671Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "e07521ef-4cda-42e5-9bb3-cf0324dfdd62",
+          "title": "Performance Monitoring and Metrics",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add performance monitoring and metrics to track DOM performance improvements and identify bottlenecks",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "757c14ed-b191-4696-b5f8-400437e5987a",
+              "title": "Implement DOM performance monitoring dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Add performance metrics tracking for DOM node count, render time, and memory usage in tree components",
+              "acceptanceCriteria": [
+                "Tracks active DOM node count in tree components",
+                "Measures tree render and update performance",
+                "Shows memory usage metrics for tree operations",
+                "Provides before/after comparison data"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "performance",
+                "monitoring"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "77391163-83d0-47fc-bf92-dac56d1c0aa0",
+              "title": "Add large tree performance benchmarks",
+              "status": "pending",
+              "level": "task",
+              "description": "Create automated benchmarks to validate performance improvements on trees with 500, 1000, and 2000+ items",
+              "acceptanceCriteria": [
+                "Benchmark suite tests trees of various sizes",
+                "Measures DOM node count, render time, and memory usage",
+                "Validates performance targets are met",
+                "Includes regression testing for performance degradation"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "performance",
+                "testing"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10c4bdde-3d18-42f7-9718-3cba99d8f6b1",
+      "title": "Timer Performance Optimization and Re-render Reduction",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "bf969580-2a1c-43da-a518-17e38e904b3b",
+          "title": "Centralized Timer Management",
+          "status": "pending",
+          "level": "feature",
+          "description": "Replace individual per-component timers with a shared timer service to reduce CPU overhead and coordinate updates",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c872f54b-e5cb-4579-8942-de7e5393ee48",
+              "title": "Implement shared timer service for elapsed time updates",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a centralized timer service that manages a single setInterval and distributes tick events to subscribed components, eliminating the need for individual timers per task card",
+              "acceptanceCriteria": [
+                "Single setInterval runs at 1-second intervals regardless of number of subscribers",
+                "Components can subscribe/unsubscribe from timer events",
+                "Timer service automatically starts when first subscriber joins and stops when last subscriber leaves",
+                "Memory leaks prevented through proper cleanup of event listeners"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "frontend",
+                "timer"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "4e51785f-d87a-4e26-82dd-da51f659ed34",
+              "title": "Refactor task-audit.ts to use shared timer service",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace individual setInterval calls in task-audit.ts with subscriptions to the shared timer service, reducing timer overhead for multiple visible task cards",
+              "acceptanceCriteria": [
+                "All individual setInterval calls removed from task-audit.ts",
+                "Elapsed time updates continue to work correctly",
+                "Component properly subscribes on mount and unsubscribes on unmount",
+                "No performance regression in elapsed time accuracy"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "frontend",
+                "refactor"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "cb8190ed-2768-4121-8b3b-765015d3fdd3",
+              "title": "Refactor active-tasks-panel.ts to use shared timer service",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace individual setInterval calls in active-tasks-panel.ts with subscriptions to the shared timer service, reducing timer overhead for the active tasks display",
+              "acceptanceCriteria": [
+                "All individual setInterval calls removed from active-tasks-panel.ts",
+                "Active task elapsed time updates continue to work correctly",
+                "Component properly subscribes on mount and unsubscribes on unmount",
+                "No performance regression in elapsed time accuracy"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "frontend",
+                "refactor"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "26c67014-a21a-4e08-bcc6-989f4c338dbd",
+          "title": "Re-render Optimization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Minimize component re-renders caused by frequent timer updates through batching and memoization strategies",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d762e20a-fceb-4314-923a-19437c4f9282",
+              "title": "Implement batched state updates for elapsed time displays",
+              "status": "pending",
+              "level": "task",
+              "description": "Group multiple elapsed time state updates into batched operations to reduce the frequency of component re-renders when many task cards are visible simultaneously",
+              "acceptanceCriteria": [
+                "State updates for elapsed time are batched within the same tick cycle",
+                "Re-render frequency reduced compared to individual setState calls",
+                "UI remains responsive with smooth elapsed time updates",
+                "Performance improvement measurable with 20+ visible task cards"
+              ],
+              "priority": "medium",
+              "tags": [
+                "performance",
+                "frontend",
+                "optimization"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "6cd4ccaf-cbf9-4b8f-ba92-63e48785117f",
+              "title": "Add memoization for elapsed time calculations",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement React.memo or useMemo to prevent unnecessary re-renders of elapsed time components when only the time value changes but other props remain constant",
+              "acceptanceCriteria": [
+                "Elapsed time components only re-render when elapsed time actually changes",
+                "Components with identical props skip re-render cycles",
+                "Memory usage for memoization remains acceptable",
+                "Elapsed time display accuracy maintained"
+              ],
+              "priority": "medium",
+              "tags": [
+                "performance",
+                "frontend",
+                "memoization"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9cb765b3-29ed-400b-b832-a63e6d038915",
+              "title": "Implement timer pause mechanism for inactive tabs",
+              "status": "pending",
+              "level": "task",
+              "description": "Pause elapsed time timer updates when the browser tab becomes inactive to reduce unnecessary computation and battery usage",
+              "acceptanceCriteria": [
+                "Timer pauses when document.visibilityState becomes 'hidden'",
+                "Timer resumes when document.visibilityState becomes 'visible'",
+                "Elapsed time catches up correctly when tab becomes active again",
+                "Page Visibility API properly handles all browser tab states"
+              ],
+              "priority": "low",
+              "tags": [
+                "performance",
+                "frontend",
+                "battery"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
+            "matchedItemId": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
+            "matchedItemTitle": "Implement intelligent tree re-render optimization",
+            "matchedItemLevel": "task",
+            "matchedItemStatus": "pending",
+            "createdAt": "2026-02-25T19:49:18.198Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "953f745a-769c-4e37-b7f0-32f807874266",
+      "title": "API Request Deduplication and Coordination",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "66d94a74-d7f3-41b3-b0c4-abcbc0504710",
+          "title": "Request deduplication infrastructure",
+          "status": "pending",
+          "level": "feature",
+          "description": "Prevent duplicate in-flight requests by tracking active API calls and returning shared promises for identical requests",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c8e90804-6b89-4dd8-a03f-c024bbf91631",
+              "title": "Implement request deduplication for fetchPRDData calls",
+              "status": "pending",
+              "level": "task",
+              "description": "Add in-flight request tracking to prevent duplicate fetchPRDData API calls when WebSocket messages arrive during active polling requests",
+              "acceptanceCriteria": [
+                "fetchPRDData returns same promise when called while previous request is in-flight",
+                "WebSocket message during 10s poll does not trigger duplicate API call",
+                "Request tracking cleanup occurs when API call completes or fails"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "frontend",
+                "deduplication"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "33e0f73b-49f2-4b65-8a9d-a18f59635c94",
+              "title": "Implement request deduplication for fetchTaskUsage calls",
+              "status": "pending",
+              "level": "task",
+              "description": "Add in-flight request tracking to prevent duplicate fetchTaskUsage API calls when WebSocket messages arrive during active polling requests",
+              "acceptanceCriteria": [
+                "fetchTaskUsage returns same promise when called while previous request is in-flight",
+                "Multiple simultaneous usage requests resolve to single API call",
+                "Request tracking handles both successful and error responses"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "frontend",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:997995fe-43df-431b-8a31-b255feb84b24",
+                "matchedItemId": "997995fe-43df-431b-8a31-b255feb84b24",
+                "matchedItemTitle": "Add rate limiting for fetchPRDData and fetchTaskUsage calls",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "pending",
+                "createdAt": "2026-02-25T19:49:57.827Z"
+              }
+            },
+            {
+              "id": "9a19a63a-c2e5-4b5b-81fe-794525d58e25",
+              "title": "Coordinate execution panel polling with WebSocket triggers",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement coordination mechanism between execution-panel 3s polling and WebSocket message triggers to prevent simultaneous /api/rex/execute/status requests",
+              "acceptanceCriteria": [
+                "Execution panel polling respects in-flight requests from WebSocket handlers",
+                "WebSocket handlers respect in-flight requests from polling loop",
+                "Maximum one /api/rex/execute/status request active at any time"
+              ],
+              "priority": "medium",
+              "tags": [
+                "performance",
+                "frontend",
+                "coordination"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "eaa2fe40-140c-445d-8ee6-03b569e4e5e2",
+              "title": "Add integration tests for request deduplication",
+              "status": "pending",
+              "level": "task",
+              "description": "Create comprehensive test suite validating that request deduplication works correctly under various timing scenarios and prevents duplicate API calls",
+              "acceptanceCriteria": [
+                "Tests verify no duplicate API calls during overlapping fetch operations",
+                "Tests cover WebSocket message arrival during active polling",
+                "Tests validate request cleanup after completion and errors"
+              ],
+              "priority": "medium",
+              "tags": [
+                "testing",
+                "integration",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:943a20b0-cea4-4177-809e-943fb6f24470",
+                "matchedItemId": "943a20b0-cea4-4177-809e-943fb6f24470",
+                "matchedItemTitle": "Add integration tests for degraded refresh API and UI parity",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:49:57.827Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "07874b87-6683-4b55-8ed9-1555c5bd0d88",
+      "title": "Token Usage Aggregation Performance Optimization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "baf1a80c-fbe1-4df9-a08b-d1cfec3d0e6f",
+          "title": "Incremental Aggregation System",
+          "status": "pending",
+          "level": "feature",
+          "description": "Replace full aggregation rebuilds with efficient incremental updates to handle large run histories",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "543d10ae-d04a-4db7-b912-c933b481f6c4",
+              "title": "Implement incremental token usage updates instead of full rebuilds",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace the current full aggregation rebuild in aggregateTaskUsage() with an incremental system that only processes new or changed run files since the last aggregation",
+              "acceptanceCriteria": [
+                "aggregateTaskUsage() only processes new/modified run files on subsequent calls",
+                "Initial aggregation still processes all existing run files",
+                "Aggregation time remains constant regardless of total run history size",
+                "Token usage totals remain accurate after incremental updates"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "hench",
+                "token-usage"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f7cc9444-d052-422e-a59c-e9f8e56a97a3",
+              "title": "Add run file change detection and delta processing",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement file system monitoring or timestamp-based detection to identify which run files need processing, enabling efficient delta aggregation",
+              "acceptanceCriteria": [
+                "System detects new run files added since last aggregation",
+                "System detects modified run files and re-processes them",
+                "Delta processing handles file deletions gracefully",
+                "Change detection works reliably across process restarts"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "file-system",
+                "hench"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "ed2a3c6f-6b4b-4e03-8d31-c4ac8c7255e5",
+              "title": "Implement aggregation result caching with invalidation",
+              "status": "pending",
+              "level": "task",
+              "description": "Cache computed aggregation results to avoid redundant processing, with smart invalidation when underlying run data changes",
+              "acceptanceCriteria": [
+                "Aggregation results are cached between polling intervals",
+                "Cache is invalidated when new run files are detected",
+                "Cache keys properly differentiate between different task scopes",
+                "Memory usage of cache is bounded and doesn't grow indefinitely"
+              ],
+              "priority": "medium",
+              "tags": [
+                "performance",
+                "caching",
+                "memory"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "8d286eb2-abe9-4045-9db7-1269c9a6fb75",
+          "title": "Stale Data Cleanup",
+          "status": "pending",
+          "level": "feature",
+          "description": "Remove obsolete entries from usage aggregation to prevent memory bloat and improve accuracy",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "a964e65d-82ce-4508-8907-8bf818c3555d",
+              "title": "Remove deleted task entries from usage aggregation state",
+              "status": "pending",
+              "level": "task",
+              "description": "Clean up token usage entries for tasks that have been deleted from the PRD, preventing accumulation of stale data in the aggregation results",
+              "acceptanceCriteria": [
+                "Deleted task usage entries are removed from aggregation state",
+                "Cleanup happens automatically during aggregation cycles",
+                "UI no longer displays usage data for non-existent tasks",
+                "Memory usage decreases when tasks are deleted"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cleanup",
+                "memory",
+                "data-integrity"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "2a69a01d-6ebc-4340-8716-90a4f7fa2a71",
+              "title": "Implement periodic cleanup of orphaned usage records",
+              "status": "pending",
+              "level": "task",
+              "description": "Add scheduled cleanup process to remove usage records that no longer correspond to any PRD items, maintaining data consistency over time",
+              "acceptanceCriteria": [
+                "Orphaned usage records are identified by cross-referencing with current PRD state",
+                "Cleanup runs on a configurable schedule (default weekly)",
+                "Cleanup process logs removed entries for auditability",
+                "Critical usage data is preserved through PRD restructuring"
+              ],
+              "priority": "low",
+              "tags": [
+                "cleanup",
+                "maintenance",
+                "data-integrity"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "cebbe860-dba1-421c-84aa-bce5a60913ff",
+          "title": "Run History Management",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement efficient storage and retention policies for historical run data to control growth",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "7f1fabf0-5751-4fef-8081-d5af4ac61786",
+              "title": "Add run file archival and compression for old entries",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement automatic archival system that compresses or consolidates old run files to reduce file system overhead while preserving historical data",
+              "acceptanceCriteria": [
+                "Run files older than configurable threshold are compressed",
+                "Compressed files maintain all necessary token usage metadata",
+                "Aggregation system can read both compressed and uncompressed files",
+                "Disk space usage grows more slowly with large run histories"
+              ],
+              "priority": "low",
+              "tags": [
+                "storage",
+                "compression",
+                "maintenance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "86939921-6e7b-4298-98b2-cb49c8d395f8",
+              "title": "Implement run history retention policies",
+              "status": "pending",
+              "level": "task",
+              "description": "Add configurable retention policies to automatically remove very old run files while preserving aggregated usage statistics",
+              "acceptanceCriteria": [
+                "Retention policy is configurable (default 6 months)",
+                "Usage statistics are preserved even after individual runs are deleted",
+                "Policy enforcement runs automatically on schedule",
+                "Users receive warnings before data deletion occurs"
+              ],
+              "priority": "low",
+              "tags": [
+                "retention",
+                "storage",
+                "policy"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "48fb83fc-91ea-4729-b05e-a9f74474a4b2",
+      "title": "Background Tab Resource Optimization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "af647f79-b553-49b3-b5db-2a86816655f0",
+          "title": "Tab Visibility Detection and Control",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement browser tab visibility detection to enable resource-aware polling management",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "e79359ab-e11a-4140-8ed7-25d41f565ab4",
+              "title": "Implement Page Visibility API for tab state detection",
+              "status": "pending",
+              "level": "task",
+              "description": "Integrate browser Page Visibility API to detect when tab becomes active/inactive for resource management",
+              "acceptanceCriteria": [
+                "Detects tab visibility state changes using Page Visibility API",
+                "Fires visibility change events to registered listeners",
+                "Handles browser compatibility and API availability gracefully"
+              ],
+              "priority": "high",
+              "tags": [
+                "performance",
+                "browser-api"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "37620ff4-7856-4266-84d5-134d794dfb92",
+              "title": "Create centralized tab visibility state manager",
+              "status": "pending",
+              "level": "task",
+              "description": "Build centralized service to coordinate tab visibility state across all polling components",
+              "acceptanceCriteria": [
+                "Provides single source of truth for tab visibility state",
+                "Allows components to register for visibility change notifications",
+                "Maintains consistent state across all polling intervals"
+              ],
+              "priority": "high",
+              "tags": [
+                "architecture",
+                "state-management"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "1291a3be-9d15-4aa2-9a9e-2d24ae7737f1",
+          "title": "Polling Suspension for Background Tabs",
+          "status": "pending",
+          "level": "feature",
+          "description": "Suspend all polling intervals when browser tab is backgrounded to reduce resource consumption",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "1d3cd284-dbee-4585-9c73-c01518dd6943",
+              "title": "Suspend loader polling (5s interval) when tab is backgrounded",
+              "status": "pending",
+              "level": "task",
+              "description": "Halt the 5-second loader polling interval when tab becomes inactive to prevent unnecessary API calls",
+              "acceptanceCriteria": [
+                "Pauses 5s loader polling when tab visibility becomes hidden",
+                "Prevents loader API requests during background state",
+                "Maintains loader state consistency during suspension"
+              ],
+              "priority": "high",
+              "tags": [
+                "polling",
+                "loader",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "fa6768f5-58d0-44ff-8cff-5502c10983aa",
+              "title": "Suspend execution panel polling (3s interval) when tab is backgrounded",
+              "status": "pending",
+              "level": "task",
+              "description": "Halt the 3-second execution panel polling when tab is inactive to reduce memory buffering",
+              "acceptanceCriteria": [
+                "Pauses 3s execution panel polling when tab becomes hidden",
+                "Stops execution status API requests during background state",
+                "Preserves execution panel state during suspension period"
+              ],
+              "priority": "high",
+              "tags": [
+                "polling",
+                "execution",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "d4bef0a2-79bb-4d5e-8127-59266cdb0219",
+              "title": "Suspend status polling (10s interval) when tab is backgrounded",
+              "status": "pending",
+              "level": "task",
+              "description": "Halt the 10-second status polling when tab is inactive to prevent unnecessary status updates",
+              "acceptanceCriteria": [
+                "Pauses 10s status polling when tab visibility becomes hidden",
+                "Stops status API requests during background state",
+                "Maintains status consistency during suspension"
+              ],
+              "priority": "high",
+              "tags": [
+                "polling",
+                "status",
+                "performance"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9ae2ed51-e1d0-4ffa-9c21-2acca1e855e9",
+              "title": "Suspend usage polling (10s interval) when tab is backgrounded",
+              "status": "pending",
+              "level": "task",
+              "description": "Halt the 10-second usage polling when tab is inactive to reduce token usage data fetching",
+              "acceptanceCriteria": [
+                "Pauses 10s usage polling when tab becomes hidden",
+                "Stops usage API requests during background state",
+                "Preserves usage data state during suspension period"
+              ],
+              "priority": "high",
+              "tags": [
+                "polling",
+                "usage",
+                "performance"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "b7889f93-f610-4742-9be7-86c0d2da52bb",
+          "title": "Memory and DOM Optimization for Inactive Tabs",
+          "status": "pending",
+          "level": "feature",
+          "description": "Prevent memory waste from DOM updates and response buffering when tab is not visible",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "7b097433-23d2-45b7-9217-bc1168e8b411",
+              "title": "Prevent DOM updates during tab inactive state",
+              "status": "pending",
+              "level": "task",
+              "description": "Block DOM updates and re-renders when tab is backgrounded to save memory and CPU resources",
+              "acceptanceCriteria": [
+                "Queues DOM updates instead of applying them during inactive state",
+                "Prevents unnecessary component re-renders in background tabs",
+                "Maintains UI state consistency for deferred updates"
+              ],
+              "priority": "medium",
+              "tags": [
+                "dom",
+                "performance",
+                "memory"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "590a0d46-d537-4e65-935c-74490d0e72d4",
+              "title": "Implement memory-efficient response buffering suspension",
+              "status": "pending",
+              "level": "task",
+              "description": "Suspend response buffering and data processing during background tab state to reduce memory usage",
+              "acceptanceCriteria": [
+                "Stops accumulating API response data during inactive state",
+                "Prevents memory buildup from background polling responses",
+                "Maintains data integrity when buffering resumes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "buffering",
+                "performance"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:1e3a6a48-70d9-4d16-a5f6-dd70da38ce5d",
+                "matchedItemId": "1e3a6a48-70d9-4d16-a5f6-dd70da38ce5d",
+                "matchedItemTitle": "Add integration tests for memory-aware polling suspension",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "pending",
+                "createdAt": "2026-02-25T19:52:45.612Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "0b6a0e2b-0d52-4454-bdd5-e16f50564dc8",
+          "title": "Tab Activation Recovery and Synchronization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Restore polling and synchronize data when tab becomes active again",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "83511931-c245-4938-8ccf-eef5e4d025b5",
+              "title": "Resume all suspended polling when tab becomes active",
+              "status": "pending",
+              "level": "task",
+              "description": "Restart all polling intervals immediately when tab visibility changes from hidden to visible",
+              "acceptanceCriteria": [
+                "Resumes all suspended polling intervals when tab becomes active",
+                "Restarts polling with original intervals (5s, 3s, 10s, 10s)",
+                "Handles multiple rapid visibility changes gracefully"
+              ],
+              "priority": "high",
+              "tags": [
+                "polling",
+                "recovery",
+                "synchronization"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "959966ce-464a-4186-8c08-abaca782129c",
+              "title": "Implement immediate data synchronization on tab activation",
+              "status": "pending",
+              "level": "task",
+              "description": "Trigger immediate data refresh when tab becomes active to catch up on missed updates",
+              "acceptanceCriteria": [
+                "Fetches latest data immediately when tab becomes active",
+                "Updates all suspended components with current state",
+                "Completes initial sync before resuming normal polling"
+              ],
+              "priority": "high",
+              "tags": [
+                "synchronization",
+                "recovery",
+                "data-refresh"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "79680865-38d1-4d53-a043-cb4a77f384a0",
+              "title": "Add integration tests for background suspension and recovery",
+              "status": "pending",
+              "level": "task",
+              "description": "Create comprehensive tests for tab visibility polling suspension and recovery workflow",
+              "acceptanceCriteria": [
+                "Tests polling suspension behavior when tab becomes inactive",
+                "Validates polling resumption when tab becomes active",
+                "Confirms memory optimization during background state"
+              ],
+              "priority": "medium",
+              "tags": [
+                "testing",
+                "integration",
+                "validation"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:1e3a6a48-70d9-4d16-a5f6-dd70da38ce5d",
+                "matchedItemId": "1e3a6a48-70d9-4d16-a5f6-dd70da38ce5d",
+                "matchedItemTitle": "Add integration tests for memory-aware polling suspension",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "pending",
+                "createdAt": "2026-02-25T19:52:45.612Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "f7e6bab2-0bc4-45fc-8743-edcee40b2f2b",
+      "title": "Hench Process Concurrency Management",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "110d22ba-ec79-4a1c-aa9c-40da273140be",
+          "title": "Execution Concurrency Controls",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement limits and queuing for concurrent hench task execution to prevent resource exhaustion",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "ea86db69-7a5d-425e-a148-f888af1c405a",
+              "title": "Implement configurable maximum concurrent hench processes",
+              "status": "completed",
+              "level": "task",
+              "description": "Add configuration setting and enforcement logic to limit the number of simultaneously running hench processes to prevent memory exhaustion from unlimited concurrent execution",
+              "acceptanceCriteria": [
+                "Configuration option for max concurrent processes (default: 3)",
+                "Process count tracking prevents spawning beyond limit",
+                "Returns meaningful error when limit reached",
+                "Integrates with existing hench configuration system"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "concurrency",
+                "config"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:21:50.616Z",
+              "completedAt": "2026-02-26T00:49:44.938Z"
+            },
+            {
+              "id": "aa2d1949-6511-466e-a0e4-1322fe30d6e1",
+              "title": "Add execution queue for pending tasks when at concurrency limit",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement queuing system to hold task execution requests when maximum concurrent processes are already running, with FIFO scheduling and queue status visibility",
+              "acceptanceCriteria": [
+                "Tasks queue automatically when concurrency limit reached",
+                "FIFO execution order with priority override support",
+                "Queue status visible via API and CLI",
+                "Graceful queue cleanup on shutdown"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "queue",
+                "scheduling"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:10:29.743Z",
+              "completedAt": "2026-02-25T23:21:50.388Z"
+            },
+            {
+              "id": "54958a70-6286-4b40-9637-da3a34bff4c1",
+              "title": "Implement hench process pool with reuse to reduce memory overhead",
+              "status": "pending",
+              "level": "task",
+              "description": "Create process pooling mechanism to reuse existing Node.js runtimes for multiple task executions instead of spawning fresh processes, reducing memory consumption per task",
+              "acceptanceCriteria": [
+                "Process pool maintains warm Node.js runtimes",
+                "Task isolation maintained between reused processes",
+                "Memory usage reduced by 60%+ for sequential tasks",
+                "Pool cleanup and refresh on idle timeout"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "performance",
+                "memory"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "f77efe62-3e32-4d6a-8b11-d7f3570acc57",
+          "title": "Resource-Aware Execution Scheduling",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement memory monitoring and intelligent scheduling to prevent system resource exhaustion during hench task execution",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "02585739-1896-42e8-b4f2-788bff260917",
+              "title": "Monitor system memory usage before spawning hench processes",
+              "status": "pending",
+              "level": "task",
+              "description": "Add system memory monitoring to check available memory before allowing new hench process creation, preventing system-wide memory pressure",
+              "acceptanceCriteria": [
+                "Real-time system memory usage detection",
+                "Configurable memory threshold for execution blocking",
+                "Memory check integrated into process spawn logic",
+                "Cross-platform memory monitoring (macOS, Linux, Windows)"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "memory",
+                "monitoring"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "492c36de-97ce-440a-bb6a-d89d0267d857",
+              "title": "Implement memory-based execution throttling",
+              "status": "pending",
+              "level": "task",
+              "description": "Add intelligent throttling that delays or rejects new hench executions when system memory usage exceeds safe thresholds, with graceful degradation",
+              "acceptanceCriteria": [
+                "Automatic execution delay when memory usage > 80%",
+                "Execution rejection when memory usage > 95%",
+                "Throttling status exposed via API",
+                "User notification of memory-based delays"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "throttling",
+                "memory"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "3172d6ad-c7a1-43c2-b1da-9d28f9fd127e",
+              "title": "Add task priority-based scheduling within resource constraints",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement task prioritization system that schedules high-priority tasks first when operating under resource constraints, with configurable priority levels",
+              "acceptanceCriteria": [
+                "Task priority metadata captured and used for scheduling",
+                "High-priority tasks bypass normal queue position",
+                "Priority configuration via task tags or explicit priority",
+                "Priority override available for urgent tasks"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "priority",
+                "scheduling"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ],
+      "overrideMarker": {
+        "type": "duplicate_guard_override",
+        "reason": "semantic_title",
+        "reasonRef": "semantic_title:9ac4a684-2100-4520-868a-b7d33d4818dd",
+        "matchedItemId": "9ac4a684-2100-4520-868a-b7d33d4818dd",
+        "matchedItemTitle": "Refresh Command Process Management",
+        "matchedItemLevel": "feature",
+        "matchedItemStatus": "completed",
+        "createdAt": "2026-02-25T19:55:14.281Z"
+      }
+    },
+    {
+      "id": "a5f844d4-da0c-48e1-9af5-077b75ccbc02",
+      "title": "Hench Resource Monitoring and User Feedback",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "92cc58fd-77a3-402a-b8a6-3ac66bb7f331",
+          "title": "Process Resource Tracking",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement comprehensive monitoring and tracking of hench process resource usage for visibility and management",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "9fdffc62-d7a8-4a78-9a22-00d331674a6a",
+              "title": "Implement real-time hench process memory monitoring",
+              "status": "pending",
+              "level": "task",
+              "description": "Add per-process memory usage tracking for running hench tasks with historical data collection and trend analysis",
+              "acceptanceCriteria": [
+                "Individual process memory usage tracked in real-time",
+                "Memory usage history stored for analysis",
+                "Memory leak detection for long-running tasks",
+                "Process memory data exposed via API"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "monitoring",
+                "memory"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "967eb37f-eed3-478b-87fa-fe06c9d5a81c",
+              "title": "Track concurrent execution metrics and resource utilization",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement comprehensive metrics collection for concurrent process count, total memory usage, and resource utilization patterns across hench executions",
+              "acceptanceCriteria": [
+                "Real-time concurrent process count tracking",
+                "Total memory utilization across all hench processes",
+                "Resource utilization metrics (CPU, memory) per task",
+                "Metrics available via API for dashboard consumption"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "metrics",
+                "resources"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "1462cc71-f995-44bd-aeda-892050e33291",
+              "title": "Add process lifecycle and resource cleanup validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement validation and monitoring to ensure hench processes properly release resources on completion and detect resource leaks or orphaned processes",
+              "acceptanceCriteria": [
+                "Process termination validation with resource cleanup checks",
+                "Orphaned process detection and automatic cleanup",
+                "Resource leak alerts for processes exceeding memory thresholds",
+                "Process lifecycle audit trail for debugging"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "cleanup",
+                "validation"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:64720ae2-dae3-4a2c-b4b8-34d743d7f720",
+                "matchedItemId": "64720ae2-dae3-4a2c-b4b8-34d743d7f720",
+                "matchedItemTitle": "Add refresh operation cleanup validation and rollback",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:55:14.281Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "9b6955b8-74b9-46cc-ab58-ea8ce5ae5ac8",
+          "title": "UI Resource Visibility and Controls",
+          "status": "pending",
+          "level": "feature",
+          "description": "Provide user interface elements to display resource usage, execution limits, and manual controls for hench process management",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "82e0aa11-9c52-4fa3-b7ac-165f0db47d5d",
+              "title": "Display concurrent execution count and limits in Hench UI",
+              "status": "pending",
+              "level": "task",
+              "description": "Add real-time display of current concurrent hench executions, configured limits, and queue status to the Hench dashboard section",
+              "acceptanceCriteria": [
+                "Current/max concurrent process count displayed prominently",
+                "Queue length and pending task count visible",
+                "Visual indicators for approaching resource limits",
+                "Updates in real-time via WebSocket or polling"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "ui",
+                "dashboard"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "293e9411-dc86-4c8c-a1df-2495810b1e89",
+              "title": "Show memory usage and system resource status in execution panel",
+              "status": "pending",
+              "level": "task",
+              "description": "Integrate system memory usage, per-process memory consumption, and resource health indicators into the active execution monitoring panel",
+              "acceptanceCriteria": [
+                "System memory usage percentage displayed",
+                "Individual task memory consumption shown",
+                "Resource health indicators (green/yellow/red status)",
+                "Memory pressure warnings visible to users"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "ui",
+                "monitoring"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "48ac348c-edbc-46d0-8a22-a70565207af8",
+              "title": "Add manual execution throttling controls and emergency stop",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement user controls to manually adjust concurrency limits, pause new executions, and emergency stop all running processes when needed",
+              "acceptanceCriteria": [
+                "Manual concurrency limit adjustment via UI",
+                "Pause/resume button for new task execution",
+                "Emergency stop all executions button with confirmation",
+                "Throttling status and control state clearly indicated"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "ui",
+                "controls"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:af647f79-b553-49b3-b5db-2a86816655f0",
+            "matchedItemId": "af647f79-b553-49b3-b5db-2a86816655f0",
+            "matchedItemTitle": "Tab Visibility Detection and Control",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "pending",
+            "createdAt": "2026-02-25T19:55:14.281Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "17874cd7-4ef1-4c90-9741-e1d2cc006925",
+      "title": "WebSocket Connection Lifecycle Management",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "464f3d4a-dacd-456c-b69c-6ebd17b575cc",
+          "title": "Dead Connection Detection and Cleanup",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement immediate detection and removal of disconnected WebSocket clients to prevent resource waste",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "04f31c24-d431-4fb8-89d3-4d5cad4aa6c9",
+              "title": "Implement immediate WebSocket disconnect detection",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace the 30-second ping/pong cycle with immediate connection state monitoring to detect client disconnections as soon as they occur",
+              "acceptanceCriteria": [
+                "WebSocket disconnect events are detected within 1 second of occurrence",
+                "Dead connections are identified before the next broadcast attempt",
+                "Connection state monitoring has minimal performance overhead"
+              ],
+              "priority": "high",
+              "tags": [
+                "websocket",
+                "performance",
+                "backend"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "5c42e669-1179-476a-a90b-7ff5d76576d9",
+              "title": "Remove dead clients from broadcast set immediately",
+              "status": "pending",
+              "level": "task",
+              "description": "Automatically prune disconnected clients from the active broadcast list to prevent wasted serialization and write operations",
+              "acceptanceCriteria": [
+                "Dead clients are removed from broadcast set within 1 second of disconnect detection",
+                "Broadcast operations skip dead clients entirely",
+                "Memory usage decreases immediately when clients disconnect"
+              ],
+              "priority": "high",
+              "tags": [
+                "websocket",
+                "memory",
+                "cleanup"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "4b039d14-58a7-4de0-85ea-e15762fdeb45",
+              "title": "Optimize broadcast operations for active connections only",
+              "status": "pending",
+              "level": "task",
+              "description": "Ensure JSON serialization and socket write operations only target verified active connections to eliminate wasted CPU cycles",
+              "acceptanceCriteria": [
+                "JSON.stringify is only called for confirmed active connections",
+                "Socket write attempts are eliminated for dead connections",
+                "Broadcast performance scales with active connection count, not total connection history"
+              ],
+              "priority": "medium",
+              "tags": [
+                "websocket",
+                "performance",
+                "optimization"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9303cc16-71a5-41d2-8ca4-3ffa9bd16fde",
+              "title": "Add WebSocket connection health monitoring dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Create visibility into WebSocket connection health, cleanup metrics, and resource usage to monitor the effectiveness of dead connection removal",
+              "acceptanceCriteria": [
+                "Dashboard shows active vs total connection counts in real-time",
+                "Cleanup success rate and timing metrics are displayed",
+                "Resource usage trends are visible before and after cleanup improvements"
+              ],
+              "priority": "low",
+              "tags": [
+                "websocket",
+                "monitoring",
+                "dashboard"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:b6baaa8a-26a0-4050-9b54-2f25fd4cc066",
+                "matchedItemId": "b6baaa8a-26a0-4050-9b54-2f25fd4cc066",
+                "matchedItemTitle": "Add task execution health monitoring",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-02-25T19:56:09.081Z"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

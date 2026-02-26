@@ -360,6 +360,13 @@
   position: relative;
 }
 
+/* Off-screen culled node placeholder — preserves scroll position height
+   while removing all child DOM nodes and event listeners. */
+.prd-node-culled {
+  contain: strict;
+  content-visibility: hidden;
+}
+
 .prd-node-row {
   display: flex;
   align-items: center;
