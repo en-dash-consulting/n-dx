@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../hooks/use-polling.js";
 import { createMessageCoalescer } from "../message-coalescer.js";
 import { createMessageThrottle } from "../message-throttle.js";
+import { isFeatureDisabled, onDegradationChange } from "../graceful-degradation.js";
 import type { ViewId } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -90,10 +91,27 @@ async function fetchStatus(): Promise<ProjectStatus | null> {
 
 /** Hook that returns project status, polling at a regular interval.
  *  Also listens for WebSocket events (hench:run-changed, rex:prd-changed)
- *  to refresh immediately when runs or PRD data change on disk. */
+ *  to refresh immediately when runs or PRD data change on disk.
+ *
+ *  Polling is automatically suspended when memory pressure disables the
+ *  `autoRefresh` feature (elevated tier and above). The last-known status
+ *  is preserved and displayed without updates until pressure subsides. */
 function useProjectStatus(): ProjectStatus | null {
   const [status, setStatus] = useState<ProjectStatus | null>(cachedStatus);
   const mountedRef = useRef(true);
+
+  // Track memory-pressure state reactively so usePolling's `enabled`
+  // parameter updates when the degradation tier changes.
+  const [autoRefreshDisabled, setAutoRefreshDisabled] = useState(
+    () => isFeatureDisabled("autoRefresh")
+  );
+
+  useEffect(() => {
+    const unsubscribe = onDegradationChange((state) => {
+      setAutoRefreshDisabled(state.disabledFeatures.has("autoRefresh"));
+    });
+    return unsubscribe;
+  }, []);
 
   const refresh = useCallback(async () => {
     const data = await fetchStatus();
@@ -164,8 +182,9 @@ function useProjectStatus(): ProjectStatus | null {
     };
   }, [refresh]);
 
-  // Visibility-aware polling via polling manager
-  usePolling("status-indicators", refresh, POLL_INTERVAL_MS);
+  // Visibility-aware polling via polling manager.
+  // Disabled during memory pressure (autoRefresh feature disabled).
+  usePolling("status-indicators", refresh, POLL_INTERVAL_MS, !autoRefreshDisabled);
 
   return status;
 }
