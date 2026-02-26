@@ -14830,9 +14830,11 @@
     {
       "id": "000ab316-d0d4-497f-9485-e9ee706acb24",
       "title": "WebSocket Message Performance Optimization",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-26T18:23:51.336Z",
+      "completedAt": "2026-02-26T18:23:51.336Z",
       "children": [
         {
           "id": "4a39248e-94d2-4bca-a1eb-0bb06ac724fb",
@@ -14915,10 +14917,12 @@
         {
           "id": "0258aa8d-c25e-4351-91f1-2f2e41ff39ef",
           "title": "UI Update Optimization",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Optimize rendering pipeline to minimize unnecessary DOM updates and improve responsiveness during high-frequency data changes",
           "source": "smart-add",
+          "startedAt": "2026-02-26T18:23:51.259Z",
+          "completedAt": "2026-02-26T18:23:51.259Z",
           "children": [
             {
               "id": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
@@ -14945,7 +14949,7 @@
             {
               "id": "561a77de-29fe-49e9-b64e-460de3baf57f",
               "title": "Add update batching for rapid WebSocket message sequences",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Batch UI updates within animation frames to ensure smooth rendering and prevent UI blocking during message bursts",
               "acceptanceCriteria": [
@@ -14960,7 +14964,8 @@
                 "batching",
                 "rendering"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T18:15:03.720Z"
             }
           ]
         }
@@ -15055,6 +15060,8 @@
           "level": "feature",
           "description": "Implement lazy rendering strategies to defer DOM creation until nodes are actually needed",
           "source": "smart-add",
+          "startedAt": "2026-02-26T17:09:19.325Z",
+          "completedAt": "2026-02-26T17:09:19.325Z",
           "children": [
             {
               "id": "aeb4fc99-9663-49d9-913c-36ac3c5fec53",
@@ -15132,17 +15139,17 @@
                 "createdAt": "2026-02-25T19:47:45.671Z"
               }
             }
-          ],
-          "startedAt": "2026-02-26T17:09:19.325Z",
-          "completedAt": "2026-02-26T17:09:19.325Z"
+          ]
         },
         {
           "id": "9b281847-53ac-4c09-8600-60eba87fbefb",
           "title": "Event Listener Optimization",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Optimize event listener management to handle large trees efficiently without creating thousands of individual listeners",
           "source": "smart-add",
+          "startedAt": "2026-02-26T17:20:21.705Z",
+          "completedAt": "2026-02-26T17:20:21.705Z",
           "children": [
             {
               "id": "3896d4bd-4c71-476b-8a52-6444341e73ee",
@@ -15179,7 +15186,7 @@
             {
               "id": "d9909ba1-7393-46b9-be0f-4fa8d89c3af1",
               "title": "Add event listener lifecycle management",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement proper cleanup and management of event listeners during node creation and destruction cycles",
               "acceptanceCriteria": [
@@ -15195,6 +15202,8 @@
                 "memory-management"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-26T17:09:48.560Z",
+              "completedAt": "2026-02-26T17:20:21.599Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -15430,17 +15439,21 @@
     {
       "id": "953f745a-769c-4e37-b7f0-32f807874266",
       "title": "API Request Deduplication and Coordination",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-26T18:14:34.898Z",
+      "completedAt": "2026-02-26T18:14:34.898Z",
       "children": [
         {
           "id": "66d94a74-d7f3-41b3-b0c4-abcbc0504710",
           "title": "Request deduplication infrastructure",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Prevent duplicate in-flight requests by tracking active API calls and returning shared promises for identical requests",
           "source": "smart-add",
+          "startedAt": "2026-02-26T18:14:34.818Z",
+          "completedAt": "2026-02-26T18:14:34.818Z",
           "children": [
             {
               "id": "c8e90804-6b89-4dd8-a03f-c024bbf91631",
@@ -15497,7 +15510,7 @@
             {
               "id": "9a19a63a-c2e5-4b5b-81fe-794525d58e25",
               "title": "Coordinate execution panel polling with WebSocket triggers",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement coordination mechanism between execution-panel 3s polling and WebSocket message triggers to prevent simultaneous /api/rex/execute/status requests",
               "acceptanceCriteria": [
@@ -15511,12 +15524,14 @@
                 "frontend",
                 "coordination"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T17:26:55.073Z",
+              "completedAt": "2026-02-26T18:14:34.708Z"
             },
             {
               "id": "eaa2fe40-140c-445d-8ee6-03b569e4e5e2",
               "title": "Add integration tests for request deduplication",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create comprehensive test suite validating that request deduplication works correctly under various timing scenarios and prevents duplicate API calls",
               "acceptanceCriteria": [
@@ -15531,6 +15546,8 @@
                 "deduplication"
               ],
               "source": "smart-add",
+              "startedAt": "2026-02-26T17:20:56.919Z",
+              "completedAt": "2026-02-26T17:26:21.022Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -16442,7 +16459,7 @@
             {
               "id": "4b039d14-58a7-4de0-85ea-e15762fdeb45",
               "title": "Optimize broadcast operations for active connections only",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Ensure JSON serialization and socket write operations only target verified active connections to eliminate wasted CPU cycles",
               "acceptanceCriteria": [
@@ -16456,7 +16473,9 @@
                 "performance",
                 "optimization"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-02-26T20:09:41.598Z",
+              "completedAt": "2026-02-26T20:16:31.917Z"
             },
             {
               "id": "9303cc16-71a5-41d2-8ca4-3ffa9bd16fde",

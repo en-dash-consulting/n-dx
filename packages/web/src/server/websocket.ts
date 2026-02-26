@@ -297,13 +297,25 @@ export function createWebSocketManager(): {
   function broadcast(data: unknown): void {
     if (clients.size === 0) return;
 
-    // Pre-broadcast health check: remove dead connections before writing
-    // so we never attempt I/O on a destroyed socket.
-    pruneDeadClients();
-    if (clients.size === 0) return;
-
-    const msg = encodeFrame(JSON.stringify(data));
+    // Single-pass broadcast: inline health checks replace the separate
+    // pruneDeadClients() call, and JSON serialization is deferred until
+    // the first confirmed-active connection is found. This means:
+    //   1. JSON.stringify is never called unless an active client exists
+    //   2. Dead connections are skipped without attempting socket writes
+    //   3. Performance scales with active connection count, not set size
+    let msg: Buffer | null = null;
     for (const client of clients) {
+      if (client.socket.destroyed || !client.socket.writable) {
+        removeClient(client);
+        continue;
+      }
+
+      // Lazy serialization: only pay the JSON.stringify + frame encoding
+      // cost once we have a confirmed-active client to write to.
+      if (msg === null) {
+        msg = encodeFrame(JSON.stringify(data));
+      }
+
       try {
         client.socket.write(msg);
       } catch {
