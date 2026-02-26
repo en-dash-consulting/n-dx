@@ -25,6 +25,7 @@ import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.
 import { diffDocument, applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
 import { usePolling } from "../hooks/use-polling.js";
+import { createMessageCoalescer } from "../message-coalescer.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -200,61 +201,74 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // Visibility-aware polling via polling manager
   usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
-  // WebSocket listener for real-time PRD updates.
+  // WebSocket listener for real-time PRD updates with message coalescing.
   //
   // Incremental strategy: rex:item-updated messages include the changed
   // fields, so we apply them directly to local state (O(path-to-node))
-  // instead of re-fetching the entire PRD tree. rex:item-deleted uses
-  // the existing removeItemById for instant local removal. Both
-  // operations are followed by a background reconciliation fetch that
-  // uses structural sharing (diffDocument) to correct any drift without
-  // triggering unnecessary re-renders.
+  // via the immediate onMessage callback. rex:item-deleted uses the
+  // existing removeItemById for instant local removal.
   //
-  // rex:prd-changed (structural changes like adds, merges, prune)
-  // still triggers a full fetch since the local tree shape changed.
+  // The coalescer batches rapid sequential messages within a 150ms
+  // trailing-edge window. The onFlush callback fires once per window
+  // to trigger a single reconciliation (fetchPRDData + fetchTaskUsage)
+  // instead of N calls. This prevents redundant fetches when e.g. a
+  // bulk status update generates 10+ rex:item-updated messages.
+  //
+  // Batch size limit (50) prevents unbounded memory growth during
+  // sustained bursts.
   useEffect(() => {
     let ws: WebSocket | null = null;
+
+    const coalescer = createMessageCoalescer({
+      // Immediate per-message handler — optimistic UI updates fire instantly.
+      onMessage: (msg) => {
+        if (msg.type === "rex:item-updated" && msg.itemId && msg.updates) {
+          // Targeted update — only the changed node and its ancestors
+          // get new object references. Memoized NodeRow components for
+          // all other nodes skip their render cycle entirely.
+          setData((prev) => {
+            if (!prev) return prev;
+            const newItems = applyItemUpdate(
+              prev.items,
+              msg.itemId as string,
+              msg.updates as Partial<PRDItemData>,
+            );
+            return newItems === prev.items ? prev : { ...prev, items: newItems };
+          });
+          return;
+        }
+
+        if (msg.type === "rex:item-deleted" && msg.itemId) {
+          // Optimistic local removal — instant UI feedback
+          setData((prev) => {
+            if (!prev) return prev;
+            const newItems = removeItemById(prev.items, msg.itemId as string);
+            return newItems === prev.items ? prev : { ...prev, items: newItems };
+          });
+        }
+      },
+
+      // Coalesced flush — fires once per debounce window for reconciliation.
+      onFlush: (batch) => {
+        const needsReconciliation =
+          batch.types.has("rex:item-updated") ||
+          batch.types.has("rex:item-deleted") ||
+          batch.types.has("rex:prd-changed");
+
+        if (needsReconciliation) {
+          fetchPRDData();
+          fetchTaskUsage();
+        }
+      },
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-
-          if (msg.type === "rex:item-updated" && msg.itemId && msg.updates) {
-            // Targeted update — only the changed node and its ancestors
-            // get new object references. Memoized NodeRow components for
-            // all other nodes skip their render cycle entirely.
-            setData((prev) => {
-              if (!prev) return prev;
-              const newItems = applyItemUpdate(prev.items, msg.itemId, msg.updates);
-              return newItems === prev.items ? prev : { ...prev, items: newItems };
-            });
-            // Background reconciliation with structural sharing
-            fetchPRDData();
-            fetchTaskUsage();
-            return;
-          }
-
-          if (msg.type === "rex:item-deleted" && msg.itemId) {
-            // Optimistic local removal — instant UI feedback
-            setData((prev) => {
-              if (!prev) return prev;
-              const newItems = removeItemById(prev.items, msg.itemId);
-              return newItems === prev.items ? prev : { ...prev, items: newItems };
-            });
-            // Background reconciliation
-            fetchPRDData();
-            fetchTaskUsage();
-            return;
-          }
-
-          if (msg.type === "rex:prd-changed") {
-            // Structural changes (adds, merges, prune) — full refetch
-            // with structural sharing to minimize re-renders.
-            fetchPRDData();
-            fetchTaskUsage();
-          }
+          coalescer.push(msg);
         } catch {
           // Ignore malformed messages
         }
@@ -262,7 +276,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     } catch {
       // WebSocket not available — polling still works as fallback
     }
+
     return () => {
+      coalescer.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }

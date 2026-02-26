@@ -12,6 +12,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../hooks/use-polling.js";
+import { createMessageCoalescer } from "../message-coalescer.js";
 import type { ViewId } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -104,8 +105,24 @@ function useProjectStatus(): ProjectStatus | null {
 
     refresh();
 
-    // Connect to WebSocket for instant status updates when runs/PRD change
+    // Connect to WebSocket for instant status updates when runs/PRD change.
+    // Uses message coalescing to batch rapid sequential events into a single
+    // refresh call (e.g. multiple hench:task-execution-progress during a run).
     let ws: WebSocket | null = null;
+
+    const coalescer = createMessageCoalescer({
+      onFlush: (batch) => {
+        if (!mountedRef.current) return;
+        const needsRefresh =
+          batch.types.has("hench:run-changed") ||
+          batch.types.has("hench:task-execution-progress") ||
+          batch.types.has("rex:prd-changed");
+        if (needsRefresh) {
+          refresh();
+        }
+      },
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
@@ -113,14 +130,7 @@ function useProjectStatus(): ProjectStatus | null {
         if (!mountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
-          // Refresh status on any event that could affect counts
-          if (
-            msg.type === "hench:run-changed" ||
-            msg.type === "hench:task-execution-progress" ||
-            msg.type === "rex:prd-changed"
-          ) {
-            refresh();
-          }
+          coalescer.push(msg);
         } catch {
           // ignore malformed messages
         }
@@ -131,6 +141,7 @@ function useProjectStatus(): ProjectStatus | null {
 
     return () => {
       mountedRef.current = false;
+      coalescer.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }
