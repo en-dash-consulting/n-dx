@@ -29,6 +29,8 @@ import { createMessageCoalescer } from "../message-coalescer.js";
 import { createMessageThrottle } from "../message-throttle.js";
 import { createRequestDedup } from "../request-dedup.js";
 import { createCallRateLimiter } from "../call-rate-limiter.js";
+import { createUpdateBatcher } from "../update-batcher.js";
+import { createResponseBufferGate } from "../response-buffer-gate.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -255,12 +257,19 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // Visibility-aware polling via polling manager
   usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
-  // WebSocket listener for real-time PRD updates with per-type throttling
-  // and message coalescing.
+  // WebSocket listener for real-time PRD updates with per-type throttling,
+  // message coalescing, RAF-based update batching, and buffer gating.
   //
-  // Two-layer pipeline:
+  // Four-layer pipeline:
   //
-  //   raw WS → throttle (per-type debounce) → coalescer (batch + flush)
+  //   raw WS → buffer gate → throttle (per-type debounce) → coalescer (batch + flush)
+  //                                                            ↓ onMessage
+  //                                                        updateBatcher → RAF → render
+  //
+  // 0. The response buffer gate checks tab visibility. When the tab is
+  //    hidden, messages are silently dropped and downstream buffers are
+  //    flushed to free memory. On resume (tab visible again), a single
+  //    reconciliation fetch restores data integrity.
   //
   // 1. The throttle debounces high-frequency message types independently:
   //    - rex:prd-changed, rex:item-updated, rex:item-deleted each get
@@ -272,21 +281,28 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   //    window, triggering one reconciliation (fetchPRDData + fetchTaskUsage)
   //    instead of N calls.
   //
-  // The coalescer's immediate onMessage callback still fires for every
-  // message the throttle emits — optimistic UI updates (item patches,
-  // local deletions) happen with at most the throttle delay, not the
-  // coalescer's additional window.
+  // 3. The update batcher collects optimistic setData() calls from the
+  //    coalescer's onMessage and applies them in a single RAF callback.
+  //    Multiple updates within one frame are composed in order, so the
+  //    setter is called exactly once per frame with the final state.
+  //    This prevents intermediate renders during rapid message bursts.
   useEffect(() => {
     let ws: WebSocket | null = null;
 
+    // RAF-based update batcher: ensures at most one setData call per
+    // animation frame during rapid WebSocket message bursts. Multiple
+    // optimistic updates are composed and applied together.
+    const batcher = createUpdateBatcher();
+
     const coalescer = createMessageCoalescer({
-      // Immediate per-message handler — optimistic UI updates fire instantly.
+      // Immediate per-message handler — optimistic UI updates are batched
+      // into the next animation frame via the update batcher.
       onMessage: (msg) => {
         if (msg.type === "rex:item-updated" && msg.itemId && msg.updates) {
           // Targeted update — only the changed node and its ancestors
           // get new object references. Memoized NodeRow components for
           // all other nodes skip their render cycle entirely.
-          setData((prev) => {
+          batcher.schedule(setData, (prev: PRDDocumentData | null) => {
             if (!prev) return prev;
             const newItems = applyItemUpdate(
               prev.items,
@@ -299,8 +315,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         }
 
         if (msg.type === "rex:item-deleted" && msg.itemId) {
-          // Optimistic local removal — instant UI feedback
-          setData((prev) => {
+          // Optimistic local removal — batched for next frame
+          batcher.schedule(setData, (prev: PRDDocumentData | null) => {
             if (!prev) return prev;
             const newItems = removeItemById(prev.items, msg.itemId as string);
             return newItems === prev.items ? prev : { ...prev, items: newItems };
@@ -309,7 +325,11 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       },
 
       // Coalesced flush — fires once per debounce window for reconciliation.
+      // Flush the batcher first so any pending optimistic updates land before
+      // the reconciliation fetch overwrites state.
       onFlush: (batch) => {
+        batcher.flush();
+
         const needsReconciliation =
           batch.types.has("rex:item-updated") ||
           batch.types.has("rex:item-deleted") ||
@@ -337,12 +357,30 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       maxPendingPerType: 20,
     });
 
+    // Response buffer gate: prevents memory buildup from WebSocket messages
+    // accumulating in the throttle/coalescer/batcher while the tab is hidden.
+    // When the tab goes to background, downstream buffers are flushed and
+    // incoming messages are dropped. On resume, one reconciliation fetch
+    // restores the UI to the latest server state.
+    const bufferGate = createResponseBufferGate({
+      flushDownstream: [
+        () => throttle.flush(),
+        () => coalescer.flush(),
+        () => batcher.flush(),
+      ],
+      onResume: () => {
+        fetchPRDData();
+        fetchTaskUsage();
+      },
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          if (!bufferGate.accept()) return; // Tab hidden — drop message
           throttle.push(msg);
         } catch {
           // Ignore malformed messages
@@ -353,8 +391,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     }
 
     return () => {
+      bufferGate.dispose();
       throttle.dispose();
       coalescer.dispose();
+      batcher.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }
