@@ -26,7 +26,11 @@
 
 import { freemem, totalmem, platform } from "node:os";
 import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { SystemMemoryReader } from "./memory-throttle.js";
+
+const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -132,6 +136,58 @@ async function readLinuxAvailableMemory(): Promise<number | undefined> {
   return undefined;
 }
 
+/**
+ * Parse macOS `vm_stat` output to compute available memory.
+ *
+ * macOS `os.freemem()` only reports "Free" pages, ignoring Inactive,
+ * Speculative, and Purgeable pages that are immediately reclaimable. This
+ * causes the system to dramatically underreport available memory — a Mac
+ * with 32 GB RAM may report only 500 MB "free" while 10+ GB of
+ * reclaimable pages sit idle.
+ *
+ * Available = (Free + Inactive + Speculative + Purgeable) * pageSize
+ *
+ * - **Free**: completely unused pages
+ * - **Inactive**: pages not recently referenced, immediately reclaimable
+ * - **Speculative**: pre-fetched file data the kernel read ahead,
+ *   immediately reclaimable
+ * - **Purgeable**: volatile caches the kernel can discard instantly
+ *
+ * @returns Available memory in bytes, or `undefined` if vm_stat fails.
+ */
+async function readDarwinAvailableMemory(): Promise<number | undefined> {
+  try {
+    const { stdout } = await execFileAsync("vm_stat", [], { timeout: 5000 });
+
+    // vm_stat reports page size on the first line:
+    //   "Mach Virtual Memory Statistics: (page size of 16384 bytes)"
+    const pageSizeMatch = stdout.match(/page size of (\d+) bytes/);
+    const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]!, 10) : 16384;
+
+    // Parse page counts from lines like:
+    //   "Pages free:         12345."
+    //   "Pages inactive:     67890."
+    //   "Pages speculative:  22222."
+    //   "Pages purgeable:    11111."
+    const parse = (label: string): number => {
+      const re = new RegExp(`^${label}:\\s+(\\d+)`, "m");
+      const m = stdout.match(re);
+      return m ? parseInt(m[1]!, 10) : 0;
+    };
+
+    const free = parse("Pages free");
+    const inactive = parse("Pages inactive");
+    const speculative = parse("Pages speculative");
+    const purgeable = parse("Pages purgeable");
+
+    const availableBytes = (free + inactive + speculative + purgeable) * pageSize;
+    return availableBytes > 0 ? availableBytes : undefined;
+  } catch {
+    // vm_stat not available or timed out — fall back to os.freemem()
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Injectable overrides (for testing)
 // ---------------------------------------------------------------------------
@@ -149,6 +205,8 @@ export interface MemoryMonitorOverrides {
   totalmem?: () => number;
   /** Override Linux `/proc/meminfo` reader. */
   readLinuxAvailable?: () => Promise<number | undefined>;
+  /** Override macOS `vm_stat` reader. */
+  readDarwinAvailable?: () => Promise<number | undefined>;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +247,7 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
   private readonly _freemem: () => number;
   private readonly _totalmem: () => number;
   private readonly _readLinuxAvailable: () => Promise<number | undefined>;
+  private readonly _readDarwinAvailable: () => Promise<number | undefined>;
 
   constructor(
     config?: Partial<MemoryMonitorConfig>,
@@ -199,6 +258,7 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
     this._freemem = overrides?.freemem ?? freemem;
     this._totalmem = overrides?.totalmem ?? totalmem;
     this._readLinuxAvailable = overrides?.readLinuxAvailable ?? readLinuxAvailableMemory;
+    this._readDarwinAvailable = overrides?.readDarwinAvailable ?? readDarwinAvailableMemory;
 
     // Validate threshold
     if (this._config.spawnThreshold < 0 || this._config.spawnThreshold > 100) {
@@ -250,6 +310,11 @@ export class SystemMemoryMonitor implements SystemMemoryReader {
       const linuxAvailable = await this._readLinuxAvailable();
       if (linuxAvailable !== undefined) {
         availableBytes = linuxAvailable;
+      }
+    } else if (this._platform === "darwin") {
+      const darwinAvailable = await this._readDarwinAvailable();
+      if (darwinAvailable !== undefined) {
+        availableBytes = darwinAvailable;
       }
     }
 
