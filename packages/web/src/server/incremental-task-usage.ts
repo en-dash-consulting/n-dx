@@ -103,6 +103,49 @@ export class IncrementalTaskUsageAggregator {
     this.initialized = false;
   }
 
+  /**
+   * Remove aggregation entries for task IDs not present in `validTaskIds`.
+   *
+   * Cleans up both the `taskUsage` accumulator and corresponding
+   * `fileContributions` entries. File snapshots are preserved so that
+   * the underlying run files are not re-processed on the next refresh
+   * (they are still on disk, just no longer contributing to results).
+   *
+   * Call this after `getTaskUsage()` — or let the route handler call it
+   * before returning results — to ensure the UI never sees usage data
+   * for tasks that have been deleted from the PRD.
+   *
+   * @returns The number of stale task IDs that were pruned.
+   */
+  pruneStaleEntries(validTaskIds: Set<string>): number {
+    // Identify stale task IDs
+    const staleIds: string[] = [];
+    for (const taskId of this.taskUsage.keys()) {
+      if (!validTaskIds.has(taskId)) {
+        staleIds.push(taskId);
+      }
+    }
+
+    if (staleIds.length === 0) return 0;
+
+    const staleSet = new Set(staleIds);
+
+    // Remove from taskUsage
+    for (const taskId of staleIds) {
+      this.taskUsage.delete(taskId);
+    }
+
+    // Remove matching fileContributions (but keep fileSnapshots so
+    // the run files are not treated as "new" on the next refresh)
+    for (const [file, contribution] of this.fileContributions) {
+      if (staleSet.has(contribution.taskId)) {
+        this.fileContributions.delete(file);
+      }
+    }
+
+    return staleIds.length;
+  }
+
   // ---- Core refresh logic --------------------------------------------------
 
   private async refresh(): Promise<void> {

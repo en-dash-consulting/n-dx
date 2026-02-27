@@ -6,6 +6,7 @@
  * - Incremental updates for added/modified/deleted files
  * - Accuracy of totals after incremental updates
  * - Edge cases: missing directory, empty runs, malformed files
+ * - Stale entry pruning for deleted PRD tasks
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, unlink, utimes } from "node:fs/promises";
@@ -310,6 +311,109 @@ describe("IncrementalTaskUsageAggregator", () => {
       const usage = await aggregator.getTaskUsage();
       expect(usage["task-a"]).toBeUndefined();
       expect(usage["task-b"]).toEqual({ totalTokens: 500, runCount: 1 });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stale entry pruning
+  // ---------------------------------------------------------------------------
+
+  describe("pruneStaleEntries", () => {
+    it("removes entries for task IDs not in the valid set", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "task-b", { input: 200, output: 100 });
+      await writeRun("run-3.json", "task-c", { input: 50, output: 25 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      // Only task-a is valid; task-b and task-c were "deleted" from PRD
+      const pruned = aggregator.pruneStaleEntries(new Set(["task-a"]));
+      expect(pruned).toBe(2);
+
+      const usage = await aggregator.getTaskUsage();
+      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-b"]).toBeUndefined();
+      expect(usage["task-c"]).toBeUndefined();
+      expect(Object.keys(usage)).toHaveLength(1);
+    });
+
+    it("returns 0 when all entries are valid", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "task-b", { input: 200, output: 100 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      const pruned = aggregator.pruneStaleEntries(new Set(["task-a", "task-b"]));
+      expect(pruned).toBe(0);
+
+      const usage = await aggregator.getTaskUsage();
+      expect(Object.keys(usage)).toHaveLength(2);
+    });
+
+    it("handles empty valid set (prunes everything)", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "task-b", { input: 200, output: 100 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      const pruned = aggregator.pruneStaleEntries(new Set());
+      expect(pruned).toBe(2);
+
+      const usage = await aggregator.getTaskUsage();
+      expect(Object.keys(usage)).toHaveLength(0);
+    });
+
+    it("pruned entries do not reappear on next refresh (files unchanged)", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "deleted-task", { input: 200, output: 100 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      aggregator.pruneStaleEntries(new Set(["task-a"]));
+
+      // Subsequent call should NOT re-read the deleted-task's run file
+      // because the file snapshot is preserved (no mtime/size change)
+      const usage = await aggregator.getTaskUsage();
+      expect(usage["deleted-task"]).toBeUndefined();
+      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+    });
+
+    it("works correctly with multiple runs per pruned task", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "task-b", { input: 200, output: 100 });
+      await writeRun("run-3.json", "task-b", { input: 300, output: 150 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      // Prune task-b which has 2 run files
+      const pruned = aggregator.pruneStaleEntries(new Set(["task-a"]));
+      expect(pruned).toBe(1); // 1 task ID pruned (even though 2 files)
+
+      const usage = await aggregator.getTaskUsage();
+      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-b"]).toBeUndefined();
+    });
+
+    it("prune then add new run for a valid task works correctly", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      await writeRun("run-2.json", "deleted-task", { input: 200, output: 100 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      aggregator.pruneStaleEntries(new Set(["task-a"]));
+
+      // Add a new run for the valid task
+      await writeRun("run-3.json", "task-a", { input: 50, output: 25 });
+
+      const usage = await aggregator.getTaskUsage();
+      expect(usage["task-a"]).toEqual({ totalTokens: 225, runCount: 2 });
+      expect(usage["deleted-task"]).toBeUndefined();
     });
   });
 

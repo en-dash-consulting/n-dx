@@ -46,6 +46,8 @@ import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { clearStatusCache } from "./routes-status.js";
 import { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
+import { collectAllIds } from "./rex-gateway.js";
+import type { PRDDocument } from "./rex-gateway.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
@@ -310,13 +312,26 @@ export function handleHenchRoute(
   const runsDir = join(ctx.projectDir, ".hench", "runs");
 
   // GET /api/hench/task-usage — incremental per-task token usage aggregation
+  // After refreshing run data, prune entries for tasks that no longer
+  // exist in the PRD so the UI never shows stale usage data.
   if (path === "task-usage" && method === "GET") {
-    return getAggregator(runsDir)
-      .getTaskUsage()
-      .then((taskUsage) => {
+    const aggregator = getAggregator(runsDir);
+    return aggregator.getTaskUsage().then((taskUsage) => {
+      const validIds = loadValidTaskIds(ctx);
+      if (validIds) {
+        aggregator.pruneStaleEntries(validIds);
+        // Re-derive output after pruning (cheap — no I/O, just Map→Object)
+        const pruned: Record<string, (typeof taskUsage)[string]> = {};
+        for (const [id, acc] of Object.entries(taskUsage)) {
+          if (validIds.has(id)) pruned[id] = acc;
+        }
+        jsonResponse(res, 200, { taskUsage: pruned });
+      } else {
+        // No PRD available — return all data (graceful degradation)
         jsonResponse(res, 200, { taskUsage });
-        return true as const;
-      });
+      }
+      return true as const;
+    });
   }
 
   // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
@@ -913,6 +928,23 @@ function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
   if (!existsSync(prdPath)) return null;
   try {
     return JSON.parse(readFileSync(prdPath, "utf-8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load the set of all task IDs currently in the PRD.
+ * Returns null if the PRD cannot be read (e.g. not initialized yet),
+ * allowing callers to degrade gracefully.
+ */
+function loadValidTaskIds(ctx: ServerContext): Set<string> | null {
+  const prdPath = join(ctx.rexDir, "prd.json");
+  if (!existsSync(prdPath)) return null;
+  try {
+    const doc = JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
+    if (!Array.isArray(doc.items)) return null;
+    return collectAllIds(doc.items);
   } catch {
     return null;
   }
