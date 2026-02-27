@@ -30,6 +30,7 @@ import { createMessageThrottle } from "../message-throttle.js";
 import { createRequestDedup } from "../request-dedup.js";
 import { createCallRateLimiter } from "../call-rate-limiter.js";
 import { createUpdateBatcher } from "../update-batcher.js";
+import { createDomUpdateGate } from "../dom-update-gate.js";
 import { createResponseBufferGate } from "../response-buffer-gate.js";
 
 export interface PRDViewProps {
@@ -258,13 +259,14 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   usePolling("prd:task-usage", fetchTaskUsage, 10_000);
 
   // WebSocket listener for real-time PRD updates with per-type throttling,
-  // message coalescing, RAF-based update batching, and buffer gating.
+  // message coalescing, RAF-based update batching, DOM update gating, and
+  // buffer gating.
   //
-  // Four-layer pipeline:
+  // Five-layer pipeline:
   //
   //   raw WS → buffer gate → throttle (per-type debounce) → coalescer (batch + flush)
   //                                                            ↓ onMessage
-  //                                                        updateBatcher → RAF → render
+  //                                                    domUpdateGate → batcher → RAF → render
   //
   // 0. The response buffer gate checks tab visibility. When the tab is
   //    hidden, messages are silently dropped and downstream buffers are
@@ -281,11 +283,16 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   //    window, triggering one reconciliation (fetchPRDData + fetchTaskUsage)
   //    instead of N calls.
   //
-  // 3. The update batcher collects optimistic setData() calls from the
-  //    coalescer's onMessage and applies them in a single RAF callback.
-  //    Multiple updates within one frame are composed in order, so the
-  //    setter is called exactly once per frame with the final state.
-  //    This prevents intermediate renders during rapid message bursts.
+  // 3. The DOM update gate prevents state updates and re-renders when the
+  //    tab is hidden. Instead of scheduling RAF callbacks in background
+  //    tabs, it queues updaters per-setter and replays them in a single
+  //    batch when the tab becomes visible again.
+  //
+  // 4. The update batcher collects optimistic setData() calls and applies
+  //    them in a single RAF callback. Multiple updates within one frame
+  //    are composed in order, so the setter is called exactly once per
+  //    frame with the final state. This prevents intermediate renders
+  //    during rapid message bursts.
   useEffect(() => {
     let ws: WebSocket | null = null;
 
@@ -294,15 +301,23 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     // optimistic updates are composed and applied together.
     const batcher = createUpdateBatcher();
 
+    // DOM update gate: wraps the batcher to prevent state updates and
+    // re-renders when the tab is hidden. Instead of scheduling RAF
+    // callbacks in background tabs (wasting CPU), the gate queues all
+    // pending updaters per-setter and replays them in a single batch
+    // when the tab becomes visible again.
+    const updateGate = createDomUpdateGate({ batcher });
+
     const coalescer = createMessageCoalescer({
-      // Immediate per-message handler — optimistic UI updates are batched
-      // into the next animation frame via the update batcher.
+      // Immediate per-message handler — optimistic UI updates are gated
+      // by tab visibility and batched into the next animation frame via
+      // the update batcher when visible, or queued for replay on resume.
       onMessage: (msg) => {
         if (msg.type === "rex:item-updated" && msg.itemId && msg.updates) {
           // Targeted update — only the changed node and its ancestors
           // get new object references. Memoized NodeRow components for
           // all other nodes skip their render cycle entirely.
-          batcher.schedule(setData, (prev: PRDDocumentData | null) => {
+          updateGate.schedule(setData, (prev: PRDDocumentData | null) => {
             if (!prev) return prev;
             const newItems = applyItemUpdate(
               prev.items,
@@ -315,8 +330,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         }
 
         if (msg.type === "rex:item-deleted" && msg.itemId) {
-          // Optimistic local removal — batched for next frame
-          batcher.schedule(setData, (prev: PRDDocumentData | null) => {
+          // Optimistic local removal — gated for background tab suspension
+          updateGate.schedule(setData, (prev: PRDDocumentData | null) => {
             if (!prev) return prev;
             const newItems = removeItemById(prev.items, msg.itemId as string);
             return newItems === prev.items ? prev : { ...prev, items: newItems };
@@ -325,10 +340,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       },
 
       // Coalesced flush — fires once per debounce window for reconciliation.
-      // Flush the batcher first so any pending optimistic updates land before
+      // Flush the gate first so any pending optimistic updates land before
       // the reconciliation fetch overwrites state.
       onFlush: (batch) => {
-        batcher.flush();
+        updateGate.flush();
 
         const needsReconciliation =
           batch.types.has("rex:item-updated") ||
@@ -366,7 +381,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       flushDownstream: [
         () => throttle.flush(),
         () => coalescer.flush(),
-        () => batcher.flush(),
+        () => updateGate.flush(),
       ],
       onResume: () => {
         fetchPRDData();
@@ -394,6 +409,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       bufferGate.dispose();
       throttle.dispose();
       coalescer.dispose();
+      updateGate.dispose();
       batcher.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
