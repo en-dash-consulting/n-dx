@@ -14,14 +14,23 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import type { WsHealthTracker, CleanupReason } from "./ws-health-tracker.js";
 
 /** A broadcast function that sends a message to all connected clients. */
 export type WebSocketBroadcaster = (data: unknown) => void;
+
+/** Options for the WebSocket manager. */
+export interface WebSocketManagerOptions {
+  /** Optional health tracker for connection lifecycle metrics. */
+  healthTracker?: WsHealthTracker;
+}
 
 /** A connected WebSocket client. */
 interface WSClient {
   socket: Duplex;
   alive: boolean;
+  /** Tracker-assigned connection ID for duration tracking. */
+  trackingId?: string;
 }
 
 /**
@@ -108,7 +117,7 @@ function encodePingFrame(): Buffer {
  * ws.broadcast({ type: "rex:item-updated", itemId: "..." });
  * ```
  */
-export function createWebSocketManager(): {
+export function createWebSocketManager(opts?: WebSocketManagerOptions): {
   handleUpgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
   broadcast: WebSocketBroadcaster;
   clientCount: () => number;
@@ -116,6 +125,7 @@ export function createWebSocketManager(): {
 } {
   const clients = new Set<WSClient>();
   let pingInterval: ReturnType<typeof setInterval> | null = null;
+  const tracker = opts?.healthTracker;
 
   /**
    * Idempotent client removal — safe to call from multiple event handlers.
@@ -128,8 +138,13 @@ export function createWebSocketManager(): {
    * Because listeners are removed before the socket is destroyed, the
    * destroy → close → removeClient chain cannot recurse.
    */
-  function removeClient(client: WSClient): void {
+  function removeClient(client: WSClient, reason?: CleanupReason): void {
     if (!clients.delete(client)) return; // already removed — nothing to do
+
+    // Record the disconnect in the health tracker.
+    if (tracker && client.trackingId) {
+      tracker.recordDisconnect(client.trackingId, reason ?? "close");
+    }
 
     // Break closure references so the client + socket can be GC'd immediately.
     client.socket.removeAllListeners();
@@ -150,7 +165,7 @@ export function createWebSocketManager(): {
   function pruneDeadClients(): void {
     for (const client of clients) {
       if (client.socket.destroyed || !client.socket.writable) {
-        removeClient(client);
+        removeClient(client, "prune");
       }
     }
   }
@@ -163,14 +178,14 @@ export function createWebSocketManager(): {
       for (const client of clients) {
         if (!client.alive) {
           // Missed last ping — full cleanup via removeClient
-          removeClient(client);
+          removeClient(client, "ping_timeout");
           continue;
         }
         client.alive = false;
         try {
           client.socket.write(encodePingFrame());
         } catch {
-          removeClient(client);
+          removeClient(client, "write_fail");
         }
       }
     }, PING_INTERVAL_MS);
@@ -208,7 +223,8 @@ export function createWebSocketManager(): {
 
     socket.write(response);
 
-    const client: WSClient = { socket, alive: true };
+    const trackingId = tracker?.recordConnect();
+    const client: WSClient = { socket, alive: true, trackingId };
     clients.add(client);
     startPingInterval();
 
@@ -224,9 +240,9 @@ export function createWebSocketManager(): {
     // Immediate disconnect detection — every socket lifecycle event that
     // signals the connection is gone triggers client removal. Set.delete
     // is idempotent so overlapping events are harmless.
-    socket.on("close", () => removeClient(client));
-    socket.on("error", () => removeClient(client));
-    socket.on("end", () => removeClient(client));
+    socket.on("close", () => removeClient(client, "close"));
+    socket.on("error", () => removeClient(client, "error"));
+    socket.on("end", () => removeClient(client, "end"));
 
     // Send a welcome message
     try {
@@ -282,7 +298,7 @@ export function createWebSocketManager(): {
         break;
       case 0x08: // Close
         try { client.socket.write(encodeCloseFrame()); } catch { /* ignore */ }
-        removeClient(client);
+        removeClient(client, "close");
         break;
       case 0x09: // Ping
         client.alive = true;
@@ -297,6 +313,8 @@ export function createWebSocketManager(): {
   function broadcast(data: unknown): void {
     if (clients.size === 0) return;
 
+    tracker?.recordBroadcast();
+
     // Single-pass broadcast: inline health checks replace the separate
     // pruneDeadClients() call, and JSON serialization is deferred until
     // the first confirmed-active connection is found. This means:
@@ -306,7 +324,7 @@ export function createWebSocketManager(): {
     let msg: Buffer | null = null;
     for (const client of clients) {
       if (client.socket.destroyed || !client.socket.writable) {
-        removeClient(client);
+        removeClient(client, "prune");
         continue;
       }
 
@@ -319,7 +337,8 @@ export function createWebSocketManager(): {
       try {
         client.socket.write(msg);
       } catch {
-        removeClient(client);
+        tracker?.recordBroadcastWriteFailure();
+        removeClient(client, "write_fail");
       }
     }
   }
@@ -334,6 +353,9 @@ export function createWebSocketManager(): {
       pingInterval = null;
     }
     for (const client of clients) {
+      if (tracker && client.trackingId) {
+        tracker.recordDisconnect(client.trackingId, "shutdown");
+      }
       try {
         client.socket.write(encodeCloseFrame());
         client.socket.destroy();

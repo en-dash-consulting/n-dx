@@ -20,6 +20,7 @@ import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
 import type { ActiveRun } from "../components/active-tasks-panel.js";
 import { ConcurrencyPanel } from "../components/concurrency-panel.js";
 import { MemoryPanel } from "../components/memory-panel.js";
+import { WsHealthPanel } from "../components/ws-health-panel.js";
 import { ThrottleControlsPanel } from "../components/throttle-controls.js";
 import type { NavigateTo } from "../types.js";
 
@@ -701,6 +702,9 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
     // Memory and resource health — system memory, per-task memory, health indicators
     h(MemoryPanel, null),
+
+    // WebSocket connection health — active connections, cleanup metrics, broadcast stats
+    h(WsHealthPanel, null),
 
     // Throttle controls — manual concurrency adjustment, pause/resume, emergency stop
     h(ThrottleControlsPanel, null),

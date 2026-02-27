@@ -24,6 +24,7 @@ import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { createWebSocketManager } from "./websocket.js";
+import { WsHealthTracker } from "./ws-health-tracker.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
 import { findAvailablePort } from "./port.js";
 
@@ -329,10 +330,12 @@ function registerDevViewerWatcher(
   }
 }
 
-/** Collected file system watchers for cleanup during shutdown. */
+/** Collected file system watchers and monitor intervals for cleanup during shutdown. */
 interface WatcherHandles {
   watchers: FSWatcher[];
   henchRunsDir: string;
+  /** Monitor intervals to clear on shutdown. */
+  monitorIntervals: ReturnType<typeof setInterval>[];
 }
 
 function registerWatchers(
@@ -351,15 +354,19 @@ function registerWatchers(
   if (hench) watchers.push(hench);
   const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
   if (dev) watchers.push(dev);
-  return { watchers, henchRunsDir };
+  return { watchers, henchRunsDir, monitorIntervals: [] };
 }
 
-/** Close all file system watchers to release OS file descriptors. */
+/** Close all file system watchers and monitor intervals to release resources. */
 function closeWatchers(handles: WatcherHandles): void {
   for (const w of handles.watchers) {
     try { w.close(); } catch { /* ignore */ }
   }
   handles.watchers.length = 0;
+  for (const interval of handles.monitorIntervals) {
+    try { clearInterval(interval); } catch { /* ignore */ }
+  }
+  handles.monitorIntervals.length = 0;
 }
 
 function setCorsHeaders(res: ServerResponse): void {
@@ -384,6 +391,19 @@ function handleConfigEndpoint(
   if ((req.url !== "/api/config") || (req.method || "GET") !== "GET") return false;
   res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
   res.end(JSON.stringify({ scope: ctx.scope ?? null, initialized: isProjectInitialized(ctx) }));
+  return true;
+}
+
+function handleWsHealthEndpoint(
+  req: IncomingMessage,
+  res: ServerResponse,
+  wsHealthTracker: WsHealthTracker,
+): boolean {
+  if (req.url !== "/api/ws/health" || (req.method || "GET") !== "GET") return false;
+
+  const snapshot = wsHealthTracker.getSnapshot();
+  res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+  res.end(JSON.stringify(snapshot));
   return true;
 }
 
@@ -441,7 +461,9 @@ async function handleApiRoutes(
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
+  wsHealthTracker: WsHealthTracker,
 ): Promise<boolean> {
+  if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
@@ -466,13 +488,14 @@ function createHttpServer(
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
+  wsHealthTracker: WsHealthTracker,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     setCorsHeaders(res);
     if (handlePreflight(req, res)) return;
     if (handleConfigEndpoint(req, res, ctx)) return;
     if (handleReloadSignalEndpoint(req, res, ws)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets)) return;
+    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker)) return;
     res.writeHead(404);
     res.end("Not found");
   });
@@ -510,6 +533,29 @@ function logStartup(
   console.log(`  claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision`);
   console.log("");
   console.log("Press Ctrl+C to stop.");
+}
+
+/** Interval (ms) for broadcasting WS health metrics to connected clients. */
+const WS_HEALTH_BROADCAST_INTERVAL_MS = 10_000;
+
+/**
+ * Periodically broadcast WebSocket connection health metrics.
+ * Follows the same pattern as heartbeat/concurrency/memory monitors.
+ */
+function startWsHealthBroadcast(
+  broadcast: (data: unknown) => void,
+  tracker: WsHealthTracker,
+  clientCount: () => number,
+): ReturnType<typeof setInterval> {
+  return setInterval(() => {
+    // Sync active count with actual client set to correct any drift
+    tracker.syncActiveCount(clientCount());
+    const snapshot = tracker.getSnapshot();
+    broadcast({
+      type: "ws:health-status",
+      ...snapshot,
+    });
+  }, WS_HEALTH_BROADCAST_INTERVAL_MS);
 }
 
 export async function startServer(
@@ -556,7 +602,8 @@ export async function startServer(
   const ctx: ServerContext = { projectDir: absDir, svDir, rexDir, dev, scope };
 
   const watcher = createDataWatcher(ctx, assets.viewerPath);
-  const ws = createWebSocketManager();
+  const wsHealthTracker = new WsHealthTracker();
+  const ws = createWebSocketManager({ healthTracker: wsHealthTracker });
   const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
@@ -567,7 +614,12 @@ export async function startServer(
     startMemoryMonitor(ws.broadcast);
   }
 
-  const server = createHttpServer(ctx, watcher, ws, assets);
+  // Start WS health broadcast — periodically sends connection health
+  // metrics to all connected dashboard clients.
+  const wsHealthInterval = startWsHealthBroadcast(ws.broadcast, wsHealthTracker, ws.clientCount);
+  watcherHandles.monitorIntervals.push(wsHealthInterval);
+
+  const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
