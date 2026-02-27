@@ -20,6 +20,7 @@
 
 import { join } from "node:path";
 import { readFile, readdir, stat } from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -235,13 +236,21 @@ export class IncrementalTaskUsageAggregator {
   // ---- File I/O ------------------------------------------------------------
 
   /**
-   * Read a single run file and extract its task usage contribution.
+   * Read a single run file (plain JSON or gzip-compressed) and extract
+   * its task usage contribution.
    * Returns null for files that cannot be read or lack a taskId.
    */
   private async readFileContribution(file: string): Promise<FileContribution | null> {
     try {
-      const raw = await readFile(join(this.runsDir, file), "utf-8");
-      const data = JSON.parse(raw) as Record<string, unknown>;
+      let data: Record<string, unknown>;
+      if (file.endsWith(".gz")) {
+        const compressed = await readFile(join(this.runsDir, file));
+        const decompressed = gunzipSync(compressed);
+        data = JSON.parse(decompressed.toString("utf-8")) as Record<string, unknown>;
+      } else {
+        const raw = await readFile(join(this.runsDir, file), "utf-8");
+        data = JSON.parse(raw) as Record<string, unknown>;
+      }
 
       const taskId = data.taskId;
       if (typeof taskId !== "string" || !taskId) return null;
@@ -260,9 +269,9 @@ export class IncrementalTaskUsageAggregator {
   }
 
   /**
-   * Scan the runs directory and return a snapshot map of all `.json` files.
-   * Hidden files (prefixed with `.`) are excluded to avoid picking up
-   * checkpoint or metadata files.
+   * Scan the runs directory and return a snapshot map of all run files
+   * (`.json` and `.json.gz`). Hidden files (prefixed with `.`) are
+   * excluded to avoid picking up checkpoint or metadata files.
    */
   private async scanRunFiles(): Promise<Map<string, FileSnapshot>> {
     const snapshots = new Map<string, FileSnapshot>();
@@ -274,13 +283,13 @@ export class IncrementalTaskUsageAggregator {
       return snapshots;
     }
 
-    const jsonFiles = files.filter(
-      (f) => f.endsWith(".json") && !f.startsWith("."),
+    const runFiles = files.filter(
+      (f) => (f.endsWith(".json") || f.endsWith(".json.gz")) && !f.startsWith("."),
     );
 
     // Stat files in parallel for performance
     const entries = await Promise.all(
-      jsonFiles.map(async (file) => {
+      runFiles.map(async (file) => {
         try {
           const st = await stat(join(this.runsDir, file));
           return { file, snapshot: { mtimeMs: st.mtimeMs, size: st.size } };

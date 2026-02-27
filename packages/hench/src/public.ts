@@ -205,6 +205,23 @@ export type {
   DeltaResult,
 } from "./store/run-change-detector.js";
 
+// ---- Run file archival ------------------------------------------------------
+
+export {
+  archiveOldRuns,
+  identifyArchivableRuns,
+  compressRunFile,
+  readCompressedJSON,
+  loadArchivalConfig,
+  DEFAULT_ARCHIVAL_CONFIG,
+} from "./store/run-archiver.js";
+
+export type {
+  ArchivalConfig,
+  ArchivalResult,
+  CompressedFileResult,
+} from "./store/run-archiver.js";
+
 // ---- Agent lifecycle types -------------------------------------------------
 
 export type { AgentLoopOptions, AgentLoopResult } from "./agent/lifecycle/loop.js";

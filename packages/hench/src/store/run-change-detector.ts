@@ -193,8 +193,8 @@ export class RunChangeDetector {
   // ---- Private ------------------------------------------------------------
 
   /**
-   * Read the runs directory and build a snapshot map of all `.json` files
-   * (excluding the checkpoint file itself).
+   * Read the runs directory and build a snapshot map of all run files
+   * (`.json` and `.json.gz`), excluding the checkpoint file itself.
    */
   private async scanRunFiles(): Promise<Record<string, FileSnapshot>> {
     const snapshots: Record<string, FileSnapshot> = {};
@@ -206,13 +206,16 @@ export class RunChangeDetector {
       return snapshots;
     }
 
-    const jsonFiles = files.filter(
-      (f) => f.endsWith(".json") && f !== CHECKPOINT_FILENAME,
+    const runFiles = files.filter(
+      (f) =>
+        (f.endsWith(".json") || f.endsWith(".json.gz")) &&
+        f !== CHECKPOINT_FILENAME &&
+        !f.startsWith("."),
     );
 
     // Stat files in parallel for performance
     const entries = await Promise.all(
-      jsonFiles.map(async (file) => {
+      runFiles.map(async (file) => {
         try {
           const st = await stat(join(this.runsDir, file));
           return { file, snapshot: { mtimeMs: st.mtimeMs, size: st.size } };
