@@ -7,12 +7,12 @@ import type { Proposal } from "../../../src/analyze/propose.js";
 // Shared mock client — all tests control LLM responses through this
 const mockComplete = vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined });
 
-vi.mock("@n-dx/claude-client", () => ({
-  createClient: () => ({
+vi.mock("@n-dx/llm-client", () => ({
+  createLLMClient: () => ({
     mode: "api",
     complete: mockComplete,
   }),
-  detectAuthMode: () => "api",
+  detectLLMAuthMode: () => "api",
 }));
 
 function makeProposal(title: string, featureCount = 1, taskCount = 2): Proposal {

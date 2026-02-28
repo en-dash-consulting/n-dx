@@ -3,7 +3,7 @@
  * and structured section headers for streaming agent output.
  *
  * Core primitives (setQuiet, isQuiet, info, result) are shared from
- * @n-dx/claude-client. Hench-specific extensions (section, subsection,
+ * @n-dx/llm-client. Hench-specific extensions (section, subsection,
  * stream, detail) are defined here and use the shared isQuiet() state.
  *
  * This module is placed in types/ to avoid circular dependencies
@@ -18,9 +18,9 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "@n-dx/claude-client";
+export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
 
-import { isQuiet } from "@n-dx/claude-client";
+import { isQuiet } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs

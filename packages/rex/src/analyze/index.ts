@@ -4,7 +4,15 @@ export { scanTests, scanDocs, scanSourceVision, scanPackageJson } from "./scanne
 export type { ReconcileStats, UpdateCandidate, ReconcileOptions } from "./reconcile.js";
 export { reconcile } from "./reconcile.js";
 
-export type { Proposal, ProposalFeature, ProposalTask } from "./propose.js";
+export type {
+  Proposal,
+  ProposalEpic,
+  ProposalFeature,
+  ProposalTask,
+  DuplicateReasonType,
+  DuplicateReasonReference,
+  DuplicateReasonMetadata,
+} from "./propose.js";
 export { buildProposals } from "./propose.js";
 
 export { similarity, deduplicateScanResults } from "./dedupe.js";
@@ -14,10 +22,13 @@ export { formatDiff } from "./diff.js";
 export type { FileFormat, AddPromptOptions, QualityIssue, ClaudeResult, ReasonResult, GranularityAssessment, GranularityAssessmentResult, BatchImportItem, BatchImportResult } from "./reason.js";
 export {
   DEFAULT_MODEL,
+  DEFAULT_CODEX_MODEL,
   MAX_RETRIES,
+  setLLMConfig,
   setClaudeConfig,
   setClaudeClient,
   getAuthMode,
+  getLLMVendor,
   CHUNK_CHAR_LIMIT,
   CHUNK_ITEM_LIMIT,
   FEW_SHOT_EXAMPLE,

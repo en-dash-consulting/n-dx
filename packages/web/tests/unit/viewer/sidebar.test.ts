@@ -51,7 +51,7 @@ describe("Sidebar", () => {
     it("renders section headers as clickable buttons", () => {
       renderSidebar();
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(4); // SOURCEVISION, REX, HENCH, SETTINGS
+      expect(sectionHeaders.length).toBe(5); // SOURCEVISION, REX, HENCH, TOKEN USAGE, SETTINGS
     });
 
     it("section headers have aria-expanded attribute", () => {
@@ -261,6 +261,7 @@ describe("Sidebar", () => {
       // HENCH section (index 2) should be expanded
       expect(headers[2].getAttribute("aria-expanded")).toBe("true");
     });
+
   });
 
   describe("section header accessibility", () => {
@@ -427,7 +428,7 @@ describe("Sidebar", () => {
     it("shows chevron on section headers", () => {
       renderSidebar();
       const chevrons = root.querySelectorAll(".nav-section-chevron");
-      expect(chevrons.length).toBe(4);
+      expect(chevrons.length).toBe(5);
     });
 
     it("expanded section has open chevron class", () => {
@@ -529,41 +530,41 @@ describe("Sidebar", () => {
   });
 
   describe("scope filtering", () => {
-    it("shows all four sections when no scope is set", () => {
+    it("shows all five sections when no scope is set", () => {
       renderSidebar({ scope: null });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(4); // SOURCEVISION, REX, HENCH, SETTINGS
+      expect(sectionHeaders.length).toBe(5); // SOURCEVISION, REX, HENCH, TOKEN USAGE, SETTINGS
     });
 
-    it("shows sourcevision + settings sections when scope=sourcevision", () => {
+    it("shows sourcevision + token usage + settings sections when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(2);
+      expect(sectionHeaders.length).toBe(3);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("SOURCEVISION");
     });
 
-    it("shows rex + settings sections when scope=rex", () => {
+    it("shows rex + token usage + settings sections when scope=rex", () => {
       renderSidebar({ scope: "rex", view: "rex-dashboard" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(2);
+      expect(sectionHeaders.length).toBe(3);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("REX");
     });
 
-    it("shows hench + settings sections when scope=hench", () => {
+    it("shows hench + token usage + settings sections when scope=hench", () => {
       renderSidebar({ scope: "hench", view: "hench-runs" as const });
       const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(2);
+      expect(sectionHeaders.length).toBe(3);
       const label = sectionHeaders[0].querySelector(".nav-section-label");
       expect(label?.textContent).toBe("HENCH");
     });
 
-    it("shows sourcevision nav items + settings items when scope=sourcevision", () => {
+    it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 8 sourcevision items + 1 settings item (Feature Flags)
-      expect(navItems.length).toBe(9);
+      // 9 sourcevision items + 1 token usage item + 1 settings item (Feature Flags)
+      expect(navItems.length).toBe(11);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

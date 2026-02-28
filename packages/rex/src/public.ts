@@ -19,7 +19,7 @@
  *
  * ## Architectural isolation
  *
- * Rex depends only on `@n-dx/claude-client` (the shared foundation)
+ * Rex depends only on `@n-dx/llm-client` (the shared foundation)
  * and has **no dependency on hench or sourcevision**. This strict
  * one-way dependency ensures the monorepo's DAG remains acyclic:
  *
@@ -116,6 +116,15 @@ export type { TreeStats } from "./core/stats.js";
 // ---- Core: deletion ---------------------------------------------------------
 
 export { deleteItem, cleanBlockedByRefs } from "./core/delete.js";
+export { removeEpic } from "./core/remove-epic.js";
+export type { RemoveEpicResult } from "./core/remove-epic.js";
+export { removeTask } from "./core/remove-task.js";
+export type { RemoveTaskResult, ParentAutoCompletion } from "./core/remove-task.js";
+export { preCheckFeatureDeletion, removeFeature } from "./core/remove-feature.js";
+export type {
+  DeletionPreCheck, RemoveFeatureResult,
+  ExternalDependent, SyncedItem,
+} from "./core/remove-feature.js";
 
 // ---- Core: task selection ---------------------------------------------------
 
@@ -194,6 +203,14 @@ export {
   acknowledgeFinding, isAcknowledged,
 } from "./analyze/acknowledge.js";
 export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowledge.js";
+
+// ---- Recommend: PRD creation from recommendations ---------------------------
+
+export { createItemsFromRecommendations } from "./recommend/create-from-recommendations.js";
+export type {
+  EnrichedRecommendation, RecommendationMeta, CreationResult,
+  SkippedRecommendation, ReparentedRecommendation,
+} from "./recommend/create-from-recommendations.js";
 
 // ---- MCP server factory -----------------------------------------------------
 

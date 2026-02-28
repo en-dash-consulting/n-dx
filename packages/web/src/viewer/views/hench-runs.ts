@@ -13,10 +13,15 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { MetricCard } from "../components/data-display/health-gauge.js";
 import { BrandedHeader } from "../components/logos.js";
+import { usePolling } from "../hooks/use-polling.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { CopyLinkButton } from "../components/copy-link-button.js";
 import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
 import type { ActiveRun } from "../components/active-tasks-panel.js";
+import { ConcurrencyPanel } from "../components/concurrency-panel.js";
+import { MemoryPanel } from "../components/memory-panel.js";
+import { WsHealthPanel } from "../components/ws-health-panel.js";
+import { ThrottleControlsPanel } from "../components/throttle-controls.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -479,9 +484,10 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   useEffect(() => {
     fetchRuns().then(() => setLoading(false));
-    const interval = setInterval(fetchRuns, 10_000);
-    return () => clearInterval(interval);
   }, [fetchRuns]);
+
+  // Visibility-aware polling via polling manager
+  usePolling("hench-runs", fetchRuns, 10_000);
 
   // Deep-link: auto-select the target run once runs are loaded
   useEffect(() => {
@@ -690,6 +696,18 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
     // Active tasks panel — shown at top when there are running tasks
     h(ActiveTasksPanel, { runs: activeRuns, navigateTo }),
+
+    // Concurrency status — shows process count, limits, and utilization
+    h(ConcurrencyPanel, null),
+
+    // Memory and resource health — system memory, per-task memory, health indicators
+    h(MemoryPanel, null),
+
+    // WebSocket connection health — active connections, cleanup metrics, broadcast stats
+    h(WsHealthPanel, null),
+
+    // Throttle controls — manual concurrency adjustment, pause/resume, emergency stop
+    h(ThrottleControlsPanel, null),
 
     // Aggregate metrics
     h(RunMetrics, { runs }),

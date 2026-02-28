@@ -1,7 +1,26 @@
-import type { Priority } from "../schema/index.js";
+import type { Priority, ItemLevel, ItemStatus } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
 import { deduplicateScanResults } from "./dedupe.js";
+
+export type DuplicateReasonType =
+  | "exact_title_match"
+  | "semantic_match"
+  | "content_overlap_match"
+  | "completed_item_match";
+
+export interface DuplicateReasonReference {
+  id: string;
+  title: string;
+  level: ItemLevel;
+  status: ItemStatus;
+}
+
+export interface DuplicateReasonMetadata {
+  type: DuplicateReasonType;
+  matchedItem: DuplicateReasonReference;
+  explanation: string;
+}
 
 export interface ProposalTask {
   title: string;
@@ -11,6 +30,7 @@ export interface ProposalTask {
   acceptanceCriteria?: string[];
   priority?: string;
   tags?: string[];
+  duplicateReason?: DuplicateReasonMetadata;
 }
 
 export interface ProposalFeature {
@@ -18,10 +38,18 @@ export interface ProposalFeature {
   source: string;
   description?: string;
   tasks: ProposalTask[];
+  duplicateReason?: DuplicateReasonMetadata;
+}
+
+export interface ProposalEpic {
+  title: string;
+  source: string;
+  description?: string;
+  duplicateReason?: DuplicateReasonMetadata;
 }
 
 export interface Proposal {
-  epic: { title: string; source: string; description?: string };
+  epic: ProposalEpic;
   features: ProposalFeature[];
 }
 

@@ -4,16 +4,42 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { toolGit } from "../../../src/tools/git.js";
-import { GuardRails } from "../../../src/guard/index.js";
-import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import type { ToolGuard } from "../../../src/tools/contracts.js";
+
+function createGitGuard(allowedGitSubcommands: string[]): ToolGuard {
+  return {
+    checkPath(filepath: string): string {
+      return filepath;
+    },
+    checkCommand(): void {},
+    checkGitSubcommand(subcommand: string): void {
+      if (!allowedGitSubcommands.includes(subcommand)) {
+        throw new Error(`Git subcommand "${subcommand}" not allowed. Allowed: ${allowedGitSubcommands.join(", ")}`);
+      }
+      this.__commandsRun += 1;
+      this.__auditLog.push({ operation: "git" });
+    },
+    recordFileRead(): void {},
+    recordFileWrite(): void {},
+    maxFileSize: 1024 * 1024,
+    commandTimeout: 30_000,
+    __commandsRun: 0,
+    __auditLog: [] as Array<{ operation: string }>,
+  } as ToolGuard & { __commandsRun: number; __auditLog: Array<{ operation: string }> };
+}
+
+const DEFAULT_ALLOWED_GIT_SUBCOMMANDS = [
+  "status", "add", "commit", "diff", "log",
+  "branch", "checkout", "stash", "show", "rev-parse",
+];
 
 describe("toolGit", () => {
   let projectDir: string;
-  let guard: GuardRails;
+  let guard: ToolGuard & { __commandsRun: number; __auditLog: Array<{ operation: string }> };
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-git-"));
-    guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
+    guard = createGitGuard(DEFAULT_ALLOWED_GIT_SUBCOMMANDS);
     execSync("git init", { cwd: projectDir });
     execSync("git config user.email 'test@test.com'", { cwd: projectDir });
     execSync("git config user.name 'Test'", { cwd: projectDir });
@@ -165,10 +191,7 @@ describe("toolGit", () => {
   describe("guard integration", () => {
     it("uses guard allowlist instead of hardcoded list", async () => {
       // Create a guard with custom git subcommand allowlist
-      const customGuard = new GuardRails(projectDir, {
-        ...DEFAULT_HENCH_CONFIG().guard,
-        allowedGitSubcommands: ["status", "log"],
-      });
+      const customGuard = createGitGuard(["status", "log"]);
 
       // status should work
       const result = await toolGit(customGuard, projectDir, { subcommand: "status" });
@@ -182,9 +205,9 @@ describe("toolGit", () => {
 
     it("records git operations in policy audit log", async () => {
       await toolGit(guard, projectDir, { subcommand: "status" });
-      expect(guard.policy.counters.commandsRun).toBe(1);
+      expect(guard.__commandsRun).toBe(1);
 
-      const entries = guard.policy.auditLog;
+      const entries = guard.__auditLog;
       expect(entries.length).toBeGreaterThanOrEqual(1);
       expect(entries.some(e => e.operation === "git")).toBe(true);
     });

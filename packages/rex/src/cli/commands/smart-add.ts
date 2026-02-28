@@ -13,15 +13,36 @@ import {
   reasonFromIdeasFile,
   validateProposalQuality,
   DEFAULT_MODEL,
+  setLLMConfig,
   setClaudeConfig,
   getAuthMode,
+  getLLMVendor,
 } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
-import { CHILD_LEVEL } from "../../schema/index.js";
-import type { PRDItem, ItemLevel } from "../../schema/index.js";
-import { loadClaudeConfig } from "../../store/project-config.js";
+import { CHILD_LEVEL, PRIORITY_ORDER } from "../../schema/index.js";
+import type { PRDItem, ItemLevel, DuplicateOverrideMarker } from "../../schema/index.js";
+import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import {
+  matchProposalNodesToPRD,
+  attachDuplicateReasonsToProposals,
+  buildDuplicateOverrideMarkerIndex,
+} from "./smart-add-duplicates.js";
+import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
+import type { LLMVendor } from "@n-dx/llm-client";
 
 const PENDING_FILE = "pending-smart-proposals.json";
+
+function isLLMDebugEnabled(): boolean {
+  const v = process.env.NDX_DEBUG_LLM ?? process.env.NDX_DEBUG;
+  return v === "1" || v === "true" || v === "yes";
+}
+
+function llmDebug(message: string): void {
+  if (isLLMDebugEnabled()) {
+    // eslint-disable-next-line no-console
+    console.error(`[ndx:rex:smart-add] ${message}`);
+  }
+}
 
 async function hasRexDir(dir: string): Promise<boolean> {
   try {
@@ -246,6 +267,255 @@ export function parseApprovalInput(
   return { approved: unique };
 }
 
+export type DuplicatePromptDecision = "cancel" | "merge" | "proceed";
+
+/**
+ * Parse duplicate confirmation input from the explicit override prompt.
+ * Empty/invalid input defaults to "cancel" for safety.
+ */
+export function parseDuplicatePromptInput(input: string): DuplicatePromptDecision {
+  const trimmed = input.trim().toLowerCase();
+  if (["p", "proceed", "proceed anyway", "force", "force-create", "force create"].includes(trimmed)) {
+    return "proceed";
+  }
+  if (["m", "merge"].includes(trimmed)) return "merge";
+  return "cancel";
+}
+
+function hasDuplicateMatches(matches: ProposalDuplicateMatch[]): boolean {
+  return matches.some((match) => match.duplicate);
+}
+
+function parseNodeKey(key: string): { proposalIndex: number; suffix: string } | null {
+  const m = /^p(\d+):(.*)$/.exec(key);
+  if (!m) return null;
+  const proposalIndex = Number.parseInt(m[1] ?? "", 10);
+  const suffix = m[2] ?? "";
+  if (!Number.isInteger(proposalIndex) || suffix.length === 0) return null;
+  return { proposalIndex, suffix };
+}
+
+type MergeableProposalNode =
+  | {
+      key: string;
+      kind: "epic" | "feature";
+      title: string;
+      description?: string;
+    }
+  | {
+      key: string;
+      kind: "task";
+      title: string;
+      description?: string;
+      acceptanceCriteria?: string[];
+      priority?: PRDItem["priority"];
+      tags?: string[];
+    };
+
+interface MergedProposalRecord {
+  proposalNodeKey: string;
+  proposalTitle: string;
+  proposalKind: "epic" | "feature" | "task";
+  reason: string;
+  score: number;
+  mergedAt: string;
+  source: "smart-add";
+}
+
+type ItemWithMergedProposals = PRDItem & { mergedProposals?: MergedProposalRecord[] };
+
+function normalizeMergeText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mergeDescription(
+  existingDescription: string | undefined,
+  proposedDescription: string | undefined,
+): string | undefined {
+  if (!proposedDescription || proposedDescription.trim().length === 0) {
+    return existingDescription;
+  }
+  if (!existingDescription || existingDescription.trim().length === 0) {
+    return proposedDescription;
+  }
+  if (normalizeMergeText(existingDescription) === normalizeMergeText(proposedDescription)) {
+    return existingDescription;
+  }
+  return proposedDescription.length > existingDescription.length
+    ? proposedDescription
+    : existingDescription;
+}
+
+function mergeStringArray(
+  existingValues: string[] | undefined,
+  proposedValues: string[] | undefined,
+): string[] | undefined {
+  if ((!existingValues || existingValues.length === 0) && (!proposedValues || proposedValues.length === 0)) {
+    return existingValues;
+  }
+  return [...new Set([...(existingValues ?? []), ...(proposedValues ?? [])])];
+}
+
+function mergePriority(
+  existingPriority: PRDItem["priority"] | undefined,
+  proposedPriority: PRDItem["priority"] | undefined,
+): PRDItem["priority"] | undefined {
+  if (!proposedPriority) return existingPriority;
+  if (!existingPriority) return proposedPriority;
+  const existingRank = PRIORITY_ORDER[existingPriority];
+  const proposedRank = PRIORITY_ORDER[proposedPriority];
+  return proposedRank < existingRank ? proposedPriority : existingPriority;
+}
+
+function buildMergeableProposalNodeIndex(
+  proposals: Proposal[],
+): Record<string, MergeableProposalNode> {
+  const index: Record<string, MergeableProposalNode> = {};
+
+  for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
+    const proposal = proposals[pIdx];
+    index[`p${pIdx}:epic`] = {
+      key: `p${pIdx}:epic`,
+      kind: "epic",
+      title: proposal.epic.title,
+      description: proposal.epic.description,
+    };
+
+    for (let fIdx = 0; fIdx < proposal.features.length; fIdx++) {
+      const feature = proposal.features[fIdx];
+      index[`p${pIdx}:feature:${fIdx}`] = {
+        key: `p${pIdx}:feature:${fIdx}`,
+        kind: "feature",
+        title: feature.title,
+        description: feature.description,
+      };
+
+      for (let tIdx = 0; tIdx < feature.tasks.length; tIdx++) {
+        const task = feature.tasks[tIdx];
+        index[`p${pIdx}:task:${fIdx}:${tIdx}`] = {
+          key: `p${pIdx}:task:${fIdx}:${tIdx}`,
+          kind: "task",
+          title: task.title,
+          description: task.description,
+          acceptanceCriteria: task.acceptanceCriteria,
+          priority: task.priority as PRDItem["priority"],
+          tags: task.tags,
+        };
+      }
+    }
+  }
+
+  return index;
+}
+
+export async function applyDuplicateProposalMerges(
+  dir: string,
+  proposals: Proposal[],
+  duplicateMatches: ProposalDuplicateMatch[],
+): Promise<{
+  mergedCount: number;
+  mergeTargetsByNodeKey: Record<string, string>;
+}> {
+  const rexDir = join(dir, REX_DIR);
+  const store = await resolveStore(rexDir);
+  const proposalNodeIndex = buildMergeableProposalNodeIndex(proposals);
+  const mergeTargetsByNodeKey: Record<string, string> = {};
+  const mergedAt = new Date().toISOString();
+  let mergedCount = 0;
+
+  for (const match of duplicateMatches) {
+    if (!match.duplicate || !match.matchedItem) continue;
+    if (match.reason === "none") continue;
+
+    const proposalNode = proposalNodeIndex[match.node.key];
+    if (!proposalNode) continue;
+
+    const existing = await store.getItem(match.matchedItem.id);
+    if (!existing) continue;
+
+    const updates: Partial<ItemWithMergedProposals> = {};
+    const nextDescription = mergeDescription(existing.description, proposalNode.description);
+    if (nextDescription !== existing.description) {
+      updates.description = nextDescription;
+    }
+
+    if (proposalNode.kind === "task") {
+      const nextCriteria = mergeStringArray(
+        existing.acceptanceCriteria,
+        proposalNode.acceptanceCriteria,
+      );
+      const sameCriteria =
+        JSON.stringify(nextCriteria ?? []) === JSON.stringify(existing.acceptanceCriteria ?? []);
+      if (!sameCriteria) {
+        updates.acceptanceCriteria = nextCriteria;
+      }
+
+      const nextPriority = mergePriority(existing.priority, proposalNode.priority);
+      if (nextPriority !== existing.priority) {
+        updates.priority = nextPriority;
+      }
+
+      const nextTags = mergeStringArray(existing.tags, proposalNode.tags);
+      const sameTags = JSON.stringify(nextTags ?? []) === JSON.stringify(existing.tags ?? []);
+      if (!sameTags) {
+        updates.tags = nextTags;
+      }
+    }
+
+    const mergedRecord: MergedProposalRecord = {
+      proposalNodeKey: match.node.key,
+      proposalTitle: proposalNode.title,
+      proposalKind: proposalNode.kind,
+      reason: match.reason,
+      score: match.score,
+      mergedAt,
+      source: "smart-add",
+    };
+    const existingRecords = ((existing as ItemWithMergedProposals).mergedProposals ?? [])
+      .filter((record) => record.proposalNodeKey !== mergedRecord.proposalNodeKey);
+    updates.mergedProposals = [...existingRecords, mergedRecord];
+
+    if (Object.keys(updates).length > 0) {
+      await store.updateItem(existing.id, updates as Partial<PRDItem>);
+      mergedCount++;
+      mergeTargetsByNodeKey[match.node.key] = existing.id;
+    }
+  }
+
+  return { mergedCount, mergeTargetsByNodeKey };
+}
+
+/**
+ * Keep only matches for selected proposal indices and remap node keys so the
+ * selected subset can be accepted with 0-based contiguous proposal indices.
+ */
+export function remapDuplicateMatchesForSelectedProposals(
+  matches: ProposalDuplicateMatch[],
+  selectedProposalIndices: number[],
+): ProposalDuplicateMatch[] {
+  const remap = new Map<number, number>();
+  for (let i = 0; i < selectedProposalIndices.length; i++) {
+    remap.set(selectedProposalIndices[i]!, i);
+  }
+
+  const remapped: ProposalDuplicateMatch[] = [];
+  for (const match of matches) {
+    const parsed = parseNodeKey(match.node.key);
+    if (!parsed) continue;
+    const nextIndex = remap.get(parsed.proposalIndex);
+    if (nextIndex === undefined) continue;
+
+    remapped.push({
+      ...match,
+      node: {
+        ...match.node,
+        key: `p${nextIndex}:${parsed.suffix}`,
+      },
+    });
+  }
+  return remapped;
+}
+
 /**
  * Parse granularity adjustment input from the approval prompt.
  * Accepts:
@@ -303,11 +573,20 @@ function parseNumericList(input: string, total: number): number[] {
 export function classifySmartAddError(
   err: Error,
   mode: "description" | "file",
+  vendor: LLMVendor = "claude",
 ): { message: string; suggestion: string } {
   const msg = err.message.toLowerCase();
+  const hasInvalidApiKey = /invalid.*api.*key/i.test(err.message);
+  llmDebug(`classify error vendor=${vendor} mode=${mode} message="${err.message}"`);
 
   // Authentication issues
-  if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid.*api.*key") || msg.includes("authentication")) {
+  if (msg.includes("401") || msg.includes("unauthorized") || hasInvalidApiKey || msg.includes("authentication")) {
+    if (vendor === "codex") {
+      return {
+        message: "Authentication failed — Codex CLI credentials were rejected.",
+        suggestion: "Run 'codex login', then retry. If needed, set the binary path with: n-dx config llm.codex.cli_path /path/to/codex",
+      };
+    }
     return {
       message: "Authentication failed — your API key was rejected.",
       suggestion: "Check your API key with: n-dx config claude.apiKey, or switch to CLI mode.",
@@ -331,7 +610,17 @@ export function classifySmartAddError(
   }
 
   // Claude CLI not found
-  if (msg.includes("claude cli not found") || msg.includes("enoent") && msg.includes("claude")) {
+  if (
+    msg.includes("codex cli not found") ||
+    msg.includes("claude cli not found") ||
+    (msg.includes("enoent") && (msg.includes("claude") || msg.includes("codex")))
+  ) {
+    if (vendor === "codex") {
+      return {
+        message: "Codex CLI not found on your system.",
+        suggestion: "Install Codex CLI and/or set its path: n-dx config llm.codex.cli_path /path/to/codex",
+      };
+    }
     return {
       message: "Claude CLI not found on your system.",
       suggestion: "Install it (npm install -g @anthropic-ai/claude-cli) or set an API key: n-dx config claude.apiKey <key>",
@@ -356,9 +645,12 @@ export function classifySmartAddError(
 
   // Generic fallback with mode-specific context
   const modeLabel = mode === "file" ? "process ideas file" : "analyze description";
+  const authHint = vendor === "codex"
+    ? "Check Codex CLI login (codex login) and your network connection, then try again."
+    : "Check your API key and network connection, then try again.";
   return {
     message: `Failed to ${modeLabel}: ${err.message}`,
-    suggestion: "Check your API key and network connection, then try again.",
+    suggestion: authHint,
   };
 }
 
@@ -426,43 +718,71 @@ export function formatQualityWarnings(issues: QualityIssue[]): string {
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
-  parentId?: string,
+  options: {
+    parentId?: string;
+    overrideMarkersByNodeKey?: Record<string, DuplicateOverrideMarker>;
+    mergeTargetsByNodeKey?: Record<string, string>;
+    mergedCount?: number;
+  } = {},
 ): Promise<number> {
+  const {
+    parentId,
+    overrideMarkersByNodeKey,
+    mergeTargetsByNodeKey,
+    mergedCount = 0,
+  } = options;
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
 
-  for (const p of proposals) {
+  for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
+    const p = proposals[pIdx];
     if (!parentId) {
       // No parent — create a new top-level epic with features and tasks beneath
-      const epicId = randomUUID();
-      await store.addItem({
-        id: epicId,
-        title: p.epic.title,
-        level: "epic",
-        status: "pending",
-        source: "smart-add",
-      });
-      addedCount++;
-
-      for (const f of p.features) {
-        const featureId = randomUUID();
-        await store.addItem(
-          {
-            id: featureId,
-            title: f.title,
-            level: "feature",
-            status: "pending",
-            source: "smart-add",
-            description: f.description,
-          },
-          epicId,
-        );
+      const epicMergeTarget = mergeTargetsByNodeKey?.[`p${pIdx}:epic`];
+      const epicId = epicMergeTarget ?? randomUUID();
+      const epicMarker = overrideMarkersByNodeKey?.[`p${pIdx}:epic`];
+      if (!epicMergeTarget) {
+        await store.addItem({
+          id: epicId,
+          title: p.epic.title,
+          level: "epic",
+          status: "pending",
+          source: "smart-add",
+          ...(epicMarker ? { overrideMarker: epicMarker } : {}),
+        });
         addedCount++;
+      }
 
-        for (const t of f.tasks) {
+      for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
+        const f = p.features[fIdx];
+        const featureKey = `p${pIdx}:feature:${fIdx}`;
+        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
+        const featureId = featureMergeTarget ?? randomUUID();
+        const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
+        if (!featureMergeTarget) {
+          await store.addItem(
+            {
+              id: featureId,
+              title: f.title,
+              level: "feature",
+              status: "pending",
+              source: "smart-add",
+              description: f.description,
+              ...(featureMarker ? { overrideMarker: featureMarker } : {}),
+            },
+            epicId,
+          );
+          addedCount++;
+        }
+
+        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
+          const t = f.tasks[tIdx];
+          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
+          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
               id: randomUUID(),
@@ -474,6 +794,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
           );
@@ -482,22 +803,33 @@ async function acceptProposals(
       }
     } else if (parentLevel === "epic") {
       // Parent is an epic — attach features (and their tasks) directly
-      for (const f of p.features) {
-        const featureId = randomUUID();
-        await store.addItem(
-          {
-            id: featureId,
-            title: f.title,
-            level: "feature",
-            status: "pending",
-            source: "smart-add",
-            description: f.description,
-          },
-          parentId,
-        );
-        addedCount++;
+      for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
+        const f = p.features[fIdx];
+        const featureKey = `p${pIdx}:feature:${fIdx}`;
+        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
+        const featureId = featureMergeTarget ?? randomUUID();
+        const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
+        if (!featureMergeTarget) {
+          await store.addItem(
+            {
+              id: featureId,
+              title: f.title,
+              level: "feature",
+              status: "pending",
+              source: "smart-add",
+              description: f.description,
+              ...(featureMarker ? { overrideMarker: featureMarker } : {}),
+            },
+            parentId,
+          );
+          addedCount++;
+        }
 
-        for (const t of f.tasks) {
+        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
+          const t = f.tasks[tIdx];
+          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
+          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
               id: randomUUID(),
@@ -509,6 +841,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
           );
@@ -518,8 +851,13 @@ async function acceptProposals(
     } else if (parentLevel === "feature") {
       // Parent is a feature — flatten proposal features' tasks as direct
       // children of the feature (level: task)
-      for (const f of p.features) {
-        for (const t of f.tasks) {
+      for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
+        const f = p.features[fIdx];
+        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
+          const t = f.tasks[tIdx];
+          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
+          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
               id: randomUUID(),
@@ -531,6 +869,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
           );
@@ -539,8 +878,13 @@ async function acceptProposals(
       }
     } else if (parentLevel === "task") {
       // Parent is a task — flatten everything as subtasks
-      for (const f of p.features) {
-        for (const t of f.tasks) {
+      for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
+        const f = p.features[fIdx];
+        for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
+          const t = f.tasks[tIdx];
+          const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
+          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
               id: randomUUID(),
@@ -552,6 +896,7 @@ async function acceptProposals(
               acceptanceCriteria: t.acceptanceCriteria,
               priority: t.priority as PRDItem["priority"],
               tags: t.tags,
+              ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
           );
@@ -564,15 +909,499 @@ async function acceptProposals(
   // Reset completed ancestors when adding under a completed parent
   await cascadeParentReset(store, parentId);
 
+  const overrideCount = overrideMarkersByNodeKey
+    ? Object.keys(overrideMarkersByNodeKey).length
+    : 0;
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "smart_add_accept",
-    detail: `Added ${addedCount} items from smart add${parentId ? ` under parent ${parentId}` : ""}`,
+    detail: `Added ${addedCount} items from smart add${parentId ? ` under parent ${parentId}` : ""}${mergedCount > 0 ? ` (${mergedCount} duplicate merge(s))` : ""}${overrideCount > 0 ? ` (${overrideCount} duplicate override marker(s))` : ""}`,
   });
 
   await clearPending(dir);
 
   return addedCount;
+}
+
+type SmartAddInput = {
+  descList: string[];
+  accept: boolean;
+  parentId?: string;
+  filePaths: string[];
+  isJson: boolean;
+};
+
+type SmartAddContext = {
+  existing: PRDItem[];
+  parentLevel?: ItemLevel;
+};
+
+function parseSmartAddInput(
+  descriptions: string | string[],
+  flags: Record<string, string>,
+  multiFlags: Record<string, string[]>,
+): SmartAddInput {
+  const descList: string[] = Array.isArray(descriptions)
+    ? descriptions
+    : descriptions ? [descriptions] : [];
+  const accept = flags.accept === "true";
+  const parentId = flags.parent;
+  const filePaths: string[] = multiFlags.file ?? (flags.file ? [flags.file] : []);
+  const isJson = flags.format === "json";
+  return { descList, accept, parentId, filePaths, isJson };
+}
+
+async function initializeSmartAddLLM(dir: string, format?: string): Promise<void> {
+  const rexConfigDir = join(dir, REX_DIR);
+  const llmConfig = await loadLLMConfig(rexConfigDir);
+  setLLMConfig(llmConfig);
+  const claudeConfig = await loadClaudeConfig(rexConfigDir);
+  setClaudeConfig(claudeConfig);
+
+  if (format === "json") return;
+  const vendor = getLLMVendor();
+  if (vendor) info(`Using ${vendor} for reasoning.`);
+  llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
+  const authMode = getAuthMode();
+  llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
+  if (authMode === "api") {
+    info("Using direct API authentication.");
+  }
+}
+
+async function replayCachedIfRequested(
+  dir: string,
+  input: SmartAddInput,
+  format?: string,
+): Promise<boolean> {
+  if (!(input.accept && input.descList.length === 0 && input.filePaths.length === 0 && !format)) {
+    return false;
+  }
+  const cached = await loadPending(dir);
+  if (!cached || cached.proposals.length === 0) return false;
+  info(`Accepting ${cached.proposals.length} cached proposal(s)...`);
+  const added = await acceptProposals(dir, cached.proposals, { parentId: cached.parentId });
+  result(`Added ${added} items to PRD.`);
+  return true;
+}
+
+async function resolveSmartAddModel(
+  dir: string,
+  requestedModel?: string,
+): Promise<string | undefined> {
+  if (requestedModel) {
+    llmDebug(`effective model=${requestedModel}`);
+    return requestedModel;
+  }
+
+  try {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+    const config = await store.loadConfig();
+    const model = config.model;
+    llmDebug(`effective model=${model ?? DEFAULT_MODEL}`);
+    return model;
+  } catch {
+    llmDebug(`effective model=${DEFAULT_MODEL}`);
+    return undefined;
+  }
+}
+
+async function loadSmartAddContext(
+  dir: string,
+  parentId?: string,
+): Promise<SmartAddContext> {
+  const rexDir = join(dir, REX_DIR);
+  const store = await resolveStore(rexDir);
+  const doc = await store.loadDocument();
+  const existing = doc.items;
+
+  if (!parentId) return { existing };
+
+  const parentEntry = findItem(existing, parentId);
+  if (!parentEntry) {
+    throw new CLIError(
+      `Parent "${parentId}" not found.`,
+      "Check the ID with 'rex status' and try again.",
+    );
+  }
+
+  const parentLevel = parentEntry.item.level;
+  if (parentLevel === "subtask") {
+    throw new CLIError(
+      "Cannot add children under a subtask.",
+      "Subtasks are leaf nodes. Specify a task, feature, or epic as the parent.",
+    );
+  }
+
+  return { existing, parentLevel };
+}
+
+async function generateSmartAddProposals(params: {
+  dir: string;
+  existing: PRDItem[];
+  parentId?: string;
+  model?: string;
+  descList: string[];
+  filePaths: string[];
+  isJson: boolean;
+}): Promise<Proposal[]> {
+  const { dir, existing, parentId, model, descList, filePaths, isJson } = params;
+  const effectiveModel = model ?? DEFAULT_MODEL;
+
+  if (filePaths.length > 0) {
+    const resolved = filePaths.map((fp) => resolve(dir, fp));
+    const label = resolved.length === 1
+      ? `Reading ideas file: ${resolved[0]}`
+      : `Reading ${resolved.length} ideas files`;
+    const spinner = !isJson ? startSpinner(`${label}...`) : null;
+
+    try {
+      spinner?.update(`Processing ideas with LLM (${effectiveModel})...`);
+      const reasonResult = await reasonFromIdeasFile(resolved, existing, {
+        model,
+        dir,
+        parentId,
+      });
+      const proposals = reasonResult.proposals;
+      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
+      return proposals;
+    } catch (err) {
+      spinner?.stop();
+      const classified = classifySmartAddError(err as Error, "file", getLLMVendor() ?? "claude");
+      throw new CLIError(classified.message, classified.suggestion);
+    }
+  }
+
+  const descLabel = descList.length > 1
+    ? `Analyzing ${descList.length} descriptions`
+    : "Analyzing description";
+  const stdinLabel = !process.stdin.isTTY ? " (from piped input)" : "";
+  const spinner = !isJson
+    ? startSpinner(`${descLabel} with LLM (${effectiveModel})${stdinLabel}...`)
+    : null;
+
+  try {
+    const reasonResult = await reasonFromDescriptions(descList, existing, {
+      model,
+      dir,
+      parentId,
+    });
+    const proposals = reasonResult.proposals;
+    spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
+    return proposals;
+  } catch (err) {
+    spinner?.stop();
+    const classified = classifySmartAddError(err as Error, "description", getLLMVendor() ?? "claude");
+    throw new CLIError(classified.message, classified.suggestion);
+  }
+}
+
+function emitNoSmartAddProposals(isJson: boolean): void {
+  if (isJson) {
+    result(JSON.stringify({ proposals: [], added: 0 }, null, 2));
+  } else {
+    result("LLM returned no proposals for the given description.");
+  }
+}
+
+function renderSmartAddProposals(params: {
+  proposals: Proposal[];
+  parentId?: string;
+  parentLevel?: ItemLevel;
+  qualityIssues: QualityIssue[];
+  isJson: boolean;
+}): void {
+  const { proposals, parentId, parentLevel, qualityIssues, isJson } = params;
+  if (isJson) return;
+
+  const summary = formatProposalSummary(proposals, parentLevel);
+  if (parentId && parentLevel) {
+    info(`\nProposed additions under parent ${parentId} (${summary}):`);
+  } else {
+    info(`\nProposed structure (${summary}):`);
+  }
+  info(formatProposalTree(proposals, parentLevel));
+
+  if (qualityIssues.length > 0) {
+    warn("");
+    warn(formatQualityWarnings(qualityIssues));
+  }
+
+  info("");
+}
+
+async function maybeCacheSmartAddProposals(
+  dir: string,
+  proposals: Proposal[],
+  parentId?: string,
+): Promise<void> {
+  if (await hasRexDir(dir)) {
+    await savePending(dir, proposals, parentId);
+  }
+}
+
+async function runInteractiveSmartAddApproval(params: {
+  dir: string;
+  existing: PRDItem[];
+  proposals: Proposal[];
+  duplicateMatches: ProposalDuplicateMatch[];
+  parentId?: string;
+  parentLevel?: ItemLevel;
+  model?: string;
+}): Promise<void> {
+  const { dir, existing, parentId, parentLevel, model } = params;
+  const { adjustGranularity } = await import("../../analyze/index.js");
+  const resolvedModel = model ?? DEFAULT_MODEL;
+  let currentProposals = params.proposals;
+  let currentDuplicateMatches = params.duplicateMatches;
+  let done = false;
+
+  while (!done) {
+    const prompt = currentProposals.length > 1
+      ? "Accept proposals? (y=all / n=none / b#=break down / c#=consolidate / 1,2,...=select) "
+      : "Accept this proposal? (y/n / b1=break down / c1=consolidate) ";
+
+    const answer = await promptUser(prompt);
+    const granularityResult = parseGranularityInput(answer, currentProposals.length);
+
+    if (granularityResult) {
+      const targetProposals = granularityResult.indices.map((i) => currentProposals[i]);
+      const label = granularityResult.direction === "break_down"
+        ? "Breaking down"
+        : "Consolidating";
+      const adjSpinner = startSpinner(
+        `${label} proposal(s) ${granularityResult.indices.map((i) => i + 1).join(", ")}...`,
+      );
+
+      try {
+        const adjusted = await adjustGranularity(
+          targetProposals,
+          granularityResult.direction,
+          resolvedModel,
+        );
+        if (adjusted.proposals.length > 0) {
+          const newProposals = [...currentProposals];
+          const sorted = [...granularityResult.indices].sort((a, b) => b - a);
+          for (const idx of sorted) {
+            newProposals.splice(idx, 1);
+          }
+          const insertAt = Math.min(...granularityResult.indices);
+          newProposals.splice(insertAt, 0, ...adjusted.proposals);
+          currentProposals = newProposals;
+
+          const actionLabel = granularityResult.direction === "break_down"
+            ? "broken down"
+            : "consolidated";
+          adjSpinner.stop(
+            `Replaced ${targetProposals.length} proposal(s) with ${adjusted.proposals.length} ${actionLabel} proposal(s).`,
+          );
+
+          const updatedSummary = formatProposalSummary(currentProposals, parentLevel);
+          info(`\nUpdated structure (${updatedSummary}):`);
+          info(formatProposalTree(currentProposals, parentLevel));
+          info("");
+
+          currentDuplicateMatches = matchProposalNodesToPRD(currentProposals, existing);
+          await maybeCacheSmartAddProposals(dir, currentProposals, parentId);
+        } else {
+          adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
+        }
+      } catch (err) {
+        adjSpinner.stop();
+        const classified = classifySmartAddError(err as Error, "description");
+        info(`Granularity adjustment failed: ${classified.message}`);
+        info("Original proposals unchanged.");
+      }
+      continue;
+    }
+
+    const decision = parseApprovalInput(answer, currentProposals.length);
+    if (decision === "all") {
+      let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
+      let mergeTargetsByNodeKey: Record<string, string> | undefined;
+      let mergedCount = 0;
+      if (hasDuplicateMatches(currentDuplicateMatches)) {
+        info("Duplicate matches were detected in the selected proposals.");
+        info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
+        const duplicateAnswer = await promptUser("Duplicate action (c/m/p): ");
+        const duplicateDecision = parseDuplicatePromptInput(duplicateAnswer);
+        if (duplicateDecision === "merge") {
+          const mergeResult = await applyDuplicateProposalMerges(
+            dir,
+            currentProposals,
+            currentDuplicateMatches,
+          );
+          mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
+          mergedCount = mergeResult.mergedCount;
+        }
+        if (duplicateDecision === "cancel") {
+          info("Cancelled. No items were created.");
+          done = true;
+          continue;
+        }
+        if (duplicateDecision === "proceed") {
+          overrideMarkersByNodeKey = buildDuplicateOverrideMarkerIndex(
+            currentDuplicateMatches,
+            new Date().toISOString(),
+          );
+        }
+      }
+
+      const added = await acceptProposals(dir, currentProposals, {
+        parentId,
+        overrideMarkersByNodeKey,
+        mergeTargetsByNodeKey,
+        mergedCount,
+      });
+      if (mergedCount > 0) {
+        result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
+      } else {
+        result(`Added ${added} items to PRD.`);
+      }
+      done = true;
+      continue;
+    }
+
+    if (decision === "none") {
+      info("Proposals saved. Run `rex add --accept` to accept later.");
+      done = true;
+      continue;
+    }
+
+    const selected = filterProposalsByIndex(currentProposals, decision.approved);
+    const names = selected.map((p) => p.epic.title).join(", ");
+    info(`Accepting: ${names}`);
+    const selectedMatches = remapDuplicateMatchesForSelectedProposals(
+      currentDuplicateMatches,
+      decision.approved,
+    );
+
+    let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
+    let mergeTargetsByNodeKey: Record<string, string> | undefined;
+    let mergedCount = 0;
+    let usedMergeDecision = false;
+    if (hasDuplicateMatches(selectedMatches)) {
+      info("Duplicate matches were detected in the selected proposals.");
+      info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
+      const duplicateAnswer = await promptUser("Duplicate action (c/m/p): ");
+      const duplicateDecision = parseDuplicatePromptInput(duplicateAnswer);
+      if (duplicateDecision === "merge") {
+        const mergeResult = await applyDuplicateProposalMerges(
+          dir,
+          selected,
+          selectedMatches,
+        );
+        mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
+        mergedCount = mergeResult.mergedCount;
+        usedMergeDecision = true;
+      }
+      if (duplicateDecision === "cancel") {
+        info("Cancelled. No items were created.");
+        done = true;
+        continue;
+      }
+      if (duplicateDecision === "proceed") {
+        overrideMarkersByNodeKey = buildDuplicateOverrideMarkerIndex(
+          selectedMatches,
+          new Date().toISOString(),
+        );
+      }
+    }
+
+    const added = await acceptProposals(dir, selected, {
+      parentId,
+      overrideMarkersByNodeKey,
+      mergeTargetsByNodeKey,
+      mergedCount,
+    });
+    if (mergedCount > 0) {
+      result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
+    } else {
+      result(`Added ${added} items to PRD.`);
+    }
+
+    const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
+    if (rejected.length > 0 && !usedMergeDecision) {
+      await savePending(dir, rejected, parentId);
+      info(`${rejected.length} proposal(s) saved. Run \`rex add --accept\` to accept later.`);
+    } else if (rejected.length > 0 && usedMergeDecision) {
+      info(`${rejected.length} unselected proposal(s) were cancelled and not written.`);
+    }
+    done = true;
+  }
+}
+
+async function finalizeSmartAdd(params: {
+  dir: string;
+  existing: PRDItem[];
+  proposals: Proposal[];
+  duplicateMatches: ProposalDuplicateMatch[];
+  qualityIssues: QualityIssue[];
+  accept: boolean;
+  parentId?: string;
+  isJson: boolean;
+  parentLevel?: ItemLevel;
+  model?: string;
+}): Promise<void> {
+  const {
+    dir,
+    existing,
+    proposals,
+    duplicateMatches,
+    qualityIssues,
+    accept,
+    parentId,
+    isJson,
+    parentLevel,
+    model,
+  } = params;
+
+  await maybeCacheSmartAddProposals(dir, proposals, parentId);
+
+  if (accept) {
+    if (hasDuplicateMatches(duplicateMatches)) {
+      if (isJson) {
+        result(JSON.stringify({
+          proposals,
+          added: 0,
+          qualityIssues,
+          duplicateGuard: "blocked_requires_interactive_confirmation",
+        }, null, 2));
+        return;
+      }
+      warn("Duplicate matches detected. Explicit confirmation is required.");
+      info("No items were created. Re-run without --accept to choose Cancel, Merge, or Proceed anyway.");
+      return;
+    }
+
+    const added = await acceptProposals(dir, proposals, { parentId });
+    if (isJson) {
+      result(JSON.stringify({ proposals, added, qualityIssues }, null, 2));
+      return;
+    }
+
+    if (qualityIssues.length > 0) {
+      warn(`Accepted with ${qualityIssues.length} quality warning(s).`);
+    }
+    result(`Added ${added} items to PRD.`);
+    return;
+  }
+
+  if (process.stdin.isTTY) {
+    await runInteractiveSmartAddApproval({
+      dir,
+      existing,
+      proposals,
+      duplicateMatches,
+      parentId,
+      parentLevel,
+      model,
+    });
+    return;
+  }
+
+  info("Proposals saved. Run `rex add --accept` to accept later.");
 }
 
 export async function cmdSmartAdd(
@@ -581,10 +1410,8 @@ export async function cmdSmartAdd(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
-  // Normalise to array for uniform handling
-  const descList: string[] = Array.isArray(descriptions)
-    ? descriptions
-    : descriptions ? [descriptions] : [];
+  const input = parseSmartAddInput(descriptions, flags, multiFlags);
+
   if (!(await hasRexDir(dir))) {
     throw new CLIError(
       `Rex directory not found in ${dir}`,
@@ -592,287 +1419,54 @@ export async function cmdSmartAdd(
     );
   }
 
-  const accept = flags.accept === "true";
-  const parentId = flags.parent;
-  const filePaths: string[] = multiFlags.file ?? (flags.file ? [flags.file] : []);
-
-  // Load unified Claude config and initialize the client abstraction layer
-  const rexConfigDir = join(dir, REX_DIR);
-  const claudeConfig = await loadClaudeConfig(rexConfigDir);
-  setClaudeConfig(claudeConfig);
-
-  // Display which authentication method will be used for LLM calls
-  if (flags.format !== "json") {
-    const authMode = getAuthMode();
-    if (authMode === "api") {
-      info("Using direct API authentication.");
-    }
+  await initializeSmartAddLLM(dir, flags.format);
+  if (await replayCachedIfRequested(dir, input, flags.format)) {
+    return;
   }
 
-  // --accept with no descriptions/files: replay cached proposals
-  if (accept && descList.length === 0 && filePaths.length === 0 && !flags.format) {
-    const cached = await loadPending(dir);
-    if (cached && cached.proposals.length > 0) {
-      info(`Accepting ${cached.proposals.length} cached proposal(s)...`);
-      const added = await acceptProposals(dir, cached.proposals, cached.parentId);
-      result(`Added ${added} items to PRD.`);
-      return;
-    }
-    // No cache — fall through to error on missing descriptions
-  }
-
-  // Resolve model: --model flag → config.model → DEFAULT_MODEL
-  let model: string | undefined = flags.model;
-  if (!model) {
-    try {
-      const rexDir = join(dir, REX_DIR);
-      const store = await resolveStore(rexDir);
-      const config = await store.loadConfig();
-      if (config.model) {
-        model = config.model;
-      }
-    } catch {
-      // Config unreadable — fall through to default
-    }
-  }
-
-  // Load existing PRD for context
-  const rexDir = join(dir, REX_DIR);
-  const store = await resolveStore(rexDir);
-  const doc = await store.loadDocument();
-  const existing = doc.items;
-
-  // Validate parent if provided and resolve its level
-  let parentLevel: ItemLevel | undefined;
-  if (parentId) {
-    const parentEntry = findItem(existing, parentId);
-    if (!parentEntry) {
-      throw new CLIError(
-        `Parent "${parentId}" not found.`,
-        "Check the ID with 'rex status' and try again.",
-      );
-    }
-    parentLevel = parentEntry.item.level;
-    if (parentLevel === "subtask") {
-      throw new CLIError(
-        "Cannot add children under a subtask.",
-        "Subtasks are leaf nodes. Specify a task, feature, or epic as the parent.",
-      );
-    }
-  }
-
-  let proposals: Proposal[];
-
-  const isJson = flags.format === "json";
-  const isPiped = !process.stdin.isTTY;
-
-  if (filePaths.length > 0) {
-    // File-based idea import mode
-    const resolved = filePaths.map((fp) => resolve(dir, fp));
-
-    const label = resolved.length === 1
-      ? `Reading ideas file: ${resolved[0]}`
-      : `Reading ${resolved.length} ideas files`;
-    const spinner = !isJson ? startSpinner(`${label}...`) : null;
-
-    try {
-      spinner?.update(`Processing ideas with LLM (${model ?? DEFAULT_MODEL})...`);
-      const reasonResult = await reasonFromIdeasFile(resolved, existing, {
-        model,
-        dir,
-        parentId,
-      });
-      proposals = reasonResult.proposals;
-      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
-    } catch (err) {
-      spinner?.stop();
-      const classified = classifySmartAddError(err as Error, "file");
-      throw new CLIError(classified.message, classified.suggestion);
-    }
-  } else {
-    // Description-based mode (single or multiple descriptions)
-    const descLabel = descList.length > 1
-      ? `Analyzing ${descList.length} descriptions`
-      : "Analyzing description";
-    const stdinLabel = isPiped ? " (from piped input)" : "";
-    const spinnerMsg = `${descLabel} with LLM (${model ?? DEFAULT_MODEL})${stdinLabel}...`;
-    const spinner = !isJson ? startSpinner(spinnerMsg) : null;
-
-    try {
-      const reasonResult = await reasonFromDescriptions(descList, existing, {
-        model,
-        dir,
-        parentId,
-      });
-      proposals = reasonResult.proposals;
-      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
-    } catch (err) {
-      spinner?.stop();
-      const classified = classifySmartAddError(err as Error, "description");
-      throw new CLIError(classified.message, classified.suggestion);
-    }
-  }
+  const model = await resolveSmartAddModel(dir, flags.model);
+  const { existing, parentLevel } = await loadSmartAddContext(dir, input.parentId);
+  const proposals = await generateSmartAddProposals({
+    dir,
+    existing,
+    parentId: input.parentId,
+    model,
+    descList: input.descList,
+    filePaths: input.filePaths,
+    isJson: input.isJson,
+  });
 
   if (proposals.length === 0) {
-    if (flags.format === "json") {
-      result(JSON.stringify({ proposals: [], added: 0 }, null, 2));
-    } else {
-      result("LLM returned no proposals for the given description.");
-    }
+    emitNoSmartAddProposals(input.isJson);
     return;
   }
 
-  // Validate proposal quality
-  const qualityIssues = validateProposalQuality(proposals);
-
-  // JSON mode without --accept: return proposals for external tools
-  if (flags.format === "json" && !accept) {
-    result(JSON.stringify({ proposals, qualityIssues }, null, 2));
+  const duplicateMatches = matchProposalNodesToPRD(proposals, existing);
+  const proposalsWithReasons = attachDuplicateReasonsToProposals(proposals, duplicateMatches);
+  const qualityIssues = validateProposalQuality(proposalsWithReasons);
+  if (input.isJson && !input.accept) {
+    result(JSON.stringify({ proposals: proposalsWithReasons, qualityIssues }, null, 2));
     return;
   }
 
-  // Display proposed structure
-  const itemCount = countProposalItems(proposals, parentLevel);
-  const summary = formatProposalSummary(proposals, parentLevel);
-  if (!isJson) {
-    if (parentId && parentLevel) {
-      info(`\nProposed additions under parent ${parentId} (${summary}):`);
-    } else {
-      info(`\nProposed structure (${summary}):`);
-    }
-    info(formatProposalTree(proposals, parentLevel));
+  renderSmartAddProposals({
+    proposals: proposalsWithReasons,
+    parentId: input.parentId,
+    parentLevel,
+    qualityIssues,
+    isJson: input.isJson,
+  });
 
-    // Show quality warnings if any
-    if (qualityIssues.length > 0) {
-      warn("");
-      warn(formatQualityWarnings(qualityIssues));
-    }
-
-    info("");
-  }
-
-  // Cache proposals so they can be accepted later without re-running
-  if (await hasRexDir(dir)) {
-    await savePending(dir, proposals, parentId);
-  }
-
-  if (accept) {
-    // Non-interactive: accept immediately
-    const added = await acceptProposals(dir, proposals, parentId);
-    if (flags.format === "json") {
-      result(JSON.stringify({ proposals, added, qualityIssues }, null, 2));
-    } else {
-      if (qualityIssues.length > 0) {
-        warn(`Accepted with ${qualityIssues.length} quality warning(s).`);
-      }
-      result(`Added ${added} items to PRD.`);
-    }
-  } else if (process.stdin.isTTY) {
-    // Interactive approval flow with granularity adjustment support
-    const { adjustGranularity } = await import("../../analyze/index.js");
-    const resolvedModel = model ?? DEFAULT_MODEL;
-
-    let currentProposals = proposals;
-    let done = false;
-
-    while (!done) {
-      const prompt = currentProposals.length > 1
-        ? `Accept proposals? (y=all / n=none / b#=break down / c#=consolidate / 1,2,...=select) `
-        : `Accept this proposal? (y/n / b1=break down / c1=consolidate) `;
-
-      const answer = await promptUser(prompt);
-
-      // Check for granularity commands before parsing approval
-      const granularityResult = parseGranularityInput(answer, currentProposals.length);
-
-      if (granularityResult) {
-        const targetProposals = granularityResult.indices.map(
-          (i) => currentProposals[i],
-        );
-        const label = granularityResult.direction === "break_down"
-          ? "Breaking down"
-          : "Consolidating";
-        const adjSpinner = startSpinner(
-          `${label} proposal(s) ${granularityResult.indices.map((i) => i + 1).join(", ")}...`,
-        );
-
-        try {
-          const adjusted = await adjustGranularity(
-            targetProposals,
-            granularityResult.direction,
-            resolvedModel,
-          );
-          if (adjusted.proposals.length > 0) {
-            // Replace targeted proposals with adjusted ones
-            const newProposals = [...currentProposals];
-            // Remove originals (in reverse to preserve indices)
-            const sorted = [...granularityResult.indices].sort((a, b) => b - a);
-            for (const idx of sorted) {
-              newProposals.splice(idx, 1);
-            }
-            const insertAt = Math.min(...granularityResult.indices);
-            newProposals.splice(insertAt, 0, ...adjusted.proposals);
-            currentProposals = newProposals;
-
-            const actionLabel = granularityResult.direction === "break_down"
-              ? "broken down"
-              : "consolidated";
-            adjSpinner.stop(
-              `Replaced ${targetProposals.length} proposal(s) with ${adjusted.proposals.length} ${actionLabel} proposal(s).`,
-            );
-
-            // Re-display the proposal tree
-            const updatedSummary = formatProposalSummary(currentProposals, parentLevel);
-            info(`\nUpdated structure (${updatedSummary}):`);
-            info(formatProposalTree(currentProposals, parentLevel));
-            info("");
-
-            // Update cache with adjusted proposals
-            if (await hasRexDir(dir)) {
-              await savePending(dir, currentProposals, parentId);
-            }
-          } else {
-            adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
-          }
-        } catch (err) {
-          adjSpinner.stop();
-          const classified = classifySmartAddError(err as Error, "description");
-          info(`Granularity adjustment failed: ${classified.message}`);
-          info("Original proposals unchanged.");
-        }
-        continue; // Re-prompt
-      }
-
-      const decision = parseApprovalInput(answer, currentProposals.length);
-
-      if (decision === "all") {
-        const added = await acceptProposals(dir, currentProposals, parentId);
-        result(`Added ${added} items to PRD.`);
-        done = true;
-      } else if (decision === "none") {
-        info("Proposals saved. Run `rex add --accept` to accept later.");
-        done = true;
-      } else {
-        // Selective approval
-        const selected = filterProposalsByIndex(currentProposals, decision.approved);
-        const names = selected.map((p) => p.epic.title).join(", ");
-        info(`Accepting: ${names}`);
-        const added = await acceptProposals(dir, selected, parentId);
-        result(`Added ${added} items to PRD.`);
-
-        // Cache remaining proposals for later
-        const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
-        if (rejected.length > 0) {
-          await savePending(dir, rejected, parentId);
-          info(
-            `${rejected.length} proposal(s) saved. Run \`rex add --accept\` to accept later.`,
-          );
-        }
-        done = true;
-      }
-    }
-  } else {
-    // Non-interactive without --accept: just show
-    info("Proposals saved. Run `rex add --accept` to accept later.");
-  }
+  await finalizeSmartAdd({
+    dir,
+    existing,
+    proposals: proposalsWithReasons,
+    duplicateMatches,
+    qualityIssues,
+    accept: input.accept,
+    parentId: input.parentId,
+    isJson: input.isJson,
+    parentLevel,
+    model,
+  });
 }

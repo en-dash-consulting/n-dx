@@ -4,7 +4,7 @@ import { callClaude } from "../../../src/analyzers/claude-client.js";
 import type { Inventory, Imports, Classifications, ArchetypeDefinition } from "../../../src/schema/index.js";
 
 vi.mock("../../../src/analyzers/claude-client.js", async () => {
-  const actual = await import("@n-dx/claude-client");
+  const actual = await import("@n-dx/llm-client");
   return {
     callClaude: vi.fn(),
     ClaudeClientError: actual.ClaudeClientError,
@@ -483,7 +483,7 @@ describe("enrichClassificationsWithLLM", () => {
   });
 
   it("stops on auth error", async () => {
-    const { ClaudeClientError } = await import("@n-dx/claude-client");
+    const { ClaudeClientError } = await import("@n-dx/llm-client");
     const base = makeBaseClassifications(["src/analyzer.ts"]);
 
     mockedCallClaude.mockRejectedValueOnce(

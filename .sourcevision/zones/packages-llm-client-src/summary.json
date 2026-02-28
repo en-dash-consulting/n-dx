@@ -1,0 +1,19 @@
+{
+  "id": "packages-llm-client:src",
+  "name": "Src",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/api-provider.ts",
+    "packages/llm-client/src/config.ts",
+    "packages/llm-client/tests/unit/api-provider.test.ts",
+    "packages/llm-client/tests/unit/config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/api-provider.ts",
+    "packages/llm-client/src/config.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 4,
+  "lineCount": 552
+}

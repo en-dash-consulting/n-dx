@@ -1,0 +1,24 @@
+{
+  "id": ".claude-worktrees-angry-chatelet:orchestration-layer",
+  "name": "Orchestration Layer",
+  "description": "Top-level entry points and CLI orchestration that coordinates between packages without tight coupling.",
+  "files": [
+    ".claude/worktrees/angry-chatelet/ci.js",
+    ".claude/worktrees/angry-chatelet/cli.js",
+    ".claude/worktrees/angry-chatelet/config.js",
+    ".claude/worktrees/angry-chatelet/help.js",
+    ".claude/worktrees/angry-chatelet/refresh-artifacts.js",
+    ".claude/worktrees/angry-chatelet/refresh-plan.js",
+    ".claude/worktrees/angry-chatelet/refresh-validate.js",
+    ".claude/worktrees/angry-chatelet/tests/unit/help.test.js",
+    ".claude/worktrees/angry-chatelet/tests/unit/refresh-artifacts.test.js",
+    ".claude/worktrees/angry-chatelet/tests/unit/refresh-plan.test.js",
+    ".claude/worktrees/angry-chatelet/tests/unit/refresh-validate.test.js",
+    ".claude/worktrees/angry-chatelet/web.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 12,
+  "lineCount": 0
+}

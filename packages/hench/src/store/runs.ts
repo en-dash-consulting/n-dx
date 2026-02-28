@@ -1,8 +1,24 @@
 import { join } from "node:path";
-import { readFile, writeFile, readdir } from "node:fs/promises";
+import { readFile, writeFile, readdir, access } from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
 import { validateRunRecord } from "../schema/index.js";
 import { toCanonicalJSON } from "./json.js";
 import type { RunRecord } from "../schema/index.js";
+
+/**
+ * Read a run file that may be either plain JSON or gzip-compressed.
+ *
+ * @param filePath Absolute path to a `.json` or `.json.gz` file.
+ * @returns Parsed JSON data.
+ */
+async function readRunJSON(filePath: string): Promise<unknown> {
+  const raw = await readFile(filePath);
+  if (filePath.endsWith(".gz")) {
+    const decompressed = gunzipSync(raw);
+    return JSON.parse(decompressed.toString("utf-8"));
+  }
+  return JSON.parse(raw.toString("utf-8"));
+}
 
 export async function saveRun(
   henchDir: string,
@@ -16,9 +32,19 @@ export async function loadRun(
   henchDir: string,
   id: string,
 ): Promise<RunRecord> {
-  const runPath = join(henchDir, "runs", `${id}.json`);
-  const raw = await readFile(runPath, "utf-8");
-  const data = JSON.parse(raw);
+  const runsDir = join(henchDir, "runs");
+  const jsonPath = join(runsDir, `${id}.json`);
+  const gzPath = join(runsDir, `${id}.json.gz`);
+
+  // Try uncompressed first, fall back to compressed
+  let data: unknown;
+  try {
+    data = await readRunJSON(jsonPath);
+  } catch {
+    // Try compressed variant
+    data = await readRunJSON(gzPath);
+  }
+
   const result = validateRunRecord(data);
   if (!result.ok) {
     throw new Error(`Invalid run record ${id}: ${result.errors.message}`);
@@ -38,16 +64,21 @@ export async function listRuns(
     return [];
   }
 
-  const jsonFiles = files
-    .filter((f) => f.endsWith(".json"))
-    .sort()
-    .reverse();
+  // Collect unique run IDs from both .json and .json.gz files
+  const runIds = new Set<string>();
+  for (const f of files) {
+    if (f.endsWith(".json.gz") && !f.startsWith(".")) {
+      runIds.add(f.replace(/\.json\.gz$/, ""));
+    } else if (f.endsWith(".json") && !f.startsWith(".")) {
+      runIds.add(f.replace(/\.json$/, ""));
+    }
+  }
 
-  const toLoad = limit ? jsonFiles.slice(0, limit) : jsonFiles;
+  const sortedIds = [...runIds].sort().reverse();
+  const toLoad = limit ? sortedIds.slice(0, limit) : sortedIds;
 
   const runs: RunRecord[] = [];
-  for (const file of toLoad) {
-    const id = file.replace(/\.json$/, "");
+  for (const id of toLoad) {
     try {
       const run = await loadRun(henchDir, id);
       runs.push(run);

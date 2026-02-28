@@ -1,8 +1,22 @@
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
+export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
+export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
+export type { RuntimePoolConfig } from "../process/pool.js";
+import type { MemoryThrottleConfig } from "../process/memory-throttle.js";
+import type { MemoryMonitorConfig } from "../process/memory-monitor.js";
+import type { RuntimePoolConfig } from "../process/pool.js";
 
 export const HENCH_SCHEMA_VERSION = "hench/v1";
 
-/** Configurable subset of policy limits (all optional, defaults applied at runtime). */
+/**
+ * Configurable subset of policy limits (all optional, defaults applied at runtime).
+ *
+ * Defined here (schema) rather than in guard/contracts so that schema/v1
+ * stays self-contained and guard stays free of schema imports.  The two
+ * definitions are structurally identical; TypeScript's structural typing
+ * ensures they remain compatible wherever HenchConfig.guard is passed to
+ * GuardRails (which accepts the guard-owned GuardConfig interface).
+ */
 export interface PolicyLimitsConfig {
   /** Maximum commands per minute (0 = unlimited). */
   maxCommandsPerMinute?: number;
@@ -14,6 +28,15 @@ export interface PolicyLimitsConfig {
   maxTotalCommands?: number;
 }
 
+/**
+ * Security guard configuration embedded in {@link HenchConfig}.
+ *
+ * Defined here (schema) rather than in guard/contracts so that schema/v1
+ * stays self-contained and guard stays free of schema imports.  The two
+ * definitions are structurally identical; TypeScript's structural typing
+ * ensures they remain compatible wherever HenchConfig.guard is passed to
+ * GuardRails (which accepts the guard-owned GuardConfig interface).
+ */
 export interface GuardConfig {
   blockedPaths: string[];
   allowedCommands: string[];
@@ -27,6 +50,12 @@ export interface GuardConfig {
   allowedGitSubcommands: string[];
   /** Policy limits for session-aware rate limiting and resource tracking. */
   policy?: PolicyLimitsConfig;
+  /** Memory-based execution throttling configuration. */
+  memoryThrottle?: Partial<MemoryThrottleConfig>;
+  /** Pre-spawn memory monitoring configuration. */
+  memoryMonitor?: Partial<MemoryMonitorConfig>;
+  /** Runtime process pool configuration for warm worker reuse. */
+  pool?: Partial<RuntimePoolConfig>;
 }
 
 export interface RetryConfig {
@@ -69,7 +98,7 @@ export function DEFAULT_HENCH_CONFIG(): HenchConfig {
       commandTimeout: 30000,
       maxFileSize: 1048576,
       spawnTimeout: 300000,          // 5 minutes
-      maxConcurrentProcesses: 4,
+      maxConcurrentProcesses: 3,
       allowedGitSubcommands: [
         "status", "add", "commit", "diff", "log",
         "branch", "checkout", "stash", "show", "rev-parse",
@@ -109,6 +138,10 @@ export interface TurnTokenUsage {
   output: number;
   cacheCreationInput?: number;
   cacheReadInput?: number;
+  /** LLM vendor used for this token event (e.g. "claude", "codex"). */
+  vendor?: string;
+  /** Model used for this token event. */
+  model?: string;
 }
 
 export interface CommandRecord {
@@ -158,6 +191,17 @@ export interface RunSummaryData {
   counts: SummaryCounts;
 }
 
+export interface RunMemoryStats {
+  /** Peak RSS of the hench process during this run (bytes). */
+  peakRssBytes: number;
+  /** System available memory at run start (bytes). -1 if unavailable. */
+  systemAvailableAtStartBytes: number;
+  /** System available memory at run end (bytes). -1 if unavailable. */
+  systemAvailableAtEndBytes: number;
+  /** System total memory (bytes). */
+  systemTotalBytes: number;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -178,6 +222,8 @@ export interface RunRecord {
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;
+  /** Memory usage statistics captured during the run. */
+  memoryStats?: RunMemoryStats;
 }
 
 export interface TaskBriefTask {

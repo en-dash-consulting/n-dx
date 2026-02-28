@@ -138,6 +138,47 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("frontend");
   });
 
+  it("renders task usage chips from aggregated usage data", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      taskUsageById: {
+        "task-2": { totalTokens: 1234, runCount: 2 },
+      },
+    }));
+    expect(root.textContent).toContain("1.2k tokens");
+  });
+
+  it("renders rounded utilization percentage from shared weekly budget", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      weeklyBudget: { budget: 50_000, source: "vendor_default" },
+      taskUsageById: {
+        "task-2": { totalTokens: 1234, runCount: 2 },
+      },
+    }));
+    expect(root.textContent).toContain("1.2k tokens | 2%");
+  });
+
+  it("renders missing-budget fallback label and reason on usage chips", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      taskUsageById: {
+        "task-2": { totalTokens: 1234, runCount: 2 },
+      },
+    }));
+    expect(root.textContent).toContain("1.2k tokens | No budget");
+    const chip = root.querySelector(".prd-usage-chip");
+    expect(chip?.getAttribute("data-utilization-reason")).toBe("missing_budget");
+  });
+
+  it("renders explicit zero usage for tasks without associated runs", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
+    expect(root.textContent).toContain("0 tokens");
+  });
+
   it("renders tree role for accessibility", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
     const tree = root.querySelector("[role='tree']");

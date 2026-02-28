@@ -1,0 +1,100 @@
+.pr-markdown-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pr-markdown-empty,
+.pr-markdown-success,
+.pr-markdown-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pr-markdown-warning {
+  border-left: 3px solid var(--orange);
+}
+
+.pr-markdown-warning-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.pr-markdown-mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  width: fit-content;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.pr-markdown-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pr-markdown-raw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pr-markdown-preview {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  max-height: 60vh;
+  overflow: auto;
+  line-height: 1.55;
+}
+
+.pr-markdown-preview-heading {
+  margin: 0 0 8px;
+}
+
+.pr-markdown-preview-paragraph {
+  margin: 0 0 8px;
+}
+
+.pr-markdown-preview-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.pr-markdown-preview-code {
+  margin: 0 0 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--panel2) 80%, black 20%);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.pr-markdown-raw {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.pr-markdown-copy-feedback {
+  min-height: 1.25em;
+}

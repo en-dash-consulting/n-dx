@@ -33,6 +33,7 @@ sourcevision init              Set up .sourcevision/ in the current project
 sourcevision analyze [dir]     Run analysis pipeline (default: .)
 sourcevision serve [dir]       Start local viewer (default: .)
 sourcevision validate [dir]    Validate .sourcevision/ output files
+sourcevision pr-markdown [dir] Regenerate PR markdown at .sourcevision/pr-markdown.md
 sourcevision reset [dir]       Remove .sourcevision/ and start fresh
 sourcevision mcp [dir]         Start MCP server for AI tool integration
 ```
@@ -57,6 +58,7 @@ All output is written to `.sourcevision/`:
 | `imports.json` | Import graph edges, externals, circulars |
 | `zones.json` | Architectural zones with metrics and findings |
 | `components.json` | Component definitions, usage graph, route modules |
+| `pr-markdown.md` | Regenerated PR-ready markdown based on git diff |
 | `llms.txt` | Structured Markdown summary for LLM consumption |
 | `CONTEXT.md` | Dense summary with XML markers for Claude parsing |
 

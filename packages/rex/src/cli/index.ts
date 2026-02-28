@@ -6,7 +6,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/claude-client";
+import { formatTypoSuggestion } from "@n-dx/llm-client";
 
 /**
  * Read all data from stdin when input is piped (not a TTY).
@@ -25,6 +25,26 @@ function readStdin(): Promise<string> {
 
 /** Keys that accept multiple values (accumulated into arrays). */
 const MULTI_VALUE_KEYS = new Set(["file"]);
+/** Keys that expect a following value when provided as `--key value`. */
+const VALUE_KEYS = new Set([
+  "model",
+  "format",
+  "parent",
+  "title",
+  "description",
+  "status",
+  "priority",
+  "epic",
+  "chunk",
+  "chunk-size",
+  "acknowledge",
+  "adapter",
+  "direction",
+  "output",
+  "host",
+  "port",
+  ...MULTI_VALUE_KEYS,
+]);
 
 function parseArgs(argv: string[]): {
   command: string | undefined;
@@ -37,7 +57,8 @@ function parseArgs(argv: string[]): {
   const positional: string[] = [];
   let command: string | undefined;
 
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
       if (eq !== -1) {
@@ -48,7 +69,17 @@ function parseArgs(argv: string[]): {
         }
         flags[key] = val;
       } else {
-        flags[arg.slice(2)] = "true";
+        const key = arg.slice(2);
+        const next = argv[i + 1];
+        if (VALUE_KEYS.has(key) && next && !next.startsWith("-")) {
+          if (MULTI_VALUE_KEYS.has(key)) {
+            (multiFlags[key] ??= []).push(next);
+          }
+          flags[key] = next;
+          i++; // consume the value token
+        } else {
+          flags[key] = "true";
+        }
       }
     } else if (arg === "-h") {
       flags.help = "true";
@@ -97,7 +128,7 @@ async function main(): Promise<void> {
     // init creates it; analyze handles its own graceful fallback.
     // Commands whose first positional arg is an ID (not a dir) must handle
     // their own dir resolution and requireRexDir check inside the case block.
-    const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move", "add", "reshape"]);
+    const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move", "add", "reshape", "remove"]);
     if (!SKIP_DIR_CHECK.has(command)) {
       requireRexDir(resolveDir());
     }
@@ -217,6 +248,42 @@ async function main(): Promise<void> {
         await cmdMove(dir, id, flags);
         break;
       }
+      case "remove": {
+        const REMOVABLE_LEVELS = new Set(["epic", "task"]);
+        const firstArg = positional[0];
+        let removeLevel: string | undefined;
+        let removeId: string;
+
+        if (firstArg && REMOVABLE_LEVELS.has(firstArg)) {
+          // rex remove epic <id> [dir]  or  rex remove task <id> [dir]
+          removeLevel = firstArg;
+          removeId = positional[1];
+          if (!removeId) {
+            throw new CLIError(
+              `Missing ${removeLevel} ID.`,
+              `Usage: rex remove ${removeLevel} <id>`,
+            );
+          }
+        } else if (firstArg) {
+          // rex remove <id> [dir]  — auto-detect level
+          removeId = firstArg;
+        } else {
+          throw new CLIError(
+            "Missing item ID.",
+            "Usage: rex remove <epic|task> <id> or rex remove <id>",
+          );
+        }
+
+        const removeDir =
+          positional.length > (removeLevel ? 2 : 1)
+            ? resolve(positional[positional.length - 1])
+            : process.cwd();
+        requireRexDir(removeDir);
+
+        const { cmdRemove } = await import("./commands/remove.js");
+        await cmdRemove(removeDir, removeId, removeLevel, flags);
+        break;
+      }
       case "reshape": {
         const { cmdReshape } = await import("./commands/reshape.js");
         await cmdReshape(resolveDir(), flags);
@@ -294,7 +361,7 @@ async function main(): Promise<void> {
       }
       default: {
         const REX_COMMANDS = [
-          "init", "status", "next", "add", "update", "move", "reshape",
+          "init", "status", "next", "add", "update", "move", "remove", "reshape",
           "prune", "validate", "fix", "sync", "usage", "report", "verify",
           "recommend", "analyze", "import", "adapter", "mcp",
         ];

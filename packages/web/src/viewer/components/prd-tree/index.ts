@@ -22,6 +22,8 @@ export { BatchImportPanel } from "./batch-import-panel.js";
 export type { BatchImportPanelProps } from "./batch-import-panel.js";
 export { ExecutionPanel } from "./execution-panel.js";
 export type { ExecutionPanelProps } from "./execution-panel.js";
+export { DeleteConfirmation } from "./delete-confirmation.js";
+export type { DeleteConfirmationProps } from "./delete-confirmation.js";
 export { PruneDiffTree } from "./prune-diff-tree.js";
 export type { PruneDiffTreeProps, EpicImpact } from "./prune-diff-tree.js";
 export { StatusFilter, defaultStatusFilter } from "./status-filter.js";
@@ -42,4 +44,12 @@ export {
   itemMatchesFilter,
   filterTree,
 } from "./compute.js";
-export { findItemById } from "./tree-utils.js";
+export { findItemById, countDescendants } from "./tree-utils.js";
+export {
+  countVisibleNodes,
+  sliceVisibleTree,
+  LoadMoreIndicator,
+  DEFAULT_CHUNK_SIZE,
+  PROGRESSIVE_THRESHOLD,
+} from "./progressive-loader.js";
+export type { ProgressiveSlice, LoadMoreIndicatorProps } from "./progressive-loader.js";

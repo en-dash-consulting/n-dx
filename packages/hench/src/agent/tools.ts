@@ -5,4 +5,4 @@
  * This shim keeps existing imports working until all consumers migrate.
  */
 export { TOOL_DEFINITIONS, dispatchTool } from "../tools/dispatch.js";
-export type { ToolContext } from "../types/index.js";
+export type { ToolContext } from "../tools/contracts.js";

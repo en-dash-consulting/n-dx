@@ -4,9 +4,9 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { getCurrentHead, getCurrentBranch } from "@n-dx/claude-client";
+import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
 import type { Manifest, ModuleStatus } from "../schema/index.js";
-import { SV_DIR, TOOL_VERSION } from "../cli/commands/constants.js";
+import { SV_DIR, TOOL_VERSION } from "../constants.js";
 
 function getGitInfo(dir: string): { sha?: string; branch?: string } {
   return {

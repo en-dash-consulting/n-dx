@@ -1,0 +1,17 @@
+{
+  "id": "graph-visualization-engine",
+  "name": "Graph Visualization Engine",
+  "description": "Physics-based graph layout engine and related testing infrastructure for network visualization features.",
+  "files": [
+    "packages/web/src/viewer/graph/physics.ts",
+    "packages/web/tests/unit/viewer/graph-destroy.test.ts",
+    "packages/web/tests/unit/viewer/graph-layout.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/graph/physics.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 3,
+  "lineCount": 888
+}

@@ -191,13 +191,13 @@ describe("validateConfig", () => {
   });
 
   describe("guard.maxConcurrentProcesses defaults and validation", () => {
-    it("is optional in schema and defaults to 4", () => {
+    it("is optional in schema and defaults to 3", () => {
       const config = DEFAULT_HENCH_CONFIG();
       const { maxConcurrentProcesses, ...guardWithout } = config.guard;
       const result = validateConfig({ ...config, guard: guardWithout });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.guard.maxConcurrentProcesses).toBe(4);
+        expect(result.data.guard.maxConcurrentProcesses).toBe(3);
       }
     });
 
@@ -403,6 +403,21 @@ describe("validateRunRecord", () => {
       expect(result.data.turnTokenUsage![0]).toEqual({ turn: 1, input: 500, output: 200 });
       expect(result.data.turnTokenUsage![1].cacheCreationInput).toBe(100);
       expect(result.data.turnTokenUsage![1].cacheReadInput).toBe(400);
+    }
+  });
+
+  it("accepts turnTokenUsage entries with vendor/model metadata", () => {
+    const run = {
+      ...validRun,
+      turnTokenUsage: [
+        { turn: 1, input: 500, output: 200, vendor: "claude", model: "claude-sonnet-4-20250514" },
+      ],
+    };
+    const result = validateRunRecord(run);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.turnTokenUsage![0].vendor).toBe("claude");
+      expect(result.data.turnTokenUsage![0].model).toBe("claude-sonnet-4-20250514");
     }
   });
 

@@ -208,7 +208,7 @@ describe("shared lifecycle", () => {
       const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
       const { readFile } = await import("node:fs/promises");
 
-      const run = await initRunRecord({
+      const { run, memoryCtx } = await initRunRecord({
         taskId: "task-1",
         taskTitle: "Test task",
         model: "claude-sonnet-4-20250514",
@@ -225,6 +225,11 @@ describe("shared lifecycle", () => {
       expect(run.turnTokenUsage).toEqual([]);
       expect(run.lastActivityAt).toBeTruthy();
       expect(run.id).toBeTruthy();
+
+      // Verify memory context was captured
+      expect(memoryCtx).toBeDefined();
+      expect(typeof memoryCtx.systemTotalBytes).toBe("number");
+      expect(typeof memoryCtx.systemAvailableAtStartBytes).toBe("number");
 
       // Verify it was persisted
       const savedFile = join(henchDir, "runs", `${run.id}.json`);

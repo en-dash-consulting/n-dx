@@ -44,7 +44,7 @@
  * @see {@link PolicyEngine} for session-aware enforcement
  */
 
-import type { GuardConfig } from "../schema/index.js";
+import type { GuardConfig } from "./contracts.js";
 import { validatePath, simpleGlobMatch, GuardError } from "./paths.js";
 import { validateCommand } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
@@ -53,6 +53,7 @@ import type { AuditEntry, SessionCounters } from "./policy.js";
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
 export { validateCommand } from "./commands.js";
 export { PolicyEngine } from "./policy.js";
+export type { GuardConfig, PolicyLimitsConfig } from "./contracts.js";
 export type {
   PolicyLimits,
   OperationType,

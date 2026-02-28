@@ -1,6 +1,6 @@
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import type { Priority } from "../schema/index.js";
 import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
 import type { AcknowledgedStore } from "./acknowledge.js";

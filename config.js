@@ -24,7 +24,7 @@ const PACKAGES = {
  * Sections stored in .n-dx.json rather than package config files.
  * These are cross-cutting settings that apply to all packages.
  */
-const PROJECT_SECTIONS = new Set(["claude", "web", "features"]);
+const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features"]);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,9 @@ async function saveJSON(path, data) {
 async function saveProjectJSON(path, data) {
   await saveJSON(path, data);
   const hasSensitiveData =
-    data?.claude?.api_key && typeof data.claude.api_key === "string";
+    (data?.claude?.api_key && typeof data.claude.api_key === "string") ||
+    (data?.llm?.claude?.api_key && typeof data.llm.claude.api_key === "string") ||
+    (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string");
   if (hasSensitiveData) {
     await chmod(path, 0o600);
   }
@@ -179,6 +181,46 @@ async function validateCliPath(value) {
     throw new Error(
       `File is not executable: ${value}\n` +
         "  Run: chmod +x " + value
+    );
+  }
+}
+
+/**
+ * Validate llm.codex.cli_path.
+ * Accepts either an absolute/relative file path or a binary name on PATH.
+ */
+async function validateCodexCliPath(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("CLI path must be a non-empty string.");
+  }
+
+  if (!value.includes("/")) {
+    const probe = testCliPath(value);
+    if (!probe.ok) {
+      throw new Error(
+        `Command not found or not runnable: ${value}\n` +
+          "  Install Codex CLI or set an absolute path with:\n" +
+          "  n-dx config llm.codex.cli_path /path/to/codex",
+      );
+    }
+    return;
+  }
+
+  try {
+    await access(value, constants.F_OK);
+  } catch {
+    throw new Error(
+      `File not found: ${value}\n` +
+        "  Provide an absolute path to the Codex CLI binary.",
+    );
+  }
+
+  try {
+    await access(value, constants.X_OK);
+  } catch {
+    throw new Error(
+      `File is not executable: ${value}\n` +
+        "  Run: chmod +x " + value,
     );
   }
 }
@@ -316,6 +358,99 @@ const CLAUDE_VALIDATORS = {
   model: validateModel,
 };
 
+/**
+ * Validate llm.vendor.
+ */
+function validateLLMVendor(value) {
+  if (value !== "claude" && value !== "codex") {
+    throw new Error(
+      `Invalid vendor "${value}". Expected one of: claude, codex.`,
+    );
+  }
+}
+
+/**
+ * Validators for llm.* config keys in .n-dx.json.
+ * Keys are setting paths relative to the llm section.
+ */
+const LLM_VALIDATORS = {
+  vendor: validateLLMVendor,
+  "claude.cli_path": validateCliPath,
+  "claude.api_endpoint": validateApiEndpoint,
+  "claude.model": validateModel,
+  "codex.cli_path": validateCodexCliPath,
+  "codex.api_endpoint": validateApiEndpoint,
+  "codex.model": validateModel,
+};
+
+/**
+ * Build provider-specific auth preflight command.
+ * Returns binary + args for the selected vendor.
+ */
+function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
+  if (vendor === "codex") {
+    const binary = llmConfig?.codex?.cli_path || "codex";
+    return {
+      binary,
+      args: [
+        "exec",
+        "--skip-git-repo-check",
+        "Reply with exactly: ok",
+      ],
+    };
+  }
+
+  const binary = llmConfig?.claude?.cli_path || legacyClaudeConfig?.cli_path || "claude";
+  return {
+    binary,
+    args: [
+      "-p",
+      "Reply with exactly: ok",
+      "--output-format",
+      "json",
+    ],
+  };
+}
+
+/**
+ * Run provider auth preflight for the selected vendor.
+ * Returns an object instead of throwing so callers can branch deterministically.
+ */
+function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
+  const { binary, args } = getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig);
+  try {
+    execFileSync(binary, args, {
+      encoding: "utf-8",
+      timeout: 15000,
+      stdio: "pipe",
+    });
+    return { ok: true, binary, args };
+  } catch (err) {
+    const stderr = typeof err?.stderr === "string"
+      ? err.stderr
+      : Buffer.isBuffer(err?.stderr) ? err.stderr.toString("utf-8") : "";
+    const stdout = typeof err?.stdout === "string"
+      ? err.stdout
+      : Buffer.isBuffer(err?.stdout) ? err.stdout.toString("utf-8") : "";
+    const combined = stderr || stdout || err?.message || "";
+    // Claude Code refuses to run nested inside another Claude Code session.
+    // This error means the binary is present and the user is authenticated.
+    if (combined.includes("cannot be launched inside another Claude Code session")) {
+      return { ok: true, binary, args };
+    }
+    const detail = combined.trim() || "unknown error";
+    return { ok: false, binary, args, detail };
+  }
+}
+
+/**
+ * Return the exact login command for the selected provider.
+ */
+function getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig) {
+  const { binary } = getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig);
+  return `${binary} login`;
+}
+
 // ── Display ──────────────────────────────────────────────────────────────────
 
 function formatValue(value) {
@@ -441,12 +576,24 @@ Claude settings (.n-dx.json — shared across all packages):
                                     Examples: claude-sonnet-4-20250514, claude-opus-4-20250514
                                     Default: claude-sonnet-4-20250514
 
+LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
+  llm.vendor               string    Active LLM vendor: "claude" or "codex"
+                                    Required for multi-vendor workflows.
+  llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
+  llm.claude.api_key       string    Claude API key (optional)
+  llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
+  llm.claude.model         string    Claude default model (optional)
+  llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
+  llm.codex.api_key        string    Codex API key (optional)
+  llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
+  llm.codex.model          string    Codex default model (optional)
+
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
 
 Project config (.n-dx.json):
   Place a .n-dx.json file at the project root to override package settings.
-  Uses the same package-scoped keys (rex, hench, web, claude). Project config
+  Uses the same package-scoped keys (rex, hench, web, claude, llm). Project config
   takes precedence over individual package configs. Deep merges nested objects;
   arrays are replaced entirely. Example:
 
@@ -454,12 +601,13 @@ Project config (.n-dx.json):
       "rex":    { "validate": "pnpm typecheck" },
       "hench":  { "model": "opus", "guard": { "commandTimeout": 60000 } },
       "web":    { "port": 4000 },
-      "claude": { "cli_path": "/usr/local/bin/claude" }
+      "claude": { "cli_path": "/usr/local/bin/claude" },
+      "llm":    { "vendor": "claude" }
     }
 
 Options:
   --json                   Output as JSON
-  --force                  Skip validation when setting claude config values
+  --force                  Skip validation when setting claude/llm config values
   --test-connection        Test configured claude.api_key and/or claude.cli_path
   --help, -h               Show this help
 
@@ -489,6 +637,13 @@ Examples:
                                                Set custom API endpoint
   n-dx config claude.model claude-opus-4-20250514
                                                Set default model for API calls
+  n-dx config llm.vendor claude                Set active LLM vendor to Claude
+  n-dx config llm.vendor codex                 Set active LLM vendor to Codex
+  n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
+  n-dx config llm.claude.model claude-opus-4-20250514
+                                               Set Claude model (llm namespace)
+  n-dx config llm.codex.cli_path /usr/local/bin/codex
+                                               Set Codex CLI path
   n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON
@@ -559,7 +714,14 @@ Examples:
     }
   }
 
-  if (Object.keys(configs).length === 0) {
+  const keyTargetsProjectSection = (() => {
+    if (!keyArg) return false;
+    const dotIdx = keyArg.indexOf(".");
+    if (dotIdx === -1) return PROJECT_SECTIONS.has(keyArg);
+    return PROJECT_SECTIONS.has(keyArg.slice(0, dotIdx));
+  })();
+
+  if (Object.keys(configs).length === 0 && !keyTargetsProjectSection) {
     console.error("No n-dx configuration found. Run 'n-dx init' first.");
     process.exit(1);
   }
@@ -656,12 +818,64 @@ Examples:
         }
       }
 
+      // Validate llm-specific settings (skip with --force)
+      if (pkg === "llm" && LLM_VALIDATORS[settingPath] && flags.force !== "true") {
+        try {
+          await LLM_VALIDATORS[settingPath](coerced);
+        } catch (err) {
+          console.error(`Invalid value for "${keyArg}": ${err.message}`);
+          console.error("  Use --force to set this value anyway.");
+          process.exit(1);
+        }
+      }
+
+      // Provider auth preflight: when selecting llm.vendor, run the matching
+      // vendor CLI auth check and branch deterministically on pass/fail.
+      if (pkg === "llm" && settingPath === "vendor") {
+        const currentLLM = configs.llm && typeof configs.llm === "object" ? configs.llm : {};
+        const llmForPreflight = {
+          ...currentLLM,
+          vendor: coerced,
+        };
+        const preflight = runVendorAuthPreflight(
+          coerced,
+          llmForPreflight,
+          configs.claude && typeof configs.claude === "object" ? configs.claude : undefined,
+        );
+
+        if (!preflight.ok) {
+          const loginCommand = getVendorLoginCommand(
+            coerced,
+            llmForPreflight,
+            configs.claude && typeof configs.claude === "object" ? configs.claude : undefined,
+          );
+          console.error(
+            `Provider auth preflight failed for "${coerced}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
+          );
+          if (preflight.detail) {
+            console.error(`Details: ${preflight.detail}`);
+          }
+          console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
+          process.exit(1);
+        }
+      }
+
       setByPath(configs[pkg], settingPath, coerced);
 
       // Write back to .n-dx.json (with restricted permissions if it contains an API key)
       const configPath = join(dir, PROJECT_CONFIG_FILE);
       const current = await loadProjectConfig(dir);
       current[pkg] = configs[pkg];
+
+      // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
+      if (pkg === "llm" && settingPath.startsWith("claude.")) {
+        if (!current.claude || typeof current.claude !== "object") {
+          current.claude = {};
+        }
+        const legacySetting = settingPath.slice("claude.".length);
+        setByPath(current.claude, legacySetting, coerced);
+      }
+
       await saveProjectJSON(configPath, current);
 
       console.log(`${keyArg} = ${formatValue(coerced)}`);

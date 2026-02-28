@@ -1,0 +1,106 @@
+{
+  "aggregation": {
+    "logEntries": [
+      {
+        "timestamp": "2026-02-01T09:00:00.000Z",
+        "event": "analyze_token_usage",
+        "detail": "{\"calls\":2,\"inputTokens\":1000,\"outputTokens\":200}"
+      },
+      {
+        "timestamp": "2026-02-02T10:00:00.000Z",
+        "event": "smart_add_token_usage",
+        "detail": "{\"calls\":1,\"inputTokens\":500,\"outputTokens\":100}"
+      },
+      {
+        "timestamp": "2026-02-04T10:00:00.000Z",
+        "event": "analyze_token_usage",
+        "detail": "{\"calls\":3,\"inputTokens\":2000,\"outputTokens\":500}"
+      }
+    ],
+    "henchRuns": [
+      {
+        "id": "run-1",
+        "startedAt": "2026-02-02T12:00:00.000Z",
+        "status": "completed",
+        "tokenUsage": {
+          "input": 900,
+          "output": 300
+        }
+      },
+      {
+        "id": "run-2",
+        "startedAt": "2026-02-05T12:00:00.000Z",
+        "status": "completed",
+        "tokenUsage": {
+          "input": 1200,
+          "output": 400
+        }
+      }
+    ],
+    "svManifest": {
+      "analyzedAt": "2026-02-03T12:00:00.000Z",
+      "tokenUsage": {
+        "calls": 2,
+        "inputTokens": 600,
+        "outputTokens": 150
+      }
+    },
+    "allTime": {
+      "packages": {
+        "rex": { "inputTokens": 3000, "outputTokens": 700, "calls": 5 },
+        "hench": { "inputTokens": 2100, "outputTokens": 700, "calls": 2 },
+        "sv": { "inputTokens": 600, "outputTokens": 150, "calls": 2 }
+      },
+      "totals": { "inputTokens": 5700, "outputTokens": 1550, "calls": 9 },
+      "commands": {
+        "rex:analyze": { "inputTokens": 3000, "outputTokens": 700, "calls": 5 },
+        "rex:smart-add": { "inputTokens": 500, "outputTokens": 100, "calls": 1 },
+        "hench:run": { "inputTokens": 2100, "outputTokens": 700, "calls": 2 },
+        "sv:analyze": { "inputTokens": 600, "outputTokens": 150, "calls": 2 }
+      }
+    },
+    "window": {
+      "since": "2026-02-02T00:00:00.000Z",
+      "until": "2026-02-04T23:59:59.000Z",
+      "packages": {
+        "rex": { "inputTokens": 2000, "outputTokens": 500, "calls": 3 },
+        "hench": { "inputTokens": 900, "outputTokens": 300, "calls": 1 },
+        "sv": { "inputTokens": 600, "outputTokens": 150, "calls": 2 }
+      },
+      "totals": { "inputTokens": 3500, "outputTokens": 950, "calls": 6 }
+    }
+  },
+  "budget": {
+    "usage": {
+      "input": 3200,
+      "output": 800
+    },
+    "normal": {
+      "budget": { "tokens": 5000, "warnAt": 70 },
+      "expected": {
+        "severity": "warning",
+        "percent": 80,
+        "tokensDefined": true,
+        "warnings": 1
+      }
+    },
+    "zeroBudget": {
+      "budget": { "tokens": 0, "cost": 0 },
+      "expected": {
+        "severity": "ok",
+        "tokensDefined": false,
+        "costDefined": false,
+        "warnings": 0
+      }
+    },
+    "missingBudget": {
+      "budget": {},
+      "expected": {
+        "severity": "ok",
+        "tokensDefined": false,
+        "costDefined": false,
+        "warnings": 0
+      }
+    }
+  }
+}

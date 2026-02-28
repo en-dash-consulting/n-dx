@@ -93,6 +93,9 @@ export class GraphRenderer {
   private viewH: number;
   private scale = 1;
 
+  // Lifecycle flag — prevents scheduling new animation frames after destroy
+  private destroyed = false;
+
   // Selection state — persists until explicitly cleared
   private selectedNodeId: string | null = null;
 
@@ -440,7 +443,23 @@ export class GraphRenderer {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.ac.abort();
+
+    // Stop the physics simulation so no more ticks are scheduled
+    this.sim.alpha.value = 0;
+
+    // Release large data structures for GC
+    this.nodeEdgeMap.clear();
+    this.zoneHullElements.clear();
+    this.zoneLabelElements.clear();
+    this.collapsedZones.clear();
+    this.zoneNodeIndices.clear();
+    this.resolvedLinks.length = 0;
+    this.linkElements.length = 0;
+    this.nodeGroups.length = 0;
+    this.nodes.length = 0;
+    this.labelRects.length = 0;
   }
 
   // ── Private: Selection highlighting ───────────────────────────────────────
@@ -944,20 +963,22 @@ export class GraphRenderer {
     return {
       updateDOM: () => this.updateDOM(),
       fitToContent: () => this.fitToContent(),
-      scheduleNextTick: (fn: () => void) => requestAnimationFrame(fn),
+      scheduleNextTick: (fn: () => void) => { if (!this.destroyed) requestAnimationFrame(fn); },
     };
   }
 
   private startSimulation(): void {
-    const runTick = () => { tick(this.sim, this.tickCallbacks()); };
+    if (this.destroyed) return;
+    const runTick = () => { if (!this.destroyed) tick(this.sim, this.tickCallbacks()); };
     requestAnimationFrame(runTick);
   }
 
   /** Re-heat the simulation to adapt to moved nodes. */
   private reheat(): void {
+    if (this.destroyed) return;
     if (this.sim.alpha.value < 0.01) {
       this.sim.alpha.value = 0.3;
-      requestAnimationFrame(() => tick(this.sim, this.tickCallbacks()));
+      requestAnimationFrame(() => { if (!this.destroyed) tick(this.sim, this.tickCallbacks()); });
     } else {
       this.sim.alpha.value = Math.max(this.sim.alpha.value, 0.3);
     }

@@ -1,0 +1,690 @@
+{
+  "archetypes": [
+    {
+      "id": "cli-command",
+      "name": "CLI Command",
+      "description": "CLI command handlers and subcommand implementations.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/commands/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/cmd/",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "description": "CLI command modules handle user-facing terminal commands"
+      }
+    },
+    {
+      "id": "component",
+      "name": "Component",
+      "description": "React/UI component files with JSX-returning functions.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "\\.[tj]sx$",
+          "weight": 0.4
+        },
+        {
+          "kind": "directory",
+          "pattern": "/components/",
+          "weight": 0.6
+        },
+        {
+          "kind": "directory",
+          "pattern": "/ui/",
+          "weight": 0.5
+        }
+      ],
+      "analysisHints": {
+        "godFunctionThresholdMultiplier": "2",
+        "description": "Components have inflated call counts from hooks, state setters, and JSX rendering"
+      }
+    },
+    {
+      "id": "config",
+      "name": "Config",
+      "description": "Configuration files and settings modules.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^config\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.config\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/config/",
+          "weight": 0.6
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "deadExports": "skip",
+        "description": "High fan-in expected — config modules are widely imported"
+      }
+    },
+    {
+      "id": "entrypoint",
+      "name": "Entry Point",
+      "description": "Module entry points, public APIs, and CLI entry files where uncalled exports are expected.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^index\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^main\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^cli\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^public\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^mod\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Uncalled exports are expected in entry points"
+      }
+    },
+    {
+      "id": "gateway",
+      "name": "Gateway",
+      "description": "Re-export-heavy gateway modules that concentrate cross-package imports.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^(?:deps|gateway|barrel)\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Gateway modules are expected to re-export heavily"
+      }
+    },
+    {
+      "id": "hook",
+      "name": "Hook",
+      "description": "React hooks — custom hooks encapsulating reusable stateful logic.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^use[A-Z].*\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/hooks/",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "description": "React hooks follow the use* naming convention"
+      }
+    },
+    {
+      "id": "middleware",
+      "name": "Middleware",
+      "description": "Request/response middleware in server frameworks.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/middleware/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/middlewares/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.middleware\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "description": "Middleware modules"
+      }
+    },
+    {
+      "id": "model",
+      "name": "Model",
+      "description": "Data models, schemas, and ORM definitions.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/models/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.model\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.schema\\.[tj]sx?$",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "description": "Data model definitions"
+      }
+    },
+    {
+      "id": "page",
+      "name": "Page",
+      "description": "Page-level components, views, or screens — top-level UI entry points for routes.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/pages/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/views/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/screens/",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "godFunctionThresholdMultiplier": "2",
+        "description": "Page/view components orchestrate many sub-components and have inflated call counts"
+      }
+    },
+    {
+      "id": "route-handler",
+      "name": "Route Handler",
+      "description": "Server-side HTTP route handlers (Express, Hono, Koa, etc.).",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^routes?[-.]",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^router\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/routes/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/api/",
+          "weight": 0.6
+        }
+      ],
+      "analysisHints": {
+        "description": "Server-side route handlers"
+      }
+    },
+    {
+      "id": "route-module",
+      "name": "Route Module",
+      "description": "Framework convention route modules (Remix/React Router) with loader/action/default exports.",
+      "signals": [
+        {
+          "kind": "export",
+          "pattern": "^(loader|action|default|meta|links|headers|ErrorBoundary)$",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Convention exports are expected in route modules"
+      }
+    },
+    {
+      "id": "schema",
+      "name": "Schema",
+      "description": "Runtime validation schemas and data shape definitions (Zod, Yup, Joi, etc.).",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/schema/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/schemas/",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^validate\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^validation\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Schema modules define runtime data shapes for validation"
+      }
+    },
+    {
+      "id": "service",
+      "name": "Service",
+      "description": "Service layer modules — API clients, data fetching, and business logic orchestration.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/services/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/service/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.service\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/clients/",
+          "weight": 0.6
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.client\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "description": "Service modules orchestrate business logic and external calls"
+      }
+    },
+    {
+      "id": "store",
+      "name": "Store",
+      "description": "State management stores and slices where high fan-in is expected.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/store/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/stores/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.store\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.slice\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "description": "High fan-in is expected for state management modules"
+      }
+    },
+    {
+      "id": "test-helper",
+      "name": "Test Helper",
+      "description": "Test utilities, fixtures, and mocks.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/fixtures/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/mocks/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/__mocks__/",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/__fixtures__/",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^test-utils\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^test-helpers\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^setup\\.[tj]sx?$",
+          "weight": 0.5
+        }
+      ],
+      "analysisHints": {
+        "description": "Test utility files"
+      }
+    },
+    {
+      "id": "types",
+      "name": "Types & Constants",
+      "description": "Type definitions, constants, and enums — companion files, not logic.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^types\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^constants\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^enums\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.types\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.constants\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.d\\.ts$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "couplingExpectation": "unidirectional",
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "deadExports": "skip",
+        "description": "Unidirectional coupling and high fan-in expected for type files"
+      }
+    },
+    {
+      "id": "utility",
+      "name": "Utility",
+      "description": "Shared utility, helper, and infrastructure modules where high fan-in is expected.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/core/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/utils/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/helpers/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/lib/",
+          "weight": 0.6
+        },
+        {
+          "kind": "filename",
+          "pattern": "^output\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^logger\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^logging\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^errors\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "description": "High fan-in is expected for utility modules"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "src/api-provider.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/auth.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/cli-provider.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/codex-cli-provider.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/config.ts",
+      "archetype": "config",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "config",
+          "signalKind": "filename",
+          "detail": "filename \"config.ts\" matches ^config\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/create-client.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/exec.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/help-format.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/json.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/llm-client.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/llm-config.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/llm-types.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/output.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "filename",
+          "detail": "filename \"output.ts\" matches ^output\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/project-config.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/project-dirs.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/provider-interface.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/provider-registry.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/provider-session.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/public.ts",
+      "archetype": "entrypoint",
+      "confidence": 0.9,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"public.ts\" matches ^public\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "path": "src/suggest.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/token-usage.ts",
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
+    },
+    {
+      "path": "src/types.ts",
+      "archetype": "types",
+      "confidence": 0.9,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "filename",
+          "detail": "filename \"types.ts\" matches ^types\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalClassified": 4,
+    "totalUnclassified": 18,
+    "byArchetype": {
+      "config": 1,
+      "utility": 1,
+      "entrypoint": 1,
+      "types": 1
+    },
+    "bySource": {
+      "algorithmic": 22
+    }
+  }
+}

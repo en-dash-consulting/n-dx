@@ -480,6 +480,84 @@ describe("cmdValidate", () => {
       expect(report.ok).toBe(true);
     });
 
+    it("reports empty container warnings in text mode", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "e1",
+            title: "Empty Epic",
+            level: "epic",
+            status: "pending",
+          },
+        ],
+      });
+
+      await cmdValidate(tmpDir, {});
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("⚠ empty containers");
+      expect(output).toContain("e1");
+    });
+
+    it("reports empty container warnings in JSON output with severity=warn", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "e1",
+            title: "Empty Epic",
+            level: "epic",
+            status: "pending",
+          },
+        ],
+      });
+
+      await cmdValidate(tmpDir, { format: "json" });
+
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try {
+          JSON.parse(c[0]);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      expect(jsonCall).toBeDefined();
+      const report = JSON.parse(jsonCall![0]);
+      const ecCheck = report.checks.find((c: { name: string }) => c.name === "empty containers");
+      expect(ecCheck).toBeDefined();
+      expect(ecCheck.pass).toBe(false);
+      expect(ecCheck.severity).toBe("warn");
+      expect(ecCheck.errors[0]).toContain("e1");
+      // Warnings don't cause failure
+      expect(report.ok).toBe(true);
+    });
+
+    it("does not warn about epics with children", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, VALID_PRD);
+
+      await cmdValidate(tmpDir, { format: "json" });
+
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try {
+          JSON.parse(c[0]);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      expect(jsonCall).toBeDefined();
+      const report = JSON.parse(jsonCall![0]);
+      const ecCheck = report.checks.find((c: { name: string }) => c.name === "empty containers");
+      expect(ecCheck).toBeDefined();
+      expect(ecCheck.pass).toBe(true);
+    });
+
     it("includes a summary field in JSON output", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       writePRD(tmpDir, {

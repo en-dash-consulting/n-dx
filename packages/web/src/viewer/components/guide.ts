@@ -55,6 +55,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Quick wins vs larger refactors. Suggestions that align with your current sprint goals. Patterns that could benefit from abstraction.",
     actions: "Prioritize suggestions by scope (global vs zone-specific). Start with suggestions that reduce coupling or improve cohesion.",
   },
+  "pr-markdown": {
+    title: "PR Markdown",
+    description: "PR-ready markdown generated for copy/paste into pull request descriptions.",
+    lookFor: "Clear summary, accurate file/change grouping, and any missing sections before sharing.",
+    actions: "Copy sections into your PR description and refresh after major changes to keep the text current.",
+  },
   // ── Rex views ──
   "rex-dashboard": {
     title: "Rex Dashboard",

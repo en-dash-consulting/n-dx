@@ -821,12 +821,18 @@ describe("estimateCost", () => {
 // ---------------------------------------------------------------------------
 
 describe("extractRexTokenEvents", () => {
-  it("returns token events from analyze_token_usage entries", () => {
+  it("returns token events from analyze_token_usage entries with vendor/model", () => {
     const entries: LogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
-        detail: JSON.stringify({ calls: 2, inputTokens: 3000, outputTokens: 500 }),
+        detail: JSON.stringify({
+          calls: 2,
+          inputTokens: 3000,
+          outputTokens: 500,
+          vendor: "claude",
+          model: "claude-sonnet-4-20250514",
+        }),
       },
     ];
 
@@ -838,6 +844,8 @@ describe("extractRexTokenEvents", () => {
     expect(events[0].inputTokens).toBe(3000);
     expect(events[0].outputTokens).toBe(500);
     expect(events[0].calls).toBe(2);
+    expect(events[0].vendor).toBe("claude");
+    expect(events[0].model).toBe("claude-sonnet-4-20250514");
   });
 
   it("maps smart_add_token_usage events to smart-add command", () => {
@@ -854,6 +862,29 @@ describe("extractRexTokenEvents", () => {
     expect(events).toHaveLength(1);
     expect(events[0].command).toBe("smart-add");
     expect(events[0].package).toBe("rex");
+    expect(events[0].vendor).toBe("unknown");
+    expect(events[0].model).toBe("unknown");
+  });
+
+  it("uses unknown fallback when metadata is missing or empty", () => {
+    const entries: LogEntry[] = [
+      {
+        timestamp: "2026-01-15T10:00:00.000Z",
+        event: "analyze_token_usage",
+        detail: JSON.stringify({
+          calls: 1,
+          inputTokens: 500,
+          outputTokens: 100,
+          vendor: " ",
+        }),
+      },
+    ];
+
+    const events = extractRexTokenEvents(entries);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].vendor).toBe("unknown");
+    expect(events[0].model).toBe("unknown");
   });
 
   it("ignores non-token events", () => {
@@ -947,6 +978,28 @@ describe("extractHenchTokenEvents", () => {
     const events = await extractHenchTokenEvents(tmp);
 
     expect(events).toHaveLength(2);
+  });
+
+  it("emits per-turn events with vendor/model when available", async () => {
+    writeRun("run-001", {
+      startedAt: "2026-01-15T10:00:00.000Z",
+      model: "fallback-model",
+      tokenUsage: { input: 7000, output: 2200 },
+      turnTokenUsage: [
+        { turn: 1, input: 3000, output: 1000, vendor: "claude", model: "claude-sonnet-4-20250514" },
+        { turn: 1, input: 4000, output: 1200, vendor: "codex" },
+      ],
+    });
+
+    const events = await extractHenchTokenEvents(tmp);
+
+    expect(events).toHaveLength(2);
+    expect(events[0].inputTokens).toBe(3000);
+    expect(events[0].vendor).toBe("claude");
+    expect(events[0].model).toBe("claude-sonnet-4-20250514");
+    expect(events[1].inputTokens).toBe(4000);
+    expect(events[1].vendor).toBe("codex");
+    expect(events[1].model).toBe("fallback-model");
   });
 
   it("returns empty array when no .hench/runs exists", async () => {

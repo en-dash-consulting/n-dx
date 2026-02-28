@@ -1,0 +1,19 @@
+{
+  "id": "hench/tests/unit/agent-3",
+  "name": "Agent 3",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/task-display.ts",
+    "packages/hench/src/types/index.ts",
+    "packages/hench/src/types/output.ts",
+    "packages/hench/tests/unit/agent/task-display.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/types/output.ts",
+    "packages/hench/src/agent/lifecycle/task-display.ts"
+  ],
+  "cohesion": 0.46,
+  "coupling": 0.54,
+  "fileCount": 4,
+  "lineCount": 226
+}

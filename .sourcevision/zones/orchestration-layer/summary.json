@@ -1,18 +1,24 @@
 {
   "id": "orchestration-layer",
-  "name": "Orchestration Layer",
-  "description": "Command-line entry points and configuration management that coordinate package execution without direct library dependencies.",
+  "name": "Project Orchestration",
+  "description": "Provides unified CLI interface and configuration management for the entire n-dx toolkit through clean entry points.",
   "files": [
     "ci.js",
     "cli.js",
     "config.js",
     "help.js",
+    "refresh-artifacts.js",
+    "refresh-plan.js",
+    "refresh-validate.js",
     "tests/unit/help.test.js",
+    "tests/unit/refresh-artifacts.test.js",
+    "tests/unit/refresh-plan.test.js",
+    "tests/unit/refresh-validate.test.js",
     "web.js"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 6,
-  "lineCount": 2958
+  "fileCount": 12,
+  "lineCount": 4472
 }

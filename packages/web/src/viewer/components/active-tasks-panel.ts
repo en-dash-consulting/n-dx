@@ -16,6 +16,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
+import { ElapsedTime } from "./elapsed-time.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -82,17 +83,7 @@ function formatStartTime(iso: string): string {
 // ── Active task card ─────────────────────────────────────────────────
 
 function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: NavigateTo }) {
-  const [elapsed, setElapsed] = useState(() => formatElapsed(run.startedAt));
   const stale = isStale(run);
-
-  // Live-tick the elapsed duration every second
-  useEffect(() => {
-    setElapsed(formatElapsed(run.startedAt));
-    const timer = setInterval(() => {
-      setElapsed(formatElapsed(run.startedAt));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [run.startedAt]);
 
   return h("div", {
     class: `active-task-card${stale ? " active-task-card-stale" : ""}`,
@@ -124,11 +115,12 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
           : null,
       ),
 
-      // Metadata row
+      // Metadata row — elapsed time is isolated in its own component to
+      // prevent the entire card from re-rendering on every 1-second tick.
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          elapsed,
+          h(ElapsedTime, { startedAt: run.startedAt, formatter: formatElapsed }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(run.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),
@@ -149,16 +141,6 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
 // ── Execution state card (for dashboard-triggered executions) ────────
 
 function ExecutionCard({ exec }: { exec: ExecutionState }) {
-  const [elapsed, setElapsed] = useState(() => formatElapsed(exec.startedAt));
-
-  useEffect(() => {
-    setElapsed(formatElapsed(exec.startedAt));
-    const timer = setInterval(() => {
-      setElapsed(formatElapsed(exec.startedAt));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [exec.startedAt]);
-
   const isStarting = exec.status === "starting";
 
   return h("div", {
@@ -177,7 +159,7 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
       h("div", { class: "active-task-meta" },
         h("span", { class: "active-task-elapsed", title: "Elapsed time" },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⏱"),
-          elapsed,
+          h(ElapsedTime, { startedAt: exec.startedAt, formatter: formatElapsed }),
         ),
         h("span", { class: "active-task-started", title: `Started at ${formatStartTime(exec.startedAt)}` },
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),
@@ -212,18 +194,20 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
 
   // WebSocket + polling
   useEffect(() => {
+    let mounted = true;
     fetchExecutions();
 
     // Connect to WebSocket for real-time updates
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}`;
-    let ws: WebSocket;
+    let ws: WebSocket | null = null;
 
     try {
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
+        if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "hench:task-execution-progress" && msg.state) {
@@ -257,11 +241,13 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     const interval = setInterval(fetchExecutions, 5000);
 
     return () => {
+      mounted = false;
       clearInterval(interval);
-      if (wsRef.current) {
-        try { wsRef.current.close(); } catch { /* ignore */ }
-        wsRef.current = null;
+      // Close WS using local reference (wsRef.current may already be null from onclose)
+      if (ws) {
+        try { ws.close(); } catch { /* ignore */ }
       }
+      wsRef.current = null;
     };
   }, [fetchExecutions]);
 

@@ -33,7 +33,7 @@ describe("help.js", () => {
   });
 
   describe("suggestCommands", () => {
-    const commands = ["init", "plan", "work", "status", "usage", "sync", "start", "dev", "web", "ci", "config"];
+    const commands = ["init", "plan", "refresh", "work", "status", "usage", "sync", "start", "dev", "web", "ci", "config"];
 
     it("suggests 'status' for 'statis'", () => {
       const suggestions = suggestCommands("statis", commands);
@@ -153,6 +153,7 @@ describe("help.js", () => {
       const commands = getOrchestratorCommands();
       expect(commands).toContain("init");
       expect(commands).toContain("plan");
+      expect(commands).toContain("refresh");
       expect(commands).toContain("work");
       expect(commands).toContain("status");
       expect(commands).toContain("rex");

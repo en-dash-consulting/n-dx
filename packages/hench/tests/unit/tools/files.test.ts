@@ -1,18 +1,36 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { GuardRails } from "../../../src/guard/index.js";
+import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "../../../src/tools/files.js";
-import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+
+function createToolGuard(projectDir: string): ToolGuard {
+  const maxFileSize = 1024 * 1024;
+  return {
+    checkPath(filepath: string): string {
+      const resolved = resolve(projectDir, filepath);
+      if (!resolved.startsWith(projectDir)) {
+        throw new Error(`Path escapes project directory: ${filepath}`);
+      }
+      return resolved;
+    },
+    checkCommand(): void {},
+    checkGitSubcommand(): void {},
+    recordFileRead(): void {},
+    recordFileWrite(): void {},
+    maxFileSize,
+    commandTimeout: 30_000,
+  };
+}
 
 describe("file tools", () => {
   let projectDir: string;
-  let guard: GuardRails;
+  let guard: ToolGuard;
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-files-"));
-    guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
+    guard = createToolGuard(projectDir);
 
     // Create test files
     await mkdir(join(projectDir, "src"), { recursive: true });

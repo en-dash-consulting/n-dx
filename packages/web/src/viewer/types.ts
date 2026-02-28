@@ -9,7 +9,7 @@ export interface LoadedData {
   callGraph: CallGraph | null;
 }
 
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "notion-config" | "integrations" | "hench-runs" | "hench-audit" | "hench-config" | "hench-templates" | "hench-optimization" | "feature-toggles";
+export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "notion-config" | "integrations" | "hench-runs" | "hench-audit" | "hench-config" | "hench-templates" | "hench-optimization" | "feature-toggles";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string }) => void;
 

@@ -1,0 +1,105 @@
+/* Refresh queue status indicator styles.
+ *
+ * Compact inline indicator shown alongside the refresh toast when
+ * refresh operations are queued, throttled, or paused due to memory
+ * pressure. Uses CSS variables from tokens.css for theme compatibility.
+ */
+
+.refresh-queue-status {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 998;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 360px;
+  animation: refresh-queue-fade-in 0.2s ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.refresh-queue-active {
+  background: var(--color-info-bg, #1a2a3a);
+  border: 1px solid var(--color-info, #4dabf7);
+  color: var(--color-info-text, #74c0fc);
+}
+
+.refresh-queue-throttled {
+  background: var(--color-warning-bg, #3a2d00);
+  border: 1px solid var(--color-warning, #f0ad4e);
+  color: var(--color-warning-text, #ffc107);
+}
+
+.refresh-queue-paused {
+  background: var(--color-error-bg, #3a0000);
+  border: 1px solid var(--color-error, #dc3545);
+  color: var(--color-error-text, #ff6b6b);
+}
+
+[data-theme="light"] .refresh-queue-active {
+  background: #d0ebff;
+  border-color: #339af0;
+  color: #1864ab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .refresh-queue-throttled {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #664d03;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .refresh-queue-paused {
+  background: #f8d7da;
+  border-color: #dc3545;
+  color: #842029;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.refresh-queue-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.refresh-queue-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.refresh-queue-level {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.refresh-queue-detail {
+  font-size: 0.7rem;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes refresh-queue-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .refresh-queue-status {
+    animation: none;
+  }
+}

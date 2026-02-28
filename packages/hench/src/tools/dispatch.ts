@@ -1,10 +1,40 @@
+/**
+ * Tool dispatch — boundary between the agent core and the guard/tools layer.
+ *
+ * This module sits at the interface of two architectural zones within the hench
+ * package:
+ *
+ *   **agent-core (hench zone)** — agent lifecycle, schema, process execution
+ *   **guard+tools (hench-2 zone)** — GuardRails, filesystem/shell/git tool impls
+ *
+ * The coupling between these zones is intentional and managed:
+ *
+ * - **Agent core → guard+tools**: `loop.ts` instantiates GuardRails from the
+ *   guard module and creates a `ToolContext`; `tools/index.ts` re-exports the
+ *   concrete tool functions for use outside this directory.
+ * - **Guard+tools → agent core**: `tools/contracts.ts` exports `ToolGuard` (a
+ *   minimal interface satisfied by GuardRails) and `ToolContext`, so tool
+ *   implementations never import from agent-core directly.  `tools/git.ts` and
+ *   `tools/shell.ts` call `process/exec-shell.ts` for subprocess execution.
+ *
+ * The `ToolGuard` interface in `./contracts.ts` is the explicit shared boundary
+ * that decouples tool implementations from concrete GuardRails internals,
+ * following the same gateway pattern used elsewhere in the monorepo.
+ *
+ * @module
+ */
+
 import type Anthropic from "@anthropic-ai/sdk";
-import { GuardError } from "../guard/index.js";
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "./files.js";
 import { toolRunCommand } from "./shell.js";
 import { toolGit } from "./git.js";
-import { toolRexUpdateStatus, toolRexAppendLog, toolRexAddSubtask } from "./rex.js";
-import type { ToolContext } from "../types/index.js";
+import type {
+  ToolContext,
+  RexToolHandlers,
+  RexUpdateStatusParams,
+  RexAppendLogParams,
+  RexAddSubtaskParams,
+} from "./contracts.js";
 
 export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
   {
@@ -126,12 +156,37 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
   },
 ];
 
+/** Tools that spawn child processes and should be memory-checked. */
+const PROCESS_SPAWNING_TOOLS = new Set(["run_command", "git"]);
+
+/**
+ * Check system memory before spawning a child process.
+ * Returns an error message if memory is too high, or undefined if OK.
+ */
+async function checkSpawnMemory(
+  ctx: ToolContext,
+  toolName: string,
+): Promise<string | undefined> {
+  if (!ctx.memoryMonitor || !PROCESS_SPAWNING_TOOLS.has(toolName)) return undefined;
+
+  const check = await ctx.memoryMonitor.checkBeforeSpawn();
+  if (!check.allowed) {
+    return `[MEMORY] ${check.reason}`;
+  }
+  return undefined;
+}
+
 export async function dispatchTool(
   ctx: ToolContext,
   name: string,
   input: Record<string, unknown>,
+  rexHandlers?: RexToolHandlers,
 ): Promise<string> {
   try {
+    // Pre-spawn memory check for process-spawning tools
+    const memoryBlock = await checkSpawnMemory(ctx, name);
+    if (memoryBlock) return memoryBlock;
+
     switch (name) {
       case "read_file":
         return await toolReadFile(ctx.guard, input as { path: string });
@@ -169,32 +224,37 @@ export async function dispatchTool(
         );
 
       case "rex_update_status":
-        return await toolRexUpdateStatus(
-          ctx.store,
-          ctx.taskId,
-          input as { status: string },
-          { projectDir: ctx.projectDir, testCommand: ctx.testCommand, startingHead: ctx.startingHead },
+        if (!rexHandlers) {
+          return "[ERROR] rex_update_status unavailable: no Rex handlers configured";
+        }
+        return await rexHandlers.updateStatus(
+          ctx,
+          input as unknown as RexUpdateStatusParams,
         );
 
       case "rex_append_log":
-        return await toolRexAppendLog(
-          ctx.store,
-          ctx.taskId,
-          input as { event: string; detail?: string },
+        if (!rexHandlers) {
+          return "[ERROR] rex_append_log unavailable: no Rex handlers configured";
+        }
+        return await rexHandlers.appendLog(
+          ctx,
+          input as unknown as RexAppendLogParams,
         );
 
       case "rex_add_subtask":
-        return await toolRexAddSubtask(
-          ctx.store,
-          ctx.taskId,
-          input as { title: string; description?: string; priority?: string },
+        if (!rexHandlers) {
+          return "[ERROR] rex_add_subtask unavailable: no Rex handlers configured";
+        }
+        return await rexHandlers.addSubtask(
+          ctx,
+          input as unknown as RexAddSubtaskParams,
         );
 
       default:
         return `Unknown tool: ${name}`;
     }
   } catch (err) {
-    if (err instanceof GuardError) {
+    if (err instanceof Error && err.name === "GuardError") {
       return `[GUARD] ${err.message}`;
     }
     return `[ERROR] ${(err as Error).message}`;

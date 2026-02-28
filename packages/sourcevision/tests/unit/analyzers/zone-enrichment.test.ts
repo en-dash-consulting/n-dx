@@ -11,7 +11,7 @@ import type {
   ZoneCrossing,
   Finding,
 } from "../../../src/schema/index.js";
-import { ClaudeClientError } from "@n-dx/claude-client";
+import { ClaudeClientError } from "@n-dx/llm-client";
 import {
   makeFileEntry,
   makeInventory,
@@ -20,7 +20,7 @@ import {
 } from "./zones-helpers.js";
 
 vi.mock("../../../src/analyzers/claude-client.js", async () => {
-  const actual = await import("@n-dx/claude-client");
+  const actual = await import("@n-dx/llm-client");
   return {
     callClaude: vi.fn(),
     ClaudeClientError: actual.ClaudeClientError,

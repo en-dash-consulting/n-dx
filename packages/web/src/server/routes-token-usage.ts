@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
+import { AggregationResultCache } from "./aggregation-cache.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -47,6 +48,73 @@ interface TokenEvent {
   inputTokens: number;
   outputTokens: number;
   calls: number;
+  vendor?: string;
+  model?: string;
+}
+
+interface ToolBreakdown {
+  rex: PackageTokenUsage;
+  hench: PackageTokenUsage;
+  sv: PackageTokenUsage;
+}
+
+interface VendorModelUsage extends PackageTokenUsage {
+  vendor: string;
+  model: string;
+  toolBreakdown: ToolBreakdown;
+}
+
+interface UtilizationTrendBucket {
+  period: string;
+  totalTokens: number;
+  byVendorModel: VendorModelUsage[];
+  toolBreakdown: ToolBreakdown;
+  estimatedCost: CostEstimate;
+}
+
+interface UtilizationSourceMeta {
+  rex: string;
+  hench: string;
+  sourcevision: string;
+}
+
+interface ConfiguredModel {
+  vendor: string;
+  model: string;
+}
+
+type WeeklyBudgetSource = "vendor_model" | "vendor_default" | "global_default" | "missing_budget";
+type WeeklyBudgetReasonCode =
+  | "fallback_model_budget_missing_or_invalid"
+  | "fallback_vendor_budget_missing_or_invalid"
+  | "missing_budget_config_not_set"
+  | "missing_budget_no_valid_match"
+  | "missing_budget_invalid_config";
+
+interface WeeklyBudgetValidationError {
+  code: "invalid_budget_value";
+  path: string;
+  message: string;
+  received: unknown;
+}
+
+interface WeeklyBudgetResolution {
+  /** Resolved weekly token budget; null means no configured budget applies. */
+  budget: number | null;
+  /** Which lookup tier produced the result. */
+  source: WeeklyBudgetSource;
+  /** Stable reason emitted when fallback/missing budget behavior is used. */
+  reasonCode?: WeeklyBudgetReasonCode;
+}
+
+interface VendorWeeklyBudgetScope {
+  default?: number;
+  models?: Record<string, number>;
+}
+
+interface WeeklyBudgetConfig {
+  globalDefault?: number;
+  vendors?: Record<string, VendorWeeklyBudgetScope>;
 }
 
 interface CostEstimate {
@@ -76,10 +144,121 @@ function emptyPackageUsage(): PackageTokenUsage {
   return { inputTokens: 0, outputTokens: 0, calls: 0 };
 }
 
+function emptyToolBreakdown(): ToolBreakdown {
+  return {
+    rex: emptyPackageUsage(),
+    hench: emptyPackageUsage(),
+    sv: emptyPackageUsage(),
+  };
+}
+
 function isInRange(timestamp: string, since?: string, until?: string): boolean {
   if (since && timestamp < since) return false;
   if (until && timestamp > until) return false;
   return true;
+}
+
+function normalizeEventMetadata(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeBudgetKey(value: unknown): string | undefined {
+  const normalized = normalizeEventMetadata(value);
+  return normalized?.toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidBudget(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function readBudgetValue(
+  value: unknown,
+  path: string,
+  errors: WeeklyBudgetValidationError[],
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (isValidBudget(value)) return value;
+  errors.push({
+    code: "invalid_budget_value",
+    path,
+    received: value,
+    message: `Expected a positive, finite number at "${path}". Update this value to a numeric weekly token budget.`,
+  });
+  return undefined;
+}
+
+function normalizeWeeklyBudgetConfig(
+  raw: unknown,
+): { config?: WeeklyBudgetConfig; validationErrors: WeeklyBudgetValidationError[] } {
+  const validationErrors: WeeklyBudgetValidationError[] = [];
+  if (!isRecord(raw)) {
+    return { config: undefined, validationErrors };
+  }
+
+  const config: WeeklyBudgetConfig = {};
+  const globalDefault = readBudgetValue(raw.globalDefault, "tokenUsage.weeklyBudget.globalDefault", validationErrors);
+  if (globalDefault !== undefined) {
+    config.globalDefault = globalDefault;
+  }
+
+  if (isRecord(raw.vendors)) {
+    const normalizedVendors: Record<string, VendorWeeklyBudgetScope> = {};
+    for (const [rawVendorKey, rawVendorValue] of Object.entries(raw.vendors)) {
+      const vendorKey = normalizeBudgetKey(rawVendorKey);
+      if (!vendorKey || !isRecord(rawVendorValue)) continue;
+
+      const existingScope = normalizedVendors[vendorKey] ?? {};
+      const vendorDefault = readBudgetValue(
+        rawVendorValue.default,
+        `tokenUsage.weeklyBudget.vendors.${rawVendorKey}.default`,
+        validationErrors,
+      );
+      if (vendorDefault !== undefined) {
+        existingScope.default = vendorDefault;
+      }
+
+      if (isRecord(rawVendorValue.models)) {
+        const existingModels = existingScope.models ?? {};
+        for (const [rawModelKey, rawModelValue] of Object.entries(rawVendorValue.models)) {
+          const modelKey = normalizeBudgetKey(rawModelKey);
+          if (!modelKey) continue;
+          const modelBudget = readBudgetValue(
+            rawModelValue,
+            `tokenUsage.weeklyBudget.vendors.${rawVendorKey}.models.${rawModelKey}`,
+            validationErrors,
+          );
+          if (modelBudget !== undefined) {
+            existingModels[modelKey] = modelBudget;
+          }
+        }
+        if (Object.keys(existingModels).length > 0) {
+          existingScope.models = existingModels;
+        }
+      }
+
+      if (existingScope.default !== undefined || existingScope.models) {
+        normalizedVendors[vendorKey] = existingScope;
+      }
+    }
+    if (Object.keys(normalizedVendors).length > 0) {
+      config.vendors = normalizedVendors;
+    }
+  }
+
+  if (
+    config.globalDefault === undefined
+    && (!config.vendors || Object.keys(config.vendors).length === 0)
+  ) {
+    return { config: undefined, validationErrors };
+  }
+
+  return { config, validationErrors };
 }
 
 /** Default Sonnet pricing. */
@@ -139,6 +318,8 @@ function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string
         calls?: number;
         inputTokens?: number;
         outputTokens?: number;
+        vendor?: string;
+        model?: string;
       };
       events.push({
         timestamp: entry.timestamp,
@@ -147,6 +328,8 @@ function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string
         inputTokens: data.inputTokens ?? 0,
         outputTokens: data.outputTokens ?? 0,
         calls: data.calls ?? 0,
+        vendor: normalizeEventMetadata(data.vendor),
+        model: normalizeEventMetadata(data.model),
       });
     } catch { /* skip */ }
   }
@@ -155,7 +338,14 @@ function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string
 
 interface HenchRunSummary {
   startedAt: string;
+  model?: string;
   tokenUsage: { input: number; output: number };
+  turnTokenUsage?: Array<{
+    input: number;
+    output: number;
+    vendor?: string;
+    model?: string;
+  }>;
 }
 
 function extractHenchEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
@@ -173,6 +363,23 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
       const run = JSON.parse(raw) as HenchRunSummary;
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, since, until)) continue;
+
+      if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        for (const turn of run.turnTokenUsage) {
+          events.push({
+            timestamp: run.startedAt,
+            command: "run",
+            package: "hench",
+            inputTokens: turn.input ?? 0,
+            outputTokens: turn.output ?? 0,
+            calls: 1,
+            vendor: normalizeEventMetadata(turn.vendor),
+            model: normalizeEventMetadata(turn.model) ?? normalizeEventMetadata(run.model),
+          });
+        }
+        continue;
+      }
+
       events.push({
         timestamp: run.startedAt,
         command: "run",
@@ -180,6 +387,7 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
         inputTokens: run.tokenUsage.input ?? 0,
         outputTokens: run.tokenUsage.output ?? 0,
         calls: 1,
+        model: normalizeEventMetadata(run.model),
       });
     } catch { /* skip */ }
   }
@@ -188,7 +396,13 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
 
 interface SvManifest {
   analyzedAt?: string;
-  tokenUsage?: { calls?: number; inputTokens?: number; outputTokens?: number };
+  tokenUsage?: {
+    calls?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    vendor?: string;
+    model?: string;
+  };
 }
 
 function extractSvEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
@@ -206,6 +420,8 @@ function extractSvEvents(projectDir: string, since?: string, until?: string): To
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
       calls: manifest.tokenUsage.calls ?? 0,
+      vendor: normalizeEventMetadata(manifest.tokenUsage.vendor) ?? "unknown",
+      model: normalizeEventMetadata(manifest.tokenUsage.model) ?? "unknown",
     });
   } catch { /* skip */ }
   return events;
@@ -219,6 +435,17 @@ function collectAllEvents(ctx: ServerContext, since?: string, until?: string): T
   return [...rexEvents, ...henchEvents, ...svEvents].sort(
     (a, b) => a.timestamp.localeCompare(b.timestamp),
   );
+}
+
+function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
+  const rexPath = join(ctx.rexDir, "execution-log.jsonl");
+  const henchPath = join(ctx.projectDir, ".hench", "runs");
+  const svPath = join(ctx.projectDir, ".sourcevision", "manifest.json");
+  return {
+    rex: existsSync(rexPath) ? ".rex/execution-log.jsonl" : "missing (.rex/execution-log.jsonl)",
+    hench: existsSync(henchPath) ? ".hench/runs/*.json" : "missing (.hench/runs/*.json)",
+    sourcevision: existsSync(svPath) ? ".sourcevision/manifest.json" : "missing (.sourcevision/manifest.json)",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +495,45 @@ function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
   );
 }
 
+function aggregateByVendorModel(events: TokenEvent[]): VendorModelUsage[] {
+  const map = new Map<string, VendorModelUsage>();
+
+  for (const ev of events) {
+    const vendor = normalizeEventMetadata(ev.vendor) ?? "unknown";
+    const model = normalizeEventMetadata(ev.model) ?? "unknown";
+    const key = `${vendor}:${model}`;
+
+    let entry = map.get(key);
+    if (!entry) {
+      entry = {
+        vendor,
+        model,
+        inputTokens: 0,
+        outputTokens: 0,
+        calls: 0,
+        toolBreakdown: emptyToolBreakdown(),
+      };
+      map.set(key, entry);
+    }
+
+    const tool = ev.package === "rex" ? entry.toolBreakdown.rex : ev.package === "hench" ? entry.toolBreakdown.hench : entry.toolBreakdown.sv;
+    tool.inputTokens += ev.inputTokens;
+    tool.outputTokens += ev.outputTokens;
+    tool.calls += ev.calls;
+    entry.inputTokens += ev.inputTokens;
+    entry.outputTokens += ev.outputTokens;
+    entry.calls += ev.calls;
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const tokenDiff = (b.inputTokens + b.outputTokens) - (a.inputTokens + a.outputTokens);
+    if (tokenDiff !== 0) return tokenDiff;
+    const vendorDiff = a.vendor.localeCompare(b.vendor);
+    if (vendorDiff !== 0) return vendorDiff;
+    return a.model.localeCompare(b.model);
+  });
+}
+
 function periodKey(timestamp: string, period: TimePeriod): string {
   const date = new Date(timestamp);
   const year = date.getUTCFullYear();
@@ -311,6 +577,37 @@ function groupByTimePeriod(events: TokenEvent[], period: TimePeriod): PeriodBuck
   for (const [key, evts] of buckets) {
     const usage = eventsToAggregate(evts);
     result.push({ period: key, usage, estimatedCost: estimateCost(usage) });
+  }
+  result.sort((a, b) => a.period.localeCompare(b.period));
+  return result;
+}
+
+function groupUtilizationTrend(
+  events: TokenEvent[],
+  period: TimePeriod,
+): UtilizationTrendBucket[] {
+  const buckets = new Map<string, TokenEvent[]>();
+  for (const ev of events) {
+    const key = periodKey(ev.timestamp, period);
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(key, bucket);
+    }
+    bucket.push(ev);
+  }
+
+  const result: UtilizationTrendBucket[] = [];
+  for (const [key, evts] of buckets) {
+    const usage = eventsToAggregate(evts);
+    const byVendorModel = aggregateByVendorModel(evts);
+    result.push({
+      period: key,
+      totalTokens: usage.totalInputTokens + usage.totalOutputTokens,
+      byVendorModel,
+      toolBreakdown: usage.packages,
+      estimatedCost: estimateCost(usage),
+    });
   }
   result.sort((a, b) => a.period.localeCompare(b.period));
   return result;
@@ -395,16 +692,181 @@ function parseQuery(url: string): URLSearchParams {
   return idx === -1 ? new URLSearchParams() : new URLSearchParams(url.slice(idx));
 }
 
+function loadConfiguredModel(projectDir: string): ConfiguredModel {
+  const path = join(projectDir, ".n-dx.json");
+  if (!existsSync(path)) return { vendor: "claude", model: "default" };
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const root = JSON.parse(raw) as Record<string, unknown>;
+    const llm = root.llm as Record<string, unknown> | undefined;
+    const llmVendor = llm?.vendor;
+    const vendor = llmVendor === "codex" ? "codex" : "claude";
+    const llmVendorCfg = llm?.[vendor] as Record<string, unknown> | undefined;
+    const llmVendorModel = llmVendorCfg?.model;
+    if (typeof llmVendorModel === "string" && llmVendorModel) {
+      return { vendor, model: llmVendorModel };
+    }
+    const legacyClaude = root.claude as Record<string, unknown> | undefined;
+    if (vendor === "claude" && typeof legacyClaude?.model === "string" && legacyClaude.model) {
+      return { vendor, model: legacyClaude.model };
+    }
+    return { vendor, model: "default" };
+  } catch {
+    return { vendor: "claude", model: "default" };
+  }
+}
+
+function loadWeeklyBudgetConfig(
+  projectDir: string,
+): {
+  config?: WeeklyBudgetConfig;
+  hasConfiguredBudget: boolean;
+  validationErrors: WeeklyBudgetValidationError[];
+} {
+  const path = join(projectDir, ".n-dx.json");
+  if (!existsSync(path)) {
+    return { config: undefined, hasConfiguredBudget: false, validationErrors: [] };
+  }
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const root = JSON.parse(raw) as Record<string, unknown>;
+    const tokenUsage = isRecord(root.tokenUsage) ? root.tokenUsage : undefined;
+    const hasConfiguredBudget = tokenUsage ? Object.hasOwn(tokenUsage, "weeklyBudget") : false;
+    const normalized = normalizeWeeklyBudgetConfig(tokenUsage?.weeklyBudget);
+    return {
+      config: normalized.config,
+      hasConfiguredBudget,
+      validationErrors: normalized.validationErrors,
+    };
+  } catch {
+    return { config: undefined, hasConfiguredBudget: false, validationErrors: [] };
+  }
+}
+
+/**
+ * Resolve weekly budget using deterministic fallback order:
+ * 1) vendor + model
+ * 2) vendor default
+ * 3) global default
+ * 4) explicit missing budget sentinel
+ */
+export function resolveWeeklyBudget(
+  configured: ConfiguredModel,
+  budgetConfig?: WeeklyBudgetConfig,
+  options?: {
+    hasConfiguredBudget?: boolean;
+    validationErrors?: WeeklyBudgetValidationError[];
+  },
+): WeeklyBudgetResolution {
+  const vendor = normalizeBudgetKey(configured.vendor);
+  const model = normalizeBudgetKey(configured.model);
+  const normalizedConfig = normalizeWeeklyBudgetConfig(budgetConfig).config;
+  const hasConfiguredBudget = options?.hasConfiguredBudget ?? !!budgetConfig;
+  const hasValidationErrors = (options?.validationErrors?.length ?? 0) > 0;
+
+  if (normalizedConfig && vendor && model) {
+    const vendorScope = normalizedConfig.vendors?.[vendor];
+    const modelBudget = vendorScope?.models?.[model];
+    if (isValidBudget(modelBudget)) {
+      return { budget: modelBudget, source: "vendor_model" };
+    }
+
+    if (isValidBudget(vendorScope?.default)) {
+      return {
+        budget: vendorScope.default,
+        source: "vendor_default",
+        reasonCode: "fallback_model_budget_missing_or_invalid",
+      };
+    }
+
+    if (isValidBudget(normalizedConfig.globalDefault)) {
+      return {
+        budget: normalizedConfig.globalDefault,
+        source: "global_default",
+        reasonCode: "fallback_vendor_budget_missing_or_invalid",
+      };
+    }
+  }
+
+  if (!hasConfiguredBudget) {
+    return {
+      budget: null,
+      source: "missing_budget",
+      reasonCode: "missing_budget_config_not_set",
+    };
+  }
+  if (hasValidationErrors) {
+    return {
+      budget: null,
+      source: "missing_budget",
+      reasonCode: "missing_budget_invalid_config",
+    };
+  }
+  return {
+    budget: null,
+    source: "missing_budget",
+    reasonCode: "missing_budget_no_valid_match",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
+/**
+ * Lazy cache instance, created on first request.
+ * Module-scoped because there is only one web server per process.
+ */
+let aggregationCache: AggregationResultCache | null = null;
+
+function getAggregationCache(ctx: ServerContext): AggregationResultCache {
+  if (!aggregationCache) {
+    aggregationCache = new AggregationResultCache(ctx.projectDir, ctx.rexDir);
+  }
+  return aggregationCache;
+}
+
+/** Reset the module-level cache (for testing). */
+export function resetAggregationCache(): void {
+  aggregationCache?.invalidate();
+  aggregationCache = null;
+}
+
+/** Get the current cache instance (for testing/monitoring). */
+export function getAggregationCacheInstance(): AggregationResultCache | null {
+  return aggregationCache;
+}
+
+/**
+ * Build a cache key from query scope parameters.
+ * Encodes all parameters that affect the events result.
+ */
+function eventsCacheKey(since?: string, until?: string): string {
+  return `events:${since ?? ""}:${until ?? ""}`;
+}
+
+/**
+ * Get cached events or collect fresh ones. The cache automatically
+ * invalidates when source files (hench runs, rex log, sv manifest) change.
+ */
+async function getCachedEvents(
+  ctx: ServerContext,
+  since?: string,
+  until?: string,
+): Promise<TokenEvent[]> {
+  const cache = getAggregationCache(ctx);
+  return cache.getOrCompute(
+    eventsCacheKey(since, until),
+    () => collectAllEvents(ctx, since, until),
+  );
+}
+
 /** Handle token usage API requests. Returns true if the request was handled. */
-export function handleTokenUsageRoute(
+export async function handleTokenUsageRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): Promise<boolean> {
   const url = req.url || "/";
   const method = req.method || "GET";
 
@@ -419,25 +881,43 @@ export function handleTokenUsageRoute(
 
   // GET /api/token/summary — aggregate usage with cost estimate
   if (path === "summary") {
-    const events = collectAllEvents(ctx, since, until);
+    const events = await getCachedEvents(ctx, since, until);
     const usage = eventsToAggregate(events);
     const cost = estimateCost(usage);
     jsonResponse(res, 200, { usage, cost, eventCount: events.length });
     return true;
   }
 
-  // GET /api/token/events — raw event list
+  // GET /api/token/events — raw event list (?offset=N&limit=N&package=...)
   if (path === "events") {
-    const events = collectAllEvents(ctx, since, until);
+    const events = await getCachedEvents(ctx, since, until);
     const pkg = params.get("package") || undefined;
     const filtered = pkg ? events.filter((e) => e.package === pkg) : events;
-    jsonResponse(res, 200, { events: filtered });
+    const total = filtered.length;
+
+    // Support pagination via ?offset=N&limit=N
+    const offsetStr = params.get("offset");
+    const limitStr = params.get("limit");
+    const offset = offsetStr ? Math.max(0, parseInt(offsetStr, 10) || 0) : 0;
+    const limit = limitStr ? Math.max(0, parseInt(limitStr, 10) || 0) : 0;
+
+    if (offset > 0 || limit > 0) {
+      const sliced = limit > 0
+        ? filtered.slice(offset, offset + limit)
+        : filtered.slice(offset);
+      jsonResponse(res, 200, {
+        events: sliced,
+        pagination: { offset, limit: limit || total - offset, total },
+      });
+    } else {
+      jsonResponse(res, 200, { events: filtered });
+    }
     return true;
   }
 
   // GET /api/token/by-command — grouped by command
   if (path === "by-command") {
-    const events = collectAllEvents(ctx, since, until);
+    const events = await getCachedEvents(ctx, since, until);
     const commands = groupByCommand(events);
     jsonResponse(res, 200, { commands });
     return true;
@@ -450,7 +930,7 @@ export function handleTokenUsageRoute(
       errorResponse(res, 400, `Invalid period: ${period}. Use "day", "week", or "month".`);
       return true;
     }
-    const events = collectAllEvents(ctx, since, until);
+    const events = await getCachedEvents(ctx, since, until);
     const buckets = groupByTimePeriod(events, period);
     jsonResponse(res, 200, { period, buckets });
     return true;
@@ -458,12 +938,59 @@ export function handleTokenUsageRoute(
 
   // GET /api/token/budget — budget status
   if (path === "budget") {
-    const events = collectAllEvents(ctx, since, until);
+    const events = await getCachedEvents(ctx, since, until);
     const usage = eventsToAggregate(events);
     const config = loadRexConfig(ctx.rexDir);
     const result = checkBudget(usage, config?.budget);
     const cost = estimateCost(usage);
     jsonResponse(res, 200, { budget: result, usage, cost });
+    return true;
+  }
+
+  // GET /api/token/utilization — config + usage grouped by vendor/model
+  if (path === "utilization") {
+    const period = (params.get("period") || "day") as TimePeriod;
+    if (!["day", "week", "month"].includes(period)) {
+      errorResponse(res, 400, `Invalid period: ${period}. Use "day", "week", or "month".`);
+      return true;
+    }
+
+    const configured = loadConfiguredModel(ctx.projectDir);
+    const events = await getCachedEvents(ctx, since, until);
+    const usage = eventsToAggregate(events);
+    const byVendorModel = aggregateByVendorModel(events);
+    const trend = groupUtilizationTrend(events, period);
+    const commands = groupByCommand(events);
+    const budget = checkBudget(usage, loadRexConfig(ctx.rexDir)?.budget);
+    const weeklyBudgetConfig = loadWeeklyBudgetConfig(ctx.projectDir);
+    const weeklyBudget = resolveWeeklyBudget(
+      configured,
+      weeklyBudgetConfig.config,
+      {
+        hasConfiguredBudget: weeklyBudgetConfig.hasConfiguredBudget,
+        validationErrors: weeklyBudgetConfig.validationErrors,
+      },
+    );
+    const source = resolveSourceMeta(ctx);
+
+    jsonResponse(res, 200, {
+      configured,
+      source,
+      weeklyBudget,
+      weeklyBudgetValidationErrors: weeklyBudgetConfig.validationErrors,
+      period,
+      window: {
+        since: since ?? null,
+        until: until ?? null,
+      },
+      usage,
+      cost: estimateCost(usage),
+      byVendorModel,
+      trend,
+      commands,
+      budget,
+      eventCount: events.length,
+    });
     return true;
   }
 

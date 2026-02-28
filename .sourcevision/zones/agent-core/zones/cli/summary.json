@@ -1,0 +1,30 @@
+{
+  "id": "hench/cli",
+  "name": "Cli",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/cli/commands/constants.ts",
+    "packages/hench/src/cli/commands/show.ts",
+    "packages/hench/src/cli/commands/status.ts",
+    "packages/hench/src/cli/commands/task-lookup.ts",
+    "packages/hench/src/cli/errors.ts",
+    "packages/hench/src/cli/help.ts",
+    "packages/hench/src/cli/index.ts",
+    "packages/hench/src/cli/output.ts",
+    "packages/hench/tests/unit/cli/commands/constants.test.ts",
+    "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+    "packages/hench/tests/unit/cli/commands/task-lookup.test.ts",
+    "packages/hench/tests/unit/cli/errors.test.ts",
+    "packages/hench/tests/unit/cli/help.test.ts",
+    "packages/hench/tests/unit/cli/output.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/errors.ts",
+    "packages/hench/src/cli/output.ts",
+    "packages/hench/src/cli/commands/constants.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 14,
+  "lineCount": 1575
+}

@@ -1,0 +1,40 @@
+{
+  "id": "hench/tests/unit-2",
+  "name": "Unit 2",
+  "description": "23 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/agent/lifecycle/shared.ts",
+    "packages/hench/src/cli/commands/init.ts",
+    "packages/hench/src/store/config.ts",
+    "packages/hench/src/store/index.ts",
+    "packages/hench/src/store/json.ts",
+    "packages/hench/src/store/project-config.ts",
+    "packages/hench/src/store/runs.ts",
+    "packages/hench/tests/integration/codex-token-accounting.test.ts",
+    "packages/hench/tests/integration/store-roundtrip.test.ts",
+    "packages/hench/tests/unit/agent/api-auth.test.ts",
+    "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+    "packages/hench/tests/unit/agent/cli-retry.test.ts",
+    "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+    "packages/hench/tests/unit/agent/heartbeat.test.ts",
+    "packages/hench/tests/unit/agent/loop.test.ts",
+    "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+    "packages/hench/tests/unit/agent/task-failure.test.ts",
+    "packages/hench/tests/unit/agent/token-tracking.test.ts",
+    "packages/hench/tests/unit/store/claude-config.test.ts",
+    "packages/hench/tests/unit/store/project-config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/store/config.ts",
+    "packages/hench/src/store/json.ts"
+  ],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 23,
+  "lineCount": 4848
+}

@@ -4,33 +4,48 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleTokenUsageRoute } from "../../../src/server/routes-token-usage.js";
+import { handleTokenUsageRoute, resetAggregationCache } from "../../../src/server/routes-token-usage.js";
 
 /** Create a hench run record with token usage. */
-function makeRun(id: string, startedAt: string, inputTokens: number, outputTokens: number) {
+function makeRun(
+  id: string,
+  startedAt: string,
+  inputTokens: number,
+  outputTokens: number,
+  opts?: { model?: string; turnTokenUsage?: Array<{ input: number; output: number; vendor?: string; model?: string }> },
+) {
   return {
     id,
     startedAt,
     status: "completed",
     tokenUsage: { input: inputTokens, output: outputTokens },
+    model: opts?.model,
+    turnTokenUsage: opts?.turnTokenUsage,
   };
 }
 
 /** Create a rex execution log entry for analyze. */
-function makeLogEntry(timestamp: string, inputTokens: number, outputTokens: number, calls: number) {
+function makeLogEntry(
+  timestamp: string,
+  inputTokens: number,
+  outputTokens: number,
+  calls: number,
+  vendor = "codex",
+  model = "gpt-5-codex",
+) {
   return JSON.stringify({
     timestamp,
     event: "analyze_token_usage",
-    detail: JSON.stringify({ calls, inputTokens, outputTokens }),
+    detail: JSON.stringify({ calls, inputTokens, outputTokens, vendor, model }),
   });
 }
 
 /** Start a test server that only runs token usage routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
-    const server = createServer((req, res) => {
+    const server = createServer(async (req, res) => {
       res.setHeader("Access-Control-Allow-Origin", "*");
-      if (handleTokenUsageRoute(req, res, ctx)) return;
+      if (await handleTokenUsageRoute(req, res, ctx)) return;
       res.writeHead(404);
       res.end("Not found");
     });
@@ -59,15 +74,30 @@ describe("Token Usage API routes", () => {
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     await mkdir(henchRunsDir, { recursive: true });
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "codex",
+          codex: { model: "gpt-5-codex" },
+        },
+      }),
+    );
 
     // Seed test data: hench runs
     await writeFile(
       join(henchRunsDir, "run-1.json"),
-      JSON.stringify(makeRun("run-1", "2026-02-01T10:00:00.000Z", 5000, 2000)),
+      JSON.stringify(makeRun("run-1", "2026-02-01T10:00:00.000Z", 5000, 2000, {
+        model: "gpt-5-codex",
+        turnTokenUsage: [{ input: 5000, output: 2000, vendor: "codex", model: "gpt-5-codex" }],
+      })),
     );
     await writeFile(
       join(henchRunsDir, "run-2.json"),
-      JSON.stringify(makeRun("run-2", "2026-02-03T14:00:00.000Z", 8000, 3000)),
+      JSON.stringify(makeRun("run-2", "2026-02-03T14:00:00.000Z", 8000, 3000, {
+        model: "gpt-5-codex",
+        turnTokenUsage: [{ input: 8000, output: 3000, vendor: "codex", model: "gpt-5-codex" }],
+      })),
     );
 
     // Seed test data: rex execution log
@@ -80,7 +110,13 @@ describe("Token Usage API routes", () => {
       join(svDir, "manifest.json"),
       JSON.stringify({
         analyzedAt: "2026-02-03T08:00:00.000Z",
-        tokenUsage: { calls: 2, inputTokens: 400, outputTokens: 200 },
+        tokenUsage: {
+          calls: 2,
+          inputTokens: 400,
+          outputTokens: 200,
+          vendor: "claude",
+          model: "claude-sonnet-4-20250514",
+        },
         targetPath: tmpDir,
         version: "1.0.0",
       }),
@@ -94,6 +130,7 @@ describe("Token Usage API routes", () => {
 
   afterEach(async () => {
     server.close();
+    resetAggregationCache();
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -258,6 +295,253 @@ describe("Token Usage API routes", () => {
 
     expect(data.budget.severity).toBe("warning");
     expect(data.budget.tokens.severity).toBe("warning");
+  });
+
+  it("GET /api/token/utilization returns vendor/model totals, trend, and source metadata", async () => {
+    // Simulate config changing after events were recorded.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "claude",
+          claude: { model: "claude-sonnet-4-20250514" },
+        },
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/utilization?period=day&since=2026-02-03T00:00:00.000Z`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.configured).toEqual({
+      vendor: "claude",
+      model: "claude-sonnet-4-20250514",
+    });
+    expect(data.source.rex).toBe(".rex/execution-log.jsonl");
+    expect(data.source.hench).toBe(".hench/runs/*.json");
+    expect(data.source.sourcevision).toBe(".sourcevision/manifest.json");
+    expect(data.window).toEqual({
+      since: "2026-02-03T00:00:00.000Z",
+      until: null,
+    });
+
+    expect(data.byVendorModel).toHaveLength(2);
+    expect(data.byVendorModel[0].vendor).toBe("codex");
+    expect(data.byVendorModel[0].model).toBe("gpt-5-codex");
+    expect(data.byVendorModel[0].inputTokens).toBe(10000);
+    expect(data.byVendorModel[0].outputTokens).toBe(3800);
+    expect(data.byVendorModel[0].toolBreakdown.hench.inputTokens).toBe(8000);
+    expect(data.byVendorModel[0].toolBreakdown.rex.inputTokens).toBe(2000);
+    expect(data.byVendorModel[1].vendor).toBe("claude");
+    expect(data.byVendorModel[1].model).toBe("claude-sonnet-4-20250514");
+    expect(data.byVendorModel[1].inputTokens).toBe(400);
+    expect(data.byVendorModel[1].outputTokens).toBe(200);
+    expect(data.byVendorModel[1].toolBreakdown.sv.inputTokens).toBe(400);
+    const groupedTotal = data.byVendorModel
+      .reduce((sum: number, vm: { inputTokens: number; outputTokens: number }) => sum + vm.inputTokens + vm.outputTokens, 0);
+    expect(groupedTotal).toBe(data.usage.totalInputTokens + data.usage.totalOutputTokens);
+
+    expect(data.trend.length).toBeGreaterThan(0);
+    for (const bucket of data.trend) {
+      const bucketTokenTotal = bucket.byVendorModel
+        .reduce((sum: number, vm: { inputTokens: number; outputTokens: number }) => sum + vm.inputTokens + vm.outputTokens, 0);
+      expect(bucketTokenTotal).toBe(bucket.totalTokens);
+      expect(bucket.toolBreakdown).toBeDefined();
+      expect(bucket.estimatedCost.total).toBeDefined();
+    }
+  });
+
+  it("GET /api/token/utilization groups by per-event metadata instead of configured model", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "claude",
+          claude: { model: "claude-opus-4-20250514" },
+        },
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/utilization?since=2026-02-03T00:00:00.000Z`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.configured).toEqual({
+      vendor: "claude",
+      model: "claude-opus-4-20250514",
+    });
+
+    expect(data.byVendorModel).toHaveLength(2);
+    expect(data.byVendorModel.some((vm: { vendor: string; model: string }) =>
+      vm.vendor === "codex" && vm.model === "gpt-5-codex",
+    )).toBe(true);
+    expect(data.byVendorModel.some((vm: { vendor: string; model: string }) =>
+      vm.vendor === "claude" && vm.model === "claude-sonnet-4-20250514",
+    )).toBe(true);
+    expect(data.byVendorModel.some((vm: { vendor: string; model: string }) =>
+      vm.vendor === "claude" && vm.model === "claude-opus-4-20250514",
+    )).toBe(false);
+  });
+
+  it("GET /api/token/utilization includes fallback reason code when weekly budget uses vendor default", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "codex",
+          codex: { model: "gpt-5-codex" },
+        },
+        tokenUsage: {
+          weeklyBudget: {
+            globalDefault: 90_000,
+            vendors: {
+              codex: {
+                default: 80_000,
+                models: {},
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.weeklyBudget).toEqual({
+      budget: 80_000,
+      source: "vendor_default",
+      reasonCode: "fallback_model_budget_missing_or_invalid",
+    });
+    expect(data.weeklyBudgetValidationErrors).toEqual([]);
+  });
+
+  it("GET /api/token/utilization rejects invalid weekly budget entries with validation diagnostics", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "codex",
+          codex: { model: "gpt-5-codex" },
+        },
+        tokenUsage: {
+          weeklyBudget: {
+            globalDefault: "100000",
+            vendors: {
+              codex: {
+                default: -1,
+                models: {
+                  "gpt-5-codex": Number.NaN,
+                },
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.weeklyBudget).toEqual({
+      budget: null,
+      source: "missing_budget",
+      reasonCode: "missing_budget_invalid_config",
+    });
+    expect(data.weeklyBudgetValidationErrors).toHaveLength(3);
+    expect(data.weeklyBudgetValidationErrors[0]).toMatchObject({
+      code: "invalid_budget_value",
+      path: "tokenUsage.weeklyBudget.globalDefault",
+    });
+    expect(data.weeklyBudgetValidationErrors[1]).toMatchObject({
+      code: "invalid_budget_value",
+      path: "tokenUsage.weeklyBudget.vendors.codex.default",
+    });
+    expect(data.weeklyBudgetValidationErrors[2]).toMatchObject({
+      code: "invalid_budget_value",
+      path: "tokenUsage.weeklyBudget.vendors.codex.models.gpt-5-codex",
+    });
+  });
+
+  it("GET /api/token/utilization aggregates missing metadata into unknown bucket across packages", async () => {
+    await writeFile(
+      join(henchRunsDir, "run-1.json"),
+      JSON.stringify(makeRun("run-1", "2026-02-01T10:00:00.000Z", 1000, 100, {
+        turnTokenUsage: [{ input: 1000, output: 100 }],
+      })),
+    );
+    await writeFile(
+      join(henchRunsDir, "run-2.json"),
+      JSON.stringify(makeRun("run-2", "2026-02-03T14:00:00.000Z", 8000, 3000, {
+        model: "gpt-5-codex",
+        turnTokenUsage: [{ input: 8000, output: 3000, vendor: "codex", model: "gpt-5-codex" }],
+      })),
+    );
+
+    await writeFile(
+      join(rexDir, "execution-log.jsonl"),
+      [
+        JSON.stringify({
+          timestamp: "2026-02-02T09:00:00.000Z",
+          event: "analyze_token_usage",
+          detail: JSON.stringify({ calls: 1, inputTokens: 300, outputTokens: 30 }),
+        }),
+        makeLogEntry("2026-02-04T11:00:00.000Z", 2000, 800, 5),
+      ].join("\n") + "\n",
+    );
+
+    await writeFile(
+      join(svDir, "manifest.json"),
+      JSON.stringify({
+        analyzedAt: "2026-02-03T08:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 400, outputTokens: 200 },
+        targetPath: tmpDir,
+        version: "1.0.0",
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    const unknownBucket = data.byVendorModel.find(
+      (vm: { vendor: string; model: string }) => vm.vendor === "unknown" && vm.model === "unknown",
+    );
+    expect(unknownBucket).toBeDefined();
+    expect(unknownBucket.inputTokens).toBe(1700); // hench 1000 + rex 300 + sv 400
+    expect(unknownBucket.outputTokens).toBe(330); // hench 100 + rex 30 + sv 200
+    expect(unknownBucket.toolBreakdown.hench.inputTokens).toBe(1000);
+    expect(unknownBucket.toolBreakdown.rex.inputTokens).toBe(300);
+    expect(unknownBucket.toolBreakdown.sv.inputTokens).toBe(400);
+
+    const codexBucket = data.byVendorModel.find(
+      (vm: { vendor: string; model: string }) => vm.vendor === "codex" && vm.model === "gpt-5-codex",
+    );
+    expect(codexBucket).toBeDefined();
+    expect(codexBucket.inputTokens).toBe(10000);
+    expect(codexBucket.outputTokens).toBe(3800);
+  });
+
+  it("falls back to unknown vendor/model when sourcevision metadata is missing", async () => {
+    await writeFile(
+      join(svDir, "manifest.json"),
+      JSON.stringify({
+        analyzedAt: "2026-02-03T08:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 400, outputTokens: 200 },
+        targetPath: tmpDir,
+        version: "1.0.0",
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/events?package=sv`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.events).toHaveLength(1);
+    expect(data.events[0].vendor).toBe("unknown");
+    expect(data.events[0].model).toBe("unknown");
   });
 
   it("returns false for non-token routes", async () => {

@@ -13,8 +13,8 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
 import { DATA_FILES } from "../schema/data-files.js";
-import { computeStats, collectCompletedIds, findNextTask } from "./domain-gateway.js";
-import type { PRDDocument, TreeStats } from "./domain-gateway.js";
+import { computeStats, collectCompletedIds, findNextTask } from "./rex-gateway.js";
+import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Types

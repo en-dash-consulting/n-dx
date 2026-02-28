@@ -658,6 +658,171 @@ describe("validateStructure", () => {
     });
   });
 
+  describe("empty containers", () => {
+    it("warns about epic with no children", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Empty Epic", level: "epic" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers.length).toBe(1);
+      expect(result.emptyContainers[0].itemId).toBe("e1");
+      expect(result.emptyContainers[0].level).toBe("epic");
+      expect(result.emptyContainers[0].reason).toMatch(/no child/i);
+    });
+
+    it("warns about epic with empty children array", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Empty Epic", level: "epic", children: [] }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers.length).toBe(1);
+      expect(result.emptyContainers[0].itemId).toBe("e1");
+    });
+
+    it("warns about feature with no children", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "f1", title: "Empty Feature", level: "feature" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers.length).toBe(1);
+      expect(result.emptyContainers[0].itemId).toBe("f1");
+      expect(result.emptyContainers[0].level).toBe("feature");
+    });
+
+    it("does not warn about epic with children", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Task", level: "task" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("does not warn about feature with children", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({
+              id: "f1",
+              title: "Feature",
+              level: "feature",
+              children: [
+                makeItem({ id: "t1", title: "Task", level: "task" }),
+              ],
+            }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("does not flag tasks or subtasks as empty containers", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Task with no subtasks", level: "task" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("skips deleted items", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Deleted Epic", level: "epic", status: "deleted" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("skips completed items", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Completed Epic",
+          level: "epic",
+          status: "completed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-02T00:00:00.000Z",
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("skips deferred items", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Deferred Epic", level: "epic", status: "deferred" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers).toEqual([]);
+    });
+
+    it("detects multiple empty containers", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Empty Epic 1", level: "epic" }),
+        makeItem({ id: "e2", title: "Empty Epic 2", level: "epic" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers.length).toBe(2);
+    });
+
+    it("includes title in empty container result", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "My Lonely Epic", level: "epic" }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers[0].title).toBe("My Lonely Epic");
+    });
+
+    it("empty container warnings do not affect valid flag", () => {
+      const items: PRDItem[] = [
+        makeItem({ id: "e1", title: "Empty Epic", level: "epic" }),
+      ];
+      const result = validateStructure(items);
+      // Empty containers are warnings, not errors
+      expect(result.valid).toBe(true);
+      expect(result.warnings.some((w) => w.includes("e1"))).toBe(true);
+    });
+
+    it("counts only non-deleted children", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic with deleted child",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Deleted Task", level: "task", status: "deleted" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.emptyContainers.length).toBe(1);
+      expect(result.emptyContainers[0].itemId).toBe("e1");
+    });
+  });
+
   describe("aggregate result", () => {
     it("returns valid true when no issues", () => {
       const items: PRDItem[] = [

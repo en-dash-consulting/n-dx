@@ -1,10 +1,10 @@
 import { readFile, writeFile, readdir, stat, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import type { GuardRails } from "../guard/index.js";
 import { simpleGlobMatch } from "../guard/paths.js";
+import type { ToolGuard } from "./contracts.js";
 
 export async function toolReadFile(
-  guard: GuardRails,
+  guard: ToolGuard,
   params: { path: string },
 ): Promise<string> {
   const resolved = guard.checkPath(params.path);
@@ -19,7 +19,7 @@ export async function toolReadFile(
 }
 
 export async function toolWriteFile(
-  guard: GuardRails,
+  guard: ToolGuard,
   params: { path: string; content: string },
 ): Promise<string> {
   const resolved = guard.checkPath(params.path);
@@ -36,7 +36,7 @@ export async function toolWriteFile(
 }
 
 export async function toolListDirectory(
-  guard: GuardRails,
+  guard: ToolGuard,
   params: { path: string; recursive?: boolean },
 ): Promise<string> {
   const resolved = guard.checkPath(params.path);
@@ -62,7 +62,7 @@ export async function toolListDirectory(
 }
 
 export async function toolSearchFiles(
-  guard: GuardRails,
+  guard: ToolGuard,
   params: { pattern: string; path: string; glob?: string },
 ): Promise<string> {
   const resolved = guard.checkPath(params.path);

@@ -1,13 +1,13 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
  *
- * Hench's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * Hench's CLIError extends the foundation CLIError from @n-dx/llm-client,
  * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/claude-client";
+import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/llm-client";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
@@ -53,6 +53,19 @@ export class EpicNotFoundError extends CLIError {
  * Each entry: [regex to match, user-friendly message, suggestion].
  */
 const ERROR_HINTS: Array<[RegExp, string, string]> = [
+  [
+    /System memory usage.*exceeds rejection threshold/,
+    "",  // Use original message (already user-friendly)
+    "Close other applications to free memory.\n" +
+    "       To adjust thresholds: hench config guard.memoryThrottle.rejectThreshold <number>\n" +
+    "       To disable throttling: hench config guard.memoryThrottle.enabled false",
+  ],
+  [
+    /Concurrent process limit reached/,
+    "",  // Use original message (already user-friendly)
+    "Active hench processes will release their locks when they finish.\n" +
+    "       To change the limit: hench config guard.maxConcurrentProcesses <number>",
+  ],
   [
     /ENOENT.*\.hench/,
     "Hench directory not found.",
@@ -111,7 +124,7 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
  */
 export function formatCLIError(err: unknown): string {
   // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
-  // (which extends foundation CLIError from @n-dx/claude-client)
+  // (which extends foundation CLIError from @n-dx/llm-client)
   if (err instanceof BaseCLIError) {
     let msg = `Error: ${err.message}`;
     if (err.suggestion) {
@@ -150,24 +163,44 @@ export function handleCLIError(err: unknown): never {
  * Throws a CLIError with install instructions and API-provider fallback if missing.
  */
 export function requireClaudeCLI(customPath?: string): void {
+  requireLLMCLI("claude", customPath);
+}
+
+/**
+ * Check that the selected vendor CLI binary is available.
+ * If a custom path is provided, checks that path; otherwise checks PATH.
+ */
+export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): void {
+  const binary = vendor === "codex" ? "codex" : "claude";
+  const installHint = vendor === "codex"
+    ? "Install Codex CLI and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex"
+    : "Install it with: npm install -g @anthropic-ai/claude-code\n" +
+      "  Set a custom path: n-dx config claude.cli_path /path/to/claude\n" +
+      "  Or switch to the API provider: n-dx config hench.provider api";
+
   if (customPath) {
-    // Custom path from unified config — check that the file exists
-    if (!existsSync(customPath)) {
+    // If config value looks like a command name ("codex", "claude"), resolve on PATH.
+    // If it looks like a filesystem path (absolute/relative with slash), require that path.
+    const looksLikePath =
+      customPath.includes("/") ||
+      customPath.includes("\\") ||
+      customPath.startsWith(".") ||
+      customPath.startsWith("~");
+
+    const exists = looksLikePath ? existsSync(customPath) : isExecutableOnPath(customPath);
+    if (!exists) {
       throw new CLIError(
-        `Claude CLI not found at configured path: ${customPath}`,
-        "Check the path in 'n-dx config claude.cli_path', or remove it to use PATH lookup.\n" +
-          "  Or switch to the API provider: n-dx config hench.provider api",
+        `${vendor === "codex" ? "Codex" : "Claude"} CLI not found at configured path: ${customPath}`,
+        installHint,
       );
     }
     return;
   }
 
-  if (!isExecutableOnPath("claude")) {
+  if (!isExecutableOnPath(binary)) {
     throw new CLIError(
-      "Claude CLI not found.",
-      "Install it with: npm install -g @anthropic-ai/claude-code\n" +
-        "  Set a custom path: n-dx config claude.cli_path /path/to/claude\n" +
-        "  Or switch to the API provider: n-dx config hench.provider api",
+      `${vendor === "codex" ? "Codex" : "Claude"} CLI not found.`,
+      installHint,
     );
   }
 }

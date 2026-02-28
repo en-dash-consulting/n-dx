@@ -16,7 +16,7 @@ import type {
   ZoneCrossing,
   SubAnalysisRef,
 } from "../schema/index.js";
-import { SV_DIR } from "../cli/commands/constants.js";
+import { SV_DIR } from "../constants.js";
 import { DATA_FILES } from "../schema/data-files.js";
 import { toPosix } from "../util/paths.js";
 

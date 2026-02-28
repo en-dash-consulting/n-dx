@@ -226,6 +226,10 @@ export interface AnalyzeTokenUsage {
   inputTokens: number;
   /** Total output tokens across all calls. */
   outputTokens: number;
+  /** LLM vendor used for this run ("claude" | "codex" | "unknown"). */
+  vendor?: string;
+  /** Resolved model used for this run (including fallback defaults). */
+  model?: string;
   /** Total cache creation input tokens (if any). */
   cacheCreationInputTokens?: number;
   /** Total cache read input tokens (if any). */

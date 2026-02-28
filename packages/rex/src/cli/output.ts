@@ -2,7 +2,7 @@
  * CLI output control — supports --quiet mode for scripting.
  *
  * Core primitives (setQuiet, isQuiet, info, result) are shared from
- * @n-dx/claude-client. Rex-specific extensions (warn, startSpinner)
+ * @n-dx/llm-client. Rex-specific extensions (warn, startSpinner)
  * are defined here and use the shared isQuiet() state.
  *
  * In quiet mode, only essential output is emitted:
@@ -14,9 +14,10 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "@n-dx/claude-client";
+export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
 
-import { isQuiet, info } from "@n-dx/claude-client";
+import ora from "ora";
+import { isQuiet, info } from "@n-dx/llm-client";
 
 /**
  * Print warning output. Suppressed in quiet mode.
@@ -27,9 +28,6 @@ export function warn(...args: unknown[]): void {
 }
 
 // ── Progress spinner ──────────────────────────────────────────────────
-
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const SPINNER_INTERVAL = 80;
 
 export interface Spinner {
   /** Update the spinner message while it's running. */
@@ -61,34 +59,19 @@ export function startSpinner(message: string): Spinner {
       },
     };
   }
-
-  let frame = 0;
-  let currentMessage = message;
+  const spinner = ora({ text: message, stream: process.stderr }).start();
   let stopped = false;
-
-  const timer = setInterval(() => {
-    if (stopped) return;
-    const spinner = SPINNER_FRAMES[frame % SPINNER_FRAMES.length];
-    process.stderr.write(`\r${spinner} ${currentMessage}`);
-    frame++;
-  }, SPINNER_INTERVAL);
-
-  // Prevent the timer from keeping the process alive
-  if (timer.unref) timer.unref();
 
   return {
     update(msg: string) {
-      currentMessage = msg;
+      if (stopped) return;
+      spinner.text = msg;
     },
     stop(finalMessage?: string) {
       if (stopped) return;
       stopped = true;
-      clearInterval(timer);
-      // Clear the spinner line
-      process.stderr.write("\r" + " ".repeat(currentMessage.length + 4) + "\r");
-      if (finalMessage) {
-        info(finalMessage);
-      }
+      spinner.stop();
+      if (finalMessage) info(finalMessage);
     },
   };
 }

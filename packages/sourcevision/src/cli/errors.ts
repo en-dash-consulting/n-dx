@@ -1,13 +1,13 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
  *
- * Sourcevision's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * Sourcevision's CLIError extends the foundation CLIError from @n-dx/llm-client,
  * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError } from "@n-dx/claude-client";
+import { CLIError as BaseCLIError } from "@n-dx/llm-client";
 import { SV_DIR } from "./commands/constants.js";
 
 /**

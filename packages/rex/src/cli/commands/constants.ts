@@ -1,4 +1,4 @@
-import { PROJECT_DIRS, formatUsage } from "@n-dx/claude-client";
+import { PROJECT_DIRS, formatUsage } from "@n-dx/llm-client";
 
 export const REX_DIR = PROJECT_DIRS.REX;
 export const TOOL_VERSION = "0.1.0";
@@ -19,6 +19,7 @@ export function usage(): void {
           { name: "add --file=<path>", description: "Import ideas from a freeform text file (repeatable)" },
           { name: "echo \"desc\" | add", description: "Pipe text as description (combinable with other sources)" },
           { name: "update <id> [dir]", description: "Update item status/priority" },
+          { name: "remove <epic|task> <id>", description: "Remove an epic or task and all descendants" },
           { name: "move <id> [dir]", description: "Move item to new parent (reparent)" },
           { name: "reshape [dir]", description: "LLM-powered PRD restructuring (merge, update, reparent, split)" },
           { name: "prune [dir]", description: "Remove completed subtrees and consolidate remaining items" },

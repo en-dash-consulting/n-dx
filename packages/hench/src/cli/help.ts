@@ -6,14 +6,14 @@
  *   - Relevant flags only
  *   - 2–3 practical examples
  *
- * Uses the shared formatHelp() from @n-dx/claude-client for consistent
+ * Uses the shared formatHelp() from @n-dx/llm-client for consistent
  * presentation with semantic color coding across all n-dx packages.
  *
  * @module hench/cli/help
  */
 
-import { formatHelp } from "@n-dx/claude-client";
-import type { HelpDefinition } from "@n-dx/claude-client";
+import { formatHelp } from "@n-dx/llm-client";
+import type { HelpDefinition } from "@n-dx/llm-client";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -48,6 +48,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--iterations=<n>", description: "Run multiple tasks sequentially (e.g. --iterations=5)" },
       { flag: "--loop", description: "Run continuously until all tasks complete or Ctrl+C" },
       { flag: "--loop-pause=<ms>", description: "Pause between loop iterations (default: config value)" },
+      { flag: "--priority=<level>", description: "Override task scheduling priority (critical|high|medium|low)" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--review", description: "Show proposed changes and prompt for approval" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },

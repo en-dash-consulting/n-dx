@@ -125,6 +125,23 @@
       ]
     },
     {
+      "file": "packages/web/src/server/routes-features.ts",
+      "prefix": "/api/features",
+      "handler": "handleFeaturesRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-features.ts",
+          "method": "GET",
+          "path": "/api/features"
+        },
+        {
+          "file": "packages/web/src/server/routes-features.ts",
+          "method": "PUT",
+          "path": "/api/features"
+        }
+      ]
+    },
+    {
       "file": "packages/web/src/server/routes-hench.ts",
       "prefix": "/api/hench/",
       "handler": "handleHenchRoute",
@@ -137,7 +154,22 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
+          "path": "/api/hench/audit"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
           "path": "/api/hench/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/execute/status"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/execute/status/:taskId"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -148,6 +180,11 @@
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
           "path": "/api/hench/runs/:id"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/runs/health"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -167,6 +204,16 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "POST",
+          "path": "/api/hench/execute/:taskId/terminate"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
+          "path": "/api/hench/runs/:id/mark-stuck"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
           "path": "/api/hench/templates"
         },
         {
@@ -178,6 +225,75 @@
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "PUT",
           "path": "/api/hench/config"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-integrations.ts",
+      "prefix": "/api/",
+      "handler": "handleIntegrationRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-integrations.ts",
+          "method": "DELETE",
+          "path": "/api/integrations/:id/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-integrations.ts",
+          "method": "GET",
+          "path": "/api/integrations"
+        },
+        {
+          "file": "packages/web/src/server/routes-integrations.ts",
+          "method": "GET",
+          "path": "/api/integrations/:id/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-integrations.ts",
+          "method": "GET",
+          "path": "/api/integrations/:id/schema"
+        },
+        {
+          "file": "packages/web/src/server/routes-integrations.ts",
+          "method": "PUT",
+          "path": "/api/integrations/:id/config"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-notion.ts",
+      "prefix": "/api/notion/",
+      "handler": "handleNotionRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "DELETE",
+          "path": "/api/notion/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "GET",
+          "path": "/api/notion/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "POST",
+          "path": "/api/notion/schema"
+        },
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "POST",
+          "path": "/api/notion/schema/fix"
+        },
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "POST",
+          "path": "/api/notion/test"
+        },
+        {
+          "file": "packages/web/src/server/routes-notion.ts",
+          "method": "PUT",
+          "path": "/api/notion/config"
         }
       ]
     },
@@ -198,6 +314,11 @@
       "prefix": "/api/rex/",
       "handler": "handleRexRoute",
       "routes": [
+        {
+          "file": "packages/web/src/server/routes-rex.ts",
+          "method": "DELETE",
+          "path": "/api/rex/items/:id"
+        },
         {
           "file": "packages/web/src/server/routes-rex.ts",
           "method": "DELETE",
@@ -373,6 +494,11 @@
         {
           "file": "packages/web/src/server/routes-sourcevision.ts",
           "method": "GET",
+          "path": "/api/sv/pr-markdown"
+        },
+        {
+          "file": "packages/web/src/server/routes-sourcevision.ts",
+          "method": "GET",
           "path": "/api/sv/summary"
         },
         {
@@ -475,7 +601,7 @@
     "totalComponents": 5,
     "totalRouteModules": 0,
     "totalUsageEdges": 0,
-    "totalServerRoutes": 71,
+    "totalServerRoutes": 92,
     "routeConventions": {},
     "mostUsedComponents": [],
     "layoutDepth": 0

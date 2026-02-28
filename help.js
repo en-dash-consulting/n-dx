@@ -12,7 +12,7 @@
  *
  * Respects NO_COLOR (https://no-color.org/) and FORCE_COLOR environment
  * variables for accessible terminal output. Color semantics match the
- * shared formatter in @n-dx/claude-client/help-format.
+ * shared formatter in @n-dx/llm-client/help-format.
  *
  * @module n-dx/help
  */
@@ -21,7 +21,7 @@
 
 /**
  * Detect whether the terminal supports color output.
- * Mirrors the logic in @n-dx/claude-client/help-format.
+ * Mirrors the logic in @n-dx/llm-client/help-format.
  */
 function supportsColor() {
   if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
@@ -96,6 +96,13 @@ const COMMAND_REGISTRY = [
     summary: "Analyze codebase and generate PRD proposals",
     keywords: ["analyze", "PRD", "proposals", "codebase", "scan", "guided", "import", "spec"],
     related: ["init", "work", "status"],
+  },
+  {
+    name: "refresh",
+    category: "Orchestration",
+    summary: "Refresh SourceVision data and dashboard UI artifacts",
+    keywords: ["refresh", "dashboard", "sourcevision", "analyze", "build", "pr-markdown"],
+    related: ["plan", "start", "web"],
   },
   {
     name: "work",
@@ -546,18 +553,20 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
+      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
     ],
     examples: [
-      { command: "ndx init", description: "Initialize in current directory" },
-      { command: "ndx init ./my-project", description: "Initialize in a specific directory" },
+      { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
+      { command: "ndx init --provider=claude .", description: "Initialize with Claude (skips vendor prompt)" },
+      { command: "ndx init --provider=codex .", description: "Initialize with Codex (skips vendor prompt)" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
     ],
-    related: ["plan", "status"],
+    related: ["plan", "status", "config"],
   },
   plan: {
     summary: "analyze codebase and generate PRD proposals",
@@ -581,9 +590,28 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["init", "work", "status"],
   },
+  refresh: {
+    summary: "refresh dashboard data and UI artifacts",
+    description: "Runs SourceVision analysis and rebuilds dashboard UI artifacts.\nOptionally regenerates PR markdown.",
+    usage: "ndx refresh [options] [dir]",
+    options: [
+      { flag: "--ui-only", description: "Rebuild UI artifacts only (skip data analysis)" },
+      { flag: "--data-only", description: "Refresh SourceVision data only (skip UI build)" },
+      { flag: "--pr-markdown", description: "Regenerate .sourcevision/pr-markdown.md only (skip analyze/build)" },
+      { flag: "--no-build", description: "Skip UI build step after data refresh" },
+      { flag: "--quiet, -q", description: "Suppress informational output from delegated tools" },
+    ],
+    examples: [
+      { command: "ndx refresh", description: "Run full refresh (data + UI build)" },
+      { command: "ndx refresh --data-only .", description: "Refresh SourceVision data only" },
+      { command: "ndx refresh --ui-only .", description: "Rebuild UI only" },
+      { command: "ndx refresh --pr-markdown .", description: "Run only PR markdown regeneration path" },
+    ],
+    related: ["plan", "start", "web"],
+  },
   work: {
     summary: "execute the next task autonomously",
-    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude'\nor 'ndx config llm.vendor codex' before using this command.",
     usage: "ndx work [options] [dir]",
     options: [
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },
@@ -818,6 +846,7 @@ export function formatMainHelp() {
     ["init [dir]", "Initialize all tools (sourcevision + rex + hench)"],
     ["plan [dir]", "Analyze codebase and show PRD proposals (--guided for new projects)"],
     ["plan --accept [dir]", "Analyze and accept proposals into PRD"],
+    ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only, --pr-markdown, --no-build)"],
     ["work [dir]", "Run next task (--task=ID, --epic=ID, --epic-by-epic, --auto)"],
     ["status [dir]", "Show PRD status (--format=json, --since, --until)"],
     ["usage [dir]", "Token usage analytics (--format=json, --group=day|week|month)"],

@@ -5,11 +5,14 @@ import {
   countProposalItems,
   filterProposalsByIndex,
   parseApprovalInput,
+  parseDuplicatePromptInput,
   parseGranularityInput,
+  remapDuplicateMatchesForSelectedProposals,
   formatQualityWarnings,
   classifySmartAddError,
 } from "../../../../src/cli/commands/smart-add.js";
 import type { Proposal, QualityIssue } from "../../../../src/analyze/index.js";
+import type { ProposalDuplicateMatch } from "../../../../src/cli/commands/smart-add-duplicates.js";
 
 const singleProposal: Proposal = {
   epic: { title: "User Authentication", source: "smart-add" },
@@ -339,6 +342,62 @@ describe("parseApprovalInput", () => {
     expect(parseApprovalInput("YES", 3)).toBe("all");
     expect(parseApprovalInput("N", 3)).toBe("none");
     expect(parseApprovalInput("All", 3)).toBe("all");
+  });
+});
+
+describe("parseDuplicatePromptInput", () => {
+  it("defaults to cancel for empty/invalid input", () => {
+    expect(parseDuplicatePromptInput("")).toBe("cancel");
+    expect(parseDuplicatePromptInput("unexpected")).toBe("cancel");
+  });
+
+  it("parses cancel aliases", () => {
+    expect(parseDuplicatePromptInput("c")).toBe("cancel");
+    expect(parseDuplicatePromptInput("cancel")).toBe("cancel");
+  });
+
+  it("parses merge aliases", () => {
+    expect(parseDuplicatePromptInput("m")).toBe("merge");
+    expect(parseDuplicatePromptInput("merge")).toBe("merge");
+  });
+
+  it("parses proceed aliases", () => {
+    expect(parseDuplicatePromptInput("p")).toBe("proceed");
+    expect(parseDuplicatePromptInput("proceed")).toBe("proceed");
+    expect(parseDuplicatePromptInput("proceed anyway")).toBe("proceed");
+    expect(parseDuplicatePromptInput("force")).toBe("proceed");
+  });
+});
+
+describe("remapDuplicateMatchesForSelectedProposals", () => {
+  it("keeps only selected proposal matches and remaps keys to contiguous indices", () => {
+    const matches: ProposalDuplicateMatch[] = [
+      {
+        node: { key: "p0:epic", kind: "epic", title: "A" },
+        duplicate: true,
+        reason: "exact_title",
+        score: 1,
+        matchedItem: { id: "e1", title: "A", level: "epic", status: "pending" },
+      },
+      {
+        node: { key: "p1:feature:0", kind: "feature", title: "B" },
+        duplicate: true,
+        reason: "semantic_title",
+        score: 0.9,
+        matchedItem: { id: "f1", title: "B", level: "feature", status: "pending" },
+      },
+      {
+        node: { key: "p2:task:0:0", kind: "task", title: "C" },
+        duplicate: false,
+        reason: "none",
+        score: 0,
+      },
+    ];
+
+    const result = remapDuplicateMatchesForSelectedProposals(matches, [2, 0]);
+    expect(result).toHaveLength(2);
+    expect(result[0]?.node.key).toBe("p1:epic");
+    expect(result[1]?.node.key).toBe("p0:task:0:0");
   });
 });
 

@@ -1,0 +1,104 @@
+/* Polling suspension indicator styles.
+ *
+ * Compact floating badge shown at the bottom-left when all non-essential
+ * polling sources have been suspended due to memory pressure. Provides
+ * a manual refresh button so users can still trigger data updates.
+ *
+ * Uses CSS variables from tokens.css for theme compatibility.
+ */
+
+.polling-suspension-indicator {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 998;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 360px;
+  animation: polling-suspension-fade-in 0.2s ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: var(--color-warning-bg, #3a2d00);
+  border: 1px solid var(--color-warning, #f0ad4e);
+  color: var(--color-warning-text, #ffc107);
+}
+
+[data-theme="light"] .polling-suspension-indicator {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #664d03;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.polling-suspension-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.polling-suspension-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.polling-suspension-title {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.polling-suspension-detail {
+  font-size: 0.7rem;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.polling-suspension-refresh {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+  line-height: 1.3;
+}
+
+.polling-suspension-refresh:hover {
+  opacity: 1;
+}
+
+.polling-suspension-refresh:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes polling-suspension-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .polling-suspension-indicator {
+    animation: none;
+  }
+}

@@ -50,6 +50,56 @@ Features require an epic parent, tasks require a feature parent, subtasks requir
 
 **Flags:** `--title` (required), `--parent=<id>`, `--description`, `--priority=<critical|high|medium|low>`, `--status=<pending|in_progress|completed|deferred|blocked>`, `--format=json`
 
+#### Smart add duplicate handling
+
+When you use smart add (`rex add "..."` or `rex add --file=...`) and accepted proposal nodes match existing PRD items, rex shows:
+
+```text
+Duplicate matches were detected in the selected proposals.
+Choose action: c=cancel / m=merge with existing / p=proceed anyway
+Duplicate action (c/m/p):
+```
+
+Cancel flow:
+
+```bash
+rex add "Add OAuth callback handler" .
+# Duplicate action (c/m/p): c
+# -> Cancelled. No items were created.
+```
+
+Merge flow:
+
+```bash
+rex add "Improve OAuth callback handling and retry behavior" .
+# Duplicate action (c/m/p): m
+# -> Matched existing items are updated
+# -> Only non-duplicate nodes are created
+```
+
+Proceed anyway flow:
+
+```bash
+rex add "Add OAuth callback handler" .
+# Duplicate action (c/m/p): p
+# -> Duplicate nodes are still created
+# -> New duplicate-created items persist override metadata
+```
+
+Input safety: empty or invalid duplicate action input defaults to `cancel`.
+
+#### Duplicate audit metadata
+
+When you choose `p` (proceed anyway), each force-created duplicate item gets an `overrideMarker` object in `.rex/prd.json`.
+
+When you choose `m` (merge), matched existing items record `mergedProposals` entries in `.rex/prd.json`.
+
+Where this appears:
+- `rex status` tree output shows `[override: <reason>]` next to items that have `overrideMarker`.
+- `rex status --format=json` includes:
+  - per-item `overrideMarker` fields on affected items
+  - top-level `overrideMarkers` summary block (`totalItems`, `overrideCreated`, `normalOrMerged`, `items`)
+
 ### `rex update <id> [dir]`
 
 Update an existing item.

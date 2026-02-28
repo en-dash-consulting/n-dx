@@ -6,14 +6,14 @@
  *   - Relevant flags only
  *   - 2–3 practical examples
  *
- * Uses the shared formatHelp() from @n-dx/claude-client for consistent
+ * Uses the shared formatHelp() from @n-dx/llm-client for consistent
  * presentation with semantic color coding across all n-dx packages.
  *
  * @module sourcevision/cli/help
  */
 
-import { formatHelp } from "@n-dx/claude-client";
-import type { HelpDefinition } from "@n-dx/claude-client";
+import { formatHelp } from "@n-dx/llm-client";
+import type { HelpDefinition } from "@n-dx/llm-client";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -134,6 +134,41 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["analyze"],
   },
+  "pr-markdown": {
+    tool: "sourcevision",
+    command: "pr-markdown",
+    summary: "regenerate pull-request markdown on demand",
+    usage: "sourcevision pr-markdown [dir]",
+    description:
+      "Generates PR-ready markdown from git diff metadata and writes it to\n" +
+      ".sourcevision/pr-markdown.md in the target directory.",
+    sections: [
+      {
+        title: "Output",
+        content: ".sourcevision/pr-markdown.md",
+      },
+    ],
+    examples: [
+      { command: "sourcevision pr-markdown", description: "Regenerate markdown in current directory" },
+      { command: "sourcevision pr-markdown ./project", description: "Regenerate markdown for a specific project" },
+      { command: "sv pr-markdown .", description: "Using the 'sv' alias" },
+    ],
+    related: ["serve", "git-credential-helper"],
+  },
+  "git-credential-helper": {
+    tool: "sourcevision",
+    command: "git-credential-helper",
+    summary: "run interactive GitHub credential setup",
+    usage: "sourcevision git-credential-helper",
+    description:
+      "Checks GitHub CLI auth state (`gh auth status`). If unauthenticated,\n" +
+      "hands off to `gh auth login`. If `gh` is unavailable, shows platform\n" +
+      "credential-manager guidance for git remote operations.",
+    examples: [
+      { command: "sourcevision git-credential-helper", description: "Start interactive GitHub auth setup" },
+    ],
+    related: ["pr-markdown"],
+  },
   mcp: {
     tool: "sourcevision",
     command: "mcp",
@@ -160,6 +195,8 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   validate: ["analyze"],
   reset: ["init"],
   "export-pdf": ["analyze"],
+  "pr-markdown": ["serve", "git-credential-helper"],
+  "git-credential-helper": ["pr-markdown"],
   mcp: [],
 };
 

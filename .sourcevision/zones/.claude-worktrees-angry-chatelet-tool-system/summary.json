@@ -1,0 +1,29 @@
+{
+  "id": ".claude-worktrees-angry-chatelet:tool-system",
+  "name": "Tool System",
+  "description": "Tool abstraction layer providing contracts, dispatch, and implementations for file, git, and shell operations.",
+  "files": [
+    ".claude/worktrees/angry-chatelet/packages/hench/src/agent/tools.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/contracts.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/dispatch.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/files.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/git.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/index.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/shell.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/test-runner.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/tools/files.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/tools/git.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/tools/test-runner.test.ts"
+  ],
+  "entryPoints": [
+    ".claude/worktrees/angry-chatelet/packages/hench/src/agent/tools.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/contracts.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/dispatch.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/index.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/tools/shell.ts"
+  ],
+  "cohesion": 0.77,
+  "coupling": 0.23,
+  "fileCount": 11,
+  "lineCount": 0
+}

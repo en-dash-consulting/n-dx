@@ -1,0 +1,25 @@
+{
+  "id": "security-guard",
+  "name": "Security Guard",
+  "description": "Security and policy enforcement subsystem with command filtering, path validation, and access controls.",
+  "files": [
+    "packages/hench/src/guard/commands.ts",
+    "packages/hench/src/guard/contracts.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts",
+    "packages/hench/src/guard/policy.ts",
+    "packages/hench/tests/unit/guard/commands.test.ts",
+    "packages/hench/tests/unit/guard/guard-integration.test.ts",
+    "packages/hench/tests/unit/guard/paths.test.ts",
+    "packages/hench/tests/unit/guard/policy.test.ts",
+    "packages/hench/tests/unit/tools/shell.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts"
+  ],
+  "cohesion": 0.9,
+  "coupling": 0.1,
+  "fileCount": 10,
+  "lineCount": 1802
+}

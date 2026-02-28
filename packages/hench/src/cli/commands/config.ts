@@ -173,6 +173,15 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       `Agent limited to writing files under ${(Number(v) / 1024 / 1024).toFixed(1)}MB`,
   },
   {
+    path: "guard.maxConcurrentProcesses",
+    label: "Max Concurrent Processes",
+    description: "Maximum simultaneous hench processes allowed (prevents memory exhaustion)",
+    type: "number",
+    category: "guard",
+    impact: (v) =>
+      `Up to ${v} hench processes can run simultaneously`,
+  },
+  {
     path: "guard.allowedGitSubcommands",
     label: "Git Subcommands",
     description: "Git subcommands the agent is permitted to execute",

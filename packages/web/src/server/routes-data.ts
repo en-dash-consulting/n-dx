@@ -3,7 +3,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
@@ -104,9 +104,13 @@ export function handleDataRoute(
     if (dataFile === "prd.json") {
       const prdPath = join(ctx.rexDir, "prd.json");
       if (existsSync(prdPath)) {
-        const content = readFileSync(prdPath, "utf-8");
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
-        res.end(content);
+        const stat = statSync(prdPath);
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Content-Length": stat.size,
+          "Cache-Control": "no-cache",
+        });
+        createReadStream(prdPath).pipe(res);
       } else {
         res.writeHead(404);
         res.end("Not found");
@@ -126,9 +130,12 @@ export function handleDataRoute(
     if (existsSync(filePath)) {
       const ext = extname(filePath);
       const mime = MIME_TYPES[ext] || "application/octet-stream";
-      const content = readFileSync(filePath, "utf-8");
-      res.writeHead(200, { "Content-Type": mime });
-      res.end(content);
+      const stat = statSync(filePath);
+      res.writeHead(200, {
+        "Content-Type": mime,
+        "Content-Length": stat.size,
+      });
+      createReadStream(filePath).pipe(res);
     } else {
       res.writeHead(404);
       res.end("Not found");

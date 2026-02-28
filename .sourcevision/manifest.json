@@ -1,43 +1,53 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-18T02:46:43.078Z",
-  "gitSha": "536ec50ff193a0dc0578a424bb0af0803716d28b",
-  "gitBranch": "feature/from-recommend",
-  "targetPath": "/Users/nick/development/endash/n-dx",
+  "analyzedAt": "2026-02-25T16:29:11.964Z",
+  "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2",
+  "gitBranch": "feature/integrate-codex",
+  "targetPath": "/Users/ryankeith/work-internal/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:41:55.169Z",
-      "completedAt": "2026-02-18T02:41:55.375Z"
+      "startedAt": "2026-02-25T16:28:02.275Z",
+      "completedAt": "2026-02-25T16:28:02.317Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:41:55.375Z",
-      "completedAt": "2026-02-18T02:41:55.799Z"
+      "startedAt": "2026-02-25T16:28:02.318Z",
+      "completedAt": "2026-02-25T16:28:02.798Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:41:55.799Z",
-      "completedAt": "2026-02-18T02:43:19.344Z"
+      "startedAt": "2026-02-25T16:28:02.799Z",
+      "completedAt": "2026-02-25T16:28:13.122Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:43:19.345Z",
-      "completedAt": "2026-02-18T02:46:41.869Z"
+      "startedAt": "2026-02-25T16:28:13.122Z",
+      "completedAt": "2026-02-25T16:29:09.967Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:46:41.870Z",
-      "completedAt": "2026-02-18T02:46:41.967Z"
+      "startedAt": "2026-02-25T16:29:09.968Z",
+      "completedAt": "2026-02-25T16:29:10.052Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-02-18T02:46:41.967Z",
-      "completedAt": "2026-02-18T02:46:43.078Z"
+      "startedAt": "2026-02-25T16:29:10.052Z",
+      "completedAt": "2026-02-25T16:29:11.964Z"
     }
   },
   "children": [
+    {
+      "id": ".claude-worktrees-angry-chatelet",
+      "prefix": ".claude/worktrees/angry-chatelet",
+      "manifestPath": ".claude/worktrees/angry-chatelet/.sourcevision/manifest.json"
+    },
+    {
+      "id": "packages-llm-client",
+      "prefix": "packages/llm-client",
+      "manifestPath": "packages/llm-client/.sourcevision/manifest.json"
+    },
     {
       "id": "packages-rex",
       "prefix": "packages/rex",
@@ -51,8 +61,10 @@
   ],
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 12,
+    "calls": 3,
     "inputTokens": 0,
-    "outputTokens": 0
+    "outputTokens": 0,
+    "vendor": "claude",
+    "model": "claude-sonnet-4-20250514"
   }
 }

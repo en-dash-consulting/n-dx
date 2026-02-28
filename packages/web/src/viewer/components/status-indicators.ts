@@ -11,6 +11,10 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { usePolling } from "../hooks/use-polling.js";
+import { createMessageCoalescer } from "../message-coalescer.js";
+import { createMessageThrottle } from "../message-throttle.js";
+import { isFeatureDisabled, onDegradationChange } from "../graceful-degradation.js";
 import type { ViewId } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -87,38 +91,79 @@ async function fetchStatus(): Promise<ProjectStatus | null> {
 
 /** Hook that returns project status, polling at a regular interval.
  *  Also listens for WebSocket events (hench:run-changed, rex:prd-changed)
- *  to refresh immediately when runs or PRD data change on disk. */
+ *  to refresh immediately when runs or PRD data change on disk.
+ *
+ *  Polling is automatically suspended when memory pressure disables the
+ *  `autoRefresh` feature (elevated tier and above). The last-known status
+ *  is preserved and displayed without updates until pressure subsides. */
 function useProjectStatus(): ProjectStatus | null {
   const [status, setStatus] = useState<ProjectStatus | null>(cachedStatus);
   const mountedRef = useRef(true);
 
+  // Track memory-pressure state reactively so usePolling's `enabled`
+  // parameter updates when the degradation tier changes.
+  const [autoRefreshDisabled, setAutoRefreshDisabled] = useState(
+    () => isFeatureDisabled("autoRefresh")
+  );
+
+  useEffect(() => {
+    const unsubscribe = onDegradationChange((state) => {
+      setAutoRefreshDisabled(state.disabledFeatures.has("autoRefresh"));
+    });
+    return unsubscribe;
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const data = await fetchStatus();
+    if (mountedRef.current) setStatus(data);
+  }, []);
+
+  // Initial fetch + WebSocket for instant updates
   useEffect(() => {
     mountedRef.current = true;
 
-    const refresh = async () => {
-      const data = await fetchStatus();
-      if (mountedRef.current) setStatus(data);
-    };
-
     refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL_MS);
 
-    // Connect to WebSocket for instant status updates when runs/PRD change
+    // Connect to WebSocket for instant status updates when runs/PRD change.
+    // Two-layer pipeline: per-type throttle → coalescer → single refresh.
+    //
+    // The throttle debounces high-frequency message types (rex:prd-changed,
+    // hench:task-execution-progress) independently before they reach the
+    // coalescer. Other types pass through immediately.
     let ws: WebSocket | null = null;
+
+    const coalescer = createMessageCoalescer({
+      onFlush: (batch) => {
+        if (!mountedRef.current) return;
+        const needsRefresh =
+          batch.types.has("hench:run-changed") ||
+          batch.types.has("hench:task-execution-progress") ||
+          batch.types.has("rex:prd-changed");
+        if (needsRefresh) {
+          refresh();
+        }
+      },
+    });
+
+    const throttle = createMessageThrottle({
+      onMessage: (msg) => coalescer.push(msg),
+      defaultDelayMs: 250,
+      delays: {
+        "rex:prd-changed": 300,
+        "hench:task-execution-progress": 200,
+      },
+      throttledTypes: ["rex:prd-changed", "hench:task-execution-progress"],
+      maxPendingPerType: 20,
+    });
+
     try {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
-          // Refresh status on any event that could affect counts
-          if (
-            msg.type === "hench:run-changed" ||
-            msg.type === "hench:task-execution-progress" ||
-            msg.type === "rex:prd-changed"
-          ) {
-            refresh();
-          }
+          throttle.push(msg);
         } catch {
           // ignore malformed messages
         }
@@ -129,12 +174,17 @@ function useProjectStatus(): ProjectStatus | null {
 
     return () => {
       mountedRef.current = false;
-      clearInterval(timer);
+      throttle.dispose();
+      coalescer.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }
     };
-  }, []);
+  }, [refresh]);
+
+  // Visibility-aware polling via polling manager.
+  // Disabled during memory pressure (autoRefresh feature disabled).
+  usePolling("status-indicators", refresh, POLL_INTERVAL_MS, !autoRefreshDisabled);
 
   return status;
 }

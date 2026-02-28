@@ -19,7 +19,7 @@ import type {
 import { DATA_FILES } from "../schema/data-files.js";
 import { generateContext } from "../analyzers/context.js";
 import { deriveNextSteps } from "../analyzers/next-steps.js";
-import { SV_DIR, TOOL_VERSION } from "./commands/constants.js";
+import { SV_DIR, TOOL_VERSION } from "../constants.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;
@@ -93,29 +93,66 @@ function manifestMtime(svDir: string): number {
 }
 
 export function createSourcevisionMcpServer(targetDir: string): McpServer {
+  const context = createMcpContext(targetDir);
+  const server = new McpServer({ name: "sourcevision", version: TOOL_VERSION });
+  registerMcpTools(server, context);
+  registerMcpResources(server, context);
+  return server;
+}
+
+interface McpContext {
+  absDir: string;
+  freshData: () => SourcevisionData;
+  invalidateCache: () => void;
+}
+
+function createMcpContext(targetDir: string): McpContext {
   const absDir = resolve(targetDir);
   const svDir = join(absDir, SV_DIR);
   let cachedData = loadData(absDir);
   let cachedMtime = manifestMtime(svDir);
 
-  function freshData(): SourcevisionData {
-    const mtime = manifestMtime(svDir);
-    if (mtime !== cachedMtime) {
-      cachedData = loadData(absDir);
-      cachedMtime = mtime;
+  return {
+    absDir,
+    freshData: () => {
+      const mtime = manifestMtime(svDir);
+      if (mtime !== cachedMtime) {
+        cachedData = loadData(absDir);
+        cachedMtime = mtime;
+      }
+      return cachedData;
+    },
+    invalidateCache: () => {
+      cachedMtime = 0;
+    },
+  };
+}
+
+function setArchetypeOverride(absDir: string, path: string, archetype: string): void {
+  const configPath = join(absDir, ".n-dx.json");
+  let config: Record<string, unknown> = {};
+  if (existsSync(configPath)) {
+    try {
+      config = JSON.parse(readFileSync(configPath, "utf-8"));
+    } catch {
+      // Start fresh if corrupted
     }
-    return cachedData;
   }
 
-  const server = new McpServer({
-    name: "sourcevision",
-    version: TOOL_VERSION,
-  });
+  if (!config.sourcevision) config.sourcevision = {};
+  const sv = config.sourcevision as Record<string, unknown>;
+  if (!sv.archetypes) sv.archetypes = {};
+  const archetypes = sv.archetypes as Record<string, unknown>;
+  if (!archetypes.overrides) archetypes.overrides = {};
+  const overrides = archetypes.overrides as Record<string, string>;
+  overrides[path] = archetype;
 
-  // ── Tools ──────────────────────────────────────────────────────────────
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+}
 
+function registerMcpTools(server: McpServer, context: McpContext): void {
   server.tool("get_overview", "Get project summary statistics", {}, () => {
-    const data = freshData();
+    const data = context.freshData();
     if (!data.manifest || !data.inventory) {
       return { content: [{ type: "text", text: "No analysis data available. Run 'sourcevision analyze' first." }] };
     }
@@ -144,7 +181,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
     "Get details for a specific zone",
     { id: z.string().describe("Zone ID") },
     ({ id }) => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.zones) {
         return { content: [{ type: "text", text: "No zones data available." }] };
       }
@@ -174,7 +211,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
     "Get inventory entry, zone, and imports for a file",
     { path: z.string().describe("File path (relative to project root)") },
     ({ path }) => {
-      const data = freshData();
+      const data = context.freshData();
       const file = data.inventory?.files.find((f) => f.path === path);
       if (!file) {
         return { content: [{ type: "text", text: `File "${path}" not found in inventory.` }] };
@@ -209,7 +246,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
     "Get import graph edges, optionally filtered to a specific file",
     { file: z.string().optional().describe("Filter to imports from/to this file") },
     ({ file }) => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.imports) {
         return { content: [{ type: "text", text: "No imports data available." }] };
       }
@@ -233,7 +270,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
   );
 
   server.tool("get_route_tree", "Get the route structure", {}, () => {
-    const data = freshData();
+    const data = context.freshData();
     if (!data.components) {
       return { content: [{ type: "text", text: "No components data available." }] };
     }
@@ -260,7 +297,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       language: z.string().optional().describe("Filter by language"),
     },
     ({ query, role, language }) => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.inventory) {
         return { content: [{ type: "text", text: "No inventory data available." }] };
       }
@@ -298,7 +335,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       severity: z.string().optional().describe("Filter by severity: info, warning, critical"),
     },
     ({ type, severity }) => {
-      const data = freshData();
+      const data = context.freshData();
       let findings = data.zones?.findings ?? [];
 
       if (type) {
@@ -325,7 +362,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       path: z.string().optional().describe("Filter by file path substring"),
     },
     ({ archetype, path }) => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.classifications) {
         return { content: [{ type: "text", text: "No classifications data available. Run 'sourcevision analyze' first." }] };
       }
@@ -361,14 +398,12 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       archetype: z.string().describe("Archetype ID to assign (e.g., utility, route-handler, entrypoint)"),
     },
     ({ path, archetype }) => {
-      // Validate the file exists in inventory
-      const data = freshData();
+      const data = context.freshData();
       const file = data.inventory?.files.find((f) => f.path === path);
       if (!file) {
         return { content: [{ type: "text", text: `File "${path}" not found in inventory.` }] };
       }
 
-      // Validate archetype ID
       const validArchetypes = data.classifications?.archetypes.map((a) => a.id) ?? [];
       if (validArchetypes.length > 0 && !validArchetypes.includes(archetype)) {
         return {
@@ -379,30 +414,8 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
         };
       }
 
-      // Load or create .n-dx.json
-      const configPath = join(absDir, ".n-dx.json");
-      let config: Record<string, unknown> = {};
-      if (existsSync(configPath)) {
-        try {
-          config = JSON.parse(readFileSync(configPath, "utf-8"));
-        } catch {
-          // Start fresh if corrupted
-        }
-      }
-
-      // Set the override
-      if (!config.sourcevision) config.sourcevision = {};
-      const sv = config.sourcevision as Record<string, unknown>;
-      if (!sv.archetypes) sv.archetypes = {};
-      const archetypes = sv.archetypes as Record<string, unknown>;
-      if (!archetypes.overrides) archetypes.overrides = {};
-      const overrides = archetypes.overrides as Record<string, string>;
-      overrides[path] = archetype;
-
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-
-      // Invalidate cache so next read picks up changes
-      cachedMtime = 0;
+      setArchetypeOverride(context.absDir, path, archetype);
+      context.invalidateCache();
 
       return {
         content: [{
@@ -421,7 +434,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       limit: z.number().optional().describe("Max results (default 10)"),
     },
     ({ priority, limit }) => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.zones) {
         return { content: [{ type: "text", text: "No zones data available." }] };
       }
@@ -443,15 +456,15 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       };
     }
   );
+}
 
-  // ── Resources ──────────────────────────────────────────────────────────
-
+function registerMcpResources(server: McpServer, context: McpContext): void {
   server.resource(
     "summary",
     "sourcevision://summary",
     { description: "Condensed codebase context (CONTEXT.md)" },
     () => {
-      const data = freshData();
+      const data = context.freshData();
       if (!data.manifest || !data.inventory || !data.imports || !data.zones) {
         return {
           contents: [{
@@ -462,7 +475,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
         };
       }
 
-      const context = generateContext(
+      const contextText = generateContext(
         data.manifest,
         data.inventory,
         data.imports,
@@ -475,7 +488,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
         contents: [{
           uri: "sourcevision://summary",
           mimeType: "text/markdown",
-          text: context,
+          text: contextText,
         }],
       };
     }
@@ -486,7 +499,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
     "sourcevision://zones",
     { description: "Zone analysis data" },
     () => {
-      const data = freshData();
+      const data = context.freshData();
       return {
         contents: [{
           uri: "sourcevision://zones",
@@ -502,7 +515,7 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
     "sourcevision://routes",
     { description: "Route tree data" },
     () => {
-      const data = freshData();
+      const data = context.freshData();
       return {
         contents: [{
           uri: "sourcevision://routes",
@@ -518,8 +531,6 @@ export function createSourcevisionMcpServer(targetDir: string): McpServer {
       };
     }
   );
-
-  return server;
 }
 
 /**

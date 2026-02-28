@@ -35,6 +35,8 @@ export type {
   RequirementCategory,
   RequirementValidationType,
   Requirement,
+  DuplicateOverrideMarker,
+  MergedProposalRecord,
   PRDItem,
   PRDDocument,
   RexConfig,

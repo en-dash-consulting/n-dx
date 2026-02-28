@@ -81,6 +81,31 @@ export interface PRDDocumentData {
   items: PRDItemData[];
 }
 
+export type WeeklyBudgetSource = "vendor_model" | "vendor_default" | "global_default" | "missing_budget";
+
+export interface WeeklyBudgetResolution {
+  /** Resolved weekly token budget; null means no configured budget applies. */
+  budget: number | null;
+  /** Which lookup tier produced the result. */
+  source: WeeklyBudgetSource;
+}
+
+export interface TaskUtilizationSummary {
+  /** Rounded weekly utilization percentage, if budget is available. */
+  percent: number | null;
+  /** Shared display label used in chips and detail panel. */
+  label: string;
+  /** Resolver source reason used for fallback diagnostics. */
+  reason: WeeklyBudgetSource;
+}
+
+/** Aggregated token usage for a single task across associated runs. */
+export interface TaskUsageSummary {
+  totalTokens: number;
+  runCount: number;
+  utilization?: TaskUtilizationSummary;
+}
+
 /** Computed stats for a branch of the tree. */
 export interface BranchStats {
   total: number;

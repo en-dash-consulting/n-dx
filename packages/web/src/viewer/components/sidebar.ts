@@ -2,7 +2,6 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import type { Manifest, Zones } from "../../schema/v1.js";
 import type { ViewId } from "../types.js";
-import { ENRICHMENT_THRESHOLDS } from "./constants.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
 import {
@@ -13,6 +12,7 @@ import {
 } from "./status-indicators.js";
 import { ConfigFooter } from "./config-footer.js";
 import { useProjectMetadata } from "../hooks/use-project-metadata.js";
+import { SOURCEVISION_TABS } from "../sourcevision-tabs.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -39,20 +39,12 @@ interface SectionGroup {
 
 const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "SOURCEVISION", product: "sourcevision" },
-  { type: "item", id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
-  { type: "item", id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
-  { type: "item", id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
-  { type: "item", id: "files", icon: "\u2630", label: "Files", minPass: 0 },
-  { type: "item", id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
-  { type: "item", id: "architecture", icon: "\u25E8", label: "Architecture", minPass: ENRICHMENT_THRESHOLDS.architecture },
-  { type: "item", id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
-  { type: "item", id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
+  ...SOURCEVISION_TABS.map((tab) => ({ type: "item" as const, ...tab })),
   { type: "section", label: "REX", product: "rex" },
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
   { type: "item", id: "rex-analysis", icon: "\u2699", label: "Analysis", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
-  { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0 },
   { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0 },
   { type: "section", label: "HENCH", product: "hench" },
@@ -61,6 +53,8 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "hench-config", icon: "\u2699", label: "Config", minPass: 0 },
   { type: "item", id: "hench-templates", icon: "\u25A6", label: "Templates", minPass: 0 },
   { type: "item", id: "hench-optimization", icon: "\u26A1", label: "Optimization", minPass: 0 },
+  { type: "section", label: "TOKEN USAGE" },
+  { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },
   { type: "item", id: "feature-toggles", icon: "\u2699", label: "Feature Flags", minPass: 0 },
 ];
@@ -94,6 +88,9 @@ function sectionForView(view: ViewId): string {
 
 /** Read persisted expanded section, falling back to the section owning the active view */
 function getInitialExpanded(view: ViewId): string {
+  // Token Usage now lives at top-level, so initial render must always surface
+  // its own section even when a different section was previously persisted.
+  if (view === "token-usage") return sectionForView(view);
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && SECTIONS.some((s) => s.label === stored)) return stored;

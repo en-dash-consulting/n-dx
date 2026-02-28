@@ -13,6 +13,7 @@ import type {
   Imports,
   Zones,
   Zone,
+  Finding,
   Components,
   ImportType,
 } from "../schema/index.js";
@@ -67,27 +68,43 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
   const chunks: Buffer[] = [];
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
-  // ── Title page ────────────────────────────────────────────────────────
+  renderTitlePage(doc, data.manifest);
+  renderProjectOverview(doc, data.inventory, data.imports, data.components);
+  renderZoneArchitecture(doc, data.zones);
+  renderImportGraphHealth(doc, data.imports, data.inventory);
+  if (data.components) {
+    renderComponentCatalog(doc, data.components);
+  }
+  renderFindings(doc, data.zones.findings ?? []);
+  renderReportFooter(doc, data.manifest);
 
+  doc.end();
+
+  return new Promise<Buffer>((resolve, reject) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+}
+
+// ── Section renderers ────────────────────────────────────────────────────────
+
+function renderTitlePage(doc: PDFKit.PDFDocument, manifest: Manifest): void {
   doc.fontSize(28).fillColor(COLORS.title).text("Sourcevision Report", {
     align: "center",
   });
   doc.moveDown(0.5);
-  doc.fontSize(18).fillColor(COLORS.accent).text(projectName(data.manifest), {
+  doc.fontSize(18).fillColor(COLORS.accent).text(projectName(manifest), {
     align: "center",
   });
   doc.moveDown(0.3);
   doc
     .fontSize(10)
     .fillColor(COLORS.muted)
-    .text(`Generated: ${new Date(data.manifest.analyzedAt).toLocaleString()}`, {
+    .text(`Generated: ${new Date(manifest.analyzedAt).toLocaleString()}`, {
       align: "center",
     });
 
-  const gitParts = [
-    data.manifest.gitBranch,
-    data.manifest.gitSha?.slice(0, 7),
-  ].filter(Boolean);
+  const gitParts = [manifest.gitBranch, manifest.gitSha?.slice(0, 7)].filter(Boolean);
   if (gitParts.length) {
     doc.text(`Git: ${gitParts.join(" @ ")}`, { align: "center" });
   }
@@ -95,12 +112,17 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
   doc.moveDown(2);
   divider(doc);
   doc.moveDown(1);
+}
 
-  // ── Project Overview ──────────────────────────────────────────────────
-
+function renderProjectOverview(
+  doc: PDFKit.PDFDocument,
+  inventory: Inventory,
+  imports: Imports,
+  components?: Components,
+): void {
   sectionHeading(doc, "Project Overview");
 
-  const { summary } = data.inventory;
+  const { summary } = inventory;
   const topLangs = Object.entries(summary.byLanguage)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 8)
@@ -110,131 +132,107 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
   bodyText(doc, `Total files: ${summary.totalFiles}`);
   bodyText(doc, `Total lines: ${summary.totalLines.toLocaleString()}`);
   bodyText(doc, `Languages: ${topLangs}`);
-  bodyText(doc, `Import edges: ${data.imports.summary.totalEdges}`);
-  bodyText(
-    doc,
-    `External packages: ${data.imports.summary.totalExternal}`
-  );
-  if (data.imports.summary.circularCount > 0) {
-    bodyText(
-      doc,
-      `Circular dependencies: ${data.imports.summary.circularCount}`
-    );
+  bodyText(doc, `Import edges: ${imports.summary.totalEdges}`);
+  bodyText(doc, `External packages: ${imports.summary.totalExternal}`);
+  if (imports.summary.circularCount > 0) {
+    bodyText(doc, `Circular dependencies: ${imports.summary.circularCount}`);
   }
-  if (data.components) {
-    bodyText(
-      doc,
-      `Components: ${data.components.summary.totalComponents}`
-    );
-    bodyText(
-      doc,
-      `Route modules: ${data.components.summary.totalRouteModules}`
-    );
+  if (components) {
+    bodyText(doc, `Components: ${components.summary.totalComponents}`);
+    bodyText(doc, `Route modules: ${components.summary.totalRouteModules}`);
   }
 
   doc.moveDown(1);
+}
 
-  // ── Zone Architecture Visualization ─────────────────────────────────
+function renderZoneArchitecture(doc: PDFKit.PDFDocument, zones: Zones): void {
+  if (zones.zones.length === 0) return;
 
-  if (data.zones.zones.length > 0) {
-    sectionHeading(doc, "Zone Architecture");
+  sectionHeading(doc, "Zone Architecture");
 
-    // Zone summary metrics
-    const totalZonedFiles = data.zones.zones.reduce(
-      (sum, z) => sum + z.files.length,
-      0
-    );
-    const avgCohesion =
-      data.zones.zones.reduce((sum, z) => sum + z.cohesion, 0) /
-      data.zones.zones.length;
-    const avgCoupling =
-      data.zones.zones.reduce((sum, z) => sum + z.coupling, 0) /
-      data.zones.zones.length;
+  const totalZonedFiles = zones.zones.reduce((sum, z) => sum + z.files.length, 0);
+  const avgCohesion = zones.zones.reduce((sum, z) => sum + z.cohesion, 0) / zones.zones.length;
+  const avgCoupling = zones.zones.reduce((sum, z) => sum + z.coupling, 0) / zones.zones.length;
 
-    bodyText(doc, `Zones: ${data.zones.zones.length}`);
-    bodyText(doc, `Zoned files: ${totalZonedFiles}`);
-    if (data.zones.unzoned.length > 0) {
-      bodyText(doc, `Unzoned files: ${data.zones.unzoned.length}`);
-    }
-    bodyText(doc, `Avg cohesion: ${avgCohesion.toFixed(2)}  |  Avg coupling: ${avgCoupling.toFixed(2)}`);
-    bodyText(doc, `Cross-zone imports: ${data.zones.crossings.length}`);
+  bodyText(doc, `Zones: ${zones.zones.length}`);
+  bodyText(doc, `Zoned files: ${totalZonedFiles}`);
+  if (zones.unzoned.length > 0) {
+    bodyText(doc, `Unzoned files: ${zones.unzoned.length}`);
+  }
+  bodyText(doc, `Avg cohesion: ${avgCohesion.toFixed(2)}  |  Avg coupling: ${avgCoupling.toFixed(2)}`);
+  bodyText(doc, `Cross-zone imports: ${zones.crossings.length}`);
+  doc.moveDown(0.5);
+
+  subHeading(doc, "Zone Size & Health");
+  doc.moveDown(0.3);
+
+  const maxFiles = Math.max(...zones.zones.map((z) => z.files.length));
+  for (const zone of zones.zones) {
+    ensureSpace(doc, 45);
+    zoneBar(doc, zone, maxFiles);
     doc.moveDown(0.5);
-
-    // Visual bar chart of zone sizes with health indicators
-    subHeading(doc, "Zone Size & Health");
-    doc.moveDown(0.3);
-
-    const maxFiles = Math.max(...data.zones.zones.map((z) => z.files.length));
-
-    for (const zone of data.zones.zones) {
-      ensureSpace(doc, 45);
-      zoneBar(doc, zone, maxFiles);
-      doc.moveDown(0.5);
-    }
-
-    doc.moveDown(0.3);
-
-    // Legend for the bar chart
-    ensureSpace(doc, 30);
-    const legendY = doc.y;
-    doc
-      .rect(PAGE_MARGIN, legendY, 8, 8)
-      .fill(COLORS.cohesionBar);
-    doc
-      .fontSize(8)
-      .fillColor(COLORS.muted)
-      .text("Cohesion (higher = more self-contained)", PAGE_MARGIN + 12, legendY);
-    const legendY2 = doc.y + 2;
-    doc
-      .rect(PAGE_MARGIN, legendY2, 8, 8)
-      .fill(COLORS.couplingBar);
-    doc
-      .fontSize(8)
-      .fillColor(COLORS.muted)
-      .text("Coupling (lower = less external dependency)", PAGE_MARGIN + 12, legendY2);
-
-    doc.moveDown(1.5);
-
-    // Zone details (descriptions + insights)
-    subHeading(doc, "Zone Details");
-    doc.moveDown(0.3);
-
-    for (const zone of data.zones.zones) {
-      ensureSpace(doc, 50);
-      doc
-        .fontSize(10)
-        .fillColor(COLORS.heading)
-        .text(zone.name, { continued: true })
-        .fontSize(8)
-        .fillColor(COLORS.muted)
-        .text(`  — ${zone.files.length} files`);
-
-      if (zone.description) {
-        doc.fontSize(9).fillColor(COLORS.body).text(zone.description, {
-          indent: 10,
-        });
-      }
-
-      if (zone.insights && zone.insights.length > 0) {
-        for (const insight of zone.insights.slice(0, 3)) {
-          doc.fontSize(8).fillColor(COLORS.accent).text(`• ${insight}`, {
-            indent: 15,
-          });
-        }
-      }
-      doc.moveDown(0.3);
-    }
-
-    doc.moveDown(1);
   }
 
-  // ── Import Graph Health ─────────────────────────────────────────────
+  doc.moveDown(0.3);
+  renderZoneLegend(doc);
+  doc.moveDown(1.5);
 
+  subHeading(doc, "Zone Details");
+  doc.moveDown(0.3);
+  renderZoneDetails(doc, zones.zones);
+
+  doc.moveDown(1);
+}
+
+function renderZoneLegend(doc: PDFKit.PDFDocument): void {
+  ensureSpace(doc, 30);
+  const legendY = doc.y;
+  doc.rect(PAGE_MARGIN, legendY, 8, 8).fill(COLORS.cohesionBar);
+  doc
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text("Cohesion (higher = more self-contained)", PAGE_MARGIN + 12, legendY);
+  const legendY2 = doc.y + 2;
+  doc.rect(PAGE_MARGIN, legendY2, 8, 8).fill(COLORS.couplingBar);
+  doc
+    .fontSize(8)
+    .fillColor(COLORS.muted)
+    .text("Coupling (lower = less external dependency)", PAGE_MARGIN + 12, legendY2);
+}
+
+function renderZoneDetails(doc: PDFKit.PDFDocument, zones: Zone[]): void {
+  for (const zone of zones) {
+    ensureSpace(doc, 50);
+    doc
+      .fontSize(10)
+      .fillColor(COLORS.heading)
+      .text(zone.name, { continued: true })
+      .fontSize(8)
+      .fillColor(COLORS.muted)
+      .text(`  — ${zone.files.length} files`);
+
+    if (zone.description) {
+      doc.fontSize(9).fillColor(COLORS.body).text(zone.description, { indent: 10 });
+    }
+
+    if (zone.insights && zone.insights.length > 0) {
+      for (const insight of zone.insights.slice(0, 3)) {
+        doc.fontSize(8).fillColor(COLORS.accent).text(`• ${insight}`, { indent: 15 });
+      }
+    }
+    doc.moveDown(0.3);
+  }
+}
+
+function renderImportGraphHealth(
+  doc: PDFKit.PDFDocument,
+  imports: Imports,
+  inventory: Inventory,
+): void {
   sectionHeading(doc, "Import Graph Health");
 
-  // Health indicators
-  const importSummary = data.imports.summary;
-  const healthScore = computeImportHealthScore(data.imports, data.inventory);
+  const importSummary = imports.summary;
+  const healthScore = computeImportHealthScore(imports, inventory);
 
   ensureSpace(doc, 80);
   const healthColor =
@@ -253,12 +251,11 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
   bodyText(doc, `External packages: ${importSummary.totalExternal}`);
   bodyText(
     doc,
-    `Circular dependencies: ${importSummary.circularCount}${importSummary.circularCount === 0 ? " ✓" : ""}`
+    `Circular dependencies: ${importSummary.circularCount}${importSummary.circularCount === 0 ? " ✓" : ""}`,
   );
   doc.moveDown(0.5);
 
-  // Import type breakdown
-  const typeCounts = countImportTypes(data.imports);
+  const typeCounts = countImportTypes(imports);
   const typeEntries = Object.entries(typeCounts).filter(([, v]) => v > 0);
   if (typeEntries.length > 0) {
     subHeading(doc, "Import Types");
@@ -271,10 +268,9 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
     doc.moveDown(0.5);
   }
 
-  // Top external packages
-  if (data.imports.external.length > 0) {
+  if (imports.external.length > 0) {
     subHeading(doc, "Top External Packages");
-    const topPkgs = [...data.imports.external]
+    const topPkgs = [...imports.external]
       .sort((a, b) => b.importedBy.length - a.importedBy.length)
       .slice(0, 10);
     for (const pkg of topPkgs) {
@@ -289,7 +285,6 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
     doc.moveDown(0.5);
   }
 
-  // Most imported files
   if (importSummary.mostImported.length > 0) {
     subHeading(doc, "Most Imported Files");
     for (const item of importSummary.mostImported.slice(0, 10)) {
@@ -304,127 +299,97 @@ export async function generatePdfReport(data: PdfReportData): Promise<Buffer> {
     doc.moveDown(0.5);
   }
 
-  // Circular dependencies
   if (importSummary.circulars.length > 0) {
     subHeading(doc, "Circular Dependencies");
     for (const circ of importSummary.circulars.slice(0, 10)) {
       ensureSpace(doc, 15);
-      doc
-        .fontSize(9)
-        .fillColor(COLORS.critical)
-        .text(circ.cycle.join(" → "));
+      doc.fontSize(9).fillColor(COLORS.critical).text(circ.cycle.join(" → "));
     }
     doc.moveDown(0.5);
   }
 
   doc.moveDown(0.5);
+}
 
-  // ── Component Catalog ──────────────────────────────────────────────
+function renderComponentCatalog(doc: PDFKit.PDFDocument, components: Components): void {
+  sectionHeading(doc, "Component Catalog");
 
-  if (data.components) {
-    sectionHeading(doc, "Component Catalog");
+  const compSummary = components.summary;
+  bodyText(doc, `Total components: ${compSummary.totalComponents}`);
+  bodyText(doc, `Total usage edges: ${compSummary.totalUsageEdges}`);
+  bodyText(doc, `Route modules: ${compSummary.totalRouteModules}`);
+  if (compSummary.layoutDepth > 0) {
+    bodyText(doc, `Layout nesting depth: ${compSummary.layoutDepth}`);
+  }
+  doc.moveDown(0.5);
 
-    const compSummary = data.components.summary;
-
-    bodyText(doc, `Total components: ${compSummary.totalComponents}`);
-    bodyText(doc, `Total usage edges: ${compSummary.totalUsageEdges}`);
-    bodyText(doc, `Route modules: ${compSummary.totalRouteModules}`);
-    if (compSummary.layoutDepth > 0) {
-      bodyText(doc, `Layout nesting depth: ${compSummary.layoutDepth}`);
+  if (components.components.length > 0) {
+    const kindCounts: Record<string, number> = {};
+    for (const comp of components.components) {
+      kindCounts[comp.kind] = (kindCounts[comp.kind] || 0) + 1;
     }
-    doc.moveDown(0.5);
-
-    // Component kind breakdown
-    if (data.components.components.length > 0) {
-      const kindCounts: Record<string, number> = {};
-      for (const comp of data.components.components) {
-        kindCounts[comp.kind] = (kindCounts[comp.kind] || 0) + 1;
-      }
-      const kindEntries = Object.entries(kindCounts).sort(([, a], [, b]) => b - a);
-
-      subHeading(doc, "Component Types");
-      for (const [kind, count] of kindEntries) {
-        bodyText(doc, `  ${kind}: ${count}`);
-      }
-      doc.moveDown(0.5);
+    const kindEntries = Object.entries(kindCounts).sort(([, a], [, b]) => b - a);
+    subHeading(doc, "Component Types");
+    for (const [kind, count] of kindEntries) {
+      bodyText(doc, `  ${kind}: ${count}`);
     }
-
-    // Most used components
-    if (compSummary.mostUsedComponents.length > 0) {
-      subHeading(doc, "Most Used Components");
-      for (const comp of compSummary.mostUsedComponents.slice(0, 10)) {
-        ensureSpace(doc, 15);
-        doc
-          .fontSize(9)
-          .fillColor(COLORS.body)
-          .text(`${comp.name}`, { continued: true })
-          .fillColor(COLORS.muted)
-          .text(`  (${comp.usageCount} uses, ${comp.file})`);
-      }
-      doc.moveDown(0.5);
-    }
-
-    // Route conventions
-    const conventions = Object.entries(compSummary.routeConventions).filter(
-      ([, v]) => v > 0
-    );
-    if (conventions.length > 0) {
-      subHeading(doc, "Route Conventions");
-      for (const [kind, count] of conventions) {
-        bodyText(doc, `  ${kind}: ${count} modules`);
-      }
-      doc.moveDown(0.5);
-    }
-
     doc.moveDown(0.5);
   }
 
-  // ── Findings ──────────────────────────────────────────────────────────
-
-  const findings = data.zones.findings ?? [];
-  const warnAndCritical = findings.filter(
-    (f) => f.severity === "warning" || f.severity === "critical"
-  );
-
-  if (warnAndCritical.length > 0) {
-    sectionHeading(doc, "Findings");
-
-    for (const f of warnAndCritical.slice(0, 20)) {
+  if (compSummary.mostUsedComponents.length > 0) {
+    subHeading(doc, "Most Used Components");
+    for (const comp of compSummary.mostUsedComponents.slice(0, 10)) {
       ensureSpace(doc, 15);
-      const color =
-        f.severity === "critical" ? COLORS.critical : COLORS.warn;
-      const label = f.severity === "critical" ? "CRITICAL" : "WARNING";
       doc
         .fontSize(9)
-        .fillColor(color)
-        .text(`[${label}] `, { continued: true })
         .fillColor(COLORS.body)
-        .text(f.text);
+        .text(`${comp.name}`, { continued: true })
+        .fillColor(COLORS.muted)
+        .text(`  (${comp.usageCount} uses, ${comp.file})`);
     }
-
-    doc.moveDown(1);
+    doc.moveDown(0.5);
   }
 
-  // ── Footer ────────────────────────────────────────────────────────────
+  const conventions = Object.entries(compSummary.routeConventions).filter(([, v]) => v > 0);
+  if (conventions.length > 0) {
+    subHeading(doc, "Route Conventions");
+    for (const [kind, count] of conventions) {
+      bodyText(doc, `  ${kind}: ${count} modules`);
+    }
+    doc.moveDown(0.5);
+  }
 
+  doc.moveDown(0.5);
+}
+
+function renderFindings(doc: PDFKit.PDFDocument, findings: Finding[]): void {
+  const warnAndCritical = findings.filter(
+    (f) => f.severity === "warning" || f.severity === "critical",
+  );
+  if (warnAndCritical.length === 0) return;
+
+  sectionHeading(doc, "Findings");
+  for (const f of warnAndCritical.slice(0, 20)) {
+    ensureSpace(doc, 15);
+    const color = f.severity === "critical" ? COLORS.critical : COLORS.warn;
+    const label = f.severity === "critical" ? "CRITICAL" : "WARNING";
+    doc
+      .fontSize(9)
+      .fillColor(color)
+      .text(`[${label}] `, { continued: true })
+      .fillColor(COLORS.body)
+      .text(f.text);
+  }
+  doc.moveDown(1);
+}
+
+function renderReportFooter(doc: PDFKit.PDFDocument, manifest: Manifest): void {
   divider(doc);
   doc.moveDown(0.5);
   doc
     .fontSize(8)
     .fillColor(COLORS.muted)
-    .text(
-      `Generated by Sourcevision v${data.manifest.toolVersion}`,
-      { align: "center" }
-    );
-
-  // ── Finalize ──────────────────────────────────────────────────────────
-
-  doc.end();
-
-  return new Promise<Buffer>((resolve, reject) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-  });
+    .text(`Generated by Sourcevision v${manifest.toolVersion}`, { align: "center" });
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import type { PRDItem, Priority, Requirement } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/index.js";
 import type { TreeEntry } from "./tree.js";
-import { walkTree } from "./tree.js";
+import { walkTree, findItem } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import { collectRequirements } from "./requirements.js";
 
@@ -139,6 +139,11 @@ export interface PrioritizationOptions {
    * Default: "medium".
    */
   riskTolerance?: RiskTolerance;
+  /**
+   * Restrict candidates to descendants of a specific feature.
+   * When set, only tasks/subtasks under this feature ID are considered.
+   */
+  featureId?: string;
 }
 
 /**
@@ -310,13 +315,33 @@ function collectActionable(
  *
  * @param options.riskTolerance — Controls how much requirements influence ordering.
  */
+/**
+ * Resolve the subtree for a featureId filter.
+ * Returns the feature's children wrapped in an array for collectActionable,
+ * or null if the feature is not found or has no children.
+ */
+function resolveFeatureSubtree(
+  items: PRDItem[],
+  featureId: string,
+): PRDItem[] | null {
+  const entry = findItem(items, featureId);
+  if (!entry) return null;
+  return entry.item.children ?? [];
+}
+
 export function findActionableTasks(
   items: PRDItem[],
   completedIds: Set<string>,
   limit = 20,
   options?: PrioritizationOptions,
 ): TreeEntry[] {
-  const results = collectActionable(items, completedIds);
+  let scope = items;
+  if (options?.featureId) {
+    const subtree = resolveFeatureSubtree(items, options.featureId);
+    if (!subtree || subtree.length === 0) return [];
+    scope = subtree;
+  }
+  const results = collectActionable(scope, completedIds);
   results.sort(makeComparator(items, options));
   return results.slice(0, limit);
 }
@@ -326,7 +351,13 @@ export function findNextTask(
   completedIds: Set<string>,
   options?: PrioritizationOptions,
 ): TreeEntry | null {
-  const results = collectActionable(items, completedIds);
+  let scope = items;
+  if (options?.featureId) {
+    const subtree = resolveFeatureSubtree(items, options.featureId);
+    if (!subtree || subtree.length === 0) return null;
+    scope = subtree;
+  }
+  const results = collectActionable(scope, completedIds);
   if (results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];

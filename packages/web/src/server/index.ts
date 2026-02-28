@@ -36,5 +36,5 @@ export { startServer, PORT_FILE } from "./start.js";
 export type { ServerOptions, StartResult } from "./start.js";
 export type { ServerContext, RouteHandler } from "./types.js";
 export type { WebSocketBroadcaster } from "./websocket.js";
-export { checkPort, findAvailablePort } from "./port.js";
-export type { PortCheckResult, PortAllocationResult } from "./port.js";
+export { checkPort, checkPortWithRetry, findAvailablePort } from "./port.js";
+export type { PortCheckResult, PortAllocationResult, PortRetryOptions } from "./port.js";

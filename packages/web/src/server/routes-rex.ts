@@ -10,6 +10,7 @@
  * GET   /api/rex/items/:id        — single item by ID
  * POST  /api/rex/items            — add a new item
  * PATCH /api/rex/items/:id        — update item fields
+ * DELETE /api/rex/items/:id       — remove item and all descendants
  * PATCH /api/rex/items/bulk       — bulk update multiple items
  * POST  /api/rex/items/merge     — consolidate/merge sibling items
  * GET   /api/rex/prune/preview    — preview items that would be pruned
@@ -38,7 +39,7 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdtempSync, r
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { exec as foundationExec, spawnManaged, type ManagedChild } from "@n-dx/claude-client";
+import { exec as foundationExec, spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -86,7 +87,7 @@ import {
   computeEpicStats,
   computePriorityDistribution,
   computeRequirementsSummary,
-} from "./domain-gateway.js";
+} from "./rex-gateway.js";
 
 const REX_PREFIX = "/api/rex/";
 
@@ -339,6 +340,11 @@ function routeItems(
     if (method === "PATCH") {
       return handleItemPatch(req, res, ctx, itemId, broadcast);
     }
+
+    // DELETE /api/rex/items/:id — remove item and all descendants
+    if (method === "DELETE") {
+      return handleItemDelete(res, ctx, itemId, broadcast);
+    }
   }
 
   return false;
@@ -568,6 +574,70 @@ async function handleItemPatch(
   } catch (err) {
     errorResponse(res, 400, String(err));
   }
+  return true;
+}
+
+/** Handle DELETE /api/rex/items/:id — remove item and all descendants */
+function handleItemDelete(
+  res: ServerResponse,
+  ctx: ServerContext,
+  itemId: string,
+  broadcast?: WebSocketBroadcaster,
+): boolean {
+  const doc = loadPRD(ctx);
+  if (!doc) {
+    errorResponse(res, 404, "No PRD data found");
+    return true;
+  }
+
+  const item = findItemById(doc.items, itemId);
+  if (!item) {
+    errorResponse(res, 404, `Item "${itemId}" not found`);
+    return true;
+  }
+
+  const title = item.title;
+  const level = item.level;
+  const removed = removeFromTree(doc.items, itemId);
+  if (!removed) {
+    errorResponse(res, 404, `Item "${itemId}" could not be removed`);
+    return true;
+  }
+
+  savePRD(ctx, doc);
+
+  // Append log entry
+  const logPath = join(ctx.rexDir, "execution-log.jsonl");
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    event: "item_deleted",
+    itemId,
+    detail: `Deleted ${level} "${title}" and its descendants (via web)`,
+  };
+  try {
+    appendFileSync(logPath, JSON.stringify(logEntry) + "\n");
+  } catch {
+    // Non-fatal — log file may not exist yet
+  }
+
+  // Broadcast change to connected WebSocket clients
+  if (broadcast) {
+    const timestamp = new Date().toISOString();
+    broadcast({
+      type: "rex:item-deleted",
+      itemId,
+      level,
+      title,
+      timestamp,
+    });
+    // Also broadcast generic prd-changed so sidebar status indicators refresh
+    broadcast({
+      type: "rex:prd-changed",
+      timestamp,
+    });
+  }
+
+  jsonResponse(res, 200, { ok: true, id: itemId, level, title });
   return true;
 }
 
@@ -2282,13 +2352,72 @@ function handleExecutionResume(
   return true;
 }
 
+/**
+ * Result returned by {@link shutdownRexExecution}.
+ *
+ * Callers (e.g. `gracefulShutdown` in start.ts) use this to build a final
+ * verification summary for the rex epic-by-epic execution component.
+ */
+export interface ShutdownRexResult {
+  /** Whether a rex epic-by-epic hench process was running at shutdown time. */
+  hadActiveProcess: boolean;
+  /** Whether the process was successfully terminated (false if it errored or was not present). */
+  terminated: boolean;
+}
+
+/**
+ * Terminate any active rex epic-by-epic hench process.
+ *
+ * Called during server graceful shutdown to ensure the hench child spawned
+ * by the rex execution engine is cleaned up alongside the hench-route
+ * executions. Mirrors the pattern used by `shutdownActiveExecutions` in
+ * routes-hench.ts.
+ *
+ * @param gracePeriodMs  How long to wait for graceful SIGTERM before
+ *                       sending SIGKILL (default: HENCH_SHUTDOWN_TIMEOUT_MS
+ *                       env var, or 5 000 ms).
+ * @returns Result indicating whether the process was present and terminated.
+ */
+export async function shutdownRexExecution(
+  gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
+): Promise<ShutdownRexResult> {
+  if (!henchProcess) return { hadActiveProcess: false, terminated: false };
+
+  const handle = henchProcess;
+  const pid = handle.pid;
+  const pidInfo = pid != null ? ` (pid ${pid})` : "";
+  henchProcess = null;
+
+  console.log(`[shutdown] terminating rex epic-by-epic execution${pidInfo}`);
+
+  let terminated = false;
+  try {
+    await killWithFallback(handle, gracePeriodMs);
+    console.log(`[shutdown] rex epic-by-epic execution${pidInfo} terminated`);
+    terminated = true;
+  } catch (err) {
+    const error = err as Error;
+    console.error(`[shutdown] rex epic-by-epic execution${pidInfo} failed to terminate: ${error.message}`);
+  }
+
+  // Mark execution as failed so callers (status endpoint, WebSocket) see a
+  // clean terminal state rather than a stale "running" after restart.
+  if (executionState.status === "running" || executionState.status === "paused") {
+    executionState.status = "failed";
+    executionState.error = "Server shutting down";
+    executionState.finishedAt = new Date().toISOString();
+  }
+
+  return { hadActiveProcess: true, terminated };
+}
+
 // ---------------------------------------------------------------------------
 // Requirements CRUD handlers
 // ---------------------------------------------------------------------------
 
 // RequirementRecord is now the canonical Requirement type from rex,
 // imported via the gateway (domain-gateway.ts).
-type RequirementRecord = import("./domain-gateway.js").Requirement;
+type RequirementRecord = import("./rex-gateway.js").Requirement;
 
 /** Walk the item tree collecting requirements with inheritance. */
 function collectInheritedRequirements(

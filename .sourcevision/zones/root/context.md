@@ -5,18 +5,26 @@
 <zone>
 
 Zone: Root (`root`)
-Files: 4, Cohesion: 1.00, Coupling: 0.00
-Description: 4 files, primarily JavaScript
-Lines: 1711
+Files: 12, Cohesion: 1.00, Coupling: 0.00
+Description: 12 files, primarily JavaScript
+Lines: 4472
 
 </zone>
 
 <files>
 
 ci.js (JavaScript, 269 lines, source)
-cli.js (JavaScript, 320 lines, source)
-config.js (JavaScript, 799 lines, source)
-web.js (JavaScript, 323 lines, source)
+cli.js (JavaScript, 840 lines, source)
+config.js (JavaScript, 1013 lines, source)
+help.js (JavaScript, 899 lines, source)
+refresh-artifacts.js (JavaScript, 54 lines, source)
+refresh-plan.js (JavaScript, 79 lines, source)
+refresh-validate.js (JavaScript, 175 lines, source)
+tests/unit/help.test.js (JavaScript, 253 lines, test)
+tests/unit/refresh-artifacts.test.js (JavaScript, 32 lines, test)
+tests/unit/refresh-plan.test.js (JavaScript, 69 lines, test)
+tests/unit/refresh-validate.test.js (JavaScript, 335 lines, test)
+web.js (JavaScript, 454 lines, source)
 
 </files>
 
@@ -25,7 +33,15 @@ web.js (JavaScript, 323 lines, source)
 Internal:
   cli.js → ci.js {runCI}
   cli.js → config.js {runConfig}
-  cli.js → web.js {runWeb}
+  cli.js → help.js {formatTypoSuggestion, getOrchestratorCommands, searchHelp, formatSearchResults, formatToolHelp, formatMainHelp, formatOrchestratorCommandHelp}
+  cli.js → refresh-artifacts.js {refreshSourcevisionDashboardArtifacts}
+  cli.js → refresh-plan.js {buildRefreshPlan, RefreshPlanError}
+  cli.js → refresh-validate.js {snapshotRefreshState, validateRefreshCompletion, rollbackRefreshState}
+  cli.js → web.js {runWeb, isProcessRunning, readPidFile, removePidFile, removePortFile, waitForProcessExit}
+  tests/unit/help.test.js → help.js {editDistance, suggestCommands, formatTypoSuggestion, searchHelp, formatSearchResults, getOrchestratorCommands, getToolSubcommands, formatToolHelp, getRelatedCommands, formatRelatedCommands}
+  tests/unit/refresh-artifacts.test.js → refresh-artifacts.js {refreshSourcevisionDashboardArtifacts}
+  tests/unit/refresh-plan.test.js → refresh-plan.js {buildRefreshPlan, RefreshPlanError}
+  tests/unit/refresh-validate.test.js → refresh-validate.js {snapshotRefreshState, validateRefreshStep, validateRefreshCompletion, rollbackRefreshState}
 
 </imports>
 
@@ -38,14 +54,6 @@ Internal:
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Clean separation of orchestration concerns with each file having a distinct role
-- Minimal file count indicates good architectural discipline
-- Perfect cohesion suggests well-bounded orchestration responsibilities
-- Excellent architectural separation with zero coupling to other zones, maintaining clean orchestration boundaries
-- Command delegation pattern centralizes all tool dispatch through cli.js hub
-- Hub-and-spoke orchestration pattern with cli.js as central dispatcher to ci.js, config.js, and web.js
-- All four orchestration files (cli.js, ci.js, config.js, web.js) use .js extension despite TypeScript codebase — intentional Node.js compatibility choice for direct execution
-- Extension inconsistency: orchestration files use .js while all packages use .ts — consider .mjs or build step for consistency
-- [call graph] 152 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- [call graph] 386 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

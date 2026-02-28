@@ -281,6 +281,38 @@ describe("cmdStatus", () => {
 
       expect(out).toContain("PRD: Test Project");
     });
+
+    it("marks override-created items in tree output", async () => {
+      const prd: PRDDocument = {
+        schema: "rex/v1",
+        title: "Overrides",
+        items: [
+          {
+            id: "t-force",
+            title: "Force-created duplicate",
+            level: "task",
+            status: "pending",
+            overrideMarker: {
+              type: "duplicate_guard_override",
+              reason: "exact_title",
+              reasonRef: "exact_title:t-existing",
+              matchedItemId: "t-existing",
+              matchedItemTitle: "Existing Task",
+              matchedItemLevel: "task",
+              matchedItemStatus: "completed",
+              createdAt: "2026-02-22T20:30:44.000Z",
+            },
+          },
+        ],
+      };
+
+      writePRD(tmp, prd);
+      await cmdStatus(tmp, { format: "tree" });
+      const out = output();
+
+      expect(out).toContain("Force-created duplicate");
+      expect(out).toContain("[override: exact_title]");
+    });
   });
 
   describe("epic progress bars", () => {
@@ -911,6 +943,62 @@ describe("cmdStatus", () => {
       const out = output();
 
       expect(out).toContain("rex:");
+    });
+  });
+
+  describe("override markers in JSON output", () => {
+    it("includes override marker summary and preserves item marker fields", async () => {
+      const prd: PRDDocument = {
+        schema: "rex/v1",
+        title: "Overrides",
+        items: [
+          {
+            id: "t-force",
+            title: "Force-created duplicate",
+            level: "task",
+            status: "pending",
+            overrideMarker: {
+              type: "duplicate_guard_override",
+              reason: "exact_title",
+              reasonRef: "exact_title:t-existing",
+              matchedItemId: "t-existing",
+              matchedItemTitle: "Existing Task",
+              matchedItemLevel: "task",
+              matchedItemStatus: "completed",
+              createdAt: "2026-02-22T20:30:44.000Z",
+            },
+          },
+          {
+            id: "t-normal",
+            title: "Normal item",
+            level: "task",
+            status: "pending",
+          },
+        ],
+      };
+
+      writePRD(tmp, prd);
+      await cmdStatus(tmp, { format: "json", tokens: "false" });
+      const parsed = JSON.parse(output());
+
+      expect(parsed.items[0].overrideMarker).toBeDefined();
+      expect(parsed.overrideMarkers).toBeDefined();
+      expect(parsed.overrideMarkers.totalItems).toBe(2);
+      expect(parsed.overrideMarkers.overrideCreated).toBe(1);
+      expect(parsed.overrideMarkers.normalOrMerged).toBe(1);
+      expect(parsed.overrideMarkers.items).toEqual([
+        {
+          id: "t-force",
+          title: "Force-created duplicate",
+          level: "task",
+          status: "pending",
+          reason: "exact_title",
+          reasonRef: "exact_title:t-existing",
+          matchedItemId: "t-existing",
+          matchedItemStatus: "completed",
+          createdAt: "2026-02-22T20:30:44.000Z",
+        },
+      ]);
     });
   });
 });

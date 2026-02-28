@@ -16,17 +16,20 @@
 
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "rex";
-import type { HenchConfig, RunRecord, TaskBrief } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief } from "../../schema/index.js";
 import { getCurrentHead } from "../../process/index.js";
+import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt } from "../planning/prompt.js";
 import { saveRun } from "../../store/index.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
-import { toolRexUpdateStatus, toolRexAppendLog, runPostTaskTests } from "../../tools/index.js";
+import { runPostTaskTests } from "../../tools/index.js";
+import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
+import type { Heartbeat } from "./heartbeat.js";
 
 // ---------------------------------------------------------------------------
 // Shared option types
@@ -158,10 +161,20 @@ export interface InitRunOptions {
 }
 
 /**
+ * System memory context captured at run start, passed through to
+ * {@link finalizeRun} for assembling {@link RunMemoryStats}.
+ */
+export interface MemoryContext {
+  systemAvailableAtStartBytes: number;
+  systemTotalBytes: number;
+}
+
+/**
  * Create a new RunRecord in "running" status and persist it.
+ * Also captures a system memory snapshot for later use in finalization.
  * Both loops create identical initial records.
  */
-export async function initRunRecord(opts: InitRunOptions): Promise<RunRecord> {
+export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
   const run: RunRecord = {
     id: randomUUID(),
     taskId: opts.taskId,
@@ -178,7 +191,23 @@ export async function initRunRecord(opts: InitRunOptions): Promise<RunRecord> {
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
 
-  return run;
+  // Capture system memory at run start
+  const monitor = new SystemMemoryMonitor();
+  let memoryCtx: MemoryContext;
+  try {
+    const snap = await monitor.snapshot();
+    memoryCtx = {
+      systemAvailableAtStartBytes: snap.availableBytes,
+      systemTotalBytes: snap.totalBytes,
+    };
+  } catch {
+    memoryCtx = {
+      systemAvailableAtStartBytes: -1,
+      systemTotalBytes: -1,
+    };
+  }
+
+  return { run, memoryCtx };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,17 +312,45 @@ export async function runPostTaskTestsIfNeeded(
 // Run finalization (identical in both loops)
 // ---------------------------------------------------------------------------
 
+export interface FinalizeRunOptions {
+  run: RunRecord;
+  henchDir: string;
+  projectDir: string;
+  testCommand?: string;
+  heartbeat?: Heartbeat;
+  memoryCtx?: MemoryContext;
+}
+
 /**
- * Finalize a run: build structured summary, run post-task tests,
- * set timestamps, and persist. Called at the end of both loops.
+ * Finalize a run: build structured summary, capture memory stats,
+ * run post-task tests, set timestamps, and persist.
+ * Called at the end of both loops.
  */
-export async function finalizeRun(
-  run: RunRecord,
-  henchDir: string,
-  projectDir: string,
-  testCommand?: string,
-): Promise<void> {
+export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
+  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx } = opts;
+
   run.structuredSummary = buildRunSummary(run.toolCalls);
+
+  // Assemble memory stats if context was captured at init
+  if (memoryCtx) {
+    const peakRssBytes = heartbeat?.peakRssBytes ?? process.memoryUsage().rss;
+
+    let systemAvailableAtEndBytes = -1;
+    try {
+      const monitor = new SystemMemoryMonitor();
+      const snap = await monitor.snapshot();
+      systemAvailableAtEndBytes = snap.availableBytes;
+    } catch {
+      // Best-effort — leave as -1
+    }
+
+    run.memoryStats = {
+      peakRssBytes,
+      systemAvailableAtStartBytes: memoryCtx.systemAvailableAtStartBytes,
+      systemAvailableAtEndBytes,
+      systemTotalBytes: memoryCtx.systemTotalBytes,
+    };
+  }
 
   await runPostTaskTestsIfNeeded(run, projectDir, testCommand);
 

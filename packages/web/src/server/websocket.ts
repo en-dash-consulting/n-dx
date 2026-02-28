@@ -7,21 +7,39 @@
  * Supports:
  * - Broadcasting PRD item changes to connected clients
  * - Broadcasting file-change events (sourcevision data updates)
- * - Ping/pong keepalive
+ * - Immediate disconnect detection via socket events + pre-broadcast pruning
+ * - Ping/pong keepalive (reduced interval safety net)
  */
 
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import type { WsHealthTracker, CleanupReason } from "./ws-health-tracker.js";
 
 /** A broadcast function that sends a message to all connected clients. */
 export type WebSocketBroadcaster = (data: unknown) => void;
+
+/** Options for the WebSocket manager. */
+export interface WebSocketManagerOptions {
+  /** Optional health tracker for connection lifecycle metrics. */
+  healthTracker?: WsHealthTracker;
+}
 
 /** A connected WebSocket client. */
 interface WSClient {
   socket: Duplex;
   alive: boolean;
+  /** Tracker-assigned connection ID for duration tracking. */
+  trackingId?: string;
 }
+
+/**
+ * Keepalive ping interval (ms). Reduced from 30 s for faster detection
+ * of silently dropped connections. Primary disconnect detection is
+ * event-driven (close/error/end handlers); pings are a safety net for
+ * connections that go silent without a TCP FIN/RST.
+ */
+export const PING_INTERVAL_MS = 5_000;
 
 const WS_MAGIC = "258EAFA5-E914-47DA-95CA-5AB9DC65B11D";
 
@@ -99,7 +117,7 @@ function encodePingFrame(): Buffer {
  * ws.broadcast({ type: "rex:item-updated", itemId: "..." });
  * ```
  */
-export function createWebSocketManager(): {
+export function createWebSocketManager(opts?: WebSocketManagerOptions): {
   handleUpgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
   broadcast: WebSocketBroadcaster;
   clientCount: () => number;
@@ -107,26 +125,70 @@ export function createWebSocketManager(): {
 } {
   const clients = new Set<WSClient>();
   let pingInterval: ReturnType<typeof setInterval> | null = null;
+  const tracker = opts?.healthTracker;
 
-  // Start keepalive pings every 30s
+  /**
+   * Idempotent client removal — safe to call from multiple event handlers.
+   *
+   * Performs full cleanup in a single call:
+   *  1. Removes from the broadcast set (stops future broadcasts immediately)
+   *  2. Strips event listeners (breaks closure references for GC)
+   *  3. Destroys the underlying socket (releases OS resources)
+   *
+   * Because listeners are removed before the socket is destroyed, the
+   * destroy → close → removeClient chain cannot recurse.
+   */
+  function removeClient(client: WSClient, reason?: CleanupReason): void {
+    if (!clients.delete(client)) return; // already removed — nothing to do
+
+    // Record the disconnect in the health tracker.
+    if (tracker && client.trackingId) {
+      tracker.recordDisconnect(client.trackingId, reason ?? "close");
+    }
+
+    // Break closure references so the client + socket can be GC'd immediately.
+    client.socket.removeAllListeners();
+
+    // Release the OS socket if still open.
+    if (!client.socket.destroyed) {
+      client.socket.destroy();
+    }
+  }
+
+  /**
+   * Remove clients whose underlying socket is no longer writable.
+   * Called before each broadcast to catch connections that died between
+   * event-loop ticks without emitting a socket event.
+   *
+   * Uses removeClient() for full cleanup (listener removal + socket destroy).
+   */
+  function pruneDeadClients(): void {
+    for (const client of clients) {
+      if (client.socket.destroyed || !client.socket.writable) {
+        removeClient(client, "prune");
+      }
+    }
+  }
+
+  // Keepalive pings — safety net for connections that go silent without
+  // a TCP FIN/RST (e.g. network drops). Primary detection is event-driven.
   function startPingInterval(): void {
     if (pingInterval) return;
     pingInterval = setInterval(() => {
       for (const client of clients) {
         if (!client.alive) {
-          // Missed last ping — disconnect
-          client.socket.destroy();
-          clients.delete(client);
+          // Missed last ping — full cleanup via removeClient
+          removeClient(client, "ping_timeout");
           continue;
         }
         client.alive = false;
         try {
           client.socket.write(encodePingFrame());
         } catch {
-          clients.delete(client);
+          removeClient(client, "write_fail");
         }
       }
-    }, 30000);
+    }, PING_INTERVAL_MS);
   }
 
   function handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
@@ -134,6 +196,17 @@ export function createWebSocketManager(): {
     if (!key) {
       socket.destroy();
       return;
+    }
+
+    // Enable TCP-level keepalive for OS-level dead-peer detection.
+    // The socket is typed as Duplex but is a net.Socket at runtime;
+    // guard with runtime checks so non-TCP transports still work.
+    const sock = socket as unknown as Record<string, unknown>;
+    if (typeof sock.setKeepAlive === "function") {
+      (sock.setKeepAlive as (enable: boolean, initialDelay: number) => void)(true, 1000);
+    }
+    if (typeof sock.setNoDelay === "function") {
+      (sock.setNoDelay as (noDelay: boolean) => void)(true);
     }
 
     const acceptKey = computeAcceptKey(key);
@@ -150,7 +223,8 @@ export function createWebSocketManager(): {
 
     socket.write(response);
 
-    const client: WSClient = { socket, alive: true };
+    const trackingId = tracker?.recordConnect();
+    const client: WSClient = { socket, alive: true, trackingId };
     clients.add(client);
     startPingInterval();
 
@@ -163,13 +237,12 @@ export function createWebSocketManager(): {
       processData(client, data);
     });
 
-    socket.on("close", () => {
-      clients.delete(client);
-    });
-
-    socket.on("error", () => {
-      clients.delete(client);
-    });
+    // Immediate disconnect detection — every socket lifecycle event that
+    // signals the connection is gone triggers client removal. Set.delete
+    // is idempotent so overlapping events are harmless.
+    socket.on("close", () => removeClient(client, "close"));
+    socket.on("error", () => removeClient(client, "error"));
+    socket.on("end", () => removeClient(client, "end"));
 
     // Send a welcome message
     try {
@@ -225,8 +298,7 @@ export function createWebSocketManager(): {
         break;
       case 0x08: // Close
         try { client.socket.write(encodeCloseFrame()); } catch { /* ignore */ }
-        client.socket.destroy();
-        clients.delete(client);
+        removeClient(client, "close");
         break;
       case 0x09: // Ping
         client.alive = true;
@@ -240,12 +312,33 @@ export function createWebSocketManager(): {
 
   function broadcast(data: unknown): void {
     if (clients.size === 0) return;
-    const msg = encodeFrame(JSON.stringify(data));
+
+    tracker?.recordBroadcast();
+
+    // Single-pass broadcast: inline health checks replace the separate
+    // pruneDeadClients() call, and JSON serialization is deferred until
+    // the first confirmed-active connection is found. This means:
+    //   1. JSON.stringify is never called unless an active client exists
+    //   2. Dead connections are skipped without attempting socket writes
+    //   3. Performance scales with active connection count, not set size
+    let msg: Buffer | null = null;
     for (const client of clients) {
+      if (client.socket.destroyed || !client.socket.writable) {
+        removeClient(client, "prune");
+        continue;
+      }
+
+      // Lazy serialization: only pay the JSON.stringify + frame encoding
+      // cost once we have a confirmed-active client to write to.
+      if (msg === null) {
+        msg = encodeFrame(JSON.stringify(data));
+      }
+
       try {
         client.socket.write(msg);
       } catch {
-        clients.delete(client);
+        tracker?.recordBroadcastWriteFailure();
+        removeClient(client, "write_fail");
       }
     }
   }
@@ -260,6 +353,9 @@ export function createWebSocketManager(): {
       pingInterval = null;
     }
     for (const client of clients) {
+      if (tracker && client.trackingId) {
+        tracker.recordDisconnect(client.trackingId, "shutdown");
+      }
       try {
         client.socket.write(encodeCloseFrame());
         client.socket.destroy();

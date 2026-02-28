@@ -1,5 +1,5 @@
 /**
- * Token Usage Analytics dashboard view.
+ * LLM Utilization dashboard view.
  *
  * Shows token consumption across packages (rex, hench, sourcevision),
  * grouped by command and time period, with budget status indicators
@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import { MetricCard } from "../components/data-display/health-gauge.js";
 import { BarChart } from "../components/data-display/mini-charts.js";
 import { BrandedHeader } from "../components/logos.js";
+import { usePolling } from "../hooks/use-polling.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -51,6 +52,40 @@ interface PeriodBucket {
   estimatedCost: CostEstimate;
 }
 
+interface VendorModelUsage extends PackageTokenUsage {
+  vendor: string;
+  model: string;
+  toolBreakdown: {
+    rex: PackageTokenUsage;
+    hench: PackageTokenUsage;
+    sv: PackageTokenUsage;
+  };
+}
+
+interface UtilizationResponse {
+  configured: { vendor: string; model: string };
+  source: { rex: string; hench: string; sourcevision: string };
+  period: TimePeriod;
+  window: { since: string | null; until: string | null };
+  usage: AggregateTokenUsage;
+  cost: CostEstimate;
+  byVendorModel: VendorModelUsage[];
+  trend: Array<{
+    period: string;
+    totalTokens: number;
+    byVendorModel: VendorModelUsage[];
+    toolBreakdown: {
+      rex: PackageTokenUsage;
+      hench: PackageTokenUsage;
+      sv: PackageTokenUsage;
+    };
+    estimatedCost: CostEstimate;
+  }>;
+  commands: CommandTokenUsage[];
+  budget: BudgetCheckResult;
+  eventCount: number;
+}
+
 type BudgetSeverity = "ok" | "warning" | "exceeded";
 
 interface BudgetDimension {
@@ -82,6 +117,15 @@ function fmtTokens(n: number): string {
 function fmtNumber(n: number): string {
   return n.toLocaleString();
 }
+
+function fmtWindow(since: string | null, until: string | null): string {
+  const from = since ? new Date(since).toLocaleDateString() : "start";
+  const to = until ? new Date(until).toLocaleDateString() : "now";
+  return `${from} → ${to}`;
+}
+
+/** Polling interval for automatic usage data refresh (ms). */
+const USAGE_POLL_INTERVAL_MS = 10_000;
 
 const PKG_COLORS: Record<string, string> = {
   hench: "var(--brand-teal)",
@@ -361,53 +405,69 @@ export function TokenUsageView() {
   const [pkgFilter, setPkgFilter] = useState<string>("all");
 
   // API data
-  const [summary, setSummary] = useState<{ usage: AggregateTokenUsage; cost: CostEstimate; eventCount: number } | null>(null);
+  const [utilization, setUtilization] = useState<UtilizationResponse | null>(null);
   const [commands, setCommands] = useState<CommandTokenUsage[]>([]);
   const [buckets, setBuckets] = useState<PeriodBucket[]>([]);
   const [budget, setBudget] = useState<BudgetCheckResult | null>(null);
 
-  const queryString = useMemo(() => {
+  const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (since) params.set("since", new Date(since).toISOString());
     if (until) params.set("until", new Date(until).toISOString());
-    const qs = params.toString();
-    return qs ? `?${qs}` : "";
-  }, [since, until]);
+    params.set("period", period);
+    return params;
+  }, [since, until, period]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, commandsRes, bucketsRes, budgetRes] = await Promise.all([
-        fetch(`/api/token/summary${queryString}`),
-        fetch(`/api/token/by-command${queryString}`),
-        fetch(`/api/token/by-period${queryString}&period=${period}`),
-        fetch(`/api/token/budget${queryString}`),
-      ]);
+      const res = await fetch(`/api/token/utilization?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch utilization data");
+      const data = await res.json() as UtilizationResponse;
 
-      if (!summaryRes.ok) throw new Error("Failed to fetch summary");
-
-      const [summaryData, commandsData, bucketsData, budgetData] = await Promise.all([
-        summaryRes.json(),
-        commandsRes.json(),
-        bucketsRes.json(),
-        budgetRes.json(),
-      ]);
-
-      setSummary(summaryData);
-      setCommands(commandsData.commands ?? []);
-      setBuckets(bucketsData.buckets ?? []);
-      setBudget(budgetData.budget ?? null);
+      setUtilization(data);
+      setCommands(data.commands ?? []);
+      setBudget(data.budget ?? null);
+      setBuckets(
+        (data.trend ?? []).map((bucket) => {
+          const usage: AggregateTokenUsage = {
+            packages: bucket.toolBreakdown,
+            totalInputTokens:
+              bucket.toolBreakdown.rex.inputTokens +
+              bucket.toolBreakdown.hench.inputTokens +
+              bucket.toolBreakdown.sv.inputTokens,
+            totalOutputTokens:
+              bucket.toolBreakdown.rex.outputTokens +
+              bucket.toolBreakdown.hench.outputTokens +
+              bucket.toolBreakdown.sv.outputTokens,
+            totalCalls:
+              bucket.toolBreakdown.rex.calls +
+              bucket.toolBreakdown.hench.calls +
+              bucket.toolBreakdown.sv.calls,
+          };
+          return {
+            period: bucket.period,
+            usage,
+            estimatedCost: bucket.estimatedCost,
+          };
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [queryString, period]);
+  }, [queryParams]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refresh usage data on a 10-second polling interval.
+  // Automatically suspended when the tab is backgrounded via the
+  // centralized polling manager.
+  usePolling("token-usage", fetchData, USAGE_POLL_INTERVAL_MS);
 
   // Filter commands by package
   const filteredCommands = useMemo(() => {
@@ -424,7 +484,7 @@ export function TokenUsageView() {
     }));
   }, [filteredCommands]);
 
-  if (loading && !summary) {
+  if (loading && !utilization) {
     return h("div", { class: "loading" }, "Loading token usage data...");
   }
 
@@ -436,14 +496,14 @@ export function TokenUsageView() {
     );
   }
 
-  const usage = summary?.usage;
-  const cost = summary?.cost;
+  const usage = utilization?.usage;
+  const cost = utilization?.cost;
 
   return h("div", { class: "token-usage-container" },
     // Header
     h("div", { class: "token-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
-      h("h2", null, "Token Usage"),
+      h("h2", null, "LLM Utilization"),
       h("div", { class: "token-controls" },
         // Date range filters
         h("label", { class: "filter-label" }, "From:",
@@ -483,6 +543,35 @@ export function TokenUsageView() {
           : null,
       ),
     ),
+
+    // Usage metadata
+    utilization
+      ? h("div", { class: "token-section" },
+          h("h3", null, "Usage Source & Window"),
+          h("div", { class: "token-source-grid" },
+            h("div", { class: "token-source-item" },
+              h("span", { class: "cost-label" }, "Configured"),
+              h("code", { class: "cost-value" }, `${utilization.configured.vendor}/${utilization.configured.model}`),
+            ),
+            h("div", { class: "token-source-item" },
+              h("span", { class: "cost-label" }, "Window"),
+              h("span", { class: "cost-value" }, fmtWindow(utilization.window.since, utilization.window.until)),
+            ),
+            h("div", { class: "token-source-item" },
+              h("span", { class: "cost-label" }, "Rex source"),
+              h("code", null, utilization.source.rex),
+            ),
+            h("div", { class: "token-source-item" },
+              h("span", { class: "cost-label" }, "Hench source"),
+              h("code", null, utilization.source.hench),
+            ),
+            h("div", { class: "token-source-item" },
+              h("span", { class: "cost-label" }, "Sourcevision source"),
+              h("code", null, utilization.source.sourcevision),
+            ),
+          ),
+        )
+      : null,
 
     // Budget warnings
     budget && budget.severity !== "ok"
@@ -531,6 +620,39 @@ export function TokenUsageView() {
             budget.cost
               ? h(BudgetIndicator, { label: "Cost", dim: budget.cost })
               : null,
+          ),
+        )
+      : null,
+
+    // Vendor/model totals
+    utilization && utilization.byVendorModel.length > 0
+      ? h("div", { class: "token-section" },
+          h("h3", null, "Totals By Vendor/Model"),
+          h("div", { class: "token-table-wrapper" },
+            h("table", { class: "token-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, "Vendor"),
+                  h("th", null, "Model"),
+                  h("th", { class: "num" }, "Input Tokens"),
+                  h("th", { class: "num" }, "Output Tokens"),
+                  h("th", { class: "num" }, "Total"),
+                  h("th", { class: "num" }, "Calls"),
+                ),
+              ),
+              h("tbody", null,
+                utilization.byVendorModel.map((row) =>
+                  h("tr", { key: `${row.vendor}:${row.model}` },
+                    h("td", null, row.vendor),
+                    h("td", null, row.model),
+                    h("td", { class: "num" }, fmtNumber(row.inputTokens)),
+                    h("td", { class: "num" }, fmtNumber(row.outputTokens)),
+                    h("td", { class: "num" }, fmtNumber(row.inputTokens + row.outputTokens)),
+                    h("td", { class: "num" }, fmtNumber(row.calls)),
+                  ),
+                ),
+              ),
+            ),
           ),
         )
       : null,

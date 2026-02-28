@@ -18,6 +18,7 @@ export type {
   PostRunTestRecord,
   SummaryCounts,
   RunSummaryData,
+  RunMemoryStats,
   RunRecord,
   TaskBrief,
   TaskBriefTask,

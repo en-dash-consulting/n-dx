@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { SV_DIR } from "./constants.js";
+import { SV_DIR } from "../../constants.js";
 import { CLIError } from "../errors.js";
 import { DATA_FILES, SUPPLEMENTARY_FILES } from "../../schema/data-files.js";
 import { readManifest, writeManifest } from "../../analyzers/manifest.js";
@@ -10,8 +10,14 @@ import { emitZoneOutputs } from "../../analyzers/zone-output.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
-import { loadClaudeConfig } from "@n-dx/claude-client";
-import { setClaudeConfig, getAuthMode } from "../../analyzers/claude-client.js";
+import { loadLLMConfig } from "@n-dx/llm-client";
+import {
+  setLLMConfig,
+  getAuthMode,
+  getLLMVendor,
+  DEFAULT_MODEL,
+  DEFAULT_CODEX_MODEL,
+} from "../../analyzers/claude-client.js";
 import {
   runInventoryPhase,
   runImportsPhase,
@@ -23,11 +29,43 @@ import {
   PhaseError,
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
+import { generatePrMarkdownFile } from "./pr-markdown.js";
 
 type PhaseFilter =
   | { type: "all" }
   | { type: "phase"; phase: number }
   | { type: "only"; module: string };
+
+const UNKNOWN_PROVIDER_METADATA = "unknown";
+
+function normalizeProviderMetadata(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function resolveAnalyzeTokenEventMetadata(
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+): { vendor: string; model: string } {
+  const vendor = normalizeProviderMetadata(getLLMVendor()) ?? UNKNOWN_PROVIDER_METADATA;
+
+  if (vendor === "codex") {
+    return {
+      vendor,
+      model: normalizeProviderMetadata(llmConfig.codex?.model) ?? DEFAULT_CODEX_MODEL,
+    };
+  }
+  if (vendor === "claude") {
+    return {
+      vendor,
+      model: normalizeProviderMetadata(llmConfig.claude?.model) ?? DEFAULT_MODEL,
+    };
+  }
+
+  return {
+    vendor,
+    model: UNKNOWN_PROVIDER_METADATA,
+  };
+}
 
 function parsePhaseFilter(extraArgs: string[]): PhaseFilter {
   for (const a of extraArgs) {
@@ -65,9 +103,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
   }
 
-  // Load unified Claude config
-  const claudeConfig = await loadClaudeConfig(absDir);
-  setClaudeConfig(claudeConfig);
+  // Load unified LLM config (llm.vendor + vendor-specific settings)
+  const llmConfig = await loadLLMConfig(absDir);
+  setLLMConfig(llmConfig);
+  const vendor = getLLMVendor();
+  if (vendor) info(`Using ${vendor} for enrichment.`);
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
   const filter = parsePhaseFilter(extraArgs);
@@ -119,6 +159,11 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     generateOutputFiles(ctx);
   }
 
+  // ── Generate PR markdown from branch work record ───────────────────
+  if (filter.type === "all") {
+    await generatePrMarkdownStep(ctx);
+  }
+
   // ── Token usage summary ─────────────────────────────────────────────
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {
@@ -127,13 +172,64 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
   // Persist token usage to manifest for cross-package aggregation
   if (ctx.tokenUsage.calls > 0) {
+    const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
     const manifest = readManifest(absDir);
-    manifest.tokenUsage = ctx.tokenUsage;
+    manifest.tokenUsage = {
+      ...ctx.tokenUsage,
+      vendor: metadata.vendor,
+      model: metadata.model,
+    };
     writeManifest(absDir, manifest);
   }
 
   info("");
   info("Done.");
+}
+
+// ── PR markdown generation ───────────────────────────────────────────
+
+/**
+ * Classify a PR markdown generation error into an actionable guidance message.
+ *
+ * Inspects the error message for common filesystem and configuration patterns
+ * and returns a human-readable suggestion for resolution.
+ */
+export function classifyPrMarkdownError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (/EACCES|EPERM/i.test(message)) {
+    return "Permission denied writing to .sourcevision/. Check directory permissions and try again.";
+  }
+  if (/ENOSPC/i.test(message)) {
+    return "Disk full. Free up space and re-run the analysis.";
+  }
+  if (/ENOENT/i.test(message) && /\.sourcevision/i.test(message)) {
+    return "The .sourcevision/ directory is missing. Run 'sourcevision init' first.";
+  }
+  if (/ENOENT/i.test(message)) {
+    return "A required file or directory was not found. Run 'sourcevision init' to ensure the project is set up.";
+  }
+
+  return `${message}. Re-run 'sourcevision analyze' or check .rex/prd.json integrity.`;
+}
+
+async function generatePrMarkdownStep(ctx: AnalyzeContext): Promise<void> {
+  try {
+    const { outputPath, itemCount, warnings } = await generatePrMarkdownFile(
+      ctx.absDir,
+      ctx.svDir,
+    );
+
+    for (const warning of warnings) {
+      info(`  Warning: ${warning}`);
+    }
+
+    info(`[output] pr-markdown.md (${itemCount} item${itemCount !== 1 ? "s" : ""}) → ${outputPath}`);
+  } catch (err) {
+    const guidance = classifyPrMarkdownError(err);
+    info("[output] pr-markdown.md — generation failed");
+    info(`  ${guidance}`);
+  }
 }
 
 // ── Output generation ────────────────────────────────────────────────

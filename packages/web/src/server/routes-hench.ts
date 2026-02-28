@@ -7,7 +7,15 @@
  * GET    /api/hench/runs/:id              — full run detail with transcript
  * GET    /api/hench/runs/health           — staleness health check for running runs
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
+ * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
  * GET    /api/hench/audit                 — audit info for active tasks (PIDs, resource usage)
+ * GET    /api/hench/metrics              — concurrent execution metrics and resource utilization
+ * GET    /api/hench/metrics/snapshots    — time-series execution metrics snapshots
+ * GET    /api/hench/memory               — system memory, per-process memory, and resource health
+ * GET    /api/hench/memory/history        — per-process memory history (all tracked processes)
+ * GET    /api/hench/memory/history/:taskId — memory history for a specific task
+ * GET    /api/hench/memory/leaks          — leak detection summary for all active processes
+ * GET    /api/hench/concurrency           — concurrent execution count, limits, and queue status
  * POST   /api/hench/execute/:taskId/terminate — terminate a running task
  * GET    /api/hench/config                — current workflow configuration with field metadata
  * PUT    /api/hench/config                — update workflow configuration (partial or full)
@@ -19,19 +27,63 @@
  * POST   /api/hench/execute               — trigger Hench run for a specific task
  * GET    /api/hench/execute/status         — get all active execution statuses
  * GET    /api/hench/execute/status/:taskId — get specific task execution status
+ * GET    /api/hench/throttle              — current throttle state (paused, concurrency override, etc.)
+ * PUT    /api/hench/throttle              — adjust concurrency limit override
+ * POST   /api/hench/throttle/pause        — pause new task executions
+ * POST   /api/hench/throttle/resume       — resume new task executions
+ * POST   /api/hench/throttle/emergency-stop — terminate all running executions immediately
  */
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, type ManagedChild } from "@n-dx/claude-client";
+import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { clearStatusCache } from "./routes-status.js";
+import { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
+import { collectAllIds } from "./rex-gateway.js";
+import type { PRDDocument } from "./rex-gateway.js";
+import { ProcessMemoryTracker } from "./process-memory-tracker.js";
+import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
 const HENCH_PREFIX = "/api/hench/";
+
+/**
+ * Per-project aggregator singletons. Keyed by runsDir so each project
+ * gets its own incremental cache that persists across requests.
+ */
+const aggregatorCache = new Map<string, IncrementalTaskUsageAggregator>();
+
+export function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
+  let aggregator = aggregatorCache.get(runsDir);
+  if (!aggregator) {
+    aggregator = new IncrementalTaskUsageAggregator(runsDir);
+    aggregatorCache.set(runsDir, aggregator);
+  }
+  return aggregator;
+}
+
+/**
+ * Module-level process memory tracker singleton.
+ *
+ * Records per-process RSS samples during each memory broadcast cycle
+ * and provides historical data + leak detection via the API.
+ */
+const processMemoryTracker = new ProcessMemoryTracker();
+
+/**
+ * Module-level concurrent execution metrics singleton.
+ *
+ * Records time-series snapshots of concurrent process counts, total memory
+ * utilization, and per-task resource metrics during each monitoring cycle.
+ * Provides aggregate patterns (peak, average) for dashboard consumption.
+ */
+const executionMetrics = new ConcurrentExecutionMetrics();
 
 /** Minimal run shape for listing (avoids loading full toolCalls/transcript). */
 interface RunSummary {
@@ -259,9 +311,93 @@ export function handleHenchRoute(
 
   const runsDir = join(ctx.projectDir, ".hench", "runs");
 
+  // GET /api/hench/task-usage — incremental per-task token usage aggregation
+  // After refreshing run data, prune entries for tasks that no longer
+  // exist in the PRD so the UI never shows stale usage data.
+  if (path === "task-usage" && method === "GET") {
+    const aggregator = getAggregator(runsDir);
+    return aggregator.getTaskUsage().then((taskUsage) => {
+      const validIds = loadValidTaskIds(ctx);
+      if (validIds) {
+        aggregator.pruneStaleEntries(validIds);
+        // Re-derive output after pruning (cheap — no I/O, just Map→Object)
+        const pruned: Record<string, (typeof taskUsage)[string]> = {};
+        for (const [id, acc] of Object.entries(taskUsage)) {
+          if (validIds.has(id)) pruned[id] = acc;
+        }
+        jsonResponse(res, 200, { taskUsage: pruned });
+      } else {
+        // No PRD available — return all data (graceful degradation)
+        jsonResponse(res, 200, { taskUsage });
+      }
+      return true as const;
+    });
+  }
+
   // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
   if (path === "audit" && method === "GET") {
     return handleAudit(res, runsDir);
+  }
+
+  // GET /api/hench/metrics/snapshots — time-series execution metrics snapshots
+  if (path === "metrics/snapshots" && method === "GET") {
+    return handleMetricsSnapshots(res);
+  }
+
+  // GET /api/hench/metrics — concurrent execution metrics and resource utilization
+  if (path === "metrics" && method === "GET") {
+    return handleMetrics(res);
+  }
+
+  // GET /api/hench/memory — system memory, per-process memory, and resource health
+  if (path === "memory" && method === "GET") {
+    return handleMemory(res);
+  }
+
+  // GET /api/hench/memory/history/:taskId — memory history for a specific task
+  const memoryHistoryMatch = path.match(/^memory\/history\/([^/?]+)$/);
+  if (memoryHistoryMatch && method === "GET") {
+    return handleMemoryHistoryByTask(memoryHistoryMatch[1]!, res);
+  }
+
+  // GET /api/hench/memory/history — per-process memory history (all tracked processes)
+  if (path === "memory/history" && method === "GET") {
+    return handleMemoryHistory(res);
+  }
+
+  // GET /api/hench/memory/leaks — leak detection summary for all active processes
+  if (path === "memory/leaks" && method === "GET") {
+    return handleMemoryLeaks(res);
+  }
+
+  // GET /api/hench/concurrency — concurrent execution count, limits, and queue status
+  if (path === "concurrency" && method === "GET") {
+    return handleConcurrency(res, ctx);
+  }
+
+  // GET /api/hench/throttle — current throttle state
+  if (path === "throttle" && method === "GET") {
+    return handleThrottleGet(res, ctx);
+  }
+
+  // PUT /api/hench/throttle — adjust concurrency limit override
+  if (path === "throttle" && method === "PUT") {
+    return handleThrottleUpdate(req, res, ctx, broadcast);
+  }
+
+  // POST /api/hench/throttle/pause — pause new executions
+  if (path === "throttle/pause" && method === "POST") {
+    return handleThrottlePause(res, broadcast, ctx);
+  }
+
+  // POST /api/hench/throttle/resume — resume new executions
+  if (path === "throttle/resume" && method === "POST") {
+    return handleThrottleResume(res, broadcast, ctx);
+  }
+
+  // POST /api/hench/throttle/emergency-stop — terminate all running executions
+  if (path === "throttle/emergency-stop" && method === "POST") {
+    return handleEmergencyStop(req, res, broadcast, ctx);
   }
 
   // POST /api/hench/execute/:taskId/terminate — terminate a running task
@@ -281,29 +417,42 @@ export function handleHenchRoute(
     return handleMarkStuck(markStuckMatch[1], res, runsDir);
   }
 
-  // GET /api/hench/runs — list runs with summary
+  // GET /api/hench/runs — list runs with summary (?limit=N&offset=N)
   if (path === "runs" && method === "GET") {
     let files: string[];
     try {
       files = readdirSync(runsDir);
     } catch {
-      jsonResponse(res, 200, { runs: [] });
+      jsonResponse(res, 200, { runs: [], total: 0 });
       return true;
     }
 
     const jsonFiles = files.filter((f) => f.endsWith(".json"));
+    const total = jsonFiles.length;
 
-    // Parse limit from query string
+    // Parse limit and offset from query string
     let limit = 0;
+    let offset = 0;
     if (qIdx !== -1) {
       const params = new URLSearchParams(fullPath.slice(qIdx));
       const limitStr = params.get("limit");
-      if (limitStr) limit = parseInt(limitStr, 10);
+      const offsetStr = params.get("offset");
+      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
+      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
     }
 
-    // Load all runs, extract summaries, sort by startedAt descending
+    // Sort filenames descending (run IDs are timestamp-based, so filename
+    // sort approximates chronological order) to avoid loading every file
+    // when only a page is requested.
+    jsonFiles.sort((a, b) => b.localeCompare(a));
+
+    // When paginated, only load the slice of files we need
+    const filesToLoad = (limit > 0 || offset > 0)
+      ? jsonFiles.slice(offset, limit > 0 ? offset + limit : undefined)
+      : jsonFiles;
+
     const summaries: RunSummary[] = [];
-    for (const file of jsonFiles) {
+    for (const file of filesToLoad) {
       const id = file.replace(/\.json$/, "");
       const run = loadRunFile(runsDir, id);
       if (run && run.id && run.startedAt) {
@@ -311,10 +460,10 @@ export function handleHenchRoute(
       }
     }
 
+    // Final sort by startedAt descending for accurate ordering
     summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
-    const result = limit > 0 ? summaries.slice(0, limit) : summaries;
-    jsonResponse(res, 200, { runs: result });
+    jsonResponse(res, 200, { runs: summaries, total });
     return true;
   }
 
@@ -784,6 +933,23 @@ function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Load the set of all task IDs currently in the PRD.
+ * Returns null if the PRD cannot be read (e.g. not initialized yet),
+ * allowing callers to degrade gracefully.
+ */
+function loadValidTaskIds(ctx: ServerContext): Set<string> | null {
+  const prdPath = join(ctx.rexDir, "prd.json");
+  if (!existsSync(prdPath)) return null;
+  try {
+    const doc = JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
+    if (!Array.isArray(doc.items)) return null;
+    return collectAllIds(doc.items);
+  } catch {
+    return null;
+  }
+}
+
 /** Recursively find a PRD item by ID. */
 function findPRDItem(
   items: Array<Record<string, unknown>>,
@@ -862,6 +1028,12 @@ async function handleExecute(
     return true;
   }
 
+  // Check if new executions are paused via throttle controls
+  if (throttleState.paused) {
+    errorResponse(res, 503, "New executions are paused. Resume via the throttle controls before starting new tasks.");
+    return true;
+  }
+
   // Check for concurrent execution
   if (activeExecutions.has(taskId)) {
     const active = activeExecutions.get(taskId)!;
@@ -905,6 +1077,9 @@ async function handleExecute(
   // Track active execution
   activeExecutions.set(taskId, { runId, handle, state: execState });
 
+  // Register with execution metrics (uses PID when available, 0 until spawned)
+  executionMetrics.taskStarted(taskId, taskTitle, handle.pid ?? 0);
+
   // Broadcast initial state
   broadcastExecState(broadcast, execState);
 
@@ -934,6 +1109,8 @@ async function handleExecute(
         }
         broadcastExecState(broadcast, { ...entry.state });
       }
+      processMemoryTracker.markCompleted(taskId);
+      executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
     })
     .catch((err) => {
@@ -944,6 +1121,8 @@ async function handleExecute(
         entry.state.error = err instanceof Error ? err.message : String(err);
         broadcastExecState(broadcast, { ...entry.state });
       }
+      processMemoryTracker.markCompleted(taskId);
+      executionMetrics.taskCompleted(taskId);
       activeExecutions.delete(taskId);
     });
 
@@ -1203,6 +1382,576 @@ export function startHeartbeatMonitor(
   }
 }
 
+/**
+ * Start a periodic concurrency status broadcaster.
+ *
+ * Broadcasts `hench:concurrency-status` via WebSocket every 10 seconds
+ * with current process count, max limit, utilization level, and queue info.
+ * This enables real-time updates of the concurrency panel in the dashboard.
+ *
+ * Call this once at server startup alongside startHeartbeatMonitor.
+ * The timer is unref'd so it won't prevent process exit.
+ */
+export function startConcurrencyMonitor(
+  ctx: ServerContext,
+  broadcast: WebSocketBroadcaster,
+): void {
+  const CONCURRENCY_BROADCAST_MS = 10_000; // 10 seconds
+
+  const timer = setInterval(() => {
+    const henchDir = join(ctx.projectDir, ".hench");
+    const locksDir = join(henchDir, "locks");
+    const runsDir = join(henchDir, "runs");
+
+    // Read max concurrent (respects runtime override from throttle controls)
+    const maxConcurrent = getEffectiveMaxConcurrent(ctx.projectDir);
+
+    // Read lock files
+    let processCount = 0;
+    try {
+      const files = readdirSync(locksDir);
+      for (const file of files) {
+        if (!file.endsWith(".lock")) continue;
+        try {
+          const raw = readFileSync(join(locksDir, file), "utf-8");
+          const lock = JSON.parse(raw) as ConcurrencyLockFile;
+          if (isPidAlive(lock.pid)) processCount++;
+        } catch {
+          // skip corrupted lock files
+        }
+      }
+    } catch {
+      // locks dir doesn't exist yet
+    }
+
+    // Dashboard active
+    const dashboardRunning = Array.from(activeExecutions.values()).filter(
+      (e) => e.state.status === "running" || e.state.status === "starting",
+    ).length;
+
+    // Disk running
+    const dashboardTaskIds = new Set(activeExecutions.keys());
+    let diskRunning = 0;
+    try {
+      const runFiles = readdirSync(runsDir);
+      for (const file of runFiles) {
+        if (!file.endsWith(".json")) continue;
+        const id = file.replace(/\.json$/, "");
+        const run = loadRunFile(runsDir, id);
+        if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
+          diskRunning++;
+        }
+      }
+    } catch {
+      // runs dir may not exist
+    }
+
+    const totalRunning = dashboardRunning + diskRunning;
+    const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
+    let level: ConcurrencyLevel;
+    if (processCount >= maxConcurrent) {
+      level = "at_limit";
+    } else if (utilization >= 0.67) {
+      level = "high";
+    } else if (utilization > 0) {
+      level = "moderate";
+    } else {
+      level = "low";
+    }
+
+    broadcast({
+      type: "hench:concurrency-status",
+      processCount,
+      maxConcurrent,
+      slotsAvailable: Math.max(0, maxConcurrent - processCount),
+      level,
+      utilization: Math.min(1, utilization),
+      totalRunning,
+      dashboardActive: activeExecutions.size,
+      diskRunning,
+      timestamp: new Date().toISOString(),
+    });
+  }, CONCURRENCY_BROADCAST_MS);
+
+  if (timer.unref) {
+    timer.unref();
+  }
+}
+
+// ── Memory / resource monitoring ──────────────────────────────────────
+
+/** Memory health level for UI indicators. */
+type MemoryHealthLevel = "healthy" | "warning" | "critical";
+
+/** Per-process memory snapshot. */
+interface ProcessMemoryEntry {
+  taskId: string;
+  taskTitle: string;
+  pid: number;
+  rssBytes: number;
+  source: "dashboard" | "disk";
+}
+
+/** Full memory status response shape. */
+interface MemoryStatus {
+  system: {
+    totalBytes: number;
+    freeBytes: number;
+    usedBytes: number;
+    usedPercent: number;
+  };
+  server: {
+    pid: number;
+    rssBytes: number;
+    heapUsedBytes: number;
+    heapTotalBytes: number;
+    externalBytes: number;
+  };
+  processes: ProcessMemoryEntry[];
+  health: MemoryHealthLevel;
+  loadAvg: [number, number, number];
+  cpuCount: number;
+  timestamp: string;
+}
+
+/**
+ * Determine memory health level based on system memory usage percentage.
+ *
+ * - healthy: < 75% used (green)
+ * - warning: 75–90% used (yellow/orange)
+ * - critical: ≥ 90% used (red)
+ */
+function computeMemoryHealth(usedPercent: number): MemoryHealthLevel {
+  if (usedPercent >= 90) return "critical";
+  if (usedPercent >= 75) return "warning";
+  return "healthy";
+}
+
+/**
+ * Attempt to read RSS (resident set size) for a given PID.
+ *
+ * Uses /proc/<pid>/statm on Linux and `ps` on macOS/other.
+ * Returns null if the PID is unreachable or the read fails.
+ */
+function getProcessRss(pid: number): number | null {
+  try {
+    // Linux: read from /proc filesystem (no child process needed)
+    try {
+      const statm = readFileSync(`/proc/${pid}/statm`, "utf-8");
+      const pages = parseInt(statm.split(" ")[1]!, 10);
+      if (!isNaN(pages)) {
+        // Page size is typically 4096 bytes
+        return pages * 4096;
+      }
+    } catch {
+      // Not Linux or PID gone — fall through to ps
+    }
+
+    // macOS / other: use ps command
+    const out = execFileSync("ps", ["-o", "rss=", "-p", String(pid)], {
+      timeout: 2000,
+      encoding: "utf-8",
+    });
+    const kb = parseInt(out.trim(), 10);
+    if (!isNaN(kb)) return kb * 1024;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Collect full memory status snapshot. */
+function collectMemoryStatus(): MemoryStatus {
+  const totalBytes = totalmem();
+  const freeBytes = freemem();
+  const usedBytes = totalBytes - freeBytes;
+  const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+
+  const mem = process.memoryUsage();
+  const load = loadavg() as [number, number, number];
+  const cpuCount = cpus().length;
+
+  // Collect per-process memory for active executions
+  const processes: ProcessMemoryEntry[] = [];
+  for (const [taskId, entry] of activeExecutions.entries()) {
+    const pid = entry.handle.pid;
+    if (pid == null) continue;
+    const rssBytes = getProcessRss(pid);
+    if (rssBytes != null) {
+      processes.push({
+        taskId,
+        taskTitle: entry.state.taskTitle,
+        pid,
+        rssBytes,
+        source: "dashboard",
+      });
+    }
+  }
+
+  return {
+    system: { totalBytes, freeBytes, usedBytes, usedPercent },
+    server: {
+      pid: process.pid,
+      rssBytes: mem.rss,
+      heapUsedBytes: mem.heapUsed,
+      heapTotalBytes: mem.heapTotal,
+      externalBytes: mem.external,
+    },
+    processes,
+    health: computeMemoryHealth(usedPercent),
+    loadAvg: load,
+    cpuCount,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** GET /api/hench/metrics — concurrent execution metrics and resource utilization. */
+function handleMetrics(res: ServerResponse): boolean {
+  const summary = executionMetrics.getSummary();
+  jsonResponse(res, 200, summary);
+  return true;
+}
+
+/** GET /api/hench/metrics/snapshots — time-series execution metrics snapshots. */
+function handleMetricsSnapshots(res: ServerResponse): boolean {
+  const snapshots = executionMetrics.getSnapshots();
+  jsonResponse(res, 200, {
+    snapshots,
+    count: snapshots.length,
+    maxSnapshots: executionMetrics.config.maxSnapshots,
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
+/** GET /api/hench/memory — system memory, per-process memory, and resource health. */
+function handleMemory(res: ServerResponse): boolean {
+  const status = collectMemoryStatus();
+  jsonResponse(res, 200, status);
+  return true;
+}
+
+/** GET /api/hench/memory/history — per-process memory history for all tracked processes. */
+function handleMemoryHistory(res: ServerResponse): boolean {
+  const histories = processMemoryTracker.getAllHistories();
+  jsonResponse(res, 200, {
+    histories,
+    activeProcesses: processMemoryTracker.activeCount,
+    completedProcesses: processMemoryTracker.completedCount,
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
+/** GET /api/hench/memory/history/:taskId — memory history for a specific task. */
+function handleMemoryHistoryByTask(taskId: string, res: ServerResponse): boolean {
+  const history = processMemoryTracker.getHistory(taskId);
+  if (!history) {
+    jsonResponse(res, 404, {
+      error: "not_found",
+      message: `No memory history for task ${taskId}`,
+    });
+    return true;
+  }
+  jsonResponse(res, 200, history);
+  return true;
+}
+
+/** GET /api/hench/memory/leaks — leak detection summary for all active processes. */
+function handleMemoryLeaks(res: ServerResponse): boolean {
+  const summary = processMemoryTracker.detectLeaks();
+  jsonResponse(res, 200, summary);
+  return true;
+}
+
+/**
+ * Periodically broadcast memory + resource health via WebSocket.
+ * Runs every 10 seconds so the memory panel stays live.
+ *
+ * Also records per-process RSS samples into the process memory tracker
+ * for historical analysis and leak detection.
+ */
+export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
+  const MEMORY_BROADCAST_MS = 10_000;
+
+  const timer = setInterval(() => {
+    const status = collectMemoryStatus();
+
+    // Record per-process samples for historical tracking + leak detection
+    for (const proc of status.processes) {
+      processMemoryTracker.recordSample(
+        proc.taskId,
+        proc.taskTitle,
+        proc.pid,
+        proc.rssBytes,
+      );
+    }
+
+    // Record execution metrics snapshot (concurrent count, total RSS, per-task)
+    const totalRssBytes = status.processes.reduce((sum, p) => sum + p.rssBytes, 0);
+    executionMetrics.recordSnapshot({
+      concurrentCount: status.processes.length,
+      totalRssBytes,
+      systemMemoryPercent: status.system.usedPercent,
+      loadAvg1m: status.loadAvg[0],
+      perTaskRss: status.processes.map((p) => ({
+        taskId: p.taskId,
+        rssBytes: p.rssBytes,
+      })),
+    });
+
+    // Prune tracker entries for processes that are no longer active
+    // (the activeExecutions map is the source of truth)
+    for (const history of processMemoryTracker.getActiveHistories()) {
+      if (!activeExecutions.has(history.taskId)) {
+        processMemoryTracker.markCompleted(history.taskId);
+      }
+    }
+
+    // Include leak alerts in the broadcast when detected
+    const leakAlerts = processMemoryTracker.getLeakAlerts();
+
+    // Include execution metrics summary in the broadcast
+    const metricsSummary = executionMetrics.getSummary();
+
+    broadcast({
+      type: "hench:memory-status",
+      ...status,
+      ...(leakAlerts.length > 0 ? { leakAlerts } : {}),
+      executionMetrics: metricsSummary,
+    });
+  }, MEMORY_BROADCAST_MS);
+
+  if (timer.unref) {
+    timer.unref();
+  }
+}
+
+// ── Concurrency status ────────────────────────────────────────────────
+
+/**
+ * Lock file shape — matches hench/src/process/limiter.ts LockFileData.
+ * Duplicated here to avoid runtime coupling with the hench package.
+ */
+interface ConcurrencyLockFile {
+  pid: number;
+  startedAt: string;
+  taskId?: string;
+}
+
+/** Default max concurrent processes (matches hench DEFAULT_HENCH_CONFIG). */
+const DEFAULT_MAX_CONCURRENT_PROCESSES = 3;
+
+/** Check whether a process with the given PID is still alive. */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Concurrency utilization level for UI indicators. */
+type ConcurrencyLevel = "low" | "moderate" | "high" | "at_limit";
+
+// ── Throttle state ────────────────────────────────────────────────────
+
+/**
+ * In-memory throttle state for manual execution controls.
+ *
+ * This is a runtime-only override — it does not persist to disk and resets
+ * on server restart. The `concurrencyOverride` (when set) takes precedence
+ * over the config-file value for all concurrency calculations. When
+ * `paused` is true, new executions are rejected by the execute handler.
+ */
+interface ThrottleState {
+  /** Whether new task executions are paused. */
+  paused: boolean;
+  /** Timestamp when pause was activated, or null if not paused. */
+  pausedAt: string | null;
+  /** Runtime concurrency limit override. null = use config value. */
+  concurrencyOverride: number | null;
+  /** Timestamp of last emergency stop, or null if never. */
+  lastEmergencyStopAt: string | null;
+  /** Count of executions terminated by last emergency stop. */
+  lastEmergencyStopCount: number;
+}
+
+const throttleState: ThrottleState = {
+  paused: false,
+  pausedAt: null,
+  concurrencyOverride: null,
+  lastEmergencyStopAt: null,
+  lastEmergencyStopCount: 0,
+};
+
+/**
+ * Get the effective max concurrent processes, respecting the runtime
+ * override when set.
+ */
+function getEffectiveMaxConcurrent(projectDir: string): number {
+  if (throttleState.concurrencyOverride !== null) {
+    return throttleState.concurrencyOverride;
+  }
+  const config = loadHenchConfig(projectDir);
+  const guard = config?.guard as Record<string, unknown> | undefined;
+  return typeof guard?.maxConcurrentProcesses === "number"
+    ? guard.maxConcurrentProcesses
+    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+}
+
+/**
+ * GET /api/hench/concurrency — returns concurrent execution status.
+ *
+ * Combines three data sources:
+ * 1. PID lock files in .hench/locks/ (cross-process limiter)
+ * 2. In-memory dashboard-triggered executions
+ * 3. Disk-based running runs (.hench/runs/)
+ *
+ * Returns current/max counts, queue info, pending PRD tasks, and
+ * a utilization level for visual indicators.
+ */
+function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
+  const henchDir = join(ctx.projectDir, ".hench");
+  const locksDir = join(henchDir, "locks");
+  const runsDir = join(henchDir, "runs");
+
+  // 1. Read max concurrent (respects runtime override from throttle controls)
+  const maxConcurrent = getEffectiveMaxConcurrent(ctx.projectDir);
+
+  // 2. Read lock files and check PID liveness
+  const activeLocks: Array<{
+    pid: number;
+    startedAt: string;
+    taskId?: string;
+    alive: boolean;
+  }> = [];
+
+  try {
+    const files = readdirSync(locksDir);
+    for (const file of files) {
+      if (!file.endsWith(".lock")) continue;
+      try {
+        const raw = readFileSync(join(locksDir, file), "utf-8");
+        const lock = JSON.parse(raw) as ConcurrencyLockFile;
+        const alive = isPidAlive(lock.pid);
+        activeLocks.push({
+          pid: lock.pid,
+          startedAt: lock.startedAt,
+          taskId: lock.taskId,
+          alive,
+        });
+      } catch {
+        // Corrupted lock file — skip
+      }
+    }
+  } catch {
+    // Locks dir doesn't exist yet — no active locks
+  }
+
+  const aliveLocks = activeLocks.filter((l) => l.alive);
+
+  // 3. Count dashboard-triggered executions
+  const dashboardActive = activeExecutions.size;
+  const dashboardRunning = Array.from(activeExecutions.values()).filter(
+    (e) => e.state.status === "running" || e.state.status === "starting",
+  ).length;
+
+  // 4. Count disk-based running runs (excludes dashboard-tracked ones)
+  const dashboardTaskIds = new Set(activeExecutions.keys());
+  let diskRunningCount = 0;
+  try {
+    const runFiles = readdirSync(runsDir);
+    for (const file of runFiles) {
+      if (!file.endsWith(".json")) continue;
+      const id = file.replace(/\.json$/, "");
+      const run = loadRunFile(runsDir, id);
+      if (run && run.status === "running" && !dashboardTaskIds.has(run.taskId as string)) {
+        diskRunningCount++;
+      }
+    }
+  } catch {
+    // runs dir may not exist
+  }
+
+  // 5. Count pending PRD tasks
+  let pendingTaskCount = 0;
+  try {
+    const prdPath = join(ctx.rexDir, "prd.json");
+    if (existsSync(prdPath)) {
+      const prdRaw = readFileSync(prdPath, "utf-8");
+      const prd = JSON.parse(prdRaw) as Record<string, unknown>;
+      const items = prd.items as Array<Record<string, unknown>> | undefined;
+      if (items) {
+        pendingTaskCount = countPendingTasks(items);
+      }
+    }
+  } catch {
+    // PRD not available
+  }
+
+  // 6. Compute aggregate counts
+  // The "active process count" is the number of live lock-holding processes,
+  // which is the authoritative cross-process count.
+  const processCount = aliveLocks.length;
+
+  // Total running tasks combines dashboard + disk sources (deduplicated)
+  const totalRunning = dashboardRunning + diskRunningCount;
+
+  // Compute utilization level
+  const utilization = maxConcurrent > 0 ? processCount / maxConcurrent : 0;
+  let level: ConcurrencyLevel;
+  if (processCount >= maxConcurrent) {
+    level = "at_limit";
+  } else if (utilization >= 0.67) {
+    level = "high";
+  } else if (utilization > 0) {
+    level = "moderate";
+  } else {
+    level = "low";
+  }
+
+  // Slots remaining before limit is reached
+  const slotsAvailable = Math.max(0, maxConcurrent - processCount);
+
+  jsonResponse(res, 200, {
+    processCount,
+    maxConcurrent,
+    slotsAvailable,
+    level,
+    utilization: Math.min(1, utilization),
+    totalRunning,
+    dashboardActive,
+    diskRunning: diskRunningCount,
+    pendingTasks: pendingTaskCount,
+    locks: aliveLocks.map((l) => ({
+      pid: l.pid,
+      startedAt: l.startedAt,
+      taskId: l.taskId,
+    })),
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
+/** Recursively count pending/blocked tasks (leaf tasks only). */
+function countPendingTasks(items: Array<Record<string, unknown>>): number {
+  let count = 0;
+  for (const item of items) {
+    const children = item.children as Array<Record<string, unknown>> | undefined;
+    if (children && children.length > 0) {
+      count += countPendingTasks(children);
+    } else {
+      const status = item.status as string;
+      if (status === "pending" || status === "blocked") {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
 // ── Audit interface ───────────────────────────────────────────────────
 
 /** Audit info for a single active task. */
@@ -1377,6 +2126,8 @@ function handleTerminate(
   entry.state.error = "Terminated via audit interface";
 
   broadcastExecState(broadcast, { ...entry.state });
+  processMemoryTracker.markCompleted(taskId);
+  executionMetrics.taskCompleted(taskId);
   activeExecutions.delete(taskId);
   clearStatusCache();
 
@@ -1390,4 +2141,326 @@ function handleTerminate(
     message: "Process terminated",
   });
   return true;
+}
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────
+
+/**
+ * Result returned by {@link shutdownActiveExecutions}.
+ *
+ * Callers (e.g. `gracefulShutdown` in start.ts) use these counts to
+ * build a final verification summary and to decide whether to exit clean.
+ */
+export interface ShutdownExecutionsResult {
+  /** Number of executions that were cleanly terminated. */
+  terminated: number;
+  /** Number of executions that failed to terminate (kill errored or timed out). */
+  failed: number;
+}
+
+/**
+ * Gracefully terminate all active hench executions on server shutdown.
+ *
+ * Iterates over all entries in `activeExecutions`, sends SIGTERM to each
+ * managed child, and waits up to `gracePeriodMs` for them to exit.  Any
+ * process that does not exit within the grace period receives SIGKILL.
+ *
+ * This must be called before the HTTP server closes so that child processes
+ * are not orphaned.  The function resolves only after all processes have
+ * been signalled and (best-effort) waited for.
+ *
+ * @param gracePeriodMs  How long to wait for each process to exit gracefully
+ *                       before force-killing it.  Defaults to 5 000 ms.
+ *                       Can be overridden via the `HENCH_SHUTDOWN_TIMEOUT_MS`
+ *                       environment variable.
+ * @returns Counts of terminated and failed executions for verification.
+ */
+export async function shutdownActiveExecutions(
+  gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
+): Promise<ShutdownExecutionsResult> {
+  if (activeExecutions.size === 0) return { terminated: 0, failed: 0 };
+
+  const count = activeExecutions.size;
+  console.log(`[shutdown] terminating ${count} active execution(s)`);
+
+  let terminated = 0;
+  let failed = 0;
+
+  const terminations = Array.from(activeExecutions.entries()).map(
+    async ([taskId, entry]) => {
+      const pid = entry.handle.pid;
+      const pidInfo = pid != null ? ` (pid ${pid})` : "";
+      try {
+        await killWithFallback(entry.handle, gracePeriodMs);
+        console.log(`[shutdown] execution ${taskId}${pidInfo} terminated`);
+        terminated++;
+      } catch (err) {
+        const error = err as Error;
+        console.error(`[shutdown] execution ${taskId}${pidInfo} failed to terminate: ${error.message}`);
+        failed++;
+      } finally {
+        processMemoryTracker.markCompleted(taskId);
+        executionMetrics.taskCompleted(taskId);
+        activeExecutions.delete(taskId);
+      }
+    },
+  );
+
+  await Promise.all(terminations);
+
+  if (failed === 0) {
+    console.log(`[shutdown] all ${count} execution(s) terminated`);
+  } else {
+    console.error(`[shutdown] ${terminated}/${count} execution(s) terminated — ${failed} failed to exit`);
+  }
+
+  return { terminated, failed };
+}
+
+// ── Throttle controls ─────────────────────────────────────────────────
+
+/**
+ * GET /api/hench/throttle — return current throttle state.
+ *
+ * Includes the effective concurrency limit, pause state, and info
+ * about the config-file default for UI comparison.
+ */
+function handleThrottleGet(res: ServerResponse, ctx: ServerContext): boolean {
+  const config = loadHenchConfig(ctx.projectDir);
+  const guard = config?.guard as Record<string, unknown> | undefined;
+  const configMax = typeof guard?.maxConcurrentProcesses === "number"
+    ? guard.maxConcurrentProcesses
+    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+
+  const effective = throttleState.concurrencyOverride ?? configMax;
+
+  jsonResponse(res, 200, {
+    paused: throttleState.paused,
+    pausedAt: throttleState.pausedAt,
+    concurrencyOverride: throttleState.concurrencyOverride,
+    effectiveMaxConcurrent: effective,
+    configMaxConcurrent: configMax,
+    lastEmergencyStopAt: throttleState.lastEmergencyStopAt,
+    lastEmergencyStopCount: throttleState.lastEmergencyStopCount,
+    activeExecutions: activeExecutions.size,
+    timestamp: new Date().toISOString(),
+  });
+  return true;
+}
+
+/**
+ * PUT /api/hench/throttle — adjust the runtime concurrency override.
+ *
+ * Body: { maxConcurrent: number | null }
+ * Pass null to clear the override and revert to the config-file value.
+ */
+async function handleThrottleUpdate(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  let body: Record<string, unknown>;
+  try {
+    const raw = await readBody(req);
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return true;
+  }
+
+  const value = body.maxConcurrent;
+  if (value === null || value === undefined) {
+    // Clear override — revert to config value
+    throttleState.concurrencyOverride = null;
+  } else if (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 20) {
+    throttleState.concurrencyOverride = value;
+  } else {
+    errorResponse(res, 400, "maxConcurrent must be an integer between 1 and 20, or null to clear");
+    return true;
+  }
+
+  // Broadcast updated concurrency status so the concurrency panel refreshes
+  if (broadcast) {
+    broadcastThrottleState(broadcast, ctx);
+  }
+
+  const effective = getEffectiveMaxConcurrent(ctx.projectDir);
+  jsonResponse(res, 200, {
+    ok: true,
+    concurrencyOverride: throttleState.concurrencyOverride,
+    effectiveMaxConcurrent: effective,
+  });
+  return true;
+}
+
+/**
+ * POST /api/hench/throttle/pause — pause new task executions.
+ *
+ * Running executions continue but no new ones can be started.
+ */
+function handleThrottlePause(
+  res: ServerResponse,
+  broadcast?: WebSocketBroadcaster,
+  ctx?: ServerContext,
+): boolean {
+  if (throttleState.paused) {
+    errorResponse(res, 409, "Executions are already paused");
+    return true;
+  }
+
+  throttleState.paused = true;
+  throttleState.pausedAt = new Date().toISOString();
+
+  if (broadcast && ctx) broadcastThrottleState(broadcast, ctx);
+
+  jsonResponse(res, 200, {
+    ok: true,
+    paused: true,
+    pausedAt: throttleState.pausedAt,
+  });
+  return true;
+}
+
+/**
+ * POST /api/hench/throttle/resume — resume new task executions.
+ */
+function handleThrottleResume(
+  res: ServerResponse,
+  broadcast?: WebSocketBroadcaster,
+  ctx?: ServerContext,
+): boolean {
+  if (!throttleState.paused) {
+    errorResponse(res, 409, "Executions are not paused");
+    return true;
+  }
+
+  throttleState.paused = false;
+  throttleState.pausedAt = null;
+
+  if (broadcast && ctx) broadcastThrottleState(broadcast, ctx);
+
+  jsonResponse(res, 200, {
+    ok: true,
+    paused: false,
+  });
+  return true;
+}
+
+/**
+ * POST /api/hench/throttle/emergency-stop — terminate all running executions.
+ *
+ * Sends SIGTERM to every active dashboard-managed execution and pauses new
+ * ones. Body must include `{ confirm: true }` to prevent accidental use.
+ */
+async function handleEmergencyStop(
+  req: IncomingMessage,
+  res: ServerResponse,
+  broadcast?: WebSocketBroadcaster,
+  ctx?: ServerContext,
+): Promise<boolean> {
+  let body: Record<string, unknown>;
+  try {
+    const raw = await readBody(req);
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    errorResponse(res, 400, "Invalid JSON in request body");
+    return true;
+  }
+
+  if (body.confirm !== true) {
+    errorResponse(res, 400, "Emergency stop requires { confirm: true } in request body");
+    return true;
+  }
+
+  const count = activeExecutions.size;
+
+  if (count === 0) {
+    jsonResponse(res, 200, {
+      ok: true,
+      terminated: 0,
+      failed: 0,
+      message: "No active executions to stop",
+    });
+    return true;
+  }
+
+  // Pause new executions automatically
+  throttleState.paused = true;
+  throttleState.pausedAt = new Date().toISOString();
+
+  // Terminate all active executions
+  console.log(`[emergency-stop] terminating ${count} active execution(s)`);
+
+  let terminated = 0;
+  let failed = 0;
+
+  const terminations = Array.from(activeExecutions.entries()).map(
+    async ([taskId, entry]) => {
+      const pid = entry.handle.pid;
+      const pidInfo = pid != null ? ` (pid ${pid})` : "";
+      try {
+        await killWithFallback(entry.handle, 3000);
+        console.log(`[emergency-stop] execution ${taskId}${pidInfo} terminated`);
+        terminated++;
+      } catch (err) {
+        const error = err as Error;
+        console.error(`[emergency-stop] execution ${taskId}${pidInfo} failed: ${error.message}`);
+        failed++;
+      } finally {
+        // Update state before removing
+        entry.state.status = "failed";
+        entry.state.finishedAt = new Date().toISOString();
+        entry.state.error = "Terminated via emergency stop";
+        broadcastExecState(broadcast, { ...entry.state });
+        processMemoryTracker.markCompleted(taskId);
+        executionMetrics.taskCompleted(taskId);
+        activeExecutions.delete(taskId);
+      }
+    },
+  );
+
+  await Promise.all(terminations);
+
+  throttleState.lastEmergencyStopAt = new Date().toISOString();
+  throttleState.lastEmergencyStopCount = terminated + failed;
+
+  if (broadcast && ctx) broadcastThrottleState(broadcast, ctx);
+  clearStatusCache();
+
+  jsonResponse(res, 200, {
+    ok: true,
+    terminated,
+    failed,
+    paused: true,
+    message: `Emergency stop complete: ${terminated} terminated, ${failed} failed. New executions paused.`,
+  });
+  return true;
+}
+
+/**
+ * Broadcast updated throttle state over WebSocket for real-time UI updates.
+ */
+function broadcastThrottleState(
+  broadcast: WebSocketBroadcaster,
+  ctx: ServerContext,
+): void {
+  const config = loadHenchConfig(ctx.projectDir);
+  const guard = config?.guard as Record<string, unknown> | undefined;
+  const configMax = typeof guard?.maxConcurrentProcesses === "number"
+    ? guard.maxConcurrentProcesses
+    : DEFAULT_MAX_CONCURRENT_PROCESSES;
+
+  broadcast({
+    type: "hench:throttle-state",
+    paused: throttleState.paused,
+    pausedAt: throttleState.pausedAt,
+    concurrencyOverride: throttleState.concurrencyOverride,
+    effectiveMaxConcurrent: throttleState.concurrencyOverride ?? configMax,
+    configMaxConcurrent: configMax,
+    lastEmergencyStopAt: throttleState.lastEmergencyStopAt,
+    lastEmergencyStopCount: throttleState.lastEmergencyStopCount,
+    activeExecutions: activeExecutions.size,
+    timestamp: new Date().toISOString(),
+  });
 }

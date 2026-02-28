@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -180,5 +180,17 @@ describe("analyze --guided integration", () => {
     // Should have displayed and accepted the proposals
     const output = consoleOutput.join("\n");
     expect(output).toContain("Auth System");
+
+    const logPath = join(tmpDir, ".rex", "execution-log.jsonl");
+    const lines = (await readFile(logPath, "utf-8"))
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const entries = lines.map((line) => JSON.parse(line) as { event: string; detail?: string });
+    const tokenEntry = entries.find((entry) => entry.event === "analyze_token_usage");
+    expect(tokenEntry).toBeDefined();
+    const detail = JSON.parse(tokenEntry!.detail ?? "{}") as { vendor?: string; model?: string };
+    expect(detail.vendor).toBeTruthy();
+    expect(detail.model).toBeTruthy();
   });
 });

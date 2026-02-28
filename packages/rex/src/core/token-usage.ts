@@ -9,7 +9,7 @@
 
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/claude-client";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import type { LogEntry } from "../schema/index.js";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +83,12 @@ function isInRange(timestamp: string, filter: TokenUsageFilter): boolean {
   return true;
 }
 
+function normalizeEventMetadata(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Rex token usage from execution log
 // ---------------------------------------------------------------------------
@@ -133,12 +139,21 @@ export interface TokenEvent {
   inputTokens: number;
   outputTokens: number;
   calls: number;
+  vendor?: string;
+  model?: string;
 }
 
 /** Minimal shape of a hench RunRecord for token extraction. */
 interface HenchRunSummary {
   startedAt: string;
+  model?: string;
   tokenUsage: { input: number; output: number };
+  turnTokenUsage?: Array<{
+    input: number;
+    output: number;
+    vendor?: string;
+    model?: string;
+  }>;
 }
 
 /**
@@ -257,6 +272,8 @@ export function extractRexTokenEvents(
         calls?: number;
         inputTokens?: number;
         outputTokens?: number;
+        vendor?: string;
+        model?: string;
       };
       events.push({
         timestamp: entry.timestamp,
@@ -265,6 +282,8 @@ export function extractRexTokenEvents(
         inputTokens: data.inputTokens ?? 0,
         outputTokens: data.outputTokens ?? 0,
         calls: data.calls ?? 0,
+        vendor: normalizeEventMetadata(data.vendor) ?? "unknown",
+        model: normalizeEventMetadata(data.model) ?? "unknown",
       });
     } catch {
       // Malformed detail — skip
@@ -302,6 +321,22 @@ export async function extractHenchTokenEvents(
       if (!run.startedAt || !run.tokenUsage) continue;
       if (!isInRange(run.startedAt, filter)) continue;
 
+      if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        for (const turn of run.turnTokenUsage) {
+          events.push({
+            timestamp: run.startedAt,
+            command: "run",
+            package: "hench",
+            inputTokens: turn.input ?? 0,
+            outputTokens: turn.output ?? 0,
+            calls: 1,
+            vendor: turn.vendor,
+            model: turn.model ?? run.model,
+          });
+        }
+        continue;
+      }
+
       events.push({
         timestamp: run.startedAt,
         command: "run",
@@ -309,6 +344,7 @@ export async function extractHenchTokenEvents(
         inputTokens: run.tokenUsage.input ?? 0,
         outputTokens: run.tokenUsage.output ?? 0,
         calls: 1,
+        model: run.model,
       });
     } catch {
       // Invalid run file — skip

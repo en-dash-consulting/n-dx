@@ -3,11 +3,18 @@ import type { PRDStore } from "rex";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
+import type { ToolContext } from "../../tools/contracts.js";
+import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/index.js";
 import { section, subsection, stream, detail } from "../../types/output.js";
-import type { ToolContext } from "../../types/index.js";
-import { loadClaudeConfig, resolveApiKey } from "../../store/project-config.js";
-import { resolveModel } from "@n-dx/claude-client";
+import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
+import {
+  loadClaudeConfig,
+  loadLLMConfig,
+  resolveApiKey,
+  resolveLLMVendor,
+} from "../../store/project-config.js";
+import { resolveModel } from "@n-dx/llm-client";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
@@ -110,6 +117,15 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   await transitionToInProgress(store, taskId, brief.task.status);
 
   // API-specific: resolve API key
+  const llmConfig = await loadLLMConfig(henchDir);
+  const vendor = resolveLLMVendor(llmConfig);
+  if (vendor !== "claude") {
+    throw new Error(
+      `Hench API mode requires llm.vendor=claude. Current vendor: ${vendor}. ` +
+      "Use provider=cli for Codex.",
+    );
+  }
+
   const claudeConfig = await loadClaudeConfig(henchDir);
   const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
   if (!apiKey) {
@@ -129,6 +145,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
   const guard = new GuardRails(projectDir, config.guard);
 
+  // Memory monitor for pre-spawn checks during tool dispatch.
+  // Uses platform-specific memory detection (Linux /proc/meminfo, macOS/Windows os module).
+  const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
+
   const toolCtx: ToolContext = {
     guard,
     projectDir,
@@ -136,10 +156,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     taskId,
     testCommand: brief.project.testCommand,
     startingHead,
+    memoryMonitor,
   };
 
-  // Shared: initialize run record
-  const run = await initRunRecord({
+  // Shared: initialize run record + capture start memory snapshot
+  const { run, memoryCtx } = await initRunRecord({
     taskId,
     taskTitle: brief.task.title,
     model,
@@ -189,6 +210,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         turn: turn + 1,
         input: parsed.input,
         output: parsed.output,
+        vendor,
+        model,
       };
       if (parsed.cacheCreationInput) turnUsage.cacheCreationInput = parsed.cacheCreationInput;
       if (parsed.cacheReadInput) turnUsage.cacheReadInput = parsed.cacheReadInput;
@@ -251,6 +274,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           toolCtx,
           block.name,
           block.input as Record<string, unknown>,
+          rexToolHandlers,
         );
 
         const durationMs = Date.now() - startMs;
@@ -302,8 +326,15 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     await runReviewGate(projectDir, store, taskId, run);
   }
 
-  // Shared: finalize run (build summary, post-task tests, save)
-  await finalizeRun(run, henchDir, projectDir, brief.project.testCommand);
+  // Shared: finalize run (build summary, memory stats, post-task tests, save)
+  await finalizeRun({
+    run,
+    henchDir,
+    projectDir,
+    testCommand: brief.project.testCommand,
+    heartbeat,
+    memoryCtx,
+  });
 
   return { run };
 }

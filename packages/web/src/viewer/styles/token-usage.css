@@ -109,6 +109,30 @@
   margin-bottom: 16px;
 }
 
+.token-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.token-source-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.token-source-item code {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text);
+  word-break: break-word;
+}
+
 /* Budget indicators */
 .budget-indicators {
   display: flex;

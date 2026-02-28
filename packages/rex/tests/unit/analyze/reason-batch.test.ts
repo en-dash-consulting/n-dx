@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import type { BatchImportItem, BatchImportResult } from "../../../src/analyze/reason.js";
 
 // We need to mock spawnClaude since it calls the LLM
-vi.mock("@n-dx/claude-client", () => ({
+vi.mock("@n-dx/llm-client", () => ({
   createClient: () => ({
     mode: "api",
     prompt: vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined }),

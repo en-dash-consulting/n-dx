@@ -360,6 +360,13 @@
   position: relative;
 }
 
+/* Off-screen culled node placeholder — preserves scroll position height
+   while removing all child DOM nodes and event listeners. */
+.prd-node-culled {
+  contain: strict;
+  content-visibility: hidden;
+}
+
 .prd-node-row {
   display: flex;
   align-items: center;
@@ -619,6 +626,16 @@
   border-radius: 2px;
 }
 
+.prd-usage-chip {
+  font-size: 10px;
+  color: var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-teal) 35%, transparent);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
 /* Timestamp */
 .prd-timestamp {
   font-size: 11px;
@@ -631,6 +648,14 @@
 .prd-children {
   border-left: 2px solid var(--border);
   margin-left: 18px;
+}
+
+/* Collapsed-but-still-mounted state during deferred unmount window.
+   Children are hidden immediately via display:none while the unmount
+   timer runs; if the parent is re-expanded before the timer fires,
+   children reappear instantly without a re-mount. */
+.prd-children-collapsed {
+  display: none;
 }
 
 /* Empty state */
@@ -685,6 +710,25 @@
   letter-spacing: 0.5px;
   color: var(--text-dim);
   margin-bottom: 6px;
+}
+
+.task-usage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-usage-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-teal);
+}
+
+.task-usage-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 /* Status selector buttons */
@@ -1411,6 +1455,10 @@
 @keyframes rex-toast-in {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.rex-toast-error {
+  background: var(--red);
 }
 
 /* ── Add Item Form ─────────────────────────────────────────────────── */
@@ -4541,4 +4589,385 @@
 
 .batch-import-process-btn {
   width: 100%;
+}
+
+/* ── Inline Delete Button (on tree node rows) ────────────────────── */
+
+.prd-inline-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: 2px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity var(--transition-normal), background var(--transition-normal),
+    border-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Show on row hover or keyboard focus */
+.prd-node-row:hover .prd-inline-delete-btn,
+.prd-node-row:focus-within .prd-inline-delete-btn,
+.prd-node-selected .prd-inline-delete-btn {
+  opacity: 1;
+}
+
+.prd-inline-delete-btn:hover {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.prd-inline-delete-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--red);
+  outline-offset: -1px;
+}
+
+/* ── Node Deleting State (API in-flight) ─────────────────────────── */
+
+.prd-node-deleting {
+  opacity: 0.45;
+  pointer-events: none;
+  animation: prd-node-fade-out 0.3s ease-out both;
+}
+
+@keyframes prd-node-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0.45; transform: scale(0.98); }
+}
+
+/* ── Node Context Menu ───────────────────────────────────────────── */
+
+.prd-context-menu {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  max-width: 260px;
+  padding: 4px 0;
+  font-size: 13px;
+  animation: rex-toast-in 0.12s ease-out;
+}
+
+.prd-context-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.prd-context-menu-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prd-context-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.prd-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.prd-context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.prd-context-menu-item-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.prd-context-menu-danger {
+  color: var(--red);
+}
+
+.prd-context-menu-danger:hover {
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+
+/* ── Task Detail: Danger Zone (Delete) ───────────────────────────── */
+
+.task-danger-zone {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--red) 30%, var(--border));
+}
+
+.task-danger-label {
+  color: var(--red);
+}
+
+.task-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.task-remove-btn:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border-color: var(--red);
+}
+
+.task-remove-btn-icon {
+  font-size: 12px;
+}
+
+.task-remove-confirm {
+  margin-top: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--red) 6%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 30%, var(--border));
+  border-radius: var(--radius-sm);
+  animation: rex-toast-in 0.15s ease-out;
+}
+
+.task-remove-confirm-msg {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.task-remove-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.task-remove-confirm-btn {
+  padding: 5px 12px;
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.task-remove-confirm-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.task-remove-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.task-remove-cancel-btn {
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.task-remove-cancel-btn:hover:not(:disabled) {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.task-remove-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Delete Confirmation Modal ───────────────────────────────────── */
+
+.delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: delete-modal-fade-in 0.15s ease-out;
+}
+
+.delete-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  animation: delete-modal-slide-in 0.15s ease-out;
+}
+
+.delete-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.delete-modal-icon {
+  font-size: 16px;
+  color: var(--red);
+  flex-shrink: 0;
+}
+
+.delete-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.delete-modal-body {
+  padding: 16px 20px;
+}
+
+.delete-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.delete-modal-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-modal-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--red) 25%, var(--border));
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.delete-modal-warning-icon {
+  color: var(--red);
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.delete-modal-message {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.delete-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.delete-modal-cancel-btn {
+  padding: 7px 16px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.delete-modal-cancel-btn:hover:not(:disabled) {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.delete-modal-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.delete-modal-confirm-btn {
+  padding: 7px 16px;
+  background: var(--red);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition-normal);
+}
+
+.delete-modal-confirm-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.delete-modal-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes delete-modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes delete-modal-slide-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }

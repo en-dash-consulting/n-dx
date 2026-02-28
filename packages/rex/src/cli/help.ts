@@ -6,14 +6,14 @@
  *   - Relevant flags only (not the full global options list)
  *   - 2–3 practical examples
  *
- * Uses the shared formatHelp() from @n-dx/claude-client for consistent
+ * Uses the shared formatHelp() from @n-dx/llm-client for consistent
  * presentation with semantic color coding across all n-dx packages.
  *
  * @module rex/cli/help
  */
 
-import { formatHelp } from "@n-dx/claude-client";
-import type { HelpDefinition } from "@n-dx/claude-client";
+import { formatHelp } from "@n-dx/llm-client";
+import type { HelpDefinition } from "@n-dx/llm-client";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -90,9 +90,20 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description:
       "Manual mode creates a single item at the specified level. Smart mode\n" +
       "uses an LLM to analyze your description(s) and generate a structured\n" +
-      "PRD proposal with epics, features, tasks, and subtasks.",
+      "PRD proposal with epics, features, tasks, and subtasks.\n" +
+      "In interactive smart mode, rex prompts for duplicate handling only when\n" +
+      "selected proposal nodes match existing PRD items.",
     sections: [
       { title: "Levels", content: "epic, feature, task, subtask" },
+      {
+        title: "Duplicate handling (smart mode)",
+        content:
+          "Prompt: Duplicate action (c/m/p)\n" +
+          "c=cancel: abort write, create nothing\n" +
+          "m=merge: update matched existing items and add only non-duplicates\n" +
+          "p=proceed anyway: create duplicates and persist override markers\n" +
+          "Empty/invalid input defaults to cancel.",
+      },
     ],
     options: [
       { flag: "--title=\"...\"", description: "Item title (required for manual mode)", required: true },
@@ -134,6 +145,52 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex update abc123 --priority=critical --title=\"Urgent fix\"", description: "Update priority and title" },
     ],
     related: ["add", "next"],
+  },
+  remove: {
+    tool: "rex",
+    command: "remove",
+    summary: "remove an epic or task from the PRD",
+    usage: [
+      "rex remove epic <id> [dir]",
+      "rex remove task <id> [dir]",
+      "rex remove <id> [dir]",
+    ],
+    description:
+      "Permanently removes an epic or task and all its descendants from the PRD tree.\n" +
+      "When the level (epic/task) is omitted, it is auto-detected from the item.\n" +
+      "An interactive confirmation prompt is shown before deletion (unless --yes\n" +
+      "is passed or output is piped). Cleans up blockedBy references on remaining\n" +
+      "items and detects parent auto-completions.\n" +
+      "\n" +
+      "WARNING: Removal is irreversible. Deleted items and all their descendants\n" +
+      "are permanently erased from prd.json. Use 'rex status' to verify IDs and\n" +
+      "review the subtree before removing.",
+    sections: [
+      {
+        title: "Epic vs task removal",
+        content:
+          "epic    Deletes the epic and its entire subtree (features, tasks,\n" +
+          "        and subtasks). Use when an initiative is cancelled or obsolete.\n" +
+          "task    Deletes the task and its subtasks only. The parent feature\n" +
+          "        and epic remain intact. If removing the task causes all\n" +
+          "        siblings to be completed, the parent is auto-completed.\n" +
+          "\n" +
+          "Features and subtasks cannot be removed directly. Remove the\n" +
+          "parent epic or task instead, or use 'rex prune' for completed\n" +
+          "subtrees.",
+      },
+    ],
+    options: [
+      { flag: "--yes, -y", description: "Skip confirmation prompt (use in scripts)" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex remove epic abc123", description: "Remove an epic and all descendants" },
+      { command: "rex remove task def456", description: "Remove a task and its subtasks" },
+      { command: "rex remove abc123", description: "Auto-detect level and remove" },
+      { command: "rex remove task def456 --yes", description: "Remove without confirmation (scripting)" },
+    ],
+    related: ["update", "prune"],
   },
   move: {
     tool: "rex",
@@ -321,15 +378,54 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description:
       "Reads SourceVision analysis findings and suggests new PRD items based on\n" +
       "code quality issues, architectural anti-patterns, and missing tests.\n" +
-      "Requires .sourcevision/ to exist (run 'sourcevision analyze' first).",
+      "Requires .sourcevision/ to exist (run 'sourcevision analyze' first).\n" +
+      "\n" +
+      "Two workflows are available: acknowledge (suppress findings from future\n" +
+      "output) and accept (create PRD items from recommendations).",
+    sections: [
+      {
+        title: "Acknowledge vs accept",
+        content:
+          "--acknowledge    Marks findings as seen. Acknowledged findings are\n" +
+          "                hidden from subsequent runs (use --show-all to\n" +
+          "                reveal them). No PRD items are created.\n" +
+          "--accept        Creates new PRD items from the recommendations.\n" +
+          "                Each recommendation becomes a feature in the PRD\n" +
+          "                with its findings as the description. Conflict\n" +
+          "                detection prevents duplicate items.",
+      },
+      {
+        title: "Selector syntax (--accept)",
+        content:
+          "--accept              Accept all recommendations (no selector)\n" +
+          "--accept==all         Accept all recommendations (explicit)\n" +
+          "--accept==.           Accept all recommendations (dot wildcard)\n" +
+          "--accept==3           Accept only recommendation 3\n" +
+          "--accept==1,4,5       Accept recommendations 1, 4, and 5\n" +
+          "\n" +
+          "Indices are 1-based and correspond to the numbered output shown\n" +
+          "by 'rex recommend'. Range syntax (e.g. 1-3) is not supported;\n" +
+          "use comma-separated indices instead.",
+      },
+    ],
     options: [
+      { flag: "--accept[=all|=1,4,5]", description: "Accept all or selected recommendations into PRD as new items" },
+      { flag: "--force", description: "Create items even when conflicts with existing PRD items are detected" },
+      { flag: "--show-all", description: "Include acknowledged findings in recommendation output" },
+      { flag: "--acknowledge=<all|1,2>", description: "Acknowledge all or selected findings by index (hides from future runs)" },
       { flag: "--format=json", description: "Machine-readable output" },
     ],
     examples: [
-      { command: "rex recommend", description: "Show recommendations interactively" },
+      { command: "rex recommend", description: "Show recommendations (run first to see indices)" },
+      { command: "rex recommend --accept", description: "Accept all recommendations into PRD" },
+      { command: "rex recommend --accept==3", description: "Accept only recommendation 3" },
+      { command: "rex recommend --accept==1,4,5 .", description: "Accept recommendations 1, 4, and 5" },
+      { command: "rex recommend --accept==all --force", description: "Accept all, overriding conflicts" },
+      { command: "rex recommend --acknowledge=all", description: "Acknowledge all findings (no PRD changes)" },
+      { command: "rex recommend --show-all", description: "Include previously acknowledged findings" },
       { command: "rex recommend --format=json .", description: "JSON output for automation" },
     ],
-    related: ["analyze"],
+    related: ["analyze", "status"],
   },
   analyze: {
     tool: "rex",
@@ -412,6 +508,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   next: ["status", "update"],
   add: ["analyze", "update"],
   update: ["add", "next"],
+  remove: ["update", "prune"],
   move: ["reshape"],
   reshape: ["prune", "move"],
   prune: ["reshape", "status"],
@@ -421,7 +518,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["status"],
   report: ["validate"],
   verify: ["status"],
-  recommend: ["analyze"],
+  recommend: ["analyze", "status"],
   analyze: ["add", "recommend"],
   import: ["add", "recommend"],
   adapter: ["sync"],

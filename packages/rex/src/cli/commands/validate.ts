@@ -3,10 +3,16 @@ import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION } from "../../schema/index.js";
 import { validateDocument, validateConfig } from "../../schema/validate.js";
 import { validateDAG } from "../../core/dag.js";
-import { validateStructure } from "../../core/structural.js";
+import { validateStructure, findEpiclessFeatures } from "../../core/structural.js";
+import {
+  resolveEpiclessFeatures,
+  applyEpiclessResolutions,
+} from "./validate-interactive.js";
+import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import type { PRDDocument } from "../../schema/index.js";
+import type { PromptFn } from "./validate-interactive.js";
 
 interface CheckResult {
   name: string;
@@ -16,9 +22,19 @@ interface CheckResult {
   errors: string[];
 }
 
+/**
+ * Options for interactive validation behavior.
+ * @internal Exposed for testability — production callers use flags only.
+ */
+export interface ValidateOptions {
+  /** Injectable prompt function for interactive resolution. */
+  prompt?: PromptFn;
+}
+
 export async function cmdValidate(
   dir: string,
   flags: Record<string, string>,
+  options?: ValidateOptions,
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
   const checks: CheckResult[] = [];
@@ -123,6 +139,15 @@ export async function cmdValidate(
       ),
     });
 
+    checks.push({
+      name: "empty containers",
+      pass: structural.emptyContainers.length === 0,
+      severity: "warn",
+      errors: structural.emptyContainers.map(
+        (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
+      ),
+    });
+
     // Categorise warnings by type for clearer reporting
     const blockedWarnings = structural.warnings.filter((w) => w.startsWith("Blocked without"));
     const timestampWarnings = structural.warnings.filter((w) => w.startsWith("Timestamp inconsistency"));
@@ -156,13 +181,16 @@ export async function cmdValidate(
     }
   }
 
+  // Detect epicless features for interactive resolution
+  const epiclessFeatures = doc ? findEpiclessFeatures(doc.items) : [];
+
   // Determine pass/fail: warnings don't cause failure
   const errorChecks = checks.filter(
     (c) => !c.pass && c.severity !== "warn",
   );
   const allPass = errorChecks.length === 0;
 
-  // Output results
+  // ── JSON output (non-interactive) ──────────────────────────────────────────
   if (flags.format === "json") {
     const report = {
       ok: allPass,
@@ -173,12 +201,14 @@ export async function cmdValidate(
         failed: errorChecks.length,
         warnings: checks.filter((c) => !c.pass && c.severity === "warn").length,
       },
+      ...(epiclessFeatures.length > 0 ? { epiclessFeatures } : {}),
     };
     result(JSON.stringify(report, null, 2));
     if (!allPass) process.exit(1);
     return;
   }
 
+  // ── Text output ────────────────────────────────────────────────────────────
   for (const check of checks) {
     const isWarn = !check.pass && check.severity === "warn";
     const icon = check.pass ? "✓" : isWarn ? "⚠" : "✗";
@@ -186,6 +216,42 @@ export async function cmdValidate(
     if (!check.pass) {
       for (const err of check.errors) {
         result(`    ${err}`);
+      }
+    }
+  }
+
+  // ── Interactive epicless feature resolution ────────────────────────────────
+  // Only offered in interactive TTY mode when epicless features are detected.
+  // Non-interactive environments (CI, piped output, JSON mode) skip this.
+  const isInteractive =
+    epiclessFeatures.length > 0 &&
+    doc !== null &&
+    process.stdin.isTTY === true &&
+    flags.yes !== "true" &&
+    flags.y !== "true";
+
+  if (isInteractive || (epiclessFeatures.length > 0 && options?.prompt)) {
+    const resolutions = await resolveEpiclessFeatures(
+      doc!,
+      epiclessFeatures,
+      options?.prompt ? { prompt: options.prompt } : undefined,
+    );
+
+    const actionable = resolutions.filter((r) => r.action !== "skip");
+    if (actionable.length > 0) {
+      const mutated = applyEpiclessResolutions(doc!, resolutions);
+      if (mutated > 0) {
+        const store = await resolveStore(rexDir);
+        await store.saveDocument(doc!);
+        await store.appendLog({
+          timestamp: new Date().toISOString(),
+          event: "validate_interactive_fix",
+          detail: `Resolved ${mutated} epicless feature${mutated === 1 ? "" : "s"} during interactive validation`,
+        });
+        info("");
+        result(
+          `Resolved ${mutated} epicless feature${mutated === 1 ? "" : "s"}.`,
+        );
       }
     }
   }

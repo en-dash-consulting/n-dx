@@ -8,6 +8,7 @@ export {
   FindingSchema,
   ComponentsSchema,
   CallGraphSchema,
+  BranchWorkRecordSchema,
   validateManifest,
   validateInventory,
   validateImports,
@@ -15,6 +16,7 @@ export {
   validateZones,
   validateComponents,
   validateCallGraph,
+  validateBranchWorkRecord,
   validateModule,
   formatValidationErrors,
 } from "./validate.js";

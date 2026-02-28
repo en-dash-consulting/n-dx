@@ -11,7 +11,7 @@
  *        ↓
  *   Domain          rex · sourcevision            (independent, never import each other)
  *        ↓
- *   Foundation      @n-dx/claude-client           (shared types, API client)
+ *   Foundation      @n-dx/llm-client              (shared types, API client)
  * ```
  *
  * ## Policies enforced
@@ -115,13 +115,13 @@ describe("architecture policy: domain layer isolation", () => {
       expect.fail(
         [
           "Rex must not import from sibling domain or upper-layer packages.",
-          "Rex sits at the domain layer and may only import from @n-dx/claude-client (foundation).",
+          "Rex sits at the domain layer and may only import from @n-dx/llm-client (foundation).",
           "",
           "Violations:",
           ...violations.map((v) => `  - ${v}`),
           "",
           "If rex needs functionality from another package, it should be:",
-          "  - Pushed down to @n-dx/claude-client (if truly shared), or",
+          "  - Pushed down to @n-dx/llm-client (if truly shared), or",
           "  - Coordinated via filesystem/CLI (loose coupling), or",
           "  - Restructured to avoid the dependency.",
         ].join("\n"),
@@ -139,8 +139,7 @@ describe("architecture policy: domain layer isolation", () => {
       const content = readFileSync(file, "utf-8");
 
       for (const pkg of forbidden) {
-        const pattern = new RegExp(`from\\s+["']${pkg.replace("/", "\\/")}["']`);
-        if (pattern.test(content)) {
+        if (hasRuntimeImportFrom(content, pkg)) {
           violations.push(`${rel} imports from "${pkg}"`);
         }
       }
@@ -150,13 +149,13 @@ describe("architecture policy: domain layer isolation", () => {
       expect.fail(
         [
           "Sourcevision must not import from sibling domain or upper-layer packages.",
-          "Sourcevision sits at the domain layer and may only import from @n-dx/claude-client (foundation).",
+          "Sourcevision sits at the domain layer and may only import from @n-dx/llm-client (foundation).",
           "",
           "Violations:",
           ...violations.map((v) => `  - ${v}`),
           "",
           "If sourcevision needs functionality from another package, it should be:",
-          "  - Pushed down to @n-dx/claude-client (if truly shared), or",
+          "  - Pushed down to @n-dx/llm-client (if truly shared), or",
           "  - Coordinated via filesystem/CLI (loose coupling), or",
           "  - Restructured to avoid the dependency.",
         ].join("\n"),
@@ -217,6 +216,7 @@ describe("architecture policy: gateway enforcement", () => {
    */
   it("web runtime imports from domain packages must go through the gateway (server/domain-gateway.ts)", () => {
     const GATEWAY = "packages/web/src/server/domain-gateway.ts";
+    const REX_GATEWAY = "packages/web/src/server/rex-gateway.ts";
     const LEGACY_GATEWAY = "packages/web/src/server/mcp-deps.ts";
     const domainPkgs = ["rex", "sourcevision"];
     const webSrc = walk(join(ROOT, "packages/web/src"));
@@ -225,8 +225,8 @@ describe("architecture policy: gateway enforcement", () => {
     for (const file of webSrc) {
       const rel = relative(ROOT, file).replace(/\\/g, "/");
 
-      // The gateway itself and its legacy re-export are allowed
-      if (rel === GATEWAY || rel === LEGACY_GATEWAY) continue;
+      // The gateways themselves and legacy re-export are allowed
+      if (rel === GATEWAY || rel === REX_GATEWAY || rel === LEGACY_GATEWAY) continue;
 
       const content = readFileSync(file, "utf-8");
       for (const pkg of domainPkgs) {
@@ -274,7 +274,7 @@ describe("architecture policy: gateway enforcement", () => {
       expect.fail(
         [
           "Hench must not import from sourcevision at runtime.",
-          "Hench sits at the execution layer and imports only from rex (via gateway) and @n-dx/claude-client.",
+          "Hench sits at the execution layer and imports only from rex (via gateway) and @n-dx/llm-client.",
           "",
           "Violations:",
           ...violations.map((v) => `  - ${v}`),

@@ -7,7 +7,19 @@
 
 export { PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs, computePerZoneAttemptConfigs, MAX_CONCURRENT_ZONES, PER_ZONE_MAX_FILES, PER_ZONE_MAX_CROSSINGS } from "./enrich-config.js";
 export type { PassConfig } from "./enrich-config.js";
-export { callClaude, setClaudeConfig, setClaudeClient, getAuthMode, ClaudeClientError, DEFAULT_MODEL } from "./claude-client.js";
+export {
+  callClaude,
+  callLLM,
+  setClaudeConfig,
+  setLLMConfig,
+  setClaudeClient,
+  setLLMClient,
+  getAuthMode,
+  getLLMVendor,
+  ClaudeClientError,
+  DEFAULT_MODEL,
+  DEFAULT_CODEX_MODEL,
+} from "./claude-client.js";
 export type { CallClaudeResult } from "./claude-client.js";
 export { tryParseJSON, extractFindings, mergeZonesByName, deduplicateFindings } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";

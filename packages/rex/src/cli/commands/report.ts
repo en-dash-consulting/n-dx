@@ -158,6 +158,15 @@ async function runChecks(dir: string): Promise<{
       ),
     });
 
+    checks.push({
+      name: "empty containers",
+      pass: structural.emptyContainers.length === 0,
+      severity: "warn",
+      errors: structural.emptyContainers.map(
+        (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
+      ),
+    });
+
     if (structural.warnings.length > 0) {
       checks.push({
         name: "blocked item dependencies",

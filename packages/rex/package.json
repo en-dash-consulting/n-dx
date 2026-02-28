@@ -26,7 +26,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
-    "@n-dx/claude-client": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
+    "ora": "^8.0.1",
     "zod": "^3.22.0"
   },
   "devDependencies": {

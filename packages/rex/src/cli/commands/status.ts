@@ -35,6 +35,24 @@ const DEFAULT_BAR_WIDTH = 20;
 
 /** Per-task coverage stats, keyed by item ID. */
 export type CoverageMap = Map<string, { covered: number; total: number }>;
+interface OverrideMarkerSummaryItem {
+  id: string;
+  title: string;
+  level: PRDItem["level"];
+  status: PRDItem["status"];
+  reason: string;
+  reasonRef: string;
+  matchedItemId: string;
+  matchedItemStatus: PRDItem["status"];
+  createdAt: string;
+}
+
+interface OverrideMarkerSummary {
+  totalItems: number;
+  overrideCreated: number;
+  normalOrMerged: number;
+  items: OverrideMarkerSummaryItem[];
+}
 
 /** Render a progress bar string from a completion ratio. */
 export function renderProgressBar(
@@ -97,6 +115,47 @@ function coverageSuffix(itemId: string, coverage?: CoverageMap): string {
   return ` [${covered}/${total} covered]`;
 }
 
+function overrideSuffix(item: PRDItem): string {
+  if (!item.overrideMarker) return "";
+  return ` [override: ${item.overrideMarker.reason}]`;
+}
+
+function summarizeOverrideMarkers(items: PRDItem[]): OverrideMarkerSummary {
+  const summary: OverrideMarkerSummary = {
+    totalItems: 0,
+    overrideCreated: 0,
+    normalOrMerged: 0,
+    items: [],
+  };
+
+  const visit = (nodes: PRDItem[]): void => {
+    for (const item of nodes) {
+      summary.totalItems++;
+      if (item.overrideMarker) {
+        summary.overrideCreated++;
+        summary.items.push({
+          id: item.id,
+          title: item.title,
+          level: item.level,
+          status: item.status,
+          reason: item.overrideMarker.reason,
+          reasonRef: item.overrideMarker.reasonRef,
+          matchedItemId: item.overrideMarker.matchedItemId,
+          matchedItemStatus: item.overrideMarker.matchedItemStatus,
+          createdAt: item.overrideMarker.createdAt,
+        });
+      }
+      if (item.children && item.children.length > 0) {
+        visit(item.children);
+      }
+    }
+  };
+
+  visit(items);
+  summary.normalOrMerged = summary.totalItems - summary.overrideCreated;
+  return summary;
+}
+
 /**
  * Filter out fully-completed subtrees from items for display.
  *
@@ -129,6 +188,7 @@ export function renderTree(
   for (const item of items) {
     const icon = STATUS_ICONS[item.status] ?? "?";
     const prefix = "  ".repeat(indent);
+    const override = overrideSuffix(item);
     const priority = item.priority ? ` [${item.priority}]` : "";
     const ts = timestampSuffix(item);
     const cov = coverageSuffix(item.id, coverage);
@@ -143,16 +203,16 @@ export function renderTree(
         const pct = Math.round(ratio * 100);
         const bar = renderProgressBar(ratio);
         lines.push(
-          `${prefix}${icon} ${item.title}${priority} ${bar} ${pct}% ${count}${blocked}`,
+          `${prefix}${icon} ${item.title}${override}${priority} ${bar} ${pct}% ${count}${blocked}`,
         );
       } else {
         lines.push(
-          `${prefix}${icon} ${item.title}${priority} ${count}${ts}${blocked}`,
+          `${prefix}${icon} ${item.title}${override}${priority} ${count}${ts}${blocked}`,
         );
       }
       lines.push(...renderTree(item.children, indent + 1, coverage));
     } else {
-      lines.push(`${prefix}${icon} ${item.title}${priority}${cov}${ts}${blocked}`);
+      lines.push(`${prefix}${icon} ${item.title}${override}${priority}${cov}${ts}${blocked}`);
     }
   }
   return lines;
@@ -234,6 +294,7 @@ export async function cmdStatus(
 
   if (format === "json") {
     const output: Record<string, unknown> = { ...doc };
+    output.overrideMarkers = summarizeOverrideMarkers(doc.items);
     if (verifyResult) {
       output.coverage = {
         tasks: verifyResult.tasks,

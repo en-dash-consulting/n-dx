@@ -69,7 +69,7 @@ describe("favicon", () => {
     it("maps sourcevision views correctly", () => {
       const svViews: ViewId[] = [
         "overview", "graph", "zones", "files", "routes",
-        "architecture", "problems", "suggestions",
+        "architecture", "problems", "suggestions", "pr-markdown",
       ];
       for (const view of svViews) {
         expect(VIEW_TO_PRODUCT[view]).toBe("sourcevision");
@@ -78,7 +78,7 @@ describe("favicon", () => {
 
     it("maps rex views correctly", () => {
       const rexViews: ViewId[] = [
-        "rex-dashboard", "prd", "rex-analysis", "token-usage", "validation",
+        "rex-dashboard", "prd", "rex-analysis", "validation",
       ];
       for (const view of rexViews) {
         expect(VIEW_TO_PRODUCT[view]).toBe("rex");
@@ -141,6 +141,11 @@ describe("favicon", () => {
     it("sets type to image/png", () => {
       updateFavicon("prd");
       expect(getFaviconType()).toBe("image/png");
+    });
+
+    it("uses n-dx favicon for global token usage view", () => {
+      updateFavicon("token-usage");
+      expect(getFaviconHref()).toContain(FAVICON_PNGS.ndx);
     });
 
     it("falls back to n-dx favicon for unmapped views", () => {

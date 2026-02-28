@@ -1,0 +1,29 @@
+{
+  "id": ".claude-worktrees-angry-chatelet:packages-sourcevision:cli",
+  "name": "Cli",
+  "description": "12 files, primarily TypeScript",
+  "files": [
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/constants.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/export-pdf.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/init.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/reset.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/validate.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/errors.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/index.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/output.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/serve.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/tests/unit/cli/errors.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/tests/unit/cli/export-pdf.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/tests/unit/cli/output.test.ts"
+  ],
+  "entryPoints": [
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/constants.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/init.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/errors.ts",
+    ".claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/output.ts"
+  ],
+  "cohesion": 0.74,
+  "coupling": 0.26,
+  "fileCount": 12,
+  "lineCount": 0
+}

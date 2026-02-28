@@ -4,7 +4,7 @@ import { PRIORITY_ORDER } from "../schema/index.js";
 // Re-export from the shared foundation to eliminate duplication.
 // All existing consumers import from this file — the re-export preserves
 // their import paths while consolidating the implementation.
-export { toCanonicalJSON } from "@n-dx/claude-client";
+export { toCanonicalJSON } from "@n-dx/llm-client";
 
 export function sortItems(items: PRDItem[]): PRDItem[] {
   const sorted = [...items].sort((a, b) => {

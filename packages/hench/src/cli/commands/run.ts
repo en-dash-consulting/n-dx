@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { resolveStore } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "rex";
 import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
@@ -8,9 +8,25 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
-import { CLIError, EpicNotFoundError, requireClaudeCLI } from "../errors.js";
+import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
-import { loadClaudeConfig, resolveCliPath } from "../../store/project-config.js";
+import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
+import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
+import type { TaskPriority } from "../../queue/index.js";
+import { ProcessLimiter } from "../../process/limiter.js";
+import { MemoryThrottle } from "../../process/memory-throttle.js";
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}m ${remaining}s`;
+}
 
 // ---------------------------------------------------------------------------
 // Epic resolution helpers (exported for testing)
@@ -105,6 +121,7 @@ export async function getEpicScopeInfo(
   if (!epic) {
     throw new EpicNotFoundError(epicId, listEpics(doc.items));
   }
+  const resolvedEpicId = epic.id;
 
   // Walk the tree and count tasks belonging to this epic
   const { walkTree } = await import("../../prd/rex-gateway.js");
@@ -116,8 +133,8 @@ export async function getEpicScopeInfo(
   for (const { item, parents } of walkTree(doc.items)) {
     // Check if this item is inside the target epic
     const isInEpic =
-      item.id === epicId ||
-      parents.some((p) => p.id === epicId);
+      item.id === resolvedEpicId ||
+      parents.some((p) => p.id === resolvedEpicId);
 
     if (isInEpic && (item.level === "task" || item.level === "subtask")) {
       // Deleted items are excluded from all counts
@@ -205,6 +222,111 @@ export async function loadStuckTaskIds(
     info(`Stuck tasks detected (${stuck.size}): ${[...stuck].join(", ")}`);
   }
   return stuck;
+}
+
+// ---------------------------------------------------------------------------
+// Execution queue factory (exported for testing and external consumers)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create an ExecutionQueue sized from the hench guard config.
+ *
+ * The queue limits concurrent task executions to
+ * `guard.maxConcurrentProcesses` (default 3). This is the same
+ * limit used for cross-process concurrency, applied here at the
+ * in-process task-run level.
+ */
+export function createExecutionQueue(maxConcurrent: number): ExecutionQueue {
+  return new ExecutionQueue(maxConcurrent);
+}
+
+// ---------------------------------------------------------------------------
+// Priority resolution helpers (exported for testing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Peek at the next task's scheduling priority without consuming it.
+ *
+ * Looks up the task (by explicit ID or auto-selection) and resolves
+ * its effective scheduling priority from PRD metadata and optional
+ * CLI override. This priority is used for {@link ExecutionQueue}
+ * insertion ordering so that high-priority tasks bypass normal queue
+ * position under resource constraints.
+ *
+ * @param store PRD store
+ * @param taskId Explicit task ID (from --task flag), or undefined for auto-select
+ * @param cliOverride Priority override from --priority flag
+ * @param excludeTaskIds Task IDs to skip during auto-selection
+ * @param epicId Restrict selection to this epic
+ */
+export async function peekNextTaskPriority(
+  store: PRDStore,
+  taskId?: string,
+  cliOverride?: string,
+  excludeTaskIds?: Set<string>,
+  epicId?: string,
+): Promise<TaskPriority> {
+  const doc = await store.loadDocument();
+
+  // If explicit task ID, look it up directly
+  if (taskId) {
+    const entry = findItem(doc.items, taskId);
+    if (entry) {
+      return resolveSchedulingPriority({
+        taskPriority: entry.item.priority,
+        tags: entry.item.tags,
+        cliOverride,
+      });
+    }
+    // Task not found — defer to default; runOne will throw later
+    return resolveSchedulingPriority({ cliOverride });
+  }
+
+  // Auto-select: peek at what findNextTask would pick
+  const completedIds = collectCompletedIds(doc.items);
+  const skipIds = excludeTaskIds
+    ? new Set([...completedIds, ...excludeTaskIds])
+    : completedIds;
+
+  if (epicId) {
+    // Use the same logic as assembleTaskBrief for epic-scoped selection
+    const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
+    const allActionable = findActionable(doc.items, skipIds, Infinity);
+    const epicActionable = allActionable.filter(
+      (e) => epicTaskIds.has(e.item.id) && !excludeTaskIds?.has(e.item.id),
+    );
+    if (epicActionable.length > 0) {
+      const next = epicActionable[0];
+      return resolveSchedulingPriority({
+        taskPriority: next.item.priority,
+        tags: next.item.tags,
+        cliOverride,
+      });
+    }
+  } else {
+    const next = findNextTask(doc.items, skipIds);
+    if (next) {
+      return resolveSchedulingPriority({
+        taskPriority: next.item.priority,
+        tags: next.item.tags,
+        cliOverride,
+      });
+    }
+  }
+
+  // No actionable tasks — default priority (runOne will handle the error)
+  return resolveSchedulingPriority({ cliOverride });
+}
+
+/**
+ * Log queue status if there are any queued tasks.
+ * Suppressed when the queue is idle.
+ */
+function logQueueStatus(queue: ExecutionQueue): void {
+  const lines = formatQueueStatus(queue.status());
+  for (const line of lines) {
+    info(line);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -324,9 +446,28 @@ async function runOne(
   output(`Run ID: ${run.id}`);
   output(`Task: ${run.taskTitle}`);
   output(`Status: ${run.status}`);
+
+  // Duration
+  if (run.startedAt && run.finishedAt) {
+    const durationMs = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
+    info(`Duration: ${formatDuration(durationMs)}`);
+  }
+
   info(`Turns: ${run.turns}`);
   info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out`);
   info(`Tool calls: ${run.toolCalls.length}`);
+
+  // Memory stats
+  if (run.memoryStats) {
+    const peakMB = Math.round(run.memoryStats.peakRssBytes / 1024 / 1024);
+    const availGB = run.memoryStats.systemAvailableAtEndBytes >= 0
+      ? (run.memoryStats.systemAvailableAtEndBytes / 1024 / 1024 / 1024).toFixed(1)
+      : "?";
+    const totalGB = run.memoryStats.systemTotalBytes >= 0
+      ? (run.memoryStats.systemTotalBytes / 1024 / 1024 / 1024).toFixed(1)
+      : "?";
+    info(`Memory: ${peakMB} MB peak RSS (system: ${availGB} / ${totalGB} GB available)`);
+  }
 
   // Post-task test results
   const postTests = run.structuredSummary?.postRunTests;
@@ -368,6 +509,8 @@ export async function cmdRun(
   const henchDir = join(dir, HENCH_DIR);
   const config = await loadConfig(henchDir);
   const rexDir = join(dir, config.rexDir);
+  const llmConfig = await loadLLMConfig(henchDir);
+  const llmVendor = resolveLLMVendor(llmConfig);
 
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
@@ -376,11 +519,17 @@ export async function cmdRun(
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
 
-  // Fail fast if CLI provider selected but claude binary not available
+  if (llmVendor === "codex" && provider === "api" && !dryRun) {
+    throw new CLIError(
+      "Hench API provider is only supported for vendor=claude.",
+      "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
+    );
+  }
+
+  // Fail fast if CLI provider selected but vendor CLI binary not available
   if (provider === "cli" && !dryRun) {
-    const claudeConfig = await loadClaudeConfig(henchDir);
-    const customPath = claudeConfig.cli_path;
-    requireClaudeCLI(customPath);
+    const customPath = resolveVendorCliPath(llmConfig);
+    requireLLMCLI(llmVendor, customPath);
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;
@@ -418,6 +567,10 @@ export async function cmdRun(
 
   const epicByEpic = flags["epic-by-epic"] === "true";
 
+  // --priority flag: override task scheduling priority.
+  // Valid values: critical, high, medium, low.
+  const priorityOverride = flags.priority;
+
   // --epic-by-epic and --epic are mutually exclusive
   if (epicByEpic && flags.epic) {
     throw new CLIError(
@@ -426,24 +579,54 @@ export async function cmdRun(
     );
   }
 
-  if (epicByEpic) {
-    await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review);
-    return;
-  }
+  // Memory-based execution throttling.
+  // Delays or rejects runs when system memory is under pressure.
+  const throttle = new MemoryThrottle(config.guard.memoryThrottle);
+  await throttle.gate(({ decision, memoryUsagePercent, delayMs, attempt, maxRetries }) => {
+    if (decision === "delay") {
+      info(
+        `⏳ Memory usage high (${memoryUsagePercent.toFixed(1)}%) — ` +
+        `delaying execution ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`,
+      );
+    } else if (decision === "reject") {
+      info(`🚫 Memory usage critical (${memoryUsagePercent.toFixed(1)}%) — rejecting execution`);
+    } else if (attempt > 0) {
+      info(`✓ Memory usage recovered (${memoryUsagePercent.toFixed(1)}%) — proceeding`);
+    }
+  });
 
-  let taskId = flags.task;
+  // Enforce cross-process concurrency limit.
+  // Prevents multiple `hench run` invocations from exhausting memory.
+  const limiter = new ProcessLimiter(henchDir, config.guard.maxConcurrentProcesses);
+  await limiter.acquire(flags.task);
 
-  // Task selection: --task > interactive (TTY) > autoselect
-  // In loop mode, always autoselect (skip interactive)
-  if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
-    taskId = await selectTask(dir, rexDir, epicId);
-  }
-  // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
+  try {
+    // Create execution queue for in-process concurrency control.
+    // The queue limits concurrent task runs within this process
+    // (loop mode, epic-by-epic).
+    const queue = createExecutionQueue(config.guard.maxConcurrentProcesses);
 
-  if (loop) {
-    await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId);
-  } else {
-    await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
+    if (epicByEpic) {
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride);
+      return;
+    }
+
+    let taskId = flags.task;
+
+    // Task selection: --task > interactive (TTY) > autoselect
+    // In loop mode, always autoselect (skip interactive)
+    if (!taskId && !auto && !loop && process.stdin.isTTY && !dryRun) {
+      taskId = await selectTask(dir, rexDir, epicId);
+    }
+    // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
+
+    if (loop) {
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride);
+    } else {
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
+    }
+  } finally {
+    await limiter.release();
   }
 }
 
@@ -520,6 +703,8 @@ async function runLoop(
   maxFailedAttempts: number,
   review: boolean,
   epicId?: string,
+  queue?: ExecutionQueue,
+  priorityOverride?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -532,6 +717,7 @@ async function runLoop(
     }
     stopping = true;
     ac.abort();
+    if (queue) queue.drain();
     info("\nReceived interrupt — finishing current task then stopping…");
   };
 
@@ -553,6 +739,9 @@ async function runLoop(
       completed++;
       info(`\n=== Loop iteration ${completed} ===`);
 
+      // Show queue status if there are pending tasks
+      if (queue) logQueueStatus(queue);
+
       // Compute stuck tasks before each iteration so that
       // recently-stuck tasks are automatically skipped
       const isAutoselect = completed > 1 || !taskId;
@@ -562,16 +751,33 @@ async function runLoop(
 
       let status: string;
       try {
-        const result = await runOne(
-          dir, henchDir, rexDir, provider,
-          // Only use explicit taskId on the very first iteration
-          completed === 1 ? taskId : undefined,
-          dryRun, model, maxTurns, tokenBudget,
-          review,
-          stuckIds,
-          epicId,
-        );
-        status = result.status;
+        // Resolve scheduling priority from task metadata before enqueuing.
+        // This lets high-priority tasks bypass normal queue position.
+        const effectiveTaskId = completed === 1 ? taskId : undefined;
+        let schedulingPriority: TaskPriority = "medium";
+        if (queue) {
+          const store = await resolveStore(rexDir);
+          schedulingPriority = await peekNextTaskPriority(
+            store, effectiveTaskId, priorityOverride, stuckIds, epicId,
+          );
+          await queue.acquire(effectiveTaskId ?? "auto", schedulingPriority);
+        }
+
+        try {
+          const result = await runOne(
+            dir, henchDir, rexDir, provider,
+            // Only use explicit taskId on the very first iteration
+            effectiveTaskId,
+            dryRun, model, maxTurns, tokenBudget,
+            review,
+            stuckIds,
+            epicId,
+          );
+          status = result.status;
+        } finally {
+          // Release the queue slot after the task completes
+          if (queue) queue.release();
+        }
       } catch (err) {
         if (isNoTasksError(err)) {
           const scope = epicId ? " in epic" : "";
@@ -658,6 +864,8 @@ async function runEpicByEpic(
   pauseMs: number,
   maxFailedAttempts: number,
   review: boolean,
+  queue?: ExecutionQueue,
+  priorityOverride?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -669,6 +877,7 @@ async function runEpicByEpic(
     }
     stopping = true;
     ac.abort();
+    if (queue) queue.drain();
     info("\nReceived interrupt — finishing current task then stopping…");
   };
 
@@ -757,19 +966,36 @@ async function runEpicByEpic(
       while (true) {
         if (stopping) break;
 
+        // Show queue status if there are pending tasks
+        if (queue) logQueueStatus(queue);
+
         const stuckIds = await loadStuckTaskIds(henchDir, maxFailedAttempts);
 
         let status: string;
         try {
-          const result = await runOne(
-            dir, henchDir, rexDir, provider,
-            undefined, // autoselect within epic
-            dryRun, model, maxTurns, tokenBudget,
-            review,
-            stuckIds,
-            epic.id,
-          );
-          status = result.status;
+          // Resolve scheduling priority from task metadata before enqueuing.
+          // This lets high-priority tasks bypass normal queue position.
+          if (queue) {
+            const schedulingPriority = await peekNextTaskPriority(
+              store, undefined, priorityOverride, stuckIds, epic.id,
+            );
+            await queue.acquire(epic.id, schedulingPriority);
+          }
+
+          try {
+            const result = await runOne(
+              dir, henchDir, rexDir, provider,
+              undefined, // autoselect within epic
+              dryRun, model, maxTurns, tokenBudget,
+              review,
+              stuckIds,
+              epic.id,
+            );
+            status = result.status;
+          } finally {
+            // Release the queue slot after the task completes
+            if (queue) queue.release();
+          }
         } catch (err) {
           if (isNoTasksError(err)) {
             // All tasks in this epic are done

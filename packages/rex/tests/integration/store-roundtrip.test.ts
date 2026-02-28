@@ -127,6 +127,47 @@ describe("Store roundtrip integration", () => {
     });
   });
 
+  it("persists override marker metadata only when explicitly provided", async () => {
+    await store.addItem({
+      id: "epic-normal",
+      title: "Normal Epic",
+      status: "pending",
+      level: "epic",
+    });
+
+    await store.addItem({
+      id: "epic-force",
+      title: "Force-created Epic",
+      status: "pending",
+      level: "epic",
+      overrideMarker: {
+        type: "duplicate_guard_override",
+        reason: "exact_title",
+        reasonRef: "exact_title:epic-existing",
+        matchedItemId: "epic-existing",
+        matchedItemTitle: "Existing Epic",
+        matchedItemLevel: "epic",
+        matchedItemStatus: "completed",
+        createdAt: "2026-02-22T20:30:44.000Z",
+      },
+    });
+
+    const normal = await store.getItem("epic-normal");
+    const forceCreated = await store.getItem("epic-force");
+
+    expect(normal?.overrideMarker).toBeUndefined();
+    expect(forceCreated?.overrideMarker).toEqual({
+      type: "duplicate_guard_override",
+      reason: "exact_title",
+      reasonRef: "exact_title:epic-existing",
+      matchedItemId: "epic-existing",
+      matchedItemTitle: "Existing Epic",
+      matchedItemLevel: "epic",
+      matchedItemStatus: "completed",
+      createdAt: "2026-02-22T20:30:44.000Z",
+    });
+  });
+
   it("log append and read", async () => {
     await store.appendLog({
       timestamp: new Date().toISOString(),

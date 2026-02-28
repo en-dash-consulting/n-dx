@@ -85,7 +85,7 @@ describe("hench CLI help", () => {
       showCommandHelp("config");
       const output = logSpy.mock.calls[0][0] as string;
       expect(output).toContain("--interactive");
-      expect(output).toContain("Display all settings");
+      expect(output).toContain("Display all current settings");
     });
 
     it("template help includes subcommands", () => {

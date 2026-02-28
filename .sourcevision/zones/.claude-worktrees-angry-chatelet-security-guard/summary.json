@@ -1,0 +1,25 @@
+{
+  "id": ".claude-worktrees-angry-chatelet:security-guard",
+  "name": "Security Guard",
+  "description": "Security and policy enforcement subsystem with command filtering, path validation, and access controls.",
+  "files": [
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/commands.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/contracts.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/index.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/paths.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/policy.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/guard/commands.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/guard/guard-integration.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/guard/paths.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/guard/policy.test.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/tests/unit/tools/shell.test.ts"
+  ],
+  "entryPoints": [
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/index.ts",
+    ".claude/worktrees/angry-chatelet/packages/hench/src/guard/paths.ts"
+  ],
+  "cohesion": 0.9,
+  "coupling": 0.1,
+  "fileCount": 10,
+  "lineCount": 0
+}

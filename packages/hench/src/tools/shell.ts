@@ -1,8 +1,8 @@
-import type { GuardRails } from "../guard/index.js";
-import { execShell } from "../process/exec-shell.js";
+import { execShell } from "./exec-shell.js";
+import type { ToolGuard } from "./contracts.js";
 
 export async function toolRunCommand(
-  guard: GuardRails,
+  guard: ToolGuard,
   projectDir: string,
   params: { command: string; cwd?: string; timeout?: number },
 ): Promise<string> {

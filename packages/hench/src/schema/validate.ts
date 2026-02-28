@@ -17,7 +17,7 @@ const GuardConfigSchema = z.object({
   commandTimeout: z.number().positive(),
   maxFileSize: z.number().positive(),
   spawnTimeout: z.number().nonnegative().optional().default(300000),
-  maxConcurrentProcesses: z.number().int().positive().optional().default(4),
+  maxConcurrentProcesses: z.number().int().positive().optional().default(3),
   allowedGitSubcommands: z.array(z.string()).optional().default([
     "status", "add", "commit", "diff", "log",
     "branch", "checkout", "stash", "show", "rev-parse",
@@ -73,6 +73,8 @@ const TurnTokenUsageSchema = z.object({
   output: z.number(),
   cacheCreationInput: z.number().optional(),
   cacheReadInput: z.number().optional(),
+  vendor: z.string().optional(),
+  model: z.string().optional(),
 });
 
 const CommandRecordSchema = z.object({
@@ -114,6 +116,13 @@ const RunSummaryDataSchema = z.object({
   counts: SummaryCountsSchema,
 });
 
+const RunMemoryStatsSchema = z.object({
+  peakRssBytes: z.number(),
+  systemAvailableAtStartBytes: z.number(),
+  systemAvailableAtEndBytes: z.number(),
+  systemTotalBytes: z.number(),
+});
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -131,6 +140,7 @@ export const RunRecordSchema = z.object({
   model: z.string(),
   retryAttempts: z.number().int().nonnegative().optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
+  memoryStats: RunMemoryStatsSchema.optional(),
 });
 
 export function validateConfig(

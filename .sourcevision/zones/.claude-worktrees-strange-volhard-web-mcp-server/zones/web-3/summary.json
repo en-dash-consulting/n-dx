@@ -1,0 +1,19 @@
+{
+  "id": "web-2/web-3",
+  "name": "Web 3",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/data-display/mini-charts.ts",
+    "packages/web/src/viewer/views/token-usage.ts",
+    "packages/web/tests/unit/viewer/bar-chart.test.ts",
+    "packages/web/tests/unit/viewer/flow-diagram.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/token-usage.ts",
+    "packages/web/src/viewer/components/data-display/mini-charts.ts"
+  ],
+  "cohesion": 0.46,
+  "coupling": 0.54,
+  "fileCount": 4,
+  "lineCount": 1039
+}

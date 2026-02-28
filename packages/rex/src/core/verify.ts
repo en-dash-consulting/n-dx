@@ -10,8 +10,8 @@
 
 import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname, relative } from "node:path";
-import { PROJECT_DIRS, exec as foundationExec } from "@n-dx/claude-client";
-import type { ExecResult } from "@n-dx/claude-client";
+import { PROJECT_DIRS, exec as foundationExec } from "@n-dx/llm-client";
+import type { ExecResult } from "@n-dx/llm-client";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch, STOP_WORDS } from "./keywords.js";
 import type { PRDItem } from "../schema/index.js";

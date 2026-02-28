@@ -8,6 +8,9 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { usePolling } from "../../hooks/use-polling.js";
+import { createRequestDedup } from "../../request-dedup.js";
+import { isFeatureDisabled, onDegradationChange } from "../../graceful-degradation.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -69,16 +72,40 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // ── Fetch execution status ─────────────────────────────────────────
+  // Track memory-pressure state reactively so usePolling's `enabled`
+  // parameter updates when the degradation tier changes.
+  const [autoRefreshDisabled, setAutoRefreshDisabled] = useState(
+    () => isFeatureDisabled("autoRefresh")
+  );
 
-  const fetchStatus = useCallback(async () => {
-    try {
+  useEffect(() => {
+    const unsubscribe = onDegradationChange((state) => {
+      setAutoRefreshDisabled(state.disabledFeatures.has("autoRefresh"));
+    });
+    return unsubscribe;
+  }, []);
+
+  // ── Fetch execution status (deduplicated) ──────────────────────────
+  //
+  // Wrapped with request deduplication: concurrent callers (e.g. a
+  // WebSocket-triggered reconciliation arriving while a polling fetch is
+  // in-flight) share a single underlying request. This guarantees at
+  // most one /api/rex/execute/status request is active at any time.
+
+  const statusDedup = useRef(
+    createRequestDedup(async () => {
       const res = await fetch("/api/rex/execute/status");
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
         setError(null);
       }
+    }),
+  );
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      await statusDedup.current.execute();
     } catch {
       // Silently fail — will retry on next poll
     }
@@ -102,9 +129,16 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "rex:execution-progress" && msg.state) {
+            // Optimistic update — instant UI feedback from the WS payload.
             setStatus(msg.state);
             // Also notify parent to refresh dashboard data
             if (onPrdChanged) onPrdChanged();
+            // Reconciliation fetch — the API handler reads fresh task
+            // counts from disk (refreshEpicProgress), which the WS
+            // broadcast may not include. Goes through the dedup so it
+            // shares any in-flight polling request rather than starting
+            // a second one.
+            fetchStatus();
           }
         } catch {
           // Ignore malformed messages
@@ -118,19 +152,23 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
       // WebSocket not available — fall back to polling
     }
 
-    // Poll as fallback (every 3s when active, 10s when idle)
-    const interval = setInterval(() => {
-      fetchStatus();
-    }, 3000);
-
     return () => {
-      clearInterval(interval);
       if (wsRef.current) {
         try { wsRef.current.close(); } catch { /* ignore */ }
         wsRef.current = null;
       }
     };
   }, [fetchStatus, onPrdChanged]);
+
+  // Dispose dedup on unmount to clear in-flight tracking state.
+  useEffect(() => {
+    const dedup = statusDedup.current;
+    return () => dedup.dispose();
+  }, []);
+
+  // Poll as fallback (every 3s) — visibility-aware via polling manager.
+  // Automatically paused when memory pressure disables autoRefresh.
+  usePolling("execution-panel", fetchStatus, 3000, !autoRefreshDisabled);
 
   // ── Handlers ───────────────────────────────────────────────────────
 

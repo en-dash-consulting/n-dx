@@ -1,13 +1,13 @@
 /**
  * CLI error handling — user-friendly errors with optional suggestions.
  *
- * Rex's CLIError extends the foundation CLIError from @n-dx/claude-client,
+ * Rex's CLIError extends the foundation CLIError from @n-dx/llm-client,
  * providing a consistent error hierarchy across all n-dx packages.
  */
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError } from "@n-dx/claude-client";
+import { CLIError as BaseCLIError } from "@n-dx/llm-client";
 import { REX_DIR } from "./commands/constants.js";
 
 /**

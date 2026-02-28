@@ -1,0 +1,470 @@
+{
+  "zones": [
+    {
+      "id": "src",
+      "name": "Src",
+      "description": "4 files, primarily TypeScript",
+      "files": [
+        "src/api-provider.ts",
+        "src/config.ts",
+        "tests/unit/api-provider.test.ts",
+        "tests/unit/config.test.ts"
+      ],
+      "entryPoints": [
+        "src/api-provider.ts",
+        "src/config.ts"
+      ],
+      "cohesion": 0.29,
+      "coupling": 0.71,
+      "insights": [
+        "Low cohesion (0.29) — files are loosely related, consider splitting this zone",
+        "High coupling (0.71) — 7 imports target \"src-3\"",
+        "[call graph] 30 internal calls, 1 outgoing, 7 incoming (cohesion: 0.97, coupling: 0.03)"
+      ]
+    },
+    {
+      "id": "src-2",
+      "name": "Src 2",
+      "description": "16 files, primarily TypeScript",
+      "files": [
+        "src/auth.ts",
+        "src/exec.ts",
+        "src/help-format.ts",
+        "src/json.ts",
+        "src/output.ts",
+        "src/project-config.ts",
+        "src/project-dirs.ts",
+        "src/public.ts",
+        "src/suggest.ts",
+        "tests/unit/auth.test.ts",
+        "tests/unit/exec.test.ts",
+        "tests/unit/help-format.test.ts",
+        "tests/unit/json.test.ts",
+        "tests/unit/output.test.ts",
+        "tests/unit/project-config.test.ts",
+        "tests/unit/suggest.test.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 0.63,
+      "coupling": 0.38,
+      "insights": [
+        "[call graph] 237 internal calls, 4 outgoing, 0 incoming (cohesion: 0.98, coupling: 0.02)"
+      ]
+    },
+    {
+      "id": "src-3",
+      "name": "Src 3",
+      "description": "17 files, primarily TypeScript",
+      "files": [
+        "src/cli-provider.ts",
+        "src/codex-cli-provider.ts",
+        "src/create-client.ts",
+        "src/llm-client.ts",
+        "src/provider-interface.ts",
+        "src/provider-registry.ts",
+        "src/provider-session.ts",
+        "src/token-usage.ts",
+        "src/types.ts",
+        "tests/unit/cli-provider.test.ts",
+        "tests/unit/create-client.test.ts",
+        "tests/unit/llm-client.test.ts",
+        "tests/unit/provider-interface.test.ts",
+        "tests/unit/provider-registry.test.ts",
+        "tests/unit/provider-session.test.ts",
+        "tests/unit/token-usage.test.ts",
+        "tests/unit/types.test.ts"
+      ],
+      "entryPoints": [
+        "src/cli-provider.ts",
+        "src/codex-cli-provider.ts",
+        "src/create-client.ts",
+        "src/llm-client.ts",
+        "src/provider-interface.ts",
+        "src/provider-registry.ts",
+        "src/provider-session.ts",
+        "src/token-usage.ts",
+        "src/types.ts"
+      ],
+      "cohesion": 0.65,
+      "coupling": 0.35,
+      "insights": [
+        "Contains 37% of project files (17/46) — may be too broad, consider splitting",
+        "9 entry points — wide API surface, consider consolidating exports",
+        "[call graph] 194 internal calls, 3 outgoing, 1 incoming (cohesion: 0.98, coupling: 0.02)"
+      ]
+    },
+    {
+      "id": "src-4",
+      "name": "Src 4",
+      "description": "3 files, primarily TypeScript",
+      "files": [
+        "src/llm-config.ts",
+        "src/llm-types.ts",
+        "tests/unit/llm-config.test.ts"
+      ],
+      "entryPoints": [
+        "src/llm-config.ts",
+        "src/llm-types.ts"
+      ],
+      "cohesion": 0.2,
+      "coupling": 0.8,
+      "insights": [
+        "High coupling (0.8) — 4 imports target \"src-3\"",
+        "High coupling (0.8) — 3 imports target \"src-3\"",
+        "[call graph] 11 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ]
+    }
+  ],
+  "crossings": [
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/provider-interface.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/token-usage.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/types.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/types.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/config.ts",
+      "to": "src/types.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "tests/unit/api-provider.test.ts",
+      "to": "src/provider-interface.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "tests/unit/api-provider.test.ts",
+      "to": "src/types.ts",
+      "fromZone": "src",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/config.ts",
+      "fromZone": "src-2",
+      "toZone": "src"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/api-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/api-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/config.ts",
+      "fromZone": "src-2",
+      "toZone": "src"
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/codex-cli-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/codex-cli-provider.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/create-client.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/create-client.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-client.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-interface.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-registry.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-registry.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-session.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/token-usage.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "tests/unit/auth.test.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-config.ts",
+      "fromZone": "src-2",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-2",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/config.ts",
+      "fromZone": "src-3",
+      "toZone": "src"
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/api-provider.ts",
+      "fromZone": "src-3",
+      "toZone": "src"
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/api-provider.ts",
+      "fromZone": "src-3",
+      "toZone": "src"
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/config.ts",
+      "fromZone": "src-3",
+      "toZone": "src"
+    },
+    {
+      "from": "src/codex-cli-provider.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/llm-client.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/provider-registry.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/provider-session.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/llm-types.ts",
+      "fromZone": "src-3",
+      "toZone": "src-4"
+    },
+    {
+      "from": "src/llm-config.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-4",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/create-client.ts",
+      "fromZone": "src-4",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/provider-interface.ts",
+      "fromZone": "src-4",
+      "toZone": "src-3"
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/types.ts",
+      "fromZone": "src-4",
+      "toZone": "src-3"
+    }
+  ],
+  "unzoned": [
+    "package-lock.json",
+    "package.json",
+    "tests/e2e/.gitkeep",
+    "tests/integration/.gitkeep",
+    "tsconfig.json",
+    "vitest.config.ts"
+  ],
+  "insights": [
+    "Hub: src/provider-interface.ts is imported by 3 zones — cross-cutting dependency",
+    "Hub: src/types.ts is imported by 3 zones — cross-cutting dependency",
+    "Bidirectional coupling: \"src\" ↔ \"src-3\" (7+4 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"src-3\" ↔ \"src-4\" (6+4 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 17 files vs smallest with 3 — uneven decomposition",
+    "Hub: src/types.ts is imported by 3 zones — cross-cutting dependency",
+    "Bidirectional coupling: \"src\" ↔ \"src-3\" (7+4 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"src-3\" ↔ \"src-4\" (7+3 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 17 files vs smallest with 3 — uneven decomposition",
+    "4 circular dependency chains detected — see imports.json for details"
+  ],
+  "findings": [
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "global",
+      "text": "Bidirectional coupling: \"src\" ↔ \"src-3\" (7+4 crossings) — consider extracting shared interface",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "global",
+      "text": "Hub: src/provider-interface.ts is imported by 3 zones — cross-cutting dependency",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "global",
+      "text": "Size imbalance: largest zone has 17 files vs smallest with 3 — uneven decomposition",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src",
+      "text": "High coupling (0.71) — 7 imports target \"src-3\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src",
+      "text": "Low cohesion (0.29) — files are loosely related, consider splitting this zone",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src-3",
+      "text": "9 entry points — wide API surface, consider consolidating exports",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src-3",
+      "text": "Contains 37% of project files (17/46) — may be too broad, consider splitting",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src-4",
+      "text": "High coupling (0.8) — 4 imports target \"src-3\"",
+      "severity": "warning"
+    }
+  ],
+  "enrichmentPass": 0,
+  "structureHash": "1cb9dd5a3e2e4b12",
+  "zoneContentHashes": {
+    "src": "ab7d7aed67d38df9",
+    "src-2": "2a96961872184640",
+    "src-3": "60a787ee76f14ca1",
+    "src-4": "1873a50e0cf2f307"
+  }
+}

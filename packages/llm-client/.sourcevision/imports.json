@@ -1,0 +1,1163 @@
+{
+  "edges": [
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveApiKey",
+        "resolveModel"
+      ]
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider",
+        "ProviderInfo"
+      ]
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseApiTokenUsage"
+      ]
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "src/api-provider.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveApiKey",
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/exec.ts",
+      "type": "static",
+      "symbols": [
+        "exec"
+      ]
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "src/auth.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "AuthMode",
+        "ClaudeClientOptions"
+      ]
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider",
+        "ProviderInfo"
+      ]
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "src/cli-provider.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult",
+        "TokenUsage"
+      ]
+    },
+    {
+      "from": "src/codex-cli-provider.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "CodexConfig"
+      ]
+    },
+    {
+      "from": "src/codex-cli-provider.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "src/codex-cli-provider.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "src/config.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/api-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/api-provider.ts",
+      "type": "type",
+      "symbols": [
+        "ApiProviderOptions"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/cli-provider.ts",
+      "type": "type",
+      "symbols": [
+        "CliProviderOptions"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/config.ts",
+      "type": "static",
+      "symbols": [
+        "resolveApiKey"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "src/create-client.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "AuthMode",
+        "ClaudeClient",
+        "ClaudeClientOptions"
+      ]
+    },
+    {
+      "from": "src/llm-client.ts",
+      "to": "src/codex-cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCodexCliClient"
+      ]
+    },
+    {
+      "from": "src/llm-client.ts",
+      "to": "src/create-client.ts",
+      "type": "static",
+      "symbols": [
+        "createClient",
+        "detectAuthMode"
+      ]
+    },
+    {
+      "from": "src/llm-client.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "CreateLLMClientOptions",
+        "LLMVendor"
+      ]
+    },
+    {
+      "from": "src/llm-client.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "AuthMode",
+        "ClaudeClient"
+      ]
+    },
+    {
+      "from": "src/llm-config.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMConfig",
+        "LLMVendor",
+        "CodexConfig"
+      ]
+    },
+    {
+      "from": "src/llm-config.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/create-client.ts",
+      "type": "type",
+      "symbols": [
+        "CreateClientOptions"
+      ]
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMVendor"
+      ]
+    },
+    {
+      "from": "src/llm-types.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeClient",
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/provider-interface.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionRequest",
+        "CompletionResult",
+        "TokenUsage"
+      ]
+    },
+    {
+      "from": "src/provider-registry.ts",
+      "to": "src/codex-cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCodexCliClient"
+      ]
+    },
+    {
+      "from": "src/provider-registry.ts",
+      "to": "src/create-client.ts",
+      "type": "static",
+      "symbols": [
+        "createClient"
+      ]
+    },
+    {
+      "from": "src/provider-registry.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMConfig"
+      ]
+    },
+    {
+      "from": "src/provider-registry.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider",
+        "ProviderInfo"
+      ]
+    },
+    {
+      "from": "src/provider-session.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMConfig"
+      ]
+    },
+    {
+      "from": "src/provider-session.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "src/provider-session.ts",
+      "to": "src/provider-registry.ts",
+      "type": "static",
+      "symbols": [
+        "ProviderRegistry",
+        "createDefaultRegistry"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/api-provider.ts",
+      "type": "reexport",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/api-provider.ts",
+      "type": "type",
+      "symbols": [
+        "ApiProviderOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/auth.ts",
+      "type": "reexport",
+      "symbols": [
+        "detectCliAvailability",
+        "validateApiKey",
+        "detectAvailableAuth",
+        "diagnoseAuth"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/auth.ts",
+      "type": "type",
+      "symbols": [
+        "AuthDetectionResult",
+        "AuthDiagnostics"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli-provider.ts",
+      "type": "reexport",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli-provider.ts",
+      "type": "type",
+      "symbols": [
+        "CliProviderOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/codex-cli-provider.ts",
+      "type": "reexport",
+      "symbols": [
+        "createCodexCliClient"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/codex-cli-provider.ts",
+      "type": "type",
+      "symbols": [
+        "CodexCliProviderOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/config.ts",
+      "type": "reexport",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath",
+        "resolveModel"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/create-client.ts",
+      "type": "reexport",
+      "symbols": [
+        "createClient",
+        "detectAuthMode"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/create-client.ts",
+      "type": "type",
+      "symbols": [
+        "CreateClientOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/exec.ts",
+      "type": "reexport",
+      "symbols": [
+        "exec",
+        "execStdout",
+        "execShellCmd",
+        "getCurrentHead",
+        "getCurrentBranch",
+        "isExecutableOnPath",
+        "spawnTool",
+        "spawnManaged",
+        "ProcessPool",
+        "ProcessLimitError"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/exec.ts",
+      "type": "type",
+      "symbols": [
+        "ExecResult",
+        "ExecOptions",
+        "SpawnToolOptions",
+        "SpawnToolResult",
+        "ManagedChild"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/help-format.ts",
+      "type": "reexport",
+      "symbols": [
+        "isColorEnabled",
+        "resetColorCache",
+        "bold",
+        "dim",
+        "cyan",
+        "yellow",
+        "cmd",
+        "flag",
+        "sectionHeader",
+        "requiredParam",
+        "optionalParam",
+        "formatHelp",
+        "formatUsage"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/help-format.ts",
+      "type": "type",
+      "symbols": [
+        "HelpOption",
+        "HelpExample",
+        "HelpDefinition",
+        "UsageSection",
+        "UsageDefinition"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/json.ts",
+      "type": "reexport",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-client.ts",
+      "type": "reexport",
+      "symbols": [
+        "createLLMClient",
+        "detectLLMAuthMode"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-config.ts",
+      "type": "reexport",
+      "symbols": [
+        "loadLLMConfig"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMVendor",
+        "CodexConfig",
+        "LLMConfig",
+        "CreateLLMClientOptions",
+        "LLMClient"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/output.ts",
+      "type": "reexport",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/project-config.ts",
+      "type": "reexport",
+      "symbols": [
+        "deepMerge",
+        "loadProjectOverrides",
+        "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/project-dirs.ts",
+      "type": "reexport",
+      "symbols": [
+        "PROJECT_DIRS"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/project-dirs.ts",
+      "type": "type",
+      "symbols": [
+        "ProjectDir"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "ProviderAuthMode",
+        "ProviderCapability",
+        "ProviderInfo",
+        "StreamChunk",
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-registry.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProviderRegistry",
+        "createDefaultRegistry",
+        "defaultRegistry"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-registry.ts",
+      "type": "type",
+      "symbols": [
+        "ProviderFactory"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/provider-session.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProviderSession",
+        "createProviderSession"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/suggest.ts",
+      "type": "reexport",
+      "symbols": [
+        "editDistance",
+        "suggestCommands",
+        "formatTypoSuggestion"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/token-usage.ts",
+      "type": "reexport",
+      "symbols": [
+        "parseApiTokenUsage",
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/types.ts",
+      "type": "reexport",
+      "symbols": [
+        "ClaudeClientError",
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage",
+        "ClaudeConfig",
+        "AuthMode",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult",
+        "ErrorReason",
+        "ClaudeClient"
+      ]
+    },
+    {
+      "from": "src/token-usage.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/api-provider.test.ts",
+      "to": "src/api-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createApiClient"
+      ]
+    },
+    {
+      "from": "tests/unit/api-provider.test.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "tests/unit/api-provider.test.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "tests/unit/auth.test.ts",
+      "to": "src/auth.ts",
+      "type": "static",
+      "symbols": [
+        "detectCliAvailability",
+        "validateApiKey",
+        "detectAvailableAuth",
+        "diagnoseAuth"
+      ]
+    },
+    {
+      "from": "tests/unit/auth.test.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli-provider.test.ts",
+      "to": "src/cli-provider.ts",
+      "type": "static",
+      "symbols": [
+        "createCliClient"
+      ]
+    },
+    {
+      "from": "tests/unit/cli-provider.test.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "tests/unit/cli-provider.test.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "tests/unit/config.test.ts",
+      "to": "src/config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath"
+      ]
+    },
+    {
+      "from": "tests/unit/create-client.test.ts",
+      "to": "src/create-client.ts",
+      "type": "static",
+      "symbols": [
+        "createClient",
+        "detectAuthMode"
+      ]
+    },
+    {
+      "from": "tests/unit/create-client.test.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
+      "from": "tests/unit/create-client.test.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/exec.test.ts",
+      "to": "src/exec.ts",
+      "type": "static",
+      "symbols": [
+        "exec",
+        "execStdout",
+        "execShellCmd",
+        "getCurrentHead",
+        "spawnTool",
+        "spawnManaged",
+        "ProcessPool",
+        "ProcessLimitError"
+      ]
+    },
+    {
+      "from": "tests/unit/help-format.test.ts",
+      "to": "src/help-format.ts",
+      "type": "static",
+      "symbols": [
+        "isColorEnabled",
+        "resetColorCache",
+        "bold",
+        "dim",
+        "cyan",
+        "yellow",
+        "cmd",
+        "flag",
+        "sectionHeader",
+        "requiredParam",
+        "optionalParam",
+        "formatHelp",
+        "formatUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/help-format.test.ts",
+      "to": "src/help-format.ts",
+      "type": "type",
+      "symbols": [
+        "HelpDefinition",
+        "UsageDefinition"
+      ]
+    },
+    {
+      "from": "tests/unit/json.test.ts",
+      "to": "src/json.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/llm-client.test.ts",
+      "to": "src/llm-client.ts",
+      "type": "static",
+      "symbols": [
+        "createLLMClient",
+        "detectLLMAuthMode"
+      ]
+    },
+    {
+      "from": "tests/unit/llm-config.test.ts",
+      "to": "src/llm-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadLLMConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/output.test.ts",
+      "to": "src/output.ts",
+      "type": "static",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "tests/unit/project-config.test.ts",
+      "to": "src/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "deepMerge",
+        "loadProjectOverrides",
+        "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-interface.test.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider",
+        "ProviderInfo",
+        "ProviderAuthMode",
+        "ProviderCapability",
+        "StreamChunk"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-interface.test.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/provider-registry.ts",
+      "type": "static",
+      "symbols": [
+        "ProviderRegistry",
+        "createDefaultRegistry",
+        "defaultRegistry"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/provider-registry.ts",
+      "type": "type",
+      "symbols": [
+        "ProviderFactory"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-registry.test.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/llm-types.ts",
+      "type": "type",
+      "symbols": [
+        "LLMConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/provider-interface.ts",
+      "type": "type",
+      "symbols": [
+        "LLMProvider"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/provider-registry.ts",
+      "type": "static",
+      "symbols": [
+        "ProviderRegistry"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/provider-registry.ts",
+      "type": "type",
+      "symbols": [
+        "ProviderFactory"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/provider-session.ts",
+      "type": "static",
+      "symbols": [
+        "ProviderSession",
+        "createProviderSession"
+      ]
+    },
+    {
+      "from": "tests/unit/provider-session.test.ts",
+      "to": "src/types.ts",
+      "type": "type",
+      "symbols": [
+        "CompletionRequest",
+        "CompletionResult"
+      ]
+    },
+    {
+      "from": "tests/unit/suggest.test.ts",
+      "to": "src/suggest.ts",
+      "type": "static",
+      "symbols": [
+        "editDistance",
+        "suggestCommands",
+        "formatTypoSuggestion"
+      ]
+    },
+    {
+      "from": "tests/unit/token-usage.test.ts",
+      "to": "src/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "parseApiTokenUsage",
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/types.test.ts",
+      "to": "src/types.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError",
+        "CLIError"
+      ]
+    }
+  ],
+  "external": [
+    {
+      "package": "@anthropic-ai/sdk",
+      "importedBy": [
+        "src/api-provider.ts",
+        "src/auth.ts",
+        "tests/unit/auth.test.ts"
+      ],
+      "symbols": [
+        "default"
+      ]
+    },
+    {
+      "package": "vitest",
+      "importedBy": [
+        "tests/unit/api-provider.test.ts",
+        "tests/unit/auth.test.ts",
+        "tests/unit/cli-provider.test.ts",
+        "tests/unit/config.test.ts",
+        "tests/unit/create-client.test.ts",
+        "tests/unit/exec.test.ts",
+        "tests/unit/help-format.test.ts",
+        "tests/unit/json.test.ts",
+        "tests/unit/llm-client.test.ts",
+        "tests/unit/llm-config.test.ts",
+        "tests/unit/output.test.ts",
+        "tests/unit/project-config.test.ts",
+        "tests/unit/provider-interface.test.ts",
+        "tests/unit/provider-registry.test.ts",
+        "tests/unit/provider-session.test.ts",
+        "tests/unit/suggest.test.ts",
+        "tests/unit/token-usage.test.ts",
+        "tests/unit/types.test.ts",
+        "vitest.config.ts"
+      ],
+      "symbols": [
+        "afterEach",
+        "beforeEach",
+        "defineConfig",
+        "describe",
+        "expect",
+        "it",
+        "vi"
+      ]
+    }
+  ],
+  "summary": {
+    "totalEdges": 111,
+    "totalExternal": 2,
+    "circularCount": 0,
+    "circulars": [],
+    "mostImported": [
+      {
+        "path": "src/types.ts",
+        "count": 11
+      },
+      {
+        "path": "src/config.ts",
+        "count": 6
+      },
+      {
+        "path": "src/create-client.ts",
+        "count": 4
+      },
+      {
+        "path": "src/provider-registry.ts",
+        "count": 4
+      },
+      {
+        "path": "src/token-usage.ts",
+        "count": 4
+      },
+      {
+        "path": "src/api-provider.ts",
+        "count": 3
+      },
+      {
+        "path": "src/cli-provider.ts",
+        "count": 3
+      },
+      {
+        "path": "src/codex-cli-provider.ts",
+        "count": 3
+      },
+      {
+        "path": "src/exec.ts",
+        "count": 3
+      },
+      {
+        "path": "src/auth.ts",
+        "count": 2
+      },
+      {
+        "path": "src/help-format.ts",
+        "count": 2
+      },
+      {
+        "path": "src/json.ts",
+        "count": 2
+      },
+      {
+        "path": "src/llm-client.ts",
+        "count": 2
+      },
+      {
+        "path": "src/llm-config.ts",
+        "count": 2
+      },
+      {
+        "path": "src/output.ts",
+        "count": 2
+      },
+      {
+        "path": "src/project-config.ts",
+        "count": 2
+      },
+      {
+        "path": "src/provider-session.ts",
+        "count": 2
+      },
+      {
+        "path": "src/suggest.ts",
+        "count": 2
+      },
+      {
+        "path": "src/project-dirs.ts",
+        "count": 1
+      }
+    ],
+    "avgImportsPerFile": 3.47
+  }
+}

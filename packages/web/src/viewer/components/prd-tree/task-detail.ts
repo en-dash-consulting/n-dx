@@ -8,15 +8,20 @@
 
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType } from "./types.js";
+import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import { formatTimestamp } from "./compute.js";
 import { findItemById } from "./tree-utils.js";
-import { CopyLinkButton } from "../copy-link-button.js";
+import { CopyLinkButton } from "./shared-imports.js";
+import { resolveTaskUtilization } from "./task-utilization.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface TaskDetailProps {
   item: PRDItemData;
+  /** Aggregated token usage for this task across associated runs. */
+  taskUsage?: TaskUsageSummary;
+  /** Shared resolved weekly budget used for deterministic utilization display. */
+  weeklyBudget?: WeeklyBudgetResolution | null;
   /** All items in the document, for resolving dependency references. */
   allItems: PRDItemData[];
   /** Called when an item is updated via the API. */
@@ -29,6 +34,8 @@ export interface TaskDetailProps {
   onPrdChanged?: () => void;
   /** Called to add a child item under the current item. */
   onAddChild?: (data: { title: string; parentId: string; level: ItemLevel; description?: string; priority?: string }) => Promise<void>;
+  /** Called to remove/delete the current item and all its descendants. */
+  onRemove?: (id: string) => Promise<void>;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -56,6 +63,12 @@ const LEVEL_LABELS: Record<string, string> = {
   task: "Task",
   subtask: "Subtask",
 };
+
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
 
 // ── Sub-components ───────────────────────────────────────────────────
 
@@ -1034,19 +1047,29 @@ function ExecuteTaskButton({
 
 // ── Main component ───────────────────────────────────────────────────
 
-export function TaskDetail({ item, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild }: TaskDetailProps) {
+export function TaskDetail({ item, taskUsage, weeklyBudget, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild, onRemove }: TaskDetailProps) {
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
   const [editingFailureReason, setEditingFailureReason] = useState(false);
   const [showAddChild, setShowAddChild] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const usageSummary = taskUsage ?? {
+    totalTokens: 0,
+    runCount: 0,
+    utilization: resolveTaskUtilization(0, weeklyBudget),
+  };
+  const utilization = usageSummary.utilization ?? resolveTaskUtilization(usageSummary.totalTokens, weeklyBudget);
 
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && CHILD_LEVEL[item.level] != null;
 
-  // Reset add-child form when item changes
+  // Reset add-child form and remove confirmation when item changes
   useEffect(() => {
     setShowAddChild(false);
+    setConfirmingRemove(false);
+    setRemoving(false);
   }, [item.id]);
 
   const handleStatusChange = useCallback(
@@ -1186,6 +1209,30 @@ export function TaskDetail({ item, allItems, onUpdate, onNavigateToItem, onExecu
         )
       : null,
 
+    // Aggregated token usage across runs
+    item.level === "task" || item.level === "subtask"
+      ? h(
+          "div",
+          { class: "task-section task-usage-section" },
+          h("div", { class: "task-section-label" }, "Usage"),
+          h("div", { class: "task-usage-row" },
+            h("span", { class: "label" }, "Total Tokens"),
+            h("span", { class: "task-usage-value" }, `${formatTokenCount(usageSummary.totalTokens)} tokens`),
+          ),
+          h("div", { class: "task-usage-row" },
+            h("span", { class: "label" }, "Weekly Utilization"),
+            h(
+              "span",
+              { class: "task-usage-value", "data-utilization-reason": utilization.reason },
+              utilization.label,
+            ),
+          ),
+          h("div", { class: "task-usage-hint", "data-utilization-reason": utilization.reason },
+            `${usageSummary.runCount} associated run${usageSummary.runCount === 1 ? "" : "s"} | reason: ${utilization.reason}`,
+          ),
+        )
+      : null,
+
     // Failure reason
     item.status === "failing" && item.failureReason && !editingFailureReason
       ? h(
@@ -1318,6 +1365,54 @@ export function TaskDetail({ item, allItems, onUpdate, onNavigateToItem, onExecu
                 h("span", null, formatTimestamp(item.completedAt)),
               )
             : null,
+        )
+      : null,
+
+    // Delete / Remove item
+    onRemove
+      ? h(
+          "div",
+          { class: "task-section task-danger-zone" },
+          h("div", { class: "task-section-label task-danger-label" }, "Danger Zone"),
+          confirmingRemove
+            ? h(
+                "div",
+                { class: "task-remove-confirm" },
+                h("p", { class: "task-remove-confirm-msg" },
+                  `Are you sure you want to delete this ${LEVEL_LABELS[item.level] || item.level}`,
+                  (item.children && item.children.length > 0)
+                    ? ` and all its ${item.children.length} descendant${item.children.length !== 1 ? "s" : ""}?`
+                    : "?",
+                ),
+                h("div", { class: "task-remove-confirm-actions" },
+                  h("button", {
+                    class: "task-remove-confirm-btn",
+                    onClick: async () => {
+                      setRemoving(true);
+                      try {
+                        await onRemove(item.id);
+                      } catch {
+                        setRemoving(false);
+                        setConfirmingRemove(false);
+                      }
+                    },
+                    disabled: removing,
+                  }, removing ? "Deleting..." : "Yes, Delete"),
+                  h("button", {
+                    class: "task-remove-cancel-btn",
+                    onClick: () => setConfirmingRemove(false),
+                    disabled: removing,
+                  }, "Cancel"),
+                ),
+              )
+            : h("button", {
+                class: "task-remove-btn",
+                onClick: () => setConfirmingRemove(true),
+                title: `Delete this ${LEVEL_LABELS[item.level] || item.level} and all its descendants`,
+              },
+                h("span", { class: "task-remove-btn-icon" }, "\u2717"),
+                `Delete ${LEVEL_LABELS[item.level] || item.level}`,
+              ),
         )
       : null,
   );

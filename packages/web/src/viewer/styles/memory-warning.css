@@ -1,0 +1,115 @@
+/* Memory warning banner styles.
+ *
+ * Non-intrusive banner positioned at the top of the main content area.
+ * Uses CSS variables from tokens.css for theme compatibility.
+ */
+
+.memory-warning-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  animation: memory-warning-slide-in 0.3s ease-out;
+}
+
+.memory-warning-level-warning {
+  background: var(--color-warning-bg, #3a2d00);
+  border-bottom: 2px solid var(--color-warning, #f0ad4e);
+  color: var(--color-warning-text, #ffc107);
+}
+
+.memory-warning-level-critical {
+  background: var(--color-error-bg, #3a0000);
+  border-bottom: 2px solid var(--color-error, #dc3545);
+  color: var(--color-error-text, #ff6b6b);
+}
+
+[data-theme="light"] .memory-warning-level-warning {
+  background: #fff3cd;
+  border-bottom-color: #ffc107;
+  color: #664d03;
+}
+
+[data-theme="light"] .memory-warning-level-critical {
+  background: #f8d7da;
+  border-bottom-color: #dc3545;
+  color: #842029;
+}
+
+.memory-warning-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.memory-warning-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.memory-warning-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-warning-text strong {
+  font-weight: 600;
+}
+
+.memory-warning-detail {
+  opacity: 0.85;
+  font-size: 0.8rem;
+}
+
+.memory-warning-advice {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.memory-warning-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.125rem 0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+
+.memory-warning-dismiss:hover {
+  opacity: 1;
+}
+
+.memory-warning-dismiss:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@keyframes memory-warning-slide-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .memory-warning-banner {
+    animation: none;
+  }
+}

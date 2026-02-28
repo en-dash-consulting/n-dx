@@ -19,7 +19,8 @@
     "dev": "pnpm -r run dev",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run && pnpm -r run test",
-    "validate": "pnpm -r run validate"
+    "validate": "pnpm -r run validate",
+    "pr-check": "node pr-check.js"
   },
   "devDependencies": {
     "vitest": "^4.0.18"

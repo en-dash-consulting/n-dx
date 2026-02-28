@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "hash": "8b7741561f6c",
+      "reason": "acknowledged",
+      "text": "Bidirectional coupling: \"agent-tool-infrastructure\" ↔ \"autonomous-agent-core\" (3+5 crossings) — consider extracting shared interface",
+      "acknowledgedAt": "2026-02-25T14:48:48.546Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "1577e8847a9b",
+      "reason": "acknowledged",
+      "text": "Bidirectional coupling: \"prd-management-interface\" ↔ \"web-ui-framework\" (6+4 crossings) — consider extracting shared interface",
+      "acknowledgedAt": "2026-02-25T14:48:48.547Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "5c30968e817e",
+      "reason": "acknowledged",
+      "text": "Circular dependencies between agent zones (hench, hench-2, hench-3) suggest need for dependency inversion or interface extraction",
+      "acknowledgedAt": "2026-02-25T14:48:48.547Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "0e9573b08dcf",
+      "reason": "acknowledged",
+      "text": "Low cohesion and high coupling ratios suggest this zone may need restructuring or merging",
+      "acknowledgedAt": "2026-02-25T14:48:48.547Z",
+      "acknowledgedBy": "user"
+    }
+  ]
+}

@@ -26,7 +26,7 @@
  *
  * ## Architectural isolation
  *
- * Sourcevision depends only on `@n-dx/claude-client` (the shared
+ * Sourcevision depends only on `@n-dx/llm-client` (the shared
  * foundation) and has **no dependency on rex or hench**:
  *
  * ```

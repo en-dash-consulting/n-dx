@@ -13,7 +13,9 @@
  * package (rex).  This creates a strict one-way dependency:
  *
  * ```
- *   hench → rex → claude-client ← sourcevision
+ *   hench → rex → llm-client
+ *   hench → llm-client
+ *   sourcevision → llm-client
  * ```
  *
  * By concentrating all hench→rex runtime imports here, we ensure:

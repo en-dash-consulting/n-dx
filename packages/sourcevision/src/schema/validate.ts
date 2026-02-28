@@ -345,6 +345,52 @@ export const CallGraphSchema = z.object({
   summary: CallGraphSummarySchema,
 });
 
+// ── Branch Work Record ──────────────────────────────────────────────────────
+
+const ChangeSignificanceSchema = z.enum(["patch", "minor", "major"]);
+
+const BranchWorkParentRefSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  level: z.string(),
+});
+
+const BranchWorkRecordItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  level: z.string(),
+  completedAt: z.string(),
+  parentChain: z.array(BranchWorkParentRefSchema),
+  priority: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  acceptanceCriteria: z.array(z.string()).optional(),
+  changeSignificance: ChangeSignificanceSchema.optional(),
+  breakingChange: z.boolean().optional(),
+});
+
+const BranchWorkEpicSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  completedCount: z.number().int().nonnegative(),
+});
+
+const BranchWorkRecordMetadataSchema = z.object({
+  totalCompletedCount: z.number().int().nonnegative().optional(),
+  gitSha: z.string().optional(),
+}).passthrough();
+
+export const BranchWorkRecordSchema = z.object({
+  schemaVersion: z.string(),
+  branch: z.string(),
+  baseBranch: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  items: z.array(BranchWorkRecordItemSchema),
+  epicSummaries: z.array(BranchWorkEpicSummarySchema),
+  metadata: BranchWorkRecordMetadataSchema.optional(),
+});
+
 // ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
@@ -396,6 +442,12 @@ export function validateCallGraph(
   data: unknown
 ): ValidationResult<V1.CallGraph> {
   return validate(CallGraphSchema, data);
+}
+
+export function validateBranchWorkRecord(
+  data: unknown
+): ValidationResult<V1.BranchWorkRecord> {
+  return validate(BranchWorkRecordSchema, data);
 }
 
 /** Validate any module output by name */

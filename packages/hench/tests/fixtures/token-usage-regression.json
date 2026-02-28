@@ -1,0 +1,129 @@
+{
+  "claude": [
+    {
+      "name": "api_usage_with_cache_fields",
+      "parser": "api",
+      "payload": {
+        "input_tokens": 1200,
+        "output_tokens": 300,
+        "cache_creation_input_tokens": 90,
+        "cache_read_input_tokens": 40
+      },
+      "expected": {
+        "input": 1200,
+        "output": 300,
+        "cacheCreationInput": 90,
+        "cacheReadInput": 40
+      }
+    },
+    {
+      "name": "stream_usage_prefers_top_level_fields",
+      "parser": "stream",
+      "payload": {
+        "input_tokens": 10,
+        "output_tokens": 4,
+        "usage": {
+          "input_tokens": 999,
+          "output_tokens": 888
+        }
+      },
+      "expected": {
+        "input": 10,
+        "output": 4
+      }
+    },
+    {
+      "name": "stream_usage_uses_total_fallback_fields",
+      "parser": "stream",
+      "payload": {
+        "usage": {
+          "total_input_tokens": 55,
+          "total_output_tokens": 15
+        }
+      },
+      "expected": {
+        "input": 55,
+        "output": 15
+      }
+    },
+    {
+      "name": "stream_usage_missing_fields_returns_undefined",
+      "parser": "stream",
+      "payload": {
+        "type": "result",
+        "result": "ok"
+      },
+      "expected": null
+    }
+  ],
+  "codex": [
+    {
+      "name": "usage_object_primary_fields",
+      "payload": {
+        "usage": {
+          "input_tokens": 250,
+          "output_tokens": 100,
+          "total_tokens": 350
+        }
+      },
+      "expected": {
+        "usage": {
+          "input": 250,
+          "output": 100
+        },
+        "total": 350,
+        "diagnostic": null
+      }
+    },
+    {
+      "name": "response_usage_with_prompt_completion_fields",
+      "payload": {
+        "response": {
+          "usage": {
+            "prompt_tokens": 42,
+            "completion_tokens": 8
+          }
+        }
+      },
+      "expected": {
+        "usage": {
+          "input": 42,
+          "output": 8
+        },
+        "total": 50,
+        "diagnostic": null
+      }
+    },
+    {
+      "name": "missing_usage_returns_zero_with_diagnostic",
+      "payload": {
+        "status": "completed",
+        "result": "done"
+      },
+      "expected": {
+        "usage": {
+          "input": 0,
+          "output": 0
+        },
+        "total": 0,
+        "diagnostic": "codex_usage_missing"
+      }
+    },
+    {
+      "name": "empty_usage_object_returns_zero_with_diagnostic",
+      "payload": {
+        "response": {
+          "usage": {}
+        }
+      },
+      "expected": {
+        "usage": {
+          "input": 0,
+          "output": 0
+        },
+        "total": 0,
+        "diagnostic": "codex_usage_missing"
+      }
+    }
+  ]
+}

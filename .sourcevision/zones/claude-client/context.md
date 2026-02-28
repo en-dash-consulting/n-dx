@@ -5,9 +5,9 @@
 <zone>
 
 Zone: Claude Client (`claude-client`)
-Files: 24, Cohesion: 1.00, Coupling: 0.00
-Description: 24 files, primarily TypeScript
-Lines: 3576
+Files: 28, Cohesion: 1.00, Coupling: 0.00
+Description: 26 files, primarily TypeScript
+Lines: 4854
 
 </zone>
 
@@ -15,15 +15,17 @@ Lines: 3576
 
 packages/claude-client/src/api-provider.ts (TypeScript, 157 lines, source)
 packages/claude-client/src/auth.ts (TypeScript, 230 lines, source)
-packages/claude-client/src/cli-provider.ts (TypeScript, 230 lines, source)
+packages/claude-client/src/cli-provider.ts (TypeScript, 252 lines, source)
 packages/claude-client/src/config.ts (TypeScript, 94 lines, source)
 packages/claude-client/src/create-client.ts (TypeScript, 86 lines, source)
-packages/claude-client/src/exec.ts (TypeScript, 363 lines, source)
+packages/claude-client/src/exec.ts (TypeScript, 525 lines, source)
+packages/claude-client/src/help-format.ts (TypeScript, 406 lines, source)
 packages/claude-client/src/json.ts (TypeScript, 18 lines, source)
 packages/claude-client/src/output.ts (TypeScript, 41 lines, source)
 packages/claude-client/src/project-config.ts (TypeScript, 84 lines, source)
 packages/claude-client/src/project-dirs.ts (TypeScript, 36 lines, source)
-packages/claude-client/src/public.ts (TypeScript, 161 lines, source)
+packages/claude-client/src/public.ts (TypeScript, 9 lines, source)
+packages/claude-client/src/suggest.ts (TypeScript, 75 lines, source)
 packages/claude-client/src/token-usage.ts (TypeScript, 131 lines, source)
 packages/claude-client/src/types.ts (TypeScript, 136 lines, source)
 packages/claude-client/tests/unit/api-provider.test.ts (TypeScript, 66 lines, test)
@@ -31,10 +33,12 @@ packages/claude-client/tests/unit/auth.test.ts (TypeScript, 511 lines, test)
 packages/claude-client/tests/unit/cli-provider.test.ts (TypeScript, 68 lines, test)
 packages/claude-client/tests/unit/config.test.ts (TypeScript, 147 lines, test)
 packages/claude-client/tests/unit/create-client.test.ts (TypeScript, 107 lines, test)
-packages/claude-client/tests/unit/exec.test.ts (TypeScript, 399 lines, test)
+packages/claude-client/tests/unit/exec.test.ts (TypeScript, 614 lines, test)
+packages/claude-client/tests/unit/help-format.test.ts (TypeScript, 434 lines, test)
 packages/claude-client/tests/unit/json.test.ts (TypeScript, 25 lines, test)
 packages/claude-client/tests/unit/output.test.ts (TypeScript, 59 lines, test)
 packages/claude-client/tests/unit/project-config.test.ts (TypeScript, 102 lines, test)
+packages/claude-client/tests/unit/suggest.test.ts (TypeScript, 116 lines, test)
 packages/claude-client/tests/unit/token-usage.test.ts (TypeScript, 264 lines, test)
 packages/claude-client/tests/unit/types.test.ts (TypeScript, 61 lines, test)
 
@@ -63,25 +67,6 @@ Internal:
   packages/claude-client/src/create-client.ts → packages/claude-client/src/config.ts {resolveApiKey}
   packages/claude-client/src/create-client.ts → packages/claude-client/src/types.ts {ClaudeClientError}
   packages/claude-client/src/create-client.ts → packages/claude-client/src/types.ts {AuthMode, ClaudeClient, ClaudeClientOptions}
-  packages/claude-client/src/public.ts → packages/claude-client/src/api-provider.ts {createApiClient}
-  packages/claude-client/src/public.ts → packages/claude-client/src/api-provider.ts {ApiProviderOptions}
-  packages/claude-client/src/public.ts → packages/claude-client/src/auth.ts {detectCliAvailability, validateApiKey, detectAvailableAuth, diagnoseAuth}
-  packages/claude-client/src/public.ts → packages/claude-client/src/auth.ts {AuthDetectionResult, AuthDiagnostics}
-  packages/claude-client/src/public.ts → packages/claude-client/src/cli-provider.ts {createCliClient}
-  packages/claude-client/src/public.ts → packages/claude-client/src/cli-provider.ts {CliProviderOptions}
-  packages/claude-client/src/public.ts → packages/claude-client/src/config.ts {loadClaudeConfig, resolveApiKey, resolveCliPath, resolveModel}
-  packages/claude-client/src/public.ts → packages/claude-client/src/create-client.ts {createClient, detectAuthMode}
-  packages/claude-client/src/public.ts → packages/claude-client/src/create-client.ts {CreateClientOptions}
-  packages/claude-client/src/public.ts → packages/claude-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, getCurrentBranch, isExecutableOnPath, spawnTool, spawnManaged}
-  packages/claude-client/src/public.ts → packages/claude-client/src/exec.ts {ExecResult, ExecOptions, SpawnToolOptions, SpawnToolResult, ManagedChild}
-  packages/claude-client/src/public.ts → packages/claude-client/src/json.ts {toCanonicalJSON}
-  packages/claude-client/src/public.ts → packages/claude-client/src/output.ts {setQuiet, isQuiet, info, result}
-  packages/claude-client/src/public.ts → packages/claude-client/src/project-config.ts {deepMerge, loadProjectOverrides, mergeWithOverrides}
-  packages/claude-client/src/public.ts → packages/claude-client/src/project-dirs.ts {PROJECT_DIRS}
-  packages/claude-client/src/public.ts → packages/claude-client/src/project-dirs.ts {ProjectDir}
-  packages/claude-client/src/public.ts → packages/claude-client/src/token-usage.ts {parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage}
-  packages/claude-client/src/public.ts → packages/claude-client/src/types.ts {ClaudeClientError, CLIError}
-  packages/claude-client/src/public.ts → packages/claude-client/src/types.ts {TokenUsage, ClaudeConfig, AuthMode, ClaudeClientOptions, CompletionRequest, CompletionResult, ErrorReason, ClaudeClient}
   packages/claude-client/src/token-usage.ts → packages/claude-client/src/types.ts {TokenUsage}
   packages/claude-client/tests/unit/api-provider.test.ts → packages/claude-client/src/api-provider.ts {createApiClient}
   packages/claude-client/tests/unit/api-provider.test.ts → packages/claude-client/src/types.ts {ClaudeClientError}
@@ -93,10 +78,13 @@ Internal:
   packages/claude-client/tests/unit/create-client.test.ts → packages/claude-client/src/create-client.ts {createClient, detectAuthMode}
   packages/claude-client/tests/unit/create-client.test.ts → packages/claude-client/src/types.ts {ClaudeClientError}
   packages/claude-client/tests/unit/create-client.test.ts → packages/claude-client/src/types.ts {ClaudeConfig}
-  packages/claude-client/tests/unit/exec.test.ts → packages/claude-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged}
+  packages/claude-client/tests/unit/exec.test.ts → packages/claude-client/src/exec.ts {exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, ProcessPool, ProcessLimitError}
+  packages/claude-client/tests/unit/help-format.test.ts → packages/claude-client/src/help-format.ts {isColorEnabled, resetColorCache, bold, dim, cyan, yellow, cmd, flag, sectionHeader, requiredParam, optionalParam, formatHelp, formatUsage}
+  packages/claude-client/tests/unit/help-format.test.ts → packages/claude-client/src/help-format.ts {HelpDefinition, UsageDefinition}
   packages/claude-client/tests/unit/json.test.ts → packages/claude-client/src/json.ts {toCanonicalJSON}
   packages/claude-client/tests/unit/output.test.ts → packages/claude-client/src/output.ts {setQuiet, isQuiet, info, result}
   packages/claude-client/tests/unit/project-config.test.ts → packages/claude-client/src/project-config.ts {deepMerge, loadProjectOverrides, mergeWithOverrides}
+  packages/claude-client/tests/unit/suggest.test.ts → packages/claude-client/src/suggest.ts {editDistance, suggestCommands, formatTypoSuggestion}
   packages/claude-client/tests/unit/token-usage.test.ts → packages/claude-client/src/token-usage.ts {parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage}
   packages/claude-client/tests/unit/types.test.ts → packages/claude-client/src/types.ts {ClaudeClientError, CLIError}
 
@@ -111,11 +99,6 @@ Internal:
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Strong cohesion indicates well-defined shared abstractions
-- Zero coupling demonstrates proper foundation layer isolation
-- Mix of services and utilities provides comprehensive API foundation
-- Well-architected foundation with strong cohesion and zero external dependencies, providing clean API abstractions
-- Foundation layer exhibits dual naming strategy: kebab-case for file names (api-provider.ts, cli-provider.ts) but camelCase for internal identifiers — consistent pattern across all 24 files
-- [call graph] 179 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- [call graph] 317 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

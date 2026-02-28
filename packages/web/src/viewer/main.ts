@@ -1,8 +1,7 @@
 import { h, render, Fragment } from "preact";
-import type { VNode } from "preact";
-import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
-import type { LoadedData, ViewId, NavigateTo, DetailItem } from "./types.js";
-import { loadFromServer, loadFromFiles, detectMode, onDataChange, startPolling, stopPolling } from "./loader.js";
+import type { VNode, ComponentChild } from "preact";
+import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
+import type { ViewId, NavigateTo, DetailItem } from "./types.js";
 import { ALL_DATA_FILES } from "../schema/data-files.js";
 import { Sidebar } from "./components/sidebar.js";
 import { DetailPanel } from "./components/detail-panel.js";
@@ -18,6 +17,7 @@ import { FilesView } from "./views/files.js";
 import { ArchitectureView } from "./views/architecture.js";
 import { ProblemsView } from "./views/problems.js";
 import { SuggestionsView } from "./views/suggestions.js";
+import { PRMarkdownView } from "./views/pr-markdown.js";
 import { RoutesView } from "./views/routes.js";
 import { PRDView } from "./views/prd.js";
 import { RexDashboard } from "./views/rex-dashboard.js";
@@ -32,18 +32,57 @@ import { TaskAuditView } from "./views/task-audit.js";
 import { NotionConfigView } from "./views/notion-config.js";
 import { IntegrationConfigView } from "./views/integration-config.js";
 import { FeatureTogglesView } from "./views/feature-toggles.js";
+import { SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
+import { useRouteState } from "./hooks/use-route-state.js";
+import { useAppData } from "./hooks/use-app-data.js";
+import { useMemoryMonitor } from "./hooks/use-memory-monitor.js";
+import { useCrashRecovery } from "./hooks/use-crash-recovery.js";
+import { useGracefulDegradation } from "./hooks/use-graceful-degradation.js";
+import { MemoryWarningBanner } from "./components/memory-warning.js";
+import { CrashRecoveryBanner } from "./components/crash-recovery-banner.js";
+import { DegradationBanner } from "./components/degradation-banner.js";
+import { RefreshQueueStatus } from "./components/refresh-queue-status.js";
+import { PollingSuspensionIndicator } from "./components/polling-suspension-indicator.js";
+import { SearchOverlay, useSearchOverlay } from "./components/search-overlay.js";
+import { useRefreshThrottle } from "./hooks/use-refresh-throttle.js";
+import { usePollingSuspension } from "./hooks/use-polling-suspension.js";
+import type { DegradableFeature } from "./graceful-degradation.js";
+import { startTabVisibilityMonitor, stopTabVisibilityMonitor } from "./tab-visibility.js";
+import { startPollingManager, stopPollingManager } from "./polling-manager.js";
+import { startPollingRestart } from "./polling-restart.js";
+import { createTickVisibilityGate } from "./tick-visibility-gate.js";
 
 initTheme();
 
+// Start tab visibility and polling manager at module level so they're
+// available before the first render.  The polling manager subscribes to
+// visibility changes and automatically suspends / resumes all registered
+// pollers when the tab is backgrounded / foregrounded.
+startTabVisibilityMonitor();
+startPollingManager();
+
+// Start the tick visibility gate. This bridges tab visibility changes to
+// the tick timer's suspend/resume lifecycle: when the tab goes hidden,
+// the 1-second elapsed time interval is cleared to conserve CPU and
+// battery; when the tab returns, an immediate catch-up tick fires so
+// elapsed time displays jump to the correct current value.
+createTickVisibilityGate();
+
+// Start the polling restart coordinator. This bridges the graceful
+// degradation system to the centralized polling state: when memory
+// pressure disables autoRefresh, all non-essential polling sources are
+// suspended; when pressure subsides, they restart at original intervals.
+startPollingRestart();
+
 /** All known views grouped by product scope. */
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
-  sourcevision: ["overview", "graph", "zones", "files", "routes", "architecture", "problems", "suggestions"],
-  rex: ["rex-dashboard", "prd", "rex-analysis", "token-usage", "validation", "notion-config", "integrations"],
+  sourcevision: SOURCEVISION_TAB_IDS,
+  rex: ["rex-dashboard", "prd", "rex-analysis", "validation", "notion-config", "integrations"],
   hench: ["hench-runs", "hench-audit", "hench-config", "hench-templates", "hench-optimization"],
 };
 
 /** Cross-cutting views available in all scopes. */
-const CROSS_CUTTING_VIEWS: ViewId[] = ["feature-toggles"];
+const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles"];
 
 const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 
@@ -65,36 +104,6 @@ async function fetchScope(): Promise<string | null> {
   }
 }
 
-/** Parse pathname into { view, subId } — handles deep-link paths like /hench-runs/RUNID */
-function parsePathname(pathname: string, validViews: Set<ViewId>): { view: ViewId | null; subId: string | null } {
-  const raw = pathname.slice(1); // strip leading "/"
-  // Exact match first
-  if (validViews.has(raw as ViewId)) return { view: raw as ViewId, subId: null };
-  // Try base/subId pattern (e.g. "hench-runs/abc-123")
-  const slashIdx = raw.indexOf("/");
-  if (slashIdx > 0) {
-    const base = raw.slice(0, slashIdx) as ViewId;
-    const sub = raw.slice(slashIdx + 1);
-    if (validViews.has(base) && sub) return { view: base, subId: sub };
-  }
-  return { view: null, subId: null };
-}
-
-function getInitialView(validViews: Set<ViewId>): ViewId {
-  const { view } = parsePathname(location.pathname, validViews);
-  return view ?? validViews.values().next().value as ViewId;
-}
-
-function getInitialRunId(validViews: Set<ViewId>): string | null {
-  const { view, subId } = parsePathname(location.pathname, validViews);
-  return view === "hench-runs" ? subId : null;
-}
-
-function getInitialTaskId(validViews: Set<ViewId>): string | null {
-  const { view, subId } = parsePathname(location.pathname, validViews);
-  return view === "prd" ? subId : null;
-}
-
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
 function getInitialSidebarCollapsed(): boolean {
@@ -105,61 +114,163 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
+/** Render the active view panel based on current state. */
+function renderActiveView(opts: {
+  view: ViewId;
+  loading: boolean;
+  data: ReturnType<typeof useAppData>["data"];
+  setDetail: (item: DetailItem | null) => void;
+  setPrdDetailContent: (content: VNode<unknown> | null) => void;
+  selectedFile: string | null;
+  setSelectedFile: (f: string | null) => void;
+  selectedZone: string | null;
+  selectedRunId: string | null;
+  selectedTaskId: string | null;
+  navigateTo: NavigateTo;
+  isFeatureDisabled: (feature: DegradableFeature) => boolean;
+}): ComponentChild {
+  const { view, loading, data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, navigateTo, isFeatureDisabled } = opts;
+
+  if (loading) {
+    return h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...");
+  }
+
+  switch (view) {
+    case "overview":
+      return h(Overview, { data });
+    case "graph":
+      if (isFeatureDisabled("graphRendering")) {
+        return h("div", { class: "degraded-view-placeholder", role: "status" },
+          h("h2", null, "Graph view unavailable"),
+          h("p", null, "The graph view has been temporarily disabled to conserve memory. It will be re-enabled automatically when memory usage decreases, or you can refresh the page."),
+        );
+      }
+      return h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
+    case "zones":
+      return h(ZonesView, { data, onSelect: setDetail, navigateTo });
+    case "files":
+      return h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo });
+    case "routes":
+      return h(RoutesView, { data });
+    case "architecture":
+      return h(ArchitectureView, { data, onSelect: setDetail, navigateTo });
+    case "problems":
+      return h(ProblemsView, { data });
+    case "suggestions":
+      return h(SuggestionsView, { data });
+    case "pr-markdown":
+      return h(PRMarkdownView, null);
+    case "rex-dashboard":
+      return h(RexDashboard, { navigateTo });
+    case "prd":
+      return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo });
+    case "rex-analysis":
+      return h(AnalysisView, null);
+    case "token-usage":
+      return h(TokenUsageView, null);
+    case "validation":
+      return h(ValidationView, { navigateTo });
+    case "notion-config":
+      return h(NotionConfigView, null);
+    case "integrations":
+      return h(IntegrationConfigView, null);
+    case "hench-runs":
+      return h(HenchRunsView, { navigateTo, initialRunId: selectedRunId });
+    case "hench-audit":
+      return h(TaskAuditView, { navigateTo });
+    case "hench-config":
+      return h(HenchConfigView, null);
+    case "hench-templates":
+      return h(HenchTemplatesView, null);
+    case "hench-optimization":
+      return h(WorkflowOptimizationView, null);
+    case "feature-toggles":
+      return h(FeatureTogglesView, null);
+    default:
+      return null;
+  }
+}
+
 function App({ scope }: { scope: string | null }) {
   const validViews = useMemo(() => buildValidViews(scope), [scope]);
-  const [view, setView] = useState<ViewId>(() => getInitialView(validViews));
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(() => getInitialRunId(validViews));
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => getInitialTaskId(validViews));
-  const [data, setData] = useState<LoadedData>({
-    manifest: null,
-    inventory: null,
-    imports: null,
-    zones: null,
-    components: null,
-    callGraph: null,
-  });
+
+  const {
+    view,
+    selectedFile,
+    setSelectedFile,
+    selectedZone,
+    selectedRunId,
+    selectedTaskId,
+    navigateTo,
+    handleSidebarNav,
+  } = useRouteState(validViews);
+
+  const { snapshot: memorySnapshot, level: memoryLevel, showWarning: showMemoryWarning, dismiss: dismissMemoryWarning } = useMemoryMonitor();
+  const {
+    tier: degradationTier,
+    isDegraded,
+    summary: degradationSummary,
+    disabledFeatures,
+    isDisabled: isFeatureDisabled,
+  } = useGracefulDegradation();
+  const { state: refreshQueueState } = useRefreshThrottle();
+  const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
+  const [searchOpen, , closeSearch] = useSearchOverlay();
+  const { data, loading, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
+  const {
+    showRecovery,
+    crashLoop,
+    recentCrashCount,
+    recoveredState,
+    dismiss: dismissRecovery,
+    restore: restoreCrashState,
+  } = useCrashRecovery({ view, selectedFile, selectedZone, selectedRunId, selectedTaskId });
+
   const [detail, setDetail] = useState<DetailItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showDrop, setShowDrop] = useState(false);
-  const [mode, setMode] = useState<"server" | "static">("static");
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [refreshToast, setRefreshToast] = useState(false);
+  const [degradationDismissed, setDegradationDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prdDetailContent, setPrdDetailContent] = useState<VNode<any> | null>(null);
 
-  const handleToggleSidebar = useCallback(() => {
+  const handleRestore = () => {
+    const state = restoreCrashState();
+    if (state) {
+      navigateTo(state.view, {
+        file: state.selectedFile ?? undefined,
+        zone: state.selectedZone ?? undefined,
+        runId: state.selectedRunId ?? undefined,
+        taskId: state.selectedTaskId ?? undefined,
+      });
+    }
+  };
+
+  const handleManualRefresh = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleToggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* noop */ }
       return next;
     });
-  }, []);
+  };
 
-  const navigateTo: NavigateTo = useCallback((targetView, opts) => {
-    const file = opts?.file ?? null;
-    const zone = opts?.zone ?? null;
-    const runId = opts?.runId ?? null;
-    const taskId = opts?.taskId ?? null;
-    setSelectedFile(file);
-    setSelectedZone(zone);
-    setSelectedRunId(runId);
-    setSelectedTaskId(taskId);
-    setView(targetView);
-    const subId = runId ?? taskId;
-    const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
-    history.pushState({ view: targetView, file, zone, runId, taskId }, "", urlPath);
-  }, []);
+  // Re-show degradation banner when tier escalates
+  useEffect(() => {
+    if (isDegraded) setDegradationDismissed(false);
+  }, [degradationTier]);
 
-  const handleSidebarNav = useCallback((id: ViewId) => {
-    setSelectedFile(null);
-    setSelectedZone(null);
-    setSelectedRunId(null);
-    setSelectedTaskId(null);
-    setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null }, "", `/${id}`);
-  }, []);
+  // Toggle CSS animation suppression class when animations are degraded
+  useEffect(() => {
+    const el = document.documentElement;
+    if (isFeatureDisabled("animations")) {
+      el.classList.add("degradation-no-animations");
+    } else {
+      el.classList.remove("degradation-no-animations");
+    }
+    return () => { el.classList.remove("degradation-no-animations"); };
+  }, [isFeatureDisabled]);
 
   // Scroll to top on view change
   useEffect(() => {
@@ -171,167 +282,15 @@ function App({ scope }: { scope: string | null }) {
     updateFavicon(view);
   }, [view]);
 
-  useEffect(() => {
-    // Backward compat: migrate old hash URLs to path URLs
-    if (location.hash) {
-      const hashView = location.hash.replace("#", "") as ViewId;
-      if (validViews.has(hashView)) {
-        setView(hashView);
-        history.replaceState({ view: hashView, file: null, zone: null, runId: null, taskId: null }, "", `/${hashView}`);
-      }
-    } else {
-      // Seed the initial history entry — preserve deep-link path if present
-      const subId = selectedRunId ?? selectedTaskId;
-      const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
-      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId }, "", initialUrl);
-    }
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (e.state) {
-        const s = e.state as { view?: string; file?: string | null; zone?: string | null; runId?: string | null; taskId?: string | null };
-        if (s.view && validViews.has(s.view as ViewId)) {
-          setView(s.view as ViewId);
-          setSelectedFile(s.file ?? null);
-          setSelectedZone(s.zone ?? null);
-          setSelectedRunId(s.runId ?? null);
-          setSelectedTaskId(s.taskId ?? null);
-        }
-      } else {
-        // Fallback: parse from pathname
-        const parsed = parsePathname(location.pathname, validViews);
-        if (parsed.view) {
-          setView(parsed.view);
-          setSelectedFile(null);
-          setSelectedZone(null);
-          const isRunView = parsed.view === "hench-runs";
-          const isTaskView = parsed.view === "prd";
-          setSelectedRunId(isRunView ? parsed.subId : null);
-          setSelectedTaskId(isTaskView ? parsed.subId : null);
-          const fallbackUrl = parsed.subId ? `/${parsed.view}/${parsed.subId}` : `/${parsed.view}`;
-          history.replaceState({ view: parsed.view, file: null, zone: null, runId: isRunView ? parsed.subId : null, taskId: isTaskView ? parsed.subId : null }, "", fallbackUrl);
-        }
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-
-    let initialLoad = true;
-    onDataChange((newData) => {
-      setData(newData);
-      if (!initialLoad) {
-        setRefreshToast(true);
-        setTimeout(() => setRefreshToast(false), 3000);
-      }
-    });
-
-    detectMode().then(async (m) => {
-      setMode(m);
-      if (m === "server") {
-        await loadFromServer();
-        setLoading(false);
-        initialLoad = false;
-        startPolling(5000);
-      } else {
-        setLoading(false);
-        setShowDrop(true);
-      }
-    });
-
-    return () => {
-      stopPolling();
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
-
-  // Drag and drop
-  useEffect(() => {
-    if (mode === "server") return;
-
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      setShowDrop(true);
-    };
-
-    const handleDrop = async (e: DragEvent) => {
-      e.preventDefault();
-      setShowDrop(false);
-      if (e.dataTransfer?.files) {
-        setLoading(true);
-        await loadFromFiles(e.dataTransfer.files);
-        setLoading(false);
-      }
-    };
-
-    const handleDragLeave = (e: DragEvent) => {
-      if (e.relatedTarget === null) setShowDrop(false);
-    };
-
-    document.addEventListener("dragover", handleDragOver);
-    document.addEventListener("drop", handleDrop);
-    document.addEventListener("dragleave", handleDragLeave);
-
-    return () => {
-      document.removeEventListener("dragover", handleDragOver);
-      document.removeEventListener("drop", handleDrop);
-      document.removeEventListener("dragleave", handleDragLeave);
-    };
-  }, [mode]);
-
   const hasData = data.manifest || data.inventory || data.imports || data.zones;
 
-  const renderView = () => {
-    if (loading) {
-      return h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...");
-    }
-
-    switch (view) {
-      case "overview":
-        return h(Overview, { data });
-      case "graph":
-        return h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
-      case "zones":
-        return h(ZonesView, { data, onSelect: setDetail, navigateTo });
-      case "files":
-        return h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo });
-      case "routes":
-        return h(RoutesView, { data });
-      case "architecture":
-        return h(ArchitectureView, { data, onSelect: setDetail, navigateTo });
-      case "problems":
-        return h(ProblemsView, { data });
-      case "suggestions":
-        return h(SuggestionsView, { data });
-      case "rex-dashboard":
-        return h(RexDashboard, { navigateTo });
-      case "prd":
-        return h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo });
-      case "rex-analysis":
-        return h(AnalysisView, null);
-      case "token-usage":
-        return h(TokenUsageView, null);
-      case "validation":
-        return h(ValidationView, { navigateTo });
-      case "notion-config":
-        return h(NotionConfigView, null);
-      case "integrations":
-        return h(IntegrationConfigView, null);
-      case "hench-runs":
-        return h(HenchRunsView, { navigateTo, initialRunId: selectedRunId });
-      case "hench-audit":
-        return h(TaskAuditView, { navigateTo });
-      case "hench-config":
-        return h(HenchConfigView, null);
-      case "hench-templates":
-        return h(HenchTemplatesView, null);
-      case "hench-optimization":
-        return h(WorkflowOptimizationView, null);
-      case "feature-toggles":
-        return h(FeatureTogglesView, null);
-      default:
-        return null;
-    }
-  };
+  // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
+  const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
   return h(Fragment, null,
+    h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
+    h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
+    h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
     h("main", {
@@ -348,12 +307,16 @@ function App({ scope }: { scope: string | null }) {
           h(Guide, { view }),
         ),
       ),
-      renderView()
+      renderActiveView({ view, loading, data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, navigateTo, isFeatureDisabled }),
     ),
-    h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent }),
-    refreshToast
+    !isFeatureDisabled("detailPanel")
+      ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+      : null,
+    (refreshToast && !isFeatureDisabled("autoRefresh"))
       ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")
       : null,
+    h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
+    h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },
@@ -361,7 +324,8 @@ function App({ scope }: { scope: string | null }) {
             h("p", null, `Drag and drop ${ALL_DATA_FILES.join(", ")}`)
           )
         )
-      : null
+      : null,
+    h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
   );
 }
 

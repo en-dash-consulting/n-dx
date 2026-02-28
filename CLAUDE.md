@@ -15,7 +15,8 @@ packages/
   sourcevision/    # analysis engine
   rex/             # PRD + task tracker
   hench/           # autonomous agent
-  claude-client/   # shared foundation (types, API abstraction)
+  claude-client/   # compatibility bridge to llm-client
+  llm-client/      # vendor-neutral LLM foundation (claude adapter + future vendors)
   web/             # dashboard + MCP HTTP server
 ci.js              # CI pipeline (analysis + PRD health validation)
 cli.js             # n-dx entry point (orchestration + delegation)
@@ -34,22 +35,23 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
        ↓
   Domain          rex · sourcevision            (independent, never import each other)
        ↓
-  Foundation      @n-dx/claude-client           (shared types, API client)
+  Foundation      @n-dx/llm-client              (shared types, API client)
 ```
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
 
 ### Gateway modules
 
-Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
+Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module per upstream package. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
 
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
 | hench | `src/prd/rex-gateway.ts` | rex | 8 functions (store, tree, task selection) |
-| web | `src/server/domain-gateway.ts` | rex, sourcevision | 2 MCP server factories + rex domain types/constants |
+| web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
+| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory |
 
 Rules:
-- **One gateway per package** — all runtime cross-package imports pass through it.
+- **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
 - **Re-export only** — gateways re-export; they contain no logic.
 - **Type imports excluded** — `import type` is erased at compile time and stays at the call-site.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
@@ -62,7 +64,7 @@ See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
 |-----------|---------|-------|
 | Public API | `src/public.ts` → `exports["."]` in `package.json` | All 5 packages follow this |
 | Test structure | `tests/{unit,integration,e2e}/**/*.test.ts` | Standardized across all packages |
-| Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/claude-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
+| Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
 | Subpath exports | `"./dist/*": "./dist/*"` | Allows direct imports from `dist/` for advanced consumers |
 
 Build and test:
@@ -82,6 +84,7 @@ Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
 
 ```sh
 ndx init [dir]            # sourcevision init → rex init → hench init
+ndx config llm.vendor ... # set active LLM vendor (claude|codex)
 ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
 ndx plan --accept [dir]   # ...then accept proposals into PRD
 ndx work [dir]            # hench run (pass --task=ID, --dry-run, etc.)
@@ -112,7 +115,7 @@ sv <command> [args]               # alias for sourcevision
 
 ### Rex commands
 
-`init`, `status`, `next`, `add`, `update`, `validate`, `analyze`, `recommend`, `mcp`
+`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
 
 ### Sourcevision commands
 

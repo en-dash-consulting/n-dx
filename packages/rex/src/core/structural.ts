@@ -2,6 +2,13 @@ import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
 import { walkTree, collectAllIds } from "./tree.js";
 
+export interface EpiclessFeature {
+  itemId: string;
+  title: string;
+  status: string;
+  childCount: number;
+}
+
 export interface OrphanedItem {
   itemId: string;
   title: string;
@@ -16,6 +23,13 @@ export interface StuckItem {
   reason: string;
 }
 
+export interface EmptyContainerItem {
+  itemId: string;
+  title: string;
+  level: ItemLevel;
+  reason: string;
+}
+
 export interface StructuralResult {
   valid: boolean;
   errors: string[];
@@ -24,6 +38,8 @@ export interface StructuralResult {
   orphanedItems: OrphanedItem[];
   cycles: string[][];
   stuckItems: StuckItem[];
+  /** Epics/features with no (non-deleted) children — indicates incomplete work. */
+  emptyContainers: EmptyContainerItem[];
 }
 
 export interface StructuralOptions {
@@ -45,6 +61,7 @@ const DEFAULT_STUCK_THRESHOLD_MS = 48 * 60 * 60 * 1000; // 48 hours
  *
  * Warns:
  * - Items with status "blocked" but no blockedBy dependencies
+ * - Empty containers — epics/features with no (non-deleted) children
  */
 export function validateStructure(
   items: PRDItem[],
@@ -55,6 +72,7 @@ export function validateStructure(
   const orphanedItems = findOrphanedItems(items);
   const cycles = findCycles(items);
   const stuckItems = findStuckItems(items, options);
+  const emptyContainers = findEmptyContainers(items);
 
   for (const orphan of orphanedItems) {
     errors.push(`Orphaned: "${orphan.itemId}" (${orphan.level}) — ${orphan.reason}`);
@@ -64,6 +82,11 @@ export function validateStructure(
   }
   for (const stuck of stuckItems) {
     errors.push(`Stuck: "${stuck.itemId}" — ${stuck.reason}`);
+  }
+  for (const ec of emptyContainers) {
+    warnings.push(
+      `Empty container: "${ec.itemId}" (${ec.title}) — ${ec.reason}`,
+    );
   }
 
   // Warn about blocked items with no recorded dependencies
@@ -95,6 +118,7 @@ export function validateStructure(
     orphanedItems,
     cycles,
     stuckItems,
+    emptyContainers,
   };
 }
 
@@ -124,6 +148,46 @@ function findOrphanedItems(items: PRDItem[]): OrphanedItem[] {
   }
 
   return orphans;
+}
+
+/**
+ * Container levels that should have children to be meaningful.
+ * Tasks and subtasks are leaf-level work items and don't require children.
+ */
+const CONTAINER_LEVELS = new Set<ItemLevel>(["epic", "feature"]);
+
+/**
+ * Terminal statuses where an empty container is expected or acceptable.
+ * Completed, deferred, and deleted items don't need children.
+ */
+const TERMINAL_CONTAINER_STATUSES = new Set<string>(["completed", "deferred", "deleted"]);
+
+/**
+ * Find epics and features with no (non-deleted) children.
+ * These indicate incomplete work — a container was created but never populated.
+ */
+function findEmptyContainers(items: PRDItem[]): EmptyContainerItem[] {
+  const empty: EmptyContainerItem[] = [];
+
+  for (const { item } of walkTree(items)) {
+    if (!CONTAINER_LEVELS.has(item.level)) continue;
+    if (TERMINAL_CONTAINER_STATUSES.has(item.status)) continue;
+
+    const liveChildren = (item.children ?? []).filter(
+      (c) => c.status !== "deleted",
+    );
+
+    if (liveChildren.length === 0) {
+      empty.push({
+        itemId: item.id,
+        title: item.title,
+        level: item.level,
+        reason: `${item.level} has no child items`,
+      });
+    }
+  }
+
+  return empty;
 }
 
 /**
@@ -251,6 +315,24 @@ function findParentChildInconsistencies(items: PRDItem[]): string[] {
   }
 
   return warnings;
+}
+
+/**
+ * Find features positioned at root level without a parent epic.
+ *
+ * These violate the hierarchy rule that features must be under an epic.
+ * Returns structured data for each epicless feature, including status
+ * and non-deleted child count, suitable for interactive resolution prompts.
+ */
+export function findEpiclessFeatures(items: PRDItem[]): EpiclessFeature[] {
+  return items
+    .filter((item) => item.level === "feature" && item.status !== "deleted")
+    .map((item) => ({
+      itemId: item.id,
+      title: item.title,
+      status: item.status,
+      childCount: (item.children ?? []).filter((c) => c.status !== "deleted").length,
+    }));
 }
 
 /**

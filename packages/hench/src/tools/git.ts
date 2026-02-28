@@ -1,10 +1,10 @@
-import type { GuardRails } from "../guard/index.js";
-import { execShell } from "../process/exec-shell.js";
+import { execShell } from "./exec-shell.js";
+import type { ToolGuard } from "./contracts.js";
 
 const GIT_TIMEOUT = 15000;
 
 export async function toolGit(
-  guard: GuardRails,
+  guard: ToolGuard,
   projectDir: string,
   params: { subcommand: string; args?: string },
 ): Promise<string> {

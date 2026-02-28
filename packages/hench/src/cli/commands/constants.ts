@@ -1,4 +1,4 @@
-import { PROJECT_DIRS, formatUsage } from "@n-dx/claude-client";
+import { PROJECT_DIRS, formatUsage } from "@n-dx/llm-client";
 import { CLIError } from "../errors.js";
 
 export const HENCH_DIR = PROJECT_DIRS.HENCH;

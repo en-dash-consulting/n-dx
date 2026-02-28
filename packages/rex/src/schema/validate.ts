@@ -17,6 +17,7 @@ const ItemStatusSchema = z.enum([
 const ItemLevelSchema = z.enum(["epic", "feature", "task", "subtask"]);
 
 const PrioritySchema = z.enum(["critical", "high", "medium", "low"]);
+const ProposalNodeKindSchema = z.enum(["epic", "feature", "task"]);
 
 const RequirementCategorySchema = z.enum([
   "technical",
@@ -64,6 +65,15 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       failureReason: z.string().optional(),
+      mergedProposals: z.array(z.object({
+        proposalNodeKey: z.string(),
+        proposalTitle: z.string(),
+        proposalKind: ProposalNodeKindSchema,
+        reason: z.string(),
+        score: z.number(),
+        mergedAt: z.string(),
+        source: z.literal("smart-add"),
+      }).strict()).optional(),
       children: z.array(PRDItemSchema).optional(),
     })
     .passthrough(),

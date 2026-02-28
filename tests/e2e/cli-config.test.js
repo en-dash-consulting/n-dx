@@ -940,6 +940,94 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── LLM vendor auth preflight ────────────────────────────────────────────
+
+  describe("llm.vendor auth preflight", () => {
+    it("runs claude auth preflight command when selecting claude", async () => {
+      const fakeClaude = join(tmpDir, "fake-claude-preflight");
+      await writeFile(
+        fakeClaude,
+        "#!/bin/sh\n" +
+          "echo \"$@\" > \"$0.args\"\n" +
+          "echo '{\"result\":\"ok\"}'\n",
+      );
+      await chmod(fakeClaude, 0o755);
+
+      run(["llm.claude.cli_path", fakeClaude, tmpDir]);
+      const output = run(["llm.vendor", "claude", tmpDir]);
+      expect(output).toContain("llm.vendor = claude");
+
+      const args = await readFile(`${fakeClaude}.args`, "utf-8");
+      expect(args).toContain("-p");
+      expect(args).toContain("--output-format");
+      expect(args).toContain("json");
+    });
+
+    it("runs codex auth preflight command when selecting codex", async () => {
+      const fakeCodex = join(tmpDir, "fake-codex-preflight");
+      await writeFile(
+        fakeCodex,
+        "#!/bin/sh\n" +
+          "echo \"$@\" > \"$0.args\"\n" +
+          "echo ok\n",
+      );
+      await chmod(fakeCodex, 0o755);
+
+      run(["llm.codex.cli_path", fakeCodex, tmpDir]);
+      const output = run(["llm.vendor", "codex", tmpDir]);
+      expect(output).toContain("llm.vendor = codex");
+
+      const args = await readFile(`${fakeCodex}.args`, "utf-8");
+      expect(args).toContain("exec");
+      expect(args).toContain("--skip-git-repo-check");
+    });
+
+    it("handles auth preflight failure with deterministic error path", async () => {
+      const fakeCodex = join(tmpDir, "fake-codex-preflight-fail");
+      await writeFile(
+        fakeCodex,
+        "#!/bin/sh\n" +
+          "echo \"$@\" > \"$0.args\"\n" +
+          "echo 'not logged in' 1>&2\n" +
+          "exit 7\n",
+      );
+      await chmod(fakeCodex, 0o755);
+
+      run(["llm.codex.cli_path", fakeCodex, tmpDir]);
+      const stderr = runFail(["llm.vendor", "codex", tmpDir]);
+      expect(stderr).toContain("Provider auth preflight failed for \"codex\"");
+      expect(stderr).toContain("Details:");
+      expect(stderr).toContain(`Next step: run '${fakeCodex} login'`);
+
+      const ndxConfig = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      );
+      expect(ndxConfig.llm.vendor).toBeUndefined();
+    });
+
+    it("prints claude login guidance on claude auth preflight failure", async () => {
+      const fakeClaude = join(tmpDir, "fake-claude-preflight-fail");
+      await writeFile(
+        fakeClaude,
+        "#!/bin/sh\n" +
+          "echo \"$@\" > \"$0.args\"\n" +
+          "echo 'please login' 1>&2\n" +
+          "exit 9\n",
+      );
+      await chmod(fakeClaude, 0o755);
+
+      run(["llm.claude.cli_path", fakeClaude, tmpDir]);
+      const stderr = runFail(["llm.vendor", "claude", tmpDir]);
+      expect(stderr).toContain("Provider auth preflight failed for \"claude\"");
+      expect(stderr).toContain(`Next step: run '${fakeClaude} login'`);
+
+      const ndxConfig = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      );
+      expect(ndxConfig.llm.vendor).toBeUndefined();
+    });
+  });
+
   // ── No config ──────────────────────────────────────────────────────────────
 
   describe("no config", () => {

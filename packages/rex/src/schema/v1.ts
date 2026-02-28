@@ -100,6 +100,50 @@ export interface Requirement {
   priority?: Priority;
 }
 
+/**
+ * Audit marker persisted on items created by explicitly overriding
+ * duplicate protection in smart-add flows.
+ */
+export interface DuplicateOverrideMarker {
+  /** Fixed marker type for downstream filtering/reporting. */
+  type: "duplicate_guard_override";
+  /** Duplicate reason category (e.g. exact_title, semantic_title). */
+  reason: string;
+  /** Stable reference combining reason + matched item id. */
+  reasonRef: string;
+  /** Existing PRD item id that was matched as duplicate. */
+  matchedItemId: string;
+  /** Existing PRD item title that was matched as duplicate. */
+  matchedItemTitle: string;
+  /** Existing PRD item level that was matched as duplicate. */
+  matchedItemLevel: ItemLevel;
+  /** Existing PRD item status that was matched as duplicate. */
+  matchedItemStatus: ItemStatus;
+  /** Timestamp when the override-created item was persisted. */
+  createdAt: string;
+}
+
+/**
+ * Provenance entry for a proposal node that was merged into an existing item
+ * during smart-add duplicate resolution.
+ */
+export interface MergedProposalRecord {
+  /** Stable node key from the proposal set (e.g. p0:task:0:1). */
+  proposalNodeKey: string;
+  /** Human-readable proposal title that was merged. */
+  proposalTitle: string;
+  /** Proposal node level in the generated structure. */
+  proposalKind: "epic" | "feature" | "task";
+  /** Duplicate-reason category used for this merge. */
+  reason: string;
+  /** Similarity score that triggered duplicate detection. */
+  score: number;
+  /** Timestamp when the merge was applied. */
+  mergedAt: string;
+  /** Merge source identifier. */
+  source: "smart-add";
+}
+
 /** All valid requirement categories as a Set. */
 export const VALID_REQUIREMENT_CATEGORIES = new Set<RequirementCategory>([
   "technical",
@@ -143,6 +187,10 @@ export interface PRDItem {
   startedAt?: string;
   completedAt?: string;
   failureReason?: string;
+  /** Present only when duplicate protection was explicitly overridden. */
+  overrideMarker?: DuplicateOverrideMarker;
+  /** Present when duplicate proposals were merged into this existing item. */
+  mergedProposals?: MergedProposalRecord[];
   children?: PRDItem[];
   [key: string]: unknown;
 }
@@ -207,6 +255,10 @@ export interface AnalyzeTokenUsage {
   inputTokens: number;
   /** Total output tokens across all calls. */
   outputTokens: number;
+  /** LLM vendor used for this token event (e.g. "claude", "codex"). */
+  vendor?: string;
+  /** Model used for this token event. */
+  model?: string;
   /** Total cache creation input tokens (if any). */
   cacheCreationInputTokens?: number;
   /** Total cache read input tokens (if any). */

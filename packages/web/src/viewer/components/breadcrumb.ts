@@ -30,7 +30,7 @@ export interface BreadcrumbProps {
 // ---------------------------------------------------------------------------
 
 interface ViewMeta {
-  product: "sourcevision" | "rex" | "hench";
+  product: "sourcevision" | "rex" | "hench" | "global";
   label: string;
   /** Product display name */
   productLabel: string;
@@ -52,10 +52,11 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   architecture:          { product: "sourcevision", label: "Architecture",    productLabel: "SourceVision" },
   problems:              { product: "sourcevision", label: "Problems",        productLabel: "SourceVision" },
   suggestions:           { product: "sourcevision", label: "Suggestions",     productLabel: "SourceVision" },
+  "pr-markdown":         { product: "sourcevision", label: "PR Markdown",     productLabel: "SourceVision" },
   "rex-dashboard":       { product: "rex",          label: "Dashboard",       productLabel: "Rex" },
   prd:                   { product: "rex",          label: "Tasks",           productLabel: "Rex" },
   "rex-analysis":        { product: "rex",          label: "Analysis",        productLabel: "Rex" },
-  "token-usage":         { product: "rex",          label: "Token Usage",     productLabel: "Rex" },
+  "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
   "notion-config":       { product: "rex",          label: "Notion",          productLabel: "Rex" },
   integrations:          { product: "rex",          label: "Integrations",    productLabel: "Rex" },
@@ -145,7 +146,7 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
         : null,
 
       // ── Segment 2: Product / tool ──
-      meta
+      meta && meta.product !== "global"
         ? h("li", { class: "breadcrumb-item" },
             h("button", {
               class: `breadcrumb-link breadcrumb-product breadcrumb-product-${meta.product}`,

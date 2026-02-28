@@ -24,6 +24,8 @@ export const HEARTBEAT_INTERVAL_MS = 30_000;
 export interface Heartbeat {
   /** Stop the heartbeat timer. Call this when the run ends. */
   stop: () => void;
+  /** Peak RSS observed during heartbeat sampling (bytes). */
+  peakRssBytes: number;
 }
 
 /**
@@ -43,11 +45,20 @@ export function startHeartbeat(
   run: RunRecord,
   intervalMs: number = HEARTBEAT_INTERVAL_MS,
 ): Heartbeat {
+  // Initialize peak RSS with current value
+  let peakRss = process.memoryUsage().rss;
+
   const timer = setInterval(async () => {
     // Only beat while the run is still active
     if (run.status !== "running") {
       clearInterval(timer);
       return;
+    }
+
+    // Sample RSS on each tick
+    const currentRss = process.memoryUsage().rss;
+    if (currentRss > peakRss) {
+      peakRss = currentRss;
     }
 
     run.lastActivityAt = new Date().toISOString();
@@ -66,6 +77,14 @@ export function startHeartbeat(
   return {
     stop() {
       clearInterval(timer);
+    },
+    get peakRssBytes() {
+      // Final sample on read to catch any RSS growth since last tick
+      const currentRss = process.memoryUsage().rss;
+      if (currentRss > peakRss) {
+        peakRss = currentRss;
+      }
+      return peakRss;
     },
   };
 }

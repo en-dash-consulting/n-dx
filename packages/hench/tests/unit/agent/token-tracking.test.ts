@@ -53,6 +53,28 @@ describe("processStreamLine token tracking", () => {
     });
   });
 
+  it("stores vendor/model metadata when provided by caller", () => {
+    const result = makeResult();
+    const counter = { value: 0 };
+
+    const event = JSON.stringify({
+      type: "assistant",
+      message: {
+        usage: { input_tokens: 200, output_tokens: 100 },
+      },
+    });
+
+    processStreamLine(event, result, counter, { vendor: "codex", model: "gpt-5-codex" });
+
+    expect(result.turnTokenUsage[0]).toEqual({
+      turn: 1,
+      input: 200,
+      output: 100,
+      vendor: "codex",
+      model: "gpt-5-codex",
+    });
+  });
+
   it("accumulates tokens across multiple turns", () => {
     const result = makeResult();
     const counter = { value: 0 };

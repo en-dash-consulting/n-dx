@@ -3,7 +3,7 @@
  * stay in sync with the canonical Rex definitions.
  *
  * After the rex-domain.ts deduplication, server routes now import Rex
- * types and constants directly through the gateway (domain-gateway.ts).
+ * types and constants directly through the Rex gateway (rex-gateway.ts).
  * The only remaining intentional duplications are:
  *
  *   1. Viewer types (packages/web/src/viewer/components/prd-tree/types.ts)
@@ -15,7 +15,7 @@
  * Rex definitions, and that the gateway re-exports are correct.
  *
  * @see packages/rex/src/schema/v1.ts — canonical definitions
- * @see packages/web/src/server/domain-gateway.ts — gateway (re-exports from rex)
+ * @see packages/web/src/server/rex-gateway.ts — gateway (re-exports from rex)
  * @see packages/web/src/viewer/components/prd-tree/types.ts — viewer type mirrors
  */
 
@@ -57,7 +57,7 @@ import {
   isItemLevel as gatewayIsItemLevel,
   isRequirementCategory as gatewayIsReqCategory,
   isValidationType as gatewayIsValidationType,
-} from "../../../src/server/domain-gateway.js";
+} from "../../../src/server/rex-gateway.js";
 
 describe("Gateway re-exports are identical to canonical", () => {
   /**

@@ -1,5 +1,6 @@
 /**
- * @deprecated Renamed to `domain-gateway.ts`. This barrel re-export exists
- * for backward compatibility; new code should import from `./domain-gateway.js`.
+ * @deprecated Use `rex-gateway.ts` for Rex imports and `domain-gateway.ts`
+ * for Sourcevision MCP imports.
  */
+export * from "./rex-gateway.js";
 export * from "./domain-gateway.js";
