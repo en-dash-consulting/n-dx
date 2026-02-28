@@ -1,7 +1,8 @@
 import { h, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
-import { meterClass, getZoneColorByIndex, basename } from "../utils.js";
+import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
+import { basename } from "../utils.js";
 import type { VNode } from "preact";
 
 interface DetailPanelProps {

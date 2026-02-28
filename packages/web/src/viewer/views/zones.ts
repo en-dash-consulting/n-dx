@@ -12,17 +12,17 @@ import { h } from "preact";
 import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import type { CallGraph, Zone, Finding } from "../../schema/v1.js";
-import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
-import { SearchFilter } from "../components/search-filter.js";
-import { BrandedHeader } from "../components/logos.js";
 import {
+  CollapsibleSection,
   buildFileToZoneMap,
   buildCallFlowEdges,
   buildExternalImportEdges,
   getZoneColorByIndex,
-  basename,
   meterClass,
-} from "../utils.js";
+} from "../visualization/index.js";
+import { basename } from "../utils.js";
+import { SearchFilter } from "../components/search-filter.js";
+import { BrandedHeader } from "../components/logos.js";
 import type {
   ZoneData,
   BoxRect,

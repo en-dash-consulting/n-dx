@@ -8,8 +8,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
-import { MetricCard } from "../components/data-display/health-gauge.js";
-import { BarChart } from "../components/data-display/mini-charts.js";
+import { MetricCard, BarChart } from "../visualization/index.js";
 import { BrandedHeader } from "../components/logos.js";
 import { usePolling } from "../hooks/use-polling.js";
 
