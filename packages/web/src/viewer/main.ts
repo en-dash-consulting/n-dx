@@ -2,7 +2,7 @@ import { h, render, Fragment } from "preact";
 import type { VNode, ComponentChild } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import type { ViewId, NavigateTo, DetailItem } from "./types.js";
-import { ALL_DATA_FILES } from "../schema/data-files.js";
+import { ALL_DATA_FILES } from "../shared/data-files.js";
 import { Sidebar } from "./components/sidebar.js";
 import { DetailPanel } from "./components/detail-panel.js";
 import { Guide } from "./components/guide.js";

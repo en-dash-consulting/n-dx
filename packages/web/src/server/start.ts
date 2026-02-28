@@ -27,7 +27,7 @@ import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { createWebSocketManager } from "./websocket.js";
 import { WsHealthTracker } from "./ws-health-tracker.js";
-import { ALL_DATA_FILES } from "../schema/data-files.js";
+import { ALL_DATA_FILES } from "../shared/data-files.js";
 import { findAvailablePort } from "./port.js";
 
 /**

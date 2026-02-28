@@ -1,5 +1,14 @@
+/**
+ * Client-side data validation for the sourcevision viewer.
+ *
+ * Zod schemas that validate JSON fetched from the server or dropped
+ * as files. Lives in the viewer layer because the viewer is the sole
+ * consumer — the server layer does its own domain-specific validation
+ * independently.
+ */
+
 import { z } from "zod";
-import type * as V1 from "./v1.js";
+import type * as V1 from "../schema/v1.js";
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 

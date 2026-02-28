@@ -3,7 +3,8 @@
  * Ensures older output formats can be rendered by newer viewers.
  */
 
-import { SCHEMA_VERSION } from "../schema/v1.js";
+/** Current schema version. Inlined to avoid runtime import from schema/. */
+const SCHEMA_VERSION = "1.0.0";
 import type { LoadedData } from "./types.js";
 
 type ModuleKey = keyof LoadedData;

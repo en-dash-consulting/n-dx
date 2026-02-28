@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
-import { DATA_FILES } from "../schema/data-files.js";
+import { DATA_FILES } from "../shared/data-files.js";
 import {
   classifyPRMarkdownRefreshFailureCode,
 } from "./pr-markdown-refresh-diagnostics.js";
