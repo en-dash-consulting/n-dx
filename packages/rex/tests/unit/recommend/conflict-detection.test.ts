@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem } from "../../../src/schema/index.js";
-import type { EnrichedRecommendation } from "../../../src/recommend/create-from-recommendations.js";
+import type { EnrichedRecommendation } from "../../../src/recommend/types.js";
 import {
   detectRecommendationConflicts,
   formatConflict,

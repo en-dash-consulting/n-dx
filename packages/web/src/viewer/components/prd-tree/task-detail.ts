@@ -11,7 +11,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import { formatTimestamp } from "./compute.js";
 import { findItemById } from "./tree-utils.js";
-import { CopyLinkButton } from "./shared-imports.js";
+import { CopyLinkButton } from "../copy-link-button.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 
 // ── Types ────────────────────────────────────────────────────────────

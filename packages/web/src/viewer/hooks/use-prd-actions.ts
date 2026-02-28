@@ -20,7 +20,7 @@ import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.
 import type { TaskUsageSummary, WeeklyBudgetResolution } from "../components/prd-tree/types.js";
 import type { AddItemInput } from "../components/prd-tree/add-item-form.js";
 import type { InlineAddInput } from "../components/prd-tree/inline-add-form.js";
-import type { DetailItem, NavigateTo } from "../components/prd-tree/shared-imports.js";
+import type { DetailItem, NavigateTo } from "../types.js";
 import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { findItemById, collectSubtreeIds, removeItemById } from "../components/prd-tree/tree-utils.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";

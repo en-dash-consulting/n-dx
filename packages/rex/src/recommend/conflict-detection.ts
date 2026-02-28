@@ -19,7 +19,7 @@
 import { similarity } from "../analyze/dedupe.js";
 import { walkTree } from "../core/tree.js";
 import type { PRDItem, ItemLevel, ItemStatus } from "../schema/index.js";
-import type { EnrichedRecommendation } from "./create-from-recommendations.js";
+import type { EnrichedRecommendation } from "./types.js";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
