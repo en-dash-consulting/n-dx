@@ -1,0 +1,17 @@
+{
+  "id": "timer-infrastructure",
+  "name": "Timer Infrastructure",
+  "description": "Provides timing utilities and elapsed time memoization for performance-sensitive operations.",
+  "files": [
+    "packages/web/src/viewer/tick-timer.ts",
+    "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+    "packages/web/tests/unit/viewer/tick-timer.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/tick-timer.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 3,
+  "lineCount": 943
+}

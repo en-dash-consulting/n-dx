@@ -1,0 +1,15 @@
+{
+  "id": "dom-performance-monitoring",
+  "name": "DOM Performance Monitoring",
+  "description": "Tracks DOM operation performance metrics and provides React hooks for performance-aware components.",
+  "files": [
+    "packages/web/src/viewer/dom-performance-monitor.ts",
+    "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+    "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 3,
+  "lineCount": 1691
+}

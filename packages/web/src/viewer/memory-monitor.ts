@@ -201,7 +201,11 @@ export function onSnapshot(
 
 function notifyListeners(snapshot: MemorySnapshot): void {
   for (const listener of changeListeners) {
-    listener(snapshot);
+    try {
+      listener(snapshot);
+    } catch (err) {
+      console.error("[memory-monitor] listener error:", err);
+    }
   }
 }
 

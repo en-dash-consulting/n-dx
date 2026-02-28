@@ -1,0 +1,20 @@
+{
+  "id": "error-recovery",
+  "name": "Error Recovery System",
+  "description": "Crash detection and recovery infrastructure that provides graceful degradation when the application encounters errors.",
+  "files": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/crash-detector.ts",
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts",
+    "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts"
+  ],
+  "cohesion": 0.64,
+  "coupling": 0.36,
+  "fileCount": 5,
+  "lineCount": 1093
+}

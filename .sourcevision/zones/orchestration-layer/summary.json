@@ -1,7 +1,7 @@
 {
   "id": "orchestration-layer",
-  "name": "Project Orchestration",
-  "description": "Provides unified CLI interface and configuration management for the entire n-dx toolkit through clean entry points.",
+  "name": "Orchestration Layer",
+  "description": "Top-level entry points and configuration that coordinate between domain packages without importing their internals.",
   "files": [
     "ci.js",
     "cli.js",

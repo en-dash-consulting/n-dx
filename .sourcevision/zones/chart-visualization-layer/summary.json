@@ -1,0 +1,19 @@
+{
+  "id": "chart-visualization-layer",
+  "name": "Chart Visualization Layer",
+  "description": "Mini-chart components and data visualization utilities for displaying metrics and problems.",
+  "files": [
+    "packages/web/src/viewer/components/data-display/mini-charts.ts",
+    "packages/web/src/viewer/views/problems.ts",
+    "packages/web/tests/unit/viewer/bar-chart.test.ts",
+    "packages/web/tests/unit/viewer/flow-diagram.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/data-display/mini-charts.ts",
+    "packages/web/src/viewer/views/problems.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 4,
+  "lineCount": 388
+}

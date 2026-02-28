@@ -1,0 +1,22 @@
+{
+  "id": "application-shell-components",
+  "name": "Application Shell Components",
+  "description": "Main application entry point and various overlay UI components including search, FAQ, and status indicators.",
+  "files": [
+    "packages/web/src/viewer/components/faq.ts",
+    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+    "packages/web/src/viewer/components/refresh-queue-status.ts",
+    "packages/web/src/viewer/components/search-overlay.ts",
+    "packages/web/src/viewer/main.ts",
+    "packages/web/tests/integration/.gitkeep",
+    "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
+    "packages/web/tests/integration/token-usage-route-regression.test.ts",
+    "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
+    "packages/web/tests/unit/viewer/search-overlay.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.2,
+  "coupling": 0.8,
+  "fileCount": 10,
+  "lineCount": 2396
+}

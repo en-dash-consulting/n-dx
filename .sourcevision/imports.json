@@ -488,6 +488,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "SystemMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -571,6 +579,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/shared.ts",
+      "to": "packages/hench/src/agent/lifecycle/heartbeat.ts",
+      "type": "type",
+      "symbols": [
+        "Heartbeat"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/shared.ts",
       "to": "packages/hench/src/agent/lifecycle/task-display.ts",
       "type": "static",
       "symbols": [
@@ -612,11 +628,20 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/shared.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "SystemMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/shared.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "HenchConfig",
         "RunRecord",
+        "RunMemoryStats",
         "TaskBrief"
       ]
     },
@@ -915,7 +940,45 @@
       "to": "packages/hench/src/prd/rex-gateway.ts",
       "type": "static",
       "symbols": [
-        "resolveStore"
+        "resolveStore",
+        "findNextTask",
+        "findActionable",
+        "findItem",
+        "collectCompletedIds"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/process/limiter.ts",
+      "type": "static",
+      "symbols": [
+        "ProcessLimiter"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "MemoryThrottle"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/queue/index.ts",
+      "type": "static",
+      "symbols": [
+        "ExecutionQueue",
+        "formatQueueStatus",
+        "resolveSchedulingPriority"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/queue/index.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriority"
       ]
     },
     {
@@ -1290,6 +1353,27 @@
     },
     {
       "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/concurrent-execution-metrics.ts",
+      "type": "reexport",
+      "symbols": [
+        "ConcurrentExecutionMetrics",
+        "DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/concurrent-execution-metrics.ts",
+      "type": "type",
+      "symbols": [
+        "ConcurrentExecutionMetricsConfig",
+        "ExecutionMetricsSnapshot",
+        "TaskResourceMetrics",
+        "UtilizationPatterns",
+        "ExecutionMetricsSummary"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
       "to": "packages/hench/src/process/exec-shell.ts",
       "type": "reexport",
       "symbols": [
@@ -1324,6 +1408,132 @@
       "symbols": [
         "ExecResult",
         "ExecOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessLifecycleValidator",
+        "LifecycleAuditTrail"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "type",
+      "symbols": [
+        "LifecycleEvent",
+        "TerminationReport",
+        "OrphanReport",
+        "ResourceSnapshot",
+        "ResourceThresholds",
+        "ProcessLifecycleValidatorOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/limiter.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessLimiter",
+        "ProcessLimitReachedError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "reexport",
+      "symbols": [
+        "SystemMemoryMonitor",
+        "DEFAULT_MEMORY_MONITOR_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryMonitorConfig",
+        "SystemMemorySnapshot",
+        "SpawnMemoryCheck",
+        "MemoryMonitorOverrides"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "reexport",
+      "symbols": [
+        "MemoryThrottle",
+        "MemoryThrottleRejectError",
+        "DEFAULT_MEMORY_THROTTLE_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryThrottleConfig",
+        "MemoryThrottleStatus",
+        "ThrottleDecision",
+        "SystemMemoryReader"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "reexport",
+      "symbols": [
+        "RuntimePool",
+        "PoolExhaustedError",
+        "DEFAULT_RUNTIME_POOL_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "type",
+      "symbols": [
+        "RuntimePoolConfig",
+        "WorkerHandle",
+        "WorkerFactory",
+        "WorkerState",
+        "PooledRuntime",
+        "PooledRuntimeInfo",
+        "RuntimePoolStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/process-memory-tracker.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessMemoryTracker",
+        "DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/index.ts",
+      "to": "packages/hench/src/process/process-memory-tracker.ts",
+      "type": "type",
+      "symbols": [
+        "ProcessMemoryTrackerConfig",
+        "ProcessMemorySample",
+        "MemoryTrend",
+        "ProcessMemoryHistory",
+        "LeakReport",
+        "LeakDetectionSummary"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/memory-monitor.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "SystemMemoryReader"
       ]
     },
     {
@@ -1376,6 +1586,162 @@
     },
     {
       "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/concurrent-execution-metrics.ts",
+      "type": "reexport",
+      "symbols": [
+        "ConcurrentExecutionMetrics",
+        "DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/concurrent-execution-metrics.ts",
+      "type": "type",
+      "symbols": [
+        "ConcurrentExecutionMetricsConfig",
+        "ExecutionMetricsSnapshot",
+        "TaskResourceMetrics",
+        "UtilizationPatterns",
+        "ExecutionMetricsSummary"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessLifecycleValidator",
+        "LifecycleAuditTrail"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "type",
+      "symbols": [
+        "LifecycleEvent",
+        "TerminationReport",
+        "OrphanReport",
+        "ResourceSnapshot",
+        "ResourceThresholds",
+        "ProcessLifecycleValidatorOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/limiter.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessLimiter",
+        "ProcessLimitReachedError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "reexport",
+      "symbols": [
+        "SystemMemoryMonitor",
+        "DEFAULT_MEMORY_MONITOR_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "SystemMemorySnapshot",
+        "SpawnMemoryCheck"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "reexport",
+      "symbols": [
+        "MemoryThrottle",
+        "MemoryThrottleRejectError",
+        "DEFAULT_MEMORY_THROTTLE_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryThrottleStatus",
+        "ThrottleDecision"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "reexport",
+      "symbols": [
+        "RuntimePool",
+        "PoolExhaustedError",
+        "DEFAULT_RUNTIME_POOL_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "type",
+      "symbols": [
+        "WorkerHandle",
+        "WorkerFactory",
+        "WorkerState",
+        "PooledRuntime",
+        "PooledRuntimeInfo",
+        "RuntimePoolStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/process-memory-tracker.ts",
+      "type": "reexport",
+      "symbols": [
+        "ProcessMemoryTracker",
+        "DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/process/process-memory-tracker.ts",
+      "type": "type",
+      "symbols": [
+        "ProcessMemoryTrackerConfig",
+        "ProcessMemorySample",
+        "MemoryTrend",
+        "ProcessMemoryHistory",
+        "LeakReport",
+        "LeakDetectionSummary"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/queue/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "ExecutionQueue",
+        "normalizePriority",
+        "resolveSchedulingPriority",
+        "extractPriorityFromTags"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/queue/index.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriority",
+        "QueueEntry",
+        "QueueStatus",
+        "TaskPriorityMetadata"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
       "to": "packages/hench/src/schema/templates.ts",
       "type": "reexport",
       "symbols": [
@@ -1408,6 +1774,9 @@
         "HenchConfig",
         "GuardConfig",
         "PolicyLimitsConfig",
+        "MemoryThrottleConfig",
+        "MemoryMonitorConfig",
+        "RuntimePoolConfig",
         "RetryConfig",
         "Provider",
         "RunRecord",
@@ -1430,11 +1799,166 @@
     },
     {
       "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-archiver.ts",
+      "type": "reexport",
+      "symbols": [
+        "archiveOldRuns",
+        "identifyArchivableRuns",
+        "compressRunFile",
+        "readCompressedJSON",
+        "loadArchivalConfig",
+        "DEFAULT_ARCHIVAL_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-archiver.ts",
+      "type": "type",
+      "symbols": [
+        "ArchivalConfig",
+        "ArchivalResult",
+        "CompressedFileResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-change-detector.ts",
+      "type": "reexport",
+      "symbols": [
+        "RunChangeDetector"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-change-detector.ts",
+      "type": "type",
+      "symbols": [
+        "FileSnapshot",
+        "AggregationCheckpoint",
+        "RunFileChange",
+        "DeltaResult"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-retention-scheduler.ts",
+      "type": "reexport",
+      "symbols": [
+        "startRetentionScheduler",
+        "runRetentionCycle",
+        "loadRetentionIntervalMs",
+        "DEFAULT_RETENTION_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-retention-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "WarningCallback",
+        "RetentionSchedulerOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "reexport",
+      "symbols": [
+        "enforceRetentionPolicy",
+        "identifyRetainableRuns",
+        "identifyWarningRuns",
+        "extractUsageStats",
+        "loadRetentionConfig",
+        "DEFAULT_RETENTION_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "type",
+      "symbols": [
+        "RetentionConfig",
+        "RetentionResult",
+        "PreservedUsageStats",
+        "RetentionLogEntry"
+      ]
+    },
+    {
+      "from": "packages/hench/src/public.ts",
       "to": "packages/hench/src/validation/completion.ts",
       "type": "type",
       "symbols": [
         "CompletionValidationResult",
         "CompletionValidationOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/format.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "type",
+      "symbols": [
+        "QueueStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/index.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "reexport",
+      "symbols": [
+        "ExecutionQueue",
+        "normalizePriority"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/index.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriority",
+        "QueueEntry",
+        "QueueStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/index.ts",
+      "to": "packages/hench/src/queue/format.ts",
+      "type": "reexport",
+      "symbols": [
+        "formatQueueStatus",
+        "formatQueueStatusJson"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/index.ts",
+      "to": "packages/hench/src/queue/priority-scheduler.ts",
+      "type": "reexport",
+      "symbols": [
+        "resolveSchedulingPriority",
+        "extractPriorityFromTags"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/index.ts",
+      "to": "packages/hench/src/queue/priority-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriorityMetadata"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/priority-scheduler.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "static",
+      "symbols": [
+        "normalizePriority"
+      ]
+    },
+    {
+      "from": "packages/hench/src/queue/priority-scheduler.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriority"
       ]
     },
     {
@@ -1483,6 +2007,7 @@
         "PostRunTestRecord",
         "SummaryCounts",
         "RunSummaryData",
+        "RunMemoryStats",
         "RunRecord",
         "TaskBrief",
         "TaskBriefTask",
@@ -1519,6 +2044,30 @@
       "type": "type",
       "symbols": [
         "HenchConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/v1.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryMonitorConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/v1.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryThrottleConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/v1.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "type",
+      "symbols": [
+        "RuntimePoolConfig"
       ]
     },
     {
@@ -1569,12 +2118,82 @@
     },
     {
       "from": "packages/hench/src/store/index.ts",
+      "to": "packages/hench/src/store/run-change-detector.ts",
+      "type": "reexport",
+      "symbols": [
+        "RunChangeDetector"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/index.ts",
+      "to": "packages/hench/src/store/run-retention-scheduler.ts",
+      "type": "reexport",
+      "symbols": [
+        "startRetentionScheduler",
+        "runRetentionCycle",
+        "loadRetentionIntervalMs",
+        "DEFAULT_RETENTION_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/index.ts",
+      "to": "packages/hench/src/store/run-retention-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "WarningCallback",
+        "RetentionSchedulerOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/index.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "reexport",
+      "symbols": [
+        "enforceRetentionPolicy",
+        "identifyRetainableRuns",
+        "identifyWarningRuns",
+        "extractUsageStats",
+        "loadRetentionConfig",
+        "DEFAULT_RETENTION_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/index.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "type",
+      "symbols": [
+        "RetentionConfig",
+        "RetentionResult",
+        "PreservedUsageStats",
+        "RetentionLogEntry"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/index.ts",
       "to": "packages/hench/src/store/runs.ts",
       "type": "reexport",
       "symbols": [
         "saveRun",
         "loadRun",
         "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/run-retention-scheduler.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "static",
+      "symbols": [
+        "enforceRetentionPolicy",
+        "loadRetentionConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/run-retention-scheduler.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "type",
+      "symbols": [
+        "RetentionConfig",
+        "RetentionResult"
       ]
     },
     {
@@ -1632,6 +2251,14 @@
       "type": "static",
       "symbols": [
         "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/contracts.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "SystemMemoryMonitor"
       ]
     },
     {
@@ -2727,6 +3354,15 @@
       ]
     },
     {
+      "from": "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
+      "to": "packages/hench/src/process/concurrent-execution-metrics.ts",
+      "type": "static",
+      "symbols": [
+        "ConcurrentExecutionMetrics",
+        "DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG"
+      ]
+    },
+    {
       "from": "packages/hench/tests/unit/process/exec.test.ts",
       "to": "packages/hench/src/process/exec.ts",
       "type": "static",
@@ -2735,6 +3371,156 @@
         "execStdout",
         "execShellCmd",
         "getCurrentHead"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/lifecycle.test.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "static",
+      "symbols": [
+        "ProcessLifecycleValidator",
+        "LifecycleAuditTrail"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/lifecycle.test.ts",
+      "to": "packages/hench/src/process/lifecycle.ts",
+      "type": "type",
+      "symbols": [
+        "LifecycleEvent",
+        "TerminationReport",
+        "OrphanReport",
+        "ResourceSnapshot",
+        "ResourceThresholds"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/limiter.test.ts",
+      "to": "packages/hench/src/process/limiter.ts",
+      "type": "static",
+      "symbols": [
+        "ProcessLimiter",
+        "ProcessLimitReachedError"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/memory-monitor.test.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "SystemMemoryMonitor",
+        "DEFAULT_MEMORY_MONITOR_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/memory-monitor.test.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryMonitorConfig",
+        "MemoryMonitorOverrides"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/memory-throttle.test.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "MemoryThrottle",
+        "MemoryThrottleRejectError",
+        "DEFAULT_MEMORY_THROTTLE_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/memory-throttle.test.ts",
+      "to": "packages/hench/src/process/memory-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "SystemMemoryReader",
+        "MemoryThrottleConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/pool.test.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "static",
+      "symbols": [
+        "RuntimePool",
+        "PoolExhaustedError",
+        "DEFAULT_RUNTIME_POOL_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/pool.test.ts",
+      "to": "packages/hench/src/process/pool.ts",
+      "type": "type",
+      "symbols": [
+        "WorkerHandle",
+        "WorkerFactory",
+        "PooledRuntime",
+        "RuntimePoolConfig",
+        "RuntimePoolStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/process/process-memory-tracker.test.ts",
+      "to": "packages/hench/src/process/process-memory-tracker.ts",
+      "type": "static",
+      "symbols": [
+        "ProcessMemoryTracker",
+        "DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/execution-queue.test.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "static",
+      "symbols": [
+        "ExecutionQueue",
+        "normalizePriority"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/execution-queue.test.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriority",
+        "QueueStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/format.test.ts",
+      "to": "packages/hench/src/queue/execution-queue.ts",
+      "type": "type",
+      "symbols": [
+        "QueueStatus"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/format.test.ts",
+      "to": "packages/hench/src/queue/format.ts",
+      "type": "static",
+      "symbols": [
+        "formatQueueStatus",
+        "formatQueueStatusJson"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/priority-scheduler.test.ts",
+      "to": "packages/hench/src/queue/priority-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "resolveSchedulingPriority",
+        "extractPriorityFromTags"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/queue/priority-scheduler.test.ts",
+      "to": "packages/hench/src/queue/priority-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "TaskPriorityMetadata"
       ]
     },
     {
@@ -2792,6 +3578,97 @@
         "ensureHenchDir",
         "loadConfig",
         "initConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-archiver.test.ts",
+      "to": "packages/hench/src/store/run-archiver.ts",
+      "type": "static",
+      "symbols": [
+        "archiveOldRuns",
+        "identifyArchivableRuns",
+        "compressRunFile",
+        "readCompressedJSON",
+        "loadArchivalConfig",
+        "DEFAULT_ARCHIVAL_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-archiver.test.ts",
+      "to": "packages/hench/src/store/run-archiver.ts",
+      "type": "type",
+      "symbols": [
+        "ArchivalConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-change-detector.test.ts",
+      "to": "packages/hench/src/store/run-change-detector.ts",
+      "type": "static",
+      "symbols": [
+        "RunChangeDetector"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-change-detector.test.ts",
+      "to": "packages/hench/src/store/run-change-detector.ts",
+      "type": "type",
+      "symbols": [
+        "AggregationCheckpoint",
+        "RunFileChange",
+        "DeltaResult"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-compressed-reads.test.ts",
+      "to": "packages/hench/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "RunRecord"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-compressed-reads.test.ts",
+      "to": "packages/hench/src/store/runs.ts",
+      "type": "static",
+      "symbols": [
+        "saveRun",
+        "loadRun",
+        "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
+      "to": "packages/hench/src/store/run-retention-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "runRetentionCycle",
+        "startRetentionScheduler",
+        "loadRetentionIntervalMs",
+        "DEFAULT_RETENTION_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-retention.test.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "static",
+      "symbols": [
+        "enforceRetentionPolicy",
+        "identifyRetainableRuns",
+        "identifyWarningRuns",
+        "extractUsageStats",
+        "loadRetentionConfig",
+        "DEFAULT_RETENTION_CONFIG"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/store/run-retention.test.ts",
+      "to": "packages/hench/src/store/run-retention.ts",
+      "type": "type",
+      "symbols": [
+        "RetentionConfig",
+        "RetentionResult",
+        "PreservedUsageStats"
       ]
     },
     {
@@ -2866,6 +3743,30 @@
       "symbols": [
         "validateCompletion",
         "formatValidationResult"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
+      "to": "packages/hench/src/process/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "SystemMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
+      "to": "packages/hench/src/tools/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "ToolContext"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
+      "to": "packages/hench/src/tools/dispatch.ts",
+      "type": "static",
+      "symbols": [
+        "dispatchTool"
       ]
     },
     {
@@ -6906,7 +7807,8 @@
       "to": "packages/rex/src/core/tree.ts",
       "type": "static",
       "symbols": [
-        "walkTree"
+        "walkTree",
+        "findItem"
       ]
     },
     {
@@ -7617,7 +8519,9 @@
       "symbols": [
         "EnrichedRecommendation",
         "RecommendationMeta",
-        "CreationResult"
+        "CreationResult",
+        "SkippedRecommendation",
+        "ReparentedRecommendation"
       ]
     },
     {
@@ -7797,7 +8701,8 @@
       "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "LEVEL_HIERARCHY"
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL"
       ]
     },
     {
@@ -13632,6 +14537,46 @@
     },
     {
       "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/concurrent-execution-metrics.ts",
+      "type": "static",
+      "symbols": [
+        "ConcurrentExecutionMetrics"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/incremental-task-usage.ts",
+      "type": "static",
+      "symbols": [
+        "IncrementalTaskUsageAggregator"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/process-memory-tracker.ts",
+      "type": "static",
+      "symbols": [
+        "ProcessMemoryTracker"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
       "to": "packages/web/src/server/routes-status.ts",
       "type": "static",
       "symbols": [
@@ -13823,6 +14768,31 @@
       ]
     },
     {
+      "from": "packages/web/src/server/routes-search.ts",
+      "to": "packages/web/src/server/search-index.ts",
+      "type": "static",
+      "symbols": [
+        "SearchIndex"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-search.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-search.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
       "from": "packages/web/src/server/routes-sourcevision.ts",
       "to": "packages/web/src/schema/data-files.ts",
       "type": "static",
@@ -13908,6 +14878,14 @@
     },
     {
       "from": "packages/web/src/server/routes-token-usage.ts",
+      "to": "packages/web/src/server/aggregation-cache.ts",
+      "type": "static",
+      "symbols": [
+        "AggregationResultCache"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-token-usage.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
       "symbols": [
@@ -13981,6 +14959,23 @@
       ]
     },
     {
+      "from": "packages/web/src/server/search-index.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/search-index.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument"
+      ]
+    },
+    {
       "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/schema/data-files.ts",
       "type": "static",
@@ -14036,7 +15031,10 @@
       "symbols": [
         "handleHenchRoute",
         "startHeartbeatMonitor",
-        "shutdownActiveExecutions"
+        "startConcurrencyMonitor",
+        "startMemoryMonitor",
+        "shutdownActiveExecutions",
+        "getAggregator"
       ]
     },
     {
@@ -14078,6 +15076,14 @@
       "symbols": [
         "handleRexRoute",
         "shutdownRexExecution"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/routes-search.ts",
+      "type": "static",
+      "symbols": [
+        "handleSearchRoute"
       ]
     },
     {
@@ -14142,10 +15148,76 @@
     },
     {
       "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "startUsageCleanupScheduler"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/websocket.ts",
       "type": "static",
       "symbols": [
         "createWebSocketManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/ws-health-tracker.ts",
+      "type": "static",
+      "symbols": [
+        "WsHealthTracker"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "to": "packages/web/src/server/incremental-task-usage.ts",
+      "type": "type",
+      "symbols": [
+        "IncrementalTaskUsageAggregator",
+        "TaskUsageAccumulator"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/websocket.ts",
+      "to": "packages/web/src/server/ws-health-tracker.ts",
+      "type": "type",
+      "symbols": [
+        "WsHealthTracker",
+        "CleanupReason"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "onTick"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/active-tasks-panel.ts",
+      "to": "packages/web/src/viewer/components/elapsed-time.ts",
+      "type": "static",
+      "symbols": [
+        "ElapsedTime"
       ]
     },
     {
@@ -14270,6 +15342,14 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/elapsed-time.ts",
+      "to": "packages/web/src/viewer/hooks/use-tick.ts",
+      "type": "static",
+      "symbols": [
+        "useTick"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/favicon.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
@@ -14370,6 +15450,31 @@
       "symbols": [
         "PRDItemData",
         "ItemLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "isFeatureDisabled",
+        "onDegradationChange"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
       ]
     },
     {
@@ -14529,6 +15634,27 @@
       "type": "type",
       "symbols": [
         "PRDTreeProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "reexport",
+      "symbols": [
+        "countVisibleNodes",
+        "sliceVisibleTree",
+        "LoadMoreIndicator",
+        "DEFAULT_CHUNK_SIZE",
+        "PROGRESSIVE_THRESHOLD"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "type",
+      "symbols": [
+        "ProgressiveSlice",
+        "LoadMoreIndicatorProps"
       ]
     },
     {
@@ -14700,6 +15826,42 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/lazy-children.ts",
+      "type": "static",
+      "symbols": [
+        "LazyChildren"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts",
+      "type": "static",
+      "symbols": [
+        "ListenerLifecycleManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/node-culler.ts",
+      "type": "static",
+      "symbols": [
+        "NodeCuller"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "static",
+      "symbols": [
+        "countVisibleNodes",
+        "sliceVisibleTree",
+        "useProgressiveLoader",
+        "LoadMoreIndicator",
+        "DEFAULT_CHUNK_SIZE"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
       "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
       "type": "static",
       "symbols": [
@@ -14717,6 +15879,14 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts",
+      "type": "static",
+      "symbols": [
+        "useTreeEventDelegation"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
       "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
       "symbols": [
@@ -14727,6 +15897,23 @@
         "Priority",
         "TaskUsageSummary",
         "WeeklyBudgetResolution"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "itemMatchesFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus"
       ]
     },
     {
@@ -14882,6 +16069,31 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "reexport",
+      "symbols": [
+        "removeItemById"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
       "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
@@ -14919,6 +16131,14 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/search-overlay.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "NavigateTo"
       ]
     },
     {
@@ -14992,6 +16212,39 @@
     },
     {
       "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "isFeatureDisabled",
+        "onDegradationChange"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
@@ -15004,6 +16257,39 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/update-batcher.ts",
+      "type": "type",
+      "symbols": [
+        "UpdateBatcher"
       ]
     },
     {
@@ -15050,6 +16336,15 @@
       "symbols": [
         "basename",
         "truncateFilename"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-app-data.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "isFeatureDisabled",
+        "onDegradationChange"
       ]
     },
     {
@@ -15102,6 +16397,39 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "startDOMPerformanceMonitor",
+        "stopDOMPerformanceMonitor",
+        "onDOMSnapshot",
+        "getLatestDOMSnapshot",
+        "getDOMSnapshotHistory",
+        "getRenderTimings",
+        "getUpdateComparisons",
+        "recordRender",
+        "recordUpdate",
+        "measureOperation",
+        "computeSummary",
+        "resetDOMPerformanceMonitor",
+        "countDOMNodes",
+        "readHeapUsage"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "DOMNodeSnapshot",
+        "DOMPerformanceConfig",
+        "RenderTiming",
+        "UpdateComparison",
+        "PerformanceSummary"
       ]
     },
     {
@@ -15169,6 +16497,32 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "onPollingStateChange",
+        "getPollingState"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "type",
+      "symbols": [
+        "PollingStateSnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-polling.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "registerPoller",
+        "unregisterPoller"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
       "to": "packages/web/src/viewer/memory-monitor.ts",
       "type": "type",
@@ -15218,6 +16572,36 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "stopTabVisibilityMonitor",
+        "onVisibilityChange",
+        "getTabVisibilitySnapshot",
+        "getVisibilityCapabilities"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilityState",
+        "TabVisibilitySnapshot",
+        "VisibilityAPICapabilities"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-tick.ts",
+      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "type": "static",
+      "symbols": [
+        "registerTickUpdater"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/hooks/use-zone-drag.ts",
       "to": "packages/web/src/viewer/hooks/use-pan-zoom.ts",
       "type": "type",
@@ -15257,6 +16641,15 @@
         "validateZones",
         "validateComponents",
         "validateCallGraph"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "registerPoller",
+        "unregisterPoller"
       ]
     },
     {
@@ -15349,10 +16742,27 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+      "type": "static",
+      "symbols": [
+        "PollingSuspensionIndicator"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/components/refresh-queue-status.ts",
       "type": "static",
       "symbols": [
         "RefreshQueueStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/components/search-overlay.ts",
+      "type": "static",
+      "symbols": [
+        "SearchOverlay",
+        "useSearchOverlay"
       ]
     },
     {
@@ -15413,6 +16823,14 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+      "type": "static",
+      "symbols": [
+        "usePollingSuspension"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
       "type": "static",
       "symbols": [
@@ -15429,10 +16847,44 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "stopPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/polling-restart.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingRestart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/sourcevision-tabs.ts",
       "type": "static",
       "symbols": [
         "SOURCEVISION_TAB_IDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "stopTabVisibilityMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createTickVisibilityGate"
       ]
     },
     {
@@ -15622,6 +17074,77 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/message-throttle.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "type",
+      "symbols": [
+        "ParsedWSMessage"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource",
+        "unregisterPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-restart.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "onDegradationChange",
+        "isFeatureDisabled"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-restart.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "type",
+      "symbols": [
+        "DegradationState"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling-restart.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "suspendAllSources",
+        "resumeAllSources",
+        "isGlobalSuspended",
+        "getGeneration",
+        "isGenerationCurrent"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/refresh-throttle.ts",
       "to": "packages/web/src/viewer/memory-monitor.ts",
       "type": "static",
@@ -15638,6 +17161,23 @@
       "symbols": [
         "MemoryLevel",
         "MemorySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/response-buffer-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/response-buffer-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
       ]
     },
     {
@@ -15678,6 +17218,40 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "suspendTickTimer",
+        "resumeTickTimer"
       ]
     },
     {
@@ -15908,6 +17482,14 @@
     },
     {
       "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/concurrency-panel.ts",
+      "type": "static",
+      "symbols": [
+        "ConcurrencyPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
       "to": "packages/web/src/viewer/components/copy-link-button.ts",
       "type": "static",
       "symbols": [
@@ -15932,10 +17514,42 @@
     },
     {
       "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/memory-panel.ts",
+      "type": "static",
+      "symbols": [
+        "MemoryPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
       "to": "packages/web/src/viewer/components/rex-task-link.ts",
       "type": "static",
       "symbols": [
         "RexTaskLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/throttle-controls.ts",
+      "type": "static",
+      "symbols": [
+        "ThrottleControlsPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/components/ws-health-panel.ts",
+      "type": "static",
+      "symbols": [
+        "WsHealthPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
       ]
     },
     {
@@ -16059,6 +17673,14 @@
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "type": "static",
+      "symbols": [
+        "createCallRateLimiter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
       "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
       "type": "static",
       "symbols": [
@@ -16158,6 +17780,15 @@
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "diffDocument",
+        "applyItemUpdate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
       "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
       "type": "static",
       "symbols": [
@@ -16175,6 +17806,62 @@
         "TaskUsageSummary",
         "WeeklyBudgetResolution",
         "WeeklyBudgetSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/dom-update-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createDomUpdateGate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/response-buffer-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createResponseBufferGate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/update-batcher.ts",
+      "type": "static",
+      "symbols": [
+        "createUpdateBatcher"
       ]
     },
     {
@@ -16255,6 +17942,14 @@
       "type": "static",
       "symbols": [
         "RexTaskLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
       ]
     },
     {
@@ -16374,6 +18069,14 @@
     },
     {
       "from": "packages/web/src/viewer/views/task-audit.ts",
+      "to": "packages/web/src/viewer/components/elapsed-time.ts",
+      "type": "static",
+      "symbols": [
+        "ElapsedTime"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/task-audit.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -16418,6 +18121,14 @@
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
       ]
     },
     {
@@ -16539,6 +18250,115 @@
       ]
     },
     {
+      "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "startDegradation",
+        "isFeatureDisabled",
+        "onDegradationChange",
+        "getDegradationState",
+        "getCurrentTier",
+        "resetDegradation"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
+      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "startMemoryMonitor",
+        "resetMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "unregisterPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "getPollerCount",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "getTabVisibility",
+        "isTabVisible",
+        "onVisibilityChange",
+        "getTransitionHistory",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "startDegradation",
+        "isFeatureDisabled",
+        "onDegradationChange",
+        "getDegradationState",
+        "getCurrentTier",
+        "resetDegradation"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "startMemoryMonitor",
+        "getCurrentLevel",
+        "resetMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "unregisterPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "getPollerCount",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "startRefreshThrottle",
+        "getQueueState",
+        "enqueueRefresh",
+        "getRecommendedInterval",
+        "resetRefreshThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
       "from": "packages/web/tests/integration/pr-markdown-refresh.test.ts",
       "to": "packages/web/src/server/routes-sourcevision.ts",
       "type": "static",
@@ -16571,11 +18391,61 @@
       ]
     },
     {
+      "from": "packages/web/tests/integration/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "type": "static",
+      "symbols": [
+        "createCallRateLimiter"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
       "from": "packages/web/tests/integration/token-usage-route-regression.test.ts",
       "to": "packages/web/src/viewer/main.ts",
       "type": "dynamic",
       "symbols": [
         "*"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/aggregation-cache.test.ts",
+      "to": "packages/web/src/server/aggregation-cache.ts",
+      "type": "static",
+      "symbols": [
+        "AggregationResultCache",
+        "takeFingerprint",
+        "fingerprintsMatch"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/aggregation-cache.test.ts",
+      "to": "packages/web/src/server/aggregation-cache.ts",
+      "type": "type",
+      "symbols": [
+        "SourceFingerprint"
       ]
     },
     {
@@ -16626,6 +18496,14 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/incremental-task-usage.test.ts",
+      "to": "packages/web/src/server/incremental-task-usage.ts",
+      "type": "static",
+      "symbols": [
+        "IncrementalTaskUsageAggregator"
       ]
     },
     {
@@ -16751,6 +18629,22 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/routes-hench-concurrency.test.ts",
+      "to": "packages/web/src/server/routes-hench.ts",
+      "type": "static",
+      "symbols": [
+        "handleHenchRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-hench-concurrency.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/routes-hench-config.test.ts",
       "to": "packages/web/src/server/routes-hench.ts",
       "type": "static",
@@ -16808,6 +18702,22 @@
     },
     {
       "from": "packages/web/tests/unit/server/routes-hench-heartbeat.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-hench-memory.test.ts",
+      "to": "packages/web/src/server/routes-hench.ts",
+      "type": "static",
+      "symbols": [
+        "handleHenchRoute"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-hench-memory.test.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "type",
       "symbols": [
@@ -16932,6 +18842,23 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/routes-search.test.ts",
+      "to": "packages/web/src/server/routes-search.ts",
+      "type": "static",
+      "symbols": [
+        "handleSearchRoute",
+        "clearSearchIndexCache"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/routes-search.test.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/routes-sourcevision.test.ts",
       "to": "packages/web/src/server/routes-sourcevision.ts",
       "type": "static",
@@ -16977,7 +18904,8 @@
       "to": "packages/web/src/server/routes-token-usage.ts",
       "type": "static",
       "symbols": [
-        "handleTokenUsageRoute"
+        "handleTokenUsageRoute",
+        "resetAggregationCache"
       ]
     },
     {
@@ -17062,6 +18990,15 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/search-index.test.ts",
+      "to": "packages/web/src/server/search-index.ts",
+      "type": "static",
+      "symbols": [
+        "SearchIndex",
+        "parseQuery"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/shutdown-handler.test.ts",
       "to": "packages/web/src/server/routes-hench.ts",
       "type": "static",
@@ -17138,11 +19075,66 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
+      "to": "packages/web/src/server/incremental-task-usage.ts",
+      "type": "static",
+      "symbols": [
+        "IncrementalTaskUsageAggregator"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "identifyOrphanedEntries",
+        "writeCleanupLog",
+        "loadCleanupConfig",
+        "runCleanupCycle",
+        "startUsageCleanupScheduler",
+        "DEFAULT_CLEANUP_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "OrphanedEntry",
+        "CleanupResult"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/websocket.test.ts",
       "to": "packages/web/src/server/websocket.ts",
       "type": "static",
       "symbols": [
+        "createWebSocketManager",
+        "PING_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/ws-health-integration.test.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "static",
+      "symbols": [
         "createWebSocketManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/ws-health-integration.test.ts",
+      "to": "packages/web/src/server/ws-health-tracker.ts",
+      "type": "static",
+      "symbols": [
+        "WsHealthTracker"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/ws-health-tracker.test.ts",
+      "to": "packages/web/src/server/ws-health-tracker.ts",
+      "type": "static",
+      "symbols": [
+        "WsHealthTracker"
       ]
     },
     {
@@ -17216,6 +19208,41 @@
       "type": "static",
       "symbols": [
         "BatchImportPanel"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "type": "static",
+      "symbols": [
+        "registerTickUpdater",
+        "getBatchedTickDispatcherState",
+        "flushBatchedTicks",
+        "resetBatchedTickDispatcher"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "resetTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
+      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "type": "static",
+      "symbols": [
+        "createCallRateLimiter"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
+      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "type": "type",
+      "symbols": [
+        "CallRateLimiter"
       ]
     },
     {
@@ -17333,6 +19360,116 @@
       "type": "static",
       "symbols": [
         "DetailPanel"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
+      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "countDOMNodes",
+        "readHeapUsage",
+        "formatDuration",
+        "formatNodeCount",
+        "formatDelta",
+        "recordRender",
+        "recordUpdate",
+        "measureOperation",
+        "takeDOMSnapshot",
+        "computeSummary",
+        "startDOMPerformanceMonitor",
+        "stopDOMPerformanceMonitor",
+        "onDOMSnapshot",
+        "getLatestDOMSnapshot",
+        "getDOMSnapshotHistory",
+        "getRenderTimings",
+        "getUpdateComparisons",
+        "setObservedContainer",
+        "getObservedContainer",
+        "resetDOMPerformanceMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
+      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "DOMNodeSnapshot",
+        "RenderTiming",
+        "UpdateComparison",
+        "PerformanceSummary"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+      "to": "packages/web/src/viewer/dom-update-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createDomUpdateGate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+      "to": "packages/web/src/viewer/dom-update-gate.ts",
+      "type": "type",
+      "symbols": [
+        "DomUpdateGate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+      "to": "packages/web/src/viewer/update-batcher.ts",
+      "type": "static",
+      "symbols": [
+        "createUpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "onTick",
+        "resetTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
       ]
     },
     {
@@ -17466,6 +19603,147 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "computeBranchStats",
+        "completionRatio",
+        "filterTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "static",
+      "symbols": [
+        "countVisibleNodes",
+        "sliceVisibleTree",
+        "PROGRESSIVE_THRESHOLD"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "diffItems",
+        "diffDocument",
+        "applyItemUpdate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "countDescendants",
+        "getAncestorIds",
+        "collectSubtreeIds"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData",
+        "ItemStatus",
+        "Priority"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/lazy-children.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/lazy-children.ts",
+      "type": "static",
+      "symbols": [
+        "LazyChildren",
+        "UNMOUNT_DELAY_MS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/listener-lifecycle.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts",
+      "type": "static",
+      "symbols": [
+        "ListenerLifecycleManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "startDegradation",
+        "isFeatureDisabled",
+        "onDegradationChange",
+        "resetDegradation"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
+      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "startMemoryMonitor",
+        "resetMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "unregisterPoller",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-polling.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/loader-polling.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/memory-monitor.test.ts",
       "to": "packages/web/src/viewer/memory-monitor.ts",
       "type": "static",
@@ -17512,6 +19790,146 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/message-coalescer.test.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/message-coalescer.test.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "type",
+      "symbols": [
+        "MessageCoalescer",
+        "CoalescedBatch",
+        "ParsedWSMessage"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
+      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "type": "type",
+      "symbols": [
+        "ParsedWSMessage"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
+      "to": "packages/web/src/viewer/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
+      "to": "packages/web/src/viewer/message-throttle.ts",
+      "type": "type",
+      "symbols": [
+        "MessageThrottle",
+        "ThrottledHandlerConfig"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/node-culler.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/node-culler.ts",
+      "type": "static",
+      "symbols": [
+        "NodeCuller"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/node-culler.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/node-culler.ts",
+      "type": "type",
+      "symbols": [
+        "VisibilityCallback"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-manager.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "stopPollingManager",
+        "registerPoller",
+        "unregisterPoller",
+        "suspendAll",
+        "resumeAll",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "getPollerCount",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-manager.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-state.test.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource",
+        "unregisterPollingSource",
+        "suspendAllSources",
+        "resumeAllSources",
+        "disposeAllSources",
+        "isGlobalSuspended",
+        "getGeneration",
+        "isSourceRegistered",
+        "getSourceInfo",
+        "getPollingState",
+        "onPollingStateChange",
+        "getSourceCount",
+        "isGenerationCurrent",
+        "resetPollingState"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-state.test.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "type",
+      "symbols": [
+        "PollingSourceCallbacks",
+        "PollingSourceStatus"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
+      "to": "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+      "type": "static",
+      "symbols": [
+        "PollingSuspensionIndicator"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/pr-markdown.test.ts",
       "to": "packages/web/src/viewer/views/pr-markdown.ts",
       "type": "static",
@@ -17555,6 +19973,52 @@
       "type": "type",
       "symbols": [
         "PRDDocumentData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loader.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "static",
+      "symbols": [
+        "countVisibleNodes",
+        "sliceVisibleTree",
+        "DEFAULT_CHUNK_SIZE",
+        "PROGRESSIVE_THRESHOLD",
+        "LoadMoreIndicator"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loader.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loading-integration.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loading-integration.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "type": "static",
+      "symbols": [
+        "PROGRESSIVE_THRESHOLD"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loading-integration.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
       ]
     },
     {
@@ -17614,6 +20078,39 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/request-dedup.ts",
+      "type": "type",
+      "symbols": [
+        "RequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
+      "to": "packages/web/src/viewer/response-buffer-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createResponseBufferGate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/route-state.test.ts",
       "to": "packages/web/src/viewer/route-state.ts",
       "type": "static",
@@ -17629,6 +20126,15 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/search-overlay.test.ts",
+      "to": "packages/web/src/viewer/components/search-overlay.ts",
+      "type": "static",
+      "symbols": [
+        "SearchOverlay",
+        "useSearchOverlay"
       ]
     },
     {
@@ -17668,6 +20174,70 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
+      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "startDegradation",
+        "isFeatureDisabled",
+        "onDegradationChange",
+        "resetDegradation"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
+      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "startMemoryMonitor",
+        "resetMemoryMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "unregisterPoller",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/status-indicators.test.ts",
       "to": "packages/web/src/viewer/components/status-indicators.ts",
       "type": "static",
@@ -17678,6 +20248,32 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/tab-visibility.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "stopTabVisibilityMonitor",
+        "getTabVisibility",
+        "getTabVisibilitySnapshot",
+        "isTabVisible",
+        "onVisibilityChange",
+        "resetTabVisibility",
+        "detectVisibilityAPI",
+        "getVisibilityCapabilities",
+        "getTransitionHistory"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tab-visibility.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot",
+        "TabVisibilityState"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
       "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
       "type": "static",
@@ -17723,6 +20319,71 @@
       "type": "type",
       "symbols": [
         "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-timer.test.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "onTick",
+        "getTickTimerState",
+        "resetTickTimer",
+        "suspendTickTimer",
+        "resumeTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-timer.test.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "type",
+      "symbols": [
+        "TickListener"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
+      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "type": "static",
+      "symbols": [
+        "resetBatchedTickDispatcher",
+        "registerTickUpdater",
+        "getBatchedTickDispatcherState"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
+      "to": "packages/web/src/viewer/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "onTick",
+        "getTickTimerState",
+        "resetTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
+      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createTickVisibilityGate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
+      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "type": "type",
+      "symbols": [
+        "TickVisibilityGate"
       ]
     },
     {
@@ -17747,6 +20408,42 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tree-differ.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "diffItems",
+        "diffDocument",
+        "applyItemUpdate"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tree-differ.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "PRDDocumentData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+      "type": "static",
+      "symbols": [
+        "PRDTree"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
       ]
     },
     {
@@ -17780,6 +20477,71 @@
       "type": "type",
       "symbols": [
         "TreeNode"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/update-batcher.test.ts",
+      "to": "packages/web/src/viewer/update-batcher.ts",
+      "type": "static",
+      "symbols": [
+        "createUpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/update-batcher.test.ts",
+      "to": "packages/web/src/viewer/update-batcher.ts",
+      "type": "type",
+      "symbols": [
+        "UpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/usage-polling.test.ts",
+      "to": "packages/web/src/viewer/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager",
+        "registerPoller",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/usage-polling.test.ts",
+      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+      "type": "static",
+      "symbols": [
+        "usePollingSuspension"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource",
+        "suspendAllSources",
+        "resumeAllSources",
+        "resetPollingState"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/polling-state.ts",
+      "type": "type",
+      "symbols": [
+        "PollingSourceCallbacks"
       ]
     },
     {
@@ -18067,6 +20829,7 @@
       "importedBy": [
         "packages/web/src/viewer/components/active-tasks-panel.ts",
         "packages/web/src/viewer/components/breadcrumb.ts",
+        "packages/web/src/viewer/components/concurrency-panel.ts",
         "packages/web/src/viewer/components/config-footer.ts",
         "packages/web/src/viewer/components/copy-link-button.ts",
         "packages/web/src/viewer/components/crash-recovery-banner.ts",
@@ -18078,11 +20841,14 @@
         "packages/web/src/viewer/components/data-display/zone-map.ts",
         "packages/web/src/viewer/components/degradation-banner.ts",
         "packages/web/src/viewer/components/detail-panel.ts",
+        "packages/web/src/viewer/components/elapsed-time.ts",
         "packages/web/src/viewer/components/faq.ts",
         "packages/web/src/viewer/components/guide.ts",
         "packages/web/src/viewer/components/logos.ts",
+        "packages/web/src/viewer/components/memory-panel.ts",
         "packages/web/src/viewer/components/memory-warning.ts",
         "packages/web/src/viewer/components/notion-schema-wizard.ts",
+        "packages/web/src/viewer/components/polling-suspension-indicator.ts",
         "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
         "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
         "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
@@ -18090,29 +20856,41 @@
         "packages/web/src/viewer/components/prd-tree/delete-confirmation.ts",
         "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
         "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
+        "packages/web/src/viewer/components/prd-tree/lazy-children.ts",
+        "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts",
         "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
         "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
+        "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
         "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
         "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
         "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
         "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
         "packages/web/src/viewer/components/prd-tree/status-filter.ts",
         "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+        "packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts",
         "packages/web/src/viewer/components/refresh-queue-status.ts",
         "packages/web/src/viewer/components/rex-task-link.ts",
         "packages/web/src/viewer/components/search-filter.ts",
+        "packages/web/src/viewer/components/search-overlay.ts",
         "packages/web/src/viewer/components/sidebar.ts",
         "packages/web/src/viewer/components/status-indicators.ts",
         "packages/web/src/viewer/components/theme-toggle.ts",
+        "packages/web/src/viewer/components/throttle-controls.ts",
+        "packages/web/src/viewer/components/ws-health-panel.ts",
         "packages/web/src/viewer/hooks/use-app-data.ts",
         "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+        "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
         "packages/web/src/viewer/hooks/use-file-edges.ts",
         "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
         "packages/web/src/viewer/hooks/use-memory-monitor.ts",
         "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+        "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+        "packages/web/src/viewer/hooks/use-polling.ts",
         "packages/web/src/viewer/hooks/use-project-metadata.ts",
         "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
         "packages/web/src/viewer/hooks/use-route-state.ts",
+        "packages/web/src/viewer/hooks/use-tab-visibility.ts",
+        "packages/web/src/viewer/hooks/use-tick.ts",
         "packages/web/src/viewer/hooks/use-zone-drag.ts",
         "packages/web/src/viewer/main.ts",
         "packages/web/src/viewer/views/analysis.ts",
@@ -18149,10 +20927,17 @@
         "packages/web/tests/unit/viewer/detail-panel.test.ts",
         "packages/web/tests/unit/viewer/flow-diagram.test.ts",
         "packages/web/tests/unit/viewer/hench-config.test.ts",
+        "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+        "packages/web/tests/unit/viewer/lazy-children.test.ts",
         "packages/web/tests/unit/viewer/memory-warning.test.ts",
+        "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
+        "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
         "packages/web/tests/unit/viewer/pr-markdown.test.ts",
         "packages/web/tests/unit/viewer/prd-tree.test.ts",
+        "packages/web/tests/unit/viewer/progressive-loader.test.ts",
+        "packages/web/tests/unit/viewer/progressive-loading-integration.test.ts",
         "packages/web/tests/unit/viewer/prune-diff-tree.test.ts",
+        "packages/web/tests/unit/viewer/search-overlay.test.ts",
         "packages/web/tests/unit/viewer/sidebar.test.ts",
         "packages/web/tests/unit/viewer/smart-add-input.test.ts",
         "packages/web/tests/unit/viewer/status-filter.test.ts",
@@ -18161,9 +20946,12 @@
         "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
         "packages/web/tests/unit/viewer/task-detail-usage.test.ts",
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
-        "packages/web/tests/unit/viewer/tree-view.test.ts"
+        "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
+        "packages/web/tests/unit/viewer/tree-view.test.ts",
+        "packages/web/tests/unit/viewer/use-polling-suspension.test.ts"
       ],
       "symbols": [
+        "Component",
         "ComponentChild",
         "ComponentChildren",
         "Fragment",
@@ -18352,14 +21140,30 @@
         "packages/hench/tests/unit/guard/guard-integration.test.ts",
         "packages/hench/tests/unit/guard/paths.test.ts",
         "packages/hench/tests/unit/guard/policy.test.ts",
+        "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
         "packages/hench/tests/unit/process/exec.test.ts",
+        "packages/hench/tests/unit/process/lifecycle.test.ts",
+        "packages/hench/tests/unit/process/limiter.test.ts",
+        "packages/hench/tests/unit/process/memory-monitor.test.ts",
+        "packages/hench/tests/unit/process/memory-throttle.test.ts",
+        "packages/hench/tests/unit/process/pool.test.ts",
+        "packages/hench/tests/unit/process/process-memory-tracker.test.ts",
+        "packages/hench/tests/unit/queue/execution-queue.test.ts",
+        "packages/hench/tests/unit/queue/format.test.ts",
+        "packages/hench/tests/unit/queue/priority-scheduler.test.ts",
         "packages/hench/tests/unit/schema/templates.test.ts",
         "packages/hench/tests/unit/schema/validate.test.ts",
         "packages/hench/tests/unit/store/claude-config.test.ts",
         "packages/hench/tests/unit/store/project-config.test.ts",
+        "packages/hench/tests/unit/store/run-archiver.test.ts",
+        "packages/hench/tests/unit/store/run-change-detector.test.ts",
+        "packages/hench/tests/unit/store/run-compressed-reads.test.ts",
+        "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
+        "packages/hench/tests/unit/store/run-retention.test.ts",
         "packages/hench/tests/unit/store/suggestions.test.ts",
         "packages/hench/tests/unit/store/templates.test.ts",
         "packages/hench/tests/unit/tools/completion-validation.test.ts",
+        "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
         "packages/hench/tests/unit/tools/files.test.ts",
         "packages/hench/tests/unit/tools/git.test.ts",
         "packages/hench/tests/unit/tools/rex.test.ts",
@@ -18531,11 +21335,16 @@
         "packages/sourcevision/tests/unit/util/merge.test.ts",
         "packages/sourcevision/tests/unit/util/sort.test.ts",
         "packages/sourcevision/vitest.config.ts",
+        "packages/web/tests/integration/background-suspension-recovery.test.ts",
+        "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
         "packages/web/tests/integration/pr-markdown-refresh.test.ts",
         "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
+        "packages/web/tests/integration/request-dedup.test.ts",
         "packages/web/tests/integration/token-usage-route-regression.test.ts",
+        "packages/web/tests/unit/server/aggregation-cache.test.ts",
         "packages/web/tests/unit/server/data-loading-efficiency.test.ts",
         "packages/web/tests/unit/server/dev-reload.test.ts",
+        "packages/web/tests/unit/server/incremental-task-usage.test.ts",
         "packages/web/tests/unit/server/memory-leak-fixes.test.ts",
         "packages/web/tests/unit/server/port.test.ts",
         "packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts",
@@ -18543,10 +21352,12 @@
         "packages/web/tests/unit/server/routes-config.test.ts",
         "packages/web/tests/unit/server/routes-data.test.ts",
         "packages/web/tests/unit/server/routes-hench-audit.test.ts",
+        "packages/web/tests/unit/server/routes-hench-concurrency.test.ts",
         "packages/web/tests/unit/server/routes-hench-config.test.ts",
         "packages/web/tests/unit/server/routes-hench-execute.test.ts",
         "packages/web/tests/unit/server/routes-hench-health.test.ts",
         "packages/web/tests/unit/server/routes-hench-heartbeat.test.ts",
+        "packages/web/tests/unit/server/routes-hench-memory.test.ts",
         "packages/web/tests/unit/server/routes-hench-shutdown.test.ts",
         "packages/web/tests/unit/server/routes-hench-templates.test.ts",
         "packages/web/tests/unit/server/routes-mcp.test.ts",
@@ -18554,6 +21365,7 @@
         "packages/web/tests/unit/server/routes-project.test.ts",
         "packages/web/tests/unit/server/routes-requirements.test.ts",
         "packages/web/tests/unit/server/routes-rex.test.ts",
+        "packages/web/tests/unit/server/routes-search.test.ts",
         "packages/web/tests/unit/server/routes-sourcevision.test.ts",
         "packages/web/tests/unit/server/routes-status.test.ts",
         "packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts",
@@ -18561,13 +21373,19 @@
         "packages/web/tests/unit/server/routes-validation.test.ts",
         "packages/web/tests/unit/server/routes-workflow.test.ts",
         "packages/web/tests/unit/server/scope.test.ts",
+        "packages/web/tests/unit/server/search-index.test.ts",
         "packages/web/tests/unit/server/shutdown-handler.test.ts",
         "packages/web/tests/unit/server/type-consistency.test.ts",
+        "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
         "packages/web/tests/unit/server/websocket.test.ts",
+        "packages/web/tests/unit/server/ws-health-integration.test.ts",
+        "packages/web/tests/unit/server/ws-health-tracker.test.ts",
         "packages/web/tests/unit/viewer/accessibility.test.ts",
         "packages/web/tests/unit/viewer/add-item-form.test.ts",
         "packages/web/tests/unit/viewer/bar-chart.test.ts",
         "packages/web/tests/unit/viewer/batch-import-panel.test.ts",
+        "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+        "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
         "packages/web/tests/unit/viewer/collapsible-section.test.ts",
         "packages/web/tests/unit/viewer/copy-link-button.test.ts",
         "packages/web/tests/unit/viewer/crash-detector.test.ts",
@@ -18575,6 +21393,11 @@
         "packages/web/tests/unit/viewer/degradation-banner.test.ts",
         "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
         "packages/web/tests/unit/viewer/detail-panel.test.ts",
+        "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
+        "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+        "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+        "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts",
+        "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
         "packages/web/tests/unit/viewer/favicon.test.ts",
         "packages/web/tests/unit/viewer/flow-diagram.test.ts",
         "packages/web/tests/unit/viewer/graceful-degradation.test.ts",
@@ -18584,24 +21407,51 @@
         "packages/web/tests/unit/viewer/graph-zoom.test.ts",
         "packages/web/tests/unit/viewer/hench-config.test.ts",
         "packages/web/tests/unit/viewer/label-utils.test.ts",
+        "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+        "packages/web/tests/unit/viewer/lazy-children.test.ts",
+        "packages/web/tests/unit/viewer/listener-lifecycle.test.ts",
+        "packages/web/tests/unit/viewer/loader-memory.test.ts",
+        "packages/web/tests/unit/viewer/loader-polling.test.ts",
         "packages/web/tests/unit/viewer/memory-monitor.test.ts",
         "packages/web/tests/unit/viewer/memory-warning.test.ts",
+        "packages/web/tests/unit/viewer/message-coalescer.test.ts",
+        "packages/web/tests/unit/viewer/message-throttle.test.ts",
+        "packages/web/tests/unit/viewer/node-culler.test.ts",
+        "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
+        "packages/web/tests/unit/viewer/polling-manager.test.ts",
+        "packages/web/tests/unit/viewer/polling-state.test.ts",
+        "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
         "packages/web/tests/unit/viewer/pr-markdown.test.ts",
         "packages/web/tests/unit/viewer/prd-tree-compute.test.ts",
         "packages/web/tests/unit/viewer/prd-tree.test.ts",
+        "packages/web/tests/unit/viewer/progressive-loader.test.ts",
+        "packages/web/tests/unit/viewer/progressive-loading-integration.test.ts",
         "packages/web/tests/unit/viewer/prune-diff-tree.test.ts",
         "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
+        "packages/web/tests/unit/viewer/request-dedup.test.ts",
+        "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
         "packages/web/tests/unit/viewer/route-state.test.ts",
+        "packages/web/tests/unit/viewer/search-overlay.test.ts",
         "packages/web/tests/unit/viewer/sidebar.test.ts",
         "packages/web/tests/unit/viewer/smart-add-input.test.ts",
         "packages/web/tests/unit/viewer/status-filter.test.ts",
+        "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
+        "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
         "packages/web/tests/unit/viewer/status-indicators.test.ts",
+        "packages/web/tests/unit/viewer/tab-visibility.test.ts",
         "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
         "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
         "packages/web/tests/unit/viewer/task-detail-usage.test.ts",
+        "packages/web/tests/unit/viewer/tick-timer.test.ts",
+        "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
+        "packages/web/tests/unit/viewer/tree-differ.test.ts",
+        "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
         "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts",
         "packages/web/tests/unit/viewer/tree-view.test.ts",
+        "packages/web/tests/unit/viewer/update-batcher.test.ts",
+        "packages/web/tests/unit/viewer/usage-polling.test.ts",
+        "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
         "packages/web/vitest.config.ts",
         "tests/e2e/architecture-policy.test.js",
         "tests/e2e/cli-ci.test.js",
@@ -18652,7 +21502,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 1939,
+    "totalEdges": 2231,
     "totalExternal": 18,
     "circularCount": 1,
     "circulars": [
@@ -18697,6 +21547,10 @@
         "count": 20
       },
       {
+        "path": "packages/web/src/viewer/tab-visibility.ts",
+        "count": 19
+      },
+      {
         "path": "packages/rex/src/analyze/reason.ts",
         "count": 16
       },
@@ -18706,10 +21560,14 @@
       },
       {
         "path": "packages/web/src/server/types.ts",
-        "count": 15
+        "count": 16
       },
       {
         "path": "packages/sourcevision/src/cli/output.ts",
+        "count": 13
+      },
+      {
+        "path": "packages/web/src/server/routes-hench.ts",
         "count": 13
       },
       {
@@ -18717,11 +21575,15 @@
         "count": 12
       },
       {
+        "path": "packages/web/src/viewer/polling-manager.ts",
+        "count": 12
+      },
+      {
         "path": "packages/llm-client/src/types.ts",
         "count": 11
       },
       {
-        "path": "packages/web/src/server/routes-hench.ts",
+        "path": "packages/web/src/viewer/memory-monitor.ts",
         "count": 11
       },
       {
@@ -18729,22 +21591,10 @@
         "count": 10
       },
       {
-        "path": "packages/sourcevision/src/cli/errors.ts",
-        "count": 10
-      },
-      {
         "path": "packages/sourcevision/src/util/sort.ts",
         "count": 10
-      },
-      {
-        "path": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-        "count": 9
-      },
-      {
-        "path": "packages/hench/src/store/index.ts",
-        "count": 9
       }
     ],
-    "avgImportsPerFile": 3.41
+    "avgImportsPerFile": 3.37
   }
 }

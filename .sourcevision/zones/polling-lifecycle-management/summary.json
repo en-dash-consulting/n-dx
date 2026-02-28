@@ -1,0 +1,21 @@
+{
+  "id": "polling-lifecycle-management",
+  "name": "Polling Lifecycle Management",
+  "description": "Manages polling suspension and restart logic to optimize resource usage during user interactions.",
+  "files": [
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/polling-restart.ts",
+    "packages/web/src/viewer/polling-state.ts",
+    "packages/web/tests/unit/viewer/polling-state.test.ts",
+    "packages/web/tests/unit/viewer/use-polling-suspension.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/polling-restart.ts",
+    "packages/web/src/viewer/polling-state.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 5,
+  "lineCount": 1455
+}

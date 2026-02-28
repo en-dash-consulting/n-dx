@@ -1,0 +1,19 @@
+{
+  "id": "usage-analytics",
+  "name": "Usage Analytics",
+  "description": "Manages incremental task usage tracking and automated cleanup scheduling for analytics data.",
+  "files": [
+    "packages/web/src/server/incremental-task-usage.ts",
+    "packages/web/src/server/usage-cleanup-scheduler.ts",
+    "packages/web/tests/unit/server/incremental-task-usage.test.ts",
+    "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/incremental-task-usage.ts",
+    "packages/web/src/server/usage-cleanup-scheduler.ts"
+  ],
+  "cohesion": 0.63,
+  "coupling": 0.38,
+  "fileCount": 4,
+  "lineCount": 1560
+}

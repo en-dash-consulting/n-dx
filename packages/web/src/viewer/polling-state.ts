@@ -140,8 +140,8 @@ function notifyListeners(): void {
   for (const listener of listeners) {
     try {
       listener(snapshot);
-    } catch {
-      // Swallow errors from individual listeners.
+    } catch (err) {
+      console.warn("[polling-state] listener error:", err);
     }
   }
 }
@@ -176,8 +176,8 @@ export function registerPollingSource(
   if (existing) {
     try {
       existing.callbacks.dispose();
-    } catch {
-      // Swallow errors from disposal.
+    } catch (err) {
+      console.warn(`[polling-state] failed to dispose replaced source "${key}":`, err);
     }
   }
 
@@ -197,8 +197,8 @@ export function registerPollingSource(
   if (globalSuspended && !entry.config.essential) {
     try {
       callbacks.suspend();
-    } catch {
-      // Swallow errors from suspension.
+    } catch (err) {
+      console.warn(`[polling-state] failed to suspend new source "${key}":`, err);
     }
   }
 
@@ -238,8 +238,8 @@ export function suspendAllSources(): void {
 
     try {
       entry.callbacks.suspend();
-    } catch {
-      // Swallow errors from individual suspensions.
+    } catch (err) {
+      console.warn(`[polling-state] failed to suspend source "${entry.key}":`, err);
     }
   }
 
@@ -263,8 +263,8 @@ export function resumeAllSources(): void {
 
     try {
       entry.callbacks.resume();
-    } catch {
-      // Swallow errors from individual resumptions.
+    } catch (err) {
+      console.warn(`[polling-state] failed to resume source "${entry.key}":`, err);
     }
   }
 
@@ -283,8 +283,8 @@ export function disposeAllSources(): void {
   for (const entry of sources.values()) {
     try {
       entry.callbacks.dispose();
-    } catch {
-      // Swallow errors from individual disposals.
+    } catch (err) {
+      console.warn(`[polling-state] failed to dispose source "${entry.key}":`, err);
     }
   }
 
@@ -386,8 +386,8 @@ export function resetPollingState(): void {
   for (const entry of sources.values()) {
     try {
       entry.callbacks.dispose();
-    } catch {
-      // Swallow errors from disposal.
+    } catch (err) {
+      console.warn(`[polling-state] failed to dispose source "${entry.key}" during reset:`, err);
     }
   }
 

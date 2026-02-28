@@ -1,0 +1,18 @@
+{
+  "id": "navigation-state-management",
+  "name": "Navigation State Management",
+  "description": "Manages UI routing state and navigation context for token usage and other dashboard views.",
+  "files": [
+    "packages/web/src/viewer/hooks/use-route-state.ts",
+    "packages/web/src/viewer/route-state.ts",
+    "packages/web/tests/unit/viewer/route-state.test.ts",
+    "packages/web/tests/unit/viewer/token-usage-nav.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-route-state.ts"
+  ],
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 4,
+  "lineCount": 409
+}

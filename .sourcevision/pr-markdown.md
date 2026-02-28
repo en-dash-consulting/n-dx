@@ -1,8 +1,8 @@
 ## Summary
 
-**Branch:** `feature/integrate-codex`
+**Branch:** `featuer/oops`
 **Base:** `main`
-**Completed items:** 293
+**Completed items:** 390
 
 | Epic | Completed |
 |------|-----------|
@@ -30,13 +30,24 @@
 | PR Markdown View Toggle and Copy UX | 6 |
 | Process Lifecycle Management and Graceful Shutdown | 14 |
 | LLM Client Circular Dependency Resolution | 12 |
-| Rex Task and Epic Deletion Functionality | 12 |
+| Rex Task and Epic Deletion Functionality | 13 |
 | PR Build Pipeline and Code Quality Automation | 6 |
 | Web UI Memory Management and Crash Resolution | 11 |
 | Interactive PRD Validation and Consistency Resolution | 3 |
 | Branch Work System of Record | 7 |
 | Automatic PR Markdown Generation | 7 |
 | Enhanced Rex Recommend Selective PRD Creation | 12 |
+| Memory-Aware Polling Loop Management | 8 |
+| WebSocket Message Performance Optimization | 6 |
+| TreeNodes DOM Performance Optimization | 11 |
+| Timer Performance Optimization and Re-render Reduction | 8 |
+| API Request Deduplication and Coordination | 5 |
+| Token Usage Aggregation Performance Optimization | 10 |
+| Background Tab Resource Optimization | 14 |
+| Hench Process Concurrency Management | 8 |
+| Hench Resource Monitoring and User Feedback | 8 |
+| WebSocket Connection Lifecycle Management | 5 |
+| Rex Web UI Search Interface | 2 |
 
 ## ⚠️ Breaking Changes
 
@@ -359,8 +370,46 @@ The llm-client module has 7 distinct layers:
 - **Enhanced Rex Recommend Selective PRD Creation**
 - **Implement selective PRD creation from selected recommendations** [critical]
   Create PRD items from the selected recommendations using the existing rex add pipeline, replacing the acknowledge-only behavior
+- **Memory-Aware Polling Loop Management**
+- **WebSocket Message Performance Optimization**
+- **TreeNodes DOM Performance Optimization**
+- **Timer Performance Optimization and Re-render Reduction**
+- **API Request Deduplication and Coordination**
+- **Token Usage Aggregation Performance Optimization**
+- **Background Tab Resource Optimization**
+- **Hench Process Concurrency Management**
+- **Hench Resource Monitoring and User Feedback**
+- **WebSocket Connection Lifecycle Management**
+- **Rex Web UI Search Interface**
 
 ## Completed Work
+
+### API Request Deduplication and Coordination
+
+**Request deduplication infrastructure**
+- Implement request deduplication for fetchPRDData calls
+  Add in-flight request tracking to prevent duplicate fetchPRDData API calls when WebSocket messages arrive during active polling requests
+  - fetchPRDData returns same promise when called while previous request is in-flight
+  - WebSocket message during 10s poll does not trigger duplicate API call
+  - Request tracking cleanup occurs when API call completes or fails
+- Implement request deduplication for fetchTaskUsage calls
+  Add in-flight request tracking to prevent duplicate fetchTaskUsage API calls when WebSocket messages arrive during active polling requests
+  - fetchTaskUsage returns same promise when called while previous request is in-flight
+  - Multiple simultaneous usage requests resolve to single API call
+  - Request tracking handles both successful and error responses
+- Coordinate execution panel polling with WebSocket triggers
+  Implement coordination mechanism between execution-panel 3s polling and WebSocket message triggers to prevent simultaneous /api/rex/execute/status requests
+  - Execution panel polling respects in-flight requests from WebSocket handlers
+  - WebSocket handlers respect in-flight requests from polling loop
+  - Maximum one /api/rex/execute/status request active at any time
+- Add integration tests for request deduplication
+  Create comprehensive test suite validating that request deduplication works correctly under various timing scenarios and prevents duplicate API calls
+  - Tests verify no duplicate API calls during overlapping fetch operations
+  - Tests cover WebSocket message arrival during active polling
+  - Tests validate request cleanup after completion and errors
+
+- Request deduplication infrastructure *(feature)*
+  Prevent duplicate in-flight requests by tracking active API calls and returning shared promises for identical requests
 
 ### Automatic PR Markdown Generation
 
@@ -402,6 +451,75 @@ The llm-client module has 7 distinct layers:
   Integrate PR markdown generation directly into the sourcevision analyze command flow, replacing the manual refresh mechanism
 - Rex-based content generation *(feature)*
   Generate PR markdown content from rex completion data rather than git differences, focusing on completed work items and their significance
+
+### Background Tab Resource Optimization
+
+**Memory and DOM Optimization for Inactive Tabs**
+- Prevent DOM updates during tab inactive state
+  Block DOM updates and re-renders when tab is backgrounded to save memory and CPU resources
+  - Queues DOM updates instead of applying them during inactive state
+  - Prevents unnecessary component re-renders in background tabs
+  - Maintains UI state consistency for deferred updates
+- Implement memory-efficient response buffering suspension
+  Suspend response buffering and data processing during background tab state to reduce memory usage
+  - Stops accumulating API response data during inactive state
+  - Prevents memory buildup from background polling responses
+  - Maintains data integrity when buffering resumes
+
+**Polling Suspension for Background Tabs**
+- Suspend loader polling (5s interval) when tab is backgrounded
+  Halt the 5-second loader polling interval when tab becomes inactive to prevent unnecessary API calls
+  - Pauses 5s loader polling when tab visibility becomes hidden
+  - Prevents loader API requests during background state
+  - Maintains loader state consistency during suspension
+- Suspend execution panel polling (3s interval) when tab is backgrounded
+  Halt the 3-second execution panel polling when tab is inactive to reduce memory buffering
+  - Pauses 3s execution panel polling when tab becomes hidden
+  - Stops execution status API requests during background state
+  - Preserves execution panel state during suspension period
+- Suspend status polling (10s interval) when tab is backgrounded
+  Halt the 10-second status polling when tab is inactive to prevent unnecessary status updates
+  - Pauses 10s status polling when tab visibility becomes hidden
+  - Stops status API requests during background state
+  - Maintains status consistency during suspension
+- Suspend usage polling (10s interval) when tab is backgrounded
+  Halt the 10-second usage polling when tab is inactive to reduce token usage data fetching
+  - Pauses 10s usage polling when tab becomes hidden
+  - Stops usage API requests during background state
+  - Preserves usage data state during suspension period
+
+**Tab Activation Recovery and Synchronization**
+- Resume all suspended polling when tab becomes active
+  Restart all polling intervals immediately when tab visibility changes from hidden to visible
+  - Resumes all suspended polling intervals when tab becomes active
+  - Restarts polling with original intervals (5s, 3s, 10s, 10s)
+  - Handles multiple rapid visibility changes gracefully
+- Add integration tests for background suspension and recovery
+  Create comprehensive tests for tab visibility polling suspension and recovery workflow
+  - Tests polling suspension behavior when tab becomes inactive
+  - Validates polling resumption when tab becomes active
+  - Confirms memory optimization during background state
+
+**Tab Visibility Detection and Control**
+- Implement Page Visibility API for tab state detection
+  Integrate browser Page Visibility API to detect when tab becomes active/inactive for resource management
+  - Detects tab visibility state changes using Page Visibility API
+  - Fires visibility change events to registered listeners
+  - Handles browser compatibility and API availability gracefully
+- Create centralized tab visibility state manager
+  Build centralized service to coordinate tab visibility state across all polling components
+  - Provides single source of truth for tab visibility state
+  - Allows components to register for visibility change notifications
+  - Maintains consistent state across all polling intervals
+
+- Tab Visibility Detection and Control *(feature)*
+  Implement browser tab visibility detection to enable resource-aware polling management
+- Polling Suspension for Background Tabs *(feature)*
+  Suspend all polling intervals when browser tab is backgrounded to reduce resource consumption
+- Memory and DOM Optimization for Inactive Tabs *(feature)*
+  Prevent memory waste from DOM updates and response buffering when tab is not visible
+- Tab Activation Recovery and Synchronization *(feature)*
+  Restore polling and synchronize data when tab becomes active again
 
 ### Branch Work System of Record
 
@@ -769,6 +887,100 @@ The llm-client module has 7 distinct layers:
 - Work-History Narrative Synthesis *(feature)*
   Generate reviewer-ready PR markdown from completed Rex tasks and corresponding Hench execution history in a consistent structure.
 
+### Hench Process Concurrency Management
+
+**Execution Concurrency Controls**
+- Implement configurable maximum concurrent hench processes
+  Add configuration setting and enforcement logic to limit the number of simultaneously running hench processes to prevent memory exhaustion from unlimited concurrent execution
+  - Configuration option for max concurrent processes (default: 3)
+  - Process count tracking prevents spawning beyond limit
+  - Returns meaningful error when limit reached
+  - Integrates with existing hench configuration system
+- Add execution queue for pending tasks when at concurrency limit
+  Implement queuing system to hold task execution requests when maximum concurrent processes are already running, with FIFO scheduling and queue status visibility
+  - Tasks queue automatically when concurrency limit reached
+  - FIFO execution order with priority override support
+  - Queue status visible via API and CLI
+  - Graceful queue cleanup on shutdown
+- Implement hench process pool with reuse to reduce memory overhead
+  Create process pooling mechanism to reuse existing Node.js runtimes for multiple task executions instead of spawning fresh processes, reducing memory consumption per task
+  - Process pool maintains warm Node.js runtimes
+  - Task isolation maintained between reused processes
+  - Memory usage reduced by 60%+ for sequential tasks
+  - Pool cleanup and refresh on idle timeout
+
+**Resource-Aware Execution Scheduling**
+- Monitor system memory usage before spawning hench processes
+  Add system memory monitoring to check available memory before allowing new hench process creation, preventing system-wide memory pressure
+  - Real-time system memory usage detection
+  - Configurable memory threshold for execution blocking
+  - Memory check integrated into process spawn logic
+  - Cross-platform memory monitoring (macOS, Linux, Windows)
+- Implement memory-based execution throttling
+  Add intelligent throttling that delays or rejects new hench executions when system memory usage exceeds safe thresholds, with graceful degradation
+  - Automatic execution delay when memory usage > 80%
+  - Execution rejection when memory usage > 95%
+  - Throttling status exposed via API
+  - User notification of memory-based delays
+- Add task priority-based scheduling within resource constraints
+  Implement task prioritization system that schedules high-priority tasks first when operating under resource constraints, with configurable priority levels
+  - Task priority metadata captured and used for scheduling
+  - High-priority tasks bypass normal queue position
+  - Priority configuration via task tags or explicit priority
+  - Priority override available for urgent tasks
+
+- Execution Concurrency Controls *(feature)*
+  Implement limits and queuing for concurrent hench task execution to prevent resource exhaustion
+- Resource-Aware Execution Scheduling *(feature)*
+  Implement memory monitoring and intelligent scheduling to prevent system resource exhaustion during hench task execution
+
+### Hench Resource Monitoring and User Feedback
+
+**Process Resource Tracking**
+- Implement real-time hench process memory monitoring
+  Add per-process memory usage tracking for running hench tasks with historical data collection and trend analysis
+  - Individual process memory usage tracked in real-time
+  - Memory usage history stored for analysis
+  - Memory leak detection for long-running tasks
+  - Process memory data exposed via API
+- Track concurrent execution metrics and resource utilization
+  Implement comprehensive metrics collection for concurrent process count, total memory usage, and resource utilization patterns across hench executions
+  - Real-time concurrent process count tracking
+  - Total memory utilization across all hench processes
+  - Resource utilization metrics (CPU, memory) per task
+  - Metrics available via API for dashboard consumption
+- Add process lifecycle and resource cleanup validation
+  Implement validation and monitoring to ensure hench processes properly release resources on completion and detect resource leaks or orphaned processes
+  - Process termination validation with resource cleanup checks
+  - Orphaned process detection and automatic cleanup
+  - Resource leak alerts for processes exceeding memory thresholds
+  - Process lifecycle audit trail for debugging
+
+**UI Resource Visibility and Controls**
+- Display concurrent execution count and limits in Hench UI
+  Add real-time display of current concurrent hench executions, configured limits, and queue status to the Hench dashboard section
+  - Current/max concurrent process count displayed prominently
+  - Queue length and pending task count visible
+  - Visual indicators for approaching resource limits
+  - Updates in real-time via WebSocket or polling
+- Show memory usage and system resource status in execution panel
+  Integrate system memory usage, per-process memory consumption, and resource health indicators into the active execution monitoring panel
+  - System memory usage percentage displayed
+  - Individual task memory consumption shown
+  - Resource health indicators (green/yellow/red status)
+  - Memory pressure warnings visible to users
+- Add manual execution throttling controls and emergency stop
+  Implement user controls to manually adjust concurrency limits, pause new executions, and emergency stop all running processes when needed
+  - Manual concurrency limit adjustment via UI
+  - Pause/resume button for new task execution
+  - Emergency stop all executions button with confirmation
+  - Throttling status and control state clearly indicated
+
+- Process Resource Tracking *(feature)*
+  Implement comprehensive monitoring and tracking of hench process resource usage for visibility and management
+- UI Resource Visibility and Controls *(feature)*
+  Provide user interface elements to display resource usage, execution limits, and manual controls for hench process management
+
 ### Init-time LLM Onboarding and Authentication
 
 **Interactive init banner and provider selection**
@@ -1051,6 +1263,46 @@ The llm-client module has 7 distinct layers:
 - Validation and Testing *(feature)*
   Verify that circular dependencies are resolved and functionality is preserved through comprehensive testing
 
+### Memory-Aware Polling Loop Management
+
+**Memory Pressure Polling Suspension**
+- Wire memory pressure flag to loader polling suspension
+  Connect the existing isFeatureDisabled(autoRefresh) flag to call stopPolling() in loader.ts when memory pressure reaches 50% threshold
+  - Loader 5s polling stops when isFeatureDisabled(autoRefresh) returns true
+  - stopPolling() function is invoked from memory degradation system
+  - Loader polling remains stopped until memory pressure subsides
+- Suspend status indicator polling during memory pressure
+  Stop the 10s status-indicator polling loop when memory pressure is detected to minimize background processing
+  - Status indicator polling stops when isFeatureDisabled(autoRefresh) is true
+  - No status update requests during memory pressure
+  - Status indicator shows last known state without updates
+
+**Memory-Aware Polling Validation**
+- Add integration tests for memory-aware polling suspension
+  Create tests that simulate memory pressure conditions and verify all polling loops are properly suspended and restarted
+  - Tests verify all three polling loops stop under simulated memory pressure
+  - Tests confirm polling restart when memory pressure clears
+  - Tests validate no resource leaks during suspension/restart cycles
+- Add polling suspension status indicators
+  Display UI indicators when polling is suspended due to memory pressure to inform users of degraded functionality
+  - Visual indicator shows when polling is suspended due to memory pressure
+  - Indicator explains why auto-refresh is disabled
+  - Manual refresh options remain available during suspension
+
+**Polling Restart and Recovery Logic**
+- Add polling state management and cleanup
+  Implement centralized polling state management to prevent orphaned intervals and ensure clean suspension/restart cycles
+  - All polling intervals are tracked and can be cleanly stopped
+  - No memory leaks from orphaned polling intervals
+  - Polling state persists across component remounts during memory pressure
+
+- Memory Pressure Polling Suspension *(feature)*
+  Integrate memory pressure detection with active polling loops to prevent resource consumption during high memory usage
+- Polling Restart and Recovery Logic *(feature)*
+  Implement automatic polling restart when memory pressure subsides to restore normal UI functionality
+- Memory-Aware Polling Validation *(feature)*
+  Add testing and monitoring to ensure polling suspension works correctly under memory pressure scenarios
+
 ### ndx Dashboard Refresh Orchestration
 
 **Dashboard Data and PR Markdown Refresh Flow**
@@ -1300,6 +1552,20 @@ The llm-client module has 7 distinct layers:
   - rex remove task <id> command removes specified task
   - Commands include confirmation prompts for safety
   - Commands provide clear success/failure feedback
+- Build complete search backend infrastructure
+  Create comprehensive search system including REST endpoints, searchable index of PRD content, and query processing with relevance scoring for fast text matching across all PRD items
+  - GET /api/search endpoint accepts query parameter and returns JSON results
+  - Search results include item ID, title, description, and relevance score
+  - Response time under 200ms for typical PRD sizes (1000+ items)
+  - Supports search across epics, features, tasks, and subtasks
+  - Index includes item titles, descriptions, and acceptance criteria text
+  - Index updates automatically when PRD items are modified
+  - Supports fuzzy matching and partial word matching
+  - Index rebuild completes in under 5 seconds for large PRDs
+  - Supports exact phrase matching with quotes
+  - Ranks results by relevance (title matches higher than description)
+  - Handles multi-word queries with AND/OR logic
+  - Returns results sorted by relevance score descending
 
 **Documentation and Help Updates**
 - Update README with deletion command documentation
@@ -1336,7 +1602,7 @@ The llm-client module has 7 distinct layers:
   - Error messages displayed if deletion fails
 
 - Backend Deletion API Implementation *(feature)*
-  Implement backend functions and CLI commands to support deletion of epics and tasks from the PRD structure
+  Build complete server-side search infrastructure including API endpoints, indexing system, and query processing with relevance scoring
 - Rex UI Deletion Interface *(feature)*
   Add interactive deletion capabilities to the Rex web UI task tab with proper user confirmation flows
 - Documentation and Help Updates *(feature)*
@@ -1414,6 +1680,14 @@ The llm-client module has 7 distinct layers:
   Expose accurate accumulated token usage on each task, including budget-relative context to support prioritization decisions.
 - Diagnostics, Fallbacks, and Test Coverage *(feature)*
   Provide explicit diagnostics for missing usage metadata and add comprehensive tests for parsing and utilization math.
+
+### Rex Web UI Search Interface
+
+**Search UI Components and Advanced Features**
+- Add advanced search features and keyboard navigation
+
+- Search UI Components and Advanced Features *(feature)*
+  Create comprehensive user interface for search functionality including input components, results display, advanced filtering, and keyboard navigation
 
 ### Selective Recommendation Acceptance Syntax
 
@@ -1742,6 +2016,53 @@ The llm-client module has 7 distinct layers:
 - Actionable UI diagnostics and retry guidance *(feature)*
   Improve operator recovery by surfacing exact failure context and tailored next actions based on failure category.
 
+### Timer Performance Optimization and Re-render Reduction
+
+**Centralized Timer Management**
+- Implement shared timer service for elapsed time updates
+  Create a centralized timer service that manages a single setInterval and distributes tick events to subscribed components, eliminating the need for individual timers per task card
+  - Single setInterval runs at 1-second intervals regardless of number of subscribers
+  - Components can subscribe/unsubscribe from timer events
+  - Timer service automatically starts when first subscriber joins and stops when last subscriber leaves
+  - Memory leaks prevented through proper cleanup of event listeners
+- Refactor task-audit.ts to use shared timer service
+  Replace individual setInterval calls in task-audit.ts with subscriptions to the shared timer service, reducing timer overhead for multiple visible task cards
+  - All individual setInterval calls removed from task-audit.ts
+  - Elapsed time updates continue to work correctly
+  - Component properly subscribes on mount and unsubscribes on unmount
+  - No performance regression in elapsed time accuracy
+- Refactor active-tasks-panel.ts to use shared timer service
+  Replace individual setInterval calls in active-tasks-panel.ts with subscriptions to the shared timer service, reducing timer overhead for the active tasks display
+  - All individual setInterval calls removed from active-tasks-panel.ts
+  - Active task elapsed time updates continue to work correctly
+  - Component properly subscribes on mount and unsubscribes on unmount
+  - No performance regression in elapsed time accuracy
+
+**Re-render Optimization**
+- Implement batched state updates for elapsed time displays
+  Group multiple elapsed time state updates into batched operations to reduce the frequency of component re-renders when many task cards are visible simultaneously
+  - State updates for elapsed time are batched within the same tick cycle
+  - Re-render frequency reduced compared to individual setState calls
+  - UI remains responsive with smooth elapsed time updates
+  - Performance improvement measurable with 20+ visible task cards
+- Add memoization for elapsed time calculations
+  Implement React.memo or useMemo to prevent unnecessary re-renders of elapsed time components when only the time value changes but other props remain constant
+  - Elapsed time components only re-render when elapsed time actually changes
+  - Components with identical props skip re-render cycles
+  - Memory usage for memoization remains acceptable
+  - Elapsed time display accuracy maintained
+- Implement timer pause mechanism for inactive tabs
+  Pause elapsed time timer updates when the browser tab becomes inactive to reduce unnecessary computation and battery usage
+  - Timer pauses when document.visibilityState becomes 'hidden'
+  - Timer resumes when document.visibilityState becomes 'visible'
+  - Elapsed time catches up correctly when tab becomes active again
+  - Page Visibility API properly handles all browser tab states
+
+- Centralized Timer Management *(feature)*
+  Replace individual per-component timers with a shared timer service to reduce CPU overhead and coordinate updates
+- Re-render Optimization *(feature)*
+  Minimize component re-renders caused by frequent timer updates through batching and memoization strategies
+
 ### Token Event Attribution Accuracy
 
 **Event-metadata-driven utilization aggregation**
@@ -1783,6 +2104,122 @@ The llm-client module has 7 distinct layers:
   Ensure every token usage event records the actual LLM vendor and model used at execution time so later reporting is based on facts, not mutable config.
 - Event-metadata-driven utilization aggregation *(feature)*
   Rework utilization calculations to aggregate by per-event vendor/model metadata rather than current configured model values.
+
+### Token Usage Aggregation Performance Optimization
+
+**Incremental Aggregation System**
+- Implement incremental token usage updates instead of full rebuilds
+  Replace the current full aggregation rebuild in aggregateTaskUsage() with an incremental system that only processes new or changed run files since the last aggregation
+  - aggregateTaskUsage() only processes new/modified run files on subsequent calls
+  - Initial aggregation still processes all existing run files
+  - Aggregation time remains constant regardless of total run history size
+  - Token usage totals remain accurate after incremental updates
+- Add run file change detection and delta processing
+  Implement file system monitoring or timestamp-based detection to identify which run files need processing, enabling efficient delta aggregation
+  - System detects new run files added since last aggregation
+  - System detects modified run files and re-processes them
+  - Delta processing handles file deletions gracefully
+  - Change detection works reliably across process restarts
+- Implement aggregation result caching with invalidation
+  Cache computed aggregation results to avoid redundant processing, with smart invalidation when underlying run data changes
+  - Aggregation results are cached between polling intervals
+  - Cache is invalidated when new run files are detected
+  - Cache keys properly differentiate between different task scopes
+  - Memory usage of cache is bounded and doesn't grow indefinitely
+
+**Run History Management**
+- Add run file archival and compression for old entries
+  Implement automatic archival system that compresses or consolidates old run files to reduce file system overhead while preserving historical data
+  - Run files older than configurable threshold are compressed
+  - Compressed files maintain all necessary token usage metadata
+  - Aggregation system can read both compressed and uncompressed files
+  - Disk space usage grows more slowly with large run histories
+- Implement run history retention policies
+  Add configurable retention policies to automatically remove very old run files while preserving aggregated usage statistics
+  - Retention policy is configurable (default 6 months)
+  - Usage statistics are preserved even after individual runs are deleted
+  - Policy enforcement runs automatically on schedule
+  - Users receive warnings before data deletion occurs
+
+**Stale Data Cleanup**
+- Remove deleted task entries from usage aggregation state
+  Clean up token usage entries for tasks that have been deleted from the PRD, preventing accumulation of stale data in the aggregation results
+  - Deleted task usage entries are removed from aggregation state
+  - Cleanup happens automatically during aggregation cycles
+  - UI no longer displays usage data for non-existent tasks
+  - Memory usage decreases when tasks are deleted
+- Implement periodic cleanup of orphaned usage records
+  Add scheduled cleanup process to remove usage records that no longer correspond to any PRD items, maintaining data consistency over time
+  - Orphaned usage records are identified by cross-referencing with current PRD state
+  - Cleanup runs on a configurable schedule (default weekly)
+  - Cleanup process logs removed entries for auditability
+  - Critical usage data is preserved through PRD restructuring
+
+- Incremental Aggregation System *(feature)*
+  Replace full aggregation rebuilds with efficient incremental updates to handle large run histories
+- Stale Data Cleanup *(feature)*
+  Remove obsolete entries from usage aggregation to prevent memory bloat and improve accuracy
+- Run History Management *(feature)*
+  Implement efficient storage and retention policies for historical run data to control growth
+
+### TreeNodes DOM Performance Optimization
+
+**Event Listener Optimization**
+- Implement event delegation for tree node interactions
+  Replace individual event listeners on each tree node with delegated event handling on the tree container to reduce listener count
+  - Single delegated event listener handles all tree node clicks
+  - Event delegation correctly identifies target tree nodes
+  - All existing tree interactions work identically
+  - Dramatic reduction in total event listener count
+- Add event listener lifecycle management
+  Implement proper cleanup and management of event listeners during node creation and destruction cycles
+  - Event listeners removed when nodes are destroyed
+  - No memory leaks from orphaned event listeners
+  - Event listener count remains proportional to visible nodes
+  - Memory profiling shows stable listener count during scrolling
+
+**Lazy Rendering and Node Culling**
+- Implement lazy rendering for collapsed tree branches
+  Defer DOM creation for child nodes under collapsed parents until the parent is expanded by the user
+  - Child nodes under collapsed parents are not rendered to DOM
+  - Child nodes render on-demand when parent is expanded
+  - State is preserved correctly across expand/collapse cycles
+  - No visual flickering during expand/collapse operations
+- Add off-screen node culling with cleanup
+  Remove DOM nodes that scroll out of viewport and clean up associated event listeners to prevent memory bloat
+  - DOM nodes removed when scrolled out of viewport buffer
+  - Event listeners cleaned up when nodes are culled
+  - Nodes re-created correctly when scrolled back into view
+  - Memory usage remains stable during extended scrolling
+- Implement progressive tree loading for large datasets
+  Load and render tree nodes in chunks rather than all at once for very large PRD trees
+  - Tree loads in configurable chunks (e.g., 50 nodes at a time)
+  - Loading indicator shown while chunks are being processed
+  - User can trigger loading of additional chunks on demand
+  - Search and filter operations work across all loaded chunks
+
+**Performance Monitoring and Metrics**
+- Implement DOM performance monitoring dashboard
+  Add performance metrics tracking for DOM node count, render time, and memory usage in tree components
+  - Tracks active DOM node count in tree components
+  - Measures tree render and update performance
+  - Shows memory usage metrics for tree operations
+  - Provides before/after comparison data
+- Add large tree performance benchmarks
+  Create automated benchmarks to validate performance improvements on trees with 500, 1000, and 2000+ items
+  - Benchmark suite tests trees of various sizes
+  - Measures DOM node count, render time, and memory usage
+  - Validates performance targets are met
+  - Includes regression testing for performance degradation
+
+- Virtual Scrolling and Windowing Implementation *(feature)*
+  Implement viewport-based rendering to only create DOM nodes for visible tree items
+- Lazy Rendering and Node Culling *(feature)*
+  Implement lazy rendering strategies to defer DOM creation until nodes are actually needed
+- Event Listener Optimization *(feature)*
+  Optimize event listener management to handle large trees efficiently without creating thousands of individual listeners
+- Performance Monitoring and Metrics *(feature)*
+  Add performance monitoring and metrics to track DOM performance improvements and identify bottlenecks
 
 ### Web UI Memory Management and Crash Resolution
 
@@ -1844,6 +2281,68 @@ The llm-client module has 7 distinct layers:
 - Crash Recovery and User Experience *(feature)*
   Implement crash detection, recovery mechanisms, and improved user experience during memory-related issues
 
+### WebSocket Connection Lifecycle Management
+
+**Dead Connection Detection and Cleanup**
+- Implement immediate WebSocket disconnect detection
+  Replace the 30-second ping/pong cycle with immediate connection state monitoring to detect client disconnections as soon as they occur
+  - WebSocket disconnect events are detected within 1 second of occurrence
+  - Dead connections are identified before the next broadcast attempt
+  - Connection state monitoring has minimal performance overhead
+- Remove dead clients from broadcast set immediately
+  Automatically prune disconnected clients from the active broadcast list to prevent wasted serialization and write operations
+  - Dead clients are removed from broadcast set within 1 second of disconnect detection
+  - Broadcast operations skip dead clients entirely
+  - Memory usage decreases immediately when clients disconnect
+- Optimize broadcast operations for active connections only
+  Ensure JSON serialization and socket write operations only target verified active connections to eliminate wasted CPU cycles
+  - JSON.stringify is only called for confirmed active connections
+  - Socket write attempts are eliminated for dead connections
+  - Broadcast performance scales with active connection count, not total connection history
+- Add WebSocket connection health monitoring dashboard
+  Create visibility into WebSocket connection health, cleanup metrics, and resource usage to monitor the effectiveness of dead connection removal
+  - Dashboard shows active vs total connection counts in real-time
+  - Cleanup success rate and timing metrics are displayed
+  - Resource usage trends are visible before and after cleanup improvements
+
+- Dead Connection Detection and Cleanup *(feature)*
+  Implement immediate detection and removal of disconnected WebSocket clients to prevent resource waste
+
+### WebSocket Message Performance Optimization
+
+**Message Throttling and Coalescing**
+- Implement throttled WebSocket message handler with configurable debounce
+  Replace direct message handlers with throttled versions that can handle rapid message sequences without triggering excessive API calls
+  - WebSocket messages are debounced with configurable delay (default 250ms)
+  - Throttling applies to rex:prd-changed, rex:item-updated, and rex:item-deleted messages
+  - Configuration allows per-message-type throttle intervals
+  - Memory footprint remains stable during message bursts
+- Implement message coalescing for rapid sequential updates
+  Batch multiple WebSocket messages that arrive in quick succession to reduce redundant fetchPRDData and fetchTaskUsage calls
+  - Sequential messages of same type are coalesced within throttle window
+  - Mixed message types are batched appropriately without data loss
+  - Coalescing preserves message ordering semantics
+  - Batch size limits prevent unbounded memory growth
+- Add rate limiting for fetchPRDData and fetchTaskUsage calls
+  Implement call-level rate limiting to prevent these expensive operations from being invoked more frequently than necessary
+  - fetchPRDData calls are rate-limited to maximum 2 per second
+  - fetchTaskUsage calls are rate-limited to maximum 2 per second
+  - Rate limits are configurable via application settings
+  - Queued calls are deduplicated to prevent redundant requests
+
+**UI Update Optimization**
+- Implement intelligent tree re-render optimization
+  Replace full tree re-renders with targeted updates that only modify changed nodes, reducing CPU load and improving UI responsiveness
+  - Tree updates use virtual DOM diffing to minimize DOM manipulation
+  - Only changed nodes and their ancestors are re-rendered
+  - Re-render performance scales sub-linearly with tree size
+  - UI remains responsive during rapid update sequences
+
+- Message Throttling and Coalescing *(feature)*
+  Implement intelligent throttling and batching mechanisms to handle high-frequency WebSocket messages without overwhelming the UI
+- UI Update Optimization *(feature)*
+  Optimize rendering pipeline to minimize unnecessary DOM updates and improve responsiveness during high-frequency data changes
+
 ### (Ungrouped)
 
 - 🔶 **Codex Vendor Reliability and Documentation** *(epic)*
@@ -1877,4 +2376,15 @@ The llm-client module has 7 distinct layers:
 - 🔶 **Branch Work System of Record** *(epic)*
 - 🔶 **Automatic PR Markdown Generation** *(epic)*
 - 🔶 **Enhanced Rex Recommend Selective PRD Creation** *(epic)*
+- 🔶 **Memory-Aware Polling Loop Management** *(epic)*
+- 🔶 **WebSocket Message Performance Optimization** *(epic)*
+- 🔶 **TreeNodes DOM Performance Optimization** *(epic)*
+- 🔶 **Timer Performance Optimization and Re-render Reduction** *(epic)*
+- 🔶 **API Request Deduplication and Coordination** *(epic)*
+- 🔶 **Token Usage Aggregation Performance Optimization** *(epic)*
+- 🔶 **Background Tab Resource Optimization** *(epic)*
+- 🔶 **Hench Process Concurrency Management** *(epic)*
+- 🔶 **Hench Resource Monitoring and User Feedback** *(epic)*
+- 🔶 **WebSocket Connection Lifecycle Management** *(epic)*
+- 🔶 **Rex Web UI Search Interface** *(epic)*
 

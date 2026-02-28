@@ -5,186 +5,169 @@
 
 ## Project Overview
 
-- **Files**: 805
-- **Lines of code**: 261,854
-- **Languages**: TypeScript (660), CSS (40), JSON (30), JavaScript (29), Other (20)
-- **Zones**: 30 (30 with descriptions)
+- **Files**: 930
+- **Lines of code**: 312,109
+- **Languages**: TypeScript (778), CSS (42), JSON (30), JavaScript (29), Markdown (25)
+- **Zones**: 39 (39 with descriptions)
 - **Git**: feature/integrate-codex @ 21786d2
-- **Analyzed**: 2026-02-25T16:29:11.964Z
+- **Analyzed**: 2026-02-28T01:34:30.222Z
 
 ## Architecture Zones
 
-### Agent Core (`.claude-worktrees-angry-chatelet:agent-core`)
+### Agent Core (`agent-core`)
 
-Main autonomous agent engine handling analysis, lifecycle management, and execution workflows.
+Primary autonomous agent implementation including analysis, review, and execution logic for task processing.
 
-- Files: 90
-- Cohesion: 0.95, Coupling: 0.05
-- Entry points: .claude/worktrees/angry-chatelet/packages/hench/src/process/index.ts, .claude/worktrees/angry-chatelet/packages/hench/src/schema/v1.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/exec-shell.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/rex.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-agent-core/context.md`
+- Files: 130
+- Cohesion: 0.99, Coupling: 0.01
+- Entry points: packages/hench/src/schema/v1.ts, packages/hench/src/tools/shell.ts
+- Detail: `.sourcevision/zones/agent-core/context.md`
 
-### Completion Validation (`.claude-worktrees-angry-chatelet:completion-validation`)
+### Application Shell Components (`application-shell-components`)
 
-Specialized validation logic for task completion detection and verification workflows.
+Main application entry point and various overlay UI components including search, FAQ, and status indicators.
 
-- Files: 5
-- Cohesion: 0.55, Coupling: 0.45
-- Entry points: .claude/worktrees/angry-chatelet/packages/hench/src/validation/completion.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-completion-validation/context.md`
+- Files: 10
+- Cohesion: 0.20, Coupling: 0.80
+- Detail: `.sourcevision/zones/application-shell-components/context.md`
 
-### Dashboard UI Foundation (`.claude-worktrees-angry-chatelet:dashboard-ui-foundation`)
+### Chart Visualization Layer (`chart-visualization-layer`)
 
-Core UI component library, schema validation, and foundational viewer infrastructure.
-
-- Files: 117
-- Cohesion: 0.96, Coupling: 0.04
-- Entry points: .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/copy-link-button.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/logos.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/types.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-dashboard-ui-foundation/context.md`
-
-### Orchestration Layer (`.claude-worktrees-angry-chatelet:orchestration-layer`)
-
-Top-level entry points and CLI orchestration that coordinates between packages without tight coupling.
-
-- Files: 12
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-orchestration-layer/context.md`
-
-### Src (`.claude-worktrees-angry-chatelet:packages-llm-client:src`)
-
-4 files, primarily TypeScript
+Mini-chart components and data visualization utilities for displaying metrics and problems.
 
 - Files: 4
 - Cohesion: 0.29, Coupling: 0.71
-- Entry points: .claude/worktrees/angry-chatelet/packages/llm-client/src/api-provider.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/config.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-llm-client-src/context.md`
+- Entry points: packages/web/src/viewer/components/data-display/mini-charts.ts, packages/web/src/viewer/views/problems.ts
+- Detail: `.sourcevision/zones/chart-visualization-layer/context.md`
 
-### Src 2 (`.claude-worktrees-angry-chatelet:packages-llm-client:src-2`)
+### Command Validation (`command-validation`)
 
-16 files, primarily TypeScript
-
-- Files: 16
-- Cohesion: 0.63, Coupling: 0.38
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-llm-client-src-2/context.md`
-
-### Src 3 (`.claude-worktrees-angry-chatelet:packages-llm-client:src-3`)
-
-17 files, primarily TypeScript
-
-- Files: 17
-- Cohesion: 0.65, Coupling: 0.35
-- Entry points: .claude/worktrees/angry-chatelet/packages/llm-client/src/cli-provider.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/codex-cli-provider.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/create-client.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/llm-client.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/provider-interface.ts (+4 more)
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-llm-client-src-3/context.md`
-
-### Src 4 (`.claude-worktrees-angry-chatelet:packages-llm-client:src-4`)
-
-3 files, primarily TypeScript
-
-- Files: 3
-- Cohesion: 0.20, Coupling: 0.80
-- Entry points: .claude/worktrees/angry-chatelet/packages/llm-client/src/llm-config.ts, .claude/worktrees/angry-chatelet/packages/llm-client/src/llm-types.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-llm-client-src-4/context.md`
-
-### Rex PRD Management CLI (`.claude-worktrees-angry-chatelet:packages-rex:rex-cli`)
-
-A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-
-- Files: 36
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-rex-rex-cli/context.md`
-
-### Cli (`.claude-worktrees-angry-chatelet:packages-sourcevision:cli`)
-
-12 files, primarily TypeScript
-
-- Files: 12
-- Cohesion: 0.74, Coupling: 0.26
-- Entry points: .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/constants.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/init.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/errors.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/output.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-sourcevision-cli/context.md`
-
-### Tests (`.claude-worktrees-angry-chatelet:packages-sourcevision:tests`)
-
-66 files, primarily TypeScript
-
-- Files: 68
-- Cohesion: 0.94, Coupling: 0.06
-- Entry points: .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/commands/analyze.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/cli/mcp.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/export/pdf-report.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/schema/data-files.ts, .claude/worktrees/angry-chatelet/packages/sourcevision/src/schema/index.ts (+1 more)
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-packages-sourcevision-tests/context.md`
-
-### PRD Management Interface (`.claude-worktrees-angry-chatelet:prd-management-interface`)
-
-Specialized PRD tree components, execution panels, and domain-specific management features.
-
-- Files: 35
-- Cohesion: 0.93, Coupling: 0.07
-- Entry points: .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/guide.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/prd-tree/execution-panel.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/prd-tree/smart-add-input.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/components/theme-toggle.ts, .claude/worktrees/angry-chatelet/packages/web/src/viewer/views/analysis.ts (+1 more)
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-prd-management-interface/context.md`
-
-### Security Guard (`.claude-worktrees-angry-chatelet:security-guard`)
-
-Security and policy enforcement subsystem with command filtering, path validation, and access controls.
-
-- Files: 10
-- Cohesion: 0.90, Coupling: 0.10
-- Entry points: .claude/worktrees/angry-chatelet/packages/hench/src/guard/index.ts, .claude/worktrees/angry-chatelet/packages/hench/src/guard/paths.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-security-guard/context.md`
-
-### Tool System (`.claude-worktrees-angry-chatelet:tool-system`)
-
-Tool abstraction layer providing contracts, dispatch, and implementations for file, git, and shell operations.
-
-- Files: 11
-- Cohesion: 0.77, Coupling: 0.23
-- Entry points: .claude/worktrees/angry-chatelet/packages/hench/src/agent/tools.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/contracts.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/dispatch.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/index.ts, .claude/worktrees/angry-chatelet/packages/hench/src/tools/shell.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-tool-system/context.md`
-
-### Web Server Infrastructure (`.claude-worktrees-angry-chatelet:web-server-infrastructure`)
-
-Server runtime, MCP endpoints, domain gateways, and core web service infrastructure.
-
-- Files: 59
-- Cohesion: 0.98, Coupling: 0.02
-- Entry points: .claude/worktrees/angry-chatelet/packages/web/src/schema/data-files.ts, .claude/worktrees/angry-chatelet/packages/web/src/server/routes-sourcevision.ts, .claude/worktrees/angry-chatelet/packages/web/src/server/types.ts
-- Detail: `.sourcevision/zones/.claude-worktrees-angry-chatelet-web-server-infrastructure/context.md`
-
-### Agent Safety Guards (`agent-safety-guards`)
-
-Implements safety validation and guard mechanisms to ensure reliable and secure agent execution.
+Guard system that validates and enforces constraints on agent commands before execution.
 
 - Files: 10
 - Cohesion: 0.90, Coupling: 0.10
 - Entry points: packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts
-- Detail: `.sourcevision/zones/agent-safety-guards/context.md`
+- Detail: `.sourcevision/zones/command-validation/context.md`
 
-### Agent Tool Infrastructure (`agent-tool-infrastructure`)
+### Dashboard Visualization (`dashboard-visualization`)
 
-Provides tool dispatch and contract management infrastructure for the autonomous agent system.
+High-level visual components that provide executive overview and architectural visualization for the main dashboard.
 
-- Files: 11
-- Cohesion: 0.77, Coupling: 0.23
-- Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/index.ts, packages/hench/src/tools/shell.ts
-- Detail: `.sourcevision/zones/agent-tool-infrastructure/context.md`
+- Files: 3
+- Cohesion: 0.27, Coupling: 0.73
+- Entry points: packages/web/src/viewer/components/data-display/health-gauge.ts, packages/web/src/viewer/views/overview.ts
+- Detail: `.sourcevision/zones/dashboard-visualization/context.md`
 
-### Autonomous Agent Core (`autonomous-agent-core`)
+### Data Visualization Components (`data-visualization`)
 
-Implements the core autonomous agent functionality including analysis, adaptation, and decision-making logic.
+Reusable components for displaying, filtering, and interacting with analysis results and findings data.
 
-- Files: 95
-- Cohesion: 0.97, Coupling: 0.03
-- Entry points: packages/hench/src/process/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/tools/exec-shell.ts
-- Detail: `.sourcevision/zones/autonomous-agent-core/context.md`
+- Files: 5
+- Cohesion: 0.35, Coupling: 0.65
+- Entry points: packages/web/src/viewer/components/data-display/collapsible-section.ts, packages/web/src/viewer/components/data-display/findings-list.ts, packages/web/src/viewer/components/search-filter.ts, packages/web/src/viewer/views/suggestions.ts
+- Detail: `.sourcevision/zones/data-visualization/context.md`
 
-### Graph Visualization Engine (`graph-visualization-engine`)
+### DOM Performance Monitoring (`dom-performance-monitoring`)
 
-Physics-based graph layout engine and related testing infrastructure for network visualization features.
+Tracks DOM operation performance metrics and provides React hooks for performance-aware components.
+
+- Files: 3
+- Cohesion: 0.75, Coupling: 0.25
+- Detail: `.sourcevision/zones/dom-performance-monitoring/context.md`
+
+### Error Recovery System (`error-recovery`)
+
+Crash detection and recovery infrastructure that provides graceful degradation when the application encounters errors.
+
+- Files: 5
+- Cohesion: 0.64, Coupling: 0.36
+- Entry points: packages/web/src/viewer/components/crash-recovery-banner.ts, packages/web/src/viewer/hooks/use-crash-recovery.ts
+- Detail: `.sourcevision/zones/error-recovery/context.md`
+
+### Event Dispatching (`event-dispatching`)
+
+Manages batched event dispatching with visibility gating for optimized UI update coordination.
+
+- Files: 3
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/viewer/batched-tick-dispatcher.ts
+- Detail: `.sourcevision/zones/event-dispatching/context.md`
+
+### Execution Queue (`execution-queue`)
+
+Task queue management system that handles scheduling and execution of agent operations.
+
+- Files: 7
+- Cohesion: 0.88, Coupling: 0.13
+- Entry points: packages/hench/src/queue/index.ts
+- Detail: `.sourcevision/zones/execution-queue/context.md`
+
+### Graceful Degradation System (`graceful-degradation-system`)
+
+Components and hooks for handling application degradation states and UI fallbacks.
+
+- Files: 7
+- Cohesion: 0.38, Coupling: 0.62
+- Entry points: packages/web/src/viewer/components/degradation-banner.ts, packages/web/src/viewer/components/prd-tree/execution-panel.ts, packages/web/src/viewer/graceful-degradation.ts, packages/web/src/viewer/hooks/use-graceful-degradation.ts
+- Detail: `.sourcevision/zones/graceful-degradation-system/context.md`
+
+### Graph Physics Engine (`graph-physics-engine`)
+
+Handles physics calculations and layout algorithms for interactive graph visualizations.
 
 - Files: 3
 - Cohesion: 0.67, Coupling: 0.33
 - Entry points: packages/web/src/viewer/graph/physics.ts
-- Detail: `.sourcevision/zones/graph-visualization-engine/context.md`
+- Detail: `.sourcevision/zones/graph-physics-engine/context.md`
 
-### Project Orchestration (`orchestration-layer`)
+### Hierarchical Navigation (`hierarchical-navigation`)
 
-Provides unified CLI interface and configuration management for the entire n-dx toolkit through clean entry points.
+Tree view components and route handlers for displaying hierarchical data structures.
+
+- Files: 3
+- Cohesion: 0.30, Coupling: 0.70
+- Entry points: packages/web/src/viewer/views/routes.ts
+- Detail: `.sourcevision/zones/hierarchical-navigation/context.md`
+
+### Interactive Data Visualization (`interactive-data-visualization`)
+
+Handles interactive graph rendering, file browsing, and zone visualization with drag-and-drop capabilities.
+
+- Files: 10
+- Cohesion: 0.55, Coupling: 0.45
+- Entry points: packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/graph.ts, packages/web/src/viewer/views/zones.ts
+- Detail: `.sourcevision/zones/interactive-data-visualization/context.md`
+
+### Memory Monitoring System (`memory-monitoring-system`)
+
+Provides real-time memory usage tracking and warning components for the web viewer.
+
+- Files: 5
+- Cohesion: 0.30, Coupling: 0.70
+- Entry points: packages/web/src/viewer/components/memory-warning.ts, packages/web/src/viewer/hooks/use-memory-monitor.ts, packages/web/src/viewer/memory-monitor.ts
+- Detail: `.sourcevision/zones/memory-monitoring-system/context.md`
+
+### Message Flow Control (`message-flow-control`)
+
+Implements rate limiting, message coalescing, and throttling for optimal communication performance.
+
+- Files: 7
+- Cohesion: 0.64, Coupling: 0.36
+- Entry points: packages/web/src/viewer/call-rate-limiter.ts, packages/web/src/viewer/message-coalescer.ts, packages/web/src/viewer/message-throttle.ts
+- Detail: `.sourcevision/zones/message-flow-control/context.md`
+
+### Navigation State Management (`navigation-state-management`)
+
+Manages UI routing state and navigation context for token usage and other dashboard views.
+
+- Files: 4
+- Cohesion: 0.57, Coupling: 0.43
+- Entry points: packages/web/src/viewer/hooks/use-route-state.ts
+- Detail: `.sourcevision/zones/navigation-state-management/context.md`
+
+### Orchestration Layer (`orchestration-layer`)
+
+Top-level entry points and configuration that coordinate between domain packages without importing their internals.
 
 - Files: 12
 - Cohesion: 1.00, Coupling: 0.00
@@ -251,32 +234,131 @@ A self-contained CLI tool and MCP server for managing hierarchical product requi
 - Entry points: packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/schema/index.ts (+1 more)
 - Detail: `.sourcevision/zones/packages-sourcevision-tests/context.md`
 
-### PRD Management Interface (`prd-management-interface`)
+### Performance Optimization Layer (`performance-optimization-layer`)
 
-Specialized components for PRD tree visualization, task management, and analysis workflows within the web dashboard.
+Implements comprehensive performance optimizations including update batching, visibility gating, and DOM throttling.
 
-- Files: 35
-- Cohesion: 0.95, Coupling: 0.05
-- Entry points: packages/web/src/viewer/components/prd-tree/execution-panel.ts, packages/web/src/viewer/components/prd-tree/smart-add-input.ts, packages/web/src/viewer/views/analysis.ts, packages/web/src/viewer/views/prd.ts
-- Detail: `.sourcevision/zones/prd-management-interface/context.md`
+- Files: 54
+- Cohesion: 0.49, Coupling: 0.51
+- Entry points: packages/web/src/viewer/dom-update-gate.ts, packages/web/src/viewer/response-buffer-gate.ts, packages/web/src/viewer/tab-visibility.ts, packages/web/src/viewer/tick-visibility-gate.ts, packages/web/src/viewer/update-batcher.ts
+- Detail: `.sourcevision/zones/performance-optimization-layer/context.md`
 
-### Web Service Foundation (`web-service-foundation`)
+### Polling Infrastructure (`polling-infrastructure`)
 
-Provides the foundational web service infrastructure including CLI, public APIs, and data schemas.
+Core polling system that coordinates data fetching, token usage tracking, and test coverage for polling operations.
 
-- Files: 61
-- Cohesion: 0.98, Coupling: 0.02
-- Entry points: packages/web/src/schema/data-files.ts, packages/web/src/server/routes-mcp.ts
-- Detail: `.sourcevision/zones/web-service-foundation/context.md`
+- Files: 10
+- Cohesion: 0.42, Coupling: 0.58
+- Entry points: packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/polling-manager.ts, packages/web/src/viewer/views/token-usage.ts
+- Detail: `.sourcevision/zones/polling-infrastructure/context.md`
 
-### Web UI Framework (`web-ui-framework`)
+### Polling Lifecycle Management (`polling-lifecycle-management`)
 
-Core frontend components, schema validation, and shared UI infrastructure that powers the web dashboard interface.
+Manages polling suspension and restart logic to optimize resource usage during user interactions.
 
-- Files: 141
-- Cohesion: 0.97, Coupling: 0.03
-- Entry points: packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/prd-tree/shared-imports.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/views/pr-markdown.ts
-- Detail: `.sourcevision/zones/web-ui-framework/context.md`
+- Files: 5
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/viewer/hooks/use-polling-suspension.ts, packages/web/src/viewer/polling-restart.ts, packages/web/src/viewer/polling-state.ts
+- Detail: `.sourcevision/zones/polling-lifecycle-management/context.md`
+
+### PRD Analysis Interface (`prd-analysis-interface`)
+
+Provides UI components for analyzing projects and managing PRD proposals and batch imports.
+
+- Files: 7
+- Cohesion: 0.67, Coupling: 0.33
+- Entry points: packages/web/src/viewer/components/prd-tree/analyze-panel.ts, packages/web/src/viewer/components/prd-tree/batch-import-panel.ts, packages/web/src/viewer/components/prd-tree/proposal-editor.ts, packages/web/src/viewer/components/prd-tree/smart-add-input.ts, packages/web/src/viewer/views/analysis.ts
+- Detail: `.sourcevision/zones/prd-analysis-interface/context.md`
+
+### Project Status UI (`project-status-ui`)
+
+Components and hooks that display project-level metadata, configuration, and status information.
+
+- Files: 6
+- Cohesion: 0.38, Coupling: 0.62
+- Entry points: packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-project-metadata.ts
+- Detail: `.sourcevision/zones/project-status-ui/context.md`
+
+### Refresh Throttling System (`refresh-throttling-system`)
+
+Controls refresh operation frequency to prevent excessive API calls and improve memory-aware performance.
+
+- Files: 4
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/viewer/hooks/use-refresh-throttle.ts, packages/web/src/viewer/refresh-throttle.ts
+- Detail: `.sourcevision/zones/refresh-throttling-system/context.md`
+
+### Request Deduplication System (`request-deduplication-system`)
+
+Provides request deduplication capabilities to prevent redundant API calls and improve performance.
+
+- Files: 3
+- Cohesion: 0.40, Coupling: 0.60
+- Entry points: packages/web/src/viewer/request-dedup.ts
+- Detail: `.sourcevision/zones/request-deduplication-system/context.md`
+
+### Schema Infrastructure (`schema-infrastructure`)
+
+Handles data validation, schema compatibility, and application data loading for the web viewer.
+
+- Files: 6
+- Cohesion: 0.41, Coupling: 0.59
+- Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/hooks/use-app-data.ts
+- Detail: `.sourcevision/zones/schema-infrastructure/context.md`
+
+### Time Tracking Interface (`time-tracking-interface`)
+
+Components and hooks for elapsed time display and task audit functionality.
+
+- Files: 3
+- Cohesion: 0.40, Coupling: 0.60
+- Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/views/task-audit.ts
+- Detail: `.sourcevision/zones/time-tracking-interface/context.md`
+
+### Timer Infrastructure (`timer-infrastructure`)
+
+Provides timing utilities and elapsed time memoization for performance-sensitive operations.
+
+- Files: 3
+- Cohesion: 0.29, Coupling: 0.71
+- Entry points: packages/web/src/viewer/tick-timer.ts
+- Detail: `.sourcevision/zones/timer-infrastructure/context.md`
+
+### UI Foundation (`ui-foundation`)
+
+Core UI components and primary views that form the foundational presentation layer for the dashboard.
+
+- Files: 10
+- Cohesion: 0.28, Coupling: 0.72
+- Entry points: packages/web/src/viewer/components/breadcrumb.ts, packages/web/src/viewer/components/constants.ts, packages/web/src/viewer/components/detail-panel.ts, packages/web/src/viewer/components/favicon.ts, packages/web/src/viewer/sourcevision-tabs.ts (+3 more)
+- Detail: `.sourcevision/zones/ui-foundation/context.md`
+
+### Usage Analytics (`usage-analytics`)
+
+Manages incremental task usage tracking and automated cleanup scheduling for analytics data.
+
+- Files: 4
+- Cohesion: 0.63, Coupling: 0.38
+- Entry points: packages/web/src/server/incremental-task-usage.ts, packages/web/src/server/usage-cleanup-scheduler.ts
+- Detail: `.sourcevision/zones/usage-analytics/context.md`
+
+### Web Platform (`web-platform`)
+
+Dashboard and MCP server platform that provides HTTP interfaces and visual management for the entire n-dx system.
+
+- Files: 137
+- Cohesion: 0.87, Coupling: 0.13
+- Entry points: packages/web/src/schema/data-files.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/logos.ts (+13 more)
+- Detail: `.sourcevision/zones/web-platform/context.md`
+
+### WebSocket Infrastructure (`websocket-infrastructure`)
+
+Provides real-time communication capabilities with health monitoring and connection management.
+
+- Files: 5
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts
+- Detail: `.sourcevision/zones/websocket-infrastructure/context.md`
 
 ## Key Dependencies
 
@@ -290,13 +372,13 @@ Core frontend components, schema validation, and shared UI infrastructure that p
 - `packages/rex/src/schema/index.ts` (24 imports)
 - `packages/web/src/viewer/components/logos.ts` (22 imports)
 - `packages/hench/src/store/config.ts` (20 imports)
+- `packages/web/src/viewer/tab-visibility.ts` (19 imports)
 - `packages/rex/src/analyze/reason.ts` (16 imports)
-- `packages/rex/src/core/canonical.ts` (16 imports)
 
 ### External Packages
 
-- `vitest` (used by 307 files)
-- `preact` (used by 97 files)
+- `vitest` (used by 369 files)
+- `preact` (used by 122 files)
 - `@n-dx/llm-client` (used by 53 files)
 - `rex` (used by 21 files)
 - `zod` (used by 9 files)
@@ -351,20 +433,33 @@ PUT     /api/features
 ```
 DELETE  /api/hench/templates/:id
 GET     /api/hench/audit
+GET     /api/hench/concurrency
 GET     /api/hench/config
 GET     /api/hench/execute/status
 GET     /api/hench/execute/status/:taskId
+GET     /api/hench/memory
+GET     /api/hench/memory/history
+GET     /api/hench/memory/history/:taskId
+GET     /api/hench/memory/leaks
+GET     /api/hench/metrics
+GET     /api/hench/metrics/snapshots
 GET     /api/hench/runs
 GET     /api/hench/runs/:id
 GET     /api/hench/runs/health
+GET     /api/hench/task-usage
 GET     /api/hench/templates
 GET     /api/hench/templates/:id
+GET     /api/hench/throttle
 POST    /api/hench/execute
 POST    /api/hench/execute/:taskId/terminate
 POST    /api/hench/runs/:id/mark-stuck
 POST    /api/hench/templates
 POST    /api/hench/templates/:id/apply
+POST    /api/hench/throttle/emergency-stop
+POST    /api/hench/throttle/pause
+POST    /api/hench/throttle/resume
 PUT     /api/hench/config
+PUT     /api/hench/throttle
 ```
 
 **/api/** (handleIntegrationRoute) — `packages/web/src/server/routes-integrations.ts`
@@ -428,6 +523,12 @@ POST    /api/rex/prune
 POST    /api/rex/smart-add-preview
 ```
 
+**/api/search** (handleSearchRoute) — `packages/web/src/server/routes-search.ts`
+
+```
+GET     /api/search?q=<query>&limit=N
+```
+
 **/api/sv/** (handleSourcevisionRoute) — `packages/web/src/server/routes-sourcevision.ts`
 
 ```
@@ -479,84 +580,163 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Anti-patterns
 
-- God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions [warning]
-- God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
+- Heavy cross-zone coupling (web-16 → web: 13 imports, web-24 → web-20: 9 imports) indicates missing abstraction layers between implementation details [critical]
+- Missing shared visualization interface abstraction forces chart and navigation zones to couple directly to different foundation systems [critical]
+- Multiple service layers (queue, validation) exceed expected coupling thresholds for isolated components, indicating insufficient architectural boundaries [warning]
+- Token usage views mixed into polling infrastructure zone instead of being consolidated with other usage analytics functionality [warning]
+- UI zone organization lacks consistent abstraction strategy - general utilities scattered across domain zones while application views leak into foundation layer [warning]
+- View components scattered across utility zones instead of grouped in dedicated view/page architectural layer [warning]
+- Web-16 zone imports heavily from multiple zones (13+8 imports) suggesting it occupies wrong architectural layer or needs interface abstraction [warning]
+- God function: PRDView in packages/web/src/viewer/views/prd.ts calls 83 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
 
-- Safety guards maintain unidirectional flow (guards → core, guards → tools) indicating proper oversight architecture [info] (agent-safety-guards)
-- Inconsistent zone naming conventions may indicate incomplete zone identification or architectural evolution [info]
-- Orchestration layer achieves coordination without coupling while domain zones maintain appropriate coupling levels for their integration needs [info]
-- Perfect domain isolation between web and hench subsystems demonstrates excellent architectural boundaries [info]
-- Mixed implementation and test files with minimal cross-zone integration suggests orphaned feature [warning] (graph-visualization-engine)
-- Perfect isolation pattern (coupling: 0) enables clean coordination without tight coupling to domain logic [info] (orchestration-layer)
+- Client-server architectural boundary is well-maintained except for schema-infrastructure zone violation [warning]
+- Cross-cutting performance concerns are integrated into functional zones rather than separated into performance layers [info]
+- Domain boundary success varies dramatically: hench achieves clean layered isolation while web shows architectural sprawl across 29 zones [warning]
+- Error-recovery zone demonstrates how focused responsibility leads to excellent architectural metrics (0.64 cohesion, 0.36 coupling) [info]
+- Foundation anti-pattern where ui-foundation contains both infrastructure utilities and application-specific views [warning]
+- Functional zone clustering (polling, performance, visualization) suggests opportunities for architectural consolidation [info]
+- Hook-component co-location pattern provides good separation between state management and presentation across zones [info]
+- Hub-and-spoke architecture with UI zones radiating from different foundation systems creates clean separation but misses opportunities for shared abstractions [info]
+- Inconsistent service abstraction patterns across utility zones - some achieve clean boundaries while others leak implementation details to consumers [warning]
+- Inconsistent use of abstraction patterns (hooks vs direct coupling) across similar UI zones indicates need for architectural standardization [warning]
+- ... and 4 more
 
 ### Relationships
 
-- Coupling gradient from core (0.03) to tools (0.23) shows appropriate dependency levels based on external integration needs [info] (agent-tool-infrastructure)
-- Low coupling (0.03) despite central role indicates well-managed dependencies in complex agent logic [info] (autonomous-agent-core)
-- Agent zone coupling gradient (core: 0.03 → guards: 0.1 → tools: 0.23) reflects increasing external integration responsibility [info]
+- Consistent external dependencies on timer/polling infrastructure reveal foundational services that support monitoring and optimization layers [info]
+- Multi-level hub architecture with web-platform as primary hub and multiple secondary hubs creates complex dependency hierarchies [warning]
+- No direct inter-zone dependencies between these UI zones suggests good boundary definition, but shared interface opportunities are missed [info]
+- Performance optimization zones show clean complementary design without circular dependencies [info]
+- Visualization concerns fragmented across multiple zones without clear abstraction hierarchy [warning]
 - Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 133 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
-- External calls to packages-rex:rex-cli (21 calls) demonstrate clean gateway pattern for service delegation [info] (web-service-foundation)
 
 ### Observations
 
-- High cohesion (0.9) — files are tightly interconnected [info] (agent-safety-guards)
-- High cohesion (0.97) — files are tightly interconnected [info] (autonomous-agent-core)
-- 1 circular dependency chain detected — see imports.json for details [warning]
-- Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (3+5 crossings) — consider extracting shared interface [warning]
-- Bidirectional coupling: "prd-management-interface" ↔ "web-ui-framework" (6+4 crossings) — consider extracting shared interface [warning]
-- Size imbalance: largest zone has 141 files vs smallest with 3 — uneven decomposition [info]
-- Agent subsystem shows thoughtful architectural separation with core logic, tool infrastructure, and safety guards as distinct zones [info]
-- Circular dependencies between agent zones (hench, hench-2, hench-3) suggest need for dependency inversion or interface extraction [warning]
-- Fan-in hotspot: packages/rex/src/core/tree.ts receives calls from 37 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects [info]
-- High cohesion (1) — files are tightly interconnected [info] (orchestration-layer)
-- ... and 3 more
+- High cohesion (0.99) — files are tightly interconnected [info] (agent-core)
+- High coupling (0.8) — 13 imports target "web-platform" [warning] (application-shell-components)
+- Low cohesion (0.2) — files are loosely related, consider splitting this zone [warning] (application-shell-components)
+- High coupling (0.71) — 2 imports target "ui-foundation" [warning] (chart-visualization-layer)
+- Low cohesion (0.29) — files are loosely related, consider splitting this zone [warning] (chart-visualization-layer)
+- High cohesion (0.9) — files are tightly interconnected [info] (command-validation)
+- High coupling (0.73) — 2 imports target "interactive-data-visualization" [warning] (dashboard-visualization)
+- High coupling (0.65) — 2 imports target "schema-infrastructure" [warning] (data-visualization)
+- Low cohesion (0.35) — files are loosely related, consider splitting this zone [warning] (data-visualization)
+- High cohesion (0.88) — files are tightly interconnected [info] (execution-queue)
+- ... and 30 more
 
 ### Suggestions
 
-- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 23 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
-- 3 potentially unused exports in packages/web/src/viewer/utils.ts have no incoming calls: getZoneColor, buildFlowEdges, buildFlowNodes [info]
-- 2 potentially unused exports in packages/web/src/viewer/loader.ts have no incoming calls: loadModule, loadFromServer [info]
-- Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts has no incoming calls — verify if still needed [info]
-- Potentially unused export: detectBranchLifecycle in packages/sourcevision/src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed [info]
-- Potentially unused export: resolveWorkedEpicTitlesForRange in packages/sourcevision/src/cli/commands/prd-epic-resolver.ts has no incoming calls — verify if still needed [info]
-- Potentially unused export: getCachedProjectMetadata in packages/web/src/viewer/hooks/use-project-metadata.ts has no incoming calls — verify if still needed [info]
+- Five separate analysis services could be consolidated into fewer, more cohesive analysis modules to reduce internal complexity [warning] (agent-core)
+- Critical architectural risk: 0.2/0.8 cohesion/coupling ratio indicates zone will break with any significant change [warning] (application-shell-components)
+- Entry point misplacement: main.ts should be in dedicated application-bootstrap zone, not mixed with UI components [info] (application-shell-components)
+- Severe naming convention violation: no files contain 'shell' or 'application' prefixes despite zone name - rename zone to reflect actual contents or standardize file naming [warning] (application-shell-components)
+- Critical risk zone: 0.29 cohesion + 0.71 coupling exceeds fragility threshold - any change will likely cascade across multiple unrelated files [warning] (chart-visualization-layer)
+- Zone name 'chart-visualization-layer' implies architectural layer but contains concrete implementations - rename to 'chart-components' or similar implementation-focused name [info] (chart-visualization-layer)
+- contracts.ts pattern should be adopted by other service zones (execution-queue) for consistent interface definition [info] (command-validation)
+- Most fragile zone in codebase (0.27/0.73) - requires immediate consolidation or complete redesign [warning] (dashboard-visualization)
+- Zero test coverage for critical dashboard components creates significant quality and maintenance risk [warning] (dashboard-visualization)
+- Zone shows fragile architecture (0.35/0.65) requiring careful change management to prevent degradation [warning] (data-visualization)
+- ... and 60 more
 
 ## Next Steps
 
 Prioritized work items derived from analysis:
 
+### High Priority
+
+1. **Critical architectural risk: 0.2/0.8 cohesion/coupling ratio indicates zone wil…**
+   Files: `packages/web/src/viewer/components/faq.ts`, `packages/web/src/viewer/components/polling-suspension-indicator.ts`, `packages/web/src/viewer/components/refresh-queue-status.ts`
+
+1. **Severe naming convention violation: no files contain 'shell' or 'application' p…**
+   Files: `packages/web/src/viewer/components/faq.ts`, `packages/web/src/viewer/components/polling-suspension-indicator.ts`, `packages/web/src/viewer/components/refresh-queue-status.ts`
+
+1. **High coupling (0.8) — 13 imports target "web-platform"**
+   Files: `packages/web/src/viewer/components/faq.ts`, `packages/web/src/viewer/components/polling-suspension-indicator.ts`, `packages/web/src/viewer/components/refresh-queue-status.ts`
+
+1. **Low cohesion (0.2) — files are loosely related, consider splitting this zone**
+   Files: `packages/web/src/viewer/components/faq.ts`, `packages/web/src/viewer/components/polling-suspension-indicator.ts`, `packages/web/src/viewer/components/refresh-queue-status.ts`
+
+1. **Most fragile zone in codebase (0.27/0.73) - requires immediate consolidation or…**
+   Files: `packages/web/src/viewer/components/data-display/health-gauge.ts`, `packages/web/src/viewer/components/data-display/zone-map.ts`, `packages/web/src/viewer/views/overview.ts`
+
+1. **Zero test coverage for critical dashboard components creates significant qualit…**
+   Files: `packages/web/src/viewer/components/data-display/health-gauge.ts`, `packages/web/src/viewer/components/data-display/zone-map.ts`, `packages/web/src/viewer/views/overview.ts`
+
+1. **High coupling (0.73) — 2 imports target "interactive-data-visualization"**
+   Files: `packages/web/src/viewer/components/data-display/health-gauge.ts`, `packages/web/src/viewer/components/data-display/zone-map.ts`, `packages/web/src/viewer/views/overview.ts`
+
+1. **Zone exhibits catastrophic architectural metrics (0.28/0.72) making it extremel…**
+   Files: `packages/web/src/viewer/components/breadcrumb.ts`, `packages/web/src/viewer/components/constants.ts`, `packages/web/src/viewer/components/detail-panel.ts`
+
+1. **High coupling (0.72) — 3 imports target "web-platform"**
+   Files: `packages/web/src/viewer/components/breadcrumb.ts`, `packages/web/src/viewer/components/constants.ts`, `packages/web/src/viewer/components/detail-panel.ts`
+
+1. **Low cohesion (0.28) — files are loosely related, consider splitting this zone**
+   Files: `packages/web/src/viewer/components/breadcrumb.ts`, `packages/web/src/viewer/components/constants.ts`, `packages/web/src/viewer/components/detail-panel.ts`
+
 ### Medium Priority
 
-1. **God function: GraphRenderer.constructor in packages/web/src… (+1 related)**
+1. **FRAGILE ZONE ALERT: Low cohesion (0.41) + high coupling (0.59) creates refactor…**
+   Files: `packages/web/src/schema/v1.ts`, `packages/web/src/schema/validate.ts`, `packages/web/src/viewer/hooks/use-app-data.ts`
 
-1. **Mixed implementation and test files with minimal cross-zone integration suggest…**
-   Files: `packages/web/src/viewer/graph/physics.ts`, `packages/web/tests/unit/viewer/graph-destroy.test.ts`, `packages/web/tests/unit/viewer/graph-layout.test.ts`
+1. **High coupling (0.59) — 3 imports target "ui-foundation"**
+   Files: `packages/web/src/schema/v1.ts`, `packages/web/src/schema/validate.ts`, `packages/web/src/viewer/hooks/use-app-data.ts`
 
-1. **1 circular dependency chain detected — see imports.json for details**
+1. **Critical risk area: high coupling (0.58) + low cohesion (0.42) makes zone fragi…**
+   Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/polling-manager.ts`, `packages/web/src/viewer/views/token-usage.ts`
 
-1. **Bidirectional coupling: "agent-tool-infrastructure" ↔ "autonomous-agent-core" (…**
+1. **Extract token-usage.ts to dedicated analytics zone to improve cohesion and sepa…**
+   Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/polling-manager.ts`, `packages/web/src/viewer/views/token-usage.ts`
 
-1. **Bidirectional coupling: "prd-management-interface" ↔ "web-ui-framework" (6+4 cr…**
+1. **High coupling (0.58) — 9 imports target "performance-optimization-layer"**
+   Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/polling-manager.ts`, `packages/web/src/viewer/views/token-usage.ts`
 
-1. **Circular dependencies between agent zones (hench, hench-2, hench-3) suggest nee…**
+1. **Decompose into focused zones by optimization strategy: dom-updates, response-bu…**
+   Files: `packages/web/src/viewer/darkmode_logo.png`, `packages/web/src/viewer/dom-update-gate.ts`, `packages/web/src/viewer/hooks/use-tab-visibility.ts`
+
+1. **High coupling (0.51) — 1 imports target "timer-infrastructure"**
+   Files: `packages/web/src/viewer/darkmode_logo.png`, `packages/web/src/viewer/dom-update-gate.ts`, `packages/web/src/viewer/hooks/use-tab-visibility.ts`
+
+1. **Multiple service layers (queue, validation) exceed expected… (+5 related)**
+
+1. **Resolve test-implementation mismatch: either create tick-visibility-gate.ts imp…**
+   Files: `packages/web/src/viewer/batched-tick-dispatcher.ts`, `packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts`, `packages/web/tests/unit/viewer/tick-visibility-gate.test.ts`
+
+1. **Gateway pattern success in web-platform should be considered for agent-core's e…**
+   Files: `packages/web/src/cli/index.ts`, `packages/web/src/landing/index.html`, `packages/web/src/landing/landing.css`
 
 ### Low Priority
 
 1. **Hub function: walkTree in packages/rex/src/core/tree.ts is called from 23 files…**
 
-1. **3 potentially unused exports in packages/web/src/viewer/utils.ts have no incomi…**
+1. **Entry point misplacement: main.ts should be in dedicated application-bootstrap …**
+   Files: `packages/web/src/viewer/components/faq.ts`, `packages/web/src/viewer/components/polling-suspension-indicator.ts`, `packages/web/src/viewer/components/refresh-queue-status.ts`
 
-1. **2 potentially unused exports in packages/web/src/viewer/loader.ts have no incom…**
+1. **sourcevision-tabs.ts violates foundation naming conventions with domain-specifi…**
+   Files: `packages/web/src/viewer/components/breadcrumb.ts`, `packages/web/src/viewer/components/constants.ts`, `packages/web/src/viewer/components/detail-panel.ts`
 
-1. **Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts…**
+1. **Zone name 'chart-visualization-layer' implies architectural layer but contains …**
+   Files: `packages/web/src/viewer/components/data-display/mini-charts.ts`, `packages/web/src/viewer/views/problems.ts`, `packages/web/tests/unit/viewer/bar-chart.test.ts`
 
-1. **Potentially unused export: detectBranchLifecycle in packages/sourcevision/src/a…**
+1. **Zone name 'timer-infrastructure' should match primary concern 'tick-timer' or b…**
+   Files: `packages/web/src/viewer/tick-timer.ts`, `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts`, `packages/web/tests/unit/viewer/tick-timer.test.ts`
 
-1. **Potentially unused export: resolveWorkedEpicTitlesForRange in packages/sourcevi…**
+1. **File names don't reflect zone naming convention - routes.ts and tree-view.ts sh…**
+   Files: `packages/web/src/viewer/components/data-display/tree-view.ts`, `packages/web/src/viewer/views/routes.ts`, `packages/web/tests/unit/viewer/tree-view.test.ts`
 
-1. **Potentially unused export: getCachedProjectMetadata in packages/web/src/viewer/…**
+1. **search-filter.ts appears to be generic utility component misnamed for domain-sp…**
+   Files: `packages/web/src/viewer/components/data-display/collapsible-section.ts`, `packages/web/src/viewer/components/data-display/findings-list.ts`, `packages/web/src/viewer/components/search-filter.ts`
+
+1. **Inconsistent naming convention: degradation-banner.ts includes prefix while exe…**
+   Files: `packages/web/src/viewer/components/degradation-banner.ts`, `packages/web/src/viewer/components/prd-tree/execution-panel.ts`, `packages/web/src/viewer/graceful-degradation.ts`
+
+1. **config-footer.ts naming conflicts with zone's status focus - either rename to s…**
+   Files: `packages/web/src/viewer/components/config-footer.ts`, `packages/web/src/viewer/components/sidebar.ts`, `packages/web/src/viewer/components/status-indicators.ts`
+
+1. **Consider whether execution-panel-specific deduplication logic belongs in a dedi…**
+   Files: `packages/web/src/viewer/request-dedup.ts`, `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts`, `packages/web/tests/unit/viewer/request-dedup.test.ts`
 
 ## File Inventory
 
@@ -580,12 +760,17 @@ Prioritized work items derived from analysis:
 | `ci.js` | source | entrypoint | orchestration-layer |
 | `cli.js` | source | entrypoint | orchestration-layer |
 | `config.js` | source | config | orchestration-layer |
+| `docs/memory-architecture.md` | docs |  |  |
+| `docs/memory-improvements.md` | docs |  |  |
+| `docs/memory-os-behavior.md` | docs |  |  |
+| `docs/memory-risks-and-flaws.md` | docs |  |  |
 | `docs/process-lifecycle-audit.md` | docs |  |  |
 | `docs/resource-allocation-catalog.md` | docs |  |  |
+| `docs/rex-smart-add-duplicate-detection.md` | docs |  |  |
 | `docs/signal-handling-audit.md` | docs |  |  |
 | `docs/viewer-architecture.md` | docs |  |  |
 | `docs/viewer-audit.md` | docs |  |  |
-| `help.js` | source | utility | orchestration-layer |
+| `help.js` | source | entrypoint | orchestration-layer |
 | `n-dx.png` | asset |  |  |
 | `package.json` | config |  |  |
 | `packages/hench/Hench-F.png` | asset |  |  |
@@ -593,123 +778,154 @@ Prioritized work items derived from analysis:
 | `packages/hench/README.md` | docs |  |  |
 | `packages/hench/package-lock.json` | generated |  |  |
 | `packages/hench/package.json` | config |  |  |
-| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/analysis/review.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/analysis/stuck.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/analysis/summary.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/analysis/workflow.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/completion.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/planning/brief.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/planning/prompt.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/agent/tools.ts` | source | service | agent-tool-infrastructure |
-| `packages/hench/src/cli/commands/config.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/constants.ts` | source | types | autonomous-agent-core |
-| `packages/hench/src/cli/commands/init.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/run.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/show.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/status.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/commands/template.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/errors.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/cli/help.ts` | source | cli-command | autonomous-agent-core |
-| `packages/hench/src/cli/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/cli/output.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/guard/commands.ts` | source | utility | agent-safety-guards |
-| `packages/hench/src/guard/contracts.ts` | source | types | agent-safety-guards |
-| `packages/hench/src/guard/index.ts` | source | entrypoint | agent-safety-guards |
-| `packages/hench/src/guard/paths.ts` | source | utility | agent-safety-guards |
-| `packages/hench/src/guard/policy.ts` | source | utility | agent-safety-guards |
-| `packages/hench/src/prd/ops.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | autonomous-agent-core |
-| `packages/hench/src/process/exec-shell.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/process/exec.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/process/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/public.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/schema/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/schema/templates.ts` | source | schema | autonomous-agent-core |
-| `packages/hench/src/schema/v1.ts` | source | schema | autonomous-agent-core |
-| `packages/hench/src/schema/validate.ts` | source | schema | autonomous-agent-core |
-| `packages/hench/src/shared/glob.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/store/config.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/store/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/store/json.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/store/project-config.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/store/runs.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/store/suggestions.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/store/templates.ts` | source | store | autonomous-agent-core |
-| `packages/hench/src/tools/contracts.ts` | source | types | agent-tool-infrastructure |
-| `packages/hench/src/tools/dispatch.ts` | source | service | agent-tool-infrastructure |
-| `packages/hench/src/tools/exec-shell.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/tools/files.ts` | source | utility | agent-tool-infrastructure |
-| `packages/hench/src/tools/git.ts` | source | utility | agent-tool-infrastructure |
-| `packages/hench/src/tools/index.ts` | source | entrypoint | agent-tool-infrastructure |
-| `packages/hench/src/tools/rex.ts` | source | service | autonomous-agent-core |
-| `packages/hench/src/tools/shell.ts` | source | utility | agent-tool-infrastructure |
-| `packages/hench/src/tools/test-runner.ts` | source | utility | agent-tool-infrastructure |
-| `packages/hench/src/types/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/src/types/output.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/validation/completion.ts` | source | utility | autonomous-agent-core |
-| `packages/hench/src/validation/index.ts` | source | entrypoint | autonomous-agent-core |
-| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | autonomous-agent-core |
+| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | agent-core |
+| `packages/hench/src/agent/analysis/review.ts` | source | service | agent-core |
+| `packages/hench/src/agent/analysis/stuck.ts` | source | service | agent-core |
+| `packages/hench/src/agent/analysis/summary.ts` | source | service | agent-core |
+| `packages/hench/src/agent/analysis/workflow.ts` | source | service | agent-core |
+| `packages/hench/src/agent/completion.ts` | source | service | agent-core |
+| `packages/hench/src/agent/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | agent-core |
+| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | service | agent-core |
+| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | agent-core |
+| `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | agent-core |
+| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | agent-core |
+| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | service | agent-core |
+| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | service | agent-core |
+| `packages/hench/src/agent/planning/brief.ts` | source | service | agent-core |
+| `packages/hench/src/agent/planning/prompt.ts` | source | service | agent-core |
+| `packages/hench/src/agent/tools.ts` | source | utility | agent-core |
+| `packages/hench/src/cli/commands/config.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/constants.ts` | source | types | agent-core |
+| `packages/hench/src/cli/commands/init.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/run.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/show.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/status.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/commands/template.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/errors.ts` | source | utility | agent-core |
+| `packages/hench/src/cli/help.ts` | source | cli-command | agent-core |
+| `packages/hench/src/cli/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/cli/output.ts` | source | utility | agent-core |
+| `packages/hench/src/guard/commands.ts` | source | service | command-validation |
+| `packages/hench/src/guard/contracts.ts` | source | types | command-validation |
+| `packages/hench/src/guard/index.ts` | source | entrypoint | command-validation |
+| `packages/hench/src/guard/paths.ts` | source | utility | command-validation |
+| `packages/hench/src/guard/policy.ts` | source | service | command-validation |
+| `packages/hench/src/prd/ops.ts` | source | service | agent-core |
+| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | agent-core |
+| `packages/hench/src/process/concurrent-execution-metrics.ts` | source | utility | agent-core |
+| `packages/hench/src/process/exec-shell.ts` | source | utility | agent-core |
+| `packages/hench/src/process/exec.ts` | source | service | agent-core |
+| `packages/hench/src/process/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/process/lifecycle.ts` | source | service | agent-core |
+| `packages/hench/src/process/limiter.ts` | source | utility | agent-core |
+| `packages/hench/src/process/memory-monitor.ts` | source | service | agent-core |
+| `packages/hench/src/process/memory-throttle.ts` | source | service | agent-core |
+| `packages/hench/src/process/pool.ts` | source | service | agent-core |
+| `packages/hench/src/process/process-memory-tracker.ts` | source | service | agent-core |
+| `packages/hench/src/public.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/queue/execution-queue.ts` | source | service | execution-queue |
+| `packages/hench/src/queue/format.ts` | source | utility | execution-queue |
+| `packages/hench/src/queue/index.ts` | source | entrypoint | execution-queue |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | service | execution-queue |
+| `packages/hench/src/schema/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/schema/templates.ts` | source | schema | agent-core |
+| `packages/hench/src/schema/v1.ts` | source | schema | agent-core |
+| `packages/hench/src/schema/validate.ts` | source | schema | agent-core |
+| `packages/hench/src/shared/glob.ts` | source | utility | agent-core |
+| `packages/hench/src/store/config.ts` | source | store | agent-core |
+| `packages/hench/src/store/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/store/json.ts` | source | store | agent-core |
+| `packages/hench/src/store/project-config.ts` | source | store | agent-core |
+| `packages/hench/src/store/run-archiver.ts` | source | store | agent-core |
+| `packages/hench/src/store/run-change-detector.ts` | source | store | agent-core |
+| `packages/hench/src/store/run-retention-scheduler.ts` | source | store | agent-core |
+| `packages/hench/src/store/run-retention.ts` | source | store | agent-core |
+| `packages/hench/src/store/runs.ts` | source | store | agent-core |
+| `packages/hench/src/store/suggestions.ts` | source | store | agent-core |
+| `packages/hench/src/store/templates.ts` | source | store | agent-core |
+| `packages/hench/src/tools/contracts.ts` | source | types | agent-core |
+| `packages/hench/src/tools/dispatch.ts` | source | service | agent-core |
+| `packages/hench/src/tools/exec-shell.ts` | source | service | agent-core |
+| `packages/hench/src/tools/files.ts` | source | service | agent-core |
+| `packages/hench/src/tools/git.ts` | source | service | agent-core |
+| `packages/hench/src/tools/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/tools/rex.ts` | source | service | agent-core |
+| `packages/hench/src/tools/shell.ts` | source | service | agent-core |
+| `packages/hench/src/tools/test-runner.ts` | source | service | agent-core |
+| `packages/hench/src/types/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/src/types/output.ts` | source | utility | agent-core |
+| `packages/hench/src/validation/completion.ts` | source | utility | agent-core |
+| `packages/hench/src/validation/index.ts` | source | entrypoint | agent-core |
+| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | agent-core |
 | `packages/hench/tests/fixtures/token-usage-regression.json` | test |  |  |
-| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/review.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/help.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/cli/output.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | agent-safety-guards |
-| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | agent-safety-guards |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | agent-safety-guards |
-| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | agent-safety-guards |
-| `packages/hench/tests/unit/process/exec.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/store/templates.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/tools/files.test.ts` | test |  | agent-tool-infrastructure |
-| `packages/hench/tests/unit/tools/git.test.ts` | test |  | agent-tool-infrastructure |
-| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | autonomous-agent-core |
-| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | agent-safety-guards |
-| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | agent-tool-infrastructure |
+| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | agent-core |
+| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/review.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/help.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/cli/output.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | command-validation |
+| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | command-validation |
+| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | command-validation |
+| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | command-validation |
+| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/exec.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/pool.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | execution-queue |
+| `packages/hench/tests/unit/queue/format.test.ts` | test |  | execution-queue |
+| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | execution-queue |
+| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/store/templates.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/dispatch-memory.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/files.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/git.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | agent-core |
+| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | command-validation |
+| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | agent-core |
 | `packages/hench/tsconfig.json` | config |  |  |
 | `packages/hench/vitest.config.ts` | config |  |  |
 | `packages/llm-client/package-lock.json` | generated |  |  |
@@ -719,7 +935,7 @@ Prioritized work items derived from analysis:
 | `packages/llm-client/src/cli-provider.ts` | source | service | packages-llm-client:src-3 |
 | `packages/llm-client/src/codex-cli-provider.ts` | source | service | packages-llm-client:src-3 |
 | `packages/llm-client/src/config.ts` | source | config | packages-llm-client:src |
-| `packages/llm-client/src/create-client.ts` | source | service | packages-llm-client:src-3 |
+| `packages/llm-client/src/create-client.ts` | source | utility | packages-llm-client:src-3 |
 | `packages/llm-client/src/exec.ts` | source | utility | packages-llm-client:src-2 |
 | `packages/llm-client/src/help-format.ts` | source | utility | packages-llm-client:src-2 |
 | `packages/llm-client/src/json.ts` | source | utility | packages-llm-client:src-2 |
@@ -773,14 +989,14 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/analyze/acknowledge.ts` | source | utility |  |
 | `packages/rex/src/analyze/dedupe.ts` | source | utility |  |
 | `packages/rex/src/analyze/diff.ts` | source | utility |  |
-| `packages/rex/src/analyze/guided.ts` | source | service |  |
+| `packages/rex/src/analyze/guided.ts` | source | utility |  |
 | `packages/rex/src/analyze/index.ts` | source | entrypoint | packages-rex:rex-cli |
 | `packages/rex/src/analyze/modify-reason.ts` | source | utility |  |
 | `packages/rex/src/analyze/propose.ts` | source | service | packages-rex:rex-cli |
 | `packages/rex/src/analyze/reason.ts` | source | utility |  |
 | `packages/rex/src/analyze/reconcile.ts` | source | utility | packages-rex:rex-cli |
 | `packages/rex/src/analyze/reshape-reason.ts` | source | utility |  |
-| `packages/rex/src/analyze/scanners.ts` | source | service | packages-rex:rex-cli |
+| `packages/rex/src/analyze/scanners.ts` | source | utility | packages-rex:rex-cli |
 | `packages/rex/src/analyze/validate-modification.ts` | source | utility |  |
 | `packages/rex/src/cli/commands/adapter.ts` | source | cli-command |  |
 | `packages/rex/src/cli/commands/add.ts` | source | cli-command | packages-rex:rex-cli |
@@ -843,7 +1059,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/core/tree.ts` | source | utility | packages-rex:rex-cli |
 | `packages/rex/src/core/verify.ts` | source | utility |  |
 | `packages/rex/src/public.ts` | source | entrypoint |  |
-| `packages/rex/src/recommend/conflict-detection.ts` | source | service |  |
+| `packages/rex/src/recommend/conflict-detection.ts` | source | utility |  |
 | `packages/rex/src/recommend/create-from-recommendations.ts` | source | service |  |
 | `packages/rex/src/schema/index.ts` | source | entrypoint | packages-rex:rex-cli |
 | `packages/rex/src/schema/v1.ts` | source | schema | packages-rex:rex-cli |
@@ -970,36 +1186,36 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/SourceVision.png` | asset |  |  |
 | `packages/sourcevision/package-lock.json` | generated |  |  |
 | `packages/sourcevision/package.json` | config |  |  |
-| `packages/sourcevision/src/analyzers/archetypes.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/branch-work-classifier.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/branch-work-collector.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/branch-work-filter.ts` | source | service |  |
+| `packages/sourcevision/src/analyzers/archetypes.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/branch-work-classifier.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/branch-work-collector.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/branch-work-filter.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/branch-work-store.ts` | source | store |  |
-| `packages/sourcevision/src/analyzers/callgraph-findings.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/callgraph.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/classify.ts` | source | service |  |
+| `packages/sourcevision/src/analyzers/callgraph-findings.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/callgraph.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/classify.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/claude-client.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/components.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/context.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich-batch.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich-config.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich-parsing.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/imports.ts` | source | service | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/components.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/context.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich-batch.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich-config.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich-parsing.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/imports.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/index.ts` | source | entrypoint | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/inventory.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/llms-txt.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/louvain.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/manifest.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/next-steps.ts` | source | service | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/inventory.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/llms-txt.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/louvain.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/manifest.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/next-steps.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/route-detection.ts` | source | route-handler | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/token-usage.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/workspace.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/zone-output.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/zones.ts` | source | service | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/token-usage.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/workspace.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/zone-output.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/zones.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/cli/commands/analyze-phases.ts` | source | cli-command |  |
 | `packages/sourcevision/src/cli/commands/analyze.ts` | source | cli-command | packages-sourcevision:tests |
 | `packages/sourcevision/src/cli/commands/constants.ts` | source | types | packages-sourcevision:cli |
@@ -1017,8 +1233,8 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/cli/output.ts` | source | utility | packages-sourcevision:cli |
 | `packages/sourcevision/src/cli/serve.ts` | source | cli-command | packages-sourcevision:cli |
 | `packages/sourcevision/src/constants.ts` | source | types |  |
-| `packages/sourcevision/src/export/pdf-report.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/generators/pr-markdown-template.ts` | source | service |  |
+| `packages/sourcevision/src/export/pdf-report.ts` | source | utility | packages-sourcevision:tests |
+| `packages/sourcevision/src/generators/pr-markdown-template.ts` | source | utility |  |
 | `packages/sourcevision/src/public.ts` | source | entrypoint | packages-sourcevision:tests |
 | `packages/sourcevision/src/schema/data-files.ts` | source | schema | packages-sourcevision:tests |
 | `packages/sourcevision/src/schema/index.ts` | source | entrypoint | packages-sourcevision:tests |
@@ -1094,259 +1310,348 @@ Prioritized work items derived from analysis:
 | `packages/web/MEMORY_PROFILE.md` | docs |  |  |
 | `packages/web/SourceVision-F.png` | asset |  |  |
 | `packages/web/SourceVision.png` | asset |  |  |
-| `packages/web/build.js` | source | entrypoint |  |
+| `packages/web/build.js` | source |  |  |
 | `packages/web/dev.js` | source | entrypoint |  |
 | `packages/web/package.json` | config |  |  |
-| `packages/web/src/cli/index.ts` | source | entrypoint | web-service-foundation |
-| `packages/web/src/landing/index.html` | other |  | web-service-foundation |
-| `packages/web/src/landing/landing.css` | other |  | web-service-foundation |
-| `packages/web/src/landing/landing.ts` | source | page | web-service-foundation |
-| `packages/web/src/public.ts` | source | entrypoint | web-service-foundation |
-| `packages/web/src/schema/data-files.ts` | source | schema | web-service-foundation |
-| `packages/web/src/schema/v1.ts` | source | schema | web-ui-framework |
-| `packages/web/src/schema/validate.ts` | source | schema | web-ui-framework |
-| `packages/web/src/server/domain-gateway.ts` | source | gateway | web-service-foundation |
-| `packages/web/src/server/index.ts` | source | entrypoint | web-service-foundation |
-| `packages/web/src/server/mcp-deps.ts` | source | utility | web-service-foundation |
-| `packages/web/src/server/port.ts` | source | utility | web-service-foundation |
-| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | service | web-service-foundation |
-| `packages/web/src/server/rex-gateway.ts` | source | gateway | web-service-foundation |
-| `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-config.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-data.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-features.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-hench.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-integrations.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-notion.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-project.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-rex.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-sourcevision.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-static.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-status.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-token-usage.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-validation.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/routes-workflow.ts` | source | route-handler | web-service-foundation |
-| `packages/web/src/server/start.ts` | source | entrypoint | web-service-foundation |
-| `packages/web/src/server/types.ts` | source | types | web-service-foundation |
-| `packages/web/src/server/websocket.ts` | source | service | web-service-foundation |
-| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/breadcrumb.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/config-footer.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/constants.ts` | source | types | web-ui-framework |
-| `packages/web/src/viewer/components/copy-link-button.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/crash-recovery-banner.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/collapsible-section.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/findings-list.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/health-gauge.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/mini-charts.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/tree-view.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/data-display/zone-map.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/degradation-banner.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/detail-panel.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/faq.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/favicon.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/guide.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/logos.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/memory-warning.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/notion-schema-wizard.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/prd-tree/add-item-form.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/analyze-panel.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/batch-import-panel.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/compute.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/delete-confirmation.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/execution-panel.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/index.ts` | source | entrypoint | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/inline-add-form.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/merge-preview.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/prd-tree.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/proposal-editor.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/prune-confirmation.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/shared-imports.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/prd-tree/smart-add-input.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/task-utilization.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/tree-utils.ts` | source | component | prd-management-interface |
-| `packages/web/src/viewer/components/prd-tree/types.ts` | source | types | prd-management-interface |
-| `packages/web/src/viewer/components/refresh-queue-status.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/rex-task-link.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/search-filter.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/sidebar.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/status-indicators.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/components/theme-toggle.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/crash-detector.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/darkmode_logo.png` | asset |  | web-ui-framework |
-| `packages/web/src/viewer/graceful-degradation.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/graph/physics.ts` | source | utility | graph-visualization-engine |
-| `packages/web/src/viewer/graph/renderer.ts` | source | service | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-app-data.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-crash-recovery.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-file-edges.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-graceful-degradation.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-memory-monitor.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-pan-zoom.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-project-metadata.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-refresh-throttle.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/hooks/use-zone-drag.ts` | source | hook | web-ui-framework |
-| `packages/web/src/viewer/index.html` | other |  | web-ui-framework |
-| `packages/web/src/viewer/lightmode_logo.png` | asset |  | web-ui-framework |
-| `packages/web/src/viewer/loader.ts` | source | service | web-ui-framework |
-| `packages/web/src/viewer/main.ts` | source | entrypoint | web-ui-framework |
-| `packages/web/src/viewer/memory-monitor.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/refresh-throttle.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/route-state.ts` | source | route-handler | web-ui-framework |
-| `packages/web/src/viewer/schema-compat.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/sourcevision-tabs.ts` | source | component | web-ui-framework |
-| `packages/web/src/viewer/styles/a11y.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/analysis.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/base.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/branding.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/breadcrumb.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/call-graph-explorer.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/cards.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/components.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/copy-link.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/crash-recovery.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/degradation-banner.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/detail.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/faq.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/feature-toggles.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/forms.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/graph.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/hench-config.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/hench-runs.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/hench-templates.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/index.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/integration-config.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/layout.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/memory-warning.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/notion-config.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/overview.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/pr-markdown.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/prd-tree.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/refresh-queue.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/responsive.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/rex-dashboard.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/routes.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/tables.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/task-audit.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/task-link.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/token-usage.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/tokens.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/utils.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/validation.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/styles/zone-map.css` | other |  | web-ui-framework |
-| `packages/web/src/viewer/types.ts` | source | types | web-ui-framework |
-| `packages/web/src/viewer/utils.ts` | source | utility | web-ui-framework |
-| `packages/web/src/viewer/views/analysis.ts` | source | page | prd-management-interface |
-| `packages/web/src/viewer/views/architecture.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/feature-toggles.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/files.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/graph.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/hench-config.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/hench-runs.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/hench-templates.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/integration-config.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/notion-config.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/overview.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/pr-markdown.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/prd.ts` | source | page | prd-management-interface |
-| `packages/web/src/viewer/views/problems.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/rex-dashboard.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/routes.ts` | source | route-handler | web-ui-framework |
-| `packages/web/src/viewer/views/suggestions.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/task-audit.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/token-usage.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/validation.ts` | source | schema | web-ui-framework |
-| `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/zone-types.ts` | source | page | web-ui-framework |
-| `packages/web/src/viewer/views/zones.ts` | source | page | web-ui-framework |
+| `packages/web/src/cli/index.ts` | source | entrypoint | web-platform |
+| `packages/web/src/landing/index.html` | other |  | web-platform |
+| `packages/web/src/landing/landing.css` | other |  | web-platform |
+| `packages/web/src/landing/landing.ts` | source | page | web-platform |
+| `packages/web/src/public.ts` | source | entrypoint | web-platform |
+| `packages/web/src/schema/data-files.ts` | source | schema | web-platform |
+| `packages/web/src/schema/v1.ts` | source | schema | schema-infrastructure |
+| `packages/web/src/schema/validate.ts` | source | schema | schema-infrastructure |
+| `packages/web/src/server/aggregation-cache.ts` | source | utility | web-platform |
+| `packages/web/src/server/concurrent-execution-metrics.ts` | source | utility | web-platform |
+| `packages/web/src/server/domain-gateway.ts` | source | gateway | web-platform |
+| `packages/web/src/server/incremental-task-usage.ts` | source | service | usage-analytics |
+| `packages/web/src/server/index.ts` | source | entrypoint | web-platform |
+| `packages/web/src/server/mcp-deps.ts` | source | utility | web-platform |
+| `packages/web/src/server/port.ts` | source | config | web-platform |
+| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | utility | web-platform |
+| `packages/web/src/server/process-memory-tracker.ts` | source | utility | web-platform |
+| `packages/web/src/server/rex-gateway.ts` | source | gateway | web-platform |
+| `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-config.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-data.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-features.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-hench.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-integrations.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-notion.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-project.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-rex.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-search.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-sourcevision.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-static.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-status.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-token-usage.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-validation.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/routes-workflow.ts` | source | route-handler | web-platform |
+| `packages/web/src/server/search-index.ts` | source | service | web-platform |
+| `packages/web/src/server/start.ts` | source | entrypoint | web-platform |
+| `packages/web/src/server/types.ts` | source | types | web-platform |
+| `packages/web/src/server/usage-cleanup-scheduler.ts` | source | utility | usage-analytics |
+| `packages/web/src/server/websocket.ts` | source | service | websocket-infrastructure |
+| `packages/web/src/server/ws-health-tracker.ts` | source | utility | websocket-infrastructure |
+| `packages/web/src/viewer/batched-tick-dispatcher.ts` | source | utility | event-dispatching |
+| `packages/web/src/viewer/call-rate-limiter.ts` | source | utility | message-flow-control |
+| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/breadcrumb.ts` | source | component | ui-foundation |
+| `packages/web/src/viewer/components/concurrency-panel.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/config-footer.ts` | source | component | project-status-ui |
+| `packages/web/src/viewer/components/constants.ts` | source | types | ui-foundation |
+| `packages/web/src/viewer/components/copy-link-button.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/crash-recovery-banner.ts` | source | component | error-recovery |
+| `packages/web/src/viewer/components/data-display/collapsible-section.ts` | source | component | data-visualization |
+| `packages/web/src/viewer/components/data-display/findings-list.ts` | source | component | data-visualization |
+| `packages/web/src/viewer/components/data-display/health-gauge.ts` | source | component | dashboard-visualization |
+| `packages/web/src/viewer/components/data-display/mini-charts.ts` | source | component | chart-visualization-layer |
+| `packages/web/src/viewer/components/data-display/tree-view.ts` | source | component | hierarchical-navigation |
+| `packages/web/src/viewer/components/data-display/zone-map.ts` | source | component | dashboard-visualization |
+| `packages/web/src/viewer/components/degradation-banner.ts` | source | component | graceful-degradation-system |
+| `packages/web/src/viewer/components/detail-panel.ts` | source | component | ui-foundation |
+| `packages/web/src/viewer/components/elapsed-time.ts` | source | component | time-tracking-interface |
+| `packages/web/src/viewer/components/faq.ts` | source | component | application-shell-components |
+| `packages/web/src/viewer/components/favicon.ts` | source | component | ui-foundation |
+| `packages/web/src/viewer/components/guide.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/logos.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/memory-panel.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/memory-warning.ts` | source | component | memory-monitoring-system |
+| `packages/web/src/viewer/components/notion-schema-wizard.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/polling-suspension-indicator.ts` | source | component | application-shell-components |
+| `packages/web/src/viewer/components/prd-tree/add-item-form.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/analyze-panel.ts` | source | component | prd-analysis-interface |
+| `packages/web/src/viewer/components/prd-tree/batch-import-panel.ts` | source | component | prd-analysis-interface |
+| `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/compute.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/delete-confirmation.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/execution-panel.ts` | source | component | graceful-degradation-system |
+| `packages/web/src/viewer/components/prd-tree/index.ts` | source | entrypoint | web-platform |
+| `packages/web/src/viewer/components/prd-tree/inline-add-form.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/lazy-children.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/merge-preview.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/node-culler.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/prd-tree.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/progressive-loader.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/proposal-editor.ts` | source | component | prd-analysis-interface |
+| `packages/web/src/viewer/components/prd-tree/prune-confirmation.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/shared-imports.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/smart-add-input.ts` | source | component | prd-analysis-interface |
+| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/task-utilization.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/tree-differ.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/tree-utils.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/prd-tree/types.ts` | source | types | web-platform |
+| `packages/web/src/viewer/components/refresh-queue-status.ts` | source | component | application-shell-components |
+| `packages/web/src/viewer/components/rex-task-link.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/search-filter.ts` | source | component | data-visualization |
+| `packages/web/src/viewer/components/search-overlay.ts` | source | component | application-shell-components |
+| `packages/web/src/viewer/components/sidebar.ts` | source | component | project-status-ui |
+| `packages/web/src/viewer/components/status-indicators.ts` | source | component | project-status-ui |
+| `packages/web/src/viewer/components/theme-toggle.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/throttle-controls.ts` | source | component | web-platform |
+| `packages/web/src/viewer/components/ws-health-panel.ts` | source | component | web-platform |
+| `packages/web/src/viewer/crash-detector.ts` | source | utility | error-recovery |
+| `packages/web/src/viewer/darkmode_logo.png` | asset |  | performance-optimization-layer |
+| `packages/web/src/viewer/dom-performance-monitor.ts` | source | utility | dom-performance-monitoring |
+| `packages/web/src/viewer/dom-update-gate.ts` | source | utility | performance-optimization-layer |
+| `packages/web/src/viewer/graceful-degradation.ts` | source | utility | graceful-degradation-system |
+| `packages/web/src/viewer/graph/physics.ts` | source | utility | graph-physics-engine |
+| `packages/web/src/viewer/graph/renderer.ts` | source | utility | interactive-data-visualization |
+| `packages/web/src/viewer/hooks/use-app-data.ts` | source | hook | schema-infrastructure |
+| `packages/web/src/viewer/hooks/use-crash-recovery.ts` | source | hook | error-recovery |
+| `packages/web/src/viewer/hooks/use-dom-performance-monitor.ts` | source | hook | dom-performance-monitoring |
+| `packages/web/src/viewer/hooks/use-file-edges.ts` | source | hook | interactive-data-visualization |
+| `packages/web/src/viewer/hooks/use-graceful-degradation.ts` | source | hook | graceful-degradation-system |
+| `packages/web/src/viewer/hooks/use-memory-monitor.ts` | source | hook | memory-monitoring-system |
+| `packages/web/src/viewer/hooks/use-pan-zoom.ts` | source | hook | interactive-data-visualization |
+| `packages/web/src/viewer/hooks/use-polling-suspension.ts` | source | hook | polling-lifecycle-management |
+| `packages/web/src/viewer/hooks/use-polling.ts` | source | hook | polling-infrastructure |
+| `packages/web/src/viewer/hooks/use-project-metadata.ts` | source | hook | project-status-ui |
+| `packages/web/src/viewer/hooks/use-refresh-throttle.ts` | source | hook | refresh-throttling-system |
+| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | navigation-state-management |
+| `packages/web/src/viewer/hooks/use-tab-visibility.ts` | source | hook | performance-optimization-layer |
+| `packages/web/src/viewer/hooks/use-tick.ts` | source | hook | time-tracking-interface |
+| `packages/web/src/viewer/hooks/use-zone-drag.ts` | source | hook | interactive-data-visualization |
+| `packages/web/src/viewer/index.html` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/lightmode_logo.png` | asset |  | performance-optimization-layer |
+| `packages/web/src/viewer/loader.ts` | source | utility | schema-infrastructure |
+| `packages/web/src/viewer/main.ts` | source | entrypoint | application-shell-components |
+| `packages/web/src/viewer/memory-monitor.ts` | source | utility | memory-monitoring-system |
+| `packages/web/src/viewer/message-coalescer.ts` | source | utility | message-flow-control |
+| `packages/web/src/viewer/message-throttle.ts` | source | utility | message-flow-control |
+| `packages/web/src/viewer/polling-manager.ts` | source | utility | polling-infrastructure |
+| `packages/web/src/viewer/polling-restart.ts` | source | utility | polling-lifecycle-management |
+| `packages/web/src/viewer/polling-state.ts` | source | utility | polling-lifecycle-management |
+| `packages/web/src/viewer/refresh-throttle.ts` | source | utility | refresh-throttling-system |
+| `packages/web/src/viewer/request-dedup.ts` | source | utility | request-deduplication-system |
+| `packages/web/src/viewer/response-buffer-gate.ts` | source | utility | performance-optimization-layer |
+| `packages/web/src/viewer/route-state.ts` | source | route-handler | navigation-state-management |
+| `packages/web/src/viewer/schema-compat.ts` | source | utility | schema-infrastructure |
+| `packages/web/src/viewer/sourcevision-tabs.ts` | source | types | ui-foundation |
+| `packages/web/src/viewer/styles/a11y.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/analysis.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/base.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/branding.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/breadcrumb.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/call-graph-explorer.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/cards.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/components.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/copy-link.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/crash-recovery.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/degradation-banner.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/detail.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/faq.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/feature-toggles.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/forms.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/graph.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/hench-config.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/hench-runs.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/hench-templates.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/index.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/integration-config.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/layout.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/memory-warning.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/notion-config.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/overview.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/polling-suspension.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/pr-markdown.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/prd-tree.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/refresh-queue.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/responsive.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/rex-dashboard.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/routes.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/search-overlay.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/tables.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/task-audit.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/task-link.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/token-usage.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/tokens.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/utils.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/validation.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/styles/zone-map.css` | other |  | performance-optimization-layer |
+| `packages/web/src/viewer/tab-visibility.ts` | source | utility | performance-optimization-layer |
+| `packages/web/src/viewer/tick-timer.ts` | source | utility | timer-infrastructure |
+| `packages/web/src/viewer/tick-visibility-gate.ts` | source | utility | performance-optimization-layer |
+| `packages/web/src/viewer/types.ts` | source | types | ui-foundation |
+| `packages/web/src/viewer/update-batcher.ts` | source | utility | performance-optimization-layer |
+| `packages/web/src/viewer/utils.ts` | source | utility | interactive-data-visualization |
+| `packages/web/src/viewer/views/analysis.ts` | source | page | prd-analysis-interface |
+| `packages/web/src/viewer/views/architecture.ts` | source | page | ui-foundation |
+| `packages/web/src/viewer/views/feature-toggles.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/files.ts` | source | page | interactive-data-visualization |
+| `packages/web/src/viewer/views/graph.ts` | source | page | interactive-data-visualization |
+| `packages/web/src/viewer/views/hench-config.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/hench-runs.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/hench-templates.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/integration-config.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/notion-config.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/overview.ts` | source | page | dashboard-visualization |
+| `packages/web/src/viewer/views/pr-markdown.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/prd.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/problems.ts` | source | page | chart-visualization-layer |
+| `packages/web/src/viewer/views/rex-dashboard.ts` | source | page | ui-foundation |
+| `packages/web/src/viewer/views/routes.ts` | source | route-handler | hierarchical-navigation |
+| `packages/web/src/viewer/views/suggestions.ts` | source | page | data-visualization |
+| `packages/web/src/viewer/views/task-audit.ts` | source | page | time-tracking-interface |
+| `packages/web/src/viewer/views/token-usage.ts` | source | page | polling-infrastructure |
+| `packages/web/src/viewer/views/validation.ts` | source | schema | web-platform |
+| `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-platform |
+| `packages/web/src/viewer/views/zone-types.ts` | source | page | interactive-data-visualization |
+| `packages/web/src/viewer/views/zones.ts` | source | page | interactive-data-visualization |
 | `packages/web/tests/e2e/.gitkeep` | test |  |  |
-| `packages/web/tests/integration/.gitkeep` | test |  | web-ui-framework |
-| `packages/web/tests/integration/pr-markdown-refresh.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/integration/pr-markdown-tab-parity.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/integration/token-usage-route-regression.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/dev-reload.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/server/port.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-adaptive.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-config.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-audit.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-config.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-execute.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-health.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-heartbeat.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-shutdown.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-hench-templates.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-notion.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-project.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-requirements.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-rex.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-sourcevision.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-status.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-token-usage.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-validation.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/routes-workflow.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/scope.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/shutdown-handler.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/server/websocket.test.ts` | test |  | web-service-foundation |
-| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/add-item-form.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/bar-chart.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/batch-import-panel.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/copy-link-button.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/crash-recovery-banner.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/degradation-banner.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/deletion-state-updates.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/detail-panel.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/favicon.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/graceful-degradation.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | graph-visualization-engine |
-| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | graph-visualization-engine |
-| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/hench-config.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/label-utils.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/memory-monitor.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/memory-warning.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/pr-markdown.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/prd-tree-compute.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/prd-tree.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/prune-diff-tree.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/refresh-throttle.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/sidebar.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/smart-add-input.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/status-indicators.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/task-detail-failure.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/task-detail-requirements.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/task-detail-usage.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | web-ui-framework |
-| `packages/web/tests/unit/viewer/tree-utils-deletion.test.ts` | test |  | prd-management-interface |
-| `packages/web/tests/unit/viewer/tree-view.test.ts` | test |  | web-ui-framework |
+| `packages/web/tests/integration/.gitkeep` | test |  | application-shell-components |
+| `packages/web/tests/integration/background-suspension-recovery.test.ts` | test |  | graceful-degradation-system |
+| `packages/web/tests/integration/memory-aware-polling-suspension.test.ts` | test |  | refresh-throttling-system |
+| `packages/web/tests/integration/pr-markdown-refresh.test.ts` | test |  | web-platform |
+| `packages/web/tests/integration/pr-markdown-tab-parity.test.ts` | test |  | application-shell-components |
+| `packages/web/tests/integration/request-dedup.test.ts` | test |  | message-flow-control |
+| `packages/web/tests/integration/token-usage-route-regression.test.ts` | test |  | application-shell-components |
+| `packages/web/tests/unit/server/aggregation-cache.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/dev-reload.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/incremental-task-usage.test.ts` | test |  | usage-analytics |
+| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | schema-infrastructure |
+| `packages/web/tests/unit/server/port.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-adaptive.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-config.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-audit.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-concurrency.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-config.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-execute.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-health.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-heartbeat.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-memory.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-shutdown.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-hench-templates.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-notion.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-project.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-requirements.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-rex.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-search.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-sourcevision.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-status.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-token-usage.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-validation.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/routes-workflow.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/scope.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/search-index.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/shutdown-handler.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts` | test |  | usage-analytics |
+| `packages/web/tests/unit/server/websocket.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/server/ws-health-integration.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/server/ws-health-tracker.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/add-item-form.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/bar-chart.test.ts` | test |  | chart-visualization-layer |
+| `packages/web/tests/unit/viewer/batch-import-panel.test.ts` | test |  | prd-analysis-interface |
+| `packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts` | test |  | event-dispatching |
+| `packages/web/tests/unit/viewer/call-rate-limiter.test.ts` | test |  | message-flow-control |
+| `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test |  | data-visualization |
+| `packages/web/tests/unit/viewer/copy-link-button.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | error-recovery |
+| `packages/web/tests/unit/viewer/crash-recovery-banner.test.ts` | test |  | error-recovery |
+| `packages/web/tests/unit/viewer/degradation-banner.test.ts` | test |  | graceful-degradation-system |
+| `packages/web/tests/unit/viewer/deletion-state-updates.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/detail-panel.test.ts` | test |  | ui-foundation |
+| `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts` | test |  | dom-performance-monitoring |
+| `packages/web/tests/unit/viewer/dom-update-gate.test.ts` | test |  | performance-optimization-layer |
+| `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts` | test |  | timer-infrastructure |
+| `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts` | test |  | request-deduplication-system |
+| `packages/web/tests/unit/viewer/execution-panel-polling.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/favicon.test.ts` | test |  | ui-foundation |
+| `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test |  | chart-visualization-layer |
+| `packages/web/tests/unit/viewer/graceful-degradation.test.ts` | test |  | graceful-degradation-system |
+| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | graph-physics-engine |
+| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | graph-physics-engine |
+| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/hench-config.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/label-utils.test.ts` | test |  | interactive-data-visualization |
+| `packages/web/tests/unit/viewer/large-tree-performance.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/lazy-children.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/listener-lifecycle.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/loader-memory.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/loader-polling.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/memory-monitor.test.ts` | test |  | memory-monitoring-system |
+| `packages/web/tests/unit/viewer/memory-warning.test.ts` | test |  | memory-monitoring-system |
+| `packages/web/tests/unit/viewer/message-coalescer.test.ts` | test |  | message-flow-control |
+| `packages/web/tests/unit/viewer/message-throttle.test.ts` | test |  | message-flow-control |
+| `packages/web/tests/unit/viewer/node-culler.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/node-culling-integration.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/polling-manager.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/polling-state.test.ts` | test |  | polling-lifecycle-management |
+| `packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts` | test |  | application-shell-components |
+| `packages/web/tests/unit/viewer/pr-markdown.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/prd-tree-compute.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/prd-tree.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/progressive-loader.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/progressive-loading-integration.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/prune-diff-tree.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/refresh-throttle.test.ts` | test |  | refresh-throttling-system |
+| `packages/web/tests/unit/viewer/request-dedup.test.ts` | test |  | request-deduplication-system |
+| `packages/web/tests/unit/viewer/response-buffer-gate.test.ts` | test |  | performance-optimization-layer |
+| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | navigation-state-management |
+| `packages/web/tests/unit/viewer/search-overlay.test.ts` | test |  | application-shell-components |
+| `packages/web/tests/unit/viewer/sidebar.test.ts` | test |  | project-status-ui |
+| `packages/web/tests/unit/viewer/smart-add-input.test.ts` | test |  | prd-analysis-interface |
+| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/status-indicators-memory.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/status-indicators-polling.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/status-indicators.test.ts` | test |  | project-status-ui |
+| `packages/web/tests/unit/viewer/tab-visibility.test.ts` | test |  | performance-optimization-layer |
+| `packages/web/tests/unit/viewer/task-detail-failure.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/task-detail-requirements.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/task-detail-usage.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/tick-timer.test.ts` | test |  | timer-infrastructure |
+| `packages/web/tests/unit/viewer/tick-visibility-gate.test.ts` | test |  | event-dispatching |
+| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | navigation-state-management |
+| `packages/web/tests/unit/viewer/tree-differ.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/tree-event-delegate.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/tree-utils-deletion.test.ts` | test |  | web-platform |
+| `packages/web/tests/unit/viewer/tree-view.test.ts` | test |  | hierarchical-navigation |
+| `packages/web/tests/unit/viewer/update-batcher.test.ts` | test |  | performance-optimization-layer |
+| `packages/web/tests/unit/viewer/usage-polling.test.ts` | test |  | polling-infrastructure |
+| `packages/web/tests/unit/viewer/use-polling-suspension.test.ts` | test |  | polling-lifecycle-management |
 | `packages/web/tsconfig.json` | config |  |  |
 | `packages/web/vitest.config.ts` | config |  |  |
 | `pnpm-lock.yaml` | generated |  |  |
 | `pnpm-workspace.yaml` | other |  |  |
-| `pr-check.js` | source | entrypoint |  |
+| `pr-check.js` | source | utility |  |
 | `prd.md` | docs |  |  |
-| `refresh-artifacts.js` | source | cli-command | orchestration-layer |
-| `refresh-plan.js` | source | cli-command | orchestration-layer |
-| `refresh-validate.js` | source | cli-command | orchestration-layer |
+| `refresh-artifacts.js` | source | utility | orchestration-layer |
+| `refresh-plan.js` | source | utility | orchestration-layer |
+| `refresh-validate.js` | source | utility | orchestration-layer |
 | `tests/e2e/architecture-policy.test.js` | test |  |  |
 | `tests/e2e/cli-ci.test.js` | test |  |  |
 | `tests/e2e/cli-config.test.js` | test |  |  |

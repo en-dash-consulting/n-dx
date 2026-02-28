@@ -1,0 +1,21 @@
+{
+  "id": "schema-infrastructure",
+  "name": "Schema Infrastructure",
+  "description": "Handles data validation, schema compatibility, and application data loading for the web viewer.",
+  "files": [
+    "packages/web/src/schema/v1.ts",
+    "packages/web/src/schema/validate.ts",
+    "packages/web/src/viewer/hooks/use-app-data.ts",
+    "packages/web/src/viewer/loader.ts",
+    "packages/web/src/viewer/schema-compat.ts",
+    "packages/web/tests/unit/server/memory-leak-fixes.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/schema/v1.ts",
+    "packages/web/src/viewer/hooks/use-app-data.ts"
+  ],
+  "cohesion": 0.41,
+  "coupling": 0.59,
+  "fileCount": 6,
+  "lineCount": 1334
+}

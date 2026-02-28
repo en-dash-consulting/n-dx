@@ -5,29 +5,31 @@
 <zone>
 
 Zone: Tests 2 (`hench/tests-2`)
-Files: 4, Cohesion: 0.29, Coupling: 0.71
-Description: 4 files, primarily TypeScript
-Entry points: packages/hench/src/cli/commands/run.ts
-Lines: 1887
+Files: 5, Cohesion: 0.57, Coupling: 0.43
+Description: 5 files, primarily TypeScript
+Entry points: packages/hench/src/validation/completion.ts
+Lines: 923
 
 </zone>
 
 <files>
 
-packages/hench/src/cli/commands/run.ts (TypeScript, 879 lines, source)
-packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
-packages/hench/tests/unit/cli/commands/run-epic.test.ts (TypeScript, 529 lines, test)
-packages/hench/tests/unit/cli/commands/run-loop.test.ts (TypeScript, 231 lines, test)
+packages/hench/src/agent/completion.ts (TypeScript, 15 lines, source)
+packages/hench/src/validation/completion.ts (TypeScript, 113 lines, source)
+packages/hench/src/validation/index.ts (TypeScript, 16 lines, source)
+packages/hench/tests/unit/agent/completion.test.ts (TypeScript, 474 lines, test)
+packages/hench/tests/unit/tools/completion-validation.test.ts (TypeScript, 305 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {getOrderedEpics, printEpicByEpicSummary}
-  packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicRunSummary, EpicScopeInfo}
-  packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {listEpics, findEpicByIdOrTitle, resolveEpicFlag, collectEpicTaskIds, getEpicScopeInfo}
-  packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicScopeInfo}
-  packages/hench/tests/unit/cli/commands/run-loop.test.ts → packages/hench/src/cli/commands/run.ts {shouldContinueLoop, loopPause}
+  packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {validateCompletion, formatValidationResult}
+  packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {CompletionValidationResult, CompletionValidationOptions}
+  packages/hench/src/validation/index.ts → packages/hench/src/validation/completion.ts {validateCompletion, formatValidationResult}
+  packages/hench/src/validation/index.ts → packages/hench/src/validation/completion.ts {CompletionValidationResult, CompletionValidationOptions}
+  packages/hench/tests/unit/agent/completion.test.ts → packages/hench/src/agent/completion.ts {validateCompletion, formatValidationResult}
+  packages/hench/tests/unit/tools/completion-validation.test.ts → packages/hench/src/validation/completion.ts {validateCompletion, formatValidationResult}
 
 </imports>

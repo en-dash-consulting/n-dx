@@ -1,0 +1,24 @@
+{
+  "id": "graceful-degradation-system",
+  "name": "Graceful Degradation System",
+  "description": "Components and hooks for handling application degradation states and UI fallbacks.",
+  "files": [
+    "packages/web/src/viewer/components/degradation-banner.ts",
+    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+    "packages/web/src/viewer/graceful-degradation.ts",
+    "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
+    "packages/web/tests/integration/background-suspension-recovery.test.ts",
+    "packages/web/tests/unit/viewer/degradation-banner.test.ts",
+    "packages/web/tests/unit/viewer/graceful-degradation.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/degradation-banner.ts",
+    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+    "packages/web/src/viewer/graceful-degradation.ts",
+    "packages/web/src/viewer/hooks/use-graceful-degradation.ts"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.62,
+  "fileCount": 7,
+  "lineCount": 2293
+}

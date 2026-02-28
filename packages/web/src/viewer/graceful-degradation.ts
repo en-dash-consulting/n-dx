@@ -113,7 +113,11 @@ function buildState(): DegradationState {
 
 function notifyListeners(state: DegradationState): void {
   for (const listener of listeners) {
-    listener(state);
+    try {
+      listener(state);
+    } catch (err) {
+      console.error("[graceful-degradation] listener error:", err);
+    }
   }
 }
 

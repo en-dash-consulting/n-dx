@@ -1,0 +1,22 @@
+{
+  "id": "data-visualization",
+  "name": "Data Visualization Components",
+  "description": "Reusable components for displaying, filtering, and interacting with analysis results and findings data.",
+  "files": [
+    "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+    "packages/web/src/viewer/components/data-display/findings-list.ts",
+    "packages/web/src/viewer/components/search-filter.ts",
+    "packages/web/src/viewer/views/suggestions.ts",
+    "packages/web/tests/unit/viewer/collapsible-section.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+    "packages/web/src/viewer/components/data-display/findings-list.ts",
+    "packages/web/src/viewer/components/search-filter.ts",
+    "packages/web/src/viewer/views/suggestions.ts"
+  ],
+  "cohesion": 0.35,
+  "coupling": 0.65,
+  "fileCount": 5,
+  "lineCount": 504
+}

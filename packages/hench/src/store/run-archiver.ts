@@ -21,7 +21,11 @@
 
 import { join } from "node:path";
 import { readFile, writeFile, readdir, stat, unlink } from "node:fs/promises";
-import { gzipSync, gunzipSync } from "node:zlib";
+import { gzip, gunzip } from "node:zlib";
+import { promisify } from "node:util";
+
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,7 +121,7 @@ export async function loadArchivalConfig(
  */
 export async function readCompressedJSON(filePath: string): Promise<unknown> {
   const compressed = await readFile(filePath);
-  const decompressed = gunzipSync(compressed);
+  const decompressed = await gunzipAsync(compressed);
   return JSON.parse(decompressed.toString("utf-8"));
 }
 
@@ -137,7 +141,7 @@ export async function compressRunFile(
   const destPath = join(runsDir, filename.replace(/\.json$/, ".json.gz"));
 
   const raw = await readFile(sourcePath);
-  const compressed = gzipSync(raw);
+  const compressed = await gzipAsync(raw);
 
   // Write compressed file first, then remove original (atomic-ish)
   await writeFile(destPath, compressed);

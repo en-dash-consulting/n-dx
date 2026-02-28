@@ -1,0 +1,23 @@
+{
+  "id": "message-flow-control",
+  "name": "Message Flow Control",
+  "description": "Implements rate limiting, message coalescing, and throttling for optimal communication performance.",
+  "files": [
+    "packages/web/src/viewer/call-rate-limiter.ts",
+    "packages/web/src/viewer/message-coalescer.ts",
+    "packages/web/src/viewer/message-throttle.ts",
+    "packages/web/tests/integration/request-dedup.test.ts",
+    "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
+    "packages/web/tests/unit/viewer/message-coalescer.test.ts",
+    "packages/web/tests/unit/viewer/message-throttle.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/call-rate-limiter.ts",
+    "packages/web/src/viewer/message-coalescer.ts",
+    "packages/web/src/viewer/message-throttle.ts"
+  ],
+  "cohesion": 0.64,
+  "coupling": 0.36,
+  "fileCount": 7,
+  "lineCount": 2723
+}

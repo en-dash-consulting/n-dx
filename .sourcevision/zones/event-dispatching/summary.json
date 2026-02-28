@@ -1,0 +1,17 @@
+{
+  "id": "event-dispatching",
+  "name": "Event Dispatching",
+  "description": "Manages batched event dispatching with visibility gating for optimized UI update coordination.",
+  "files": [
+    "packages/web/src/viewer/batched-tick-dispatcher.ts",
+    "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+    "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/batched-tick-dispatcher.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 3,
+  "lineCount": 1504
+}

@@ -1,0 +1,20 @@
+{
+  "id": "websocket-infrastructure",
+  "name": "WebSocket Infrastructure",
+  "description": "Provides real-time communication capabilities with health monitoring and connection management.",
+  "files": [
+    "packages/web/src/server/websocket.ts",
+    "packages/web/src/server/ws-health-tracker.ts",
+    "packages/web/tests/unit/server/websocket.test.ts",
+    "packages/web/tests/unit/server/ws-health-integration.test.ts",
+    "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/websocket.ts",
+    "packages/web/src/server/ws-health-tracker.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 5,
+  "lineCount": 1477
+}

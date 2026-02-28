@@ -14,14 +14,11 @@ const MB = 1024 * 1024;
  * Create a tracker with an injectable clock for deterministic tests.
  */
 function createTracker(
-  config?: Parameters<typeof ProcessMemoryTracker.prototype.recordSample extends (...args: infer _P) => void ? never : never>,
   opts?: {
     startTime?: number;
     maxSamples?: number;
-    minSamplesForLeakDetection?: number;
-    leakSlopeThreshold?: number;
-    leakRSquaredThreshold?: number;
     maxCompletedHistories?: number;
+    rssWarningBytes?: number;
   },
 ): { tracker: ProcessMemoryTracker; advanceClock: (ms: number) => void } {
   let currentTime = opts?.startTime ?? 1_700_000_000_000;
@@ -29,10 +26,8 @@ function createTracker(
   const tracker = new ProcessMemoryTracker(
     {
       maxSamples: opts?.maxSamples,
-      minSamplesForLeakDetection: opts?.minSamplesForLeakDetection,
-      leakSlopeThreshold: opts?.leakSlopeThreshold,
-      leakRSquaredThreshold: opts?.leakRSquaredThreshold,
       maxCompletedHistories: opts?.maxCompletedHistories,
+      rssWarningBytes: opts?.rssWarningBytes,
     },
     { now: () => currentTime },
   );
@@ -41,25 +36,6 @@ function createTracker(
     tracker,
     advanceClock: (ms: number) => { currentTime += ms; },
   };
-}
-
-/**
- * Record a series of samples with linearly growing RSS to simulate a leak.
- */
-function recordLinearGrowth(
-  tracker: ProcessMemoryTracker,
-  advanceClock: (ms: number) => void,
-  taskId: string,
-  count: number,
-  baseRss: number,
-  growthPerSample: number,
-  intervalMs: number = 10_000,
-): void {
-  for (let i = 0; i < count; i++) {
-    if (i > 0) advanceClock(intervalMs);
-    const rss = baseRss + i * growthPerSample;
-    tracker.recordSample(taskId, "Test task", 1234, rss);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -76,8 +52,8 @@ describe("ProcessMemoryTracker", () => {
     it("merges partial config with defaults", () => {
       const tracker = new ProcessMemoryTracker({ maxSamples: 100 });
       expect(tracker.config.maxSamples).toBe(100);
-      expect(tracker.config.minSamplesForLeakDetection).toBe(
-        DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG.minSamplesForLeakDetection,
+      expect(tracker.config.maxCompletedHistories).toBe(
+        DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG.maxCompletedHistories,
       );
     });
 
@@ -96,10 +72,8 @@ describe("ProcessMemoryTracker", () => {
     it("has sensible defaults", () => {
       const cfg = DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG;
       expect(cfg.maxSamples).toBe(360);
-      expect(cfg.minSamplesForLeakDetection).toBe(6);
-      expect(cfg.leakSlopeThreshold).toBe(100 * 1024); // 100 KB/s
-      expect(cfg.leakRSquaredThreshold).toBe(0.7);
       expect(cfg.maxCompletedHistories).toBe(20);
+      expect(cfg.rssWarningBytes).toBe(512 * MB);
     });
   });
 
@@ -320,7 +294,7 @@ describe("ProcessMemoryTracker", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Leak detection
+  // Leak detection (RSS threshold)
   // -------------------------------------------------------------------------
 
   describe("detectLeaks()", () => {
@@ -333,56 +307,36 @@ describe("ProcessMemoryTracker", () => {
       expect(summary.health).toBe("healthy");
     });
 
-    it("returns healthy when process has too few samples", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-      });
+    it("returns healthy when RSS is below threshold", () => {
+      const { tracker } = createTracker({ rssWarningBytes: 512 * MB });
 
-      // Only 3 samples — not enough for leak detection
-      tracker.recordSample("task-1", "Test", 1234, 50 * MB);
-      advanceClock(10_000);
-      tracker.recordSample("task-1", "Test", 1234, 60 * MB);
-      advanceClock(10_000);
-      tracker.recordSample("task-1", "Test", 1234, 70 * MB);
+      tracker.recordSample("task-1", "Test", 1234, 100 * MB);
 
       const summary = tracker.detectLeaks();
       expect(summary.leaks).toEqual([]);
       expect(summary.health).toBe("healthy");
     });
 
-    it("detects a clear memory leak", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024, // 1 KB/s — low threshold for test
-        leakRSquaredThreshold: 0.7,
-      });
+    it("flags process when RSS exceeds threshold", () => {
+      const { tracker } = createTracker({ rssWarningBytes: 256 * MB });
 
-      // Simulate 200 KB/s growth over 10 samples at 10s intervals
-      // growth = 2MB per 10s = ~200KB/s
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 2 * MB, 10_000);
+      tracker.recordSample("task-1", "Test", 1234, 300 * MB);
 
       const summary = tracker.detectLeaks();
       expect(summary.leaks).toHaveLength(1);
       expect(summary.leaks[0]!.taskId).toBe("task-1");
       expect(summary.leaks[0]!.trend.isLeaking).toBe(true);
-      expect(summary.leaks[0]!.trend.slopeBytesSec).toBeGreaterThan(0);
-      expect(summary.leaks[0]!.trend.rSquared).toBeGreaterThan(0.9);
-      expect(summary.health).not.toBe("healthy");
+      expect(summary.leaks[0]!.trend.description).toContain("exceeds");
+      expect(summary.health).toBe("warning");
     });
 
-    it("does not flag stable memory as a leak", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 100 * 1024,
-        leakRSquaredThreshold: 0.7,
-      });
+    it("does not flag stable low-memory process", () => {
+      const { tracker, advanceClock } = createTracker({ rssWarningBytes: 512 * MB });
 
-      // Stable memory: all samples at ~50MB with tiny alternating jitter
-      const base = 50 * MB;
+      // Stable memory well below threshold
       for (let i = 0; i < 10; i++) {
         if (i > 0) advanceClock(10_000);
-        const jitter = (i % 2 === 0 ? 1 : -1) * 100;
-        tracker.recordSample("task-1", "Stable", 1234, base + jitter);
+        tracker.recordSample("task-1", "Stable", 1234, 50 * MB);
       }
 
       const summary = tracker.detectLeaks();
@@ -390,31 +344,11 @@ describe("ProcessMemoryTracker", () => {
       expect(summary.health).toBe("healthy");
     });
 
-    it("classifies severe leaks correctly", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024,
-        leakRSquaredThreshold: 0.7,
-      });
-
-      // Severe: >1MB/s growth — 10 MB per 10s interval = 1 MB/s
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 10 * MB, 10_000);
-
-      const summary = tracker.detectLeaks();
-      expect(summary.leaks).toHaveLength(1);
-      expect(summary.leaks[0]!.severity).toBe("severe");
-      expect(summary.health).toBe("critical");
-    });
-
     it("only analyzes active processes", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024,
-        leakRSquaredThreshold: 0.7,
-      });
+      const { tracker } = createTracker({ rssWarningBytes: 256 * MB });
 
-      // Record a leaking process then complete it
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 2 * MB, 10_000);
+      // Record a high-RSS process then complete it
+      tracker.recordSample("task-1", "Test", 1234, 300 * MB);
       tracker.markCompleted("task-1");
 
       const summary = tracker.detectLeaks();
@@ -422,18 +356,16 @@ describe("ProcessMemoryTracker", () => {
       expect(summary.completedProcesses).toBe(1);
     });
 
-    it("includes projected RSS at +1 hour", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024,
-        leakRSquaredThreshold: 0.7,
-      });
+    it("includes tracking duration in report", () => {
+      const { tracker, advanceClock } = createTracker({ rssWarningBytes: 256 * MB });
 
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 2 * MB, 10_000);
+      tracker.recordSample("task-1", "Test", 1234, 300 * MB);
+      advanceClock(60_000); // 60 seconds
+      tracker.recordSample("task-1", "Test", 1234, 350 * MB);
 
       const summary = tracker.detectLeaks();
       const leak = summary.leaks[0]!;
-      expect(leak.projectedRss1hBytes).toBeGreaterThan(leak.currentRssBytes);
+      expect(leak.trackingDurationSec).toBe(60);
     });
   });
 
@@ -442,19 +374,15 @@ describe("ProcessMemoryTracker", () => {
   // -------------------------------------------------------------------------
 
   describe("getLeakAlerts()", () => {
-    it("returns empty array when no leaks", () => {
+    it("returns empty array when no warnings", () => {
       const { tracker } = createTracker();
       expect(tracker.getLeakAlerts()).toEqual([]);
     });
 
-    it("returns leak reports when leaks detected", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024,
-        leakRSquaredThreshold: 0.7,
-      });
+    it("returns reports when RSS exceeds threshold", () => {
+      const { tracker } = createTracker({ rssWarningBytes: 256 * MB });
 
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 2 * MB, 10_000);
+      tracker.recordSample("task-1", "Test", 1234, 300 * MB);
 
       const alerts = tracker.getLeakAlerts();
       expect(alerts).toHaveLength(1);
@@ -463,55 +391,30 @@ describe("ProcessMemoryTracker", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Memory trend analysis
+  // Memory trend
   // -------------------------------------------------------------------------
 
-  describe("trend analysis", () => {
-    it("returns undefined trend when insufficient samples", () => {
-      const { tracker } = createTracker({
-        minSamplesForLeakDetection: 6,
-      });
+  describe("trend", () => {
+    it("returns trend showing normal range for low RSS", () => {
+      const { tracker } = createTracker({ rssWarningBytes: 512 * MB });
 
       tracker.recordSample("task-1", "Test", 1234, 50 * MB);
-      tracker.recordSample("task-1", "Test", 1234, 55 * MB);
-
-      const history = tracker.getHistory("task-1");
-      expect(history!.trend).toBeUndefined();
-    });
-
-    it("computes trend with description for growing memory", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 1024,
-        leakRSquaredThreshold: 0.7,
-      });
-
-      recordLinearGrowth(tracker, advanceClock, "task-1", 10, 50 * MB, 2 * MB, 10_000);
-
-      const history = tracker.getHistory("task-1");
-      expect(history!.trend).toBeDefined();
-      expect(history!.trend!.isLeaking).toBe(true);
-      expect(history!.trend!.description).toContain("potential leak");
-    });
-
-    it("describes stable memory as within normal range", () => {
-      const { tracker, advanceClock } = createTracker({
-        minSamplesForLeakDetection: 6,
-        leakSlopeThreshold: 100 * 1024, // 100 KB/s threshold
-        leakRSquaredThreshold: 0.7,
-      });
-
-      // Slight growth under threshold: 1KB per 10s = 0.1 KB/s
-      const base = 50 * MB;
-      for (let i = 0; i < 10; i++) {
-        if (i > 0) advanceClock(10_000);
-        tracker.recordSample("task-1", "Test", 1234, base + i * 1024);
-      }
 
       const history = tracker.getHistory("task-1");
       expect(history!.trend).toBeDefined();
       expect(history!.trend!.isLeaking).toBe(false);
-      expect(history!.trend!.description).not.toContain("potential leak");
+      expect(history!.trend!.description).toContain("normal range");
+    });
+
+    it("returns trend showing warning for high RSS", () => {
+      const { tracker } = createTracker({ rssWarningBytes: 256 * MB });
+
+      tracker.recordSample("task-1", "Test", 1234, 300 * MB);
+
+      const history = tracker.getHistory("task-1");
+      expect(history!.trend).toBeDefined();
+      expect(history!.trend!.isLeaking).toBe(true);
+      expect(history!.trend!.description).toContain("exceeds");
     });
   });
 

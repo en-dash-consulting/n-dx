@@ -1,0 +1,27 @@
+{
+  "id": "interactive-data-visualization",
+  "name": "Interactive Data Visualization",
+  "description": "Handles interactive graph rendering, file browsing, and zone visualization with drag-and-drop capabilities.",
+  "files": [
+    "packages/web/src/viewer/graph/renderer.ts",
+    "packages/web/src/viewer/hooks/use-file-edges.ts",
+    "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+    "packages/web/src/viewer/hooks/use-zone-drag.ts",
+    "packages/web/src/viewer/utils.ts",
+    "packages/web/src/viewer/views/files.ts",
+    "packages/web/src/viewer/views/graph.ts",
+    "packages/web/src/viewer/views/zone-types.ts",
+    "packages/web/src/viewer/views/zones.ts",
+    "packages/web/tests/unit/viewer/label-utils.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/utils.ts",
+    "packages/web/src/viewer/views/files.ts",
+    "packages/web/src/viewer/views/graph.ts",
+    "packages/web/src/viewer/views/zones.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 10,
+  "lineCount": 4661
+}

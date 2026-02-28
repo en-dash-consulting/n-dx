@@ -1,0 +1,21 @@
+{
+  "id": "memory-monitoring-system",
+  "name": "Memory Monitoring System",
+  "description": "Provides real-time memory usage tracking and warning components for the web viewer.",
+  "files": [
+    "packages/web/src/viewer/components/memory-warning.ts",
+    "packages/web/src/viewer/hooks/use-memory-monitor.ts",
+    "packages/web/src/viewer/memory-monitor.ts",
+    "packages/web/tests/unit/viewer/memory-monitor.test.ts",
+    "packages/web/tests/unit/viewer/memory-warning.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/memory-warning.ts",
+    "packages/web/src/viewer/hooks/use-memory-monitor.ts",
+    "packages/web/src/viewer/memory-monitor.ts"
+  ],
+  "cohesion": 0.3,
+  "coupling": 0.7,
+  "fileCount": 5,
+  "lineCount": 1133
+}

@@ -8,7 +8,7 @@ Zone: Cli (`hench/cli`)
 Files: 14, Cohesion: 0.67, Coupling: 0.33
 Description: 14 files, primarily TypeScript
 Entry points: packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/cli/commands/constants.ts
-Lines: 1575
+Lines: 1589
 
 </zone>
 
@@ -18,8 +18,8 @@ packages/hench/src/cli/commands/constants.ts (TypeScript, 55 lines, source)
 packages/hench/src/cli/commands/show.ts (TypeScript, 114 lines, source)
 packages/hench/src/cli/commands/status.ts (TypeScript, 76 lines, source)
 packages/hench/src/cli/commands/task-lookup.ts (TypeScript, 83 lines, source)
-packages/hench/src/cli/errors.ts (TypeScript, 206 lines, source)
-packages/hench/src/cli/help.ts (TypeScript, 198 lines, source)
+packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
+packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
 packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
 packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
 packages/hench/tests/unit/cli/commands/constants.test.ts (TypeScript, 42 lines, test)

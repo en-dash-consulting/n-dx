@@ -1,0 +1,17 @@
+{
+  "id": "hierarchical-navigation",
+  "name": "Hierarchical Navigation",
+  "description": "Tree view components and route handlers for displaying hierarchical data structures.",
+  "files": [
+    "packages/web/src/viewer/components/data-display/tree-view.ts",
+    "packages/web/src/viewer/views/routes.ts",
+    "packages/web/tests/unit/viewer/tree-view.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/routes.ts"
+  ],
+  "cohesion": 0.3,
+  "coupling": 0.7,
+  "fileCount": 3,
+  "lineCount": 549
+}

@@ -1,0 +1,19 @@
+{
+  "id": "refresh-throttling-system",
+  "name": "Refresh Throttling System",
+  "description": "Controls refresh operation frequency to prevent excessive API calls and improve memory-aware performance.",
+  "files": [
+    "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
+    "packages/web/src/viewer/refresh-throttle.ts",
+    "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+    "packages/web/tests/unit/viewer/refresh-throttle.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
+    "packages/web/src/viewer/refresh-throttle.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 4,
+  "lineCount": 2039
+}

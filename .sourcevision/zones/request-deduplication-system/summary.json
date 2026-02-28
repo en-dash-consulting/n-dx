@@ -1,0 +1,17 @@
+{
+  "id": "request-deduplication-system",
+  "name": "Request Deduplication System",
+  "description": "Provides request deduplication capabilities to prevent redundant API calls and improve performance.",
+  "files": [
+    "packages/web/src/viewer/request-dedup.ts",
+    "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts",
+    "packages/web/tests/unit/viewer/request-dedup.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/request-dedup.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 598
+}

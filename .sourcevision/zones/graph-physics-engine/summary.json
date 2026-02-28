@@ -1,0 +1,17 @@
+{
+  "id": "graph-physics-engine",
+  "name": "Graph Physics Engine",
+  "description": "Handles physics calculations and layout algorithms for interactive graph visualizations.",
+  "files": [
+    "packages/web/src/viewer/graph/physics.ts",
+    "packages/web/tests/unit/viewer/graph-destroy.test.ts",
+    "packages/web/tests/unit/viewer/graph-layout.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/graph/physics.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 3,
+  "lineCount": 888
+}

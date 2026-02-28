@@ -6926,7 +6926,19 @@
                 "Web UI displays current workflow configuration in editable form with form controls",
                 "Configuration changes show preview of impact on workflow behavior",
                 "Changes are validated and applied immediately to workflow configuration",
-                "Configuration changes persist across hench runs"
+                "Configuration changes persist across hench runs",
+                "Search input appears prominently in Rex dashboard header",
+                "Shows search suggestions after 2+ characters typed",
+                "Debounces input to avoid excessive API calls (300ms delay)",
+                "Displays search history dropdown when input is focused",
+                "Displays search results in organized list with item hierarchy",
+                "Shows item title, type (epic/feature/task), and description snippet",
+                "Includes navigation links to view full item details",
+                "Highlights matching text within results",
+                "Paginates results after 20 items with load more button",
+                "Shows loading spinner during search API calls",
+                "Displays empty state message when no results found",
+                "Preserves search state when navigating between results"
               ],
               "priority": "high",
               "tags": [
@@ -6934,11 +6946,28 @@
                 "web",
                 "ui",
                 "hench",
-                "configuration"
+                "configuration",
+                "frontend",
+                "components",
+                "ux",
+                "navigation",
+                "pagination",
+                "loading"
               ],
               "source": "smart-add",
               "startedAt": "2026-02-11T04:14:24.298Z",
               "completedAt": "2026-02-11T05:51:25.283Z",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:1:0",
+                  "proposalTitle": "Create comprehensive search interface with input and results",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.6460215863453815,
+                  "mergedAt": "2026-02-27T18:26:10.896Z",
+                  "source": "smart-add"
+                }
+              ],
               "children": [
                 {
                   "id": "4665728f-a7cc-4f9d-83f2-66d88188433a",
@@ -13238,10 +13267,21 @@
           "title": "Backend Deletion API Implementation",
           "status": "completed",
           "level": "feature",
-          "description": "Implement backend functions and CLI commands to support deletion of epics and tasks from the PRD structure",
+          "description": "Build complete server-side search infrastructure including API endpoints, indexing system, and query processing with relevance scoring",
           "source": "smart-add",
           "startedAt": "2026-02-24T15:54:29.578Z",
           "completedAt": "2026-02-24T15:54:29.578Z",
+          "mergedProposals": [
+            {
+              "proposalNodeKey": "p0:feature:0",
+              "proposalTitle": "Search Backend Implementation",
+              "proposalKind": "feature",
+              "reason": "semantic_title",
+              "score": 0.7142857142857143,
+              "mergedAt": "2026-02-27T18:26:10.896Z",
+              "source": "smart-add"
+            }
+          ],
           "children": [
             {
               "id": "b16f5baa-e899-4933-9b57-edaf57e82cf6",
@@ -13335,6 +13375,40 @@
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-24T15:20:05.533Z"
               }
+            },
+            {
+              "id": "235cf776-053a-4647-9d0e-1bd5644a7ddc",
+              "title": "Build complete search backend infrastructure",
+              "status": "completed",
+              "level": "task",
+              "description": "Create comprehensive search system including REST endpoints, searchable index of PRD content, and query processing with relevance scoring for fast text matching across all PRD items",
+              "acceptanceCriteria": [
+                "GET /api/search endpoint accepts query parameter and returns JSON results",
+                "Search results include item ID, title, description, and relevance score",
+                "Response time under 200ms for typical PRD sizes (1000+ items)",
+                "Supports search across epics, features, tasks, and subtasks",
+                "Index includes item titles, descriptions, and acceptance criteria text",
+                "Index updates automatically when PRD items are modified",
+                "Supports fuzzy matching and partial word matching",
+                "Index rebuild completes in under 5 seconds for large PRDs",
+                "Supports exact phrase matching with quotes",
+                "Ranks results by relevance (title matches higher than description)",
+                "Handles multi-word queries with AND/OR logic",
+                "Returns results sorted by relevance score descending"
+              ],
+              "priority": "high",
+              "tags": [
+                "backend",
+                "api",
+                "search",
+                "indexing",
+                "performance",
+                "algorithms",
+                "relevance"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-27T18:52:06.310Z",
+              "completedAt": "2026-02-27T18:58:53.197Z"
             }
           ]
         },
@@ -15600,6 +15674,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-02-27T04:40:55.059Z",
+      "completedAt": "2026-02-27T04:40:55.059Z",
       "children": [
         {
           "id": "baf1a80c-fbe1-4df9-a08b-d1cfec3d0e6f",
@@ -15791,9 +15867,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-02-27T04:40:55.059Z",
-      "completedAt": "2026-02-27T04:40:55.059Z"
+      ]
     },
     {
       "id": "48fb83fc-91ea-4729-b05e-a9f74474a4b2",
@@ -16578,6 +16652,63 @@
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-25T19:56:09.081Z"
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03b055b1-d640-470a-b273-c5c6f0dd5925",
+      "title": "Rex Web UI Search Interface",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-02-27T19:10:37.490Z",
+      "completedAt": "2026-02-27T19:10:37.490Z",
+      "children": [
+        {
+          "id": "5864049e-a3ea-4724-bc52-af42daf9b36b",
+          "title": "Search UI Components and Advanced Features",
+          "status": "completed",
+          "level": "feature",
+          "description": "Create comprehensive user interface for search functionality including input components, results display, advanced filtering, and keyboard navigation",
+          "source": "smart-add",
+          "startedAt": "2026-02-27T19:10:37.405Z",
+          "completedAt": "2026-02-27T19:10:37.405Z",
+          "children": [
+            {
+              "id": "0ca8b8d1-72a1-45b7-bec6-4ddf736ca803",
+              "title": "Add advanced search features and keyboard navigation",
+              "status": "completed",
+              "level": "task",
+              "description": "Enhance search with filter controls, result highlighting with context, and keyboard shortcuts for efficient navigation",
+              "acceptanceCriteria": [
+                "Filter by item type (epic, feature, task, subtask) with checkboxes",
+                "Filter by status (pending, in_progress, completed, blocked) with dropdown",
+                "Filter by priority level (critical, high, medium, low)",
+                "Filters persist during search session and show active count",
+                "Highlights exact matching terms in yellow within result text",
+                "Shows 50 characters of context around matches in descriptions",
+                "Highlights partial matches in different color (light blue)",
+                "Truncates long content with ellipsis while preserving highlights",
+                "Ctrl+K or Cmd+K opens search input and focuses cursor",
+                "Escape key clears search and closes results",
+                "Arrow keys navigate through search results",
+                "Enter key navigates to selected search result"
+              ],
+              "priority": "medium",
+              "tags": [
+                "frontend",
+                "filters",
+                "ux",
+                "highlighting",
+                "context",
+                "keyboard",
+                "accessibility"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-27T18:59:36.198Z",
+              "completedAt": "2026-02-27T19:10:37.245Z"
             }
           ]
         }
