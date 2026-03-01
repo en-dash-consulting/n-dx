@@ -20,6 +20,7 @@ import {
   handleGetCapabilities,
   handleReorganize,
   handleHealth,
+  handleFacets,
 } from "./mcp-tools.js";
 
 /**
@@ -163,6 +164,15 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool("health", "Get structure health score with dimensional breakdown (depth, balance, granularity, completeness, staleness)", {},
     async () => handleHealth(store));
+
+  server.tool(
+    "facets",
+    "List configured facets with distribution, or suggest facets for an item",
+    {
+      itemId: z.string().optional().describe("Item ID to get facet suggestions for (omit for overview)"),
+    },
+    async (args) => handleFacets(store, args),
+  );
 
   server.tool("get_capabilities", "Get Rex server capabilities and configuration", {},
     async () => handleGetCapabilities(store));

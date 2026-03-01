@@ -17,6 +17,10 @@ import { isRootLevel } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
+import { findAutoCompletions } from "../../core/parent-completion.js";
+import { validateStructure } from "../../core/structural.js";
+import { groupByFacet, getFacetValue } from "../../core/facets.js";
+import { walkTree } from "../../core/tree.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
 
@@ -258,6 +262,56 @@ function formatCoverageSummary(verifyResult: VerifyResult): string {
   return `${coveredCriteria}/${totalCriteria} criteria covered across ${totalTasks} task(s)`;
 }
 
+/** Render items grouped by a facet key. */
+function renderGroupedByFacet(items: PRDItem[], facetKey: string): string[] {
+  const groups = groupByFacet(items, facetKey);
+  const lines: string[] = [];
+
+  // Items without the facet
+  const ungrouped: PRDItem[] = [];
+  for (const { item } of walkTree(items)) {
+    if (!getFacetValue(item, facetKey)) {
+      ungrouped.push(item);
+    }
+  }
+
+  for (const [value, groupItems] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const stats = computeStats(groupItems);
+    lines.push(`${facetKey}:${value} (${stats.completed}/${stats.total} complete)`);
+    for (const item of groupItems) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      const priority = item.priority ? ` [${item.priority}]` : "";
+      lines.push(`  ${icon} ${item.title}${priority}`);
+    }
+    lines.push("");
+  }
+
+  if (ungrouped.length > 0) {
+    lines.push(`(untagged) (${ungrouped.length} items)`);
+    for (const item of ungrouped) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      lines.push(`  ${icon} ${item.title}`);
+    }
+  }
+
+  return lines;
+}
+
+/** Find stale items (in_progress > 48h). */
+function findStaleItems(items: PRDItem[], now: Date = new Date()): PRDItem[] {
+  const stale: PRDItem[] = [];
+  const threshold = 48 * 60 * 60 * 1000; // 48h in ms
+  for (const { item } of walkTree(items)) {
+    if (item.status === "in_progress" && item.startedAt) {
+      const started = new Date(item.startedAt).getTime();
+      if (!isNaN(started) && now.getTime() - started > threshold) {
+        stale.push(item);
+      }
+    }
+  }
+  return stale;
+}
+
 export async function cmdStatus(
   dir: string,
   flags: Record<string, string>,
@@ -266,6 +320,8 @@ export async function cmdStatus(
   const showCoverage = flags.coverage === "true";
   const showTokens = flags.tokens !== "false";
   const showAll = flags.all === "true";
+  const groupBy = flags["group-by"];
+  const showStaleOnly = flags.stale === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -320,12 +376,37 @@ export async function cmdStatus(
     return;
   }
 
+  // --stale: show only stale items
+  if (showStaleOnly) {
+    const staleItems = findStaleItems(doc.items);
+    if (staleItems.length === 0) {
+      result("No stale items (in_progress > 48h).");
+      return;
+    }
+    result(`Stale items (in_progress > 48h): ${staleItems.length}`);
+    result("");
+    for (const item of staleItems) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      const ts = item.startedAt ? ` (started ${formatTimestamp(item.startedAt)})` : "";
+      result(`  ${icon} ${item.title}${ts}`);
+    }
+    return;
+  }
+
   // Default and --format=tree both render the tree view
   result(`PRD: ${doc.title}`);
   result("");
 
   if (doc.items.length === 0) {
     result("  No items yet. Run: rex add epic --title=\"...\" " + dir);
+    return;
+  }
+
+  // --group-by: render grouped by facet instead of hierarchy
+  if (groupBy) {
+    for (const line of renderGroupedByFacet(doc.items, groupBy)) {
+      result(line);
+    }
     return;
   }
 
@@ -377,6 +458,40 @@ export async function cmdStatus(
       }
     } catch {
       // Config unavailable — skip budget check
+    }
+  }
+
+  // Auto-completion hints: parents that could be auto-completed
+  const autoCompletable: Array<{ id: string; title: string }> = [];
+  for (const { item } of walkTree(doc.items)) {
+    if (item.children && item.children.length > 0) {
+      const { completedItems } = findAutoCompletions(doc.items, item.children[0].id);
+      for (const ci of completedItems) {
+        if (!autoCompletable.find((a) => a.id === ci.id)) {
+          autoCompletable.push({ id: ci.id, title: ci.title });
+        }
+      }
+    }
+  }
+  if (autoCompletable.length > 0) {
+    info("");
+    info("Auto-completable:");
+    for (const ac of autoCompletable) {
+      info(`  ● ${ac.title} — all children done, can be marked completed`);
+    }
+  }
+
+  // Stale item warnings
+  const staleItems = findStaleItems(doc.items);
+  if (staleItems.length > 0) {
+    warn("");
+    warn(`Stale items (in_progress > 48h): ${staleItems.length}`);
+    for (const item of staleItems.slice(0, 5)) {
+      const ts = item.startedAt ? ` (started ${formatTimestamp(item.startedAt)})` : "";
+      warn(`  ⚠ ${item.title}${ts}`);
+    }
+    if (staleItems.length > 5) {
+      warn(`  ... and ${staleItems.length - 5} more (use --stale to see all)`);
     }
   }
 }

@@ -74,3 +74,11 @@ export {
   computeRequirementsSummary,
 } from "rex";
 export type { EpicStats, PriorityDistribution, RequirementsSummary } from "rex";
+
+// ---- Rex health -------------------------------------------------------------
+export { computeHealthScore, formatHealthScore } from "rex";
+export type { StructureHealthScore, HealthDimensions, HealthOptions } from "rex";
+
+// ---- Rex reorganize ---------------------------------------------------------
+export { detectReorganizations, applyProposals, formatApplyResult } from "rex";
+export type { ReorganizationProposal, ReorganizationPlan, ApplyResult } from "rex";

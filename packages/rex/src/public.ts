@@ -82,6 +82,7 @@ export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
 export type {
   PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
+  FacetDefinition,
 } from "./schema/v1.js";
 export {
   PRIORITY_ORDER,
@@ -264,6 +265,37 @@ export type {
   EnrichedRecommendation, RecommendationMeta, CreationResult,
   SkippedRecommendation, ReparentedRecommendation,
 } from "./recommend/create-from-recommendations.js";
+
+// ---- Core: facets -----------------------------------------------------------
+
+export {
+  isFacetTag,
+  parseFacetTag,
+  getFacetValue,
+  setFacetValue,
+  removeFacet,
+  getItemFacets,
+  getItemsByFacet,
+  groupByFacet,
+  suggestFacets,
+  computeFacetDistribution,
+} from "./core/facets.js";
+export type { FacetConfig, FacetSuggestion } from "./core/facets.js";
+
+// ---- Core: scope creep detection --------------------------------------------
+
+export {
+  detectScopeCreep,
+  setInitialChildCount,
+} from "./core/scope-creep.js";
+export type { ScopeCreepResult } from "./core/scope-creep.js";
+
+// ---- Core: code coverage cross-reference ------------------------------------
+
+export { crossReferenceChanges } from "./core/code-coverage.js";
+export type {
+  AffectedTask, UncoveredChange, CrossReferenceResult,
+} from "./core/code-coverage.js";
 
 // ---- MCP server factory -----------------------------------------------------
 

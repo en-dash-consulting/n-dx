@@ -13,6 +13,8 @@ import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
+import { HealthGauge } from "../visualization/index.js";
+import { ReorganizePanel } from "../components/prd-tree/reorganize-panel.js";
 import { usePolling } from "../hooks/use-polling.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -51,6 +53,20 @@ interface NextTask {
   priority?: string;
   description?: string;
   tags?: string[];
+}
+
+interface HealthDimensions {
+  depth: number;
+  balance: number;
+  granularity: number;
+  completeness: number;
+  staleness: number;
+}
+
+interface HealthData {
+  overall: number;
+  dimensions: HealthDimensions;
+  suggestions: string[];
 }
 
 interface DashboardData {
@@ -238,6 +254,9 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [reorgOpen, setReorgOpen] = useState(false);
+  const [reorgCount, setReorgCount] = useState(0);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -258,9 +277,33 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     }
   }, []);
 
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rex/health");
+      if (res.ok) {
+        setHealth(await res.json());
+      }
+    } catch {
+      // Non-critical — silently skip
+    }
+  }, []);
+
+  const fetchReorgCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rex/reorganize");
+      if (res.ok) {
+        const data = await res.json();
+        setReorgCount(data.proposals?.length ?? 0);
+      }
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
   useEffect(() => {
-    fetchDashboard().then(() => setLoading(false));
-  }, [fetchDashboard]);
+    Promise.all([fetchDashboard(), fetchHealth(), fetchReorgCount()])
+      .then(() => setLoading(false));
+  }, [fetchDashboard, fetchHealth, fetchReorgCount]);
 
   // Visibility-aware polling via polling manager
   usePolling("rex-dashboard", fetchDashboard, 10_000);
@@ -471,6 +514,41 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             )
           : null,
 
+        // Structure health card
+        health
+          ? h("div", { class: "rex-dash-panel" },
+              h("h3", { class: "rex-dash-panel-title" }, "Structure Health"),
+              h("div", { class: "rex-dash-health" },
+                h("div", { class: "rex-dash-health-gauge" },
+                  h(HealthGauge, { value: health.overall / 100, label: "Overall", size: 80 }),
+                ),
+                h("div", { class: "rex-dash-health-dims" },
+                  ...(["depth", "balance", "granularity", "completeness", "staleness"] as const).map((dim) =>
+                    h("div", { key: dim, class: "rex-dash-health-dim" },
+                      h("span", { class: "rex-dash-health-dim-label" },
+                        dim.charAt(0).toUpperCase() + dim.slice(1),
+                      ),
+                      h("div", { class: "rex-dash-health-dim-track" },
+                        h("div", {
+                          class: `rex-dash-health-dim-fill${health.dimensions[dim] >= 70 ? " good" : health.dimensions[dim] >= 40 ? " mid" : " low"}`,
+                          style: `width: ${health.dimensions[dim]}%`,
+                        }),
+                      ),
+                      h("span", { class: "rex-dash-health-dim-val" }, String(Math.round(health.dimensions[dim]))),
+                    ),
+                  ),
+                ),
+                health.suggestions.length > 0
+                  ? h("ul", { class: "rex-dash-health-suggestions" },
+                      health.suggestions.slice(0, 3).map((s, i) =>
+                        h("li", { key: i }, s),
+                      ),
+                    )
+                  : null,
+              ),
+            )
+          : null,
+
         // Status breakdown (small summary)
         h("div", { class: "rex-dash-panel" },
           h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
@@ -524,10 +602,25 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   class: "rex-dash-action-btn",
                   onClick: () => navigateTo("validation" as ViewId),
                 }, "Validate PRD"),
+                h("button", {
+                  class: "rex-dash-action-btn",
+                  onClick: () => setReorgOpen(true),
+                }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
               ),
             )
           : null,
       ),
     ),
+
+    // Reorganize slide-out panel
+    h(ReorganizePanel, {
+      open: reorgOpen,
+      onClose: () => setReorgOpen(false),
+      onApplied: () => {
+        fetchDashboard();
+        fetchHealth();
+        fetchReorgCount();
+      },
+    }),
   );
 }

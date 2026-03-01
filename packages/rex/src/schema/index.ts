@@ -40,6 +40,7 @@ export type {
   PRDItem,
   PRDDocument,
   RexConfig,
+  FacetDefinition,
   BudgetThresholds,
   LogEntry,
   TokenUsage,

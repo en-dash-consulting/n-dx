@@ -218,6 +218,13 @@ export interface BudgetThresholds {
   abort?: boolean;
 }
 
+/** Configuration for a single facet dimension (stored in config.json). */
+export interface FacetDefinition {
+  label: string;
+  values: string[];
+  required?: boolean;
+}
+
 export interface RexConfig {
   schema: string;
   project: string;
@@ -227,6 +234,8 @@ export interface RexConfig {
   sourcevision?: string;
   model?: string;
   budget?: BudgetThresholds;
+  /** Facet dimensions for item classification (e.g. component, concern). */
+  facets?: Record<string, FacetDefinition>;
   future?: Record<string, unknown>;
   [key: string]: unknown;
 }

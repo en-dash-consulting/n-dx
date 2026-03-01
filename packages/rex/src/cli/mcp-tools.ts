@@ -23,6 +23,7 @@ import { verify } from "../core/verify.js";
 import { detectReorganizations } from "../core/reorganize.js";
 import { applyProposals } from "../core/reorganize-executor.js";
 import { computeHealthScore } from "../core/health.js";
+import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -524,6 +525,39 @@ export async function handleHealth(store: PRDStore): Promise<McpResult> {
     const doc = await store.loadDocument();
     const health = computeHealthScore(doc.items);
     return textResult(JSON.stringify(health, null, 2));
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+export async function handleFacets(
+  store: PRDStore,
+  args: { itemId?: string },
+): Promise<McpResult> {
+  try {
+    const config = await store.loadConfig();
+    const facetConfig = config.facets ?? {};
+    const doc = await store.loadDocument();
+
+    if (args.itemId) {
+      // Suggest facets for a specific item
+      const entry = findItem(doc.items, args.itemId);
+      if (!entry) {
+        return textResult(`Item "${args.itemId}" not found.`, true);
+      }
+      const parent = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
+      const currentFacets = getItemFacets(entry.item);
+      const suggestions = Object.keys(facetConfig).length > 0
+        ? suggestFacets(entry.item, facetConfig, parent)
+        : [];
+      return textResult(JSON.stringify({ itemId: args.itemId, currentFacets, suggestions }, null, 2));
+    }
+
+    // List configured facets + distribution
+    const distribution = Object.keys(facetConfig).length > 0
+      ? computeFacetDistribution(doc.items, facetConfig)
+      : {};
+    return textResult(JSON.stringify({ facets: facetConfig, distribution }, null, 2));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
   }

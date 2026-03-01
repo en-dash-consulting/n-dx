@@ -89,6 +89,9 @@ import {
   computeRequirementsSummary,
   isRootLevel,
   isWorkItem,
+  computeHealthScore,
+  detectReorganizations,
+  applyProposals,
 } from "./rex-gateway.js";
 
 const REX_PREFIX = "/api/rex/";
@@ -489,6 +492,92 @@ function routeExecution(
   return false;
 }
 
+/** Health and reorganize routes. */
+function routeHealthReorganize(
+  path: string, method: string,
+  req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): boolean | Promise<boolean> {
+  // GET /api/rex/health — structure health score
+  if (path === "health" && method === "GET") {
+    const doc = loadPRD(ctx);
+    if (!doc) {
+      errorResponse(res, 404, "No PRD data found");
+      return true;
+    }
+    const health = computeHealthScore(doc.items);
+    jsonResponse(res, 200, health);
+    return true;
+  }
+
+  // GET /api/rex/reorganize — detect reorganization proposals
+  if (path === "reorganize" && method === "GET") {
+    const doc = loadPRD(ctx);
+    if (!doc) {
+      errorResponse(res, 404, "No PRD data found");
+      return true;
+    }
+    if (doc.items.length === 0) {
+      jsonResponse(res, 200, { proposals: [], stats: {} });
+      return true;
+    }
+    const plan = detectReorganizations(doc.items);
+    jsonResponse(res, 200, {
+      proposals: plan.proposals.map((p) => ({
+        id: p.id,
+        type: p.type,
+        description: p.description,
+        risk: p.risk,
+        confidence: p.confidence,
+        items: p.items,
+      })),
+      stats: plan.stats,
+    });
+    return true;
+  }
+
+  // POST /api/rex/reorganize/apply — apply selected proposals
+  if (path === "reorganize/apply" && method === "POST") {
+    return (async () => {
+      const doc = loadPRD(ctx);
+      if (!doc) {
+        errorResponse(res, 404, "No PRD data found");
+        return true;
+      }
+
+      const body = await readBody(req);
+      let proposalIds: number[];
+      try {
+        const parsed = JSON.parse(body);
+        proposalIds = parsed.proposalIds ?? [];
+      } catch {
+        errorResponse(res, 400, "Invalid JSON body");
+        return true;
+      }
+
+      const plan = detectReorganizations(doc.items);
+      const toApply = proposalIds.length > 0
+        ? plan.proposals.filter((p) => proposalIds.includes(p.id))
+        : plan.proposals.filter((p) => p.risk === "low");
+
+      if (toApply.length === 0) {
+        jsonResponse(res, 200, { applied: 0, failed: 0, results: [] });
+        return true;
+      }
+
+      const result = applyProposals(doc.items, toApply);
+      if (result.applied > 0) {
+        savePRD(ctx, doc);
+        if (broadcast) broadcast({ type: "rex:prd-changed", source: "reorganize" });
+      }
+      jsonResponse(res, 200, result);
+      return true;
+    })();
+  }
+
+  return false;
+}
+
 /**
  * Handle Rex API requests. Returns true if the request was handled.
  *
@@ -499,6 +588,7 @@ function routeExecution(
  * - Prune (preview, execute)
  * - Proposals (analyze, proposals, smart-add, batch-import)
  * - Execution (epic-by-epic, status, pause, resume)
+ * - Health & reorganize (health score, proposals, apply)
  */
 export function handleRexRoute(
   req: IncomingMessage,
@@ -533,6 +623,9 @@ export function handleRexRoute(
 
   const execResult = routeExecution(path, method, req, res, ctx, broadcast);
   if (execResult !== false) return execResult;
+
+  const healthResult = routeHealthReorganize(path, method, req, res, ctx, broadcast);
+  if (healthResult !== false) return healthResult;
 
   return false;
 }

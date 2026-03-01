@@ -24,6 +24,7 @@ const EXPECTED_TOOLS = [
   "verify_criteria",
   "reorganize",
   "health",
+  "facets",
   "get_capabilities",
 ];
 
