@@ -234,10 +234,15 @@ export async function createItemsFromRecommendations(
           (d) => d.indexB === idx,
         );
 
-        // Completed-item conflicts: reparent as child (if level allows demotion)
+        // Completed-item conflicts: reparent as child (if level allows demotion
+        // AND the matched item's level is a valid parent for the demoted level)
         if (conflict && conflict.matchedItem.status === "completed") {
           const childLevel = CHILD_LEVEL[rec.level];
-          if (childLevel) {
+          const allowedParents = childLevel ? LEVEL_HIERARCHY[childLevel] : undefined;
+          const parentLevelValid = allowedParents?.some(
+            (p) => p === conflict.matchedItem.level,
+          );
+          if (childLevel && parentLevelValid) {
             reparented.push({
               index: idx,
               title: rec.title,

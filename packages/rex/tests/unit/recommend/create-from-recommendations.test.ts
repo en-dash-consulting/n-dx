@@ -1685,6 +1685,78 @@ describe("createItemsFromRecommendations", () => {
       expect(result.reparented).toBeUndefined();
     });
 
+    it("skips feature recommendation matched against completed task (invalid parent level)", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "completed-task",
+          title: "Fix auth flow",
+          status: "completed",
+          level: "task",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Fix auth flow",
+            level: "feature",
+            description: "Updated auth findings",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      // Feature demoted to task, but task can't be child of task → skip
+      expect(result.created).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.reparented).toBeUndefined();
+
+      // PRD unchanged
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(1);
+      expect(doc.items[0].children).toBeUndefined();
+    });
+
+    it("skips epic recommendation matched against completed task (invalid parent level)", async () => {
+      await writeFixtureProject(tmpDir, [
+        {
+          id: "completed-task",
+          title: "Improve security",
+          status: "completed",
+          level: "task",
+        },
+      ]);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      const result = await createItemsFromRecommendations(
+        store,
+        [
+          {
+            title: "Improve security",
+            level: "epic",
+            description: "New security epic",
+            priority: "high",
+            source: "sourcevision",
+          },
+        ],
+        { conflictStrategy: "skip" },
+      );
+
+      // Epic demoted to feature, but feature can't be child of task → skip
+      expect(result.created).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.reparented).toBeUndefined();
+
+      // PRD unchanged
+      const doc = await readPrd(tmpDir);
+      expect(doc.items).toHaveLength(1);
+      expect(doc.items[0].children).toBeUndefined();
+    });
+
     it("still skips active-item conflicts alongside reparented ones", async () => {
       await writeFixtureProject(tmpDir, [
         {
