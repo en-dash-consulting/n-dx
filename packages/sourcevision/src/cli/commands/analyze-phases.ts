@@ -193,6 +193,30 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
   }
 }
 
+// ── Hints loading ────────────────────────────────────────────────────
+
+/**
+ * Load project hints from `.sourcevision/hints.md`.
+ * Strips HTML comments and blank lines. Returns undefined if file is missing or empty after stripping.
+ */
+export function loadHints(svDir: string): string | undefined {
+  const hintsPath = join(svDir, "hints.md");
+  if (!existsSync(hintsPath)) return undefined;
+  try {
+    const raw = readFileSync(hintsPath, "utf-8");
+    // Strip HTML comments (single-line and multi-line)
+    const stripped = raw.replace(/<!--[\s\S]*?-->/g, "");
+    const trimmed = stripped
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .join("\n")
+      .trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ── Phase 4: Zones ───────────────────────────────────────────────────
 
 export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): Promise<void> {
@@ -229,12 +253,15 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     // Load classifications for archetype labels in enrichment prompts
     const fileArchetypes = loadFileArchetypes(ctx.svDir);
 
+    // Load project hints for enrichment context
+    const hints = loadHints(ctx.svDir);
+
     const onReset = (fromPass: number, toPass: number) => {
       info(`  Detected changes, resetting from Pass ${fromPass} to Pass ${toPass}`);
     };
 
     let zonesResult = await analyzeZones(inventory, importsData, {
-      enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset,
+      enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
@@ -252,7 +279,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       for (let p = 0; p < passesNeeded; p++) {
         info(`\n[phase 4] Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
-          enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset,
+          enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {

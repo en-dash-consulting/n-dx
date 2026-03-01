@@ -71,6 +71,7 @@ export async function enrichZonesWithAI(
   previousZones?: Zones,
   fileArchetypes?: Map<string, string | null>,
   currentContentHashes?: Record<string, string>,
+  hints?: string,
 ): Promise<EnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
@@ -117,7 +118,7 @@ export async function enrichZonesWithAI(
   // 1. Meta-evaluation path (pass 5+) — single prompt, no batching
   if (isMetaPass && existingFindings.length > 0) {
     const metaResult = await runMetaEvaluation(
-      zones, existingFindings, crossings, passNumber, passConfig
+      zones, existingFindings, crossings, passNumber, passConfig, hints,
     );
     if (!metaResult) return empty;
 
@@ -198,7 +199,7 @@ export async function enrichZonesWithAI(
       const result = await enrichBatch(
         batches[bi], zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
-        enrichedNames, fileArchetypes,
+        enrichedNames, fileArchetypes, hints,
       );
       if (result && "authError" in result) {
         authFailed = true;

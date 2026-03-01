@@ -151,6 +151,7 @@ export function buildMetaPrompt(
   zones: Zone[],
   findings: Finding[],
   crossings: ZoneCrossing[],
+  hints?: string,
 ): string {
   // Group findings by zone
   const findingsByZone = new Map<string, Finding[]>();
@@ -186,7 +187,7 @@ Global Findings:
 ${globalStr || "  (none)"}
 
 Cross-zone crossings: ${crossings.length} total across ${new Set(crossings.map(c => c.fromZone + "\u2192" + c.toZone)).size} zone pairs.
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 IMPORTANT CONSTRAINTS:
 - Findings annotated "pass 0: automated heuristic" come from deterministic code analysis (call-graph edge counting, zone metric thresholds). Do NOT escalate their severity unless corroborated by MULTIPLE independent findings pointing to the same root cause. A single heuristic finding alone is never sufficient evidence for "critical" severity.
 - Do NOT generate specific file decomposition suggestions (e.g. "split X into Y and Z", "extract module from X") unless the underlying metric exceeds 2x its detection threshold. Vague heuristic signals do not justify concrete refactoring prescriptions.

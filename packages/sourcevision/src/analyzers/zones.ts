@@ -990,6 +990,7 @@ async function applyEnrichment(
   perZone: boolean,
   fileArchetypes?: Map<string, string | null>,
   currentContentHashes?: Record<string, string>,
+  hints?: string,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -1021,7 +1022,7 @@ async function applyEnrichment(
 
     if (perZone) {
       const result = await enrichZonesPerZone(
-        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
+        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
       );
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
@@ -1032,7 +1033,7 @@ async function applyEnrichment(
     } else {
       const result = await enrichZonesWithAI(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
-        currentContentHashes,
+        currentContentHashes, hints,
       );
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
@@ -1326,6 +1327,8 @@ export async function analyzeZones(
     onReset?: (fromPass: number, toPass: number) => void;
     /** File archetype classifications for enrichment prompts. */
     fileArchetypes?: Map<string, string | null>;
+    /** Project context from .sourcevision/hints.md, injected into enrichment prompts. */
+    hints?: string;
     /**
      * Maximum percentage of project files a single zone may contain (1–100).
      * Zones exceeding this are split via internal Louvain subdivision.
@@ -1405,7 +1408,7 @@ export async function analyzeZones(
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
-    zoneContentHashes,
+    zoneContentHashes, options?.hints,
   );
   const { finalZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
