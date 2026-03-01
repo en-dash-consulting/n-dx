@@ -6,6 +6,7 @@
 
 Zone: Src 3 (`packages-llm-client:src-3`)
 Files: 17, Cohesion: 0.65, Coupling: 0.35
+Risk: healthy (score: 0.35)
 Description: 17 files, primarily TypeScript
 Entry points: packages/llm-client/src/cli-provider.ts, packages/llm-client/src/codex-cli-provider.ts, packages/llm-client/src/create-client.ts, packages/llm-client/src/llm-client.ts, packages/llm-client/src/provider-interface.ts, packages/llm-client/src/provider-registry.ts, packages/llm-client/src/provider-session.ts, packages/llm-client/src/token-usage.ts, packages/llm-client/src/types.ts
 Lines: 3088

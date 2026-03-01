@@ -6,6 +6,7 @@
 
 Zone: Src 2 (`packages-llm-client:src-2`)
 Files: 16, Cohesion: 0.63, Coupling: 0.38
+Risk: healthy (score: 0.38)
 Description: 16 files, primarily TypeScript
 Lines: 3691
 

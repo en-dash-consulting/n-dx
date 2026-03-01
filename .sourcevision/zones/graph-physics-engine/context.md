@@ -6,7 +6,8 @@
 
 Zone: Graph Physics Engine (`graph-physics-engine`)
 Files: 3, Cohesion: 0.67, Coupling: 0.33
-Description: Handles physics calculations and layout algorithms for interactive graph visualizations.
+Risk: healthy (score: 0.33)
+Description: Provides physics simulation algorithms for interactive graph layout and visualization in the dashboard viewer.
 Entry points: packages/web/src/viewer/graph/physics.ts
 Lines: 888
 
@@ -29,28 +30,37 @@ Internal:
   packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
 
 Incoming (other zones → this zone):
-  ← interactive-data-visualization: packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts; packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts
+  ← dashboard-frontend: packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts; packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts
 
 </imports>
 
 <findings>
 
-[suggestion] [info] Investigate test-implementation mismatch: tests for graph-destroy and graph-layout but only physics.ts implementation present
+[suggestion] [info] Consider renaming zone to 'graph-physics' for consistency with web package naming conventions
+[suggestion] [warning] Extract test files to separate test zone to eliminate coupling between implementation and verification
+[suggestion] [info] Re-evaluate physics.ts archetype from [utility] to [engine] or [computational] to better reflect specialized nature
 
 </findings>
 
 <insights>
 
-- Dedicated physics engine for graph layout with clear separation from rendering concerns
-- Well-contained zone focusing solely on computational aspects of graph visualization
-- Good architectural isolation from other visualization components
-- Strong cohesion (0.67) and appropriate coupling (0.33) demonstrate clean separation of physics calculations from visualization rendering
-- Represents specialized computational zone with no external dependencies, ideal for performance-critical calculations
-- Achieves complete isolation from other zones while maintaining strong internal cohesion, ideal for computational components
-- Test file naming (graph-destroy.test.ts, graph-layout.test.ts) suggests broader scope than single physics.ts utility implies
-- Test organization inconsistency - tests for destroy/layout functionality but only physics.ts implementation file present
-- Test files suggest broader scope (destroy, layout) than single implementation file indicates - potential missing files or misplaced tests
-- Investigate test-implementation mismatch: tests for graph-destroy and graph-layout but only physics.ts implementation present
+- Small, focused zone with clear single responsibility for graph physics calculations
+- Well-isolated physics logic that can evolve independently of other visualization concerns
+- Good test coverage with dedicated unit tests for physics algorithms
+- Clean separation of physics simulation logic from graph rendering, enabling independent optimization of layout algorithms
+- Compact zone size (3 files) suggests focused responsibility and minimal complexity overhead
+- Represents computational architecture layer focused on pure mathematical calculations with minimal state
+- Compact size (3 files) enables rapid iteration on physics algorithms without broader system impact
+- Clean computational layer architecture with stateless physics algorithms that integrate via dashboard without cross-dependencies
+- Relatively high coupling (0.33) for a 3-file computational zone suggests potential over-integration with consumer components
+- Test files co-located with implementation in same zone creates unnecessary coupling - tests should be external consumers
+- High coupling ratio (0.33) for small computational zone indicates over-tight integration with consumers - pure computational zones should have minimal external dependencies
+- Zone name 'graph-physics-engine' uses verbose naming pattern inconsistent with other web zones that prefer shorter names
+- Physics.ts archetype marked as [utility] but represents specialized computational engine - archetype classification may be imprecise
+- Test files co-located within computational zone creates unnecessary coupling between implementation and verification concerns
+- Consider renaming zone to 'graph-physics' for consistency with web package naming conventions
+- Extract test files to separate test zone to eliminate coupling between implementation and verification
+- Re-evaluate physics.ts archetype from [utility] to [engine] or [computational] to better reflect specialized nature
 - [call graph] 68 internal calls, 0 outgoing, 3 incoming (cohesion: 1, coupling: 0)
 
 </insights>

@@ -2,7 +2,7 @@
 
 **Branch:** `featuer/oops`
 **Base:** `main`
-**Completed items:** 390
+**Completed items:** 403
 
 | Epic | Completed |
 |------|-----------|
@@ -381,6 +381,44 @@ The llm-client module has 7 distinct layers:
 - **Hench Resource Monitoring and User Feedback**
 - **WebSocket Connection Lifecycle Management**
 - **Rex Web UI Search Interface**
+- **Address pattern issues (9 findings)** [critical]
+  - Client-server architectural boundary is well-maintained except for schema-infrastructure zone violation
+- Cross-cutting performance concerns are integrated into functional zones rather than separated into performance layers
+- Domain boundary success varies dramatically: hench achieves clean layered isolation while web shows architectural sprawl across 29 zones
+- Foundation anti-pattern where ui-foundation contains both infrastructure utilities and application-specific views
+- Inconsistent service abstraction patterns across utility zones - some achieve clean boundaries while others leak implementation details to consumers
+- Inconsistent use of abstraction patterns (hooks vs direct coupling) across similar UI zones indicates need for architectural standardization
+- Zone size distribution shows healthy specialization pattern broken by one oversized catch-all zone that needs decomposition
+- Critical architectural debt concentration in web package: 29 fragmented zones + god-zone pattern + systematic high coupling (12+ zones >0.6) indicates architectural reset needed before incremental improvements
+- Missing abstraction layer pattern spans visualization (charts + navigation), UI foundation (scattered across zones), and service interfaces (inconsistent contract patterns), indicating systematic under-architecture rather than over-engineering
+- **Extract viewer infrastructure into organized subdirectories** [critical]
+  Move 19 root-level infrastructure files from viewer/ into logical subdirectories: viewer/performance/ (DOM optimization, memory, crash, degradation, gates), viewer/polling/ (state, manager, restart, visibility, tick, refresh), viewer/messaging/ (coalescer, throttle, rate limiter, dedup). Update all import paths. Add barrel exports. Addresses findings: cross-cutting performance concerns, oversized catch-all zone, god-zone pattern, missing abstraction layers.
+- **Address anti-pattern issues (9 findings)** [critical]
+  - Heavy cross-zone coupling (web-16 → web: 13 imports, web-24 → web-20: 9 imports) indicates missing abstraction layers between implementation details
+- Missing shared visualization interface abstraction forces chart and navigation zones to couple directly to different foundation systems
+- Multiple service layers (queue, validation) exceed expected coupling thresholds for isolated components, indicating insufficient architectural boundaries
+- Token usage views mixed into polling infrastructure zone instead of being consolidated with other usage analytics functionality
+- UI zone organization lacks consistent abstraction strategy - general utilities scattered across domain zones while application views leak into foundation layer
+- View components scattered across utility zones instead of grouped in dedicated view/page architectural layer
+- Web-16 zone imports heavily from multiple zones (13+8 imports) suggesting it occupies wrong architectural layer or needs interface abstraction
+- God function: PRDView in packages/web/src/viewer/views/prd.ts calls 83 unique functions — consider decomposing into smaller, focused functions
+- Web package exhibits god-zone anti-pattern where primary web zone (137 files) acts as catch-all while specialized concerns fragment into 28 micro-zones, inverting expected architectural hierarchy
+- **Decompose PRDView god function into focused hooks** [critical]
+  Extract PRDView (941 lines, 83 unique function calls) into focused custom hooks: usePRDData (fetch/polling/dedup), usePRDWebSocket (WS pipeline), usePRDActions (CRUD mutations), usePRDDeepLink (deep link resolution), useToast (notification state). PRDView should become a thin render shell that composes these hooks.
+- **Address suggestion issues (11 findings)** [critical]
+  - Audit test-implementation pairs to identify orphaned tests and incomplete features that may indicate architectural boundary violations
+- Consolidate scattered token usage functionality from polling-infrastructure and navigation-state-management into dedicated usage analytics zone
+- Contract definition inconsistency across service zones - only command-validation uses explicit contracts.ts pattern
+- Define architectural risk thresholds: zones with cohesion < 0.4 AND coupling > 0.6 should trigger mandatory refactoring
+- Implement architectural risk scoring to identify zones with both low cohesion (<0.3) and high coupling (>0.7) for priority refactoring
+- Prioritize refactoring zones with combined architectural risks: cohesion < 0.5 AND coupling > 0.6 indicate fragile components
+- Three zones show catastrophic fragility (coupling >0.65, cohesion <0.4) requiring immediate architectural intervention before further development
+- Decompose packages/web/src/viewer/views/prd.ts PRDView function (83 calls) into focused components: extract data fetching layer (estimated 20-25 calls), state management layer (estimated 15-20 calls), and presentation components (remaining calls)
+- Establish architectural governance thresholds: zones with cohesion <0.4 AND coupling >0.6 require mandatory refactoring before new feature development - currently affects web-8, web-10, web-12, web-16 requiring immediate intervention
+- Implement three-phase web package consolidation: Phase 1 - merge zones web-2,web-10,web-11,web-13 (shared coupling patterns), Phase 2 - consolidate visualization zones web-14,web-16,web-17,web-24, Phase 3 - extract shared UI foundation from primary web zone
+- Refactor web-16 zone to reduce 13+ imports from web zone by extracting shared interface layer or moving components to appropriate architectural tier
+- **Implement architectural risk scoring module in sourcevision** [critical]
+  Consolidates 5 overlapping suggestions about architectural risk thresholds into a single risk scoring module. Add risk metrics to zones, classify zones into risk levels, and generate structured findings. Standardize on cohesion < 0.4 AND coupling > 0.6 as the governance threshold.
 
 ## Completed Work
 
@@ -2345,6 +2383,48 @@ The llm-client module has 7 distinct layers:
 
 ### (Ungrouped)
 
+**Address anti-pattern issues (9 findings)**
+- 🔶 **Decompose PRDView god function into focused hooks**
+  Extract PRDView (941 lines, 83 unique function calls) into focused custom hooks: usePRDData (fetch/polling/dedup), usePRDWebSocket (WS pipeline), usePRDActions (CRUD mutations), usePRDDeepLink (deep link resolution), useToast (notification state). PRDView should become a thin render shell that composes these hooks.
+  - PRDView function body is under 200 lines
+  - Each extracted hook has a single responsibility
+  - No behavior changes - all existing functionality preserved
+  - Tests continue to pass
+  - TypeScript compiles without errors
+
+**Address pattern issues (9 findings)**
+- 🔶 **Extract viewer infrastructure into organized subdirectories**
+  Move 19 root-level infrastructure files from viewer/ into logical subdirectories: viewer/performance/ (DOM optimization, memory, crash, degradation, gates), viewer/polling/ (state, manager, restart, visibility, tick, refresh), viewer/messaging/ (coalescer, throttle, rate limiter, dedup). Update all import paths. Add barrel exports. Addresses findings: cross-cutting performance concerns, oversized catch-all zone, god-zone pattern, missing abstraction layers.
+  - No infrastructure files remain at viewer/ root (only main.ts, types.ts, utils.ts, route-state.ts, sourcevision-tabs.ts, schema-compat.ts, loader.ts)
+  - Files organized into viewer/performance/, viewer/polling/, viewer/messaging/
+  - All import paths updated and build passes
+  - Tests pass with no regressions
+- Fix foundation zone boundaries and standardize abstraction patterns
+  Address ui-foundation anti-pattern (web-7): domain-specific views mixed with infrastructure primitives. Standardize hook vs direct coupling patterns across UI zones. Addresses findings: foundation anti-pattern, inconsistent service abstraction patterns, inconsistent hook patterns.
+  - Foundation layer contains only infrastructure primitives, not domain views
+  - Consistent hook abstraction pattern across all infrastructure services
+  - Build and tests pass
+- Fix schema-infrastructure client-server boundary violation
+  Clean separation between schema/ validation (server-side contracts) and viewer/ data loading (client-side). Address the zone violation where schema files are grouped with viewer files. Addresses findings: client-server boundary violation, domain boundary sprawl.
+  - Schema validation imports do not cross into viewer data-loading layer
+  - Clean import boundaries between schema/ and viewer/
+  - Build and tests pass
+
+**Address suggestion issues (11 findings)**
+- 🔶 **Implement architectural risk scoring module in sourcevision**
+  Consolidates 5 overlapping suggestions about architectural risk thresholds into a single risk scoring module. Add risk metrics to zones, classify zones into risk levels, and generate structured findings. Standardize on cohesion < 0.4 AND coupling > 0.6 as the governance threshold.
+  - New risk-scoring.ts analyzer module computes risk scores for all zones
+  - Zones get riskLevel classification: healthy | at-risk | critical | catastrophic
+  - Risk thresholds are configurable constants (cohesion < 0.4, coupling > 0.6)
+  - Zone schema type includes riskScore and riskLevel fields
+  - Risk findings are emitted for zones exceeding thresholds
+  - Unit tests cover risk scoring logic
+  - Build and typecheck pass
+- Refactor web-16 main.ts god component to reduce cross-zone coupling
+  Extract view registry pattern from main.ts to eliminate 13+ direct imports from web zone. Separate bootstrap concerns from view orchestration. Addresses web-16 coupling (0.8) and cohesion (0.2).
+- Consolidate token usage files into dedicated zone boundary
+- Audit orphaned tests and standardize contract patterns
+
 - 🔶 **Codex Vendor Reliability and Documentation** *(epic)*
 - 🔶 **Selective Recommendation Acceptance Syntax** *(epic)*
 - 🔶 **Init-time LLM Onboarding and Authentication** *(epic)*
@@ -2387,4 +2467,66 @@ The llm-client module has 7 distinct layers:
 - 🔶 **Hench Resource Monitoring and User Feedback** *(epic)*
 - 🔶 **WebSocket Connection Lifecycle Management** *(epic)*
 - 🔶 **Rex Web UI Search Interface** *(epic)*
+- 🔶 **Address pattern issues (9 findings)** *(feature)*
+  - Client-server architectural boundary is well-maintained except for schema-infrastructure zone violation
+- Cross-cutting performance concerns are integrated into functional zones rather than separated into performance layers
+- Domain boundary success varies dramatically: hench achieves clean layered isolation while web shows architectural sprawl across 29 zones
+- Foundation anti-pattern where ui-foundation contains both infrastructure utilities and application-specific views
+- Inconsistent service abstraction patterns across utility zones - some achieve clean boundaries while others leak implementation details to consumers
+- Inconsistent use of abstraction patterns (hooks vs direct coupling) across similar UI zones indicates need for architectural standardization
+- Zone size distribution shows healthy specialization pattern broken by one oversized catch-all zone that needs decomposition
+- Critical architectural debt concentration in web package: 29 fragmented zones + god-zone pattern + systematic high coupling (12+ zones >0.6) indicates architectural reset needed before incremental improvements
+- Missing abstraction layer pattern spans visualization (charts + navigation), UI foundation (scattered across zones), and service interfaces (inconsistent contract patterns), indicating systematic under-architecture rather than over-engineering
+- 🔶 **Address anti-pattern issues (9 findings)** *(feature)*
+  - Heavy cross-zone coupling (web-16 → web: 13 imports, web-24 → web-20: 9 imports) indicates missing abstraction layers between implementation details
+- Missing shared visualization interface abstraction forces chart and navigation zones to couple directly to different foundation systems
+- Multiple service layers (queue, validation) exceed expected coupling thresholds for isolated components, indicating insufficient architectural boundaries
+- Token usage views mixed into polling infrastructure zone instead of being consolidated with other usage analytics functionality
+- UI zone organization lacks consistent abstraction strategy - general utilities scattered across domain zones while application views leak into foundation layer
+- View components scattered across utility zones instead of grouped in dedicated view/page architectural layer
+- Web-16 zone imports heavily from multiple zones (13+8 imports) suggesting it occupies wrong architectural layer or needs interface abstraction
+- God function: PRDView in packages/web/src/viewer/views/prd.ts calls 83 unique functions — consider decomposing into smaller, focused functions
+- Web package exhibits god-zone anti-pattern where primary web zone (137 files) acts as catch-all while specialized concerns fragment into 28 micro-zones, inverting expected architectural hierarchy
+- 🔶 **Address suggestion issues (11 findings)** *(feature)*
+  - Audit test-implementation pairs to identify orphaned tests and incomplete features that may indicate architectural boundary violations
+- Consolidate scattered token usage functionality from polling-infrastructure and navigation-state-management into dedicated usage analytics zone
+- Contract definition inconsistency across service zones - only command-validation uses explicit contracts.ts pattern
+- Define architectural risk thresholds: zones with cohesion < 0.4 AND coupling > 0.6 should trigger mandatory refactoring
+- Implement architectural risk scoring to identify zones with both low cohesion (<0.3) and high coupling (>0.7) for priority refactoring
+- Prioritize refactoring zones with combined architectural risks: cohesion < 0.5 AND coupling > 0.6 indicate fragile components
+- Three zones show catastrophic fragility (coupling >0.65, cohesion <0.4) requiring immediate architectural intervention before further development
+- Decompose packages/web/src/viewer/views/prd.ts PRDView function (83 calls) into focused components: extract data fetching layer (estimated 20-25 calls), state management layer (estimated 15-20 calls), and presentation components (remaining calls)
+- Establish architectural governance thresholds: zones with cohesion <0.4 AND coupling >0.6 require mandatory refactoring before new feature development - currently affects web-8, web-10, web-12, web-16 requiring immediate intervention
+- Implement three-phase web package consolidation: Phase 1 - merge zones web-2,web-10,web-11,web-13 (shared coupling patterns), Phase 2 - consolidate visualization zones web-14,web-16,web-17,web-24, Phase 3 - extract shared UI foundation from primary web zone
+- Refactor web-16 zone to reduce 13+ imports from web zone by extracting shared interface layer or moving components to appropriate architectural tier
+- Address observation issues (26 findings) *(feature)*
+  - 1 circular dependency chain detected — see imports.json for details
+- Bidirectional coupling: "web" ↔ "web-18" (8+1 crossings) — consider extracting shared interface
+- Four of five zones exceed healthy coupling thresholds (>0.6), suggesting systematic architecture review needed for UI component organization
+- Multiple zones show architectural boundary issues, with only Error Recovery system achieving good cohesion/coupling balance
+- 18 entry points — wide API surface, consider consolidating exports
+- High coupling (0.65) — 2 imports target "web-2"
+- Low cohesion (0.35) — files are loosely related, consider splitting this zone
+- High coupling (0.73) — 2 imports target "web-2"
+- High coupling (0.71) — 2 imports target "web-7"
+- Low cohesion (0.29) — files are loosely related, consider splitting this zone
+- High coupling (0.7) — 2 imports target "web-10"
+- High coupling (0.62) — 7 imports target "web-17"
+- Low cohesion (0.38) — files are loosely related, consider splitting this zone
+- High coupling (0.6) — 2 imports target "web"
+- High coupling (0.8) — 13 imports target "web"
+- Low cohesion (0.2) — files are loosely related, consider splitting this zone
+- High coupling (0.7) — 1 imports target "web-23"
+- Low cohesion (0.3) — files are loosely related, consider splitting this zone
+- High coupling (0.59) — 3 imports target "web-7"
+- High coupling (0.51) — 1 imports target "web-28"
+- High coupling (0.58) — 9 imports target "web-20"
+- High coupling (0.71) — 1 imports target "web-23"
+- High coupling (0.72) — 3 imports target "web"
+- Low cohesion (0.28) — files are loosely related, consider splitting this zone
+- High coupling (0.62) — 3 imports target "web-7"
+- Low cohesion (0.38) — files are loosely related, consider splitting this zone
+- Address relationship issues (2 findings) *(feature)*
+  - Multi-level hub architecture with web-platform as primary hub and multiple secondary hubs creates complex dependency hierarchies
+- Visualization concerns fragmented across multiple zones without clear abstraction hierarchy
 

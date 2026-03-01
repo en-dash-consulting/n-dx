@@ -5,86 +5,94 @@
 <zone>
 
 Zone: Polling Infrastructure (`polling-infrastructure`)
-Files: 10, Cohesion: 0.42, Coupling: 0.58
-Description: Core polling system that coordinates data fetching, token usage tracking, and test coverage for polling operations.
-Entry points: packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/polling-manager.ts, packages/web/src/viewer/views/token-usage.ts
-Lines: 3209
+Files: 14, Cohesion: 0.69, Coupling: 0.31
+Risk: healthy (score: 0.31)
+Description: Manages real-time data updates, DOM performance optimization, and batched polling mechanisms for the dashboard viewer.
+Entry points: packages/web/src/viewer/hooks/use-polling-suspension.ts, packages/web/src/viewer/polling/batched-tick-dispatcher.ts, packages/web/src/viewer/polling/polling-restart.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/polling/tick-timer.ts
+Lines: 4984
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/hooks/use-polling.ts (TypeScript, 68 lines, source)
-packages/web/src/viewer/polling-manager.ts (TypeScript, 316 lines, source)
-packages/web/src/viewer/views/token-usage.ts (TypeScript, 763 lines, source)
-packages/web/tests/unit/viewer/execution-panel-polling.test.ts (TypeScript, 210 lines, test)
-packages/web/tests/unit/viewer/loader-memory.test.ts (TypeScript, 298 lines, test)
-packages/web/tests/unit/viewer/loader-polling.test.ts (TypeScript, 211 lines, test)
-packages/web/tests/unit/viewer/polling-manager.test.ts (TypeScript, 626 lines, test)
-packages/web/tests/unit/viewer/status-indicators-memory.test.ts (TypeScript, 297 lines, test)
-packages/web/tests/unit/viewer/status-indicators-polling.test.ts (TypeScript, 210 lines, test)
-packages/web/tests/unit/viewer/usage-polling.test.ts (TypeScript, 210 lines, test)
+packages/web/src/viewer/hooks/use-dom-performance-monitor.ts (TypeScript, 175 lines, source)
+packages/web/src/viewer/hooks/use-polling-suspension.ts (TypeScript, 61 lines, source)
+packages/web/src/viewer/performance/dom-performance-monitor.ts (TypeScript, 505 lines, source)
+packages/web/src/viewer/polling/.gitkeep (Other, 0 lines, other)
+packages/web/src/viewer/polling/batched-tick-dispatcher.ts (TypeScript, 240 lines, source)
+packages/web/src/viewer/polling/polling-restart.ts (TypeScript, 143 lines, source)
+packages/web/src/viewer/polling/polling-state.ts (TypeScript, 398 lines, source)
+packages/web/src/viewer/polling/tick-timer.ts (TypeScript, 205 lines, source)
+packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts (TypeScript, 655 lines, test)
+packages/web/tests/unit/viewer/dom-performance-monitor.test.ts (TypeScript, 1011 lines, test)
+packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts (TypeScript, 282 lines, test)
+packages/web/tests/unit/viewer/polling-state.test.ts (TypeScript, 725 lines, test)
+packages/web/tests/unit/viewer/tick-timer.test.ts (TypeScript, 456 lines, test)
+packages/web/tests/unit/viewer/use-polling-suspension.test.ts (TypeScript, 128 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/hooks/use-polling.ts → packages/web/src/viewer/polling-manager.ts {registerPoller, unregisterPoller}
-  packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
-  packages/web/tests/unit/viewer/execution-panel-polling.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
-  packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isPollerActive, getRegisteredPollers, resetPollingManager}
-  packages/web/tests/unit/viewer/loader-polling.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
-  packages/web/tests/unit/viewer/polling-manager.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, stopPollingManager, registerPoller, unregisterPoller, suspendAll, resumeAll, isSuspended, isPollerActive, getRegisteredPollers, getPollerCount, resetPollingManager}
-  packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isPollerActive, getRegisteredPollers, resetPollingManager}
-  packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
-  packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, recordRender, recordUpdate, measureOperation, computeSummary, resetDOMPerformanceMonitor, countDOMNodes, readHeapUsage}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, DOMPerformanceConfig, RenderTiming, UpdateComparison, PerformanceSummary}
+  packages/web/src/viewer/hooks/use-polling-suspension.ts → packages/web/src/viewer/polling/polling-state.ts {onPollingStateChange, getPollingState}
+  packages/web/src/viewer/hooks/use-polling-suspension.ts → packages/web/src/viewer/polling/polling-state.ts {PollingStateSnapshot}
+  packages/web/src/viewer/performance/dom-performance-monitor.ts → packages/web/src/viewer/polling/polling-state.ts {registerPollingSource}
+  packages/web/src/viewer/polling/batched-tick-dispatcher.ts → packages/web/src/viewer/polling/tick-timer.ts {onTick}
+  packages/web/src/viewer/polling/polling-restart.ts → packages/web/src/viewer/polling/polling-state.ts {suspendAllSources, resumeAllSources, isGlobalSuspended, getGeneration, isGenerationCurrent}
+  packages/web/src/viewer/polling/tick-timer.ts → packages/web/src/viewer/polling/polling-state.ts {registerPollingSource}
+  packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts → packages/web/src/viewer/polling/batched-tick-dispatcher.ts {registerTickUpdater, getBatchedTickDispatcherState, flushBatchedTicks, resetBatchedTickDispatcher}
+  packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts → packages/web/src/viewer/polling/tick-timer.ts {resetTickTimer}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {countDOMNodes, readHeapUsage, formatDuration, formatNodeCount, formatDelta, recordRender, recordUpdate, measureOperation, takeDOMSnapshot, computeSummary, startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, setObservedContainer, getObservedContainer, resetDOMPerformanceMonitor}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, RenderTiming, UpdateComparison, PerformanceSummary}
+  packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts → packages/web/src/viewer/polling/tick-timer.ts {onTick, resetTickTimer}
+  packages/web/tests/unit/viewer/polling-state.test.ts → packages/web/src/viewer/polling/polling-state.ts {registerPollingSource, unregisterPollingSource, suspendAllSources, resumeAllSources, disposeAllSources, isGlobalSuspended, getGeneration, isSourceRegistered, getSourceInfo, getPollingState, onPollingStateChange, getSourceCount, isGenerationCurrent, resetPollingState}
+  packages/web/tests/unit/viewer/polling-state.test.ts → packages/web/src/viewer/polling/polling-state.ts {PollingSourceCallbacks, PollingSourceStatus}
+  packages/web/tests/unit/viewer/tick-timer.test.ts → packages/web/src/viewer/polling/tick-timer.ts {onTick, getTickTimerState, resetTickTimer, suspendTickTimer, resumeTickTimer}
+  packages/web/tests/unit/viewer/tick-timer.test.ts → packages/web/src/viewer/polling/tick-timer.ts {TickListener}
+  packages/web/tests/unit/viewer/use-polling-suspension.test.ts → packages/web/src/viewer/hooks/use-polling-suspension.ts {usePollingSuspension}
+  packages/web/tests/unit/viewer/use-polling-suspension.test.ts → packages/web/src/viewer/polling/polling-state.ts {registerPollingSource, suspendAllSources, resumeAllSources, resetPollingState}
+  packages/web/tests/unit/viewer/use-polling-suspension.test.ts → packages/web/src/viewer/polling/polling-state.ts {PollingSourceCallbacks}
 
 Outgoing (this zone → other zones):
-  → chart-visualization-layer: packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/components/data-display/mini-charts.ts
-  → dashboard-visualization: packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/components/data-display/health-gauge.ts
-  → graceful-degradation-system: packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/graceful-degradation.ts; packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/graceful-degradation.ts
-  → memory-monitoring-system: packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/memory-monitor.ts; packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/memory-monitor.ts
-  → performance-optimization-layer: packages/web/src/viewer/polling-manager.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/src/viewer/polling-manager.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/execution-panel-polling.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/loader-polling.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/polling-manager.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/tab-visibility.ts; packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/tab-visibility.ts
-  → polling-lifecycle-management: packages/web/src/viewer/polling-manager.ts → packages/web/src/viewer/polling-state.ts
-  → web-platform: packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/components/logos.ts
+  → dashboard-frontend: packages/web/src/viewer/polling/polling-restart.ts → packages/web/src/viewer/performance/graceful-degradation.ts; packages/web/src/viewer/polling/polling-restart.ts → packages/web/src/viewer/performance/graceful-degradation.ts
 
 Incoming (other zones → this zone):
-  ← application-shell-components: packages/web/src/viewer/main.ts → packages/web/src/viewer/polling-manager.ts; packages/web/src/viewer/main.ts → packages/web/src/viewer/views/token-usage.ts
-  ← graceful-degradation-system: packages/web/src/viewer/components/prd-tree/execution-panel.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/tests/integration/background-suspension-recovery.test.ts → packages/web/src/viewer/polling-manager.ts
-  ← project-status-ui: packages/web/src/viewer/components/status-indicators.ts → packages/web/src/viewer/hooks/use-polling.ts
-  ← refresh-throttling-system: packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/polling-manager.ts
-  ← schema-infrastructure: packages/web/src/viewer/loader.ts → packages/web/src/viewer/polling-manager.ts
-  ← ui-foundation: packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/hooks/use-polling.ts
-  ← web-platform: packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/use-polling.ts
+  ← dashboard-frontend: packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/polling-restart.ts; packages/web/src/viewer/hooks/use-tick.ts → packages/web/src/viewer/polling/batched-tick-dispatcher.ts; packages/web/src/viewer/main.ts → packages/web/src/viewer/hooks/use-polling-suspension.ts; packages/web/src/viewer/performance/memory-monitor.ts → packages/web/src/viewer/polling/polling-state.ts; packages/web/src/viewer/polling/polling-manager.ts → packages/web/src/viewer/polling/polling-state.ts; packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/batched-tick-dispatcher.ts; packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tick-timer.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] High coupling (0.58) — 9 imports target "performance-optimization-layer"
-[suggestion] [warning] Critical risk area: high coupling (0.58) + low cohesion (0.42) makes zone fragile to changes - requires immediate architectural review
-[suggestion] [warning] Extract token-usage.ts to dedicated analytics zone to improve cohesion and separate infrastructure from domain concerns
+[suggestion] [info] Consider extracting batched tick dispatcher as reusable temporal coordination utility for broader platform use
+[suggestion] [warning] Extract DOM performance monitoring into separate cross-cutting performance zone to reduce responsibility overlap
+[suggestion] [warning] Separate React-specific hooks into UI layer zone to maintain clean technology boundaries in infrastructure
 
 </findings>
 
 <insights>
 
-- High coupling (0.58) — 9 imports target "performance-optimization-layer"
-- Central hub for all polling operations across the application
-- Heavy test coverage indicates critical system component
-- Manages both general polling and specialized token usage polling
-- Lower cohesion (0.42) and higher coupling (0.58) suggest this zone may benefit from decomposition
-- Central coordination hub showing potential architectural stress from accumulated responsibilities
-- Hub degradation pattern - high coupling (0.58) indicates hub taking on too many coordination responsibilities
-- Zone contains both core infrastructure coordination and domain-specific token usage views, violating single responsibility
-- Token usage functionality creates coupling to domain concerns that should be separated from infrastructure
-- Zone mixes core polling infrastructure with domain-specific token usage views - token-usage.ts belongs in analytics/usage zone rather than infrastructure
-- Hub degradation pattern with high coupling (0.58) and low cohesion (0.42) indicates zone has accumulated too many coordination responsibilities and needs decomposition
-- Zone exhibits critical architectural risk pattern: high coupling (0.58) combined with low cohesion (0.42) creates fragile system boundaries
-- Token usage functionality scattered across infrastructure zones instead of consolidated analytics domain
-- Critical risk area: high coupling (0.58) + low cohesion (0.42) makes zone fragile to changes - requires immediate architectural review
-- Extract token-usage.ts to dedicated analytics zone to improve cohesion and separate infrastructure from domain concerns
-- [call graph] 386 internal calls, 80 outgoing, 98 incoming (cohesion: 0.83, coupling: 0.17)
+- Strong cohesion around real-time data synchronization and performance optimization concerns
+- Well-designed polling abstraction with batched tick dispatch and suspension capabilities
+- Performance-first architecture with dedicated DOM monitoring and optimization hooks
+- Comprehensive polling architecture with suspension, restart, and batching capabilities supports responsive real-time interfaces
+- Good cohesion (0.69) and low coupling (0.31) indicate well-bounded real-time infrastructure that integrates cleanly with dashboard components
+- Multiple entry points suggest flexible API surface for different polling patterns and performance monitoring needs
+- Represents temporal architecture layer managing real-time data synchronization with comprehensive state management
+- Architectural complexity (14 files) reflects sophisticated real-time coordination patterns including batching, suspension, and performance monitoring
+- Mature temporal architecture with sophisticated state management patterns for real-time data coordination
+- Bidirectional coupling with dashboard-frontend violates infrastructure dependency direction - polling should serve dashboard, not depend on it
+- Zone spans three distinct concerns: polling coordination, DOM performance monitoring, and tick dispatching - architectural complexity suggests need for decomposition
+- Bidirectional coupling with dashboard-frontend (8 imports out, 2 imports in) violates dependency inversion - infrastructure should not depend on UI components
+- Zone combines polling coordination, DOM performance monitoring, and tick dispatching concerns - should be decomposed into separate focused zones
+- React-specific hook patterns (use-*) mixed with general infrastructure utilities suggests blurred technology boundaries
+- DOM performance monitoring represents cross-cutting concern that spans beyond polling responsibilities
+- Batched tick dispatcher implements sophisticated temporal coordination pattern that could be generalized for reuse
+- Extract DOM performance monitoring into separate cross-cutting performance zone to reduce responsibility overlap
+- Separate React-specific hooks into UI layer zone to maintain clean technology boundaries in infrastructure
+- Consider extracting batched tick dispatcher as reusable temporal coordination utility for broader platform use
+- [call graph] 762 internal calls, 2 outgoing, 32 incoming (cohesion: 1, coupling: 0)
 
 </insights>

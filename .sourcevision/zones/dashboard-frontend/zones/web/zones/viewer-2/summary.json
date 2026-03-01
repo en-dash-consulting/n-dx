@@ -1,0 +1,22 @@
+{
+  "id": "web-2/web/viewer-2",
+  "name": "Viewer 2",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/memory-panel.ts",
+    "packages/web/src/viewer/components/rex-task-link.ts",
+    "packages/web/src/viewer/components/throttle-controls.ts",
+    "packages/web/src/viewer/components/ws-health-panel.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/rex-task-link.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "cohesion": 0.58,
+  "coupling": 0.42,
+  "fileCount": 7,
+  "lineCount": 2656
+}

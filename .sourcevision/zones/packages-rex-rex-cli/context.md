@@ -6,8 +6,9 @@
 
 Zone: Rex PRD Management CLI (`packages-rex:rex-cli`)
 Files: 36, Cohesion: 1.00, Coupling: 0.00
+Risk: healthy (score: 0.00)
 Description: A self-contained CLI tool and MCP server for managing hierarchical product requirements documents, including code analysis, tree operations, validation, persistence, and AI-agent workflow integration.
-Lines: 10217
+Lines: 10040
 
 </zone>
 
@@ -37,7 +38,6 @@ packages/rex/src/schema/v1.ts (TypeScript, 358 lines, source)
 packages/rex/src/schema/validate.ts (TypeScript, 163 lines, source)
 packages/rex/src/store/file-adapter.ts (TypeScript, 152 lines, source)
 packages/rex/src/store/index.ts (TypeScript, 131 lines, source)
-packages/rex/src/store/types.ts (TypeScript, 177 lines, source)
 packages/rex/src/workflow/default.ts (TypeScript, 20 lines, source)
 packages/rex/tests/integration/store-roundtrip.test.ts (TypeScript, 299 lines, test)
 packages/rex/tests/unit/analyze/propose.test.ts (TypeScript, 355 lines, test)
@@ -135,11 +135,8 @@ Internal:
   packages/rex/src/store/file-adapter.ts → packages/rex/src/core/tree.ts {findItem, insertChild, updateInTree, removeFromTree}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
   packages/rex/src/store/file-adapter.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/types.ts {PRDStore, StoreCapabilities}
   packages/rex/src/store/index.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
   packages/rex/src/store/index.ts → packages/rex/src/store/file-adapter.ts {FileStore}
-  packages/rex/src/store/index.ts → packages/rex/src/store/types.ts {PRDStore, StoreCapabilities}
-  packages/rex/src/store/types.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
   packages/rex/tests/integration/store-roundtrip.test.ts → packages/rex/src/core/canonical.ts {toCanonicalJSON}
   packages/rex/tests/integration/store-roundtrip.test.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
   packages/rex/tests/integration/store-roundtrip.test.ts → packages/rex/src/schema/index.ts {PRDItem, PRDDocument}
@@ -166,7 +163,7 @@ Internal:
   packages/rex/tests/unit/store/file-adapter.test.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir}
 
 Incoming (other zones → this zone):
-  ← web: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
+  ← web-api-core: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
 
 </imports>
 

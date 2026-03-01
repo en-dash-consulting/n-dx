@@ -6,6 +6,7 @@
 
 Zone: Src 4 (`packages-llm-client:src-4`)
 Files: 3, Cohesion: 0.20, Coupling: 0.80
+Risk: catastrophic (score: 0.80)
 Description: 3 files, primarily TypeScript
 Entry points: packages/llm-client/src/llm-config.ts, packages/llm-client/src/llm-types.ts
 Lines: 181
@@ -34,6 +35,12 @@ Incoming (other zones → this zone):
   ← packages-llm-client:src-3: packages/llm-client/src/codex-cli-provider.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/codex-cli-provider.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/llm-client.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/llm-client.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/provider-registry.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/provider-registry.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/provider-session.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/src/provider-session.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/tests/unit/provider-registry.test.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/tests/unit/provider-registry.test.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/tests/unit/provider-session.test.ts → packages/llm-client/src/llm-types.ts; packages/llm-client/tests/unit/provider-session.test.ts → packages/llm-client/src/llm-types.ts
 
 </imports>
+
+<findings>
+
+[suggestion] [critical] Zone "Src 4" (packages-llm-client:src-4) has catastrophic risk (score: 0.80, cohesion: 0.20, coupling: 0.80) — requires immediate architectural intervention
+
+</findings>
 
 <insights>
 

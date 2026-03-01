@@ -1,0 +1,29 @@
+{
+  "id": "web-utils",
+  "name": "Web Utils",
+  "description": "Analysis and import tooling for automated PRD generation and intelligent project planning workflows.",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
+    "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
+    "packages/web/src/viewer/views/analysis.ts",
+    "packages/web/tests/unit/viewer/batch-import-panel.test.ts",
+    "packages/web/tests/unit/viewer/smart-add-input.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
+    "packages/web/src/viewer/views/analysis.ts"
+  ],
+  "cohesion": 0.82,
+  "coupling": 0.18,
+  "fileCount": 7,
+  "lineCount": 3191,
+  "riskMetrics": {
+    "cohesion": 0.82,
+    "coupling": 0.18,
+    "riskScore": 0.18000000000000002,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "agent-suggestions-store",
+  "name": "Agent Suggestions Store",
+  "description": "Specialized storage subsystem for managing agent execution suggestions and recommendations.",
+  "files": [
+    "packages/hench/src/store/suggestions.ts",
+    "packages/hench/tests/unit/store/suggestions.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 217,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

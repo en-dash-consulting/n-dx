@@ -1,0 +1,22 @@
+{
+  "id": "hench/tests/store",
+  "name": "Store",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/cli/commands/init.ts",
+    "packages/hench/src/store/index.ts",
+    "packages/hench/src/store/run-change-detector.ts",
+    "packages/hench/src/store/run-retention-scheduler.ts",
+    "packages/hench/src/store/run-retention.ts",
+    "packages/hench/tests/unit/store/run-change-detector.test.ts",
+    "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
+    "packages/hench/tests/unit/store/run-retention.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/store/index.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 8,
+  "lineCount": 2201
+}

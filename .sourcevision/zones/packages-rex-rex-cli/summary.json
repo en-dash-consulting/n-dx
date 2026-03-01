@@ -44,5 +44,12 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 36,
-  "lineCount": 10217
+  "lineCount": 10040,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
 }

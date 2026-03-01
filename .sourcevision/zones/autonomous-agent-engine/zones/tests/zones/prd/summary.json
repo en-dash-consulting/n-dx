@@ -1,0 +1,19 @@
+{
+  "id": "hench/tests/prd",
+  "name": "Prd",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/prd/ops.ts",
+    "packages/hench/src/prd/rex-gateway.ts",
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/tests/unit/tools/rex.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/src/prd/rex-gateway.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 4,
+  "lineCount": 567
+}

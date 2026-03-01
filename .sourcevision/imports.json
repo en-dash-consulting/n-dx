@@ -300,6 +300,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
+      "to": "packages/hench/src/agent/analysis/spin.ts",
+      "type": "static",
+      "symbols": [
+        "isSpinningRun"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
       "to": "packages/hench/src/agent/lifecycle/heartbeat.ts",
       "type": "static",
       "symbols": [
@@ -428,6 +436,15 @@
       "type": "static",
       "symbols": [
         "saveRun"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/agent/analysis/spin.ts",
+      "type": "static",
+      "symbols": [
+        "updateEmptyTurnCount",
+        "DEFAULT_SPIN_THRESHOLD"
       ]
     },
     {
@@ -2888,6 +2905,16 @@
       "type": "static",
       "symbols": [
         "initConfig"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/unit/agent/spin-detection.test.ts",
+      "to": "packages/hench/src/agent/analysis/spin.ts",
+      "type": "static",
+      "symbols": [
+        "updateEmptyTurnCount",
+        "isSpinningRun",
+        "DEFAULT_SPIN_THRESHOLD"
       ]
     },
     {
@@ -7639,7 +7666,7 @@
     },
     {
       "from": "packages/rex/src/core/cascade-reset.ts",
-      "to": "packages/rex/src/store/types.ts",
+      "to": "packages/rex/src/store/contracts.ts",
       "type": "type",
       "symbols": [
         "PRDStore"
@@ -8128,7 +8155,7 @@
     },
     {
       "from": "packages/rex/src/core/sync-engine.ts",
-      "to": "packages/rex/src/store/types.ts",
+      "to": "packages/rex/src/store/contracts.ts",
       "type": "type",
       "symbols": [
         "PRDStore"
@@ -8563,6 +8590,14 @@
     },
     {
       "from": "packages/rex/src/public.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/public.ts",
       "to": "packages/rex/src/store/index.ts",
       "type": "reexport",
       "symbols": [
@@ -8622,14 +8657,6 @@
       ]
     },
     {
-      "from": "packages/rex/src/public.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore"
-      ]
-    },
-    {
       "from": "packages/rex/src/recommend/conflict-detection.ts",
       "to": "packages/rex/src/analyze/dedupe.ts",
       "type": "static",
@@ -8647,7 +8674,7 @@
     },
     {
       "from": "packages/rex/src/recommend/conflict-detection.ts",
-      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/recommend/types.ts",
       "type": "type",
       "symbols": [
         "EnrichedRecommendation"
@@ -8698,6 +8725,16 @@
     },
     {
       "from": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/recommend/types.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "ConflictStrategy"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/create-from-recommendations.ts",
       "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
@@ -8711,16 +8748,24 @@
       "type": "type",
       "symbols": [
         "PRDItem",
-        "ItemLevel",
-        "Priority"
+        "ItemLevel"
       ]
     },
     {
       "from": "packages/rex/src/recommend/create-from-recommendations.ts",
-      "to": "packages/rex/src/store/types.ts",
+      "to": "packages/rex/src/store/contracts.ts",
       "type": "type",
       "symbols": [
         "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/recommend/types.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel",
+        "Priority"
       ]
     },
     {
@@ -8777,6 +8822,14 @@
     },
     {
       "from": "packages/rex/src/store/adapter-registry.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/adapter-registry.ts",
       "to": "packages/rex/src/store/file-adapter.ts",
       "type": "static",
       "symbols": [
@@ -8800,11 +8853,14 @@
       ]
     },
     {
-      "from": "packages/rex/src/store/adapter-registry.ts",
-      "to": "packages/rex/src/store/types.ts",
+      "from": "packages/rex/src/store/contracts.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
-        "PRDStore"
+        "PRDDocument",
+        "PRDItem",
+        "RexConfig",
+        "LogEntry"
       ]
     },
     {
@@ -8849,20 +8905,20 @@
     },
     {
       "from": "packages/rex/src/store/file-adapter.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/file-adapter.ts",
       "to": "packages/rex/src/store/project-config.ts",
       "type": "static",
       "symbols": [
         "loadProjectOverrides",
         "mergeWithOverrides"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/file-adapter.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore",
-        "StoreCapabilities"
       ]
     },
     {
@@ -8912,6 +8968,15 @@
         "AdapterConfig",
         "AdapterConfigField",
         "AdapterInfo"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/index.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
       ]
     },
     {
@@ -9024,15 +9089,6 @@
       "symbols": [
         "NotionClient",
         "NotionAdapterConfig"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/index.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore",
-        "StoreCapabilities"
       ]
     },
     {
@@ -9174,6 +9230,15 @@
     },
     {
       "from": "packages/rex/src/store/notion-adapter.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-adapter.ts",
       "to": "packages/rex/src/store/notion-client.ts",
       "type": "type",
       "symbols": [
@@ -9188,26 +9253,6 @@
       "symbols": [
         "loadProjectOverrides",
         "mergeWithOverrides"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/notion-adapter.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore",
-        "StoreCapabilities"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/types.ts",
-      "to": "packages/rex/src/schema/index.ts",
-      "type": "type",
-      "symbols": [
-        "PRDDocument",
-        "PRDItem",
-        "RexConfig",
-        "LogEntry"
       ]
     },
     {
@@ -10779,7 +10824,7 @@
     },
     {
       "from": "packages/rex/tests/unit/core/sync-engine.test.ts",
-      "to": "packages/rex/src/store/types.ts",
+      "to": "packages/rex/src/store/contracts.ts",
       "type": "type",
       "symbols": [
         "PRDStore",
@@ -10995,7 +11040,7 @@
     },
     {
       "from": "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
-      "to": "packages/rex/src/recommend/create-from-recommendations.ts",
+      "to": "packages/rex/src/recommend/types.ts",
       "type": "type",
       "symbols": [
         "EnrichedRecommendation"
@@ -11081,6 +11126,14 @@
     },
     {
       "from": "packages/rex/tests/unit/store/adapter-registry.test.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/store/adapter-registry.test.ts",
       "to": "packages/rex/src/store/file-adapter.ts",
       "type": "static",
       "symbols": [
@@ -11095,14 +11148,6 @@
         "resolveRemoteStore",
         "resolveStore",
         "createStore"
-      ]
-    },
-    {
-      "from": "packages/rex/tests/unit/store/adapter-registry.test.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore"
       ]
     },
     {
@@ -11265,6 +11310,14 @@
     },
     {
       "from": "packages/rex/tests/unit/store/resolve-store.test.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/store/resolve-store.test.ts",
       "to": "packages/rex/src/store/file-adapter.ts",
       "type": "static",
       "symbols": [
@@ -11279,14 +11332,6 @@
         "resolveStore",
         "resolveRemoteStore",
         "createStore"
-      ]
-    },
-    {
-      "from": "packages/rex/tests/unit/store/resolve-store.test.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore"
       ]
     },
     {
@@ -11316,6 +11361,14 @@
     },
     {
       "from": "packages/rex/tests/unit/store/store-contract.test.ts",
+      "to": "packages/rex/src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/store/store-contract.test.ts",
       "to": "packages/rex/src/store/file-adapter.ts",
       "type": "static",
       "symbols": [
@@ -11339,14 +11392,6 @@
       "symbols": [
         "NotionClient",
         "NotionAdapterConfig"
-      ]
-    },
-    {
-      "from": "packages/rex/tests/unit/store/store-contract.test.ts",
-      "to": "packages/rex/src/store/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDStore"
       ]
     },
     {
@@ -12164,6 +12209,24 @@
       ]
     },
     {
+      "from": "packages/sourcevision/src/analyzers/risk-scoring.ts",
+      "to": "packages/sourcevision/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "Zones",
+        "Finding"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/analyzers/risk-scoring.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "ZoneRiskMetrics"
+      ]
+    },
+    {
       "from": "packages/sourcevision/src/analyzers/route-detection.ts",
       "to": "packages/sourcevision/src/schema/index.ts",
       "type": "type",
@@ -12258,7 +12321,8 @@
         "Zone",
         "ZoneCrossing",
         "Finding",
-        "ZoneSummary"
+        "ZoneSummary",
+        "ZoneRiskMetrics"
       ]
     },
     {
@@ -12505,6 +12569,15 @@
     },
     {
       "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/analyzers/enrich-parsing.ts",
+      "type": "static",
+      "symbols": [
+        "deduplicateFindings",
+        "enforceSeverityRules"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
       "to": "packages/sourcevision/src/analyzers/llms-txt.ts",
       "type": "static",
       "symbols": [
@@ -12518,6 +12591,14 @@
       "symbols": [
         "readManifest",
         "writeManifest"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/analyzers/risk-scoring.ts",
+      "type": "static",
+      "symbols": [
+        "assessAllZoneRisks"
       ]
     },
     {
@@ -12607,6 +12688,14 @@
       "symbols": [
         "DATA_FILES",
         "SUPPLEMENTARY_FILES"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/src/cli/commands/analyze.ts",
+      "to": "packages/sourcevision/src/util/sort.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
       ]
     },
     {
@@ -13079,6 +13168,8 @@
         "Zones",
         "Zone",
         "ZoneSummary",
+        "ZoneRiskMetrics",
+        "RiskLevel",
         "ZoneCrossing",
         "ZoneTokenUsage",
         "Finding",
@@ -13763,6 +13854,28 @@
       ]
     },
     {
+      "from": "packages/sourcevision/tests/unit/analyzers/risk-scoring.test.ts",
+      "to": "packages/sourcevision/src/analyzers/risk-scoring.ts",
+      "type": "static",
+      "symbols": [
+        "computeRiskScore",
+        "classifyRiskLevel",
+        "assessZoneRisk",
+        "assessAllZoneRisks",
+        "RISK_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/sourcevision/tests/unit/analyzers/risk-scoring.test.ts",
+      "to": "packages/sourcevision/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "Zones",
+        "Finding"
+      ]
+    },
+    {
       "from": "packages/sourcevision/tests/unit/analyzers/token-usage.test.ts",
       "to": "packages/sourcevision/src/analyzers/token-usage.ts",
       "type": "static",
@@ -14378,14 +14491,6 @@
       ]
     },
     {
-      "from": "packages/web/src/schema/validate.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "*"
-      ]
-    },
-    {
       "from": "packages/web/src/server/index.ts",
       "to": "packages/web/src/server/port.ts",
       "type": "reexport",
@@ -14494,15 +14599,6 @@
     },
     {
       "from": "packages/web/src/server/routes-data.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES",
-        "SUPPLEMENTARY_FILES"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/routes-data.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
       "symbols": [
@@ -14515,6 +14611,15 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-data.ts",
+      "to": "packages/web/src/shared/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES",
+        "SUPPLEMENTARY_FILES"
       ]
     },
     {
@@ -14794,14 +14899,6 @@
     },
     {
       "from": "packages/web/src/server/routes-sourcevision.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/routes-sourcevision.ts",
       "to": "packages/web/src/server/pr-markdown-refresh-diagnostics.ts",
       "type": "static",
       "symbols": [
@@ -14826,19 +14923,19 @@
       ]
     },
     {
+      "from": "packages/web/src/server/routes-sourcevision.ts",
+      "to": "packages/web/src/shared/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
+      ]
+    },
+    {
       "from": "packages/web/src/server/routes-static.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "type",
       "symbols": [
         "ServerContext"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/routes-status.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
       ]
     },
     {
@@ -14874,6 +14971,14 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-status.ts",
+      "to": "packages/web/src/shared/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
       ]
     },
     {
@@ -14973,14 +15078,6 @@
       "symbols": [
         "PRDItem",
         "PRDDocument"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/start.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES"
       ]
     },
     {
@@ -15171,6 +15268,14 @@
       ]
     },
     {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/shared/data-files.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES"
+      ]
+    },
+    {
       "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
       "to": "packages/web/src/server/incremental-task-usage.ts",
       "type": "type",
@@ -15205,11 +15310,43 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/batched-tick-dispatcher.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "from": "packages/web/src/viewer/bootstrap.ts",
+      "to": "packages/web/src/viewer/components/theme-toggle.ts",
       "type": "static",
       "symbols": [
-        "onTick"
+        "initTheme"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/bootstrap.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/bootstrap.ts",
+      "to": "packages/web/src/viewer/polling/polling-restart.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingRestart"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/bootstrap.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "startTabVisibilityMonitor"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/bootstrap.ts",
+      "to": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createTickVisibilityGate"
       ]
     },
     {
@@ -15254,8 +15391,16 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/constants.ts",
+      "to": "packages/web/src/viewer/visualization/colors.ts",
+      "type": "reexport",
+      "symbols": [
+        "ZONE_COLORS"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/crash-recovery-banner.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "type",
       "symbols": [
         "SavedNavigationState"
@@ -15305,7 +15450,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/degradation-banner.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "type",
       "symbols": [
         "DegradableFeature"
@@ -15313,7 +15458,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/degradation-banner.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryLevel"
@@ -15336,9 +15481,16 @@
       "to": "packages/web/src/viewer/utils.ts",
       "type": "static",
       "symbols": [
-        "meterClass",
-        "getZoneColorByIndex",
         "basename"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/detail-panel.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "meterClass",
+        "getZoneColorByIndex"
       ]
     },
     {
@@ -15359,7 +15511,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/memory-warning.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "formatBytes",
@@ -15368,7 +15520,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/memory-warning.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemorySnapshot",
@@ -15454,15 +15606,6 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
-      "type": "static",
-      "symbols": [
-        "isFeatureDisabled",
-        "onDegradationChange"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
       "to": "packages/web/src/viewer/hooks/use-polling.ts",
       "type": "static",
       "symbols": [
@@ -15471,153 +15614,19 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "static",
       "symbols": [
         "createRequestDedup"
       ]
     },
     {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
-      "type": "reexport",
+      "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "type": "static",
       "symbols": [
-        "AddItemForm"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
-      "type": "type",
-      "symbols": [
-        "AddItemFormProps",
-        "AddItemInput"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
-      "type": "reexport",
-      "symbols": [
-        "AnalyzePanel"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
-      "type": "type",
-      "symbols": [
-        "AnalyzePanelProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
-      "type": "reexport",
-      "symbols": [
-        "BatchImportPanel"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
-      "type": "type",
-      "symbols": [
-        "BatchImportPanelProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
-      "type": "reexport",
-      "symbols": [
-        "BulkActions"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
-      "type": "type",
-      "symbols": [
-        "BulkActionsProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
-      "type": "reexport",
-      "symbols": [
-        "computeBranchStats",
-        "completionRatio",
-        "countChildStatuses",
-        "formatTimestamp",
-        "itemMatchesFilter",
-        "filterTree"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/delete-confirmation.ts",
-      "type": "reexport",
-      "symbols": [
-        "DeleteConfirmation"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/delete-confirmation.ts",
-      "type": "type",
-      "symbols": [
-        "DeleteConfirmationProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "type": "reexport",
-      "symbols": [
-        "ExecutionPanel"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "type": "type",
-      "symbols": [
-        "ExecutionPanelProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
-      "type": "reexport",
-      "symbols": [
-        "InlineAddForm"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
-      "type": "type",
-      "symbols": [
-        "InlineAddFormProps",
-        "InlineAddInput"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
-      "type": "reexport",
-      "symbols": [
-        "MergePreview"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
-      "type": "type",
-      "symbols": [
-        "MergePreviewProps"
+        "isFeatureDisabled",
+        "onDegradationChange"
       ]
     },
     {
@@ -15634,136 +15643,6 @@
       "type": "type",
       "symbols": [
         "PRDTreeProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "type": "reexport",
-      "symbols": [
-        "countVisibleNodes",
-        "sliceVisibleTree",
-        "LoadMoreIndicator",
-        "DEFAULT_CHUNK_SIZE",
-        "PROGRESSIVE_THRESHOLD"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "type": "type",
-      "symbols": [
-        "ProgressiveSlice",
-        "LoadMoreIndicatorProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
-      "type": "reexport",
-      "symbols": [
-        "ProposalEditor"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
-      "type": "type",
-      "symbols": [
-        "ProposalEditorProps",
-        "RawProposal"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
-      "type": "reexport",
-      "symbols": [
-        "PruneConfirmation"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
-      "type": "type",
-      "symbols": [
-        "PruneConfirmationProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
-      "type": "reexport",
-      "symbols": [
-        "PruneDiffTree"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
-      "type": "type",
-      "symbols": [
-        "PruneDiffTreeProps",
-        "EpicImpact"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-      "type": "reexport",
-      "symbols": [
-        "SmartAddInput"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-      "type": "type",
-      "symbols": [
-        "SmartAddInputProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
-      "type": "reexport",
-      "symbols": [
-        "StatusFilter",
-        "defaultStatusFilter"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
-      "type": "type",
-      "symbols": [
-        "StatusFilterProps",
-        "FilterPreset"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "reexport",
-      "symbols": [
-        "TaskDetail"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "type",
-      "symbols": [
-        "TaskDetailProps"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-      "type": "reexport",
-      "symbols": [
-        "findItemById",
-        "countDescendants"
       ]
     },
     {
@@ -15961,32 +15840,6 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
-      "to": "packages/web/src/viewer/components/copy-link-button.ts",
-      "type": "reexport",
-      "symbols": [
-        "CopyLinkButton",
-        "buildShareableUrl"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
-      "to": "packages/web/src/viewer/components/logos.ts",
-      "type": "reexport",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "DetailItem",
-        "NavigateTo"
-      ]
-    },
-    {
       "from": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
       "to": "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
       "type": "static",
@@ -16012,18 +15865,18 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "to": "packages/web/src/viewer/components/copy-link-button.ts",
       "type": "static",
       "symbols": [
-        "formatTimestamp"
+        "CopyLinkButton"
       ]
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
       "type": "static",
       "symbols": [
-        "CopyLinkButton"
+        "formatTimestamp"
       ]
     },
     {
@@ -16103,7 +15956,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/refresh-queue-status.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryLevel"
@@ -16111,7 +15964,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/refresh-queue-status.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
       "type": "type",
       "symbols": [
         "RefreshQueueState"
@@ -16196,51 +16049,37 @@
     },
     {
       "from": "packages/web/src/viewer/components/sidebar.ts",
-      "to": "packages/web/src/viewer/sourcevision-tabs.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/views/sourcevision-tabs.ts",
       "type": "static",
       "symbols": [
         "SOURCEVISION_TABS"
       ]
     },
     {
-      "from": "packages/web/src/viewer/components/sidebar.ts",
-      "to": "packages/web/src/viewer/types.ts",
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "type": "reexport",
+      "symbols": [
+        "useProjectStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/status-indicators.ts",
+      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
       "type": "type",
       "symbols": [
-        "ViewId"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
-      "type": "static",
-      "symbols": [
-        "isFeatureDisabled",
-        "onDegradationChange"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
-      "type": "static",
-      "symbols": [
-        "usePolling"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
-      "type": "static",
-      "symbols": [
-        "createMessageCoalescer"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/message-throttle.ts",
-      "type": "static",
-      "symbols": [
-        "createMessageThrottle"
+        "ProjectStatus",
+        "SourceVisionStatus",
+        "RexStatus",
+        "HenchStatus"
       ]
     },
     {
@@ -16249,66 +16088,6 @@
       "type": "type",
       "symbols": [
         "ViewId"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/crash-detector.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/dom-performance-monitor.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
-      "type": "static",
-      "symbols": [
-        "registerPollingSource"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/dom-update-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
-      "type": "static",
-      "symbols": [
-        "onVisibilityChange",
-        "isTabVisible"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/dom-update-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
-      "type": "type",
-      "symbols": [
-        "TabVisibilitySnapshot"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/dom-update-gate.ts",
-      "to": "packages/web/src/viewer/update-batcher.ts",
-      "type": "type",
-      "symbols": [
-        "UpdateBatcher"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/graceful-degradation.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
-      "type": "static",
-      "symbols": [
-        "onSnapshot",
-        "getCurrentLevel",
-        "getLatestSnapshot"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/graceful-degradation.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
-      "type": "type",
-      "symbols": [
-        "MemoryLevel",
-        "MemorySnapshot"
       ]
     },
     {
@@ -16340,15 +16119,6 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-app-data.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
-      "type": "static",
-      "symbols": [
-        "isFeatureDisabled",
-        "onDegradationChange"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/hooks/use-app-data.ts",
       "to": "packages/web/src/viewer/loader.ts",
       "type": "static",
       "symbols": [
@@ -16363,6 +16133,15 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-app-data.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "isFeatureDisabled",
+        "onDegradationChange"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-app-data.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
@@ -16371,7 +16150,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "static",
       "symbols": [
         "detectCrash",
@@ -16384,7 +16163,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "type",
       "symbols": [
         "CrashDetectionResult",
@@ -16401,7 +16180,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
-      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "type": "static",
       "symbols": [
         "startDOMPerformanceMonitor",
@@ -16422,7 +16201,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
-      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "type": "type",
       "symbols": [
         "DOMNodeSnapshot",
@@ -16446,7 +16225,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "startDegradation",
@@ -16458,7 +16237,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "type",
       "symbols": [
         "DegradableFeature",
@@ -16467,7 +16246,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryLevel"
@@ -16475,7 +16254,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-memory-monitor.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -16488,7 +16267,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-memory-monitor.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemorySnapshot",
@@ -16498,7 +16277,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
         "onPollingStateChange",
@@ -16507,7 +16286,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "type",
       "symbols": [
         "PollingStateSnapshot"
@@ -16515,7 +16294,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-polling.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "registerPoller",
@@ -16523,8 +16302,236 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
+      "type": "type",
+      "symbols": [
+        "AddItemInput"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
+      "type": "type",
+      "symbols": [
+        "InlineAddInput"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "type": "static",
+      "symbols": [
+        "TaskDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "applyItemUpdate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "collectSubtreeIds",
+        "removeItemById"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData",
+        "TaskUsageSummary",
+        "WeeklyBudgetResolution"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "DetailItem",
+        "NavigateTo"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
+      "type": "static",
+      "symbols": [
+        "resolveTaskUtilization"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "diffDocument"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "TaskUsageSummary",
+        "WeeklyBudgetResolution"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
+      "type": "static",
+      "symbols": [
+        "createCallRateLimiter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "getAncestorIds"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+      "type": "static",
+      "symbols": [
+        "applyItemUpdate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "removeItemById"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/messaging/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/performance/dom-update-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createDomUpdateGate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/performance/response-buffer-gate.ts",
+      "type": "static",
+      "symbols": [
+        "createResponseBufferGate"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "to": "packages/web/src/viewer/performance/update-batcher.ts",
+      "type": "static",
+      "symbols": [
+        "createUpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageCoalescer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/messaging/message-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "type": "static",
+      "symbols": [
+        "isFeatureDisabled",
+        "onDegradationChange"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryLevel"
@@ -16532,7 +16539,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
       "type": "static",
       "symbols": [
         "startRefreshThrottle",
@@ -16546,7 +16553,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
       "type": "type",
       "symbols": [
         "RefreshQueueState",
@@ -16573,7 +16580,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -16585,7 +16592,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "type",
       "symbols": [
         "TabVisibilityState",
@@ -16595,7 +16602,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tick.ts",
-      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "to": "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
       "type": "static",
       "symbols": [
         "registerTickUpdater"
@@ -16607,14 +16614,6 @@
       "type": "type",
       "symbols": [
         "ViewBox"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/schema/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
       ]
     },
     {
@@ -16632,20 +16631,15 @@
     },
     {
       "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/schema/validate.ts",
+      "to": "packages/web/src/shared/data-files.ts",
       "type": "static",
       "symbols": [
-        "validateManifest",
-        "validateInventory",
-        "validateImports",
-        "validateZones",
-        "validateComponents",
-        "validateCallGraph"
+        "DATA_FILES"
       ]
     },
     {
       "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "registerPoller",
@@ -16669,11 +16663,32 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/viewer/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateManifest",
+        "validateInventory",
+        "validateImports",
+        "validateZones",
+        "validateComponents",
+        "validateCallGraph"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/schema/data-files.ts",
+      "to": "packages/web/src/shared/data-files.ts",
       "type": "static",
       "symbols": [
         "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/bootstrap.ts",
+      "type": "static",
+      "symbols": [
+        "bootstrap"
       ]
     },
     {
@@ -16775,22 +16790,6 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/theme-toggle.ts",
-      "type": "static",
-      "symbols": [
-        "initTheme"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
-      "type": "type",
-      "symbols": [
-        "DegradableFeature"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/hooks/use-app-data.ts",
       "type": "static",
       "symbols": [
@@ -16847,260 +16846,57 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
-      "type": "static",
-      "symbols": [
-        "startPollingManager",
-        "stopPollingManager"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/polling-restart.ts",
-      "type": "static",
-      "symbols": [
-        "startPollingRestart"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/sourcevision-tabs.ts",
-      "type": "static",
-      "symbols": [
-        "SOURCEVISION_TAB_IDS"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
-      "type": "static",
-      "symbols": [
-        "startTabVisibilityMonitor",
-        "stopTabVisibilityMonitor"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
-      "type": "static",
-      "symbols": [
-        "createTickVisibilityGate"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
         "ViewId",
-        "NavigateTo",
         "DetailItem"
       ]
     },
     {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/analysis.ts",
+      "to": "packages/web/src/viewer/views/view-registry.ts",
       "type": "static",
       "symbols": [
-        "AnalysisView"
+        "renderActiveView",
+        "buildValidViews"
       ]
     },
     {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/architecture.ts",
-      "type": "static",
-      "symbols": [
-        "ArchitectureView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/feature-toggles.ts",
-      "type": "static",
-      "symbols": [
-        "FeatureTogglesView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/files.ts",
-      "type": "static",
-      "symbols": [
-        "FilesView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/graph.ts",
-      "type": "static",
-      "symbols": [
-        "Graph"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/hench-config.ts",
-      "type": "static",
-      "symbols": [
-        "HenchConfigView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/hench-runs.ts",
-      "type": "static",
-      "symbols": [
-        "HenchRunsView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/hench-templates.ts",
-      "type": "static",
-      "symbols": [
-        "HenchTemplatesView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/integration-config.ts",
-      "type": "static",
-      "symbols": [
-        "IntegrationConfigView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/notion-config.ts",
-      "type": "static",
-      "symbols": [
-        "NotionConfigView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/overview.ts",
-      "type": "static",
-      "symbols": [
-        "Overview"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/pr-markdown.ts",
-      "type": "static",
-      "symbols": [
-        "PRMarkdownView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/prd.ts",
-      "type": "static",
-      "symbols": [
-        "PRDView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/problems.ts",
-      "type": "static",
-      "symbols": [
-        "ProblemsView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "type": "static",
-      "symbols": [
-        "RexDashboard"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/routes.ts",
-      "type": "static",
-      "symbols": [
-        "RoutesView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/suggestions.ts",
-      "type": "static",
-      "symbols": [
-        "SuggestionsView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/task-audit.ts",
-      "type": "static",
-      "symbols": [
-        "TaskAuditView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "TokenUsageView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/validation.ts",
-      "type": "static",
-      "symbols": [
-        "ValidationView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/workflow-optimization.ts",
-      "type": "static",
-      "symbols": [
-        "WorkflowOptimizationView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/views/zones.ts",
-      "type": "static",
-      "symbols": [
-        "ZonesView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/memory-monitor.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
-      "type": "static",
-      "symbols": [
-        "registerPollingSource"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/message-throttle.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "from": "packages/web/src/viewer/messaging/message-throttle.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
       "type": "type",
       "symbols": [
         "ParsedWSMessage"
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-manager.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
-      "type": "static",
+      "from": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
       "symbols": [
-        "registerPollingSource",
-        "unregisterPollingSource"
+        "ViewId"
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-manager.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "from": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/performance/update-batcher.ts",
+      "type": "type",
+      "symbols": [
+        "UpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "onVisibilityChange",
@@ -17108,16 +16904,113 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-manager.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "from": "packages/web/src/viewer/performance/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "type",
       "symbols": [
         "TabVisibilitySnapshot"
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-restart.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "from": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "onSnapshot",
+        "getCurrentLevel",
+        "getLatestSnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryLevel",
+        "MemorySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/memory-monitor.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
+      "type": "static",
+      "symbols": [
+        "onSnapshot",
+        "getLatestSnapshot",
+        "getCurrentLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
+      "type": "type",
+      "symbols": [
+        "MemoryLevel",
+        "MemorySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/response-buffer-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/performance/response-buffer-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "onTick"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "registerPollingSource",
+        "unregisterPollingSource"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "static",
+      "symbols": [
+        "onVisibilityChange",
+        "isTabVisible"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "type",
+      "symbols": [
+        "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/polling-restart.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "onDegradationChange",
@@ -17125,16 +17018,16 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-restart.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "from": "packages/web/src/viewer/polling/polling-restart.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "type",
       "symbols": [
         "DegradationState"
       ]
     },
     {
-      "from": "packages/web/src/viewer/polling-restart.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "from": "packages/web/src/viewer/polling/polling-restart.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
         "suspendAllSources",
@@ -17145,27 +17038,16 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/refresh-throttle.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "from": "packages/web/src/viewer/polling/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
-        "onSnapshot",
-        "getLatestSnapshot",
-        "getCurrentLevel"
+        "registerPollingSource"
       ]
     },
     {
-      "from": "packages/web/src/viewer/refresh-throttle.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
-      "type": "type",
-      "symbols": [
-        "MemoryLevel",
-        "MemorySnapshot"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/response-buffer-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "from": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "onVisibilityChange",
@@ -17173,11 +17055,20 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/response-buffer-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "from": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "type",
       "symbols": [
         "TabVisibilitySnapshot"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
+      "type": "static",
+      "symbols": [
+        "suspendTickTimer",
+        "resumeTickTimer"
       ]
     },
     {
@@ -17190,68 +17081,10 @@
     },
     {
       "from": "packages/web/src/viewer/schema-compat.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "static",
-      "symbols": [
-        "SCHEMA_VERSION"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/schema-compat.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
         "LoadedData"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/sourcevision-tabs.ts",
-      "to": "packages/web/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/sourcevision-tabs.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/tick-timer.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
-      "type": "static",
-      "symbols": [
-        "registerPollingSource"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
-      "type": "static",
-      "symbols": [
-        "onVisibilityChange",
-        "isTabVisible"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
-      "type": "type",
-      "symbols": [
-        "TabVisibilitySnapshot"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/tick-visibility-gate.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
-      "type": "static",
-      "symbols": [
-        "suspendTickTimer",
-        "resumeTickTimer"
       ]
     },
     {
@@ -17268,21 +17101,67 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/utils.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "from": "packages/web/src/viewer/usage/constants.ts",
+      "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
-        "Zones",
-        "CallEdge",
-        "ExternalImport"
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/usage/index.ts",
+      "to": "packages/web/src/viewer/usage/constants.ts",
+      "type": "reexport",
+      "symbols": [
+        "TOKEN_USAGE_POLL_KEY",
+        "USAGE_POLL_INTERVAL_MS",
+        "TOKEN_USAGE_VIEW_ID"
       ]
     },
     {
       "from": "packages/web/src/viewer/utils.ts",
-      "to": "packages/web/src/viewer/components/constants.ts",
+      "to": "packages/web/src/viewer/visualization/colors.ts",
+      "type": "reexport",
+      "symbols": [
+        "getZoneColorByIndex",
+        "getZoneColor",
+        "buildZoneColorMap"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/utils.ts",
+      "to": "packages/web/src/viewer/visualization/flow.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildFileToZoneMap",
+        "buildFlowEdges",
+        "buildCallFlowEdges",
+        "buildExternalImportEdges",
+        "buildFlowNodes"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/utils.ts",
+      "to": "packages/web/src/viewer/visualization/metrics.ts",
+      "type": "reexport",
+      "symbols": [
+        "meterClass"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/validate.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/analysis.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
-        "ZONE_COLORS"
+        "BrandedHeader"
       ]
     },
     {
@@ -17303,14 +17182,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/analysis.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/analysis.ts",
       "to": "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
       "type": "static",
       "symbols": [
@@ -17323,30 +17194,6 @@
       "type": "type",
       "symbols": [
         "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/architecture.ts",
-      "to": "packages/web/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/architecture.ts",
-      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
-      "symbols": [
-        "FindingsList"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/architecture.ts",
-      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
       ]
     },
     {
@@ -17365,6 +17212,23 @@
         "LoadedData",
         "NavigateTo",
         "DetailItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList",
+        "BarChart"
       ]
     },
     {
@@ -17406,9 +17270,16 @@
       "to": "packages/web/src/viewer/utils.ts",
       "type": "static",
       "symbols": [
-        "buildFileToZoneMap",
-        "getZoneColorByIndex",
         "basename"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "buildFileToZoneMap",
+        "getZoneColorByIndex"
       ]
     },
     {
@@ -17449,7 +17320,7 @@
     },
     {
       "from": "packages/web/src/viewer/views/graph.ts",
-      "to": "packages/web/src/viewer/utils.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
       "type": "static",
       "symbols": [
         "buildZoneColorMap",
@@ -17494,14 +17365,6 @@
       "type": "static",
       "symbols": [
         "CopyLinkButton"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/hench-runs.ts",
-      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
       ]
     },
     {
@@ -17561,6 +17424,14 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/views/hench-runs.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "MetricCard"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/views/hench-templates.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
@@ -17603,41 +17474,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "HealthGauge",
-        "PatternBadge",
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/viewer/components/data-display/zone-map.ts",
-      "type": "static",
-      "symbols": [
-        "ZoneMap",
-        "ZoneDetail"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -17659,8 +17495,22 @@
       "to": "packages/web/src/viewer/utils.ts",
       "type": "static",
       "symbols": [
-        "getZoneColorByIndex",
         "basename"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "BarChart",
+        "CollapsibleSection",
+        "HealthGauge",
+        "PatternBadge",
+        "MetricCard",
+        "ZoneMap",
+        "ZoneDetail",
+        "getZoneColorByIndex"
       ]
     },
     {
@@ -17673,10 +17523,10 @@
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
-        "createCallRateLimiter"
+        "BrandedHeader"
       ]
     },
     {
@@ -17716,17 +17566,7 @@
       "to": "packages/web/src/viewer/components/prd-tree/index.ts",
       "type": "type",
       "symbols": [
-        "PRDDocumentData",
-        "PRDItemData",
-        "AddItemInput"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
-      "type": "type",
-      "symbols": [
-        "InlineAddInput"
+        "PRDDocumentData"
       ]
     },
     {
@@ -17747,121 +17587,51 @@
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-actions.ts",
       "type": "static",
       "symbols": [
-        "BrandedHeader"
+        "usePRDActions"
       ]
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/shared-imports.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "type": "static",
+      "symbols": [
+        "usePRDData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+      "type": "static",
+      "symbols": [
+        "usePRDDeepLink"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "type": "static",
+      "symbols": [
+        "usePRDWebSocket"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/hooks/use-toast.ts",
+      "type": "static",
+      "symbols": [
+        "useToast"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
         "DetailItem",
         "NavigateTo"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
-      "type": "static",
-      "symbols": [
-        "TaskDetail"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
-      "type": "static",
-      "symbols": [
-        "resolveTaskUtilization"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
-      "type": "static",
-      "symbols": [
-        "diffDocument",
-        "applyItemUpdate"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-      "type": "static",
-      "symbols": [
-        "findItemById",
-        "getAncestorIds",
-        "collectSubtreeIds",
-        "removeItemById"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "TaskUsageSummary",
-        "WeeklyBudgetResolution",
-        "WeeklyBudgetSource"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/dom-update-gate.ts",
-      "type": "static",
-      "symbols": [
-        "createDomUpdateGate"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
-      "type": "static",
-      "symbols": [
-        "usePolling"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
-      "type": "static",
-      "symbols": [
-        "createMessageCoalescer"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/message-throttle.ts",
-      "type": "static",
-      "symbols": [
-        "createMessageThrottle"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
-      "type": "static",
-      "symbols": [
-        "createRequestDedup"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/response-buffer-gate.ts",
-      "type": "static",
-      "symbols": [
-        "createResponseBufferGate"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/update-batcher.ts",
-      "type": "static",
-      "symbols": [
-        "createUpdateBatcher"
       ]
     },
     {
@@ -17870,30 +17640,6 @@
       "type": "type",
       "symbols": [
         "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/problems.ts",
-      "to": "packages/web/src/viewer/components/constants.ts",
-      "type": "static",
-      "symbols": [
-        "ENRICHMENT_THRESHOLDS"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/problems.ts",
-      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
-      "symbols": [
-        "FindingsList"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/problems.ts",
-      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
       ]
     },
     {
@@ -17910,6 +17656,23 @@
       "type": "type",
       "symbols": [
         "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList",
+        "BarChart"
       ]
     },
     {
@@ -17973,38 +17736,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/routes.ts",
-      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/routes.ts",
-      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/routes.ts",
-      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
-      "type": "static",
-      "symbols": [
-        "TreeView"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/routes.ts",
-      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
-      "type": "type",
-      "symbols": [
-        "TreeNode"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/routes.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -18028,16 +17759,34 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/views/suggestions.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
       "symbols": [
-        "Finding"
+        "TreeView",
+        "CollapsibleSection",
+        "BarChart"
       ]
     },
     {
-      "from": "packages/web/src/viewer/views/suggestions.ts",
-      "to": "packages/web/src/viewer/components/constants.ts",
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "type",
+      "symbols": [
+        "TreeNode"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/sourcevision-tabs.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/sourcevision-tabs.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
       "type": "static",
       "symbols": [
         "ENRICHMENT_THRESHOLDS"
@@ -18045,10 +17794,10 @@
     },
     {
       "from": "packages/web/src/viewer/views/suggestions.ts",
-      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
-      "type": "static",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
       "symbols": [
-        "FindingsList"
+        "Finding"
       ]
     },
     {
@@ -18065,6 +17814,22 @@
       "type": "type",
       "symbols": [
         "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "FindingsList"
       ]
     },
     {
@@ -18101,22 +17866,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/token-usage.ts",
-      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
-      "type": "static",
-      "symbols": [
-        "MetricCard"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/token-usage.ts",
-      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
-      "type": "static",
-      "symbols": [
-        "BarChart"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/token-usage.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -18129,6 +17878,24 @@
       "type": "static",
       "symbols": [
         "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/usage/constants.ts",
+      "type": "static",
+      "symbols": [
+        "TOKEN_USAGE_POLL_KEY",
+        "USAGE_POLL_INTERVAL_MS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/token-usage.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "MetricCard",
+        "BarChart"
       ]
     },
     {
@@ -18148,6 +17915,209 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
+      "type": "type",
+      "symbols": [
+        "DegradableFeature"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId",
+        "NavigateTo",
+        "DetailItem",
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/analysis.ts",
+      "type": "static",
+      "symbols": [
+        "AnalysisView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/architecture.ts",
+      "type": "static",
+      "symbols": [
+        "ArchitectureView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/feature-toggles.ts",
+      "type": "static",
+      "symbols": [
+        "FeatureTogglesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/files.ts",
+      "type": "static",
+      "symbols": [
+        "FilesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/graph.ts",
+      "type": "static",
+      "symbols": [
+        "Graph"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/hench-config.ts",
+      "type": "static",
+      "symbols": [
+        "HenchConfigView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/hench-runs.ts",
+      "type": "static",
+      "symbols": [
+        "HenchRunsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/hench-templates.ts",
+      "type": "static",
+      "symbols": [
+        "HenchTemplatesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/integration-config.ts",
+      "type": "static",
+      "symbols": [
+        "IntegrationConfigView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/notion-config.ts",
+      "type": "static",
+      "symbols": [
+        "NotionConfigView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/overview.ts",
+      "type": "static",
+      "symbols": [
+        "Overview"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/pr-markdown.ts",
+      "type": "static",
+      "symbols": [
+        "PRMarkdownView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/prd.ts",
+      "type": "static",
+      "symbols": [
+        "PRDView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/problems.ts",
+      "type": "static",
+      "symbols": [
+        "ProblemsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/rex-dashboard.ts",
+      "type": "static",
+      "symbols": [
+        "RexDashboard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/routes.ts",
+      "type": "static",
+      "symbols": [
+        "RoutesView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/sourcevision-tabs.ts",
+      "type": "static",
+      "symbols": [
+        "SOURCEVISION_TAB_IDS"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/suggestions.ts",
+      "type": "static",
+      "symbols": [
+        "SuggestionsView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/task-audit.ts",
+      "type": "static",
+      "symbols": [
+        "TaskAuditView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "TokenUsageView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/validation.ts",
+      "type": "static",
+      "symbols": [
+        "ValidationView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/workflow-optimization.ts",
+      "type": "static",
+      "symbols": [
+        "WorkflowOptimizationView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/view-registry.ts",
+      "to": "packages/web/src/viewer/views/zones.ts",
+      "type": "static",
+      "symbols": [
+        "ZonesView"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/views/workflow-optimization.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
@@ -18163,14 +18133,6 @@
         "CallGraph",
         "Zone",
         "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
-      "type": "static",
-      "symbols": [
-        "CollapsibleSection"
       ]
     },
     {
@@ -18228,12 +18190,7 @@
       "to": "packages/web/src/viewer/utils.ts",
       "type": "static",
       "symbols": [
-        "buildFileToZoneMap",
-        "buildCallFlowEdges",
-        "buildExternalImportEdges",
-        "getZoneColorByIndex",
-        "basename",
-        "meterClass"
+        "basename"
       ]
     },
     {
@@ -18250,8 +18207,138 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/visualization/index.ts",
+      "type": "static",
+      "symbols": [
+        "CollapsibleSection",
+        "buildFileToZoneMap",
+        "buildCallFlowEdges",
+        "buildExternalImportEdges",
+        "getZoneColorByIndex",
+        "meterClass"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/colors.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zones"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/flow.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Zones",
+        "CallEdge",
+        "ExternalImport"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/flow.ts",
+      "to": "packages/web/src/viewer/visualization/colors.ts",
+      "type": "static",
+      "symbols": [
+        "getZoneColorByIndex"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
+      "type": "reexport",
+      "symbols": [
+        "CollapsibleSection"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "type": "reexport",
+      "symbols": [
+        "FindingsList"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/health-gauge.ts",
+      "type": "reexport",
+      "symbols": [
+        "HealthGauge",
+        "PatternBadge",
+        "MetricCard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/mini-charts.ts",
+      "type": "reexport",
+      "symbols": [
+        "BarChart",
+        "FlowDiagram"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
+      "type": "reexport",
+      "symbols": [
+        "TreeView"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/tree-view.ts",
+      "type": "type",
+      "symbols": [
+        "TreeNode"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/components/data-display/zone-map.ts",
+      "type": "reexport",
+      "symbols": [
+        "ZoneMap",
+        "ZoneDetail"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/visualization/colors.ts",
+      "type": "reexport",
+      "symbols": [
+        "ZONE_COLORS",
+        "getZoneColorByIndex",
+        "getZoneColor",
+        "buildZoneColorMap"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/visualization/flow.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildFileToZoneMap",
+        "buildFlowEdges",
+        "buildCallFlowEdges",
+        "buildExternalImportEdges",
+        "buildFlowNodes"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/visualization/index.ts",
+      "to": "packages/web/src/viewer/visualization/metrics.ts",
+      "type": "reexport",
+      "symbols": [
+        "meterClass"
+      ]
+    },
+    {
       "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "startDegradation",
@@ -18264,7 +18351,7 @@
     },
     {
       "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -18273,7 +18360,7 @@
     },
     {
       "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -18288,7 +18375,7 @@
     },
     {
       "from": "packages/web/tests/integration/background-suspension-recovery.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -18301,7 +18388,7 @@
     },
     {
       "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "startDegradation",
@@ -18314,7 +18401,7 @@
     },
     {
       "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -18324,7 +18411,19 @@
     },
     {
       "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
+      "type": "static",
+      "symbols": [
+        "startRefreshThrottle",
+        "getQueueState",
+        "enqueueRefresh",
+        "getRecommendedInterval",
+        "resetRefreshThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -18339,19 +18438,7 @@
     },
     {
       "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
-      "type": "static",
-      "symbols": [
-        "startRefreshThrottle",
-        "getQueueState",
-        "enqueueRefresh",
-        "getRecommendedInterval",
-        "resetRefreshThrottle"
-      ]
-    },
-    {
-      "from": "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -18392,7 +18479,7 @@
     },
     {
       "from": "packages/web/tests/integration/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
       "type": "static",
       "symbols": [
         "createCallRateLimiter"
@@ -18400,7 +18487,7 @@
     },
     {
       "from": "packages/web/tests/integration/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
       "type": "static",
       "symbols": [
         "createMessageCoalescer"
@@ -18408,7 +18495,7 @@
     },
     {
       "from": "packages/web/tests/integration/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/message-throttle.ts",
+      "to": "packages/web/src/viewer/messaging/message-throttle.ts",
       "type": "static",
       "symbols": [
         "createMessageThrottle"
@@ -18416,7 +18503,7 @@
     },
     {
       "from": "packages/web/tests/integration/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "static",
       "symbols": [
         "createRequestDedup"
@@ -19212,7 +19299,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
-      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "to": "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
       "type": "static",
       "symbols": [
         "registerTickUpdater",
@@ -19223,7 +19310,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
       "type": "static",
       "symbols": [
         "resetTickTimer"
@@ -19231,7 +19318,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
-      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
       "type": "static",
       "symbols": [
         "createCallRateLimiter"
@@ -19239,7 +19326,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/call-rate-limiter.test.ts",
-      "to": "packages/web/src/viewer/call-rate-limiter.ts",
+      "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
       "type": "type",
       "symbols": [
         "CallRateLimiter"
@@ -19264,7 +19351,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-detector.test.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "static",
       "symbols": [
         "detectCrash",
@@ -19280,7 +19367,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-detector.test.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "type",
       "symbols": [
         "CrashDetectionResult",
@@ -19297,7 +19384,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts",
-      "to": "packages/web/src/viewer/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/crash-detector.ts",
       "type": "type",
       "symbols": [
         "SavedNavigationState"
@@ -19313,7 +19400,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/degradation-banner.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "type",
       "symbols": [
         "DegradableFeature"
@@ -19321,7 +19408,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/degradation-banner.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryLevel"
@@ -19364,7 +19451,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
-      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "type": "static",
       "symbols": [
         "countDOMNodes",
@@ -19391,7 +19478,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
-      "to": "packages/web/src/viewer/dom-performance-monitor.ts",
+      "to": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "type": "type",
       "symbols": [
         "DOMNodeSnapshot",
@@ -19402,7 +19489,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
-      "to": "packages/web/src/viewer/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/performance/dom-update-gate.ts",
       "type": "static",
       "symbols": [
         "createDomUpdateGate"
@@ -19410,7 +19497,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
-      "to": "packages/web/src/viewer/dom-update-gate.ts",
+      "to": "packages/web/src/viewer/performance/dom-update-gate.ts",
       "type": "type",
       "symbols": [
         "DomUpdateGate"
@@ -19418,7 +19505,15 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/performance/update-batcher.ts",
+      "type": "static",
+      "symbols": [
+        "createUpdateBatcher"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -19426,16 +19521,8 @@
       ]
     },
     {
-      "from": "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
-      "to": "packages/web/src/viewer/update-batcher.ts",
-      "type": "static",
-      "symbols": [
-        "createUpdateBatcher"
-      ]
-    },
-    {
       "from": "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
       "type": "static",
       "symbols": [
         "onTick",
@@ -19444,7 +19531,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "static",
       "symbols": [
         "createRequestDedup"
@@ -19452,7 +19539,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -19465,7 +19552,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -19501,7 +19588,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/graceful-degradation.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "featuresForTier",
@@ -19517,7 +19604,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/graceful-degradation.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "type",
       "symbols": [
         "DegradableFeature"
@@ -19525,7 +19612,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/graceful-degradation.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -19681,7 +19768,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "startDegradation",
@@ -19692,7 +19779,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -19701,7 +19788,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -19714,7 +19801,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-memory.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -19723,7 +19810,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-polling.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -19736,7 +19823,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/loader-polling.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -19745,7 +19832,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/memory-monitor.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "classifyLevel",
@@ -19764,7 +19851,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/memory-monitor.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemoryThresholds",
@@ -19782,7 +19869,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/memory-warning.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "type",
       "symbols": [
         "MemorySnapshot",
@@ -19791,7 +19878,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/message-coalescer.test.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
       "type": "static",
       "symbols": [
         "createMessageCoalescer"
@@ -19799,7 +19886,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/message-coalescer.test.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
       "type": "type",
       "symbols": [
         "MessageCoalescer",
@@ -19809,7 +19896,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
-      "to": "packages/web/src/viewer/message-coalescer.ts",
+      "to": "packages/web/src/viewer/messaging/message-coalescer.ts",
       "type": "type",
       "symbols": [
         "ParsedWSMessage"
@@ -19817,7 +19904,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
-      "to": "packages/web/src/viewer/message-throttle.ts",
+      "to": "packages/web/src/viewer/messaging/message-throttle.ts",
       "type": "static",
       "symbols": [
         "createMessageThrottle"
@@ -19825,7 +19912,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/message-throttle.test.ts",
-      "to": "packages/web/src/viewer/message-throttle.ts",
+      "to": "packages/web/src/viewer/messaging/message-throttle.ts",
       "type": "type",
       "symbols": [
         "MessageThrottle",
@@ -19866,7 +19953,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/polling-manager.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -19884,7 +19971,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/polling-manager.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -19893,7 +19980,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/polling-state.test.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
         "registerPollingSource",
@@ -19914,7 +20001,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/polling-state.test.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "type",
       "symbols": [
         "PollingSourceCallbacks",
@@ -20047,7 +20134,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -20056,7 +20143,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
       "type": "static",
       "symbols": [
         "startRefreshThrottle",
@@ -20071,7 +20158,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
-      "to": "packages/web/src/viewer/refresh-throttle.ts",
+      "to": "packages/web/src/viewer/performance/refresh-throttle.ts",
       "type": "type",
       "symbols": [
         "RefreshQueueState"
@@ -20079,7 +20166,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "static",
       "symbols": [
         "createRequestDedup"
@@ -20087,7 +20174,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
-      "to": "packages/web/src/viewer/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "type",
       "symbols": [
         "RequestDedup"
@@ -20095,7 +20182,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
-      "to": "packages/web/src/viewer/response-buffer-gate.ts",
+      "to": "packages/web/src/viewer/performance/response-buffer-gate.ts",
       "type": "static",
       "symbols": [
         "createResponseBufferGate"
@@ -20103,7 +20190,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20175,7 +20262,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
-      "to": "packages/web/src/viewer/graceful-degradation.ts",
+      "to": "packages/web/src/viewer/performance/graceful-degradation.ts",
       "type": "static",
       "symbols": [
         "startDegradation",
@@ -20186,7 +20273,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
-      "to": "packages/web/src/viewer/memory-monitor.ts",
+      "to": "packages/web/src/viewer/performance/memory-monitor.ts",
       "type": "static",
       "symbols": [
         "startMemoryMonitor",
@@ -20195,7 +20282,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -20208,7 +20295,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20217,7 +20304,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -20230,7 +20317,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20249,7 +20336,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tab-visibility.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20266,7 +20353,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tab-visibility.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "type",
       "symbols": [
         "TabVisibilitySnapshot",
@@ -20323,7 +20410,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-timer.test.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
       "type": "static",
       "symbols": [
         "onTick",
@@ -20335,7 +20422,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-timer.test.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
       "type": "type",
       "symbols": [
         "TickListener"
@@ -20343,7 +20430,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
-      "to": "packages/web/src/viewer/batched-tick-dispatcher.ts",
+      "to": "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
       "type": "static",
       "symbols": [
         "resetBatchedTickDispatcher",
@@ -20353,7 +20440,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20362,7 +20449,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
-      "to": "packages/web/src/viewer/tick-timer.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
       "type": "static",
       "symbols": [
         "onTick",
@@ -20372,7 +20459,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
-      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
       "type": "static",
       "symbols": [
         "createTickVisibilityGate"
@@ -20380,7 +20467,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
-      "to": "packages/web/src/viewer/tick-visibility-gate.ts",
+      "to": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
       "type": "type",
       "symbols": [
         "TickVisibilityGate"
@@ -20408,6 +20495,14 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
+      "to": "packages/web/src/viewer/usage/constants.ts",
+      "type": "static",
+      "symbols": [
+        "TOKEN_USAGE_VIEW_ID"
       ]
     },
     {
@@ -20481,7 +20576,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/update-batcher.test.ts",
-      "to": "packages/web/src/viewer/update-batcher.ts",
+      "to": "packages/web/src/viewer/performance/update-batcher.ts",
       "type": "static",
       "symbols": [
         "createUpdateBatcher"
@@ -20489,7 +20584,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/update-batcher.test.ts",
-      "to": "packages/web/src/viewer/update-batcher.ts",
+      "to": "packages/web/src/viewer/performance/update-batcher.ts",
       "type": "type",
       "symbols": [
         "UpdateBatcher"
@@ -20497,7 +20592,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/usage-polling.test.ts",
-      "to": "packages/web/src/viewer/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
       "symbols": [
         "startPollingManager",
@@ -20510,11 +20605,20 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/usage-polling.test.ts",
-      "to": "packages/web/src/viewer/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
         "resetTabVisibility"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/usage-polling.test.ts",
+      "to": "packages/web/src/viewer/usage/constants.ts",
+      "type": "static",
+      "symbols": [
+        "TOKEN_USAGE_KEY",
+        "USAGE_POLL_INTERVAL_MS"
       ]
     },
     {
@@ -20527,7 +20631,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
         "registerPollingSource",
@@ -20538,7 +20642,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
-      "to": "packages/web/src/viewer/polling-state.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "type",
       "symbols": [
         "PollingSourceCallbacks"
@@ -20886,11 +20990,17 @@
         "packages/web/src/viewer/hooks/use-pan-zoom.ts",
         "packages/web/src/viewer/hooks/use-polling-suspension.ts",
         "packages/web/src/viewer/hooks/use-polling.ts",
+        "packages/web/src/viewer/hooks/use-prd-actions.ts",
+        "packages/web/src/viewer/hooks/use-prd-data.ts",
+        "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+        "packages/web/src/viewer/hooks/use-prd-websocket.ts",
         "packages/web/src/viewer/hooks/use-project-metadata.ts",
+        "packages/web/src/viewer/hooks/use-project-status.ts",
         "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
         "packages/web/src/viewer/hooks/use-route-state.ts",
         "packages/web/src/viewer/hooks/use-tab-visibility.ts",
         "packages/web/src/viewer/hooks/use-tick.ts",
+        "packages/web/src/viewer/hooks/use-toast.ts",
         "packages/web/src/viewer/hooks/use-zone-drag.ts",
         "packages/web/src/viewer/main.ts",
         "packages/web/src/viewer/views/analysis.ts",
@@ -20913,6 +21023,7 @@
         "packages/web/src/viewer/views/task-audit.ts",
         "packages/web/src/viewer/views/token-usage.ts",
         "packages/web/src/viewer/views/validation.ts",
+        "packages/web/src/viewer/views/view-registry.ts",
         "packages/web/src/viewer/views/workflow-optimization.ts",
         "packages/web/src/viewer/views/zones.ts",
         "packages/web/tests/integration/pr-markdown-refresh.test.ts",
@@ -21117,6 +21228,7 @@
         "packages/hench/tests/unit/agent/prompt.test.ts",
         "packages/hench/tests/unit/agent/review.test.ts",
         "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+        "packages/hench/tests/unit/agent/spin-detection.test.ts",
         "packages/hench/tests/unit/agent/stuck.test.ts",
         "packages/hench/tests/unit/agent/summary.test.ts",
         "packages/hench/tests/unit/agent/task-display.test.ts",
@@ -21311,6 +21423,7 @@
         "packages/sourcevision/tests/unit/analyzers/inventory.test.ts",
         "packages/sourcevision/tests/unit/analyzers/manifest.test.ts",
         "packages/sourcevision/tests/unit/analyzers/next-steps.test.ts",
+        "packages/sourcevision/tests/unit/analyzers/risk-scoring.test.ts",
         "packages/sourcevision/tests/unit/analyzers/token-usage.test.ts",
         "packages/sourcevision/tests/unit/analyzers/workspace.test.ts",
         "packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts",
@@ -21493,7 +21606,7 @@
         "packages/rex/src/schema/validate.ts",
         "packages/sourcevision/src/cli/mcp.ts",
         "packages/sourcevision/src/schema/validate.ts",
-        "packages/web/src/schema/validate.ts"
+        "packages/web/src/viewer/validate.ts"
       ],
       "symbols": [
         "ZodError",
@@ -21502,17 +21615,10 @@
     }
   ],
   "summary": {
-    "totalEdges": 2231,
+    "totalEdges": 2240,
     "totalExternal": 18,
-    "circularCount": 1,
-    "circulars": [
-      {
-        "cycle": [
-          "packages/rex/src/recommend/create-from-recommendations.ts",
-          "packages/rex/src/recommend/conflict-detection.ts"
-        ]
-      }
-    ],
+    "circularCount": 0,
+    "circulars": [],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
@@ -21540,14 +21646,14 @@
       },
       {
         "path": "packages/web/src/viewer/components/logos.ts",
-        "count": 22
+        "count": 23
       },
       {
         "path": "packages/hench/src/store/config.ts",
         "count": 20
       },
       {
-        "path": "packages/web/src/viewer/tab-visibility.ts",
+        "path": "packages/web/src/viewer/polling/tab-visibility.ts",
         "count": 19
       },
       {
@@ -21575,7 +21681,7 @@
         "count": 12
       },
       {
-        "path": "packages/web/src/viewer/polling-manager.ts",
+        "path": "packages/web/src/viewer/polling/polling-manager.ts",
         "count": 12
       },
       {
@@ -21583,18 +21689,18 @@
         "count": 11
       },
       {
-        "path": "packages/web/src/viewer/memory-monitor.ts",
+        "path": "packages/sourcevision/src/util/sort.ts",
         "count": 11
       },
       {
-        "path": "packages/sourcevision/src/analyzers/claude-client.ts",
-        "count": 10
+        "path": "packages/web/src/viewer/performance/memory-monitor.ts",
+        "count": 11
       },
       {
-        "path": "packages/sourcevision/src/util/sort.ts",
-        "count": 10
+        "path": "packages/web/src/viewer/visualization/index.ts",
+        "count": 11
       }
     ],
-    "avgImportsPerFile": 3.37
+    "avgImportsPerFile": 3.3
   }
 }

@@ -1,0 +1,31 @@
+{
+  "id": "project-orchestration",
+  "name": "Project Orchestration",
+  "description": "Top-level CLI entrypoints and build automation scripts that coordinate the n-dx toolchain.",
+  "files": [
+    "ci.js",
+    "cli.js",
+    "config.js",
+    "help.js",
+    "refresh-artifacts.js",
+    "refresh-plan.js",
+    "refresh-validate.js",
+    "tests/unit/help.test.js",
+    "tests/unit/refresh-artifacts.test.js",
+    "tests/unit/refresh-plan.test.js",
+    "tests/unit/refresh-validate.test.js",
+    "web.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 12,
+  "lineCount": 4472,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

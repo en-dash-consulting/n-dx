@@ -6,6 +6,7 @@
 
 Zone: Src (`packages-llm-client:src`)
 Files: 4, Cohesion: 0.29, Coupling: 0.71
+Risk: catastrophic (score: 0.71)
 Description: 4 files, primarily TypeScript
 Entry points: packages/llm-client/src/api-provider.ts, packages/llm-client/src/config.ts
 Lines: 552
@@ -36,6 +37,12 @@ Incoming (other zones → this zone):
   ← packages-llm-client:src-3: packages/llm-client/src/cli-provider.ts → packages/llm-client/src/config.ts; packages/llm-client/src/cli-provider.ts → packages/llm-client/src/config.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/api-provider.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/api-provider.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/api-provider.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/api-provider.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/config.ts; packages/llm-client/src/create-client.ts → packages/llm-client/src/config.ts
 
 </imports>
+
+<findings>
+
+[suggestion] [critical] Zone "Src" (packages-llm-client:src) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+
+</findings>
 
 <insights>
 

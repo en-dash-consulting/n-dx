@@ -1,26 +1,39 @@
 {
   "id": "polling-infrastructure",
   "name": "Polling Infrastructure",
-  "description": "Core polling system that coordinates data fetching, token usage tracking, and test coverage for polling operations.",
+  "description": "Manages real-time data updates, DOM performance optimization, and batched polling mechanisms for the dashboard viewer.",
   "files": [
-    "packages/web/src/viewer/hooks/use-polling.ts",
-    "packages/web/src/viewer/polling-manager.ts",
-    "packages/web/src/viewer/views/token-usage.ts",
-    "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
-    "packages/web/tests/unit/viewer/loader-memory.test.ts",
-    "packages/web/tests/unit/viewer/loader-polling.test.ts",
-    "packages/web/tests/unit/viewer/polling-manager.test.ts",
-    "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
-    "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
-    "packages/web/tests/unit/viewer/usage-polling.test.ts"
+    "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/performance/dom-performance-monitor.ts",
+    "packages/web/src/viewer/polling/.gitkeep",
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts",
+    "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+    "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
+    "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+    "packages/web/tests/unit/viewer/polling-state.test.ts",
+    "packages/web/tests/unit/viewer/tick-timer.test.ts",
+    "packages/web/tests/unit/viewer/use-polling-suspension.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/hooks/use-polling.ts",
-    "packages/web/src/viewer/polling-manager.ts",
-    "packages/web/src/viewer/views/token-usage.ts"
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts"
   ],
-  "cohesion": 0.42,
-  "coupling": 0.58,
-  "fileCount": 10,
-  "lineCount": 3209
+  "cohesion": 0.69,
+  "coupling": 0.31,
+  "fileCount": 14,
+  "lineCount": 4984,
+  "riskMetrics": {
+    "cohesion": 0.69,
+    "coupling": 0.31,
+    "riskScore": 0.31000000000000005,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
 }

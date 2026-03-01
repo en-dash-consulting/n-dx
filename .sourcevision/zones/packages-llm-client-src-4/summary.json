@@ -14,5 +14,12 @@
   "cohesion": 0.2,
   "coupling": 0.8,
   "fileCount": 3,
-  "lineCount": 181
+  "lineCount": 181,
+  "riskMetrics": {
+    "cohesion": 0.2,
+    "coupling": 0.8,
+    "riskScore": 0.8,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
 }

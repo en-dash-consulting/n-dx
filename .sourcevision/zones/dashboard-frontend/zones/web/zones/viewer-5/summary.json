@@ -1,0 +1,26 @@
+{
+  "id": "web-2/web/viewer-5",
+  "name": "Viewer 5",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/components/faq.ts",
+    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+    "packages/web/src/viewer/components/refresh-queue-status.ts",
+    "packages/web/src/viewer/components/search-overlay.ts",
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/src/viewer/main.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts",
+    "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
+    "packages/web/tests/integration/token-usage-route-regression.test.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts",
+    "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts",
+    "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
+    "packages/web/tests/unit/viewer/search-overlay.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.73,
+  "coupling": 0.27,
+  "fileCount": 14,
+  "lineCount": 3349
+}

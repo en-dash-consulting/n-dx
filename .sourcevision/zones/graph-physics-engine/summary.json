@@ -1,7 +1,7 @@
 {
   "id": "graph-physics-engine",
   "name": "Graph Physics Engine",
-  "description": "Handles physics calculations and layout algorithms for interactive graph visualizations.",
+  "description": "Provides physics simulation algorithms for interactive graph layout and visualization in the dashboard viewer.",
   "files": [
     "packages/web/src/viewer/graph/physics.ts",
     "packages/web/tests/unit/viewer/graph-destroy.test.ts",
@@ -13,5 +13,12 @@
   "cohesion": 0.67,
   "coupling": 0.33,
   "fileCount": 3,
-  "lineCount": 888
+  "lineCount": 888,
+  "riskMetrics": {
+    "cohesion": 0.67,
+    "coupling": 0.33,
+    "riskScore": 0.32999999999999996,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
 }
