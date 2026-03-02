@@ -692,11 +692,11 @@ export async function spawnClaude(prompt: string, model: string, claudeConfig?: 
 
 // ── Format detection ──
 
-export type FileFormat = "markdown" | "json" | "yaml";
+export type FileFormat = "markdown" | "text" | "json" | "yaml";
 
 const FORMAT_MAP: Record<string, FileFormat> = {
   ".md": "markdown",
-  ".txt": "markdown",
+  ".txt": "text",
   ".json": "json",
   ".yaml": "yaml",
   ".yml": "yaml",
@@ -790,7 +790,7 @@ export function parseStructuredFile(
   format: FileFormat,
   existingItems: PRDItem[],
 ): Proposal[] | null {
-  if (format === "markdown") return null;
+  if (format === "markdown" || format === "text") return null;
 
   // For JSON, first try to parse as the full Proposal schema
   if (format === "json") {
@@ -884,6 +884,8 @@ export function parseStructuredFile(
 const FORMAT_HINTS: Record<FileFormat, string> = {
   markdown:
     "The document is in Markdown format. Pay attention to headings, bullet points, and structured sections.",
+  text:
+    "The document is in plain text format. Look for section headers (ALL CAPS, underlined, numbered), bullet points, and requirement keywords (must, should, shall).",
   json:
     "The document is in JSON format. Extract meaningful requirements from the structured data, including nested objects and arrays.",
   yaml:
@@ -1167,10 +1169,19 @@ export async function reasonFromFile(
   const tokenUsage = emptyAnalyzeTokenUsage();
 
   // For JSON/YAML, try direct structured parsing first
-  if (format !== "markdown") {
+  if (format !== "markdown" && format !== "text") {
     const structured = parseStructuredFile(content, format, existingItems);
     if (structured !== null) {
       return { proposals: structured, tokenUsage };
+    }
+  }
+
+  // For text files, try local extraction before LLM
+  if (format === "text") {
+    const { extractFromText } = await import("./extract.js");
+    const extraction = extractFromText(content, { existingItems });
+    if (extraction.proposals.length > 0) {
+      return { proposals: extraction.proposals, tokenUsage };
     }
   }
 
@@ -1987,10 +1998,21 @@ export async function reasonFromIdeasFile(
       // Fall through to LLM processing
     }
 
-    // Try local markdown/text extraction (no LLM needed)
+    // Try local markdown extraction (no LLM needed)
     if (format === "markdown") {
       const { extractFromMarkdown } = await import("./extract.js");
       const extraction = extractFromMarkdown(content, { existingItems });
+      if (extraction.proposals.length > 0) {
+        localProposals.push(...extraction.proposals);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // Try local plain text extraction (no LLM needed)
+    if (format === "text") {
+      const { extractFromText } = await import("./extract.js");
+      const extraction = extractFromText(content, { existingItems });
       if (extraction.proposals.length > 0) {
         localProposals.push(...extraction.proposals);
         continue;
