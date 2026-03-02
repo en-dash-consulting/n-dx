@@ -81,3 +81,6 @@ export { validateModificationRequest, classifyModificationRequest } from "./vali
 
 export type { ExtractionOptions, ExtractionResult } from "./extract.js";
 export { extractFromMarkdown, extractFromText, extractFromFile, classifyHeadingLevels } from "./extract.js";
+
+export type { FileValidationResult, MarkdownValidationResult, FileValidationErrorCode } from "./file-validation.js";
+export { validateFileInput, validateMarkdownContent, FileValidationError, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from "./file-validation.js";

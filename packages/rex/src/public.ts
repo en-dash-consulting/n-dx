@@ -317,6 +317,21 @@ export {
 } from "./analyze/extract.js";
 export type { ExtractionOptions, ExtractionResult } from "./analyze/extract.js";
 
+// ---- Analyze: file validation -----------------------------------------------
+
+export {
+  validateFileInput,
+  validateMarkdownContent,
+  FileValidationError,
+  SUPPORTED_EXTENSIONS,
+  MAX_FILE_SIZE_BYTES,
+} from "./analyze/file-validation.js";
+export type {
+  FileValidationResult,
+  MarkdownValidationResult,
+  FileValidationErrorCode,
+} from "./analyze/file-validation.js";
+
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";

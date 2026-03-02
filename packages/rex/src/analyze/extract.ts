@@ -20,6 +20,8 @@ import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import { detectFileFormat } from "./reason.js";
 import type { FileFormat } from "./reason.js";
+import { validateFileInput, validateMarkdownContent } from "./file-validation.js";
+import type { MarkdownValidationResult } from "./file-validation.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -39,6 +41,8 @@ export interface ExtractionResult {
   usedLLM: boolean;
   /** Token usage if LLM was used. */
   tokenUsage?: AnalyzeTokenUsage;
+  /** Non-fatal warnings about the input (e.g., markdown syntax issues). */
+  warnings?: string[];
 }
 
 /** PRD level assignment for a heading depth. */
@@ -995,24 +999,45 @@ export function extractFromText(
 }
 
 /**
- * Extract structured requirements from a file. Auto-detects format
- * (markdown vs text) and delegates to the appropriate extractor.
+ * Extract structured requirements from a file. Validates the file
+ * input, auto-detects format, and delegates to the appropriate extractor.
+ *
+ * @throws {FileValidationError} when the file is missing, unsupported,
+ *   too large, binary, or empty.
  */
 export async function extractFromFile(
   filePath: string,
   options?: ExtractionOptions,
 ): Promise<ExtractionResult> {
-  const content = await readFile(filePath, "utf-8");
-  const format = detectFileFormat(filePath);
+  // Validate file before reading — checks existence, extension, size,
+  // binary content, and emptiness.
+  const validation = await validateFileInput(filePath);
 
-  if (format === "markdown") {
-    return extractFromMarkdown(content, options);
+  const content = await readFile(filePath, "utf-8");
+
+  // For markdown files, run content-level syntax validation
+  let contentWarnings: string[] = [];
+  if (validation.format === "markdown") {
+    const mdValidation = validateMarkdownContent(content);
+    contentWarnings = mdValidation.warnings;
   }
-  if (format === "text") {
-    return extractFromText(content, options);
+
+  let result: ExtractionResult;
+  if (validation.format === "markdown") {
+    result = extractFromMarkdown(content, options);
+  } else if (validation.format === "text") {
+    result = extractFromText(content, options);
+  } else {
+    // For JSON/YAML and unknown formats, try text extractor as fallback
+    result = extractFromText(content, options);
   }
-  // For JSON/YAML and unknown formats, try text extractor as fallback
-  return extractFromText(content, options);
+
+  // Attach any warnings from validation
+  if (contentWarnings.length > 0) {
+    result = { ...result, warnings: contentWarnings };
+  }
+
+  return result;
 }
 
 // ── Flat content handler ───────────────────────────────────────────
