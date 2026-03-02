@@ -276,11 +276,11 @@ describe("validateConfig", () => {
       schema: "rex/v1",
       project: "myproject",
       adapter: "file",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6-20250514",
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.data.model).toBe("claude-sonnet-4-20250514");
+      expect(result.data.model).toBe("claude-sonnet-4-6-20250514");
     }
   });
 

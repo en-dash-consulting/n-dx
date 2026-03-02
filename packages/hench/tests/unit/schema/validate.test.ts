@@ -263,7 +263,7 @@ describe("validateRunRecord", () => {
     turns: 5,
     tokenUsage: { input: 1000, output: 500 },
     toolCalls: [],
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6-20250514",
   };
 
   it("accepts valid run record", () => {
@@ -410,14 +410,14 @@ describe("validateRunRecord", () => {
     const run = {
       ...validRun,
       turnTokenUsage: [
-        { turn: 1, input: 500, output: 200, vendor: "claude", model: "claude-sonnet-4-20250514" },
+        { turn: 1, input: 500, output: 200, vendor: "claude", model: "claude-sonnet-4-6-20250514" },
       ],
     };
     const result = validateRunRecord(run);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.turnTokenUsage![0].vendor).toBe("claude");
-      expect(result.data.turnTokenUsage![0].model).toBe("claude-sonnet-4-20250514");
+      expect(result.data.turnTokenUsage![0].model).toBe("claude-sonnet-4-6-20250514");
     }
   });
 

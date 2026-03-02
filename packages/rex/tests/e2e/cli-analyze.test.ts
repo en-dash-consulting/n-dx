@@ -581,7 +581,7 @@ describe("Model", () => {
     const output = run([
       "analyze",
       "--no-llm",
-      "--model=claude-sonnet-4-20250514",
+      "--model=claude-sonnet-4-6-20250514",
       "--format=json",
       tmpDir,
     ]);

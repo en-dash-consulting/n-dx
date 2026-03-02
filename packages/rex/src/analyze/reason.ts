@@ -18,7 +18,7 @@ import {
   detectLLMAuthMode,
 } from "@n-dx/llm-client";
 
-export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
 export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 /** Maximum number of LLM retry attempts for transient/parse failures. */

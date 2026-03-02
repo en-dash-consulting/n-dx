@@ -257,7 +257,7 @@ async function testApiConnection(apiKey, endpoint, model) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "claude-sonnet-4-20250514",
+        model: model || "claude-sonnet-4-6-20250514",
         max_tokens: 1,
         messages: [{ role: "user", content: "hi" }],
       }),
@@ -573,8 +573,8 @@ Claude settings (.n-dx.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-4-20250514, claude-opus-4-20250514
-                                    Default: claude-sonnet-4-20250514
+                                    Examples: claude-sonnet-4-6-20250514, claude-opus-4-20250514
+                                    Default: claude-sonnet-4-6-20250514
 
 LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"

@@ -12,12 +12,11 @@ import { isFullyCompleted } from "../../core/prune.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, warn, result, isQuiet } from "../output.js";
-import type { PRDItem } from "../../schema/index.js";
+import type { PRDItem, ItemStatus } from "../../schema/index.js";
 import { isRootLevel } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
-import { findAutoCompletions } from "../../core/parent-completion.js";
 import { validateStructure } from "../../core/structural.js";
 import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
@@ -461,16 +460,16 @@ export async function cmdStatus(
     }
   }
 
-  // Auto-completion hints: parents that could be auto-completed
+  // Auto-completion hints: parents whose children are ALL completed/deferred
   const autoCompletable: Array<{ id: string; title: string }> = [];
+  const TERMINAL: Set<ItemStatus> = new Set(["completed", "deferred"]);
   for (const { item } of walkTree(doc.items)) {
-    if (item.children && item.children.length > 0) {
-      const { completedItems } = findAutoCompletions(doc.items, item.children[0].id);
-      for (const ci of completedItems) {
-        if (!autoCompletable.find((a) => a.id === ci.id)) {
-          autoCompletable.push({ id: ci.id, title: ci.title });
-        }
-      }
+    if (
+      item.children && item.children.length > 0 &&
+      (item.status === "pending" || item.status === "in_progress") &&
+      item.children.every((c) => TERMINAL.has(c.status))
+    ) {
+      autoCompletable.push({ id: item.id, title: item.title });
     }
   }
   if (autoCompletable.length > 0) {
