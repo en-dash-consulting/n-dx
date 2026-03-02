@@ -219,6 +219,66 @@ describe("generateZoneContext", () => {
     // No imports for this zone
     expect(result).not.toContain("<imports>");
   });
+
+  it("shows sub-crossings section with counts grouped by zone pair", () => {
+    const subA = makeZone("parent/sub-a", ["src/parent/a1.ts", "src/parent/a2.ts"]);
+    const subB = makeZone("parent/sub-b", ["src/parent/b1.ts", "src/parent/b2.ts"]);
+    const zone = makeZone("parent", ["src/parent/a1.ts", "src/parent/a2.ts", "src/parent/b1.ts", "src/parent/b2.ts"], {
+      subZones: [subA, subB],
+      subCrossings: [
+        { from: "src/parent/a1.ts", to: "src/parent/b1.ts", fromZone: "parent/sub-a", toZone: "parent/sub-b" },
+        { from: "src/parent/a2.ts", to: "src/parent/b2.ts", fromZone: "parent/sub-a", toZone: "parent/sub-b" },
+        { from: "src/parent/b1.ts", to: "src/parent/a1.ts", fromZone: "parent/sub-b", toZone: "parent/sub-a" },
+      ],
+    });
+    const inventory = makeInventory([
+      makeFileEntry("src/parent/a1.ts"),
+      makeFileEntry("src/parent/a2.ts"),
+      makeFileEntry("src/parent/b1.ts"),
+      makeFileEntry("src/parent/b2.ts"),
+    ]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).toContain("<sub-crossings>");
+    expect(result).toContain("</sub-crossings>");
+    expect(result).toContain("parent/sub-a → parent/sub-b: 2");
+    expect(result).toContain("parent/sub-b → parent/sub-a: 1");
+  });
+
+  it("omits sub-crossings section when no sub-crossings exist", () => {
+    const subA = makeZone("parent/sub-a", ["src/parent/a1.ts"]);
+    const subB = makeZone("parent/sub-b", ["src/parent/b1.ts"]);
+    const zone = makeZone("parent", ["src/parent/a1.ts", "src/parent/b1.ts"], {
+      subZones: [subA, subB],
+    });
+    const inventory = makeInventory([
+      makeFileEntry("src/parent/a1.ts"),
+      makeFileEntry("src/parent/b1.ts"),
+    ]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).not.toContain("<sub-crossings>");
+  });
+
+  it("omits sub-crossings section when subCrossings is empty array", () => {
+    const zone = makeZone("parent", ["src/parent/a1.ts"], {
+      subZones: [makeZone("parent/child", ["src/parent/a1.ts"])],
+      subCrossings: [],
+    });
+    const inventory = makeInventory([makeFileEntry("src/parent/a1.ts")]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).not.toContain("<sub-crossings>");
+  });
 });
 
 // ── buildZoneSummary ────────────────────────────────────────────────────────

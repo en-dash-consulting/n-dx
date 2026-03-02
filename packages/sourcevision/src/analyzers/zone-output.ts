@@ -152,6 +152,27 @@ export function generateZoneContext(
     lines.push("");
   }
 
+  // ── Sub-crossings ──
+  if (zone.subCrossings && zone.subCrossings.length > 0) {
+    lines.push("<sub-crossings>");
+    lines.push("");
+    lines.push("Cross-dependencies between sub-zones:");
+
+    // Group by directed zone pair and count
+    const pairCounts = new Map<string, number>();
+    for (const c of zone.subCrossings) {
+      const key = `${c.fromZone} → ${c.toZone}`;
+      pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+    }
+    for (const [pair, count] of sortedEntries(pairCounts)) {
+      lines.push(`  ${pair}: ${count}`);
+    }
+
+    lines.push("");
+    lines.push("</sub-crossings>");
+    lines.push("");
+  }
+
   // ── Sub-zones ──
   if (zone.subZones && zone.subZones.length > 0) {
     lines.push("<sub-zones>");
