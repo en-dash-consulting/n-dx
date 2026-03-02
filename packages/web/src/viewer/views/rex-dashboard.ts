@@ -603,7 +603,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   onClick: () => navigateTo("validation" as ViewId),
                 }, "Validate PRD"),
                 h("button", {
-                  class: "rex-dash-action-btn",
+                  class: `rex-dash-action-btn${reorgCount > 0 ? " rex-dash-action-btn-accent" : ""}`,
                   onClick: () => setReorgOpen(true),
                 }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
               ),
