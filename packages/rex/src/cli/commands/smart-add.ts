@@ -1126,14 +1126,17 @@ async function generateSmartAddProposals(params: {
     const spinner = !isJson ? startSpinner(`${label}...`) : null;
 
     try {
-      spinner?.update(`Processing ideas with LLM (${effectiveModel})...`);
+      spinner?.update(`Processing ideas files...`);
       const reasonResult = await reasonFromIdeasFile(resolved, existing, {
         model,
         dir,
         parentId,
       });
       const proposals = reasonResult.proposals;
-      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
+      const method = reasonResult.tokenUsage.calls > 0
+        ? `via LLM (${effectiveModel})`
+        : "from file structure";
+      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s) ${method}.` : undefined);
       return proposals;
     } catch (err) {
       spinner?.stop();
@@ -1170,7 +1173,7 @@ function emitNoSmartAddProposals(isJson: boolean): void {
   if (isJson) {
     result(JSON.stringify({ proposals: [], added: 0 }, null, 2));
   } else {
-    result("LLM returned no proposals for the given description.");
+    result("No proposals could be generated from the given input.");
   }
 }
 

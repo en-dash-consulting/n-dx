@@ -18,7 +18,7 @@ import {
   detectLLMAuthMode,
 } from "@n-dx/llm-client";
 
-export const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 /** Maximum number of LLM retry attempts for transient/parse failures. */
@@ -1943,9 +1943,15 @@ ${OUTPUT_INSTRUCTION}`;
 }
 
 /**
- * Read one or more freeform idea files and structure them into proposals via
- * LLM. Unlike `reasonFromFile` / `reasonFromFiles` (used by `analyze --file`
- * for formal spec import), this function uses a prompt specifically tuned for
+ * Read one or more freeform idea files and structure them into proposals.
+ *
+ * For well-structured files (markdown with headings, JSON matching the Proposal
+ * schema, YAML with title/name fields), extraction is performed locally without
+ * an LLM call. Files that cannot be meaningfully extracted fall back to the LLM
+ * ideas pipeline.
+ *
+ * Unlike `reasonFromFile` / `reasonFromFiles` (used by `analyze --file` for
+ * formal spec import), the LLM fallback uses a prompt specifically tuned for
  * rough brainstorming notes.
  */
 export async function reasonFromIdeasFile(
@@ -1959,28 +1965,60 @@ export async function reasonFromIdeasFile(
 
   const dir = options?.dir ?? process.cwd();
 
-  // Read and concatenate all idea files
-  const sections: string[] = [];
+  // Phase 1: Try local extraction for each file.
+  // Collect proposals from files that can be parsed without LLM, and
+  // accumulate content from files that need LLM fallback.
+  const localProposals: Proposal[] = [];
+  const llmSections: string[] = [];
+
   for (const fp of filePaths) {
     const content = await readFile(fp, "utf-8");
     if (content.trim().length === 0) continue;
+
+    const format = detectFileFormat(fp);
+
+    // Try structured parsing for JSON/YAML files (no LLM needed)
+    if (format === "json" || format === "yaml") {
+      const structured = parseStructuredFile(content, format, existingItems);
+      if (structured !== null && structured.length > 0) {
+        localProposals.push(...structured);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // Try local markdown/text extraction (no LLM needed)
+    if (format === "markdown") {
+      const { extractFromMarkdown } = await import("./extract.js");
+      const extraction = extractFromMarkdown(content, { existingItems });
+      if (extraction.proposals.length > 0) {
+        localProposals.push(...extraction.proposals);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // File could not be locally extracted — queue for LLM
     if (filePaths.length > 1) {
-      sections.push(`--- ${fp} ---\n${content.trim()}`);
+      llmSections.push(`--- ${fp} ---\n${content.trim()}`);
     } else {
-      sections.push(content.trim());
+      llmSections.push(content.trim());
     }
   }
 
-  if (sections.length === 0) return { proposals: [], tokenUsage };
+  // Phase 2: Fall back to LLM for files that couldn't be locally parsed.
+  if (llmSections.length > 0) {
+    const combined = llmSections.join("\n\n");
+    const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
+      parentId: options?.parentId,
+    });
 
-  const combined = sections.join("\n\n");
-  const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
-    parentId: options?.parentId,
-  });
+    const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+    accumulateTokenUsage(tokenUsage, result.tokenUsage);
+    localProposals.push(...parseProposalResponse(result.text));
+  }
 
-  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  accumulateTokenUsage(tokenUsage, result.tokenUsage);
-  return { proposals: parseProposalResponse(result.text), tokenUsage };
+  return { proposals: localProposals, tokenUsage };
 }
 
 // ── Batch import ──
