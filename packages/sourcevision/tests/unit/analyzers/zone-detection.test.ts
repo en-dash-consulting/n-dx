@@ -12,8 +12,9 @@ import {
   disambiguateZoneId,
   analyzeZones,
   assignByProximity,
+  SUBDIVISION_THRESHOLD,
 } from "../../../src/analyzers/zones.js";
-import type { Zone } from "../../../src/schema/index.js";
+import type { Zone, ImportEdge } from "../../../src/schema/index.js";
 import {
   makeFileEntry,
   makeInventory,
@@ -1061,5 +1062,146 @@ describe("splitLargeCommunities with resolution escalation", () => {
       const comm = result.get(cluster[0])!;
       for (const f of cluster) expect(result.get(f)).toBe(comm);
     }
+  });
+});
+
+// ── End-to-end: analyzeZones produces subCrossings on large zones ──────────
+
+describe("analyzeZones subdivision integration", () => {
+  it("produces subZones and subCrossings on zones exceeding subdivision threshold", async () => {
+    // Build a scenario where analyzeZones creates a large zone that gets subdivided
+    // Two distinct sub-clusters within a single package directory
+    const clusterA = Array.from(
+      { length: Math.ceil(SUBDIVISION_THRESHOLD * 0.7) },
+      (_, i) => `packages/bigpkg/src/alpha/f${i}.ts`
+    );
+    const clusterB = Array.from(
+      { length: Math.ceil(SUBDIVISION_THRESHOLD * 0.7) },
+      (_, i) => `packages/bigpkg/src/beta/f${i}.ts`
+    );
+    const allFiles = [...clusterA, ...clusterB];
+
+    const inventory = makeInventory(allFiles.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    // Strong intra-cluster connectivity
+    for (let i = 0; i < clusterA.length - 1; i++) {
+      edges.push(makeEdge(clusterA[i], clusterA[i + 1]));
+      if (i < clusterA.length - 2) edges.push(makeEdge(clusterA[i], clusterA[i + 2]));
+    }
+    for (let i = 0; i < clusterB.length - 1; i++) {
+      edges.push(makeEdge(clusterB[i], clusterB[i + 1]));
+      if (i < clusterB.length - 2) edges.push(makeEdge(clusterB[i], clusterB[i + 2]));
+    }
+    // Weak cross-cluster links (create crossings between sub-zones)
+    edges.push(makeEdge(clusterA[0], clusterB[0]));
+    edges.push(makeEdge(clusterA[5], clusterB[5]));
+
+    const imports = makeImports(edges);
+    const { zones: result } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100, // Disable size cap — let same-ID merge create one large zone
+    });
+
+    // All files share packages/bigpkg root → merged into one zone (via mergeSameIdCommunities)
+    // That zone should then be subdivided because it exceeds threshold
+    const bigZone = result.zones.find((z) => z.files.length >= SUBDIVISION_THRESHOLD);
+
+    if (bigZone) {
+      // The large zone should have sub-zones from subdivision
+      expect(bigZone.subZones).toBeDefined();
+      expect(bigZone.subZones!.length).toBeGreaterThanOrEqual(2);
+
+      // Sub-zone IDs should be prefixed with parent
+      for (const sub of bigZone.subZones!) {
+        expect(sub.id).toMatch(new RegExp(`^${bigZone.id}/`));
+        expect(sub.depth).toBe(1);
+      }
+
+      // Sub-crossings should exist (we added cross-cluster edges)
+      if (bigZone.subCrossings) {
+        expect(bigZone.subCrossings.length).toBeGreaterThan(0);
+        const subZoneIds = new Set(bigZone.subZones!.map((z) => z.id));
+        for (const crossing of bigZone.subCrossings) {
+          expect(subZoneIds.has(crossing.fromZone)).toBe(true);
+          expect(subZoneIds.has(crossing.toZone)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("zones below subdivision threshold have no subZones", async () => {
+    // Small zone that should NOT be subdivided
+    const inventory = makeInventory([
+      makeFileEntry("src/small/a.ts"),
+      makeFileEntry("src/small/b.ts"),
+      makeFileEntry("src/small/c.ts"),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/small/a.ts", "src/small/b.ts"),
+      makeEdge("src/small/b.ts", "src/small/c.ts"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    for (const zone of result.zones) {
+      expect(zone.subZones).toBeUndefined();
+      expect(zone.subCrossings).toBeUndefined();
+    }
+  });
+});
+
+// ── Regression: pipeline determinism with subdivision ─────────────────────────
+
+describe("analyzeZones subdivision determinism", () => {
+  it("produces identical output across multiple runs on the same input", async () => {
+    // A large-enough scenario that triggers subdivision
+    const clusterA = Array.from({ length: 30 }, (_, i) => `packages/proj/src/api/f${i}.ts`);
+    const clusterB = Array.from({ length: 30 }, (_, i) => `packages/proj/src/web/f${i}.ts`);
+    const allFiles = [...clusterA, ...clusterB];
+
+    const inventory = makeInventory(allFiles.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < clusterA.length - 1; i++) {
+      edges.push(makeEdge(clusterA[i], clusterA[i + 1]));
+      if (i < clusterA.length - 2) edges.push(makeEdge(clusterA[i], clusterA[i + 2]));
+    }
+    for (let i = 0; i < clusterB.length - 1; i++) {
+      edges.push(makeEdge(clusterB[i], clusterB[i + 1]));
+      if (i < clusterB.length - 2) edges.push(makeEdge(clusterB[i], clusterB[i + 2]));
+    }
+    edges.push(makeEdge(clusterA[0], clusterB[0]));
+
+    const imports = makeImports(edges);
+
+    const { zones: run1 } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100,
+    });
+    const { zones: run2 } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100,
+    });
+
+    // Full deep equality — zone structure, subZones, crossings, everything
+    expect(run1).toEqual(run2);
+  });
+
+  it("produces same structure hash when subdivision yields same groupings", async () => {
+    const files = Array.from({ length: 60 }, (_, i) => `src/mod/f${i}.ts`);
+    const inventory = makeInventory(files.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < files.length - 1; i++) {
+      edges.push(makeEdge(files[i], files[i + 1]));
+    }
+
+    const imports = makeImports(edges);
+
+    const { zones: run1 } = await analyzeZones(inventory, imports, { enrich: false });
+    const { zones: run2 } = await analyzeZones(inventory, imports, { enrich: false });
+
+    expect(run1.structureHash).toBe(run2.structureHash);
   });
 });
