@@ -488,6 +488,66 @@ function StatCard({ value, label, color }: { value: string; label: string; color
   );
 }
 
+/** Chevron separator for zone breadcrumb trail. */
+function ZoneBreadcrumbSep() {
+  return h("svg", {
+    class: "zone-breadcrumb-sep",
+    width: 12,
+    height: 12,
+    viewBox: "0 0 12 12",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.5",
+    "stroke-linecap": "round",
+    "aria-hidden": "true",
+  }, h("path", { d: "M4.5 2.5l3 3.5-3 3.5" }));
+}
+
+/**
+ * Drill-down breadcrumb trail rendered above the zone diagram.
+ *
+ * Hidden at root level (drillPath has only the root entry).
+ * Clicking a crumb navigates back to that level by truncating the drill path.
+ */
+function ZoneBreadcrumbNav({
+  drillPath,
+  onNavigate,
+}: {
+  drillPath: ZoneBreadcrumb[];
+  onNavigate: (depth: number) => void;
+}) {
+  // Hidden at root — no unnecessary UI
+  if (drillPath.length <= 1) return null;
+
+  return h("nav", {
+    class: "zone-breadcrumb",
+    "aria-label": "Zone navigation",
+  },
+    h("ol", { class: "zone-breadcrumb-list" },
+      ...drillPath.map((crumb, i) => {
+        const isLast = i === drillPath.length - 1;
+        return h("li", {
+          key: crumb.zoneId ?? "root",
+          class: `zone-breadcrumb-item${isLast ? " zone-breadcrumb-current" : ""}`,
+        },
+          isLast
+            // Current level — plain text, not clickable
+            ? h("span", { "aria-current": "location" }, crumb.label)
+            // Ancestor level — clickable to pop back
+            : [
+                h("button", {
+                  class: "zone-breadcrumb-link",
+                  type: "button",
+                  onClick: () => onNavigate(i),
+                }, crumb.label),
+                ZoneBreadcrumbSep(),
+              ],
+        );
+      }),
+    ),
+  );
+}
+
 function FileRow({
   file,
   y,
@@ -1308,6 +1368,11 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
     setSlideoutZone(null);
   }, []);
 
+  /** Navigate the drill-down breadcrumb: truncate path to the given depth. */
+  const handleBreadcrumbNavigate = useCallback((depth: number) => {
+    setDrillPath((prev) => prev.slice(0, depth + 1));
+  }, []);
+
   return h("div", null,
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
@@ -1339,6 +1404,9 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
             : null,
         )
       : null,
+
+    // Drill-down breadcrumb (hidden at root level)
+    h(ZoneBreadcrumbNav, { drillPath, onNavigate: handleBreadcrumbNavigate }),
 
     // Zone Diagram
     zoneDataList.length > 0
