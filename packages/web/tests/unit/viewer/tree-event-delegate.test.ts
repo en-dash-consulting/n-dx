@@ -154,7 +154,7 @@ describe("Tree event delegation", () => {
       }));
       // Find the delete button for epic-1
       const epic1 = root.querySelector('[data-node-id="epic-1"]') as HTMLElement;
-      const deleteBtn = epic1.querySelector(".prd-inline-delete-btn") as HTMLElement;
+      const deleteBtn = epic1.querySelector(".prd-node-action-delete") as HTMLElement;
       expect(deleteBtn).not.toBeNull();
       deleteBtn.click();
       expect(onRemove).toHaveBeenCalledOnce();
@@ -191,34 +191,39 @@ describe("Tree event delegation", () => {
     });
   });
 
-  // ── Context menu delegation ────────────────────────────────────────
+  // ── Inline action group ────────────────────────────────────────────
 
-  describe("context menu delegation", () => {
-    it("renders context menu at tree level (not per-node)", async () => {
-      const onRemove = vi.fn();
+  describe("inline action group", () => {
+    it("renders all inline action buttons (Edit, Status, Delete) on every node", () => {
       const root = renderToDiv(h(PRDTree, {
         document: sampleDoc,
         defaultExpandDepth: 3,
-        onRemoveItem: onRemove,
+        onRemoveItem: vi.fn(),
+        onUpdateItem: vi.fn(),
       }));
-      // Initially, no context menu should be visible
-      expect(root.querySelector(".prd-context-menu")).toBeNull();
-      // Right-click a node to trigger context menu via delegation
+      const rows = root.querySelectorAll("[data-node-id]");
+      for (const row of rows) {
+        // Edit and Status should always be present
+        expect(row.querySelector(".prd-node-action-edit")).not.toBeNull();
+        expect(row.querySelector(".prd-node-action-status")).not.toBeNull();
+        // Delete is present when onRemoveItem is provided
+        expect(row.querySelector(".prd-node-action-delete")).not.toBeNull();
+      }
+    });
+
+    it("renders Edit action on the edit button that selects the item", () => {
+      const onSelect = vi.fn();
+      const root = renderToDiv(h(PRDTree, {
+        document: sampleDoc,
+        defaultExpandDepth: 3,
+        onSelectItem: onSelect,
+      }));
       const epic1 = root.querySelector('[data-node-id="epic-1"]') as HTMLElement;
-      const contextEvent = new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100,
-      });
-      epic1.dispatchEvent(contextEvent);
-      // Wait for Preact's async render batch to flush
-      await new Promise((r) => setTimeout(r, 0));
-      // Context menu should appear
-      const menu = root.querySelector(".prd-context-menu");
-      expect(menu).not.toBeNull();
-      // Menu should contain delete action
-      expect(menu!.textContent).toContain("Delete");
+      const editBtn = epic1.querySelector(".prd-node-action-edit") as HTMLElement;
+      expect(editBtn).not.toBeNull();
+      editBtn.click();
+      expect(onSelect).toHaveBeenCalledOnce();
+      expect(onSelect.mock.calls[0][0].id).toBe("epic-1");
     });
   });
 
@@ -253,7 +258,7 @@ describe("Tree event delegation", () => {
         onInlineAddSubmit: vi.fn(),
       }));
       const addBtns = root.querySelectorAll(".prd-inline-add-btn");
-      const deleteBtns = root.querySelectorAll(".prd-inline-delete-btn");
+      const deleteBtns = root.querySelectorAll(".prd-node-action-delete");
       for (const btn of [...addBtns, ...deleteBtns]) {
         expect(btn.getAttribute("onclick")).toBeNull();
       }

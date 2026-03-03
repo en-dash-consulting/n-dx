@@ -1,14 +1,18 @@
 /**
  * Event delegation hook for the PRD tree container.
  *
- * Replaces per-node click, contextmenu, and keydown listeners with a single
- * set of delegated handlers on the `[role="tree"]` container. Each event
+ * Replaces per-node click and keydown listeners with a single set of
+ * delegated handlers on the `[role="tree"]` container. Each event
  * bubbles up and is routed to the correct callback by inspecting the target
  * and its closest `[data-node-id]` ancestor.
  *
- * Net effect: from O(N * handlers-per-node) down to O(1) for click,
- * contextmenu, and keydown — a dramatic reduction in total listener count
- * for large trees.
+ * Click delegation routes to the correct handler based on the target's
+ * CSS class: `.prd-inline-add-btn` → add, `.prd-node-action-edit` → edit
+ * (select), `.prd-node-action-status` → status picker,
+ * `.prd-node-action-delete` → delete, `.prd-chevron` → toggle.
+ *
+ * Net effect: from O(N * handlers-per-node) down to O(1) for click and
+ * keydown — a dramatic reduction in total listener count for large trees.
  *
  * Individual NodeRow components only need `data-node-id` and
  * `data-has-children` attributes; no event handler props.
@@ -36,15 +40,14 @@ export interface TreeDelegationCallbacks {
   onInlineAdd?: (item: PRDItemData) => void;
   /** Remove / delete an item. */
   onRemoveItem?: (item: PRDItemData) => void;
-  /** Show context menu at viewport position for an item. */
-  onContextMenu?: (item: PRDItemData, x: number, y: number) => void;
+  /** Open inline status picker, passing the anchor button's bounding rect. */
+  onStatusClick?: (item: PRDItemData, anchorRect: { left: number; top: number; bottom: number }) => void;
   /** Set of currently expanded node IDs (for keyboard arrow logic). */
   expanded: Set<string>;
 }
 
 export interface TreeDelegationHandlers {
   onClick: (e: MouseEvent) => void;
-  onContextMenu: (e: MouseEvent) => void;
   onKeyDown: (e: KeyboardEvent) => void;
 }
 
@@ -102,8 +105,24 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       return;
     }
 
-    // Inline delete button
-    if (target.closest(".prd-inline-delete-btn")) {
+    // Edit action button — select item for detail panel
+    if (target.closest(".prd-node-action-edit")) {
+      if (c.onSelectItem) c.onSelectItem(item);
+      return;
+    }
+
+    // Status action button — open inline status picker
+    if (target.closest(".prd-node-action-status")) {
+      if (c.onStatusClick) {
+        const btn = target.closest(".prd-node-action-status") as HTMLElement;
+        const rect = btn.getBoundingClientRect();
+        c.onStatusClick(item, { left: rect.left, top: rect.top, bottom: rect.bottom });
+      }
+      return;
+    }
+
+    // Delete action button
+    if (target.closest(".prd-node-action-delete")) {
       if (c.onRemoveItem) c.onRemoveItem(item);
       return;
     }
@@ -120,23 +139,6 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
     } else if (hasChildren) {
       c.onToggle(node.id);
     }
-  }, []);
-
-  // ── Context-menu delegation ───────────────────────────────────────
-  const onContextMenu = useCallback((e: MouseEvent) => {
-    const node = findNodeRow(e.target);
-    if (!node) return;
-
-    const c = cbRef.current;
-    const item = c.getItem(node.id);
-    if (!item) return;
-
-    // Only show when there are actions available (delete).
-    if (!c.onRemoveItem || !c.onContextMenu) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    c.onContextMenu(item, e.clientX, e.clientY);
   }, []);
 
   // ── Keydown delegation ────────────────────────────────────────────
@@ -188,5 +190,5 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
     }
   }, []);
 
-  return { onClick, onContextMenu, onKeyDown };
+  return { onClick, onKeyDown };
 }

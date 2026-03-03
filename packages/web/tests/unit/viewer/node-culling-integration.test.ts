@@ -181,7 +181,7 @@ describe("PRDTree virtual scroll rendering", () => {
       onRemoveItem: vi.fn(),
     }));
 
-    const deleteButtons = root.querySelectorAll(".prd-inline-delete-btn");
+    const deleteButtons = root.querySelectorAll(".prd-node-action-delete");
     expect(deleteButtons.length).toBeGreaterThan(0);
   });
 

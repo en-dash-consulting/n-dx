@@ -27,6 +27,7 @@ import { isWorkItem, isRootLevel } from "./levels.js";
 import { defaultStatusFilter } from "./status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
+import { InlineStatusPicker } from "./inline-status-picker.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
 import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT } from "./virtual-scroll.js";
@@ -163,68 +164,6 @@ function TimestampSuffix({ item }: { item: PRDItemData }) {
     return h("span", { class: "prd-timestamp prd-failure-reason" }, item.failureReason);
   }
   return null;
-}
-
-// ── Node context menu ───────────────────────────────────────────────
-
-interface NodeContextMenuProps {
-  item: PRDItemData;
-  x: number;
-  y: number;
-  onClose: () => void;
-  onRemove?: (item: PRDItemData) => void;
-}
-
-function NodeContextMenu({ item, x, y, onClose, onRemove }: NodeContextMenuProps) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [onClose]);
-
-  // Clamp position so menu doesn't overflow viewport
-  const style: Record<string, string> = {
-    position: "fixed",
-    left: `${Math.min(x, window.innerWidth - 180)}px`,
-    top: `${Math.min(y, window.innerHeight - 120)}px`,
-    zIndex: "9999",
-  };
-
-  return h("div", { ref, class: "prd-context-menu", style, role: "menu" },
-    // Header
-    h("div", { class: "prd-context-menu-header" },
-      h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
-      h("span", { class: "prd-context-menu-title", title: item.title }, item.title),
-    ),
-    h("div", { class: "prd-context-menu-divider" }),
-    // Delete action
-    onRemove
-      ? h("button", {
-          class: "prd-context-menu-item prd-context-menu-danger",
-          role: "menuitem",
-          onClick: () => {
-            onRemove(item);
-            onClose();
-          },
-        },
-          h("span", { class: "prd-context-menu-item-icon" }, "\u2717"),
-          `Delete ${LEVEL_LABELS[item.level]}`,
-        )
-      : null,
-  );
 }
 
 // ── Single tree node ────────────────────────────────────────────────
@@ -402,25 +341,43 @@ class NodeRow extends Component<NodeRowProps> {
         : null,
       // Timestamp
       h(TimestampSuffix, { item }),
-      // Inline add child button (appears on hover, only for addable levels)
-      // No onClick — handled by delegated click on tree container.
-      canAddChild && canInlineAdd
-        ? h("button", {
-            class: `prd-inline-add-btn${isInlineAddActive ? " active" : ""}`,
-            title: `Add child to ${item.title}`,
-            "aria-label": `Add child item to ${item.title}`,
-          }, "+")
-        : null,
-      // Inline delete button (appears on hover)
-      // No onClick — handled by delegated click on tree container.
-      canDelete
-        ? h("button", {
-            class: "prd-inline-delete-btn",
-            title: `Delete ${LEVEL_LABELS[item.level]} "${item.title}"`,
-            "aria-label": `Delete ${item.title}`,
-          }, "\u2717")
-        : null,
-      // Context menu rendering moved to PRDTree (tree-level state)
+      // ── Inline action group (hover-reveal) ──────────────────────────
+      // Unified action row: [+Add] [✎Edit] [↕Status] [✕Delete]
+      // All buttons use delegated click handling on the tree container.
+      h("span", { class: "prd-node-actions" },
+        // Add child (only for levels that support children)
+        canAddChild && canInlineAdd
+          ? h("button", {
+              class: `prd-node-action prd-inline-add-btn${isInlineAddActive ? " active" : ""}`,
+              title: `Add child to ${item.title}`,
+              "aria-label": `Add child item to ${item.title}`,
+              tabIndex: 0,
+            }, "+")
+          : null,
+        // Edit (opens detail panel)
+        h("button", {
+          class: "prd-node-action prd-node-action-edit",
+          title: `Edit ${item.title}`,
+          "aria-label": `Edit ${item.title}`,
+          tabIndex: 0,
+        }, "\u270E"),
+        // Change status (opens inline status picker)
+        h("button", {
+          class: "prd-node-action prd-node-action-status",
+          title: `Change status of ${item.title}`,
+          "aria-label": `Change status of ${item.title}`,
+          tabIndex: 0,
+        }, "\u21C5"),
+        // Delete
+        canDelete
+          ? h("button", {
+              class: "prd-node-action prd-node-action-delete",
+              title: `Delete ${LEVEL_LABELS[item.level]} "${item.title}"`,
+              "aria-label": `Delete ${item.title}`,
+              tabIndex: 0,
+            }, "\u2717")
+          : null,
+      ),
     );
   }
 }
@@ -540,6 +497,8 @@ export interface PRDTreeProps {
   deepLinkExpandIds?: Set<string> | null;
   /** Called to remove/delete an item from the tree. */
   onRemoveItem?: (item: PRDItemData) => void;
+  /** Called to update an item's fields (e.g. status change from inline picker). */
+  onUpdateItem?: (id: string, updates: Partial<PRDItemData>) => Promise<void>;
   /** ID of item currently being deleted (shows loading state). */
   deletingItemId?: string | null;
   /**
@@ -570,7 +529,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId, activeStatuses: externalStatuses, chunkSize }: PRDTreeProps) {
+export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, chunkSize }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -696,14 +655,27 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
   const expandAll = useCallback(() => setExpanded(new Set(allIds)), [allIds]);
   const collapseAll = useCallback(() => setExpanded(new Set<string>()), []);
 
-  // ── Context menu state (lifted from NodeRow) ──────────────────────
-  const [contextMenu, setContextMenu] = useState<{ item: PRDItemData; x: number; y: number } | null>(null);
-  const handleContextMenu = useCallback((item: PRDItemData, x: number, y: number) => {
-    setContextMenu({ item, x, y });
+  // ── Inline status picker state ──────────────────────────────────────
+  const [statusPicker, setStatusPicker] = useState<{
+    item: PRDItemData;
+    anchorRect: { left: number; top: number; bottom: number };
+  } | null>(null);
+
+  const handleStatusClick = useCallback((item: PRDItemData, anchorRect: { left: number; top: number; bottom: number }) => {
+    setStatusPicker((prev) => (prev?.item.id === item.id ? null : { item, anchorRect }));
   }, []);
-  const handleContextMenuClose = useCallback(() => {
-    setContextMenu(null);
+
+  const handleStatusPickerClose = useCallback(() => {
+    setStatusPicker(null);
   }, []);
+
+  const handleStatusChange = useCallback(
+    (status: ItemStatus) => {
+      if (!statusPicker || !onUpdateItem) return;
+      onUpdateItem(statusPicker.item.id, { status });
+    },
+    [statusPicker, onUpdateItem],
+  );
 
   // ── Delegated event handlers ──────────────────────────────────────
   // A single set of click / contextmenu / keydown listeners on the tree
@@ -715,7 +687,7 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
     onSelectItem,
     onInlineAdd: onInlineAddSubmit ? handleInlineAdd : undefined,
     onRemoveItem,
-    onContextMenu: onRemoveItem ? handleContextMenu : undefined,
+    onStatusClick: onUpdateItem ? handleStatusClick : undefined,
     expanded,
   });
 
@@ -754,7 +726,6 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
         "aria-label": "PRD hierarchy",
         onScroll: virtualScroll.onScroll,
         onClick: treeHandlers.onClick,
-        onContextMenu: treeHandlers.onContextMenu,
         onKeyDown: treeHandlers.onKeyDown,
       },
       // Spacer before visible items (maintains scroll position)
@@ -809,14 +780,13 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
             "aria-hidden": "true",
           })
         : null,
-      // Context menu (tree-level, lifted from NodeRow)
-      contextMenu
-        ? h(NodeContextMenu, {
-            item: contextMenu.item,
-            x: contextMenu.x,
-            y: contextMenu.y,
-            onClose: handleContextMenuClose,
-            onRemove: onRemoveItem,
+      // Inline status picker (tree-level state, renders as anchored popover)
+      statusPicker && onUpdateItem
+        ? h(InlineStatusPicker, {
+            currentStatus: statusPicker.item.status,
+            anchorRect: statusPicker.anchorRect,
+            onSelect: handleStatusChange,
+            onClose: handleStatusPickerClose,
           })
         : null,
     ),
