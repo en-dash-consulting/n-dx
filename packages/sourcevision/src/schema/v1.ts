@@ -29,6 +29,8 @@ export interface Manifest {
   zoneOutputs?: boolean;
   /** Incorporated sub-analyses (nested .sourcevision/ directories). */
   children?: SubAnalysisRef[];
+  /** True when this analysis is a workspace aggregation (not a single repo). */
+  workspace?: boolean;
 }
 
 /** Reference to an incorporated sub-analysis. */
@@ -559,6 +561,21 @@ export interface BranchWorkRecord {
   epicSummaries: BranchWorkEpicSummary[];
   /** Optional record-level metadata. */
   metadata?: BranchWorkRecordMetadata;
+}
+
+// ── Workspace ────────────────────────────────────────────────────────────────
+
+/** Workspace member configuration (stored in .n-dx.json). */
+export interface WorkspaceMember {
+  /** Path to the member directory, relative to workspace root. */
+  path: string;
+  /** Display name and zone prefix. Defaults to directory basename. */
+  name?: string;
+}
+
+/** Workspace configuration block in .n-dx.json. */
+export interface WorkspaceConfig {
+  members: WorkspaceMember[];
 }
 
 // ── Union type for all output modules ───────────────────────────────────────

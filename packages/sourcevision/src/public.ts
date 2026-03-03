@@ -102,6 +102,9 @@ export type {
   CallType,
   FunctionNode,
   CallGraphSummary,
+  // workspace
+  WorkspaceMember,
+  WorkspaceConfig,
   // aggregate
   SourcevisionOutput,
   TokenUsage,
