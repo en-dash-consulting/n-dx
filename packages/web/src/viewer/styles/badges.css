@@ -98,13 +98,13 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
 }
 
 .tag-chip-list {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-shrink: 0;
   flex-wrap: wrap;
 }

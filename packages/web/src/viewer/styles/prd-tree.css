@@ -1,7 +1,7 @@
 /* PRD Tree Hierarchy View */
 
 .prd-tree-container {
-  padding: 0 4px;
+  padding: 0 var(--space-1);
 }
 
 /* Header with title and toolbar */
@@ -9,9 +9,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .prd-title {
@@ -22,7 +22,7 @@
 /* Toolbar */
 .prd-toolbar {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .prd-toolbar-btn {
@@ -30,7 +30,7 @@
   border: 1px solid var(--border);
   color: var(--text-dim);
   font-size: var(--font-sm);
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-2-5);
   border-radius: 4px;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
@@ -43,7 +43,7 @@
 
 /* Summary bar */
 .prd-summary {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .prd-summary-bar {
@@ -52,7 +52,7 @@
   border-radius: 3px;
   overflow: hidden;
   background: var(--border);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .prd-summary-segment {
@@ -70,7 +70,7 @@
 .prd-summary-stats {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   font-size: var(--font-base);
   color: var(--text-dim);
@@ -79,7 +79,7 @@
 .prd-summary-stat {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .prd-summary-pct {
@@ -107,8 +107,8 @@
 .prd-status-filter {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -123,15 +123,15 @@
 
 .prd-status-filter-chips {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .prd-status-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-surface);
@@ -205,12 +205,12 @@
 
 .prd-status-filter-presets {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .prd-status-preset {
-  padding: 3px 10px;
+  padding: 3px var(--space-2-5);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-surface);
@@ -235,7 +235,7 @@
 .prd-status-preset-custom {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 3px var(--space-2-5);
   border: 1px dashed var(--text-dim);
   border-radius: 4px;
   color: var(--text-dim);
@@ -246,13 +246,13 @@
 
 /* Failing status */
 .prd-failure-reason { color: var(--red); font-style: italic; }
-.task-failure-reason { border-left: 3px solid var(--red); padding-left: 8px; }
+.task-failure-reason { border-left: 3px solid var(--red); padding-left: var(--space-2); }
 .task-failure-text { color: var(--red); font-style: italic; }
 
 .task-failure-reason-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .task-failure-edit-btn {
@@ -261,7 +261,7 @@
   border-radius: 3px;
   color: var(--text-dim);
   font-size: var(--font-sm);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -274,13 +274,13 @@
 .task-failure-input-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
 }
 
 .task-failure-input {
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--bg-hover);
   border: 1px solid var(--red);
   border-radius: 4px;
@@ -303,11 +303,11 @@
 
 .task-failure-form-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .task-failure-submit-btn {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   background: var(--red);
   border: 1px solid var(--red);
   border-radius: 4px;
@@ -328,7 +328,7 @@
 }
 
 .task-failure-cancel-btn {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -389,8 +389,8 @@
 .prd-node-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
+  gap: var(--space-1-5);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-base);
   border-bottom: 1px solid var(--border);
   position: relative;
@@ -514,7 +514,7 @@
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 1px 5px;
+  padding: 1px var(--space-1);
   border-radius: 3px;
   flex-shrink: 0;
   background: var(--bg-hover);
@@ -560,7 +560,7 @@
 .prd-priority-badge {
   font-size: var(--font-sm);
   font-weight: var(--weight-semibold);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   flex-shrink: 0;
   text-transform: capitalize;
@@ -591,7 +591,7 @@
 .prd-progress-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   flex-shrink: 0;
 }
 
@@ -625,7 +625,7 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   flex-shrink: 0;
 }
@@ -634,7 +634,7 @@
    These selectors extend the base to keep existing markup working. */
 .prd-tag-list {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -646,7 +646,7 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
 }
 
@@ -656,7 +656,7 @@
   background: color-mix(in srgb, var(--brand-teal) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand-teal) 35%, transparent);
   border-radius: 999px;
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   white-space: nowrap;
 }
 
@@ -671,7 +671,7 @@
 /* Children container */
 .prd-children {
   border-left: 2px solid var(--border);
-  margin-left: 18px;
+  margin-left: var(--space-5);
 }
 
 /* Collapsed-but-still-mounted state during deferred unmount window.
@@ -685,12 +685,12 @@
 /* Empty state */
 .prd-empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-10) var(--space-5);
   color: var(--text-dim);
 }
 
 .prd-empty p {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .prd-empty-hint {
@@ -699,7 +699,7 @@
 
 .prd-empty-hint code {
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   font-size: var(--font-base);
   color: var(--accent);
@@ -710,8 +710,8 @@
 .task-meta-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .task-id {
@@ -719,12 +719,12 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
 }
 
 .task-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .task-section-label {
@@ -733,14 +733,14 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .task-usage-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .task-usage-value {
@@ -750,7 +750,7 @@
 }
 
 .task-usage-hint {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   font-size: var(--font-sm);
   color: var(--text-dim);
 }
@@ -759,14 +759,14 @@
 .task-status-selector {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .task-status-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-surface);
@@ -841,15 +841,15 @@
 .task-execute-section {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .task-execute-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3-5);
   border: 1px solid var(--accent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -895,7 +895,7 @@
 
 .task-execute-result {
   font-size: var(--font-sm);
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
 }
 
@@ -918,9 +918,9 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 8px 10px;
+  gap: var(--space-1);
+  margin-top: var(--space-1-5);
+  padding: var(--space-2) var(--space-2-5);
   background: var(--bg-hover);
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -994,9 +994,9 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 10px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-2-5);
   border-radius: 6px;
   font-size: var(--font-sm);
   font-weight: var(--weight-semibold);
@@ -1039,7 +1039,7 @@
   line-height: 1.5;
   color: var(--text);
   background: var(--bg-hover);
-  padding: 10px 12px;
+  padding: var(--space-2-5) var(--space-3);
   border-radius: 6px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1057,7 +1057,7 @@
 .task-criterion {
   font-size: var(--font-base);
   color: var(--text);
-  padding: 5px 0 5px 20px;
+  padding: var(--space-1) 0 var(--space-1) var(--space-5);
   border-bottom: 1px solid var(--border);
   position: relative;
 }
@@ -1077,7 +1077,7 @@
 /* Priority selector */
 .task-priority-select {
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--space-1-5) var(--space-2-5);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1102,7 +1102,7 @@
 .task-tag-editor {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
   align-items: center;
 }
 
@@ -1113,7 +1113,7 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
 }
 
@@ -1138,7 +1138,7 @@
   border: 1px dashed var(--border);
   color: var(--text-dim);
   font-size: var(--font-sm);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   cursor: pointer;
 }
@@ -1156,7 +1156,7 @@
 
 .task-tag-input {
   width: 80px;
-  padding: 2px 6px;
+  padding: 2px var(--space-1-5);
   background: var(--bg-surface);
   border: 1px solid var(--accent);
   border-radius: 3px;
@@ -1183,14 +1183,14 @@
 .task-dependency-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .task-dependency-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
   border-radius: 4px;
   font-size: var(--font-base);
   cursor: pointer;
@@ -1228,8 +1228,8 @@
 .task-child-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
   border-radius: 4px;
   font-size: var(--font-base);
   cursor: pointer;
@@ -1252,9 +1252,9 @@
 .task-add-child-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  margin-top: 8px;
+  gap: var(--space-1);
+  padding: var(--space-1-5) var(--space-3);
+  margin-top: var(--space-2);
   background: var(--bg-surface);
   border: 1px dashed var(--border);
   border-radius: 6px;
@@ -1274,8 +1274,8 @@
 
 /* Add child form (in detail panel) */
 .task-add-child-form {
-  margin-top: 8px;
-  padding: 10px;
+  margin-top: var(--space-2);
+  padding: var(--space-2-5);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1284,8 +1284,8 @@
 .task-add-child-error {
   color: var(--red, #e74c3c);
   font-size: var(--font-sm);
-  margin-bottom: 6px;
-  padding: 4px 8px;
+  margin-bottom: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
   background: color-mix(in srgb, var(--red, #e74c3c) 10%, transparent);
   border-radius: 4px;
 }
@@ -1293,13 +1293,13 @@
 .task-add-child-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .task-add-child-title {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1317,12 +1317,12 @@
 .task-add-child-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
 }
 
 .task-add-child-more {
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1339,7 +1339,7 @@
 }
 
 .task-add-child-submit {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -1360,7 +1360,7 @@
 }
 
 .task-add-child-cancel {
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-2-5);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1377,14 +1377,14 @@
 
 /* Extra fields */
 .task-add-child-extra {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .task-add-child-description {
-  padding: 6px 8px;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1403,7 +1403,7 @@
 .task-add-child-priority-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .task-add-child-priority-label {
@@ -1412,7 +1412,7 @@
 }
 
 .task-add-child-priority {
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1430,15 +1430,15 @@
 .rex-command-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-4);
 }
 
 .rex-command-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 14px;
+  gap: var(--space-1);
+  padding: var(--space-1-5) var(--space-3-5);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1464,12 +1464,12 @@
 
 .rex-toast {
   position: fixed;
-  bottom: 20px;
+  bottom: var(--space-5);
   left: 50%;
   transform: translateX(-50%);
   background: var(--green);
   color: #fff;
-  padding: 8px 20px;
+  padding: var(--space-2) var(--space-5);
   border-radius: 6px;
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
@@ -1731,7 +1731,7 @@
   width: 20px;
   height: 20px;
   padding: 0;
-  margin-left: 4px;
+  margin-left: var(--space-1);
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -1777,10 +1777,10 @@
 .prd-inline-add-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 4px;
-  padding-bottom: 6px;
-  padding-right: 12px;
+  gap: var(--space-1-5);
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1-5);
+  padding-right: var(--space-3);
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--accent) 4%, var(--bg-surface));
   animation: prd-inline-add-slide-in 0.15s ease-out;
@@ -1801,13 +1801,13 @@
 .prd-inline-add-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .prd-inline-add-title {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1891,13 +1891,13 @@
 .prd-inline-add-extra {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
   margin-left: 52px; /* align with title input (badge + gap) */
 }
 
 .prd-inline-add-description {
   width: 100%;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1923,7 +1923,7 @@
 .prd-inline-add-priority-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .prd-inline-add-priority-label {
@@ -1935,7 +1935,7 @@
 }
 
 .prd-inline-add-priority {
-  padding: 2px 6px;
+  padding: 2px var(--space-1-5);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1956,12 +1956,12 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .rex-analyze-header {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .rex-analyze-title {
@@ -1972,8 +1972,8 @@
 .rex-analyze-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .rex-analyze-checkbox-label {
@@ -1981,12 +1981,12 @@
   color: var(--text-dim);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   cursor: pointer;
 }
 
 .rex-analyze-btn {
-  padding: 7px 16px;
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: var(--font-base);
@@ -2014,13 +2014,13 @@
 .rex-analyze-progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--space-2-5);
+  padding: var(--space-3);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-radius: 6px;
   font-size: var(--font-base);
   color: var(--text);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .rex-analyze-spinner {
@@ -2042,19 +2042,19 @@
   border: 1px solid var(--red);
   border-radius: 4px;
   color: var(--red);
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-base);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .rex-analyze-empty {
   text-align: center;
-  padding: 20px;
+  padding: var(--space-5);
   color: var(--text-dim);
 }
 
 .rex-analyze-empty p {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .rex-analyze-hint {
@@ -2065,9 +2065,9 @@
 .rex-analyze-selection {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2-5);
+  padding-bottom: var(--space-2-5);
   border-bottom: 1px solid var(--border);
 }
 
@@ -2083,7 +2083,7 @@
   color: var(--accent);
   font-size: var(--font-sm);
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
 }
 
 .rex-analyze-select-btn:hover {
@@ -2094,10 +2094,10 @@
 .rex-analyze-proposals {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
   max-height: 400px;
   overflow-y: auto;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .rex-proposal-card {
@@ -2115,8 +2115,8 @@
 .rex-proposal-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5);
   cursor: pointer;
   font-size: var(--font-base);
 }
@@ -2128,7 +2128,7 @@
 .rex-proposal-info {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   flex: 1;
   min-width: 0;
 }
@@ -2153,7 +2153,7 @@
   color: var(--text-dim);
   font-size: var(--font-sm);
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-1);
   transition: transform 0.15s;
 }
 
@@ -2163,38 +2163,38 @@
 
 /* Proposal details */
 .rex-proposal-details {
-  padding: 0 10px 10px 36px;
+  padding: 0 var(--space-2-5) var(--space-2-5) var(--space-8);
   border-top: 1px solid var(--border);
 }
 
 .rex-proposal-desc {
   font-size: var(--font-base);
   color: var(--text-dim);
-  margin: 8px 0;
+  margin: var(--space-2) 0;
   line-height: 1.4;
 }
 
 .rex-proposal-feature {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .rex-proposal-feature-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .rex-proposal-tasks {
-  padding-left: 16px;
+  padding-left: var(--space-4);
 }
 
 .rex-proposal-task {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-size: var(--font-base);
   padding: 2px 0;
   color: var(--text-dim);
@@ -2245,11 +2245,11 @@
 .proposal-editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .proposal-editor-header {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .proposal-editor-title {
@@ -2269,19 +2269,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 0;
+  gap: var(--space-2);
+  padding: var(--space-1-5) 0;
   border-bottom: 1px solid var(--border);
 }
 
 .proposal-editor-counts {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .proposal-editor-count-badge {
   font-size: var(--font-sm);
-  padding: 2px 6px;
+  padding: 2px var(--space-1-5);
   border-radius: 4px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
@@ -2290,14 +2290,14 @@
 
 .proposal-editor-select-btns {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .proposal-editor-select-btn {
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   font-size: var(--font-sm);
   cursor: pointer;
   color: var(--text);
@@ -2312,14 +2312,14 @@
   background: color-mix(in srgb, var(--red) 10%, transparent);
   border: 1px solid var(--red);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-base);
   color: var(--red);
 }
 
 .proposal-editor-errors ul {
-  margin: 4px 0 0;
-  padding-left: 16px;
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
 }
 
 .proposal-editor-errors li {
@@ -2330,7 +2330,7 @@
   background: color-mix(in srgb, var(--red) 10%, transparent);
   border: 1px solid var(--red);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-base);
   color: var(--red);
 }
@@ -2339,7 +2339,7 @@
 .proposal-editor-tree {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   max-height: 500px;
   overflow-y: auto;
 }
@@ -2362,18 +2362,18 @@
 .proposal-editor-epic-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: var(--space-1-5);
+  padding: var(--space-2) var(--space-2-5);
   background: color-mix(in srgb, var(--accent) 3%, transparent);
 }
 
 .proposal-editor-epic-body {
-  padding: 4px 10px 8px 32px;
+  padding: var(--space-1) var(--space-2-5) var(--space-2) var(--space-8);
 }
 
 /* Feature node */
 .proposal-editor-feature {
-  margin: 4px 10px 4px 32px;
+  margin: var(--space-1) var(--space-2-5) var(--space-1) var(--space-8);
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -2390,18 +2390,18 @@
 .proposal-editor-feature-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-2);
   font-size: var(--font-base);
 }
 
 .proposal-editor-feature-body {
-  padding: 4px 8px 6px 28px;
+  padding: var(--space-1) var(--space-2) var(--space-1-5) var(--space-6);
 }
 
 /* Task node */
 .proposal-editor-task {
-  margin: 3px 8px 3px 28px;
+  margin: 3px var(--space-2) 3px var(--space-6);
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -2418,21 +2418,21 @@
 .proposal-editor-task-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
   font-size: var(--font-base);
 }
 
 .proposal-editor-task-body {
-  padding: 4px 8px 6px 28px;
+  padding: var(--space-1) var(--space-2) var(--space-1-5) var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .proposal-editor-task-meta {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -2451,7 +2451,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 3px 6px;
+  padding: 3px var(--space-1-5);
   font-size: var(--font-base);
   color: var(--text);
   font-family: inherit;
@@ -2485,7 +2485,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 4px 6px;
+  padding: var(--space-1) var(--space-1-5);
   font-size: var(--font-base);
   color: var(--text);
   font-family: inherit;
@@ -2507,7 +2507,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
   font-size: var(--font-base);
   color: var(--text);
 }
@@ -2531,7 +2531,7 @@
   color: var(--text-dim);
   font-size: var(--font-sm);
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-1);
   transition: transform 0.15s;
   flex-shrink: 0;
 }
@@ -2544,13 +2544,13 @@
 .proposal-editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding-top: 8px;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--border);
 }
 
 .proposal-editor-btn {
-  padding: 6px 14px;
+  padding: var(--space-1-5) var(--space-3-5);
   border-radius: 6px;
   border: 1px solid var(--border);
   font-size: var(--font-base);
@@ -2586,16 +2586,16 @@
 
 .rex-bulk-bar {
   position: fixed;
-  bottom: 20px;
+  bottom: var(--space-5);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   background: var(--bg-surface);
   border: 1px solid var(--accent);
   border-radius: 10px;
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 100;
   animation: rex-toast-in 0.2s ease;
@@ -2622,14 +2622,14 @@
 .rex-bulk-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .rex-bulk-action-btn {
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-surface);
@@ -2687,7 +2687,7 @@
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
-  margin-left: 4px;
+  margin-left: var(--space-1);
 }
 
 .rex-bulk-clear:hover {
@@ -2726,8 +2726,8 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
   animation: rex-toast-in 0.2s ease;
 }
 
@@ -2735,7 +2735,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .merge-preview-header h3 {
@@ -2762,8 +2762,8 @@
   background: color-mix(in srgb, var(--red) 10%, transparent);
   border: 1px solid var(--red);
   border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
   color: var(--red);
   font-size: var(--font-base);
 }
@@ -2772,29 +2772,29 @@
   background: color-mix(in srgb, var(--green) 10%, transparent);
   border: 1px solid var(--green);
   border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
   color: var(--green);
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
 }
 
 .merge-preview-section {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .merge-preview-label {
   display: block;
   font-size: var(--font-sm);
   color: var(--text-dim);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .merge-preview-select {
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -2804,7 +2804,7 @@
 
 .merge-preview-input {
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -2818,7 +2818,7 @@
 }
 
 .merge-preview-loading {
-  padding: 12px;
+  padding: var(--space-3);
   text-align: center;
   color: var(--text-dim);
   font-size: var(--font-base);
@@ -2839,8 +2839,8 @@
 .merge-preview-card {
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  padding: var(--space-2-5) var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .merge-preview-card-target {
@@ -2856,8 +2856,8 @@
 .merge-preview-card-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
+  gap: var(--space-1-5);
+  margin-bottom: var(--space-1);
 }
 
 .merge-preview-card-icon {
@@ -2872,7 +2872,7 @@
 .merge-preview-field {
   font-size: var(--font-sm);
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .merge-preview-field-label {
@@ -2880,7 +2880,7 @@
 }
 
 .merge-preview-criteria {
-  margin: 4px 0 0 16px;
+  margin: var(--space-1) 0 0 var(--space-4);
   padding: 0;
   font-size: var(--font-sm);
   color: var(--text-dim);
@@ -2892,8 +2892,8 @@
 
 .merge-preview-tags {
   display: inline-flex;
-  gap: 4px;
-  margin-left: 4px;
+  gap: var(--space-1);
+  margin-left: var(--space-1);
 }
 
 .merge-preview-absorbed {
@@ -2901,8 +2901,8 @@
 }
 
 .merge-preview-deps {
-  margin-top: 8px;
-  padding: 6px 10px;
+  margin-top: var(--space-2);
+  padding: var(--space-1-5) var(--space-2-5);
   background: color-mix(in srgb, var(--orange) 8%, transparent);
   border-radius: 4px;
   font-size: var(--font-sm);
@@ -2912,14 +2912,14 @@
 .merge-preview-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
 .merge-preview-btn {
-  padding: 6px 16px;
+  padding: var(--space-1-5) var(--space-4);
   border-radius: 4px;
   font-size: var(--font-base);
   cursor: pointer;
@@ -2954,7 +2954,7 @@
 }
 
 .merge-preview-empty {
-  padding: 12px;
+  padding: var(--space-3);
   text-align: center;
   color: var(--text-dim);
   font-size: var(--font-base);
@@ -2966,8 +2966,8 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
   animation: rex-toast-in 0.2s ease;
 }
 
@@ -2975,7 +2975,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .prune-confirmation-header h3 {
@@ -3006,8 +3006,8 @@
 .prune-confirmation-loading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px;
+  gap: var(--space-2-5);
+  padding: var(--space-4);
   color: var(--text-dim);
   font-size: var(--font-base);
   justify-content: center;
@@ -3017,8 +3017,8 @@
   background: color-mix(in srgb, var(--red) 10%, transparent);
   border: 1px solid var(--red);
   border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
   color: var(--red);
   font-size: var(--font-base);
 }
@@ -3027,8 +3027,8 @@
   background: color-mix(in srgb, var(--green) 10%, transparent);
   border: 1px solid var(--green);
   border-radius: 4px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
+  padding: var(--space-2-5) var(--space-3-5);
+  margin-bottom: var(--space-3);
   color: var(--green);
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
@@ -3036,7 +3036,7 @@
 
 .prune-confirmation-empty {
   text-align: center;
-  padding: 16px;
+  padding: var(--space-4);
   color: var(--text-dim);
 }
 
@@ -3051,11 +3051,11 @@
 
 .prune-confirmation-warning {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2-5);
   background: color-mix(in srgb, var(--orange) 10%, transparent);
   border: 1px solid var(--orange);
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3-5);
   margin-bottom: 14px;
   font-size: var(--font-base);
   color: var(--orange);
@@ -3081,9 +3081,9 @@
 .prune-confirmation-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3-5);
   background: var(--bg-hover);
   border-radius: 6px;
   margin-bottom: 14px;
@@ -3102,7 +3102,7 @@
 
 .prune-confirmation-breakdown {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
   flex-wrap: wrap;
   margin-left: auto;
 }
@@ -3112,7 +3112,7 @@
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   border-radius: 3px;
   background: var(--bg-hover);
   color: var(--text-dim);
@@ -3143,7 +3143,7 @@
 .prune-confirmation-item-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   max-height: 240px;
   overflow-y: auto;
 }
@@ -3151,8 +3151,8 @@
 .prune-confirmation-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-2-5);
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: var(--font-base);
@@ -3179,14 +3179,14 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   flex-shrink: 0;
 }
 
 .prune-confirmation-option {
   margin-bottom: 14px;
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3-5);
   background: var(--bg-hover);
   border-radius: 6px;
 }
@@ -3194,7 +3194,7 @@
 .prune-confirmation-option-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: var(--font-base);
   color: var(--text);
   cursor: pointer;
@@ -3211,15 +3211,15 @@
   display: block;
   font-size: var(--font-sm);
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: var(--space-1);
   padding-left: 23px;
 }
 
 .prune-confirmation-result-details {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
+  gap: var(--space-1-5);
+  padding: var(--space-2-5) var(--space-3-5);
   background: var(--bg-hover);
   border-radius: 6px;
 }
@@ -3236,7 +3236,7 @@
 .prune-confirmation-field code {
   font-size: var(--font-sm);
   background: var(--bg-surface);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   color: var(--accent);
 }
@@ -3244,14 +3244,14 @@
 .prune-confirmation-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
 .prune-confirmation-btn {
-  padding: 6px 16px;
+  padding: var(--space-1-5) var(--space-4);
   border-radius: 4px;
   font-size: var(--font-base);
   cursor: pointer;
@@ -3316,17 +3316,17 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .prune-criteria-chips {
   display: flex;
-  gap: 6px;
+  gap: var(--space-1-5);
   flex-wrap: wrap;
 }
 
 .prune-criteria-chip {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   border-radius: 4px;
   font-size: var(--font-base);
   border: 1px solid var(--border);
@@ -3352,14 +3352,14 @@
   display: block;
   width: 100%;
   max-width: 220px;
-  padding: 6px 10px;
+  padding: var(--space-1-5) var(--space-2-5);
   border-radius: 4px;
   font-size: var(--font-base);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .prune-criteria-select:focus {
@@ -3372,7 +3372,7 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   opacity: 0.8;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 /* ── Active Criteria Summary ───────────────────────────────────── */
@@ -3380,8 +3380,8 @@
 .prune-criteria-active {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-3);
   background: var(--bg-hover);
   border-radius: 4px;
   margin-bottom: 10px;
@@ -3397,7 +3397,7 @@
 
 .prune-criteria-active-value {
   color: var(--text);
-  padding: 1px 8px;
+  padding: 1px var(--space-2);
   background: var(--bg-surface);
   border-radius: 3px;
   border: 1px solid var(--border);
@@ -3405,7 +3405,7 @@
 
 .prune-criteria-edit-btn {
   margin-left: auto;
-  padding: 2px 10px;
+  padding: 2px var(--space-2-5);
   font-size: var(--font-sm);
   border-radius: 3px;
   border: 1px solid var(--border);
@@ -3425,8 +3425,8 @@
 .prune-dryrun-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   border-radius: 4px;
@@ -3480,7 +3480,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3-5);
   border-bottom: 1px solid var(--border);
   background: var(--bg-hover);
 }
@@ -3495,11 +3495,11 @@
 .prune-diff-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .prune-diff-filter-btn {
-  padding: 2px 10px;
+  padding: 2px var(--space-2-5);
   font-size: var(--font-sm);
   border-radius: 3px;
   border: 1px solid var(--border);
@@ -3530,7 +3530,7 @@
 }
 
 .prune-diff-toolbar-btn {
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   font-size: var(--font-sm);
   border-radius: 3px;
   border: 1px solid var(--border);
@@ -3549,8 +3549,8 @@
 
 .prune-diff-legend {
   display: flex;
-  gap: 16px;
-  padding: 6px 14px;
+  gap: var(--space-4);
+  padding: var(--space-1-5) var(--space-3-5);
   border-bottom: 1px solid var(--border);
   font-size: var(--font-sm);
   color: var(--text-dim);
@@ -3559,7 +3559,7 @@
 .prune-diff-legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 /* Overall Impact */
@@ -3567,8 +3567,8 @@
 .prune-diff-overall-impact {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3-5);
   border-bottom: 1px solid var(--border);
   font-size: var(--font-base);
   background: color-mix(in srgb, var(--accent) 4%, transparent);
@@ -3587,7 +3587,7 @@
 .prune-diff-tree {
   max-height: 340px;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
 }
 
 .prune-diff-node {
@@ -3603,8 +3603,8 @@
 .prune-diff-node-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2-5);
   font-size: var(--font-base);
   cursor: pointer;
   border-radius: 3px;
@@ -3726,8 +3726,8 @@
 .prune-diff-epic-impact {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
   border-radius: 3px;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
@@ -3789,15 +3789,15 @@
 .prune-diff-loading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px;
+  gap: var(--space-2-5);
+  padding: var(--space-4);
   color: var(--text-dim);
   font-size: var(--font-base);
   justify-content: center;
 }
 
 .prune-diff-error {
-  padding: 10px 14px;
+  padding: var(--space-2-5) var(--space-3-5);
   color: var(--red);
   font-size: var(--font-base);
   background: color-mix(in srgb, var(--red) 8%, transparent);
@@ -3807,7 +3807,7 @@
 
 .prune-diff-empty {
   text-align: center;
-  padding: 16px;
+  padding: var(--space-4);
   color: var(--text-dim);
   font-size: var(--font-base);
 }
@@ -3825,7 +3825,7 @@
 
 .prune-diff-view-tab {
   flex: 1;
-  padding: 6px 12px;
+  padding: var(--space-1-5) var(--space-3);
   font-size: var(--font-sm);
   border: none;
   background: var(--bg);
@@ -4214,7 +4214,7 @@
   font-size: var(--font-xs);
   color: var(--accent);
   background: var(--accent-subtle);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: var(--radius-sm);
   font-weight: var(--weight-medium);
   flex-shrink: 0;
@@ -4785,7 +4785,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 160px;
   max-width: 260px;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   font-size: var(--font-base);
   animation: rex-toast-in 0.12s ease-out;
 }
@@ -4793,8 +4793,8 @@
 .prd-context-menu-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3);
   font-weight: var(--weight-semibold);
   font-size: var(--font-base);
   color: var(--text);
@@ -4810,15 +4810,15 @@
 .prd-context-menu-divider {
   height: 1px;
   background: var(--border);
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .prd-context-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 6px 12px;
+  padding: var(--space-1-5) var(--space-3);
   background: none;
   border: none;
   font-size: var(--font-base);
@@ -4860,9 +4860,9 @@
 .task-remove-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  margin-top: 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3-5);
+  margin-top: var(--space-2);
   background: none;
   border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border));
   border-radius: var(--radius-sm);
@@ -4883,8 +4883,8 @@
 }
 
 .task-remove-confirm {
-  margin-top: 8px;
-  padding: 12px;
+  margin-top: var(--space-2);
+  padding: var(--space-3);
   background: color-mix(in srgb, var(--red) 6%, var(--bg-surface));
   border: 1px solid color-mix(in srgb, var(--red) 30%, var(--border));
   border-radius: var(--radius-sm);
@@ -4900,11 +4900,11 @@
 
 .task-remove-confirm-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .task-remove-confirm-btn {
-  padding: 5px 12px;
+  padding: var(--space-1) var(--space-3);
   background: var(--red);
   border: 1px solid var(--red);
   border-radius: var(--radius-sm);
@@ -4925,7 +4925,7 @@
 }
 
 .task-remove-cancel-btn {
-  padding: 5px 12px;
+  padding: var(--space-1) var(--space-3);
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -4972,8 +4972,8 @@
 .delete-modal-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px 20px 12px;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
@@ -4990,15 +4990,15 @@
 }
 
 .delete-modal-body {
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
 }
 
 .delete-modal-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  margin-bottom: var(--space-3);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -5016,9 +5016,9 @@
 .delete-modal-warning {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  margin-bottom: var(--space-3);
   background: color-mix(in srgb, var(--red) 8%, var(--bg-surface));
   border: 1px solid color-mix(in srgb, var(--red) 25%, var(--border));
   border-radius: var(--radius-md);
@@ -5043,13 +5043,13 @@
 .delete-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 20px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
   border-top: 1px solid var(--border);
 }
 
 .delete-modal-cancel-btn {
-  padding: 7px 16px;
+  padding: var(--space-2) var(--space-4);
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -5071,7 +5071,7 @@
 }
 
 .delete-modal-confirm-btn {
-  padding: 7px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--red);
   border: 1px solid var(--red);
   border-radius: var(--radius-sm);

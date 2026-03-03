@@ -43,7 +43,7 @@
   color: var(--accent);
   font-size: var(--font-sm);
   font-weight: var(--weight-semibold);
-  padding: 6px 14px;
+  padding: var(--space-1-5) var(--space-3-5);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast);
@@ -71,8 +71,8 @@
 .rex-dash-stat {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: var(--space-1-5);
+  padding: var(--space-2) var(--space-3-5);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -108,7 +108,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .rex-dash-progress-label {
@@ -142,13 +142,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .rex-dash-legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   font-size: var(--font-xs);
   color: var(--text-dim);
 }
@@ -259,7 +259,7 @@
 .rex-dash-next-badges {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   flex-wrap: wrap;
 }
 
@@ -267,7 +267,8 @@
   font-size: var(--font-md);
   font-weight: var(--weight-semibold);
   padding: 2px 0;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
+
   max-width: 100%;
   overflow: hidden;
 }
@@ -276,8 +277,8 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   line-height: var(--leading-relaxed);
-  margin-top: 6px;
-  margin-bottom: 6px;
+  margin-top: var(--space-1-5);
+  margin-bottom: var(--space-1-5);
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -285,7 +286,7 @@
 .rex-dash-next-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--space-1);
   margin-top: var(--space-2);
 }
 
@@ -316,7 +317,7 @@
   color: #fff;
   background: var(--accent);
   border: none;
-  padding: 5px 14px;
+  padding: var(--space-1-5) var(--space-3-5);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast), transform var(--transition-fast);
@@ -342,7 +343,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .rex-dash-start-error {
@@ -416,13 +417,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .rex-dash-epic-info {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   min-width: 0;
   flex: 1;
   flex-wrap: wrap;
@@ -455,7 +456,7 @@
 .rex-dash-epic-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .rex-dash-epic-track {
@@ -485,7 +486,7 @@
   font-size: var(--font-xs);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
@@ -529,13 +530,13 @@
 .rex-dash-priority-bars {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .rex-dash-priority-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .rex-dash-priority-label {
@@ -583,14 +584,14 @@
 .rex-dash-status-grid {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .rex-dash-status-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
 }
 
 .rex-dash-status-label {
@@ -614,13 +615,13 @@
 .rex-dash-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .rex-dash-action-btn {
   display: block;
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -672,7 +673,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .rex-dash-health-dim {
@@ -732,7 +733,7 @@
 }
 
 .rex-dash-health-suggestions li {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   line-height: 1.4;
 }
 
@@ -789,7 +790,7 @@
   color: var(--text-dim);
   font-size: var(--font-3xl);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   line-height: 1;
 }
@@ -874,7 +875,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   flex-wrap: wrap;
 }
 
@@ -892,7 +893,7 @@
   font-size: var(--font-sm);
   font-weight: 600;
   text-transform: uppercase;
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   letter-spacing: 0.03em;
 }
@@ -927,7 +928,7 @@
 .reorg-affected {
   font-size: var(--font-sm);
   color: var(--text-dim);
-  margin-top: 4px;
+  margin-top: var(--space-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -942,7 +943,7 @@
 }
 
 .reorg-btn {
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   font-size: var(--font-sm);
   font-weight: 500;
@@ -1005,13 +1006,13 @@
   }
 
   .rex-dash-stats {
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .rex-dash-stat {
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-2-5);
     min-width: 64px;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .rex-dash-stat-value {
@@ -1048,7 +1049,7 @@
   }
 
   .rex-dash-action-btn {
-    padding: 10px 12px;
+    padding: var(--space-2-5) var(--space-3);
     font-size: var(--font-base);
   }
 }
@@ -1117,7 +1118,7 @@
   color: #fff;
   background: var(--accent);
   border: none;
-  padding: 10px 24px;
+  padding: var(--space-2-5) var(--space-6);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast), transform var(--transition-fast);
@@ -1154,7 +1155,7 @@
 .exec-panel-progress {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .exec-panel-progress-header {
@@ -1205,7 +1206,7 @@
 .exec-panel-resume-btn {
   font-size: var(--font-sm);
   font-weight: var(--weight-semibold);
-  padding: 6px 16px;
+  padding: var(--space-1-5) var(--space-4);
   border-radius: var(--radius-md);
   cursor: pointer;
   border: 1px solid;
@@ -1249,7 +1250,7 @@
 }
 
 .exec-panel-epic {
-  padding: 6px var(--space-2);
+  padding: var(--space-1-5) var(--space-2);
   border-radius: var(--radius-md);
   background: var(--bg);
   border: 1px solid transparent;
@@ -1277,7 +1278,7 @@
 .exec-panel-epic-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .exec-panel-epic-icon {
@@ -1306,7 +1307,7 @@
   font-size: var(--font-xs);
   color: var(--text-dim);
   background: var(--bg-hover);
-  padding: 1px 6px;
+  padding: 1px var(--space-1-5);
   border-radius: 3px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
@@ -1317,7 +1318,7 @@
   border-radius: 2px;
   background: var(--border);
   overflow: hidden;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .exec-panel-epic-fill {
@@ -1372,7 +1373,7 @@
 
   .exec-panel-start-btn {
     width: 100%;
-    padding: 12px;
+    padding: var(--space-3);
   }
 
   .exec-panel-pause-btn,

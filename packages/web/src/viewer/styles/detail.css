@@ -2,7 +2,7 @@
 .detail-row {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   font-size: 12px;
 }
 
@@ -12,8 +12,8 @@
 .detail-nav-btn {
   display: block;
   width: 100%;
-  margin-top: 16px;
-  padding: 8px 12px;
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -41,7 +41,7 @@
   font-size: 11px;
   font-family: monospace;
   color: var(--text-dim);
-  padding: 2px 6px;
+  padding: 2px var(--space-1-5);
   border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
@@ -58,9 +58,9 @@
   font-family: monospace;
   font-size: 11px;
   background: var(--bg-hover);
-  padding: 8px;
+  padding: var(--space-2);
   border-radius: 4px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   word-break: break-all;
   color: var(--accent);
 }
@@ -68,7 +68,7 @@
 /* Zone badge */
 .zone-badge {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 1px var(--space-2);
   border-radius: 10px;
   font-size: 10px;
   font-weight: 500;
@@ -90,10 +90,10 @@
   color: var(--text-dim);
   font-size: 12px;
   cursor: pointer;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .detail-close:hover { border-color: var(--accent); color: var(--accent); }
@@ -103,15 +103,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 /* Detail nav button group (no top margin on children) */
 .detail-nav-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 16px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-4);
 }
 
 .detail-nav-group .detail-nav-btn {
@@ -122,7 +122,7 @@
 .detail-finding-item {
   font-size: 12px;
   color: var(--text-dim);
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -130,5 +130,5 @@
 .detail-more {
   font-size: 11px;
   color: var(--text-dim);
-  padding-top: 4px;
+  padding-top: var(--space-1);
 }
