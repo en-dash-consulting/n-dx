@@ -16491,7 +16491,7 @@
             {
               "id": "21f89819-e032-44c2-8d94-05edcb82610d",
               "title": "Integrate file upload support in rex add UI interface",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add file upload capability to the rex add web interface, allowing users to drag and drop or select markdown/text files for requirements import",
               "acceptanceCriteria": [
@@ -16509,6 +16509,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-03-02T07:50:35.863Z",
+              "completedAt": "2026-03-03T06:20:37.555Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -16541,6 +16542,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-03-02T07:43:10.841Z",
+              "completedAt": "2026-03-03T06:14:44.996Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "semantic_title",
@@ -16550,8 +16552,7 @@
                 "matchedItemLevel": "feature",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-03-02T05:41:33.798Z"
-              },
-              "completedAt": "2026-03-03T06:14:44.996Z"
+              }
             }
           ]
         }
@@ -16662,7 +16663,7 @@
             {
               "id": "task-subdivision-tests",
               "title": "Add subdivision enhancement tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "New test file packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts plus updates to existing zone-detection.test.ts.",
               "acceptanceCriteria": [
@@ -16679,7 +16680,8 @@
               "blockedBy": [
                 "task-rewrite-subdividezone"
               ],
-              "startedAt": "2026-03-02T14:58:01.009Z"
+              "startedAt": "2026-03-02T14:58:01.009Z",
+              "completedAt": "2026-03-03T06:30:12.615Z"
             }
           ]
         },
@@ -16769,27 +16771,35 @@
         {
           "id": "feat-multi-repo-workspace",
           "title": "Multi-repo workspace aggregation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Phase 3 (future): sourcevision workspace [dirs...] command. Each repo's analysis becomes a top-level zone. Cross-repo crossings from external import resolution. The fractal property from Phase 1/2 makes this a data assembly problem.",
+          "startedAt": "2026-03-03T06:55:31.871Z",
+          "completedAt": "2026-03-03T06:55:31.871Z",
           "children": [
             {
               "id": "task-workspace-design",
               "title": "Design workspace command and config format",
-              "status": "pending",
-              "level": "task"
+              "status": "completed",
+              "level": "task",
+              "startedAt": "2026-03-03T06:30:42.142Z",
+              "completedAt": "2026-03-03T06:36:17.294Z"
             },
             {
               "id": "task-workspace-zone-builder",
               "title": "Implement workspace zone builder",
-              "status": "pending",
-              "level": "task"
+              "status": "completed",
+              "level": "task",
+              "startedAt": "2026-03-03T06:46:36.244Z",
+              "completedAt": "2026-03-03T06:55:31.688Z"
             },
             {
               "id": "task-cross-repo-crossings",
               "title": "Implement cross-repo crossing computation",
-              "status": "pending",
-              "level": "task"
+              "status": "completed",
+              "level": "task",
+              "startedAt": "2026-03-03T06:36:43.771Z",
+              "completedAt": "2026-03-03T06:45:59.232Z"
             }
           ]
         }
@@ -16813,7 +16823,7 @@
             {
               "id": "c277b516-6b48-4d58-8d2b-7254a7d4d0b2",
               "title": "Redesign proposal schema and LLM prompt to elicit consolidated, LoE-estimated proposals",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add optional loe (number, engineer-weeks), loeRationale (string), and loeConfidence ('low'|'medium'|'high') fields to the proposal item Zod schema, then revise the rex add system prompt to (a) generate consolidated, sprint-sized work packages (3–7 items for broad input) rather than micro-tasks, and (b) return structured LoE estimates as JSON fields with a worked example. Prompt wording should be isolated in a named constant or template file for independent iteration.",
               "acceptanceCriteria": [
@@ -16833,7 +16843,9 @@
                 "loe",
                 "proposals"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-03T07:09:27.798Z",
+              "completedAt": "2026-03-03T07:19:41.544Z"
             },
             {
               "id": "c7a696d0-cbb2-4887-bcc6-094ecffa28e8",
@@ -16868,7 +16880,7 @@
         {
           "id": "c12a5570-d983-44b5-b112-1aa386de0a50",
           "title": "LoE Threshold-Driven Proposal Decomposition",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Implement an automatic decomposition pass that splits proposal items exceeding the LoE threshold into smaller child items. The threshold defaults to 2 engineer-weeks and is user-configurable. Decomposed items are presented inline in the review so users can accept children, keep the original, or skip entirely.",
           "source": "smart-add",
@@ -16876,7 +16888,7 @@
             {
               "id": "b91ff0ae-ef1b-43c1-ac8d-500caa1ff61e",
               "title": "Implement configurable LoE threshold and automatic decomposition pass",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Introduce an loe.taskThresholdWeeks key (default: 2) into the rex configuration system and wire it through ndx config for reading, setting, and validation. Implement the decomposition pass: after the initial proposal step, identify items whose loe exceeds the threshold and run a secondary LLM call per item to produce child proposals, each with their own LoE estimates. Recursively decompose children that still exceed the threshold up to a configurable depth limit (default: 2 levels).",
               "acceptanceCriteria": [
@@ -16898,12 +16910,14 @@
                 "loe",
                 "decomposition"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-03T06:56:10.352Z",
+              "completedAt": "2026-03-03T07:08:51.066Z"
             },
             {
               "id": "a82072ae-6e96-4960-a58d-a4e73a46ca2b",
               "title": "Add decomposition confirmation UI to proposal review workflow",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When decomposition has occurred for a proposal item, present the decomposed children indented beneath their parent during the review step. The user can accept the decomposed version (adds children, discards the parent), keep the original consolidated item, or skip entirely. Non-interactive mode defaults to accepting decomposed items. Output should clearly label which items were auto-decomposed and the LoE value that triggered decomposition.",
               "acceptanceCriteria": [
@@ -16922,9 +16936,13 @@
                 "decomposition",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-03T07:20:07.467Z",
+              "completedAt": "2026-03-03T07:31:24.814Z"
             }
-          ]
+          ],
+          "startedAt": "2026-03-03T07:31:24.963Z",
+          "completedAt": "2026-03-03T07:31:24.963Z"
         }
       ]
     },

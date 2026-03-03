@@ -214,7 +214,18 @@ export function formatChunk(
       lines.push(`     [feature] ${f.title}`);
       for (const t of f.tasks) {
         const pri = t.priority ? ` [${t.priority}]` : "";
-        lines.push(`       [task] ${t.title}${pri}`);
+        if (t.decomposition) {
+          const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
+          const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
+          lines.push(`       [task] ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
+          for (const child of t.decomposition.children) {
+            const childPri = child.priority ? ` [${child.priority}]` : "";
+            const childLoe = child.loe !== undefined ? ` (LoE: ${child.loe}w)` : "";
+            lines.push(`         ↳ ${child.title}${childPri}${childLoe}`);
+          }
+        } else {
+          lines.push(`       [task] ${t.title}${pri}`);
+        }
       }
     }
   }

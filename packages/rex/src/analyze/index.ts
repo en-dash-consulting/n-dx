@@ -9,6 +9,7 @@ export type {
   ProposalEpic,
   ProposalFeature,
   ProposalTask,
+  TaskDecomposition,
   DuplicateReasonType,
   DuplicateReasonReference,
   DuplicateReasonMetadata,

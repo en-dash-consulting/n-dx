@@ -36,7 +36,22 @@ export interface ProposalTask {
   loeRationale?: string;
   /** Confidence in the LoE estimate. */
   loeConfidence?: "low" | "medium" | "high";
+  /**
+   * When present, this task was auto-decomposed because its LoE exceeded
+   * the configured threshold. Contains the child tasks and the threshold
+   * that triggered decomposition. The review step lets users choose between
+   * accepting children, keeping the original, or skipping entirely.
+   */
+  decomposition?: TaskDecomposition;
   duplicateReason?: DuplicateReasonMetadata;
+}
+
+/** Decomposition metadata attached to a task that exceeded the LoE threshold. */
+export interface TaskDecomposition {
+  /** Child tasks produced by decomposition. */
+  children: ProposalTask[];
+  /** The LoE threshold (in engineer-weeks) that was exceeded. */
+  thresholdWeeks: number;
 }
 
 export interface ProposalFeature {

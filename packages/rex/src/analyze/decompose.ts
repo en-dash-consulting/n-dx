@@ -181,8 +181,8 @@ export async function decomposeTask(
 
 /**
  * Recursively decompose tasks that exceed the threshold, up to the depth limit.
- * Returns the final flat list of tasks (with oversized ones replaced by children)
- * and tracking info about what was decomposed.
+ * Returns tasks with decomposition annotations (oversized tasks carry their
+ * children in `task.decomposition`) and tracking info about what was decomposed.
  */
 async function decomposeTasks(
   tasks: ProposalTask[],
@@ -247,7 +247,14 @@ async function decomposeTasks(
       decomposed,
     );
 
-    result.push(...resolvedChildren);
+    // Annotate the task with its decomposition instead of replacing it
+    result.push({
+      ...task,
+      decomposition: {
+        children: resolvedChildren,
+        thresholdWeeks,
+      },
+    });
   }
 
   return result;

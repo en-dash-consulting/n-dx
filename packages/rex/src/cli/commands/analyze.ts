@@ -109,7 +109,18 @@ function formatProposals(proposals: Proposal[]): string {
       lines.push(`  [feature] ${f.title} (from: ${f.source})`);
       for (const t of f.tasks) {
         const pri = t.priority ? ` [${t.priority}]` : "";
-        lines.push(`    [task] ${t.title}${pri} (from: ${t.sourceFile})`);
+        if (t.decomposition) {
+          const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
+          const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
+          lines.push(`    [task] ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
+          for (const child of t.decomposition.children) {
+            const childPri = child.priority ? ` [${child.priority}]` : "";
+            const childLoe = child.loe !== undefined ? ` (LoE: ${child.loe}w)` : "";
+            lines.push(`      ↳ ${child.title}${childPri}${childLoe}`);
+          }
+        } else {
+          lines.push(`    [task] ${t.title}${pri} (from: ${t.sourceFile})`);
+        }
       }
     }
   }
@@ -434,7 +445,7 @@ export async function cmdAnalyze(
       }
 
       info(
-        `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} into smaller units.`,
+        `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} (LoE exceeded threshold).`,
       );
     }
   }
@@ -446,6 +457,32 @@ export async function cmdAnalyze(
     info(formatProposals(proposals));
   }
   info("");
+
+  // Decomposition review: let user choose how to handle decomposed tasks
+  const { countDecomposedTasks } = await import("./decomposition-review.js");
+  if (countDecomposedTasks(proposals) > 0) {
+    const {
+      autoResolveDecompositions,
+      runDecompositionReview,
+      formatDecompositionSummary,
+    } = await import("./decomposition-review.js");
+
+    let decompositionResult;
+    if (accept || !process.stdin.isTTY) {
+      // Non-interactive: default to accepting decomposed versions
+      decompositionResult = await autoResolveDecompositions(proposals);
+    } else {
+      // Interactive: prompt user for each decomposed task
+      decompositionResult = await runDecompositionReview(proposals);
+    }
+
+    proposals = decompositionResult.proposals;
+    const summaryLine = formatDecompositionSummary(decompositionResult.summary);
+    if (summaryLine) {
+      info(summaryLine);
+      info("");
+    }
+  }
 
   // Display token usage summary
   const usageLine = formatTokenUsage(tokenUsage);

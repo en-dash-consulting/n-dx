@@ -280,11 +280,17 @@ describe("applyDecompositionPass", () => {
 
     const result = await applyDecompositionPass(proposals, { taskThresholdWeeks: 2 });
 
-    // Big task should be replaced by 2 children
-    expect(result.proposals[0].features[0].tasks).toHaveLength(3); // 2 children + 1 small task
-    expect(result.proposals[0].features[0].tasks[0].title).toBe("Child 1");
-    expect(result.proposals[0].features[0].tasks[1].title).toBe("Child 2");
-    expect(result.proposals[0].features[0].tasks[2].title).toBe("Small task");
+    // Big task should be annotated with decomposition (not replaced)
+    const tasks = result.proposals[0].features[0].tasks;
+    expect(tasks).toHaveLength(2); // annotated big task + small task
+    expect(tasks[0].title).toBe("Big task");
+    expect(tasks[0].decomposition).toBeDefined();
+    expect(tasks[0].decomposition!.children).toHaveLength(2);
+    expect(tasks[0].decomposition!.children[0].title).toBe("Child 1");
+    expect(tasks[0].decomposition!.children[1].title).toBe("Child 2");
+    expect(tasks[0].decomposition!.thresholdWeeks).toBe(2);
+    expect(tasks[1].title).toBe("Small task");
+    expect(tasks[1].decomposition).toBeUndefined();
 
     expect(result.decomposed).toHaveLength(1);
     expect(result.decomposed[0].original.title).toBe("Big task");
@@ -373,9 +379,18 @@ describe("applyDecompositionPass", () => {
     expect(result.decomposed[0].depth).toBe(0);
     expect(result.decomposed[1].depth).toBe(1);
 
-    // Final tasks should be the grandchildren
-    expect(result.proposals[0].features[0].tasks).toHaveLength(2);
-    expect(result.proposals[0].features[0].tasks[0].title).toBe("Grandchild 1");
+    // Task should be annotated with nested decomposition
+    const tasks = result.proposals[0].features[0].tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toBe("Huge task");
+    expect(tasks[0].decomposition).toBeDefined();
+    // The child is itself annotated with further decomposition
+    const children = tasks[0].decomposition!.children;
+    expect(children).toHaveLength(1);
+    expect(children[0].title).toBe("Still-big child");
+    expect(children[0].decomposition).toBeDefined();
+    expect(children[0].decomposition!.children).toHaveLength(2);
+    expect(children[0].decomposition!.children[0].title).toBe("Grandchild 1");
   });
 
   it("stops recursion at depth limit even if children still exceed threshold", async () => {
@@ -404,9 +419,14 @@ describe("applyDecompositionPass", () => {
     expect(result.decomposed).toHaveLength(1);
     expect(spawnClaudeMock).toHaveBeenCalledTimes(1);
 
-    // The still-big child should remain as-is (not decomposed further)
-    expect(result.proposals[0].features[0].tasks).toHaveLength(1);
-    expect(result.proposals[0].features[0].tasks[0].title).toBe("Still-big child");
+    // Task should be annotated with decomposition, child should NOT be further decomposed
+    const tasks = result.proposals[0].features[0].tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toBe("Huge task");
+    expect(tasks[0].decomposition).toBeDefined();
+    expect(tasks[0].decomposition!.children).toHaveLength(1);
+    expect(tasks[0].decomposition!.children[0].title).toBe("Still-big child");
+    expect(tasks[0].decomposition!.children[0].decomposition).toBeUndefined();
   });
 
   it("preserves proposals with mixed tasks (some over, some under threshold)", async () => {
@@ -430,13 +450,17 @@ describe("applyDecompositionPass", () => {
 
     const result = await applyDecompositionPass(proposals, { taskThresholdWeeks: 2 });
 
-    // Small stays, Big becomes 2 children, Medium stays
+    // Small stays, Big is annotated, Medium stays
     const tasks = result.proposals[0].features[0].tasks;
-    expect(tasks).toHaveLength(4); // 1 + 2 + 1
+    expect(tasks).toHaveLength(3); // 1 + 1 annotated + 1
     expect(tasks[0].title).toBe("Small task");
-    expect(tasks[1].title).toBe("Child A");
-    expect(tasks[2].title).toBe("Child B");
-    expect(tasks[3].title).toBe("Medium task");
+    expect(tasks[0].decomposition).toBeUndefined();
+    expect(tasks[1].title).toBe("Big task");
+    expect(tasks[1].decomposition).toBeDefined();
+    expect(tasks[1].decomposition!.children[0].title).toBe("Child A");
+    expect(tasks[1].decomposition!.children[1].title).toBe("Child B");
+    expect(tasks[2].title).toBe("Medium task");
+    expect(tasks[2].decomposition).toBeUndefined();
   });
 
   it("handles multiple features in a single proposal", async () => {
@@ -467,12 +491,15 @@ describe("applyDecompositionPass", () => {
 
     const result = await applyDecompositionPass(proposals, { taskThresholdWeeks: 2 });
 
-    // Feature 1: big task decomposed
+    // Feature 1: big task annotated with decomposition
     expect(result.proposals[0].features[0].tasks).toHaveLength(1);
-    expect(result.proposals[0].features[0].tasks[0].title).toBe("Child");
+    expect(result.proposals[0].features[0].tasks[0].title).toBe("F1 big task");
+    expect(result.proposals[0].features[0].tasks[0].decomposition).toBeDefined();
+    expect(result.proposals[0].features[0].tasks[0].decomposition!.children[0].title).toBe("Child");
 
     // Feature 2: small task unchanged
     expect(result.proposals[0].features[1].tasks).toHaveLength(1);
     expect(result.proposals[0].features[1].tasks[0].title).toBe("F2 small task");
+    expect(result.proposals[0].features[1].tasks[0].decomposition).toBeUndefined();
   });
 });
