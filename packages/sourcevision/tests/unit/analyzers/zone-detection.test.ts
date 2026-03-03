@@ -1107,26 +1107,27 @@ describe("analyzeZones subdivision integration", () => {
     // That zone should then be subdivided because it exceeds threshold
     const bigZone = result.zones.find((z) => z.files.length >= SUBDIVISION_THRESHOLD);
 
-    if (bigZone) {
-      // The large zone should have sub-zones from subdivision
-      expect(bigZone.subZones).toBeDefined();
-      expect(bigZone.subZones!.length).toBeGreaterThanOrEqual(2);
+    // Assert the zone exists — the test is meaningless without it
+    expect(bigZone).toBeDefined();
 
-      // Sub-zone IDs should be prefixed with parent
-      for (const sub of bigZone.subZones!) {
-        expect(sub.id).toMatch(new RegExp(`^${bigZone.id}/`));
-        expect(sub.depth).toBe(1);
-      }
+    // The large zone should have sub-zones from subdivision
+    expect(bigZone!.subZones).toBeDefined();
+    expect(bigZone!.subZones!.length).toBeGreaterThanOrEqual(2);
 
-      // Sub-crossings should exist (we added cross-cluster edges)
-      if (bigZone.subCrossings) {
-        expect(bigZone.subCrossings.length).toBeGreaterThan(0);
-        const subZoneIds = new Set(bigZone.subZones!.map((z) => z.id));
-        for (const crossing of bigZone.subCrossings) {
-          expect(subZoneIds.has(crossing.fromZone)).toBe(true);
-          expect(subZoneIds.has(crossing.toZone)).toBe(true);
-        }
-      }
+    // Sub-zone IDs should be prefixed with parent
+    for (const sub of bigZone!.subZones!) {
+      expect(sub.id).toMatch(new RegExp(`^${bigZone!.id}/`));
+      expect(sub.depth).toBe(1);
+    }
+
+    // Sub-crossings should exist (we added cross-cluster edges)
+    expect(bigZone!.subCrossings).toBeDefined();
+    expect(bigZone!.subCrossings!.length).toBeGreaterThan(0);
+    const subZoneIds = new Set(bigZone!.subZones!.map((z) => z.id));
+    for (const crossing of bigZone!.subCrossings!) {
+      expect(subZoneIds.has(crossing.fromZone)).toBe(true);
+      expect(subZoneIds.has(crossing.toZone)).toBe(true);
+      expect(crossing.fromZone).not.toBe(crossing.toZone);
     }
   });
 
@@ -1203,5 +1204,138 @@ describe("analyzeZones subdivision determinism", () => {
     const { zones: run2 } = await analyzeZones(inventory, imports, { enrich: false });
 
     expect(run1.structureHash).toBe(run2.structureHash);
+  });
+});
+
+// ── Regression: pipeline on fixture-like data ──────────────────────────────────
+
+describe("analyzeZones fixture regression", () => {
+  /**
+   * Models the small-ts-project fixture (7 files with known import graph).
+   * Verifies the refactored pipeline (runZonePipeline extraction, subdivideZone
+   * rewrite) produces correct, stable output for a well-understood topology.
+   */
+  it("produces correct zone structure for fixture-like small project", async () => {
+    // Recreate the small-ts-project import graph:
+    //   index.ts → user-service.ts, format.ts
+    //   user-service.ts → user.ts, validate.ts, format.ts
+    //   email-service.ts → user.ts
+    //   validate.ts → format.ts
+    const inventory = makeInventory([
+      makeFileEntry("src/index.ts"),
+      makeFileEntry("src/config.ts"),
+      makeFileEntry("src/models/user.ts"),
+      makeFileEntry("src/services/user-service.ts"),
+      makeFileEntry("src/services/email-service.ts"),
+      makeFileEntry("src/utils/validate.ts"),
+      makeFileEntry("src/utils/format.ts"),
+    ]);
+
+    const imports = makeImports([
+      makeEdge("src/index.ts", "src/services/user-service.ts", ["UserService"]),
+      makeEdge("src/index.ts", "src/utils/format.ts", ["formatName"]),
+      makeEdge("src/services/user-service.ts", "src/models/user.ts", ["User", "createUser"]),
+      makeEdge("src/services/user-service.ts", "src/utils/validate.ts", ["validateName"]),
+      makeEdge("src/services/user-service.ts", "src/utils/format.ts", ["formatName"]),
+      makeEdge("src/services/email-service.ts", "src/models/user.ts", ["User"]),
+      makeEdge("src/utils/validate.ts", "src/utils/format.ts", ["formatName"]),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    // Should produce zones (small project → likely 1-2 zones)
+    expect(result.zones.length).toBeGreaterThanOrEqual(1);
+
+    // All 7 files should be accounted for (in zones or unzoned)
+    const allZonedFiles = new Set(result.zones.flatMap((z) => z.files));
+    const allAccountedFiles = new Set([...allZonedFiles, ...result.unzoned]);
+    for (const f of inventory.files) {
+      expect(allAccountedFiles.has(f.path)).toBe(true);
+    }
+
+    // No zone should have subZones (all well under threshold)
+    for (const zone of result.zones) {
+      expect(zone.subZones).toBeUndefined();
+      expect(zone.subCrossings).toBeUndefined();
+    }
+
+    // Structure hash should be present
+    expect(result.structureHash).toBeDefined();
+    expect(result.structureHash).toMatch(/^[0-9a-f]{16}$/);
+
+    // Zone content hashes should cover all zones
+    expect(result.zoneContentHashes).toBeDefined();
+    for (const zone of result.zones) {
+      expect(result.zoneContentHashes![zone.id]).toBeDefined();
+    }
+
+    // Each zone should have valid metrics
+    for (const zone of result.zones) {
+      expect(zone.cohesion).toBeGreaterThanOrEqual(0);
+      expect(zone.cohesion).toBeLessThanOrEqual(1);
+      expect(zone.coupling).toBeGreaterThanOrEqual(0);
+      expect(zone.coupling).toBeLessThanOrEqual(1);
+      expect(zone.id).toBeTruthy();
+      expect(zone.name).toBeTruthy();
+      expect(zone.files.length).toBeGreaterThan(0);
+    }
+
+    // Deterministic: running again produces identical output
+    const { zones: run2 } = await analyzeZones(inventory, imports, { enrich: false });
+    expect(result).toEqual(run2);
+  });
+
+  it("produces correct output for multi-cluster fixture with subdivision", async () => {
+    // Larger fixture that triggers subdivision: 3 packages with distinct clusters
+    const pkgA = Array.from({ length: 25 }, (_, i) => `packages/alpha/src/f${i}.ts`);
+    const pkgB = Array.from({ length: 25 }, (_, i) => `packages/beta/src/f${i}.ts`);
+    const pkgC = Array.from({ length: 25 }, (_, i) => `packages/gamma/src/f${i}.ts`);
+    const allFiles = [...pkgA, ...pkgB, ...pkgC];
+
+    const inventory = makeInventory(allFiles.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    // Strong intra-package edges
+    for (const pkg of [pkgA, pkgB, pkgC]) {
+      for (let i = 0; i < pkg.length - 1; i++) {
+        edges.push(makeEdge(pkg[i], pkg[i + 1], ["sym1", "sym2"]));
+        if (i < pkg.length - 2) edges.push(makeEdge(pkg[i], pkg[i + 2]));
+      }
+    }
+    // Weak cross-package edges
+    edges.push(makeEdge(pkgA[0], pkgB[0]));
+    edges.push(makeEdge(pkgB[0], pkgC[0]));
+
+    const imports = makeImports(edges);
+
+    const { zones: result } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100, // Let natural clustering dominate
+    });
+
+    // Should produce at least 3 zones (one per package)
+    expect(result.zones.length).toBeGreaterThanOrEqual(3);
+
+    // All files accounted for
+    const allZonedFiles = result.zones.flatMap((z) => z.files);
+    const allAccountedFiles = new Set([...allZonedFiles, ...result.unzoned]);
+    expect(allAccountedFiles.size).toBe(allFiles.length);
+
+    // Crossings should exist between the packages (we added cross-package edges)
+    expect(result.crossings.length).toBeGreaterThan(0);
+
+    // Each crossing should reference valid zone IDs
+    const zoneIds = new Set(result.zones.map((z) => z.id));
+    for (const crossing of result.crossings) {
+      expect(zoneIds.has(crossing.fromZone)).toBe(true);
+      expect(zoneIds.has(crossing.toZone)).toBe(true);
+    }
+
+    // Deterministic
+    const { zones: run2 } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100,
+    });
+    expect(result).toEqual(run2);
   });
 });

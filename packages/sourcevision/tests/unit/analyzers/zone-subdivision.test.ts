@@ -528,6 +528,89 @@ describe("recursive multi-depth subdivision", () => {
     }
   });
 
+  it("propagates sub-crossings through recursive subdivision levels", () => {
+    // Create a zone with 4 large clusters, each >= threshold, with cross-links
+    // at both levels. The first subdivision creates sub-zones; those large
+    // enough to recurse should also produce sub-crossings.
+    const clusterCount = 4;
+    const filesPerCluster = Math.ceil(SUBDIVISION_THRESHOLD * 1.5);
+    const clusters: string[][] = [];
+    for (let c = 0; c < clusterCount; c++) {
+      // Split each cluster into two sub-directories so second-level Louvain
+      // can find two sub-communities within each first-level sub-zone
+      clusters.push(
+        Array.from(
+          { length: filesPerCluster },
+          (_, i) => `src/group${c}/part${i < filesPerCluster / 2 ? "a" : "b"}/file${i}.ts`
+        )
+      );
+    }
+    const allFiles = clusters.flat();
+
+    const zone = makeZone("root", allFiles);
+    const inventory = makeInventory(allFiles.map((f) => makeFileEntry(f)));
+
+    const edges: ImportEdge[] = [];
+    // Strong intra-cluster connectivity (chain + skip-one)
+    for (const cluster of clusters) {
+      const half = Math.floor(cluster.length / 2);
+      // Wire up first half internally
+      for (let i = 0; i < half - 1; i++) {
+        edges.push(makeEdge(cluster[i], cluster[i + 1]));
+        if (i < half - 2) edges.push(makeEdge(cluster[i], cluster[i + 2]));
+      }
+      // Wire up second half internally
+      for (let i = half; i < cluster.length - 1; i++) {
+        edges.push(makeEdge(cluster[i], cluster[i + 1]));
+        if (i < cluster.length - 2) edges.push(makeEdge(cluster[i], cluster[i + 2]));
+      }
+      // Weak link between the two halves (creates sub-crossings at level 2)
+      edges.push(makeEdge(cluster[0], cluster[half]));
+    }
+    // Cross-cluster links (creates sub-crossings at level 1)
+    for (let c = 0; c < clusterCount - 1; c++) {
+      edges.push(makeEdge(clusters[c][0], clusters[c + 1][0]));
+    }
+
+    const imports = makeImports(edges);
+    const subZones = subdivideZone(zone, imports, inventory, new Set(), 0);
+
+    expect(subZones.length).toBeGreaterThanOrEqual(2);
+
+    // Parent zone should have sub-crossings from cross-cluster edges
+    if (zone.subCrossings) {
+      expect(zone.subCrossings.length).toBeGreaterThan(0);
+      const subZoneIds = new Set(subZones.map((z) => z.id));
+      for (const crossing of zone.subCrossings) {
+        expect(subZoneIds.has(crossing.fromZone)).toBe(true);
+        expect(subZoneIds.has(crossing.toZone)).toBe(true);
+      }
+    }
+
+    // Check that any recursively subdivided sub-zones also have sub-crossings
+    for (const sub of subZones) {
+      if (sub.subZones && sub.subZones.length >= 2) {
+        // If a sub-zone was recursively subdivided and has cross-edges between
+        // its nested sub-zones, it should have subCrossings populated
+        if (sub.subCrossings) {
+          const nestedIds = new Set(sub.subZones.map((z) => z.id));
+          for (const crossing of sub.subCrossings) {
+            expect(nestedIds.has(crossing.fromZone)).toBe(true);
+            expect(nestedIds.has(crossing.toZone)).toBe(true);
+            // Nested sub-crossings reference files within the parent sub-zone
+            expect(sub.files).toContain(crossing.from);
+            expect(sub.files).toContain(crossing.to);
+          }
+        }
+        // Verify nested depth
+        for (const nested of sub.subZones) {
+          expect(nested.depth).toBe(2);
+          expect(nested.id).toMatch(/^root\/.+\//);
+        }
+      }
+    }
+  });
+
   it("stops recursion at MAX_SUBDIVISION_DEPTH", () => {
     // Even with very large clusters, recursion should stop at depth limit
     const files = Array.from({ length: 200 }, (_, i) => `src/deep/mod${i}.ts`);
