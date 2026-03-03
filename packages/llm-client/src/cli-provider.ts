@@ -108,8 +108,13 @@ function spawnOnce(
       ...(request.cliFlags ?? []),
     ];
 
+    // Strip CLAUDECODE so the spawned claude process doesn't think it's
+    // nested inside an interactive Claude Code session (e.g. when the web
+    // server is launched from within Claude Code).
+    const { CLAUDECODE: _, ...cleanEnv } = process.env;
     const proc = spawn(cliBinary, args, {
       stdio: ["ignore", "pipe", "pipe"],
+      env: cleanEnv,
     });
 
     let stdout = "";

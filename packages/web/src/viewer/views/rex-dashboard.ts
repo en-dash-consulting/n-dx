@@ -290,7 +290,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
 
   const fetchReorgCount = useCallback(async () => {
     try {
-      const res = await fetch("/api/rex/reorganize");
+      const res = await fetch("/api/rex/reorganize?mode=fast");
       if (res.ok) {
         const data = await res.json();
         setReorgCount(data.proposals?.length ?? 0);
@@ -301,8 +301,10 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchDashboard(), fetchHealth(), fetchReorgCount()])
+    Promise.all([fetchDashboard(), fetchHealth()])
       .then(() => setLoading(false));
+    // Reorg count is non-critical and can be slow — don't block initial render
+    fetchReorgCount();
   }, [fetchDashboard, fetchHealth, fetchReorgCount]);
 
   // Visibility-aware polling via polling manager

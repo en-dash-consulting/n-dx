@@ -3724,3 +3724,5 @@
 {"timestamp":"2026-03-02T16:33:26.692Z","event":"auto_completed","itemId":"epic-recursive-zone-arch","detail":"Auto-completed epic: Recursive zone architecture (all children done)"}
 {"timestamp":"2026-03-02T16:34:00.370Z","event":"status_updated","itemId":"task-drilldown-tests","detail":"Status changed to completed by hench agent"}
 {"timestamp":"2026-03-02T16:34:00.435Z","event":"task_completed","itemId":"task-drilldown-tests","detail":"## Summary\n\n**Task completed: Add drill-down tests** (`task-drilldown-tests`)\n\n### What was done\n\nCreated `packages/web/tests/unit/viewer/zone-drill-down.test.ts` with **24 tests** covering all 5 acceptance criteria:\n\n| Acceptance Criteria | Tests | Approach |\n|---|---|---|\n| **Breadcrumb rendering** | 5 | jsdom rendering of `ZoneBreadcrumbNav` — null at root, nav structure, separators, current item aria-current |\n| **Sub-zone diagram rendering after drill-down** | 7 | Pure function tests of `co"}
+{"timestamp":"2026-03-03T03:53:44.844Z","event":"bulk_update","detail":"Bulk updated 3/3 items (via web)"}
+{"timestamp":"2026-03-03T03:59:34.093Z","event":"bulk_update","detail":"Bulk updated 5/5 items (via web)"}

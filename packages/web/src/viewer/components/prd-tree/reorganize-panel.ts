@@ -73,7 +73,7 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/rex/reorganize");
+      const res = await fetch("/api/rex/reorganize?mode=fast");
       if (!res.ok) {
         setError(`Failed to fetch proposals (${res.status})`);
         return;
