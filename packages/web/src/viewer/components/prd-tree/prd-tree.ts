@@ -5,16 +5,17 @@
  * with status indicators, progress bars, completion percentages, and optional
  * multi-select checkboxes for bulk operations (status update, merge).
  *
- * Off-screen nodes are automatically culled via IntersectionObserver to prevent
- * DOM bloat and memory leaks during extended scrolling. Culled nodes are replaced
- * with height-preserving placeholders and re-created when scrolled back into view.
+ * Uses virtual scrolling to render only items within the viewport plus a
+ * configurable buffer zone. The tree is flattened into a linear array
+ * respecting expansion state and status filters, then only visible items
+ * are rendered — dramatically reducing DOM node count for large trees.
  *
  * Event handling uses delegation: a single set of click / contextmenu / keydown
  * listeners on the `[role="tree"]` container replaces per-node handlers, reducing
  * total listener count from O(N × 6) to O(1) + O(N_checkboxes).
  *
- * @see ./node-culler.ts  — IntersectionObserver-based culling engine
- * @see ./tree-event-delegate.ts — delegated event handling hook
+ * @see ./virtual-scroll.ts      — tree flattening and viewport computation
+ * @see ./tree-event-delegate.ts  — delegated event handling hook
  */
 
 import { h, Fragment, Component } from "preact";
@@ -27,11 +28,9 @@ import { StatusFilter, defaultStatusFilter } from "./status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
-import { NodeCuller } from "./node-culler.js";
-import { ListenerLifecycleManager } from "./listener-lifecycle.js";
-import { LazyChildren } from "./lazy-children.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
-import { countVisibleNodes, sliceVisibleTree, useProgressiveLoader, LoadMoreIndicator, DEFAULT_CHUNK_SIZE } from "./progressive-loader.js";
+import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT } from "./virtual-scroll.js";
+import type { FlatNode } from "./virtual-scroll.js";
 
 /** Levels that can have children added via inline form. */
 const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
@@ -426,199 +425,12 @@ class NodeRow extends Component<NodeRowProps> {
   }
 }
 
-// ── Off-screen node culling ──────────────────────────────────────────
-
-/** Default height for placeholder nodes before actual height is recorded. */
-const CULLED_PLACEHOLDER_HEIGHT = 40;
-
-/**
- * Wrapper component that culls off-screen tree nodes.
- *
- * Uses a shared NodeCuller (IntersectionObserver) to detect when this node
- * leaves the viewport buffer. When culled:
- * - Children are not rendered (freeing DOM nodes and event listeners)
- * - A height-preserving placeholder div maintains scroll position
- *
- * When the node scrolls back into view, full content is re-rendered.
- * The wrapper div always stays in the DOM so the observer can track it.
- *
- * Highlighted nodes (deep-link targets) are never culled to ensure
- * scrollIntoView works correctly.
- */
-interface CulledNodeProps {
-  /** Shared culler instance, or null to disable culling. */
-  culler: NodeCuller | null;
-  /** Whether this node should never be culled (e.g. deep-link target). */
-  neverCull?: boolean;
-  /** Node ID for listener lifecycle scope (cleanup on cull/unmount). */
-  nodeId?: string;
-  /** Shared listener lifecycle manager, or null to skip tracking. */
-  listenerManager?: ListenerLifecycleManager | null;
-  /** Child VNodes to render when visible. */
-  children?: ComponentChildren;
-}
-
-function CulledNode({ culler, neverCull, nodeId, listenerManager, children }: CulledNodeProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(true);
-  const heightRef = useRef(CULLED_PLACEHOLDER_HEIGHT);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !culler || neverCull) return;
-
-    return culler.observe(el, (isVisible) => {
-      if (!isVisible) {
-        // Record height before culling so the placeholder preserves scroll position.
-        const recordedHeight = culler.getLastHeight(el);
-        if (recordedHeight > 0) heightRef.current = recordedHeight;
-        // Clean up event listeners for this node scope when culled.
-        if (nodeId && listenerManager) {
-          listenerManager.cleanupScope(nodeId);
-        }
-      }
-      setVisible(isVisible);
-    });
-  }, [culler, neverCull, nodeId, listenerManager]);
-
-  // Ensure listener cleanup on unmount (covers data changes and filter removals).
-  useEffect(() => {
-    return () => {
-      if (nodeId && listenerManager) {
-        listenerManager.cleanupScope(nodeId);
-      }
-    };
-  }, [nodeId, listenerManager]);
-
-  if (!visible && !neverCull) {
-    return h("div", {
-      ref,
-      class: "prd-node prd-node-culled",
-      style: `height: ${heightRef.current}px`,
-      "aria-hidden": "true",
-    });
-  }
-
-  return h("div", { ref, class: "prd-node" }, children);
-}
-
-// ── Recursive tree renderer ─────────────────────────────────────────
-
-interface TreeNodesProps {
-  items: PRDItemData[];
-  taskUsageById?: Record<string, TaskUsageSummary>;
-  weeklyBudget?: WeeklyBudgetResolution | null;
-  depth: number;
-  expanded: Set<string>;
-  selectedItemId?: string | null;
-  activeStatuses: Set<ItemStatus>;
-  // Event callbacks removed — click / contextmenu / keydown are delegated
-  // to the tree container via useTreeEventDelegation.
-  bulkSelectedIds?: Set<string>;
-  /** Still per-node: checkbox onChange requires it on the <input>. */
-  onToggleBulkSelect?: (item: PRDItemData) => void;
-  /** ID of the parent node whose inline add form is currently open. */
-  inlineAddParentId?: string | null;
-  /** Whether to show inline add buttons (rendering flag). */
-  canInlineAdd?: boolean;
-  /** Called when the inline add form is submitted. */
-  onInlineAddSubmit?: (data: InlineAddInput) => Promise<void>;
-  /** Called when the inline add form is cancelled. */
-  onInlineAddCancel?: () => void;
-  /** ID of the item highlighted by a deep-link. */
-  highlightedItemId?: string | null;
-  /** Ref callback for the highlighted node (scroll-into-view). */
-  highlightedNodeRef?: (el: HTMLDivElement | null) => void;
-  /** Whether to show inline delete buttons (rendering flag). */
-  canDelete?: boolean;
-  /** ID of item currently being deleted (shows loading state). */
-  deletingItemId?: string | null;
-  /** Shared NodeCuller instance for off-screen node culling. */
-  culler?: NodeCuller | null;
-  /** Shared listener lifecycle manager for scope-based cleanup. */
-  listenerManager?: ListenerLifecycleManager | null;
-}
-
-function TreeNodes({ items, taskUsageById, weeklyBudget, depth, expanded, selectedItemId, activeStatuses, bulkSelectedIds, onToggleBulkSelect, inlineAddParentId, canInlineAdd, onInlineAddSubmit, onInlineAddCancel, highlightedItemId, highlightedNodeRef, canDelete, deletingItemId, culler, listenerManager }: TreeNodesProps) {
-  return h(
-    Fragment,
-    null,
-    items
-      .filter((item) => itemMatchesFilter(item, activeStatuses))
-      .map((item) => {
-        const children = item.children ?? [];
-        const hasChildren = children.length > 0;
-        const isOpen = expanded.has(item.id);
-        const isInlineAddActive = inlineAddParentId === item.id;
-        const isHL = highlightedItemId === item.id;
-
-        return h(
-          CulledNode,
-          {
-            key: item.id,
-            culler: culler ?? null,
-            neverCull: isHL || isInlineAddActive,
-            nodeId: item.id,
-            listenerManager: listenerManager ?? null,
-          },
-          h(NodeRow, {
-            item,
-            taskUsage: taskUsageById?.[item.id],
-            weeklyBudget,
-            depth,
-            isExpanded: isOpen,
-            hasChildren,
-            isSelected: selectedItemId === item.id,
-            isBulkSelected: bulkSelectedIds?.has(item.id),
-            onToggleBulkSelect,
-            canInlineAdd,
-            isInlineAddActive,
-            isHighlighted: isHL,
-            nodeRef: isHL ? highlightedNodeRef : undefined,
-            canDelete,
-            isDeleting: deletingItemId === item.id,
-          }),
-          // Inline add form — rendered below the parent node, above its children
-          isInlineAddActive && onInlineAddSubmit && onInlineAddCancel
-            ? h(InlineAddForm, {
-                parentLevel: item.level,
-                parentId: item.id,
-                depth,
-                onSubmit: onInlineAddSubmit,
-                onCancel: onInlineAddCancel,
-              })
-            : null,
-          hasChildren
-            ? h(LazyChildren, {
-                isOpen,
-                renderChildren: () =>
-                  h(TreeNodes, {
-                    items: children,
-                    taskUsageById,
-                    weeklyBudget,
-                    depth: depth + 1,
-                    expanded,
-                    selectedItemId,
-                    activeStatuses,
-                    bulkSelectedIds,
-                    onToggleBulkSelect,
-                    inlineAddParentId,
-                    canInlineAdd,
-                    onInlineAddSubmit,
-                    onInlineAddCancel,
-                    highlightedItemId,
-                    highlightedNodeRef,
-                    canDelete,
-                    deletingItemId,
-                    culler,
-                    listenerManager,
-                  }),
-              })
-            : null,
-        );
-      }),
-  );
-}
+// ── Virtual tree renderer (flat, viewport-only) ─────────────────────
+//
+// Replaces the recursive TreeNodes + CulledNode + LazyChildren approach
+// with a flat virtual-scrolled list. Only items within the viewport plus
+// a buffer zone are rendered, dramatically reducing DOM node count for
+// large trees. See virtual-scroll.ts for the flattening and range logic.
 
 // ── Summary bar ─────────────────────────────────────────────────────
 
@@ -731,10 +543,8 @@ export interface PRDTreeProps {
   /** ID of item currently being deleted (shows loading state). */
   deletingItemId?: string | null;
   /**
-   * Number of nodes per progressive loading chunk.
-   * When the visible node count exceeds this value, the tree renders
-   * incrementally with a "Load More" indicator.
-   * Defaults to DEFAULT_CHUNK_SIZE (50).
+   * @deprecated Virtual scrolling replaces progressive loading.
+   * This prop is accepted for backward compatibility but has no effect.
    */
   chunkSize?: number;
 }
@@ -754,35 +564,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId, chunkSize = DEFAULT_CHUNK_SIZE }: PRDTreeProps) {
-  // ── Node culler lifecycle ─────────────────────────────────────────
-  // Create a shared NodeCuller on mount and dispose on unmount.
-  // The culler uses IntersectionObserver to track which nodes are within
-  // the viewport buffer and notifies CulledNode wrappers to swap between
-  // full content and lightweight placeholders.
-  const cullerRef = useRef<NodeCuller | null>(null);
-  if (!cullerRef.current && typeof IntersectionObserver !== "undefined") {
-    cullerRef.current = new NodeCuller({ bufferPx: 200 });
-  }
-
-  // ── Listener lifecycle manager ──────────────────────────────────────
-  // Tracks per-node event listeners by scope (node ID). When nodes are
-  // culled or unmounted, their listeners are batch-removed via
-  // cleanupScope(). Provides diagnostic state for memory profiling.
-  const listenerManagerRef = useRef<ListenerLifecycleManager | null>(null);
-  if (!listenerManagerRef.current) {
-    listenerManagerRef.current = new ListenerLifecycleManager();
-  }
-
-  useEffect(() => {
-    return () => {
-      cullerRef.current?.dispose();
-      cullerRef.current = null;
-      listenerManagerRef.current?.dispose();
-      listenerManagerRef.current = null;
-    };
-  }, []);
-
+export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onToggleBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, deletingItemId, chunkSize }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -816,39 +598,52 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
     });
   }, [deepLinkExpandIds]);
 
-  // Scroll the deep-linked node into view when it renders
-  const scrolledRef = useRef(false);
-  const deepLinkNodeRef = useCallback((el: HTMLDivElement | null) => {
-    if (el && !scrolledRef.current) {
-      scrolledRef.current = true;
-      // Defer so the DOM has settled after ancestor expansion
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-    }
-  }, []);
-
   const [activeStatuses, setActiveStatuses] = useState<Set<ItemStatus>>(() =>
     defaultStatusFilter(),
   );
 
-  // ── Progressive tree loading ────────────────────────────────────────
-  // Count visible nodes and manage chunk-based rendering for large trees.
-  // The full tree is always available for filtering/searching — progressive
-  // loading only limits how many nodes are rendered at once.
-  const totalVisibleNodes = useMemo(
-    () => countVisibleNodes(doc.items, activeStatuses),
-    [doc.items, activeStatuses],
+  // ── Virtual scroll ────────────────────────────────────────────────
+  // Flatten the tree into a linear array respecting expansion and filter
+  // state, then render only items within the viewport + buffer zone.
+  const flatNodes = useMemo(
+    () => flattenVisibleTree(doc.items, expanded, activeStatuses),
+    [doc.items, expanded, activeStatuses],
   );
-  const progressive = useProgressiveLoader(totalVisibleNodes, chunkSize);
 
-  // Slice the tree to the current progressive limit.
-  // When progressive loading is not active (small tree), sliceVisibleTree
-  // returns the original items reference unchanged (structural sharing).
-  const progressiveSlice = useMemo(
-    () => sliceVisibleTree(doc.items, activeStatuses, progressive.limit),
-    [doc.items, activeStatuses, progressive.limit],
-  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const virtualScroll = useVirtualScroll({
+    flatNodes,
+    containerRef: scrollContainerRef,
+  });
+
+  // Deep-link: scroll to the highlighted item via virtual scroll.
+  const scrolledRef = useRef(false);
+  useEffect(() => {
+    if (!highlightedItemId) {
+      scrolledRef.current = false;
+      return;
+    }
+    if (scrolledRef.current) return;
+
+    const idx = findFlatNodeIndex(flatNodes, highlightedItemId);
+    if (idx >= 0) {
+      scrolledRef.current = true;
+      // Defer so the DOM has settled after ancestor expansion
+      requestAnimationFrame(() => {
+        virtualScroll.scrollToIndex(idx);
+      });
+    }
+  }, [highlightedItemId, flatNodes, virtualScroll.scrollToIndex]);
+
+  // Ref callback for the highlighted node (scroll-into-view fallback).
+  const deepLinkNodeRef = useCallback((el: HTMLDivElement | null) => {
+    if (el && highlightedItemId) {
+      // The virtual scroll centers the item; this ensures sub-pixel alignment.
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    }
+  }, [highlightedItemId]);
 
   // Inline add form state — tracks which parent node has its form open
   const [inlineAddParentId, setInlineAddParentId] = useState<string | null>(null);
@@ -927,6 +722,10 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
     );
   }
 
+  // Determine if inline add form should render for each visible node
+  const canInlineAdd = !!onInlineAddSubmit;
+  const canDelete = !!onRemoveItem;
+
   return h(
     "div",
     { class: "prd-tree-container" },
@@ -941,38 +740,71 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
     h(StatusFilter, { activeStatuses, onChange: setActiveStatuses }),
     // Summary
     h(SummaryBar, { items: doc.items }),
-    // Tree — delegated event handlers replace per-node listeners
+    // Tree — virtual scroll container with delegated event handlers
     h(
       "div",
       {
-        class: "prd-tree",
+        ref: scrollContainerRef,
+        class: "prd-tree prd-tree-virtual",
         role: "tree",
         "aria-label": "PRD hierarchy",
+        onScroll: virtualScroll.onScroll,
         onClick: treeHandlers.onClick,
         onContextMenu: treeHandlers.onContextMenu,
         onKeyDown: treeHandlers.onKeyDown,
       },
-      h(TreeNodes, {
-        items: progressiveSlice.items,
-        taskUsageById,
-        weeklyBudget,
-        depth: 0,
-        expanded,
-        selectedItemId,
-        activeStatuses,
-        bulkSelectedIds,
-        onToggleBulkSelect,
-        inlineAddParentId: onInlineAddSubmit ? inlineAddParentId : null,
-        canInlineAdd: !!onInlineAddSubmit,
-        onInlineAddSubmit: onInlineAddSubmit ? handleInlineAddSubmit : undefined,
-        onInlineAddCancel: onInlineAddSubmit ? handleInlineAddCancel : undefined,
-        highlightedItemId,
-        highlightedNodeRef: deepLinkNodeRef,
-        canDelete: !!onRemoveItem,
-        deletingItemId,
-        culler: cullerRef.current,
-        listenerManager: listenerManagerRef.current,
+      // Spacer before visible items (maintains scroll position)
+      virtualScroll.offsetY > 0
+        ? h("div", {
+            class: "prd-virtual-spacer",
+            style: `height: ${virtualScroll.offsetY}px`,
+            "aria-hidden": "true",
+          })
+        : null,
+      // Visible items — flat rendering from virtual scroll
+      virtualScroll.visibleNodes.map((node: FlatNode) => {
+        const { item, depth, isExpanded, hasChildren } = node;
+        const isInlineAddActive = inlineAddParentId === item.id;
+        const isHL = highlightedItemId === item.id;
+
+        return h(Fragment, { key: item.id },
+          h(NodeRow, {
+            item,
+            taskUsage: taskUsageById?.[item.id],
+            weeklyBudget,
+            depth,
+            isExpanded,
+            hasChildren,
+            isSelected: selectedItemId === item.id,
+            isBulkSelected: bulkSelectedIds?.has(item.id),
+            onToggleBulkSelect,
+            canInlineAdd,
+            isInlineAddActive,
+            isHighlighted: isHL,
+            nodeRef: isHL ? deepLinkNodeRef : undefined,
+            canDelete,
+            isDeleting: deletingItemId === item.id,
+          }),
+          // Inline add form — rendered below the parent node
+          isInlineAddActive && onInlineAddSubmit
+            ? h(InlineAddForm, {
+                parentLevel: item.level,
+                parentId: item.id,
+                depth,
+                onSubmit: handleInlineAddSubmit,
+                onCancel: handleInlineAddCancel,
+              })
+            : null,
+        );
       }),
+      // Spacer after visible items (maintains total scroll height)
+      virtualScroll.afterSpaceHeight > 0
+        ? h("div", {
+            class: "prd-virtual-spacer",
+            style: `height: ${virtualScroll.afterSpaceHeight}px`,
+            "aria-hidden": "true",
+          })
+        : null,
       // Context menu (tree-level, lifted from NodeRow)
       contextMenu
         ? h(NodeContextMenu, {
@@ -984,17 +816,5 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, defaultExp
           })
         : null,
     ),
-    // Progressive loading indicator — shown below the tree when there are
-    // more nodes beyond the current rendering limit.
-    progressive.hasMore
-      ? h(LoadMoreIndicator, {
-          renderedCount: progressiveSlice.renderedCount,
-          totalCount: progressiveSlice.totalCount,
-          chunkSize,
-          isLoading: progressive.isLoading,
-          onLoadMore: progressive.loadMore,
-          onLoadAll: progressive.loadAll,
-        })
-      : null,
   );
 }

@@ -356,6 +356,23 @@
   overflow: hidden;
 }
 
+/* Virtual scroll container — scrollable tree with viewport-only rendering.
+   Only items within the viewport plus a buffer zone are rendered; spacer
+   elements before/after maintain total scroll height. */
+.prd-tree-virtual {
+  max-height: 70vh;
+  overflow-y: auto;
+  /* Smooth scroll for virtual scroll index-based navigation */
+  scroll-behavior: smooth;
+}
+
+/* Height-only spacer elements that maintain virtual scroll position.
+   Rendered above and below the visible items to preserve total height. */
+.prd-virtual-spacer {
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
 .prd-node {
   position: relative;
 }
