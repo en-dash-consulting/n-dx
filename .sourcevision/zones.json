@@ -5821,6 +5821,16 @@
     "Introduce packages/rex/src/analyze/analysis-types.ts containing the shared interfaces currently causing the reason.ts ↔ extract.ts and reason.ts ↔ extract.ts ↔ file-validation.ts cycles. Introduce packages/sourcevision/src/analyzers/zone-types.ts for the enrich.ts ↔ zones.ts cycle. Both files are type-only modules with no runtime logic. Both analysis modules import from their respective types module rather than from each other. Two files break all 5 circular dependencies using the same pattern, which is consistent with the shared structural cause identified across findings 10, 11, 12, 18, and 19.",
     "Add a dependency-cruiser configuration at the monorepo root codifying the four-tier hierarchy as enforced rules: Orchestration may import Execution; Execution may import Domain; Domain packages may not import each other; Foundation may not import above its tier. Include workspace: true in the resolver config so workspace package references are resolved to their actual source paths rather than treated as external. This single config addition converts finding 23 (convention-only enforcement) from a standing risk into a CI gate, and addresses finding 22 (workspace deps invisible to coupling metrics) simultaneously.",
     "Export DEFAULT_MODEL and DEFAULT_CODEX_MODEL from packages/llm-client/src/public.ts and remove the independently hardcoded string literals in the three domain packages that duplicate them. This is a pure constant-centralization change with no logic impact. The foundation layer becomes the authoritative source for model name strings, making finding 30 a closed issue and strengthening the four-tier contract at a concrete file level.",
+    "Three independent symptoms — zone fragmentation across messaging/, duplicated two-import wiring in use-project-status.ts and use-prd-websocket.ts, and inflated import surface in web-viewer — all trace to the same root cause: absence of barrel exports in packages/web/src/viewer/messaging/, packages/web/src/viewer/polling/, and packages/web/src/viewer/performance/. Six or more independent findings corroborate this single structural gap (web-viewer zone findings 3–6, global findings 19, 27, 28, 38, 39), making it the highest-density root cause cluster in the entire finding set. Three files fix all six symptoms simultaneously.",
+    "All 5 circular dependency cycles share an identical root cause: shared interface types defined inside modules that must also import from those same modules to complete type resolution, producing bidirectional edges. Both affected subsystems (rex/analyze/ and sourcevision/analyzers/) have independent cycles caused by the same missing-types-module structural pattern. The fix identified in finding 43 — extracting a dedicated types module per subsystem — should be codified as a project-wide convention: any intra-package bidirectional import is a diagnostic signal to extract a shared types module rather than a symptom to tolerate.",
+    "Zone naming inconsistency during multi-pass enrichment produced at least two incorrect findings (15 and 18) that persisted through three analysis passes before being corrected by finding 16. The correction itself confirms that opaque auto-generated zone aliases (web-integration, web-4, web-5) make LLM-based enrichment structurally unreliable: the model cannot distinguish production utilities from test infrastructure by name alone, and misclassification propagates to every downstream finding that references the misnamed zone. Semantic zone IDs must be established and stable before any enrichment pass begins.",
+    "The four-tier dependency hierarchy is enforced entirely by convention with no automated tooling gate (findings 25, 41). Simultaneously, the coupling metrics that would detect tier violations are blind to workspace package dependencies (finding 24). This creates a compound blind spot: the architecture has no automated enforcement AND the primary metric for detecting violations is structurally incapable of measuring the most important dependency dimension — cross-package imports. These two gaps reinforce each other and represent the highest systemic architectural risk in the codebase because violations can land undetected in both code review and analysis output.",
+    "Five zero-importer production files are all concentrated in a single subdirectory: packages/web/src/viewer/ (lazy-children.ts, listener-lifecycle.ts, node-culler.ts, use-dom-performance-monitor.ts, dom-performance-monitor.ts). The spatial concentration in a single subtree distinguishes this from ordinary scattered dead code — it suggests the viewer layer contains an integrated prototype or feature branch that was never wired into production consumers, rather than independently orphaned utilities. This warrants a single targeted bundle audit of src/viewer/ rather than per-file dead-code analysis.",
+    "Finding 22 was issued at warning severity for packages/web/tests/unit/server/type-consistency.test.ts importing packages/rex/src/schema/v1.ts directly alongside the rex-gateway. Per project constraints, test-to-implementation coupling is expected by design. The test is verifying type consistency between the gateway re-export surface and the underlying schema module — a pattern that requires the direct import to function and is architecturally beneficial. This is correctly downgraded to info. The gateway bypass concern documented in finding 22 applies only to production code; tests that explicitly verify gateway fidelity are a feature, not a violation.",
+    "The five highest-leverage single-file changes, ordered by number of existing findings each would close: (1) Add packages/web/src/viewer/messaging/index.ts re-exporting createMessageCoalescer, createMessageThrottle, createRateLimiter, createRequestDedup, and a createMessagingPipeline factory — closes web-viewer zone findings 3 and 4, global findings 19, 27, 28, 38, and partially 39. (2) Add packages/web/src/viewer/polling/index.ts and packages/web/src/viewer/performance/index.ts — closes web-viewer zone finding 6 and global finding 39. (3) Add packages/rex/src/analyze/analysis-types.ts and packages/sourcevision/src/analyzers/zone-types.ts as type-only modules — closes global findings 11, 13, 20, 21, and 43. (4) Export DEFAULT_MODEL and DEFAULT_CODEX_MODEL from packages/llm-client/src/public.ts — closes global findings 32 and 42. (5) Add a dependency-cruiser configuration at the monorepo root with workspace resolver enabled — closes global findings 25 and 41 and structurally mitigates finding 24. Total: 8 files close 19 open warning-severity findings.",
+    "The enrich.ts ↔ zones.ts circular dependency in packages/sourcevision/src/analyzers/ is uniquely high-blast-radius among the 5 detected cycles. It is corroborated by four independent findings (11, 12, 21, 43) and sits directly in the critical 4-phase analyze pipeline. Every downstream consumer in the toolchain — hench task briefs, web dashboard zone rendering, rex recommendations — depends on output produced by this cycle-affected pipeline. A compilation-order change, bundler upgrade, or module evaluation side-effect in either file could silently alter zone detection results for all consumers without surfacing as a type error. Resolving it via packages/sourcevision/src/analyzers/zone-types.ts (finding 43) should be treated as higher priority than the intra-rex cycles, which affect a closed analyze subsystem with lower downstream surface.",
+    "Finding 10 — fan-in hotspot on packages/rex/src/schema/index.ts (22 callers) — is a single heuristic measurement with no corroborating finding identifying a concrete failure mode. A schema barrel export aggregating all public types for a 159-file package is structurally expected to have high fan-in; 22 callers is a natural consequence of correct barrel-export usage. Per analysis constraints, a single heuristic finding without corroboration should not be treated as actionable. Downgraded to info. Changes to this file remain high-impact by definition, but that is a code-review concern, not an architectural defect.",
+    "To confirm whether the five zero-importer viewer files are dead code or dynamically imported, run a targeted search: grep -rn 'lazy-children\\|listener-lifecycle\\|node-culler\\|dom-performance-monitor\\|use-dom-performance-monitor' packages/web/src --include='*.ts' --include='*.tsx' | grep 'import('. If no dynamic import() call sites exist, all five files are confirmed dead code and can be deleted. If dynamic import() references are found, add a JSDoc comment to each file documenting the call site path so future static analysis passes can exclude them from dead-export scans. Either outcome closes findings 30, 33, and 51 with a single grep.",
     "[call graph] 21 calls: \"web-viewer\" → \"packages-rex:rex-cli\"",
     "[call graph] 19 calls: \"packages-sourcevision:tests\" → \"packages-sourcevision:cli\"",
     "[call graph] 7 calls: \"web-integration\" → \"web-6\""
@@ -5909,6 +5919,13 @@
       "scope": "global",
       "text": "web-5 (cohesion: 0.45) and web-6 (cohesion: 0.40) are the only zones at or near the warning threshold — both receive imports from web-viewer and web-integration, suggesting they are low-cohesion shared utility clusters rather than focused domain modules that may benefit from refactoring.",
       "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "Finding 22 was issued at warning severity for packages/web/tests/unit/server/type-consistency.test.ts importing packages/rex/src/schema/v1.ts directly alongside the rex-gateway. Per project constraints, test-to-implementation coupling is expected by design. The test is verifying type consistency between the gateway re-export surface and the underlying schema module — a pattern that requires the direct import to function and is architecturally beneficial. This is correctly downgraded to info. The gateway bypass concern documented in finding 22 applies only to production code; tests that explicitly verify gateway fidelity are a feature, not a violation.",
+      "severity": "info"
     },
     {
       "type": "observation",
@@ -6036,6 +6053,13 @@
       "severity": "info"
     },
     {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "The five highest-leverage single-file changes, ordered by number of existing findings each would close: (1) Add packages/web/src/viewer/messaging/index.ts re-exporting createMessageCoalescer, createMessageThrottle, createRateLimiter, createRequestDedup, and a createMessagingPipeline factory — closes web-viewer zone findings 3 and 4, global findings 19, 27, 28, 38, and partially 39. (2) Add packages/web/src/viewer/polling/index.ts and packages/web/src/viewer/performance/index.ts — closes web-viewer zone finding 6 and global finding 39. (3) Add packages/rex/src/analyze/analysis-types.ts and packages/sourcevision/src/analyzers/zone-types.ts as type-only modules — closes global findings 11, 13, 20, 21, and 43. (4) Export DEFAULT_MODEL and DEFAULT_CODEX_MODEL from packages/llm-client/src/public.ts — closes global findings 32 and 42. (5) Add a dependency-cruiser configuration at the monorepo root with workspace resolver enabled — closes global findings 25 and 41 and structurally mitigates finding 24. Total: 8 files close 19 open warning-severity findings.",
+      "severity": "warning"
+    },
+    {
       "type": "relationship",
       "pass": 2,
       "scope": "global",
@@ -6079,6 +6103,13 @@
     },
     {
       "type": "relationship",
+      "pass": 5,
+      "scope": "global",
+      "text": "The enrich.ts ↔ zones.ts circular dependency in packages/sourcevision/src/analyzers/ is uniquely high-blast-radius among the 5 detected cycles. It is corroborated by four independent findings (11, 12, 21, 43) and sits directly in the critical 4-phase analyze pipeline. Every downstream consumer in the toolchain — hench task briefs, web dashboard zone rendering, rex recommendations — depends on output produced by this cycle-affected pipeline. A compilation-order change, bundler upgrade, or module evaluation side-effect in either file could silently alter zone detection results for all consumers without surfacing as a type error. Resolving it via packages/sourcevision/src/analyzers/zone-types.ts (finding 43) should be treated as higher priority than the intra-rex cycles, which affect a closed analyze subsystem with lower downstream surface.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
       "pass": 0,
       "scope": "global",
       "text": "Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 142 cross-file calls (unidirectional). Consider extracting shared interface or merging",
@@ -6093,7 +6124,7 @@
       "pass": 3,
       "scope": "global",
       "text": "All workspace package dependencies resolve as 'external' in the static import graph, causing zone coupling scores to structurally underreport real cross-package dependency depth for every zone. The coupling metric is blind to intended workspace consumption, making it impossible to use sourcevision's coupling scores to reason about compliance with the four-tier dependency hierarchy — a separate cross-package dependency audit tool or lint rule is required for that purpose.",
-      "severity": "warning"
+      "severity": "info"
     },
     {
       "type": "anti-pattern",
@@ -6136,6 +6167,13 @@
       "scope": "global",
       "text": "Three production files across two zones (lazy-children.ts, listener-lifecycle.ts, node-culler.ts) have no production importers anywhere in the codebase — confirmed by full import graph traversal. If dynamic import() is not in use, these files are dead code kept alive only by unit tests. A build-output audit (checking whether these modules appear in any compiled bundle) would definitively resolve the ambiguity and either confirm dead-code removal candidates or document the dynamic import contract.",
       "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Finding 10 — fan-in hotspot on packages/rex/src/schema/index.ts (22 callers) — is a single heuristic measurement with no corroborating finding identifying a concrete failure mode. A schema barrel export aggregating all public types for a 159-file package is structurally expected to have high fan-in; 22 callers is a natural consequence of correct barrel-export usage. Per analysis constraints, a single heuristic finding without corroboration should not be treated as actionable. Downgraded to info. Changes to this file remain high-impact by definition, but that is a code-review concern, not an architectural defect.",
+      "severity": "info"
     },
     {
       "type": "anti-pattern",
@@ -6230,6 +6268,13 @@
       "scope": "global",
       "text": "Introduce packages/rex/src/analyze/analysis-types.ts containing the shared interfaces currently causing the reason.ts ↔ extract.ts and reason.ts ↔ extract.ts ↔ file-validation.ts cycles. Introduce packages/sourcevision/src/analyzers/zone-types.ts for the enrich.ts ↔ zones.ts cycle. Both files are type-only modules with no runtime logic. Both analysis modules import from their respective types module rather than from each other. Two files break all 5 circular dependencies using the same pattern, which is consistent with the shared structural cause identified across findings 10, 11, 12, 18, and 19.",
       "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "To confirm whether the five zero-importer viewer files are dead code or dynamically imported, run a targeted search: grep -rn 'lazy-children\\|listener-lifecycle\\|node-culler\\|dom-performance-monitor\\|use-dom-performance-monitor' packages/web/src --include='*.ts' --include='*.tsx' | grep 'import('. If no dynamic import() call sites exist, all five files are confirmed dead code and can be deleted. If dynamic import() references are found, add a JSDoc comment to each file documenting the call site path so future static analysis passes can exclude them from dead-export scans. Either outcome closes findings 30, 33, and 51 with a single grep.",
+      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -6376,7 +6421,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 4,
+  "metaEvaluationCount": 5,
   "structureHash": "c1c3c645ff1b54c3",
   "zoneContentHashes": {
     "root": "a1f09ffd4dbb6ee4",

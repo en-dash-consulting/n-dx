@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (845), CSS (44), JSON (30), Markdown (30), JavaScript (29)
 - **Zones**: 22 (22 with descriptions)
 - **Git**: feature/integrate-codex @ 21786d2
-- **Analyzed**: 2026-03-03T16:00:16.216Z
+- **Analyzed**: 2026-03-03T18:45:16.223Z
 
 ## Architecture Zones
 
@@ -423,13 +423,14 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Anti-patterns
 
-- All workspace package dependencies resolve as 'external' in the static import graph, causing zone coupling scores to structurally underreport real cross-package dependency depth for every zone. The coupling metric is blind to intended workspace consumption, making it impossible to use sourcevision's coupling scores to reason about compliance with the four-tier dependency hierarchy — a separate cross-package dependency audit tool or lint rule is required for that purpose. [warning]
+- All workspace package dependencies resolve as 'external' in the static import graph, causing zone coupling scores to structurally underreport real cross-package dependency depth for every zone. The coupling metric is blind to intended workspace consumption, making it impossible to use sourcevision's coupling scores to reason about compliance with the four-tier dependency hierarchy — a separate cross-package dependency audit tool or lint rule is required for that purpose. [info]
 - No automated import boundary enforcement exists (no ESLint import-no-restricted-paths rules, no dependency-cruiser configuration, no CI gate). The four-tier dependency hierarchy and gateway pattern are enforced entirely by convention — a developer adding a direct cross-tier import in any leaf file will bypass the architecture with no automated rejection and the violation will only surface during code review if a reviewer recognizes it. [warning]
 - The absence of a shared types package forces independent type definition across domain packages. Types that conceptually span rex and hench (task IDs, status enums, tree node shapes) are defined in rex and consumed by hench via gateway re-exports — if rex ever restructures its type definitions, hench and web must both update their gateway imports simultaneously. A dedicated @n-dx/types foundation package would decouple type evolution from domain logic changes. [info]
 - The canonical messaging pipeline wiring (throttle → coalescer → rateLimiter → dedup) exists only in test infrastructure. Any production consumer that re-implements this wiring (e.g. a second viewer or a server-side handler) must rediscover the correct composition order from the test file. Extracting a createMessagingPipeline factory to production code would make the pipeline order explicit, testable as a unit, and prevent divergence. [warning]
 - The messaging directory lacks an index.ts despite containing four cohesive utilities with uniform API shapes. The absence of a barrel export is the root cause of the three-zone fragmentation, the 7 cross-zone import edges, and the below-threshold cohesion scores in viewer-message-flow-control and viewer-request-deduplication. Adding messaging/index.ts is the minimum viable fix that resolves all three symptoms simultaneously. [warning]
 - The web package has no enforced boundary between its Node.js server layer (src/server/) and its browser client layer (src/viewer/). Both are in the same zone with the same import rules. A tsconfig path alias, package.json exports condition, or lint rule scoped to each subdirectory would make cross-environment imports a compile-time or lint error rather than a silent runtime failure. [warning]
 - Three production files across two zones (lazy-children.ts, listener-lifecycle.ts, node-culler.ts) have no production importers anywhere in the codebase — confirmed by full import graph traversal. If dynamic import() is not in use, these files are dead code kept alive only by unit tests. A build-output audit (checking whether these modules appear in any compiled bundle) would definitively resolve the ambiguity and either confirm dead-code removal candidates or document the dynamic import contract. [warning]
+- Finding 10 — fan-in hotspot on packages/rex/src/schema/index.ts (22 callers) — is a single heuristic measurement with no corroborating finding identifying a concrete failure mode. A schema barrel export aggregating all public types for a 159-file package is structurally expected to have high fan-in; 22 callers is a natural consequence of correct barrel-export usage. Per analysis constraints, a single heuristic finding without corroboration should not be treated as actionable. Downgraded to info. Changes to this file remain high-impact by definition, but that is a code-review concern, not an architectural defect. [info]
 - God function: handleHenchRoute in packages/web/src/server/routes-hench.ts calls 59 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
@@ -440,6 +441,7 @@ POST    /api/hench/workflow/suggestions/:id
 - web-5 and web-6 are the only inter-zone coupling bottlenecks; both receive imports from exactly two consumers (web-viewer and web-integration). Formalizing them as named shared-utilities modules with documented public APIs would make their structural role explicit and prevent further ad-hoc imports from additional consumers. [info]
 - web-integration sits between web-viewer and the messaging primitives (web-5, web-6) in the import graph but does not serve as a true facade — web-viewer bypasses it with 6 direct imports to the primitives while also holding 1 import to web-integration. web-integration is a partially-realized abstraction layer: present in the graph but not structurally enforced. [warning]
 - CONTRADICTION RESOLUTION: Global findings 14 and 16 are misdiagnoses caused by zone naming inconsistency. Finding 16 characterizes the web-viewer → web-integration import as a 'test-layer isolation violation'; finding 14 characterizes web-integration as a 'partially-realized abstraction layer'. Both conclusions depend on web-integration being an integration-test zone. Finding 33 establishes it is viewer-call-rate-limiter, a production messaging utility. The import is a valid production-to-production dependency. Both findings have been downgraded to info. No remediation is warranted. [info]
+- The five highest-leverage single-file changes, ordered by number of existing findings each would close: (1) Add packages/web/src/viewer/messaging/index.ts re-exporting createMessageCoalescer, createMessageThrottle, createRateLimiter, createRequestDedup, and a createMessagingPipeline factory — closes web-viewer zone findings 3 and 4, global findings 19, 27, 28, 38, and partially 39. (2) Add packages/web/src/viewer/polling/index.ts and packages/web/src/viewer/performance/index.ts — closes web-viewer zone finding 6 and global finding 39. (3) Add packages/rex/src/analyze/analysis-types.ts and packages/sourcevision/src/analyzers/zone-types.ts as type-only modules — closes global findings 11, 13, 20, 21, and 43. (4) Export DEFAULT_MODEL and DEFAULT_CODEX_MODEL from packages/llm-client/src/public.ts — closes global findings 32 and 42. (5) Add a dependency-cruiser configuration at the monorepo root with workspace resolver enabled — closes global findings 25 and 41 and structurally mitigates finding 24. Total: 8 files close 19 open warning-severity findings. [warning]
 
 ### Relationships
 
@@ -449,6 +451,7 @@ POST    /api/hench/workflow/suggestions/:id
 - packages/rex/src/analyze/reason.ts participates in a circular dependency with extract.ts (detected twice) and a 3-node cycle with file-validation.ts — with 24 inbound importers, any attempt to break these cycles risks cascading type errors across a significant portion of the rex analyze subsystem. [warning]
 - packages/sourcevision/src/analyzers/enrich.ts and zones.ts form a circular dependency detected twice — both files are in the critical 4-phase analyze pipeline, meaning the cycle directly affects the zone detection output that every downstream consumer (hench briefs, web dashboard, rex recommendations) depends on. [warning]
 - packages/web/tests/unit/server/type-consistency.test.ts directly imports packages/rex/src/schema/v1.ts alongside the web rex-gateway, creating an undeclared compile-time dependency on rex schema internals from test code — if rex's schema module path changes the test breaks silently until CI runs, and the direct import is a gateway bypass even if intentional for type verification. [warning]
+- The enrich.ts ↔ zones.ts circular dependency in packages/sourcevision/src/analyzers/ is uniquely high-blast-radius among the 5 detected cycles. It is corroborated by four independent findings (11, 12, 21, 43) and sits directly in the critical 4-phase analyze pipeline. Every downstream consumer in the toolchain — hench task briefs, web dashboard zone rendering, rex recommendations — depends on output produced by this cycle-affected pipeline. A compilation-order change, bundler upgrade, or module evaluation side-effect in either file could silently alter zone detection results for all consumers without surfacing as a type error. Resolving it via packages/sourcevision/src/analyzers/zone-types.ts (finding 43) should be treated as higher priority than the intra-rex cycles, which affect a closed analyze subsystem with lower downstream surface. [warning]
 - Tightly coupled modules: packages/web/src/server/routes-rex.ts and packages/web/src/server/types.ts — 142 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
 
 ### Observations
@@ -463,7 +466,7 @@ POST    /api/hench/workflow/suggestions/:id
 - Integration test files placed in zones determined by import proximity rather than source ownership (e.g., request-dedup integration test in the rate-limiter zone) reduce the diagnostic value of cohesion scores — consider co-locating tests with their source files or establishing a test-placement convention. [warning]
 - The hench package (159 files) and web-viewer (330 files) are the two largest zones by file count — their size relative to other zones suggests they may benefit from further internal modularization to support independent testing and reduce cognitive load for new contributors. [info]
 - The messaging subsystem spans three zones with overlapping concerns; treating viewer-call-rate-limiter, viewer-message-flow-control, and viewer-request-deduplication as a single 'viewer/messaging' package boundary would eliminate cross-zone coupling warnings and simplify web-viewer's import surface. [info]
-- ... and 13 more
+- ... and 14 more
 
 ### Suggestions
 
@@ -477,7 +480,7 @@ POST    /api/hench/workflow/suggestions/:id
 - Three viewer subdirectories (messaging/, polling/, performance/) all lack index.ts barrel exports despite containing cohesive utilities consumed by 4, 11, and 12 files respectively. Adopting a monorepo-wide convention that every utility subdirectory with 3+ consumers exposes an index.ts would retroactively fix all three directories and prevent the pattern from recurring in new subdirectories. [warning]
 - Zone naming is inconsistent across the viewer subsystem: 'dom-performance-monitoring' omits the 'viewer-' prefix applied to all three messaging zones. Adopting a convention where zone names derive from their source directory path (src/viewer/* → viewer-*) would make the zone map self-documenting and eliminate the current outlier. [info]
 - Add a dependency-cruiser configuration at the monorepo root codifying the four-tier hierarchy as enforced rules: Orchestration may import Execution; Execution may import Domain; Domain packages may not import each other; Foundation may not import above its tier. Include workspace: true in the resolver config so workspace package references are resolved to their actual source paths rather than treated as external. This single config addition converts finding 23 (convention-only enforcement) from a standing risk into a CI gate, and addresses finding 22 (workspace deps invisible to coupling metrics) simultaneously. [warning]
-- ... and 18 more
+- ... and 19 more
 
 ## Next Steps
 
@@ -497,7 +500,7 @@ Prioritized work items derived from analysis:
 
 1. **2 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …**
 
-1. **All workspace package dependencies resolve as 'external' in… (+6 related)**
+1. **No automated import boundary enforcement exists (no ESLint … (+5 related)**
 
 1. **use-project-status.ts and use-prd-websocket.ts both independently import and wi…**
    Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/v1.ts`
@@ -511,7 +514,7 @@ Prioritized work items derived from analysis:
 1. **Add packages/web/src/viewer/polling/index.ts and packages/web/src/viewer/perfor…**
    Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/v1.ts`
 
-1. **All 5 detected circular dependency chains are likely intra-… (+6 related)**
+1. **All 5 detected circular dependency chains are likely intra-… (+8 related)**
 
 1. **@n-dx/llm-client's public.ts does not export DEFAULT_CODEX_MODEL or DEFAULT_MOD…**
 
@@ -578,7 +581,7 @@ Prioritized work items derived from analysis:
 | `docs/signal-handling-audit.md` | docs |  | docs |
 | `docs/viewer-architecture.md` | docs |  | docs |
 | `docs/viewer-audit.md` | docs |  | docs |
-| `help.js` | source | utility | root |
+| `help.js` | source | cli-command | root |
 | `n-dx.png` | asset |  | root |
 | `package.json` | config |  | root |
 | `packages/hench/Hench-F.png` | asset |  | hench |
@@ -603,7 +606,7 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/agent/lifecycle/token-usage.ts` | source | service | hench |
 | `packages/hench/src/agent/planning/brief.ts` | source | service | hench |
 | `packages/hench/src/agent/planning/prompt.ts` | source | service | hench |
-| `packages/hench/src/agent/tools.ts` | source | utility | hench |
+| `packages/hench/src/agent/tools.ts` | source | types | hench |
 | `packages/hench/src/cli/commands/config.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/constants.ts` | source | types | hench |
 | `packages/hench/src/cli/commands/init.ts` | source | cli-command | hench |
@@ -634,10 +637,10 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/process/pool.ts` | source | service | hench |
 | `packages/hench/src/process/process-memory-tracker.ts` | source | utility | hench |
 | `packages/hench/src/public.ts` | source | entrypoint | hench |
-| `packages/hench/src/queue/execution-queue.ts` | source | store | hench |
+| `packages/hench/src/queue/execution-queue.ts` | source | service | hench |
 | `packages/hench/src/queue/format.ts` | source | utility | hench |
 | `packages/hench/src/queue/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/queue/priority-scheduler.ts` | source | utility | hench |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | service | hench |
 | `packages/hench/src/schema/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/schema/templates.ts` | source | schema | hench |
 | `packages/hench/src/schema/v1.ts` | source | schema | hench |
@@ -657,7 +660,7 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/tools/contracts.ts` | source | types | hench |
 | `packages/hench/src/tools/dispatch.ts` | source | service | hench |
 | `packages/hench/src/tools/exec-shell.ts` | source | utility | hench |
-| `packages/hench/src/tools/files.ts` | source | service | hench |
+| `packages/hench/src/tools/files.ts` | source | utility | hench |
 | `packages/hench/src/tools/git.ts` | source | utility | hench |
 | `packages/hench/src/tools/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/tools/rex.ts` | source | service | hench |
@@ -753,14 +756,14 @@ Prioritized work items derived from analysis:
 | `packages/llm-client/src/llm-config.ts` | source | config | packages-llm-client:src-4 |
 | `packages/llm-client/src/llm-types.ts` | source | types | packages-llm-client:src-4 |
 | `packages/llm-client/src/output.ts` | source | utility | packages-llm-client:src-2 |
-| `packages/llm-client/src/project-config.ts` | source | utility | packages-llm-client:src-2 |
-| `packages/llm-client/src/project-dirs.ts` | source | utility | packages-llm-client:src-2 |
+| `packages/llm-client/src/project-config.ts` | source | config | packages-llm-client:src-2 |
+| `packages/llm-client/src/project-dirs.ts` | source | config | packages-llm-client:src-2 |
 | `packages/llm-client/src/provider-interface.ts` | source | types | packages-llm-client:src-3 |
-| `packages/llm-client/src/provider-registry.ts` | source | service | packages-llm-client:src-3 |
-| `packages/llm-client/src/provider-session.ts` | source | service | packages-llm-client:src-3 |
+| `packages/llm-client/src/provider-registry.ts` | source | utility | packages-llm-client:src-3 |
+| `packages/llm-client/src/provider-session.ts` | source | utility | packages-llm-client:src-3 |
 | `packages/llm-client/src/public.ts` | source | entrypoint | packages-llm-client:src-2 |
-| `packages/llm-client/src/suggest.ts` | source | service | packages-llm-client:src-2 |
-| `packages/llm-client/src/token-usage.ts` | source | service | packages-llm-client:src-3 |
+| `packages/llm-client/src/suggest.ts` | source | utility | packages-llm-client:src-2 |
+| `packages/llm-client/src/token-usage.ts` | source | utility | packages-llm-client:src-3 |
 | `packages/llm-client/src/types.ts` | source | types | packages-llm-client:src-3 |
 | `packages/llm-client/tests/e2e/.gitkeep` | test |  |  |
 | `packages/llm-client/tests/integration/.gitkeep` | test |  |  |
@@ -796,10 +799,10 @@ Prioritized work items derived from analysis:
 | `packages/rex/llms.txt` | docs |  |  |
 | `packages/rex/package-lock.json` | generated |  |  |
 | `packages/rex/package.json` | config |  |  |
-| `packages/rex/src/analyze/acknowledge.ts` | source | service |  |
-| `packages/rex/src/analyze/consolidation-guard.ts` | source | utility |  |
+| `packages/rex/src/analyze/acknowledge.ts` | source | utility |  |
+| `packages/rex/src/analyze/consolidation-guard.ts` | source | service |  |
 | `packages/rex/src/analyze/decompose.ts` | source | service |  |
-| `packages/rex/src/analyze/dedupe.ts` | source | utility |  |
+| `packages/rex/src/analyze/dedupe.ts` | source | service |  |
 | `packages/rex/src/analyze/diff.ts` | source | utility |  |
 | `packages/rex/src/analyze/extract.ts` | source | service |  |
 | `packages/rex/src/analyze/file-validation.ts` | source | utility |  |
@@ -841,10 +844,10 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/cli/commands/validate.ts` | source | cli-command | packages-rex:rex-cli |
 | `packages/rex/src/cli/commands/verify.ts` | source | cli-command |  |
 | `packages/rex/src/cli/errors.ts` | source | utility |  |
-| `packages/rex/src/cli/help.ts` | source | utility |  |
+| `packages/rex/src/cli/help.ts` | source | types |  |
 | `packages/rex/src/cli/index.ts` | source | entrypoint | packages-rex:rex-cli |
 | `packages/rex/src/cli/mcp-tools.ts` | source | service |  |
-| `packages/rex/src/cli/mcp.ts` | source | cli-command | packages-rex:rex-cli |
+| `packages/rex/src/cli/mcp.ts` | source | entrypoint | packages-rex:rex-cli |
 | `packages/rex/src/cli/output.ts` | source | utility |  |
 | `packages/rex/src/cli/validate-input.ts` | source | utility |  |
 | `packages/rex/src/core/analytics.ts` | source | utility |  |
@@ -883,7 +886,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/core/tree.ts` | source | utility | packages-rex:rex-cli |
 | `packages/rex/src/core/verify.ts` | source | utility |  |
 | `packages/rex/src/public.ts` | source | entrypoint |  |
-| `packages/rex/src/recommend/conflict-detection.ts` | source | utility |  |
+| `packages/rex/src/recommend/conflict-detection.ts` | source | service |  |
 | `packages/rex/src/recommend/create-from-recommendations.ts` | source | service |  |
 | `packages/rex/src/recommend/types.ts` | source | types |  |
 | `packages/rex/src/schema/index.ts` | source | entrypoint | packages-rex:rex-cli |
@@ -901,7 +904,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/store/notion-adapter.ts` | source | store |  |
 | `packages/rex/src/store/notion-client.ts` | source | store |  |
 | `packages/rex/src/store/project-config.ts` | source | store |  |
-| `packages/rex/src/workflow/default.ts` | source | config | packages-rex:rex-cli |
+| `packages/rex/src/workflow/default.ts` | source | types | packages-rex:rex-cli |
 | `packages/rex/tests/e2e/cli-adapter.test.ts` | test |  |  |
 | `packages/rex/tests/e2e/cli-analyze.test.ts` | test |  |  |
 | `packages/rex/tests/e2e/cli-import.test.ts` | test |  |  |
@@ -1028,8 +1031,8 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/WORKSPACE_DESIGN.md` | docs |  |  |
 | `packages/sourcevision/package-lock.json` | generated |  |  |
 | `packages/sourcevision/package.json` | config |  |  |
-| `packages/sourcevision/src/analyzers/archetypes.ts` | source | service |  |
-| `packages/sourcevision/src/analyzers/branch-work-classifier.ts` | source | service |  |
+| `packages/sourcevision/src/analyzers/archetypes.ts` | source | config |  |
+| `packages/sourcevision/src/analyzers/branch-work-classifier.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/branch-work-collector.ts` | source | service |  |
 | `packages/sourcevision/src/analyzers/branch-work-filter.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/branch-work-store.ts` | source | store |  |
@@ -1037,14 +1040,14 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/callgraph.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/classify.ts` | source | service |  |
 | `packages/sourcevision/src/analyzers/claude-client.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | service |  |
+| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/components.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/context.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/enrich-batch.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/enrich-config.ts` | source | config | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/enrich-parsing.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/enrich.ts` | source | entrypoint | packages-sourcevision:tests |
+| `packages/sourcevision/src/analyzers/enrich.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/imports.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/index.ts` | source | entrypoint | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/inventory.ts` | source | service | packages-sourcevision:tests |
@@ -1052,9 +1055,9 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/louvain.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/manifest.ts` | source | service | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/next-steps.ts` | source | service | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/risk-scoring.ts` | source | service |  |
+| `packages/sourcevision/src/analyzers/risk-scoring.ts` | source | utility |  |
 | `packages/sourcevision/src/analyzers/route-detection.ts` | source | route-handler | packages-sourcevision:tests |
-| `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | utility |  |
+| `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | service |  |
 | `packages/sourcevision/src/analyzers/token-usage.ts` | source | utility | packages-sourcevision:tests |
 | `packages/sourcevision/src/analyzers/workspace-aggregate.ts` | source | service |  |
 | `packages/sourcevision/src/analyzers/workspace-crossings.ts` | source | service |  |
@@ -1176,9 +1179,9 @@ Prioritized work items derived from analysis:
 | `packages/web/src/server/domain-gateway.ts` | source | gateway | web-viewer |
 | `packages/web/src/server/incremental-task-usage.ts` | source | service | web-viewer |
 | `packages/web/src/server/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/server/mcp-deps.ts` | source | config | web-viewer |
+| `packages/web/src/server/mcp-deps.ts` | source | gateway | web-viewer |
 | `packages/web/src/server/port.ts` | source | utility | web-viewer |
-| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | service | web-viewer |
+| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | types | web-viewer |
 | `packages/web/src/server/process-memory-tracker.ts` | source | service | web-viewer |
 | `packages/web/src/server/rex-gateway.ts` | source | gateway | web-viewer |
 | `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-viewer |
@@ -1317,7 +1320,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | utility | web-viewer |
 | `packages/web/src/viewer/polling/polling-manager.ts` | source | service | web-viewer |
 | `packages/web/src/viewer/polling/polling-restart.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/polling-state.ts` | source | store | web-viewer |
+| `packages/web/src/viewer/polling/polling-state.ts` | source | utility | web-viewer |
 | `packages/web/src/viewer/polling/tab-visibility.ts` | source | utility | web-viewer |
 | `packages/web/src/viewer/polling/tick-timer.ts` | source | utility | web-viewer |
 | `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | utility | web-viewer |
