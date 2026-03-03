@@ -444,6 +444,7 @@
   background: var(--bg-surface);
   border-left: 1px solid var(--border);
   padding: 16px;
+  overflow-x: hidden;
   overflow-y: auto;
   flex-shrink: 0;
   display: none;
@@ -455,6 +456,9 @@
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Detail panel backdrop for mobile */

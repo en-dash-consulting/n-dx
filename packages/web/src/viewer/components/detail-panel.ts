@@ -54,7 +54,7 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
       h("div", {
         class: "detail-header",
       },
-        h("h3", null, detail.title || "Details"),
+        h("h3", { title: detail.title || "Details" }, detail.title || "Details"),
         h("button", {
           class: "detail-close",
           onClick: onClose,

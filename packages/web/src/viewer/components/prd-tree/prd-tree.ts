@@ -207,7 +207,7 @@ function NodeContextMenu({ item, x, y, onClose, onRemove }: NodeContextMenuProps
     // Header
     h("div", { class: "prd-context-menu-header" },
       h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
-      h("span", { class: "prd-context-menu-title" }, item.title),
+      h("span", { class: "prd-context-menu-title", title: item.title }, item.title),
     ),
     h("div", { class: "prd-context-menu-divider" }),
     // Delete action
@@ -368,7 +368,7 @@ class NodeRow extends Component<NodeRowProps> {
       // Level badge
       h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
       // Title
-      h("span", { class: "prd-node-title" }, item.title),
+      h("span", { class: "prd-node-title", title: item.title }, item.title),
       // Priority
       item.priority
         ? h(PriorityBadge, { priority: item.priority })

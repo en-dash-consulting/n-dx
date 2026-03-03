@@ -333,7 +333,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
                     class: `exec-panel-epic-icon exec-panel-epic-icon-${epic.status}`,
                     "aria-label": EPIC_STATUS_LABELS[epic.status] ?? epic.status,
                   }, EPIC_STATUS_ICONS[epic.status] ?? "○"),
-                  h("span", { class: "exec-panel-epic-title" }, epic.title),
+                  h("span", { class: "exec-panel-epic-title", title: epic.title }, epic.title),
                   h("span", { class: "exec-panel-epic-count" },
                     `${epic.tasksCompleted}/${epic.tasksTotal}`,
                   ),
@@ -383,7 +383,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
                       h("span", {
                         class: `exec-panel-epic-icon exec-panel-epic-icon-${epic.status}`,
                       }, EPIC_STATUS_ICONS[epic.status] ?? "○"),
-                      h("span", { class: "exec-panel-epic-title" }, epic.title),
+                      h("span", { class: "exec-panel-epic-title", title: epic.title }, epic.title),
                       h("span", { class: "exec-panel-epic-count" },
                         `${epic.tasksCompleted}/${epic.tasksTotal}`,
                       ),

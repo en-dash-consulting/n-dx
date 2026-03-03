@@ -16962,7 +16962,7 @@
         {
           "id": "9a56a5a1-ee74-4e34-8f6a-185e5490b760",
           "title": "Typography and Text Rendering Fixes",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Address small, broken, and inconsistently sized text across all Rex pages — including task cards, detail panels, status badges, and section headers",
           "source": "smart-add",
@@ -16992,7 +16992,7 @@
             {
               "id": "6f4539a3-24d9-48a5-84d1-4b9a1c0ea1d7",
               "title": "Fix text overflow and truncation in task cards and detail panels",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Long task titles and descriptions currently overflow their containers or get clipped without ellipsis, and tooltip fallbacks are missing. This makes content unreadable without expanding items manually.",
               "acceptanceCriteria": [
@@ -17007,9 +17007,13 @@
                 "ui",
                 "typography"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-03T08:18:02.213Z",
+              "completedAt": "2026-03-03T08:57:59.407Z"
             }
-          ]
+          ],
+          "startedAt": "2026-03-03T08:57:59.556Z",
+          "completedAt": "2026-03-03T08:57:59.556Z"
         },
         {
           "id": "5af8caa9-43b5-4eb3-9b43-dd11b424b0b1",
