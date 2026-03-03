@@ -338,6 +338,26 @@
   transform: none;
 }
 
+.rex-dash-start-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.rex-dash-start-error {
+  font-size: var(--font-xs);
+  color: var(--red, #ef4444);
+  max-width: 200px;
+  text-align: right;
+  animation: rex-dash-error-in 0.2s ease;
+}
+
+@keyframes rex-dash-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Smart Add (dashboard) ────────────────────────────────────────── */
 
 .rex-dash-smart-add {

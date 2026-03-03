@@ -150,3 +150,36 @@
   text-align: center;
   flex-shrink: 0;
 }
+
+/* ── Context Menu Feedback ─────────────────────────────────────── */
+
+.rex-context-menu-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--green, #22c55e);
+  animation: rex-context-feedback-in 0.15s ease;
+}
+
+.rex-context-menu-feedback-error {
+  color: var(--red, #ef4444);
+}
+
+.rex-context-menu-feedback-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+@keyframes rex-context-feedback-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

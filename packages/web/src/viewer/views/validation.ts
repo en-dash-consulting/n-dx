@@ -687,11 +687,12 @@ export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
   // Navigate to item in PRD view
   const navigateToItem = useCallback((id: string) => {
     if (navigateTo) {
-      navigateTo("prd");
+      navigateTo("prd", { taskId: id });
     } else {
-      history.pushState({ view: "prd", file: null, zone: null }, "", "/prd");
+      history.pushState({ view: "prd", file: null, zone: null }, "", `/prd/${id}`);
     }
-    // Dispatch custom event so PRD view can pick up the selection
+    // Also dispatch custom event as a fallback for cases where the PRD view
+    // is already mounted and needs to react to the navigation.
     window.dispatchEvent(
       new CustomEvent("prd-navigate", { detail: { itemId: id } }),
     );

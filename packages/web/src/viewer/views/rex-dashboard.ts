@@ -166,30 +166,42 @@ function StatChip({ value, label, color, accent }: {
 /** Quick action button for starting the next task */
 function StartButton({ taskId, onStarted }: { taskId: string; onStarted: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleStart = useCallback(async (e: Event) => {
     e.stopPropagation();
     setLoading(true);
+    setError(null);
     try {
-      await fetch(`/api/rex/items/${taskId}`, {
+      const res = await fetch(`/api/rex/items/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "in_progress" }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `Failed (${res.status})`);
+      }
       onStarted();
-    } catch {
-      // silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start task");
+      setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(false);
     }
   }, [taskId, onStarted]);
 
-  return h("button", {
-    class: "rex-dash-start-btn",
-    onClick: handleStart,
-    disabled: loading,
-    "aria-label": "Start this task",
-  }, loading ? "Starting…" : "Start Task");
+  return h("div", { class: "rex-dash-start-wrapper" },
+    h("button", {
+      class: "rex-dash-start-btn",
+      onClick: handleStart,
+      disabled: loading,
+      "aria-label": "Start this task",
+    }, loading ? "Starting…" : "Start Task"),
+    error
+      ? h("div", { class: "rex-dash-start-error", role: "alert" }, error)
+      : null,
+  );
 }
 
 /** Epic card with enhanced progress and status display */
