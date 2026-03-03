@@ -5,6 +5,7 @@
 
 .rex-dash {
   max-width: 1200px;
+  min-height: 0;
 }
 
 /* ── Header ───────────────────────────────────────────────────────── */
@@ -167,6 +168,7 @@
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: var(--space-6);
+  align-items: start;
 }
 
 /* ── Left column ──────────────────────────────────────────────────── */
@@ -176,6 +178,7 @@
   flex-direction: column;
   gap: var(--space-5);
   min-width: 0;
+  min-height: 0;
 }
 
 /* Section headers */
@@ -207,6 +210,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
+  min-height: 80px;
 }
 
 .rex-dash-next-card {
@@ -365,6 +369,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
+  min-height: 60px;
 }
 
 .rex-dash-smart-add .smart-add-panel-compact {
@@ -380,6 +385,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
+  min-height: 80px;
 }
 
 .rex-dash-epic-list {
@@ -519,6 +525,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-height: 0;
 }
 
 /* Panel cards */
@@ -527,6 +534,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-4);
+  min-height: 60px;
 }
 
 .rex-dash-panel-title {
@@ -1075,6 +1083,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
+  min-height: 100px;
 }
 
 /* ── Header ──────────────────────────────────────────────────────── */

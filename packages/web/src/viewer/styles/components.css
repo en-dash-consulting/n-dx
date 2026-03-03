@@ -47,6 +47,7 @@
 }
 
 .collapsible-scroll-container {
+  min-height: 60px;
   max-height: 60vh;
   overflow-y: auto;
   position: relative;

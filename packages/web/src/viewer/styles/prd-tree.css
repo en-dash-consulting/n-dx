@@ -354,12 +354,14 @@
   border-radius: 8px;
   background: var(--bg-surface);
   overflow: hidden;
+  min-height: 80px;
 }
 
 /* Virtual scroll container — scrollable tree with viewport-only rendering.
    Only items within the viewport plus a buffer zone are rendered; spacer
    elements before/after maintain total scroll height. */
 .prd-tree-virtual {
+  min-height: 120px;
   max-height: 70vh;
   overflow-y: auto;
   /* Smooth scroll for virtual scroll index-based navigation */
