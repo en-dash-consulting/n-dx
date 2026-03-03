@@ -6,9 +6,13 @@ import {
   validateFileInput,
   validateMarkdownContent,
   validateTextContent,
+  validateJsonContent,
+  validateYamlContent,
+  detectMagicBytes,
   FileValidationError,
   SUPPORTED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
+  LARGE_FILE_WARNING_BYTES,
 } from "../../../src/analyze/file-validation.js";
 
 // ── Temp directory management ──
@@ -221,16 +225,86 @@ describe("validateFileInput", () => {
     });
   });
 
+  describe("content-type mismatch (magic bytes)", () => {
+    it("rejects a .md file that contains PNG magic bytes", async () => {
+      // PNG header: 0x89 0x50 0x4E 0x47
+      const pngHeader = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+      const content = Buffer.concat([pngHeader, Buffer.from("fake image data here")]);
+      const path = await writeTempFile("sneaky.md", content);
+      try {
+        await validateFileInput(path);
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(FileValidationError);
+        // PNG header also has null byte, may get BINARY_CONTENT or CONTENT_TYPE_MISMATCH
+        const code = (err as FileValidationError).code;
+        expect(["BINARY_CONTENT", "CONTENT_TYPE_MISMATCH"]).toContain(code);
+      }
+    });
+
+    it("rejects a .txt file that contains JPEG magic bytes", async () => {
+      // JPEG starts with FF D8 FF — no null bytes, so it should hit magic bytes check
+      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
+      const fakeContent = Buffer.alloc(100, 0x41); // 'A' padding
+      const content = Buffer.concat([jpegHeader, fakeContent]);
+      const path = await writeTempFile("not-text.txt", content);
+      try {
+        await validateFileInput(path);
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(FileValidationError);
+        expect((err as FileValidationError).code).toBe("CONTENT_TYPE_MISMATCH");
+        expect((err as FileValidationError).message).toContain("JPEG");
+      }
+    });
+
+    it("rejects a .json file with PDF magic bytes", async () => {
+      // PDF: %PDF (0x25 0x50 0x44 0x46) — no null bytes
+      const pdfContent = Buffer.from("%PDF-1.4 fake pdf content here with enough text");
+      const path = await writeTempFile("fake.json", pdfContent);
+      try {
+        await validateFileInput(path);
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(FileValidationError);
+        expect((err as FileValidationError).code).toBe("CONTENT_TYPE_MISMATCH");
+        expect((err as FileValidationError).message).toContain("PDF");
+      }
+    });
+
+    it("accepts a .md file with normal text content", async () => {
+      const path = await writeTempFile("normal.md", "# Hello\nThis is markdown.");
+      const result = await validateFileInput(path);
+      expect(result.format).toBe("markdown");
+    });
+  });
+
+  describe("large file warnings", () => {
+    it("returns a warning for files over the warning threshold", async () => {
+      // Create a file just over 5 MB
+      const content = Buffer.alloc(LARGE_FILE_WARNING_BYTES + 1, "x");
+      const path = await writeTempFile("large.md", content);
+      const result = await validateFileInput(path);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings!.length).toBeGreaterThan(0);
+      expect(result.warnings![0]).toContain("MB");
+    });
+
+    it("returns no warnings for small files", async () => {
+      const path = await writeTempFile("small.md", "# Small file\n- item");
+      const result = await validateFileInput(path);
+      expect(result.warnings).toBeUndefined();
+    });
+  });
+
   describe("return value", () => {
     it("returns filePath, format, and sizeBytes", async () => {
       const content = "# Requirements\n- Item 1";
       const path = await writeTempFile("reqs.md", content);
       const result = await validateFileInput(path);
-      expect(result).toEqual({
-        filePath: path,
-        format: "markdown",
-        sizeBytes: Buffer.byteLength(content),
-      });
+      expect(result.filePath).toBe(path);
+      expect(result.format).toBe("markdown");
+      expect(result.sizeBytes).toBe(Buffer.byteLength(content));
     });
   });
 });
@@ -299,6 +373,58 @@ const x = 1;
 `;
     const result = validateMarkdownContent(md);
     expect(result.warnings.some((w) => w.includes("skip"))).toBe(true);
+  });
+
+  it("detects unclosed YAML front matter", () => {
+    const md = `---
+title: My Document
+author: Test
+# Missing closing ---
+
+# Real Heading
+Content here.
+`;
+    const result = validateMarkdownContent(md);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("front matter"))).toBe(true);
+  });
+
+  it("does not warn about properly closed front matter", () => {
+    const md = `---
+title: My Document
+---
+
+# Real Heading
+Content here.
+`;
+    const result = validateMarkdownContent(md);
+    expect(result.warnings.some((w) => w.includes("front matter"))).toBe(false);
+  });
+
+  it("detects unmatched HTML block-level tags", () => {
+    const md = `# Requirements
+<div>
+Some nested content
+<section>
+  Inner section
+</section>
+
+## More content
+`;
+    const result = validateMarkdownContent(md);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("<div>"))).toBe(true);
+  });
+
+  it("does not warn about matched HTML tags", () => {
+    const md = `# Requirements
+<details>
+<summary>Click to expand</summary>
+Hidden content
+</details>
+`;
+    const result = validateMarkdownContent(md);
+    expect(result.warnings.some((w) => w.includes("Unmatched"))).toBe(false);
   });
 });
 
@@ -370,5 +496,221 @@ Some content here
     const result = validateTextContent(text);
     expect(result.valid).toBe(true);
     expect(result.warnings).toEqual([]);
+  });
+});
+
+// ── validateJsonContent ──
+
+describe("validateJsonContent", () => {
+  it("returns valid for well-formed JSON object", () => {
+    const json = '{"title": "Requirements", "items": [{"name": "Auth"}]}';
+    const result = validateJsonContent(json);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("returns valid for JSON array", () => {
+    const json = '[{"title": "Feature A"}, {"title": "Feature B"}]';
+    const result = validateJsonContent(json);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("returns invalid for malformed JSON with clear error", () => {
+    const json = '{"title": "Requirements", items: [}';
+    const result = validateJsonContent(json);
+    expect(result.valid).toBe(false);
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0]).toContain("JSON parse error");
+  });
+
+  it("warns about primitive top-level values", () => {
+    const json = '"just a string"';
+    const result = validateJsonContent(json);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("primitive"))).toBe(true);
+  });
+
+  it("warns about empty arrays", () => {
+    const result = validateJsonContent("[]");
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("empty"))).toBe(true);
+  });
+
+  it("warns about empty objects", () => {
+    const result = validateJsonContent("{}");
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("empty"))).toBe(true);
+  });
+
+  it("returns invalid for empty content", () => {
+    const result = validateJsonContent("");
+    expect(result.valid).toBe(false);
+    expect(result.warnings.some((w) => w.includes("Empty"))).toBe(true);
+  });
+
+  it("returns invalid for whitespace-only content", () => {
+    const result = validateJsonContent("   \n  ");
+    expect(result.valid).toBe(false);
+  });
+});
+
+// ── validateYamlContent ──
+
+describe("validateYamlContent", () => {
+  it("returns valid for well-formed YAML", () => {
+    const yaml = `title: Requirements
+description: Product requirements document
+items:
+  - name: Authentication
+    priority: high
+  - name: Dashboard
+    priority: medium
+`;
+    const result = validateYamlContent(yaml);
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("warns about tab indentation", () => {
+    const yaml = "items:\n\t- name: Auth\n\t- name: Dashboard";
+    const result = validateYamlContent(yaml);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("Tab"))).toBe(true);
+  });
+
+  it("warns about inconsistent indentation", () => {
+    const yaml = `title: test
+items:
+  - name: A
+      description: nested too deep
+   another: odd indent
+`;
+    const result = validateYamlContent(yaml);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("Inconsistent indentation"))).toBe(true);
+  });
+
+  it("warns about duplicate top-level keys", () => {
+    const yaml = `title: First
+description: First description
+title: Second
+`;
+    const result = validateYamlContent(yaml);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes("Duplicate"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("title"))).toBe(true);
+  });
+
+  it("handles YAML with front matter delimiter", () => {
+    const yaml = `---
+title: Document
+items:
+  - name: Feature
+`;
+    const result = validateYamlContent(yaml);
+    expect(result.valid).toBe(true);
+    // Should not flag anything about the front matter delimiter
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("does not warn about consistent 2-space indentation", () => {
+    const yaml = `root:
+  child:
+    grandchild: value
+  sibling: other
+`;
+    const result = validateYamlContent(yaml);
+    expect(result.warnings.some((w) => w.includes("Inconsistent"))).toBe(false);
+  });
+});
+
+// ── detectMagicBytes ──
+
+describe("detectMagicBytes", () => {
+  it("detects PNG files", () => {
+    const buffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    expect(detectMagicBytes(buffer)).toBe("PNG");
+  });
+
+  it("detects JPEG files", () => {
+    const buffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]);
+    expect(detectMagicBytes(buffer)).toBe("JPEG");
+  });
+
+  it("detects PDF files", () => {
+    const buffer = Buffer.from("%PDF-1.4");
+    expect(detectMagicBytes(buffer)).toBe("PDF");
+  });
+
+  it("detects ZIP files", () => {
+    const buffer = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]);
+    expect(detectMagicBytes(buffer)).toBe("ZIP");
+  });
+
+  it("detects GIF files", () => {
+    const buffer = Buffer.from("GIF89a");
+    expect(detectMagicBytes(buffer)).toBe("GIF");
+  });
+
+  it("detects GZIP files", () => {
+    const buffer = Buffer.from([0x1F, 0x8B, 0x08, 0x00]);
+    expect(detectMagicBytes(buffer)).toBe("GZIP");
+  });
+
+  it("detects ELF binaries", () => {
+    const buffer = Buffer.from([0x7F, 0x45, 0x4C, 0x46]);
+    expect(detectMagicBytes(buffer)).toBe("ELF");
+  });
+
+  it("returns null for text content", () => {
+    const buffer = Buffer.from("# Hello World\nThis is markdown.");
+    expect(detectMagicBytes(buffer)).toBeNull();
+  });
+
+  it("returns null for JSON content", () => {
+    const buffer = Buffer.from('{"title": "test"}');
+    expect(detectMagicBytes(buffer)).toBeNull();
+  });
+
+  it("returns null for empty buffer", () => {
+    const buffer = Buffer.alloc(0);
+    expect(detectMagicBytes(buffer)).toBeNull();
+  });
+
+  it("returns null for buffer too small to match any signature", () => {
+    const buffer = Buffer.from([0x89]); // Only one byte of PNG header
+    expect(detectMagicBytes(buffer)).toBeNull();
+  });
+});
+
+// ── New error codes ──
+
+describe("new FileValidationError codes", () => {
+  it("supports CONTENT_TYPE_MISMATCH code", () => {
+    const err = new FileValidationError(
+      "File content doesn't match extension",
+      "CONTENT_TYPE_MISMATCH",
+      "Rename or fix the file",
+    );
+    expect(err.code).toBe("CONTENT_TYPE_MISMATCH");
+  });
+
+  it("supports ENCODING_ERROR code", () => {
+    const err = new FileValidationError(
+      "Cannot read as UTF-8",
+      "ENCODING_ERROR",
+      "Re-save as UTF-8",
+    );
+    expect(err.code).toBe("ENCODING_ERROR");
+  });
+
+  it("supports PARSE_ERROR code", () => {
+    const err = new FileValidationError(
+      "Failed to parse content",
+      "PARSE_ERROR",
+      "Check syntax",
+    );
+    expect(err.code).toBe("PARSE_ERROR");
   });
 });

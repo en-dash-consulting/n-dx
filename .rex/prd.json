@@ -9090,7 +9090,7 @@
             {
               "id": "b5dfa9b2-ad8a-4dcd-b871-7c6308a378e5",
               "title": "Add integrity-protected deletion option for epicless features",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement safe deletion workflow for epicless features with comprehensive dependency checks and corruption prevention safeguards, ensuring PRD structural integrity is maintained",
               "acceptanceCriteria": [
@@ -9107,7 +9107,8 @@
                 "safety"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-24T21:02:19.880Z"
+              "startedAt": "2026-02-24T21:02:19.880Z",
+              "completedAt": "2026-03-03T04:43:13.022Z"
             }
           ]
         }
@@ -10305,11 +10306,15 @@
               "title": "Add codex and claude regression tests for parsing, aggregation, and budget percentages",
               "status": "completed",
               "level": "task",
-              "description": "Create fixture-driven tests that validate vendor-specific payload parsing and end-to-end totals/percentages across tools and time windows.",
+              "description": "Each Rex view currently places primary actions (Add, Prune, Filter, Refresh) in different positions — some inline with section headers, some floating, some embedded mid-content. Define a single page-header action bar pattern and apply it consistently across Dashboard, PRD tree, proposals, and validation pages.",
               "acceptanceCriteria": [
                 "Tests cover codex and claude payload variants including missing fields",
                 "Aggregation tests verify per-tool, per-vendor/model, task, and project totals",
-                "Percentage tests verify correct outputs for normal, zero-budget, and missing-budget scenarios"
+                "Percentage tests verify correct outputs for normal, zero-budget, and missing-budget scenarios",
+                "All Rex views with primary actions use the same header action bar layout",
+                "Primary actions (Add, Filter, Refresh) appear in the top-right of their respective page header on every Rex view",
+                "Secondary/contextual actions (per-item operations) remain in context menus or inline controls, not in the page header",
+                "The action bar pattern is documented in a code comment or component prop contract for future contributors"
               ],
               "priority": "high",
               "tags": [
@@ -10317,11 +10322,26 @@
                 "codex",
                 "claude",
                 "aggregation",
-                "budget"
+                "budget",
+                "rex",
+                "ui",
+                "ux",
+                "layout"
               ],
               "source": "smart-add",
               "startedAt": "2026-02-21T08:19:46.333Z",
-              "completedAt": "2026-02-21T08:27:05.787Z"
+              "completedAt": "2026-02-21T08:27:05.787Z",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:2:0",
+                  "proposalTitle": "Define and apply a consistent action bar pattern for Rex page headers",
+                  "proposalKind": "task",
+                  "reason": "semantic_title",
+                  "score": 0.6218487394957983,
+                  "mergedAt": "2026-03-03T04:33:23.116Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         }
@@ -13785,7 +13805,7 @@
             {
               "id": "7bdfa843-b611-4d44-a831-4e735ec5dfdb",
               "title": "Analyze refresh task orchestration for memory-intensive operations",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Examine the ndx refresh command and related web UI refresh behaviors to identify operations that may be loading excessive data into memory",
               "acceptanceCriteria": [
@@ -13800,17 +13820,18 @@
                 "debugging"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-24T18:39:16.849Z",
               "requirements": [
                 {
+                  "id": "req-mma2s9zx",
                   "title": "output doc in markdown prefixed with the date",
                   "category": "technical",
                   "validationType": "automated",
                   "acceptanceCriteria": [],
-                  "priority": "medium",
-                  "id": "req-mma2s9zx"
+                  "priority": "medium"
                 }
-              ]
+              ],
+              "startedAt": "2026-02-24T18:39:16.849Z",
+              "completedAt": "2026-03-03T04:49:17.259Z"
             },
             {
               "id": "0b87a119-c6a2-498a-ad5f-050e70f3b664",
@@ -15046,7 +15067,7 @@
             {
               "id": "10dc3d4a-0c7c-4a82-8564-c7406c6b091b",
               "title": "Implement virtual scrolling container for TreeNodes component",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Replace full tree rendering with a virtual scrolling container that only renders items within the viewport plus a configurable buffer zone",
               "acceptanceCriteria": [
@@ -15062,7 +15083,8 @@
                 "virtualization"
               ],
               "source": "smart-add",
-              "startedAt": "2026-02-25T23:04:34.884Z"
+              "startedAt": "2026-02-25T23:04:34.884Z",
+              "completedAt": "2026-03-03T05:08:49.650Z"
             },
             {
               "id": "7a4147b5-4841-48b1-8b52-8b9d18f85e6b",
@@ -16401,7 +16423,7 @@
             {
               "id": "935284b6-5cd8-4409-bcf3-0e1aff807c75",
               "title": "Implement markdown file parsing for rex add command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add support for parsing markdown files in the rex add command, extracting structured requirements from markdown format including headers, lists, and sections",
               "acceptanceCriteria": [
@@ -16417,12 +16439,13 @@
                 "markdown"
               ],
               "source": "smart-add",
-              "startedAt": "2026-03-02T07:25:11.824Z"
+              "startedAt": "2026-03-02T07:25:11.824Z",
+              "completedAt": "2026-03-03T05:45:40.095Z"
             },
             {
               "id": "710072f7-b895-40f3-be57-75e918094f9b",
               "title": "Implement text file parsing for rex add command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add support for parsing plain text files in the rex add command, using natural language processing to extract requirements and structure from unstructured text",
               "acceptanceCriteria": [
@@ -16439,12 +16462,13 @@
                 "nlp"
               ],
               "source": "smart-add",
-              "startedAt": "2026-03-02T07:31:47.994Z"
+              "startedAt": "2026-03-02T07:31:47.994Z",
+              "completedAt": "2026-03-03T05:59:25.301Z"
             },
             {
               "id": "66b6e1b8-2e15-4acf-ac7f-05fa55b4183a",
               "title": "Add structured requirements extraction engine",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement intelligent parsing logic to extract epics, features, and tasks from markdown and text documents using pattern recognition and LLM assistance",
               "acceptanceCriteria": [
@@ -16461,7 +16485,8 @@
                 "requirements"
               ],
               "source": "smart-add",
-              "startedAt": "2026-03-02T07:16:47.451Z"
+              "startedAt": "2026-03-02T07:16:47.451Z",
+              "completedAt": "2026-03-03T05:23:01.531Z"
             },
             {
               "id": "21f89819-e032-44c2-8d94-05edcb82610d",
@@ -16498,7 +16523,7 @@
             {
               "id": "f0200d1b-edbe-42c7-9051-48f4ab0a8307",
               "title": "Add file format validation and error handling",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement comprehensive validation for markdown and text file inputs, with clear error messages for unsupported formats or malformed content",
               "acceptanceCriteria": [
@@ -16525,7 +16550,8 @@
                 "matchedItemLevel": "feature",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-03-02T05:41:33.798Z"
-              }
+              },
+              "completedAt": "2026-03-03T06:14:44.996Z"
             }
           ]
         }
@@ -16764,6 +16790,352 @@
               "title": "Implement cross-repo crossing computation",
               "status": "pending",
               "level": "task"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8feca975-1a79-4eb2-8fb8-50fea69012f6",
+      "title": "LoE-Calibrated Proposal Generation in rex add",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "b4127ae4-3f1c-4201-82ba-f648a7915037",
+          "title": "LoE-Aware Consolidated Proposal Generation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Enhance the rex add proposal pipeline so the LLM produces fewer, larger work packages by default and attaches structured LoE estimates (engineer-weeks, rationale, confidence) to each item. Changes span the proposal Zod schema, the system prompt, post-processing guardrails, and the CLI review display.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c277b516-6b48-4d58-8d2b-7254a7d4d0b2",
+              "title": "Redesign proposal schema and LLM prompt to elicit consolidated, LoE-estimated proposals",
+              "status": "pending",
+              "level": "task",
+              "description": "Add optional loe (number, engineer-weeks), loeRationale (string), and loeConfidence ('low'|'medium'|'high') fields to the proposal item Zod schema, then revise the rex add system prompt to (a) generate consolidated, sprint-sized work packages (3–7 items for broad input) rather than micro-tasks, and (b) return structured LoE estimates as JSON fields with a worked example. Prompt wording should be isolated in a named constant or template file for independent iteration.",
+              "acceptanceCriteria": [
+                "Proposal item Zod schema includes loe, loeRationale, and loeConfidence as optional fields",
+                "Existing proposals without LoE fields parse without error",
+                "LoE fields round-trip correctly through proposal serialization and PRD item creation",
+                "tsc --noEmit passes with no new type errors after the schema change",
+                "System prompt explicitly instructs the LLM to prefer consolidated proposals; sample outputs for broad input produce 3–7 high-level items rather than 10+ micro-tasks",
+                "Prompt explicitly requests loe, loeRationale, and loeConfidence as structured JSON fields and includes a worked example",
+                "Prompt wording is isolated in a named constant or template file"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "llm",
+                "schema",
+                "loe",
+                "proposals"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "c7a696d0-cbb2-4887-bcc6-094ecffa28e8",
+              "title": "Add post-processing consolidation guard and LoE display to proposal review",
+              "status": "pending",
+              "level": "task",
+              "description": "After the LLM returns proposals, apply a post-processing pass that detects over-granular output (item count exceeds a configurable ceiling, default 10) and triggers a secondary re-consolidation prompt as a safety net. Additionally, update the interactive proposal review CLI to show loe and loeRationale for each item, visually flagging items that exceed the decomposition threshold so reviewers can make informed decisions before accepting.",
+              "acceptanceCriteria": [
+                "Post-processing detects when proposal item count exceeds a configurable ceiling (default: 10 items per input description)",
+                "Over-granular results trigger a secondary LLM consolidation pass using a defined re-prompt template",
+                "Consolidation pass reduces item count to within the ceiling or emits a labeled warning if it cannot",
+                "The ceiling value is configurable via rex config and exposed in ndx config --help",
+                "Proposal review output shows loe value and rationale for each item that carries LoE data",
+                "Items with loe exceeding the configured decomposition threshold are flagged with a visible indicator",
+                "Items without LoE data display cleanly without empty brackets or missing-field noise",
+                "LoE display is consistent between interactive and --yes (non-interactive) modes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "llm",
+                "proposals",
+                "post-processing",
+                "cli",
+                "loe",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "c12a5570-d983-44b5-b112-1aa386de0a50",
+          "title": "LoE Threshold-Driven Proposal Decomposition",
+          "status": "pending",
+          "level": "feature",
+          "description": "Implement an automatic decomposition pass that splits proposal items exceeding the LoE threshold into smaller child items. The threshold defaults to 2 engineer-weeks and is user-configurable. Decomposed items are presented inline in the review so users can accept children, keep the original, or skip entirely.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "b91ff0ae-ef1b-43c1-ac8d-500caa1ff61e",
+              "title": "Implement configurable LoE threshold and automatic decomposition pass",
+              "status": "pending",
+              "level": "task",
+              "description": "Introduce an loe.taskThresholdWeeks key (default: 2) into the rex configuration system and wire it through ndx config for reading, setting, and validation. Implement the decomposition pass: after the initial proposal step, identify items whose loe exceeds the threshold and run a secondary LLM call per item to produce child proposals, each with their own LoE estimates. Recursively decompose children that still exceed the threshold up to a configurable depth limit (default: 2 levels).",
+              "acceptanceCriteria": [
+                "ndx config loe.taskThresholdWeeks returns the current value (default: 2)",
+                "ndx config loe.taskThresholdWeeks 3 updates and persists the value to the config file",
+                "Negative or non-numeric values are rejected with a helpful validation error",
+                "The key appears in ndx config --help output with a description and default value",
+                "Items with loe > loe.taskThresholdWeeks trigger the decomposition pass automatically",
+                "Decomposition LLM call produces child items whose individual LoE values fall at or below the threshold",
+                "Each child item carries its own loe, loeRationale, and loeConfidence",
+                "Items already at or below the threshold are not decomposed",
+                "Decomposition depth is capped at a configurable limit (default: 2 levels) to prevent runaway recursion"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "config",
+                "llm",
+                "loe",
+                "decomposition"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "a82072ae-6e96-4960-a58d-a4e73a46ca2b",
+              "title": "Add decomposition confirmation UI to proposal review workflow",
+              "status": "pending",
+              "level": "task",
+              "description": "When decomposition has occurred for a proposal item, present the decomposed children indented beneath their parent during the review step. The user can accept the decomposed version (adds children, discards the parent), keep the original consolidated item, or skip entirely. Non-interactive mode defaults to accepting decomposed items. Output should clearly label which items were auto-decomposed and the LoE value that triggered decomposition.",
+              "acceptanceCriteria": [
+                "Decomposed children are shown indented beneath their parent item in the review output",
+                "Review prompt offers three choices for decomposed items: accept decomposed, keep original, skip",
+                "Choosing 'accept decomposed' adds child items to the PRD and does not add the parent",
+                "Choosing 'keep original' adds the parent item unmodified",
+                "Non-interactive (--yes) mode defaults to accepting the decomposed version",
+                "Review output labels auto-decomposed items with the LoE value that triggered decomposition"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "cli",
+                "loe",
+                "decomposition",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b73ae2ff-6ed0-46dd-94a3-e297e837549f",
+      "title": "Rex UI Consistency and Polish",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "9a56a5a1-ee74-4e34-8f6a-185e5490b760",
+          "title": "Typography and Text Rendering Fixes",
+          "status": "pending",
+          "level": "feature",
+          "description": "Address small, broken, and inconsistently sized text across all Rex pages — including task cards, detail panels, status badges, and section headers",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "a06d1971-0b90-47be-aebd-c7bb5f233f78",
+              "title": "Audit and fix font size and weight inconsistencies across Rex pages",
+              "status": "pending",
+              "level": "task",
+              "description": "Walk every Rex view (Dashboard, PRD tree, task detail, proposals, validation, token usage) and produce a consistent type scale. Currently some labels render at unreadable sizes and headings vary arbitrarily between pages, making the UI feel unfinished.",
+              "acceptanceCriteria": [
+                "All body text in Rex views uses a single consistent base size",
+                "Heading levels (h2/h3/h4) map to a documented type scale and do not vary between pages",
+                "No label or status badge text is smaller than 11px",
+                "Changes verified visually at 1280px and 1440px viewport widths"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "typography"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "6f4539a3-24d9-48a5-84d1-4b9a1c0ea1d7",
+              "title": "Fix text overflow and truncation in task cards and detail panels",
+              "status": "pending",
+              "level": "task",
+              "description": "Long task titles and descriptions currently overflow their containers or get clipped without ellipsis, and tooltip fallbacks are missing. This makes content unreadable without expanding items manually.",
+              "acceptanceCriteria": [
+                "Task titles truncate with ellipsis at container boundary and show full text in a tooltip on hover",
+                "Description text in detail panels wraps correctly and does not overflow its scrollable region",
+                "Epic and feature titles in the PRD tree do not bleed outside their nodes",
+                "Behavior verified with titles of 30, 80, and 150 characters"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "typography"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "5af8caa9-43b5-4eb3-9b43-dd11b424b0b1",
+          "title": "Broken and Non-Functional UI Element Repair",
+          "status": "pending",
+          "level": "feature",
+          "description": "Identify and fix buttons, toggles, inputs, and other interactive controls across Rex pages that are visually present but non-functional, incorrectly wired, or produce no feedback",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d526ccae-0f7c-4522-96b1-caa936f12d6c",
+              "title": "Audit all Rex page controls for broken interactivity and fix unresponsive elements",
+              "status": "pending",
+              "level": "task",
+              "description": "Systematically test every clickable and input element across Rex views. Non-functional controls erode user trust and make it unclear whether actions succeeded. Produce a fix list covering buttons that fire no handler, dropdowns that do not open, and status toggles that show no loading or confirmation state.",
+              "acceptanceCriteria": [
+                "Every button and toggle in Rex views has an attached handler or is visibly disabled with a reason",
+                "Clicking any active control produces a visible response within 200ms (spinner, state change, or error message)",
+                "No interactive element is present in the DOM but invisible to click due to a z-index or pointer-events issue",
+                "Audit covers: Dashboard, PRD tree, task detail panel, smart add, prune, proposals, validation, and token usage views"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "ui",
+                "bug"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f1daf91a-30dc-43c4-b917-34bb6796bf4b",
+              "title": "Fix broken layout containers and collapsed or zero-height sections",
+              "status": "pending",
+              "level": "task",
+              "description": "Several Rex page sections render with zero height, invisible content areas, or collapsed containers that appear empty even when data is present. These are likely CSS flex/grid issues or missing height constraints on parent elements.",
+              "acceptanceCriteria": [
+                "No Rex view section renders with zero height when it contains data",
+                "Scrollable content areas have explicit max-height or flex-grow constraints that prevent content from being clipped",
+                "Collapsible panels retain their last open/closed state across page navigation",
+                "Tested with both small (5 items) and large (100+ items) data sets"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "layout",
+                "bug"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "3c630e22-d440-4a94-a65a-d5009881ce1c",
+          "title": "Interactive Element Placement Standardization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Rationalize the placement of action buttons, filters, and contextual controls across Rex pages — currently each page has invented its own layout for these, producing a disjointed experience",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "4e691d1d-3709-4a7e-8275-c1d145c9b5d3",
+              "title": "Consolidate and reposition misplaced filter and sort controls in Rex PRD tree",
+              "status": "pending",
+              "level": "task",
+              "description": "Filter controls (status filter, search, quick presets) are scattered at different vertical positions depending on which Rex sub-view is active. Consolidate them into a single persistent filter bar directly above the tree, visible on all Rex tree-based views.",
+              "acceptanceCriteria": [
+                "Status filter, search input, and quick filter presets appear in a single bar directly above the PRD tree on all Rex tree views",
+                "Filter bar is sticky and remains visible when scrolling through a long tree",
+                "Filter state persists when switching between Rex sub-views (e.g., Dashboard → tree and back)",
+                "No filter controls appear below the tree or inside individual tree nodes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ui",
+                "ux",
+                "filters"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "df1e460c-962d-4a24-9baf-218b5ab7716c",
+              "title": "Standardize per-item action menus and inline control placement across Rex tree nodes",
+              "status": "pending",
+              "level": "task",
+              "description": "Task and epic nodes expose different controls in different positions — some show action buttons inline, some reveal them on hover, some have context menus that appear in unpredictable locations. Establish a single hover-reveal inline action pattern for all tree nodes.",
+              "acceptanceCriteria": [
+                "All tree nodes (epic, feature, task, subtask) reveal the same set of contextual actions (Edit, Delete, Change status) on hover using a consistent icon-button row",
+                "Action buttons appear in the same position relative to the node label on every node type",
+                "No node type shows actions in a floating dropdown that covers adjacent rows",
+                "Keyboard navigation reaches inline node actions via Tab after the node label"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ui",
+                "ux",
+                "tree"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "b29321f8-f42e-4915-85af-a10fd1f835ee",
+          "title": "Visual and Spacing Consistency",
+          "status": "pending",
+          "level": "feature",
+          "description": "Normalize spacing, padding, border, and color usage across all Rex views to eliminate the patchwork appearance caused by independently styled page sections",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "09465857-883c-440b-b3c4-9ee3cd6a677a",
+              "title": "Audit and normalize spacing and padding across all Rex page sections",
+              "status": "pending",
+              "level": "task",
+              "description": "Rex pages currently mix arbitrary px values and inconsistent spacing tokens, making the layout feel cobbled together. Conduct a spacing audit and apply consistent margin/padding using the project's existing CSS custom properties or utility classes.",
+              "acceptanceCriteria": [
+                "All Rex page sections use spacing values from a defined scale (e.g., 4px increments)",
+                "Card and panel components use uniform internal padding across all Rex views",
+                "Section separators and whitespace between stacked components are consistent within and across pages",
+                "No hard-coded px values for spacing remain outside of the design token definitions"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ui",
+                "styling"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "fd71defa-7b02-4125-a0ce-7f7639586d59",
+              "title": "Align status badge and chip styles across Rex task and epic displays",
+              "status": "pending",
+              "level": "task",
+              "description": "Status indicators (pending, in_progress, completed, failing, blocked) render with different sizes, colors, and border radii depending on where they appear. Centralize the badge/chip component and apply it uniformly across the PRD tree, task detail panel, and dashboard summary cards.",
+              "acceptanceCriteria": [
+                "All status badges across Rex views use the same component with identical color, border-radius, and font-size",
+                "Priority chips (critical, high, medium, low) use a consistent color coding across the PRD tree, detail panel, and dashboard",
+                "Tag chips in task detail and tree nodes are visually identical",
+                "Changes do not regress any existing Vitest/component tests for badge or chip components"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "ui",
+                "styling",
+                "components"
+              ],
+              "source": "smart-add"
             }
           ]
         }

@@ -32,8 +32,14 @@ import {
   OUTPUT_INSTRUCTION,
 } from "./reason.js";
 import type { FileFormat } from "./reason.js";
-import { validateFileInput, validateMarkdownContent, validateTextContent } from "./file-validation.js";
-import type { MarkdownValidationResult, TextValidationResult } from "./file-validation.js";
+import {
+  validateFileInput,
+  validateMarkdownContent,
+  validateTextContent,
+  validateJsonContent,
+  validateYamlContent,
+  FileValidationError,
+} from "./file-validation.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -1288,17 +1294,28 @@ function applyPriorityExtraction(proposals: Proposal[]): Proposal[] {
  * input, auto-detects format, and delegates to the appropriate extractor.
  *
  * @throws {FileValidationError} when the file is missing, unsupported,
- *   too large, binary, or empty.
+ *   too large, binary, empty, has mismatched content type, or cannot be
+ *   read as UTF-8.
  */
 export async function extractFromFile(
   filePath: string,
   options?: ExtractionOptions,
 ): Promise<ExtractionResult> {
   // Validate file before reading — checks existence, extension, size,
-  // binary content, and emptiness.
+  // binary content, magic bytes, and emptiness.
   const validation = await validateFileInput(filePath);
 
-  const content = await readFile(filePath, "utf-8");
+  // Read file with encoding error handling
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch (err: unknown) {
+    throw new FileValidationError(
+      `Cannot read file as UTF-8: ${(err as Error).message}`,
+      "ENCODING_ERROR",
+      "Ensure the file uses UTF-8 encoding. Re-save the file with a text editor that supports UTF-8.",
+    );
+  }
 
   // Auto-populate sourceFile from the file path when not explicitly provided
   const effectiveOptions: ExtractionOptions = {
@@ -1306,29 +1323,56 @@ export async function extractFromFile(
     sourceFile: options?.sourceFile ?? filePath,
   };
 
+  // Collect warnings from file-level validation (e.g., large file)
+  const allWarnings: string[] = [...(validation.warnings ?? [])];
+
   // Run content-level validation for supported formats
-  let contentWarnings: string[] = [];
   if (validation.format === "markdown") {
     const mdValidation = validateMarkdownContent(content);
-    contentWarnings = mdValidation.warnings;
+    allWarnings.push(...mdValidation.warnings);
   } else if (validation.format === "text") {
     const txtValidation = validateTextContent(content);
-    contentWarnings = txtValidation.warnings;
+    allWarnings.push(...txtValidation.warnings);
+  } else if (validation.format === "json") {
+    const jsonValidation = validateJsonContent(content);
+    allWarnings.push(...jsonValidation.warnings);
+    if (!jsonValidation.valid) {
+      throw new FileValidationError(
+        `Invalid JSON in "${filePath}": ${jsonValidation.warnings[0]}`,
+        "PARSE_ERROR",
+        "Fix the JSON syntax errors and try again. Use a JSON validator to identify the issue.",
+      );
+    }
+  } else if (validation.format === "yaml") {
+    const yamlValidation = validateYamlContent(content);
+    allWarnings.push(...yamlValidation.warnings);
   }
 
+  // Extraction with error wrapping
   let result: ExtractionResult;
-  if (validation.format === "markdown") {
-    result = extractFromMarkdown(content, effectiveOptions);
-  } else if (validation.format === "text") {
-    result = extractFromText(content, effectiveOptions);
-  } else {
-    // For JSON/YAML and unknown formats, try text extractor as fallback
-    result = extractFromText(content, effectiveOptions);
+  try {
+    if (validation.format === "markdown") {
+      result = extractFromMarkdown(content, effectiveOptions);
+    } else if (validation.format === "text") {
+      result = extractFromText(content, effectiveOptions);
+    } else {
+      // For JSON/YAML and unknown formats, try text extractor as fallback
+      result = extractFromText(content, effectiveOptions);
+    }
+  } catch (err: unknown) {
+    // Re-throw FileValidationErrors as-is
+    if (err instanceof FileValidationError) throw err;
+    // Wrap unexpected errors in a structured error
+    throw new FileValidationError(
+      `Failed to parse "${filePath}": ${(err as Error).message}`,
+      "PARSE_ERROR",
+      "The file content could not be processed. Check for encoding issues or corrupted content.",
+    );
   }
 
   // Attach any warnings from validation
-  if (contentWarnings.length > 0) {
-    result = { ...result, warnings: contentWarnings };
+  if (allWarnings.length > 0) {
+    result = { ...result, warnings: allWarnings };
   }
 
   return result;

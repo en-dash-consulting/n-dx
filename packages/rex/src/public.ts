@@ -324,13 +324,21 @@ export type { ExtractionOptions, ExtractionResult } from "./analyze/extract.js";
 export {
   validateFileInput,
   validateMarkdownContent,
+  validateTextContent,
+  validateJsonContent,
+  validateYamlContent,
+  detectMagicBytes,
   FileValidationError,
   SUPPORTED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
+  LARGE_FILE_WARNING_BYTES,
 } from "./analyze/file-validation.js";
 export type {
   FileValidationResult,
   MarkdownValidationResult,
+  TextValidationResult,
+  JsonValidationResult,
+  YamlValidationResult,
   FileValidationErrorCode,
 } from "./analyze/file-validation.js";
 

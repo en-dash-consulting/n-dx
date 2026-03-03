@@ -82,5 +82,5 @@ export { validateModificationRequest, classifyModificationRequest } from "./vali
 export type { ExtractionOptions, ExtractionResult } from "./extract.js";
 export { extractFromMarkdown, extractFromText, extractFromFile, extractPriorityTag, classifyHeadingLevels } from "./extract.js";
 
-export type { FileValidationResult, MarkdownValidationResult, TextValidationResult, FileValidationErrorCode } from "./file-validation.js";
-export { validateFileInput, validateMarkdownContent, validateTextContent, FileValidationError, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from "./file-validation.js";
+export type { FileValidationResult, MarkdownValidationResult, TextValidationResult, JsonValidationResult, YamlValidationResult, FileValidationErrorCode } from "./file-validation.js";
+export { validateFileInput, validateMarkdownContent, validateTextContent, validateJsonContent, validateYamlContent, detectMagicBytes, FileValidationError, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES, LARGE_FILE_WARNING_BYTES } from "./file-validation.js";
