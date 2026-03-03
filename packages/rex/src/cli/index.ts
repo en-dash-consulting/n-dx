@@ -251,13 +251,13 @@ async function main(): Promise<void> {
         break;
       }
       case "remove": {
-        const REMOVABLE_LEVELS = new Set(["epic", "task"]);
+        const REMOVABLE_LEVELS = new Set(["epic", "feature", "task"]);
         const firstArg = positional[0];
         let removeLevel: string | undefined;
         let removeId: string;
 
         if (firstArg && REMOVABLE_LEVELS.has(firstArg)) {
-          // rex remove epic <id> [dir]  or  rex remove task <id> [dir]
+          // rex remove epic <id> [dir]  or  rex remove feature <id> [dir]  or  rex remove task <id> [dir]
           removeLevel = firstArg;
           removeId = positional[1];
           if (!removeId) {
@@ -272,7 +272,7 @@ async function main(): Promise<void> {
         } else {
           throw new CLIError(
             "Missing item ID.",
-            "Usage: rex remove <epic|task> <id> or rex remove <id>",
+            "Usage: rex remove <epic|feature|task> <id> or rex remove <id>",
           );
         }
 
