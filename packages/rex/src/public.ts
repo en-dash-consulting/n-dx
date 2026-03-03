@@ -82,7 +82,7 @@ export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
 export type {
   PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
-  FacetDefinition,
+  FacetDefinition, LoEConfig,
 } from "./schema/v1.js";
 export {
   PRIORITY_ORDER,
@@ -93,6 +93,7 @@ export {
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
   CHILD_LEVEL,
+  LOE_DEFAULTS,
   isPriority,
   isItemLevel,
   isItemStatus,
@@ -306,6 +307,11 @@ export { crossReferenceChanges } from "./core/code-coverage.js";
 export type {
   AffectedTask, UncoveredChange, CrossReferenceResult,
 } from "./core/code-coverage.js";
+
+// ---- Analyze: LoE decomposition ---------------------------------------------
+
+export type { DecomposedTask, DecompositionResult } from "./analyze/decompose.js";
+export { applyDecompositionPass, buildDecompositionPrompt } from "./analyze/decompose.js";
 
 // ---- Analyze: structured extraction -----------------------------------------
 

@@ -96,6 +96,13 @@ const BudgetThresholdsSchema = z
   })
   .strict();
 
+const LoEConfigSchema = z
+  .object({
+    taskThresholdWeeks: z.number().positive("taskThresholdWeeks must be a positive number").optional(),
+    maxDecompositionDepth: z.number().int().positive("maxDecompositionDepth must be a positive integer").optional(),
+  })
+  .strict();
+
 export const RexConfigSchema = z
   .object({
     schema: z.string(),
@@ -106,6 +113,7 @@ export const RexConfigSchema = z
     sourcevision: z.string().optional(),
     model: z.string().optional(),
     budget: BudgetThresholdsSchema.optional(),
+    loe: LoEConfigSchema.optional(),
     future: z.record(z.unknown()).optional(),
   })
   .passthrough();

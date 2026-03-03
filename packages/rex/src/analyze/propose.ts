@@ -30,6 +30,12 @@ export interface ProposalTask {
   acceptanceCriteria?: string[];
   priority?: string;
   tags?: string[];
+  /** Level of effort estimate in engineer-weeks. */
+  loe?: number;
+  /** Rationale behind the LoE estimate. */
+  loeRationale?: string;
+  /** Confidence in the LoE estimate. */
+  loeConfidence?: "low" | "medium" | "high";
   duplicateReason?: DuplicateReasonMetadata;
 }
 

@@ -218,6 +218,28 @@ export interface BudgetThresholds {
   abort?: boolean;
 }
 
+/** Level-of-Effort estimation and decomposition thresholds (stored in config.json). */
+export interface LoEConfig {
+  /**
+   * Maximum task size in engineer-weeks before automatic decomposition.
+   * Tasks with LoE exceeding this threshold are broken into smaller children.
+   * Default: 2.
+   */
+  taskThresholdWeeks?: number;
+  /**
+   * Maximum recursion depth for decomposition.
+   * Prevents runaway decomposition of deeply nested items.
+   * Default: 2.
+   */
+  maxDecompositionDepth?: number;
+}
+
+/** Default LoE configuration values. */
+export const LOE_DEFAULTS = {
+  taskThresholdWeeks: 2,
+  maxDecompositionDepth: 2,
+} as const;
+
 /** Configuration for a single facet dimension (stored in config.json). */
 export interface FacetDefinition {
   label: string;
@@ -234,6 +256,8 @@ export interface RexConfig {
   sourcevision?: string;
   model?: string;
   budget?: BudgetThresholds;
+  /** Level-of-Effort estimation thresholds for proposal decomposition. */
+  loe?: LoEConfig;
   /** Facet dimensions for item classification (e.g. component, concern). */
   facets?: Record<string, FacetDefinition>;
   future?: Record<string, unknown>;

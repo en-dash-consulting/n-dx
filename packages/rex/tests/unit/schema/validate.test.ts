@@ -372,6 +372,101 @@ describe("validateConfig", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("accepts config with valid loe settings", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: {
+        taskThresholdWeeks: 3,
+        maxDecompositionDepth: 2,
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.loe).toEqual({
+        taskThresholdWeeks: 3,
+        maxDecompositionDepth: 2,
+      });
+    }
+  });
+
+  it("accepts config with partial loe (only threshold)", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { taskThresholdWeeks: 1 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.loe!.taskThresholdWeeks).toBe(1);
+      expect(result.data.loe!.maxDecompositionDepth).toBeUndefined();
+    }
+  });
+
+  it("accepts config with fractional loe threshold", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { taskThresholdWeeks: 0.5 },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects config with negative loe threshold", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { taskThresholdWeeks: -1 },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects config with zero loe threshold", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { taskThresholdWeeks: 0 },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects config with negative decomposition depth", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { maxDecompositionDepth: -1 },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects config with non-integer decomposition depth", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+      loe: { maxDecompositionDepth: 1.5 },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts config without loe (backward compat)", () => {
+    const result = validateConfig({
+      schema: "rex/v1",
+      project: "myproject",
+      adapter: "file",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.loe).toBeUndefined();
+    }
+  });
+
   it("accepts config without budget (backward compat)", () => {
     const result = validateConfig({
       schema: "rex/v1",

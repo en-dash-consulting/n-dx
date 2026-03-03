@@ -535,6 +535,12 @@ Rex budget settings (token/cost usage limits):
   rex.budget.warnAt        number    Warning threshold percentage (default: 80)
   rex.budget.abort         boolean   Abort operations when budget exceeded (default: false)
 
+Rex LoE settings (level-of-effort estimation and decomposition):
+  rex.loe.taskThresholdWeeks     number    Max task size in engineer-weeks before
+                                           automatic decomposition (default: 2)
+  rex.loe.maxDecompositionDepth  number    Max recursion depth for decomposition
+                                           (default: 2)
+
 Hench settings (.hench/config.json):
   hench.provider           string    API provider: "cli" or "api" (default: "cli")
   hench.model              string    Claude model name (default: "sonnet")

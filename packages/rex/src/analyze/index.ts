@@ -79,6 +79,9 @@ export { buildModifyPrompt, modifyProposals } from "./modify-reason.js";
 export type { ValidationResult, ClassificationResult } from "./validate-modification.js";
 export { validateModificationRequest, classifyModificationRequest } from "./validate-modification.js";
 
+export type { DecomposedTask, DecompositionResult } from "./decompose.js";
+export { buildDecompositionPrompt, parseDecompositionResponse, decomposeTask, applyDecompositionPass } from "./decompose.js";
+
 export type { ExtractionOptions, ExtractionResult } from "./extract.js";
 export { extractFromMarkdown, extractFromText, extractFromFile, extractPriorityTag, classifyHeadingLevels } from "./extract.js";
 

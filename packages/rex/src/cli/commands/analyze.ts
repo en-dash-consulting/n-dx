@@ -28,9 +28,10 @@ import {
   setClaudeConfig,
   getAuthMode,
   getLLMVendor,
+  applyDecompositionPass,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
-import type { PRDItem, PRDDocument, AnalyzeTokenUsage } from "../../schema/index.js";
+import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "./chunked-review.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 
@@ -388,6 +389,49 @@ export async function cmdAnalyze(
     if (proposals.length === 0) {
       result("No new proposals found.");
       return;
+    }
+  }
+
+  // LoE decomposition pass: break down oversized tasks automatically
+  if (!noLlm) {
+    let loeConfig: LoEConfig | undefined;
+    if (await hasRexDir(dir)) {
+      try {
+        const rexDir = join(dir, REX_DIR);
+        const store = await resolveStore(rexDir);
+        const config = await store.loadConfig();
+        loeConfig = config.loe;
+      } catch {
+        // Config unreadable — use defaults
+      }
+    }
+
+    const decompositionResult = await applyDecompositionPass(
+      proposals,
+      loeConfig,
+      model,
+    );
+
+    if (decompositionResult.decomposed.length > 0) {
+      proposals = decompositionResult.proposals;
+      // Accumulate decomposition token usage
+      tokenUsage.calls += decompositionResult.tokenUsage.calls;
+      tokenUsage.inputTokens += decompositionResult.tokenUsage.inputTokens;
+      tokenUsage.outputTokens += decompositionResult.tokenUsage.outputTokens;
+      if (decompositionResult.tokenUsage.cacheCreationInputTokens) {
+        tokenUsage.cacheCreationInputTokens =
+          (tokenUsage.cacheCreationInputTokens ?? 0) +
+          decompositionResult.tokenUsage.cacheCreationInputTokens;
+      }
+      if (decompositionResult.tokenUsage.cacheReadInputTokens) {
+        tokenUsage.cacheReadInputTokens =
+          (tokenUsage.cacheReadInputTokens ?? 0) +
+          decompositionResult.tokenUsage.cacheReadInputTokens;
+      }
+
+      info(
+        `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} into smaller units.`,
+      );
     }
   }
 

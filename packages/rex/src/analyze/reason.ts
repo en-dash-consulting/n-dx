@@ -181,6 +181,9 @@ const ProposalTaskSchema = z.object({
   acceptanceCriteria: z.array(z.string()).optional(),
   priority: z.enum(["critical", "high", "medium", "low"]).optional(),
   tags: z.array(z.string()).optional(),
+  loe: z.number().positive().optional(),
+  loeRationale: z.string().optional(),
+  loeConfidence: z.enum(["low", "medium", "high"]).optional(),
 });
 
 const ProposalFeatureSchema = z.object({
