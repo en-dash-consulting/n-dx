@@ -16,7 +16,7 @@
  * below for convenient integration with component lifecycles.
  *
  * @see ./prd-tree.ts    — PRDTree component that owns the manager instance
- * @see ./node-culler.ts — off-screen culling that triggers scope cleanup
+ * @see ../../../shared/node-culler.ts — off-screen culling that triggers scope cleanup
  */
 
 import { useEffect, useRef, useCallback } from "preact/hooks";

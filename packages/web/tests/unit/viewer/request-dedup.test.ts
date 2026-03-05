@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createRequestDedup,
   type RequestDedup,
-} from "../../../src/viewer/messaging/request-dedup.js";
+} from "../../../src/shared/request-dedup.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

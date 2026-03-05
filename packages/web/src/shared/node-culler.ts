@@ -13,8 +13,6 @@
  *
  * Designed as a standalone module with zero framework dependencies —
  * Preact integration is handled in the CulledNode component (prd-tree.ts).
- *
- * @see ./prd-tree.ts — CulledNode component that wraps each tree node
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
