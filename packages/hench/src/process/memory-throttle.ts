@@ -102,7 +102,7 @@ export interface MemoryThrottleConfig {
 
 /** Default memory throttle configuration. */
 export const DEFAULT_MEMORY_THROTTLE_CONFIG: MemoryThrottleConfig = {
-  enabled: true,
+  enabled: false,
   delayThreshold: DEFAULT_DELAY_THRESHOLD,
   rejectThreshold: DEFAULT_REJECT_THRESHOLD,
   baseDelayMs: DEFAULT_BASE_DELAY_MS,
