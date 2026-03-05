@@ -12,30 +12,47 @@ import type { ViewId, NavigateTo, DetailItem, LoadedData } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
 import { SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
 
-// ── View component imports ─────────────────────────────────────
+// ── View component imports (via domain barrels) ────────────────
+//
+// Each domain barrel groups related view components behind a single
+// import boundary. This creates natural decomposition points that:
+//   - Make the import surface explicit and auditable
+//   - Enable future lazy-loading per domain
+//   - Reduce the blast radius of view-level changes
 
-import { Overview } from "./overview.js";
-import { Graph } from "./graph.js";
-import { ZonesView } from "./zones.js";
-import { FilesView } from "./files.js";
-import { ArchitectureView } from "./architecture.js";
-import { ProblemsView } from "./problems.js";
-import { SuggestionsView } from "./suggestions.js";
-import { PRMarkdownView } from "./pr-markdown.js";
-import { RoutesView } from "./routes.js";
-import { PRDView } from "./prd.js";
-import { RexDashboard } from "./rex-dashboard.js";
-import { TokenUsageView } from "./token-usage.js";
-import { ValidationView } from "./validation.js";
-import { AnalysisView } from "./analysis.js";
-import { HenchRunsView } from "./hench-runs.js";
-import { HenchConfigView } from "./hench-config.js";
-import { HenchTemplatesView } from "./hench-templates.js";
-import { WorkflowOptimizationView } from "./workflow-optimization.js";
-import { TaskAuditView } from "./task-audit.js";
-import { NotionConfigView } from "./notion-config.js";
-import { IntegrationConfigView } from "./integration-config.js";
-import { FeatureTogglesView } from "./feature-toggles.js";
+import {
+  Overview,
+  Graph,
+  ZonesView,
+  FilesView,
+  ArchitectureView,
+  ProblemsView,
+  SuggestionsView,
+  PRMarkdownView,
+  RoutesView,
+  AnalysisView,
+} from "./domain-sourcevision.js";
+
+import {
+  PRDView,
+  RexDashboard,
+  TokenUsageView,
+  ValidationView,
+  TaskAuditView,
+  WorkflowOptimizationView,
+} from "./domain-rex.js";
+
+import {
+  HenchRunsView,
+  HenchConfigView,
+  HenchTemplatesView,
+} from "./domain-hench.js";
+
+import {
+  NotionConfigView,
+  IntegrationConfigView,
+  FeatureTogglesView,
+} from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
 

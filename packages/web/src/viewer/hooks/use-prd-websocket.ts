@@ -33,7 +33,7 @@ import { useEffect } from "preact/hooks";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { removeItemById } from "../components/prd-tree/tree-utils.js";
-import { createMessageCoalescer, createMessageThrottle } from "../messaging/index.js";
+import { createWSPipeline } from "../messaging/index.js";
 import { createUpdateBatcher, createDomUpdateGate, createResponseBufferGate } from "../performance/index.js";
 
 export interface PRDWebSocketDeps {
@@ -64,7 +64,8 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
     // re-renders when the tab is hidden.
     const updateGate = createDomUpdateGate({ batcher });
 
-    const coalescer = createMessageCoalescer({
+    // Composed throttle → coalescer pipeline for WebSocket messages.
+    const pipeline = createWSPipeline({
       // Immediate per-message handler — optimistic UI updates are gated
       // by tab visibility and batched into the next animation frame.
       onMessage: (msg) => {
@@ -104,11 +105,6 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
           fetchTaskUsage();
         }
       },
-    });
-
-    // Per-type throttle debounces the three high-frequency rex message types.
-    const throttle = createMessageThrottle({
-      onMessage: (msg) => coalescer.push(msg),
       defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,     // heavier — full tree reconciliation
@@ -123,8 +119,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
     // reconciles on resume.
     const bufferGate = createResponseBufferGate({
       flushDownstream: [
-        () => throttle.flush(),
-        () => coalescer.flush(),
+        () => pipeline.flush(),
         () => updateGate.flush(),
       ],
       onResume: () => {
@@ -140,7 +135,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
         try {
           const msg = JSON.parse(event.data);
           if (!bufferGate.accept()) return; // Tab hidden — drop message
-          throttle.push(msg);
+          pipeline.push(msg);
         } catch {
           // Ignore malformed messages
         }
@@ -151,8 +146,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
 
     return () => {
       bufferGate.dispose();
-      throttle.dispose();
-      coalescer.dispose();
+      pipeline.dispose();
       updateGate.dispose();
       batcher.dispose();
       if (ws) {
