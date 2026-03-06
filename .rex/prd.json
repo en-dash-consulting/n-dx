@@ -18426,7 +18426,7 @@
             {
               "id": "6b7536e1-7c34-4906-be43-74e715c267dc",
               "title": "Limit tag filter options in Rex task search to tags present in the current PRD",
-              "status": "failing",
+              "status": "completed",
               "level": "task",
               "description": "The tag facet selector in the Rex task search area currently shows an unbounded or static list of tag options. It should instead derive its options dynamically from the set of tags actually used across all tasks in the current PRD tree, so users only see relevant, actionable choices. Tags with zero matching tasks in the current view should be omitted or visually disabled.",
               "acceptanceCriteria": [
@@ -18445,6 +18445,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-03-06T18:27:52.549Z",
+              "completedAt": "2026-03-06T21:39:10.140Z",
               "failureReason": "I still see all the hundred plus tags in the list beneath the search bar"
             }
           ]
