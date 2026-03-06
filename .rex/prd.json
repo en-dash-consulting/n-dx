@@ -17622,10 +17622,9 @@
     {
       "id": "8b518f76-029b-42af-b9bd-7eadb183c008",
       "title": "Fix cross-level matching in smart-add duplicate merge",
+      "status": "completed",
       "level": "task",
-      "status": "pending",
       "description": "The smart-add duplicate detection (`matchProposalNodeToPRD` in `smart-add-duplicates.ts`) walks the entire PRD tree and scores every item against each proposal node with no level filtering. A proposed epic can match an existing task, a proposed feature can match an existing epic, etc. This causes two failure modes:\n\n1. **Crash + partial state** — A proposed epic matches an existing task/feature. The merge target ID is used as `epicId` in `acceptProposals`. When it tries to add a new feature under this \"epic\" (actually a task), `insertChild` rejects the hierarchy mismatch (`tree.ts:65`), `addItem` throws (`file-adapter.ts:50`), and the loop aborts mid-way. Items added before the crash are already persisted → partial, broken PRD.\n\n2. **Silent structural corruption** — A proposed feature matches an existing epic. The merge target ID becomes `featureId`. New tasks are added with `featureId` = an epic ID. Since `LEVEL_HIERARCHY.task` allows parent `[\"feature\", \"epic\"]`, `insertChild` succeeds — but tasks become direct children of the epic, orphaned from any feature grouping.\n\n**Fix required (3 parts):**\n\n1. **Primary: Add level filtering to `matchProposalNodeToPRD`** (`smart-add-duplicates.ts:288-323`) — only match epic↔epic, feature↔feature, task↔task. Add a guard in `scoreNodeAgainstItem` or in the caller's loop: skip items whose `level` doesn't match `node.kind`.\n\n2. **Secondary: Validate merge targets in `acceptProposals`** (`smart-add.ts:~791-880`) — before using a merge target ID as a parent, verify the existing item has the expected level. If not, fall back to creating a new item instead of silently using the wrong parent.\n\n3. **Optional: Batch mutations for atomicity** — currently each `store.addItem()` individually loads/saves the document. If any add fails mid-loop, previously persisted items stay → inconsistent partial state. Consider collecting all mutations and saving once at the end.\n\n**Key files:**\n- `packages/rex/src/cli/commands/smart-add-duplicates.ts` — `matchProposalNodeToPRD` (lines 288-323), `scoreNodeAgainstItem` (lines 213-250)\n- `packages/rex/src/cli/commands/smart-add.ts` — `acceptProposals` (lines ~787-883), `applyDuplicateProposalMerges` (lines 458-533)\n- `packages/rex/src/store/file-adapter.ts` — `addItem` (lines 45-56)\n- `packages/rex/src/core/tree.ts` — `insertChild` (lines 50-78)",
-      "priority": "high",
       "acceptanceCriteria": [
         "matchProposalNodeToPRD only matches nodes against PRD items of the same level (epic↔epic, feature↔feature, task↔task)",
         "acceptProposals validates merge target level before using it as a parent, falls back to creation on mismatch",
@@ -17633,13 +17632,16 @@
         "New test: cross-level match is rejected (e.g. proposed epic with same title as existing task does NOT produce a duplicate match)",
         "New test: merge with level-matched duplicates correctly merges fields and adds non-duplicate children under the right parent"
       ],
+      "priority": "high",
       "tags": [
         "bug",
         "rex",
         "smart-add",
         "merge"
       ],
-      "source": "manual"
+      "source": "manual",
+      "startedAt": "2026-03-06T06:04:33.772Z",
+      "completedAt": "2026-03-06T06:09:55.004Z"
     }
   ]
 }
