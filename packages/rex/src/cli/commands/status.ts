@@ -181,6 +181,28 @@ export function filterCompleted(items: PRDItem[]): PRDItem[] {
   return result;
 }
 
+/**
+ * Filter out deleted items from the tree for display.
+ *
+ * Any item with status 'deleted' is removed along with its entire subtree.
+ * Non-deleted items that have deleted children will have those children
+ * recursively filtered out.
+ *
+ * Returns a new array — does not mutate the input.
+ */
+export function filterDeleted(items: PRDItem[]): PRDItem[] {
+  const result: PRDItem[] = [];
+  for (const item of items) {
+    if (item.status === "deleted") continue;
+    if (item.children && item.children.length > 0) {
+      result.push({ ...item, children: filterDeleted(item.children) });
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 /** Render a PRD tree to lines with status icons and indentation. */
 export function renderTree(
   items: PRDItem[],
@@ -237,7 +259,7 @@ export function formatStats(
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
   const suffix =
     options?.hidingCompleted
-      ? " (showing active items, use --all for full tree)"
+      ? " (hiding completed/deleted items, use --all for full tree)"
       : "";
   return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})${suffix}`;
 }
@@ -348,8 +370,9 @@ export async function cmdStatus(
   if (flags.until) tokenFilter.until = flags.until;
 
   if (format === "json") {
-    const output: Record<string, unknown> = { ...doc };
-    output.overrideMarkers = summarizeOverrideMarkers(doc.items);
+    const jsonItems = showAll ? doc.items : filterDeleted(doc.items);
+    const output: Record<string, unknown> = { ...doc, items: jsonItems };
+    output.overrideMarkers = summarizeOverrideMarkers(jsonItems);
     if (verifyResult) {
       output.coverage = {
         tasks: verifyResult.tasks,
@@ -408,9 +431,9 @@ export async function cmdStatus(
     return;
   }
 
-  const displayItems = showAll ? doc.items : filterCompleted(doc.items);
+  const displayItems = showAll ? doc.items : filterDeleted(filterCompleted(doc.items));
   const stats = computeStats(doc.items);
-  const hidingCompleted = !showAll && stats.completed > 0;
+  const hidingCompleted = !showAll && (stats.completed > 0 || stats.deleted > 0);
 
   const coverageMap = verifyResult ? buildCoverageMap(verifyResult) : undefined;
   for (const line of renderTree(displayItems, 0, coverageMap)) {

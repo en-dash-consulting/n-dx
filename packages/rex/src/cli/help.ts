@@ -43,9 +43,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex status [options] [dir]",
     description:
       "Displays the full PRD hierarchy with status icons, progress bars, and\n" +
-      "optional token usage summary. Completed subtrees are hidden by default.",
+      "optional token usage summary. Completed subtrees and deleted items are\n" +
+      "hidden by default.",
     options: [
-      { flag: "--all", description: "Show all items including completed ones" },
+      { flag: "--all", description: "Show all items including completed and deleted ones" },
       { flag: "--coverage", description: "Show test coverage per task" },
       { flag: "--tokens=false", description: "Hide token usage summary (shown by default)" },
       { flag: "--since=<ISO>", description: "Filter token usage after this timestamp" },
@@ -56,7 +57,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     examples: [
       { command: "rex status", description: "Show PRD tree (hides completed)" },
-      { command: "rex status --all", description: "Show everything including completed items" },
+      { command: "rex status --all", description: "Show everything including completed and deleted items" },
       { command: "rex status --group-by=component", description: "Group items by component facet" },
       { command: "rex status --stale", description: "Show stale in-progress items" },
       { command: "rex status --format=json .", description: "Machine-readable JSON output" },
