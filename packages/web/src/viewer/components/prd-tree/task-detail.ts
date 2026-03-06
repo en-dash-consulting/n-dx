@@ -265,21 +265,246 @@ function DependencyList({
   );
 }
 
-/** Acceptance criteria checklist (read-only display). */
-function AcceptanceCriteria({ criteria }: { criteria: string[] }) {
-  if (criteria.length === 0) return null;
+/** Editable title — click to edit inline. */
+function EditableTitle({
+  title,
+  onUpdate,
+}: {
+  title: string;
+  onUpdate?: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+
+  // Sync draft when item changes externally
+  useEffect(() => { setDraft(title); }, [title]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== title && onUpdate) {
+      onUpdate(trimmed);
+    }
+    setEditing(false);
+  }, [draft, title, onUpdate]);
+
+  if (!onUpdate) {
+    return h("div", { class: "task-title-display" }, title);
+  }
+
+  if (editing) {
+    return h("div", { class: "task-title-edit" },
+      h("input", {
+        class: "task-title-input",
+        type: "text",
+        value: draft,
+        onInput: (e: Event) => setDraft((e.target as HTMLInputElement).value),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+          if (e.key === "Escape") { setDraft(title); setEditing(false); }
+        },
+        onBlur: handleSave,
+        ref: (el: HTMLInputElement | null) => el?.focus(),
+      }),
+    );
+  }
+
+  return h("div", {
+    class: "task-title-display editable",
+    onClick: () => { setDraft(title); setEditing(true); },
+    title: "Click to edit title",
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(title); setEditing(true); }
+    },
+  }, title, h("span", { class: "task-edit-icon" }, "\u270e"));
+}
+
+/** Editable description — click to edit with textarea. */
+function EditableDescription({
+  description,
+  onUpdate,
+}: {
+  description?: string;
+  onUpdate?: (description: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(description ?? "");
+
+  // Sync draft when item changes externally
+  useEffect(() => { setDraft(description ?? ""); }, [description]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed !== (description ?? "") && onUpdate) {
+      onUpdate(trimmed);
+    }
+    setEditing(false);
+  }, [draft, description, onUpdate]);
+
+  if (!onUpdate) {
+    return description
+      ? h("div", { class: "task-description" }, description)
+      : null;
+  }
+
+  if (editing) {
+    return h("div", { class: "task-description-edit" },
+      h("textarea", {
+        class: "task-description-textarea",
+        value: draft,
+        rows: Math.max(3, (draft.match(/\n/g) ?? []).length + 2),
+        onInput: (e: Event) => setDraft((e.target as HTMLTextAreaElement).value),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleSave(); }
+          if (e.key === "Escape") { setDraft(description ?? ""); setEditing(false); }
+        },
+        ref: (el: HTMLTextAreaElement | null) => el?.focus(),
+      }),
+      h("div", { class: "task-edit-actions" },
+        h("button", { class: "task-edit-save", onClick: handleSave }, "Save"),
+        h("button", { class: "task-edit-cancel", onClick: () => { setDraft(description ?? ""); setEditing(false); } }, "Cancel"),
+        h("span", { class: "task-edit-hint" }, "Ctrl+Enter to save"),
+      ),
+    );
+  }
+
+  if (!description) {
+    return h("button", {
+      class: "task-add-description-btn",
+      onClick: () => { setDraft(""); setEditing(true); },
+    }, "+ Add description");
+  }
+
+  return h("div", {
+    class: "task-description editable",
+    onClick: () => { setDraft(description ?? ""); setEditing(true); },
+    title: "Click to edit description",
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(description ?? ""); setEditing(true); }
+    },
+  }, description, h("span", { class: "task-edit-icon" }, "\u270e"));
+}
+
+/** Editable acceptance criteria — add, edit, remove individual items. */
+function EditableAcceptanceCriteria({
+  criteria,
+  onUpdate,
+}: {
+  criteria: string[];
+  onUpdate?: (criteria: string[]) => void;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addDraft, setAddDraft] = useState("");
+
+  const handleStartEdit = useCallback((i: number) => {
+    setEditingIndex(i);
+    setEditDraft(criteria[i]);
+  }, [criteria]);
+
+  const handleSaveEdit = useCallback(() => {
+    if (editingIndex === null || !onUpdate) return;
+    const trimmed = editDraft.trim();
+    if (!trimmed) {
+      // Empty means remove
+      onUpdate(criteria.filter((_, i) => i !== editingIndex));
+    } else if (trimmed !== criteria[editingIndex]) {
+      const updated = [...criteria];
+      updated[editingIndex] = trimmed;
+      onUpdate(updated);
+    }
+    setEditingIndex(null);
+    setEditDraft("");
+  }, [editingIndex, editDraft, criteria, onUpdate]);
+
+  const handleRemove = useCallback((i: number) => {
+    if (!onUpdate) return;
+    onUpdate(criteria.filter((_, idx) => idx !== i));
+  }, [criteria, onUpdate]);
+
+  const handleAdd = useCallback(() => {
+    const trimmed = addDraft.trim();
+    if (trimmed && onUpdate) {
+      onUpdate([...criteria, trimmed]);
+    }
+    setAddDraft("");
+    setAdding(false);
+  }, [addDraft, criteria, onUpdate]);
+
+  if (criteria.length === 0 && !onUpdate) return null;
 
   return h(
     "div",
     { class: "task-acceptance-criteria" },
     h("div", { class: "task-section-label" }, "Acceptance Criteria"),
-    h(
-      "ul",
-      { class: "task-criteria-list" },
-      criteria.map((criterion, i) =>
-        h("li", { key: i, class: "task-criterion" }, criterion),
-      ),
-    ),
+    criteria.length > 0
+      ? h(
+          "ul",
+          { class: "task-criteria-list" },
+          criteria.map((criterion, i) =>
+            editingIndex === i
+              ? h("li", { key: i, class: "task-criterion editing" },
+                  h("input", {
+                    class: "task-criterion-input",
+                    type: "text",
+                    value: editDraft,
+                    onInput: (e: Event) => setEditDraft((e.target as HTMLInputElement).value),
+                    onKeyDown: (e: KeyboardEvent) => {
+                      if (e.key === "Enter") { e.preventDefault(); handleSaveEdit(); }
+                      if (e.key === "Escape") { setEditingIndex(null); setEditDraft(""); }
+                    },
+                    onBlur: handleSaveEdit,
+                    ref: (el: HTMLInputElement | null) => el?.focus(),
+                  }),
+                )
+              : h("li", {
+                  key: i,
+                  class: `task-criterion${onUpdate ? " editable" : ""}`,
+                  onClick: onUpdate ? () => handleStartEdit(i) : undefined,
+                  role: onUpdate ? "button" : undefined,
+                  tabIndex: onUpdate ? 0 : undefined,
+                  onKeyDown: onUpdate
+                    ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleStartEdit(i); } }
+                    : undefined,
+                },
+                  h("span", { class: "task-criterion-text" }, criterion),
+                  onUpdate
+                    ? h("button", {
+                        class: "task-criterion-remove",
+                        onClick: (e: Event) => { e.stopPropagation(); handleRemove(i); },
+                        "aria-label": `Remove criterion ${i + 1}`,
+                        title: "Remove",
+                      }, "\u00d7")
+                    : null,
+                ),
+          ),
+        )
+      : null,
+    // Add new criterion
+    onUpdate
+      ? adding
+        ? h("div", { class: "task-criterion-add-form" },
+            h("input", {
+              class: "task-criterion-add-input",
+              type: "text",
+              value: addDraft,
+              placeholder: "New acceptance criterion...",
+              onInput: (e: Event) => setAddDraft((e.target as HTMLInputElement).value),
+              onKeyDown: (e: KeyboardEvent) => {
+                if (e.key === "Enter" && addDraft.trim()) { e.preventDefault(); handleAdd(); }
+                if (e.key === "Escape") { setAdding(false); setAddDraft(""); }
+              },
+              ref: (el: HTMLInputElement | null) => el?.focus(),
+            }),
+            h("button", { class: "task-criterion-add-confirm", onClick: handleAdd, disabled: !addDraft.trim() }, "\u2713"),
+            h("button", { class: "task-criterion-add-cancel", onClick: () => { setAdding(false); setAddDraft(""); } }, "\u00d7"),
+          )
+        : h("button", { class: "task-criterion-add-btn", onClick: () => setAdding(true) }, "+ criterion")
+      : null,
   );
 }
 
@@ -1292,6 +1517,18 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
       h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
     ),
 
+    // Editable title
+    h(
+      "div",
+      { class: "task-section" },
+      h(EditableTitle, {
+        title: item.title,
+        onUpdate: onUpdate
+          ? (title: string) => onUpdate(item.id, { title })
+          : undefined,
+      }),
+    ),
+
     // Status selector
     h(
       "div",
@@ -1340,22 +1577,30 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         : null,
     ),
 
-    // Description
-    item.description
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Description"),
-          h("div", { class: "task-description" }, item.description),
-        )
-      : null,
+    // Description (editable)
+    h(
+      "div",
+      { class: "task-section" },
+      h("div", { class: "task-section-label" }, "Description"),
+      h(EditableDescription, {
+        description: item.description,
+        onUpdate: onUpdate
+          ? (description: string) => onUpdate(item.id, { description: description || undefined })
+          : undefined,
+      }),
+    ),
 
-    // Acceptance criteria
-    item.acceptanceCriteria && item.acceptanceCriteria.length > 0
+    // Acceptance criteria (editable)
+    (item.acceptanceCriteria && item.acceptanceCriteria.length > 0) || onUpdate
       ? h(
           "div",
           { class: "task-section" },
-          h(AcceptanceCriteria, { criteria: item.acceptanceCriteria }),
+          h(EditableAcceptanceCriteria, {
+            criteria: item.acceptanceCriteria ?? [],
+            onUpdate: onUpdate
+              ? (criteria: string[]) => onUpdate(item.id, { acceptanceCriteria: criteria })
+              : undefined,
+          }),
         )
       : null,
 

@@ -464,6 +464,24 @@ export function usePRDActions({
       return;
     }
 
+    // Keep the detail header in sync with the current item title
+    if (onSelectItem) {
+      onSelectItem({
+        type: "prd",
+        title: item.title,
+        id: item.id,
+        level: item.level,
+        status: item.status,
+        description: item.description,
+        acceptanceCriteria: item.acceptanceCriteria,
+        priority: item.priority,
+        tags: item.tags,
+        blockedBy: item.blockedBy,
+        startedAt: item.startedAt,
+        completedAt: item.completedAt,
+      });
+    }
+
     onDetailContent(
       h(TaskDetail, {
         item,
@@ -489,6 +507,7 @@ export function usePRDActions({
     taskUsageById,
     weeklyBudget,
     showTokenBudget,
+    onSelectItem,
     onDetailContent,
     handleItemUpdate,
     handleNavigateToItem,

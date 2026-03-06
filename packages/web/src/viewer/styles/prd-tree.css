@@ -1131,6 +1131,60 @@
   }
 }
 
+/* Editable title */
+.task-title-display {
+  font-size: var(--font-lg, 1.1rem);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.task-title-display.editable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+}
+
+.task-title-display.editable:hover {
+  background: var(--bg-hover);
+}
+
+.task-title-display.editable:hover .task-edit-icon,
+.task-description.editable:hover .task-edit-icon {
+  opacity: 1;
+}
+
+.task-edit-icon {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.task-title-edit {
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+}
+
+.task-title-input {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: var(--font-lg, 1.1rem);
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
 /* Description */
 .task-description {
   font-size: var(--font-base);
@@ -1143,6 +1197,94 @@
   word-break: break-word;
   overflow-wrap: break-word;
   overflow-x: hidden;
+}
+
+.task-description.editable {
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  transition: background 0.15s;
+}
+
+.task-description.editable:hover {
+  background: var(--bg-surface);
+}
+
+.task-description-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-description-textarea {
+  width: 100%;
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--font-base);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
+.task-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-edit-save,
+.task-edit-cancel {
+  padding: var(--space-1) var(--space-2-5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.task-edit-save {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.task-edit-save:hover {
+  opacity: 0.9;
+}
+
+.task-edit-cancel:hover {
+  border-color: var(--text-dim);
+}
+
+.task-edit-hint {
+  font-size: var(--font-xs, 0.7rem);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.task-add-description-btn {
+  padding: var(--space-1-5) var(--space-2-5);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.task-add-description-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Acceptance criteria */
@@ -1158,6 +1300,140 @@
   padding: var(--space-1) 0 var(--space-1) var(--space-5);
   border-bottom: 1px solid var(--border);
   position: relative;
+}
+
+.task-criterion.editable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-6);
+}
+
+.task-criterion.editable:hover {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+.task-criterion.editing {
+  padding-left: var(--space-5);
+}
+
+.task-criterion.editing::before {
+  content: "☐";
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+  font-size: var(--font-base);
+}
+
+.task-criterion-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-criterion-remove {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: var(--font-base);
+  cursor: pointer;
+  padding: var(--space-1);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.task-criterion.editable:hover .task-criterion-remove {
+  opacity: 1;
+}
+
+.task-criterion-remove:hover {
+  color: var(--red, #e74c3c);
+}
+
+.task-criterion-input {
+  width: 100%;
+  padding: var(--space-1) var(--space-1-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: var(--font-base);
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
+.task-criterion-add-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.task-criterion-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.task-criterion-add-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.task-criterion-add-confirm,
+.task-criterion-add-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-1-5);
+}
+
+.task-criterion-add-confirm:hover {
+  color: var(--green, #2ecc71);
+  border-color: var(--green, #2ecc71);
+}
+
+.task-criterion-add-cancel:hover {
+  color: var(--red, #e74c3c);
+  border-color: var(--red, #e74c3c);
+}
+
+.task-criterion-add-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.task-criterion-add-btn {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.task-criterion-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .task-criterion:last-child {

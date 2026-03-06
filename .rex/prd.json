@@ -17861,8 +17861,10 @@
         {
           "id": "8de98d96-3ee3-47bd-be66-46d1bb7e25b8",
           "title": "Ability to edit epic/feature/task details in the side panel",
-          "status": "pending",
-          "level": "feature"
+          "status": "completed",
+          "level": "feature",
+          "startedAt": "2026-03-06T07:39:31.119Z",
+          "completedAt": "2026-03-06T07:44:35.624Z"
         }
       ]
     },
@@ -17872,6 +17874,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-06T07:38:57.537Z",
+      "completedAt": "2026-03-06T07:38:57.537Z",
       "children": [
         {
           "id": "8e04e63b-854c-4e25-9689-3a261ed2d20d",
@@ -17940,9 +17944,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-03-06T07:38:57.537Z",
-      "completedAt": "2026-03-06T07:38:57.537Z"
+      ]
     }
   ]
 }
