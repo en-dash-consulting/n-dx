@@ -1,0 +1,38 @@
+{
+  "id": "web-build-infrastructure",
+  "name": "Web Build Infrastructure",
+  "description": "Build tooling, package metadata, and shared viewer components (elapsed-time, task-audit) that sit outside the main web-viewer bundle.",
+  "files": [
+    "packages/web/BROWSER_ERROR_CODE_5.md",
+    "packages/web/MEMORY_PROFILE.md",
+    "packages/web/SourceVision-F.png",
+    "packages/web/SourceVision.png",
+    "packages/web/build.js",
+    "packages/web/dev.js",
+    "packages/web/package.json",
+    "packages/web/src/viewer/components/elapsed-time.ts",
+    "packages/web/src/viewer/components/prd-tree/lazy-children.ts",
+    "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts",
+    "packages/web/src/viewer/hooks/use-tick.ts",
+    "packages/web/src/viewer/views/task-audit.ts",
+    "packages/web/tests/unit/viewer/lazy-children.test.ts",
+    "packages/web/tests/unit/viewer/listener-lifecycle.test.ts",
+    "packages/web/tsconfig.json",
+    "packages/web/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/elapsed-time.ts",
+    "packages/web/src/viewer/views/task-audit.ts"
+  ],
+  "cohesion": 0.77,
+  "coupling": 0.23,
+  "fileCount": 16,
+  "lineCount": 3352,
+  "riskMetrics": {
+    "cohesion": 0.77,
+    "coupling": 0.23,
+    "riskScore": 0.22999999999999998,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

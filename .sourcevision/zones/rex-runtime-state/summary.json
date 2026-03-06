@@ -1,0 +1,27 @@
+{
+  "id": "rex-runtime-state",
+  "name": "Rex Runtime State",
+  "description": "Persistent runtime data for the rex PRD tracker: project config, the live PRD tree, execution logs, pending proposals, and workflow state.",
+  "files": [
+    ".rex/acknowledged-findings.json",
+    ".rex/archive.json",
+    ".rex/config.json",
+    ".rex/execution-log.1.jsonl",
+    ".rex/execution-log.jsonl",
+    ".rex/pending-proposals.json",
+    ".rex/prd.json",
+    ".rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 24317,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

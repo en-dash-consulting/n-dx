@@ -1,0 +1,21 @@
+{
+  "id": "hench/unit/queue",
+  "name": "Hench/unit/queue",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/queue/execution-queue.ts",
+    "packages/hench/src/queue/format.ts",
+    "packages/hench/src/queue/index.ts",
+    "packages/hench/src/queue/priority-scheduler.ts",
+    "packages/hench/tests/unit/queue/execution-queue.test.ts",
+    "packages/hench/tests/unit/queue/format.test.ts",
+    "packages/hench/tests/unit/queue/priority-scheduler.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/queue/index.ts"
+  ],
+  "cohesion": 0.83,
+  "coupling": 0.17,
+  "fileCount": 7,
+  "lineCount": 1140
+}

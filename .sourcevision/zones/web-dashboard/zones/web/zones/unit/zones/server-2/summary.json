@@ -1,0 +1,18 @@
+{
+  "id": "web-viewer/web/unit/server-2",
+  "name": "Web Viewer/web/unit/server 2",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/public.ts",
+    "packages/web/src/server/index.ts",
+    "packages/web/src/server/port.ts",
+    "packages/web/tests/unit/server/port.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/port.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 4,
+  "lineCount": 592
+}

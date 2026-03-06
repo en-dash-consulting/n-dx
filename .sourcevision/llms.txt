@@ -5,62 +5,46 @@
 
 ## Project Overview
 
-- **Files**: 1034
-- **Lines of code**: 346,710
-- **Languages**: TypeScript (873), CSS (44), Markdown (32), JavaScript (31), JSON (30)
+- **Files**: 1035
+- **Lines of code**: 347,213
+- **Languages**: TypeScript (875), CSS (44), Markdown (32), JavaScript (31), JSON (30)
 - **Zones**: 35 (35 with descriptions)
 - **Git**: feature/integrate-codex @ 21786d2
-- **Analyzed**: 2026-03-06T17:51:40.236Z
+- **Analyzed**: 2026-03-06T18:50:14.926Z
 
 ## Architecture Zones
 
-### .rex (`.rex`)
+### Autonomous Agent (`autonomous-agent`)
 
-8 files, primarily JSON, Other, Markdown
-
-- Files: 8
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/.rex/context.md`
-
-### Docs (`docs`)
-
-16 files, primarily Markdown
-
-- Files: 16
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/docs/context.md`
-
-### Dom (`dom`)
-
-3 files, primarily TypeScript
-
-- Files: 3
-- Cohesion: 0.67, Coupling: 0.33
-- Detail: `.sourcevision/zones/dom/context.md`
-
-### E2e (`e2e`)
-
-14 files, primarily JavaScript
-
-- Files: 14
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/e2e/context.md`
-
-### Hench (`hench`)
-
-157 files, primarily TypeScript, JSON, Other
+The hench package: autonomous task execution via agent loops, tool dispatch, brief generation, and run recording against the rex PRD.
 
 - Files: 159
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/hench/context.md`
+- Detail: `.sourcevision/zones/autonomous-agent/context.md`
 
-### Logo (`logo`)
+### DOM Performance Monitoring (`dom-performance-monitoring`)
 
-3 files, primarily Other, HTML
+Encapsulates the DOM performance monitoring utility and its React hook abstraction for the viewer.
 
 - Files: 3
+- Cohesion: 0.67, Coupling: 0.33
+- Detail: `.sourcevision/zones/dom-performance-monitoring/context.md`
+
+### End-to-End Test Suite (`e2e-tests`)
+
+Comprehensive CLI and architecture E2E tests covering orchestration, delegation, error handling, config, and web server behavior.
+
+- Files: 14
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/logo/context.md`
+- Detail: `.sourcevision/zones/e2e-tests/context.md`
+
+### Monorepo Orchestration (`monorepo-orchestration`)
+
+Root-level entry points and configuration that coordinate the three-package pipeline (sourcevision → rex → hench) without importing from any package directly.
+
+- Files: 27
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/monorepo-orchestration/context.md`
 
 ### Root (`packages-llm-client:root`)
 
@@ -262,57 +246,73 @@ The next-task selection algorithm including scoring, feature filtering, requirem
 - Entry points: packages/sourcevision/src/analyzers/branch-work-classifier.ts, packages/sourcevision/src/analyzers/risk-scoring.ts, packages/sourcevision/src/cli/commands/workspace.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/generators/pr-markdown-template.ts (+3 more)
 - Detail: `.sourcevision/zones/packages-sourcevision-unit/context.md`
 
-### Root (`root`)
+### Project Documentation (`project-documentation`)
 
-27 files, primarily JavaScript, Markdown, Other
+Architecture decision records, design analyses, and long-form reference documentation for the n-dx system and its memory/PRD subsystems.
 
-- Files: 27
+- Files: 16
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/root/context.md`
+- Detail: `.sourcevision/zones/project-documentation/context.md`
 
-### Web (`web`)
+### Rex Runtime State (`rex-runtime-state`)
 
-16 files, primarily TypeScript, Markdown, Other
+Persistent runtime data for the rex PRD tracker: project config, the live PRD tree, execution logs, pending proposals, and workflow state.
+
+- Files: 8
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/rex-runtime-state/context.md`
+
+### Task Usage Tracking (`task-usage-tracking`)
+
+Server-side services for recording and cleaning up per-task token/usage metrics incrementally over time.
+
+- Files: 4
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/server/incremental-task-usage.ts, packages/web/src/server/usage-cleanup-scheduler.ts
+- Detail: `.sourcevision/zones/task-usage-tracking/context.md`
+
+### Viewer Static Assets (`viewer-static-assets`)
+
+Raw static assets (light/dark logo PNGs and the viewer's root HTML shell) that are bundled directly into the dashboard viewer at build time.
+
+- Files: 3
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/viewer-static-assets/context.md`
+
+### Web Build Infrastructure (`web-build-infrastructure`)
+
+Build tooling, package metadata, and shared viewer components (elapsed-time, task-audit) that sit outside the main web-viewer bundle.
 
 - Files: 16
 - Cohesion: 0.77, Coupling: 0.23
 - Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/views/task-audit.ts
-- Detail: `.sourcevision/zones/web/context.md`
+- Detail: `.sourcevision/zones/web-build-infrastructure/context.md`
 
-### Web Landing (`web-landing`)
+### Web Dashboard (`web-dashboard`)
 
-3 files, primarily HTML, CSS, TypeScript
+The primary web application zone encompassing the full-stack dashboard: HTTP/MCP server, React viewer components, data aggregation, gateways, and CLI entrypoint.
+
+- Files: 351
+- Cohesion: 0.98, Coupling: 0.02
+- Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts (+1 more)
+- Detail: `.sourcevision/zones/web-dashboard/context.md`
+
+### Web Landing Page (`web-landing`)
+
+Self-contained static landing page (HTML + CSS + TypeScript entrypoint) served before the main dashboard application loads.
 
 - Files: 3
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/web-landing/context.md`
 
-### Web Server (`web-server`)
+### WebSocket Infrastructure (`websocket-infrastructure`)
 
-4 files, primarily TypeScript
-
-- Files: 4
-- Cohesion: 0.40, Coupling: 0.60
-- Entry points: packages/web/src/server/incremental-task-usage.ts, packages/web/src/server/usage-cleanup-scheduler.ts
-- Detail: `.sourcevision/zones/web-server/context.md`
-
-### Web Unit (`web-unit`)
-
-5 files, primarily TypeScript
+WebSocket server implementation and connection health tracking for real-time push updates from the server to the dashboard viewer.
 
 - Files: 6
 - Cohesion: 0.25, Coupling: 0.75
 - Entry points: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts
-- Detail: `.sourcevision/zones/web-unit/context.md`
-
-### Web Viewer (`web-viewer`)
-
-349 files, primarily TypeScript, CSS
-
-- Files: 349
-- Cohesion: 0.98, Coupling: 0.02
-- Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts (+1 more)
-- Detail: `.sourcevision/zones/web-viewer/context.md`
+- Detail: `.sourcevision/zones/websocket-infrastructure/context.md`
 
 ## Key Dependencies
 
@@ -332,7 +332,7 @@ The next-task selection algorithm including scoring, feature filtering, requirem
 ### External Packages
 
 - `vitest` (used by 405 files)
-- `preact` (used by 141 files)
+- `preact` (used by 143 files)
 - `@n-dx/llm-client` (used by 54 files)
 - `rex` (used by 21 files)
 - `zod` (used by 11 files)
@@ -528,16 +528,8 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Anti-patterns
 
-- God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions [warning]
-- God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions [warning]
-
-### Patterns
-
-- Seven potentially unused exports (findings 14–20) across 6 files suggest no periodic dead-code audit exists. A project-wide pass using the existing call-graph data (already computed by sourcevision) to flag zero-incoming-call exports would surface all of these in one step and establish a repeatable process. [info]
-- Seven potentially unused exports across six files (packages/web/src/viewer/polling/polling-restart.ts: 3 exports; packages/web/src/viewer/loader.ts: 2 exports; packages/hench/src/shared/glob.ts: simpleGlobMatch; packages/sourcevision/src/analyzers/branch-work-filter.ts: detectBranchLifecycle; packages/sourcevision/src/cli/commands/prd-epic-resolver.ts: resolveWorkedEpicTitlesForRange; packages/web/src/server/routes-token-usage.ts: getAggregationCacheInstance) share one root cause: no CI gate enforces that non-test public exports remain reachable. Sourcevision's call-graph already tracks this data; adding a CI step that fails on zero-incoming-call exports in non-test, non-barrel files would surface and prevent all of these without new tooling. [warning]
-- The architecture enforces inter-package DAG ordering (four-tier hierarchy, gateway pattern) but applies no equivalent discipline to intra-package module ordering. This asymmetry means cross-package structure is auditable but internal package structure is opaque. Adding `madge --circular` per package in CI closes the gap without changing any existing code. [warning]
-- The naming-convention gap (finding 4) and the structural-health CI gap (finding 5) are the only two findings that, if addressed, would prevent recurrence of multiple other findings: naming conventions would prevent new zone-ID inconsistencies; CI enforcement would prevent new dead exports, new circular dependencies, and new cohesion/coupling regressions. Prioritizing these two meta-level work items yields higher long-term leverage than fixing any individual instance finding. [info]
-- The web package's structural complexity (bidirectional coupling, lowest cohesion zone at 0.5, two god-function candidates, 142-call module pair, multiple dead exports) is fully explained by its architectural role: it is the only package that integrates all other packages. This is not an accident of implementation — it is load-bearing complexity. The correct response is metric tracking with enforced thresholds (finding 7), not decomposition. [info]
+- God function: cmdAnalyze in packages/rex/src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions [warning]
+- God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Relationships
 
@@ -545,31 +537,31 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Observations
 
-- High cohesion (1) — files are tightly interconnected [info] (.rex)
-- High cohesion (1) — files are tightly interconnected [info] (docs)
-- High cohesion (1) — files are tightly interconnected [info] (e2e)
-- Bidirectional coupling: "web" ↔ "web-viewer" (4+2 crossings) — consider extracting shared interface [warning]
-- Size imbalance: largest zone has 349 files vs smallest with 3 — uneven decomposition [info]
-- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects [warning]
-- High cohesion (1) — files are tightly interconnected [info] (hench)
-- High cohesion (1) — files are tightly interconnected [info] (logo)
-- High cohesion (1) — files are tightly interconnected [info] (root)
-- High cohesion (1) — files are tightly interconnected [info] (web-landing)
-- ... and 4 more
+- High cohesion (1) — files are tightly interconnected [info] (autonomous-agent)
+- 159 files in a single zone suggests the internal structure is dense; sourcevision may benefit from per-subdirectory zone hints to surface finer-grained architectural boundaries within hench. [info] (autonomous-agent)
+- Agent analysis files (adaptive.ts, review.ts, spin.ts) represent domain-specific loop heuristics — documenting their interaction order would help contributors understand the agent's decision pipeline. [info] (autonomous-agent)
+- Perfect cohesion (1.0) and zero external coupling confirm the rex-gateway pattern is working as intended for this package. [info] (autonomous-agent)
+- High cohesion (1) — files are tightly interconnected [info] (e2e-tests)
+- 14 E2E test files with no shared fixtures module detected; if setup/teardown logic is duplicated across files, a shared helper could reduce maintenance burden. [info] (e2e-tests)
+- Perfect cohesion and zero coupling are ideal for an E2E suite — these tests correctly treat the CLI as a black box. [info] (e2e-tests)
+- architecture-policy.test.js should be reviewed periodically to ensure it encodes current tier boundaries; policy tests that are not updated alongside architectural changes become stale and misleading. [info] (e2e-tests)
+- Bidirectional coupling: "task-usage-tracking" ↔ "web-dashboard" (1+3 crossings) — consider extracting shared interface [warning]
+- Bidirectional coupling: "web-build-infrastructure" ↔ "web-dashboard" (4+2 crossings) — consider extracting shared interface [warning]
+- ... and 49 more
 
 ### Suggestions
 
-- Zone "dom" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/hooks/dom/ and moving related files there [info] (dom)
-- packages/web/tests/unit/viewer/ contains files from 4 zones (dom, hench, web, web-viewer) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Consolidate findings 4, 5, 6, and 10 into a single work item: author a NAMING.md (or extend PACKAGE_GUIDELINES.md) that specifies: (a) zone ID convention (content-descriptor vs package-prefix — pick one), (b) sub-zone ID format aligned with zone IDs, (c) gateway module suffix (*-gateway.ts canonical), (d) 'unit' reserved for test zones only. This one document eliminates all four naming findings. [info]
-- Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Actions job named 'structural-health' that runs (1) the existing architecture-policy test in isolation, (2) madge --circular per package, and (3) a zone-metrics check that fails if any zone has cohesion < 0.7 AND coupling > 0.3. This single job enforces the invariants described across three separate findings. [warning]
-- Global finding 0 (bidirectional web↔web-viewer coupling, severity: warning) directly contradicts global finding 16 (LLM analysis: web's structural complexity is load-bearing and intentional, correct response is metric tracking). Finding 16 is correct: 6 total crossings from a deliberate integration package is expected behavior, not a defect. The coupling should be tracked via enforced thresholds as recommended in finding 5, not treated as a warning-level structural problem. [info]
-- Global finding 2 (fan-in hotspot: packages/rex/src/schema/index.ts flagged as warning) contradicts the barrel-export convention documented in CLAUDE.md ('Public API: src/public.ts → exports["."] in package.json — all 5 packages follow this'). Schema index files are explicitly designed to be the canonical import point; 22 callers is the intended outcome of the pattern, not a hotspot defect. The finding correctly identifies that changes here have wide impact, but warning severity is inappropriate for a module whose high fan-in is a deliberate design consequence. [info]
-- The structural-health CI job proposed in global finding 5 (madge --circular + zone-metrics check) should add a third sub-check: a fan-in threshold (e.g., > 30 callers) applied exclusively to non-index, non-barrel files. This correctly flags future walkTree-class hotspots while exempting schema/index.ts and similar barrel exports that are designed for wide import. The distinction — barrel vs non-barrel — can be approximated by excluding files named index.ts or public.ts. [info]
+- Zone "autonomous-agent" has files across 31 directories — consider consolidating under a dedicated directory [info] (autonomous-agent)
+- packages/web/tests/unit/viewer/ contains files from 4 zones (autonomous-agent, dom-performance-monitoring, web-build-infrastructure, web-dashboard) — consider grouping into subdirectories to clarify architectural boundaries [info]
 - Hub function: walkTree in packages/rex/src/core/tree.ts is called from 29 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - 3 potentially unused exports in packages/web/src/viewer/polling/polling-restart.ts have no incoming calls: isPollingRestartStarted, isCoordinatorSuspended, resetPollingRestart [info]
 - 2 potentially unused exports in packages/web/src/viewer/loader.ts have no incoming calls: loadModule, loadFromServer [info]
-- ... and 14 more
+- Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts has no incoming calls — verify if still needed [info]
+- Potentially unused export: detectBranchLifecycle in packages/sourcevision/src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed [info]
+- Potentially unused export: resolveWorkedEpicTitlesForRange in packages/sourcevision/src/cli/commands/prd-epic-resolver.ts has no incoming calls — verify if still needed [info]
+- Potentially unused export: getAggregationCacheInstance in packages/web/src/server/routes-token-usage.ts has no incoming calls — verify if still needed [info]
+- Potentially unused export: useNodeListeners in packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts has no incoming calls — verify if still needed [info]
+- ... and 7 more
 
 ## Next Steps
 
@@ -587,27 +579,40 @@ Prioritized work items derived from analysis:
 1. **Zone "Fix Command Pipeline" (packages-rex:fix-command) has catastrophic risk (s…**
    Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
 
-1. **Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, …**
+1. **Zone "WebSocket Infrastructure" (websocket-infrastructure) has catastrophic ris…**
    Files: `packages/web/src/server/websocket.ts`, `packages/web/src/server/ws-health-tracker.ts`, `packages/web/tests/unit/server/boundary-check.test.ts`
 
 1. **Low cohesion (0.25) — files are loosely related, consider splitting this zone**
    Files: `packages/web/src/server/websocket.ts`, `packages/web/src/server/ws-health-tracker.ts`, `packages/web/tests/unit/server/boundary-check.test.ts`
 
+1. **Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmenta…**
+   Files: `packages/web/src/server/websocket.ts`, `packages/web/src/server/ws-health-tracker.ts`, `packages/web/tests/unit/server/boundary-check.test.ts`
+
+1. **Only 2 of 6 files are production source; the test-to-source ratio inflates coup…**
+   Files: `packages/web/src/server/websocket.ts`, `packages/web/src/server/ws-health-tracker.ts`, `packages/web/tests/unit/server/boundary-check.test.ts`
+
 1. **Zone "Recommendation Scanning" (packages-rex:recommendation-scanning) has criti…**
    Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/extract.ts`, `packages/rex/src/analyze/reconcile.ts`
 
-1. **High coupling (0.6) — 2 imports target "web-viewer"**
-   Files: `packages/web/src/server/incremental-task-usage.ts`, `packages/web/src/server/usage-cleanup-scheduler.ts`, `packages/web/tests/unit/server/incremental-task-usage.test.ts`
-
 ### Medium Priority
 
-1. **God function: main in packages/rex/src/cli/index.ts calls 4… (+1 related)**
+1. **God function: cmdAnalyze in packages/rex/src/cli/commands/a… (+1 related)**
 
-1. **Seven potentially unused exports across six files (packages… (+1 related)**
+1. **The cleanup scheduler imports back into web-viewer (per cross-zone import graph…**
+   Files: `packages/web/src/server/incremental-task-usage.ts`, `packages/web/src/server/usage-cleanup-scheduler.ts`, `packages/web/tests/unit/server/incremental-task-usage.test.ts`
 
-1. **Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Act…**
+1. **Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer…**
+   Files: `packages/web/BROWSER_ERROR_CODE_5.md`, `packages/web/MEMORY_PROFILE.md`, `packages/web/SourceVision-F.png`
 
-1. **Bidirectional coupling: "web" ↔ "web-viewer" (4+2 crossings) — consider extract…**
+1. **Bidirectional coupling: "task-usage-tracking" ↔ "web-dashboard" (1+3 crossings)…**
+
+1. **Bidirectional coupling: "web-build-infrastructure" ↔ "web-dashboard" (4+2 cross…**
+
+1. **The mutual import relationship between web-viewer and web-server warrants monit…**
+
+1. **The web-unit zone's low cohesion (0.25) combined with high coupling (0.75) stan…**
+
+1. **web-unit has cohesion 0.25 (below the 0.4 warning threshold) and receives impor…**
 
 ### Low Priority
 
@@ -627,213 +632,212 @@ Prioritized work items derived from analysis:
 
 1. **Potentially unused export: useNodeListeners in packages/web/src/viewer/componen…**
 
-1. **Zone "dom" was identified from filename patterns, not directory structure — con…**
-   Files: `packages/web/src/viewer/hooks/use-dom-performance-monitor.ts`, `packages/web/src/viewer/performance/dom-performance-monitor.ts`, `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts`
-
-1. **Zone "web" has files across 6 directories — consider consolidating under a dedi…**
+1. **Zone "web-build-infrastructure" has files across 6 directories — consider conso…**
    Files: `packages/web/BROWSER_ERROR_CODE_5.md`, `packages/web/MEMORY_PROFILE.md`, `packages/web/SourceVision-F.png`
+
+1. **Zone "web-dashboard" has files across 21 directories — consider consolidating u…**
+   Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/v1.ts`
 
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
 |------|------|-----------|------|
 | `.github/workflows/ci.yml` | build |  |  |
-| `.gitignore` | config |  | root |
+| `.gitignore` | config |  | monorepo-orchestration |
 | `.hench/config.json` | other |  |  |
-| `.hench/locks/45093.lock` | other |  |  |
-| `.npmrc` | config |  | root |
-| `.rex/acknowledged-findings.json` | other |  | .rex |
-| `.rex/archive.json` | other |  | .rex |
-| `.rex/config.json` | other |  | .rex |
-| `.rex/execution-log.1.jsonl` | other |  | .rex |
-| `.rex/execution-log.jsonl` | other |  | .rex |
-| `.rex/pending-proposals.json` | other |  | .rex |
-| `.rex/prd.json` | other |  | .rex |
-| `.rex/workflow.md` | docs |  | .rex |
-| `CLAUDE.md` | docs |  | root |
-| `CODEX.md` | docs |  | root |
-| `PACKAGE_GUIDELINES.md` | docs |  | root |
-| `README.md` | docs |  | root |
-| `ci.js` | source | entrypoint | root |
-| `claude-integration.js` | source | service | root |
-| `cli.js` | source | entrypoint | root |
-| `config.js` | source | config | root |
-| `docs/2026-03-03-refresh-orchestration-memory-analysis.md` | docs |  | docs |
-| `docs/level-refactor-and-steward-plan.md` | docs |  | docs |
-| `docs/level-system-reference.md` | docs |  | docs |
-| `docs/memory-architecture.md` | docs |  | docs |
-| `docs/memory-improvements.md` | docs |  | docs |
-| `docs/memory-os-behavior.md` | docs |  | docs |
-| `docs/memory-risks-and-flaws.md` | docs |  | docs |
-| `docs/prd-steward-vision.md` | docs |  | docs |
-| `docs/process-lifecycle-audit.md` | docs |  | docs |
-| `docs/resource-allocation-catalog.md` | docs |  | docs |
-| `docs/rex-smart-add-duplicate-detection.md` | docs |  | docs |
-| `docs/signal-handling-audit.md` | docs |  | docs |
-| `docs/viewer-architecture.md` | docs |  | docs |
-| `docs/viewer-audit.md` | docs |  | docs |
-| `docs/web-zone-architecture.md` | docs |  | docs |
-| `docs/zone-naming-conventions.md` | docs |  | docs |
-| `help.js` | source | cli-command | root |
-| `n-dx.png` | asset |  | root |
-| `package.json` | config |  | root |
-| `packages/hench/Hench-F.png` | asset |  | hench |
-| `packages/hench/Hench.png` | asset |  | hench |
-| `packages/hench/README.md` | docs |  | hench |
-| `packages/hench/package-lock.json` | generated |  | hench |
-| `packages/hench/package.json` | config |  | hench |
-| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/review.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/spin.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/stuck.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/summary.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/workflow.ts` | source | service | hench |
-| `packages/hench/src/agent/completion.ts` | source | service | hench |
-| `packages/hench/src/agent/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | service | hench |
-| `packages/hench/src/agent/planning/brief.ts` | source | service | hench |
-| `packages/hench/src/agent/planning/prompt.ts` | source | service | hench |
-| `packages/hench/src/agent/tools.ts` | source | service | hench |
-| `packages/hench/src/cli/commands/config.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/constants.ts` | source | types | hench |
-| `packages/hench/src/cli/commands/init.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/run.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/show.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/status.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/commands/template.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/errors.ts` | source | utility | hench |
-| `packages/hench/src/cli/help.ts` | source | cli-command | hench |
-| `packages/hench/src/cli/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/cli/output.ts` | source | utility | hench |
-| `packages/hench/src/guard/commands.ts` | source | service | hench |
-| `packages/hench/src/guard/contracts.ts` | source | types | hench |
-| `packages/hench/src/guard/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/guard/paths.ts` | source | service | hench |
-| `packages/hench/src/guard/policy.ts` | source | service | hench |
-| `packages/hench/src/prd/ops.ts` | source | service | hench |
-| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | hench |
-| `packages/hench/src/process/concurrent-execution-metrics.ts` | source | service | hench |
-| `packages/hench/src/process/exec-shell.ts` | source | utility | hench |
-| `packages/hench/src/process/exec.ts` | source | utility | hench |
-| `packages/hench/src/process/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/process/lifecycle.ts` | source | service | hench |
-| `packages/hench/src/process/limiter.ts` | source | utility | hench |
-| `packages/hench/src/process/memory-monitor.ts` | source | service | hench |
-| `packages/hench/src/process/memory-throttle.ts` | source | utility | hench |
-| `packages/hench/src/process/pool.ts` | source | service | hench |
-| `packages/hench/src/process/process-memory-tracker.ts` | source | utility | hench |
-| `packages/hench/src/public.ts` | source | entrypoint | hench |
-| `packages/hench/src/queue/execution-queue.ts` | source | service | hench |
-| `packages/hench/src/queue/format.ts` | source | utility | hench |
-| `packages/hench/src/queue/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/queue/priority-scheduler.ts` | source | service | hench |
-| `packages/hench/src/schema/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/schema/templates.ts` | source | schema | hench |
-| `packages/hench/src/schema/v1.ts` | source | schema | hench |
-| `packages/hench/src/schema/validate.ts` | source | schema | hench |
-| `packages/hench/src/shared/glob.ts` | source | utility | hench |
-| `packages/hench/src/store/config.ts` | source | store | hench |
-| `packages/hench/src/store/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/store/json.ts` | source | store | hench |
-| `packages/hench/src/store/project-config.ts` | source | store | hench |
-| `packages/hench/src/store/run-archiver.ts` | source | store | hench |
-| `packages/hench/src/store/run-change-detector.ts` | source | store | hench |
-| `packages/hench/src/store/run-retention-scheduler.ts` | source | store | hench |
-| `packages/hench/src/store/run-retention.ts` | source | store | hench |
-| `packages/hench/src/store/runs.ts` | source | store | hench |
-| `packages/hench/src/store/suggestions.ts` | source | store | hench |
-| `packages/hench/src/store/templates.ts` | source | store | hench |
-| `packages/hench/src/tools/contracts.ts` | source | types | hench |
-| `packages/hench/src/tools/dispatch.ts` | source | service | hench |
-| `packages/hench/src/tools/exec-shell.ts` | source | utility | hench |
-| `packages/hench/src/tools/files.ts` | source | service | hench |
-| `packages/hench/src/tools/git.ts` | source | service | hench |
-| `packages/hench/src/tools/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/tools/rex.ts` | source | service | hench |
-| `packages/hench/src/tools/shell.ts` | source | service | hench |
-| `packages/hench/src/tools/test-runner.ts` | source | service | hench |
-| `packages/hench/src/types/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/types/output.ts` | source | utility | hench |
-| `packages/hench/src/validation/completion.ts` | source | service | hench |
-| `packages/hench/src/validation/index.ts` | source | entrypoint | hench |
-| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | hench |
-| `packages/hench/tests/fixtures/token-usage-regression.json` | test |  | hench |
-| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | hench |
-| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/review.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/spin-detection.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/help.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/cli/output.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/exec.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/pool.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/queue/format.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/store/templates.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/dispatch-memory.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/files.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/git.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | hench |
-| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | hench |
-| `packages/hench/tsconfig.json` | config |  | hench |
-| `packages/hench/vitest.config.ts` | config |  | hench |
+| `.npmrc` | config |  | monorepo-orchestration |
+| `.rex/acknowledged-findings.json` | other |  | rex-runtime-state |
+| `.rex/archive.json` | other |  | rex-runtime-state |
+| `.rex/config.json` | other |  | rex-runtime-state |
+| `.rex/execution-log.1.jsonl` | other |  | rex-runtime-state |
+| `.rex/execution-log.jsonl` | other |  | rex-runtime-state |
+| `.rex/pending-proposals.json` | other |  | rex-runtime-state |
+| `.rex/prd.json` | other |  | rex-runtime-state |
+| `.rex/workflow.md` | docs |  | rex-runtime-state |
+| `CLAUDE.md` | docs |  | monorepo-orchestration |
+| `CODEX.md` | docs |  | monorepo-orchestration |
+| `PACKAGE_GUIDELINES.md` | docs |  | monorepo-orchestration |
+| `README.md` | docs |  | monorepo-orchestration |
+| `ci.js` | source | entrypoint | monorepo-orchestration |
+| `claude-integration.js` | source | service | monorepo-orchestration |
+| `cli.js` | source | entrypoint | monorepo-orchestration |
+| `config.js` | source | config | monorepo-orchestration |
+| `docs/2026-03-03-refresh-orchestration-memory-analysis.md` | docs |  | project-documentation |
+| `docs/level-refactor-and-steward-plan.md` | docs |  | project-documentation |
+| `docs/level-system-reference.md` | docs |  | project-documentation |
+| `docs/memory-architecture.md` | docs |  | project-documentation |
+| `docs/memory-improvements.md` | docs |  | project-documentation |
+| `docs/memory-os-behavior.md` | docs |  | project-documentation |
+| `docs/memory-risks-and-flaws.md` | docs |  | project-documentation |
+| `docs/prd-steward-vision.md` | docs |  | project-documentation |
+| `docs/process-lifecycle-audit.md` | docs |  | project-documentation |
+| `docs/resource-allocation-catalog.md` | docs |  | project-documentation |
+| `docs/rex-smart-add-duplicate-detection.md` | docs |  | project-documentation |
+| `docs/signal-handling-audit.md` | docs |  | project-documentation |
+| `docs/viewer-architecture.md` | docs |  | project-documentation |
+| `docs/viewer-audit.md` | docs |  | project-documentation |
+| `docs/web-zone-architecture.md` | docs |  | project-documentation |
+| `docs/zone-naming-conventions.md` | docs |  | project-documentation |
+| `help.js` | source | cli-command | monorepo-orchestration |
+| `n-dx.png` | asset |  | monorepo-orchestration |
+| `package.json` | config |  | monorepo-orchestration |
+| `packages/hench/Hench-F.png` | asset |  | autonomous-agent |
+| `packages/hench/Hench.png` | asset |  | autonomous-agent |
+| `packages/hench/README.md` | docs |  | autonomous-agent |
+| `packages/hench/package-lock.json` | generated |  | autonomous-agent |
+| `packages/hench/package.json` | config |  | autonomous-agent |
+| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/analysis/review.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/analysis/spin.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/analysis/stuck.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/analysis/summary.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/analysis/workflow.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/completion.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/planning/brief.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/planning/prompt.ts` | source | service | autonomous-agent |
+| `packages/hench/src/agent/tools.ts` | source | service | autonomous-agent |
+| `packages/hench/src/cli/commands/config.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/constants.ts` | source | types | autonomous-agent |
+| `packages/hench/src/cli/commands/init.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/run.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/show.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/status.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/commands/template.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/errors.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/cli/help.ts` | source | cli-command | autonomous-agent |
+| `packages/hench/src/cli/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/cli/output.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/guard/commands.ts` | source | service | autonomous-agent |
+| `packages/hench/src/guard/contracts.ts` | source | types | autonomous-agent |
+| `packages/hench/src/guard/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/guard/paths.ts` | source | service | autonomous-agent |
+| `packages/hench/src/guard/policy.ts` | source | service | autonomous-agent |
+| `packages/hench/src/prd/ops.ts` | source | service | autonomous-agent |
+| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | autonomous-agent |
+| `packages/hench/src/process/concurrent-execution-metrics.ts` | source | service | autonomous-agent |
+| `packages/hench/src/process/exec-shell.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/process/exec.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/process/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/process/lifecycle.ts` | source | service | autonomous-agent |
+| `packages/hench/src/process/limiter.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/process/memory-monitor.ts` | source | service | autonomous-agent |
+| `packages/hench/src/process/memory-throttle.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/process/pool.ts` | source | service | autonomous-agent |
+| `packages/hench/src/process/process-memory-tracker.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/public.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/queue/execution-queue.ts` | source | service | autonomous-agent |
+| `packages/hench/src/queue/format.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/queue/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | service | autonomous-agent |
+| `packages/hench/src/schema/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/schema/templates.ts` | source | schema | autonomous-agent |
+| `packages/hench/src/schema/v1.ts` | source | schema | autonomous-agent |
+| `packages/hench/src/schema/validate.ts` | source | schema | autonomous-agent |
+| `packages/hench/src/shared/glob.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/store/config.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/store/json.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/project-config.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/run-archiver.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/run-change-detector.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/run-retention-scheduler.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/run-retention.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/runs.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/suggestions.ts` | source | store | autonomous-agent |
+| `packages/hench/src/store/templates.ts` | source | store | autonomous-agent |
+| `packages/hench/src/tools/contracts.ts` | source | types | autonomous-agent |
+| `packages/hench/src/tools/dispatch.ts` | source | service | autonomous-agent |
+| `packages/hench/src/tools/exec-shell.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/tools/files.ts` | source | service | autonomous-agent |
+| `packages/hench/src/tools/git.ts` | source | service | autonomous-agent |
+| `packages/hench/src/tools/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/tools/rex.ts` | source | service | autonomous-agent |
+| `packages/hench/src/tools/shell.ts` | source | service | autonomous-agent |
+| `packages/hench/src/tools/test-runner.ts` | source | service | autonomous-agent |
+| `packages/hench/src/types/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/src/types/output.ts` | source | utility | autonomous-agent |
+| `packages/hench/src/validation/completion.ts` | source | service | autonomous-agent |
+| `packages/hench/src/validation/index.ts` | source | entrypoint | autonomous-agent |
+| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/fixtures/token-usage-regression.json` | test |  | autonomous-agent |
+| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/review.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/spin-detection.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/help.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/cli/output.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/exec.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/pool.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/queue/format.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/store/templates.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/dispatch-memory.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/files.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/git.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | autonomous-agent |
+| `packages/hench/tsconfig.json` | config |  | autonomous-agent |
+| `packages/hench/vitest.config.ts` | config |  | autonomous-agent |
 | `packages/llm-client/package-lock.json` | generated |  | packages-llm-client:root |
 | `packages/llm-client/package.json` | config |  | packages-llm-client:root |
 | `packages/llm-client/src/api-provider.ts` | source | service | packages-llm-client:src |
@@ -1159,7 +1163,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/workspace.ts` | source | service | packages-sourcevision:analyzers |
 | `packages/sourcevision/src/analyzers/zone-hash.ts` | source | utility | packages-sourcevision:analyzers-3 |
 | `packages/sourcevision/src/analyzers/zone-output.ts` | source | service | packages-sourcevision:analyzers |
-| `packages/sourcevision/src/analyzers/zones.ts` | source |  | packages-sourcevision:analyzers-3 |
+| `packages/sourcevision/src/analyzers/zones.ts` | source | service | packages-sourcevision:analyzers-3 |
 | `packages/sourcevision/src/cli/commands/analyze-phases.ts` | source | cli-command | packages-sourcevision:analyzers |
 | `packages/sourcevision/src/cli/commands/analyze.ts` | source | cli-command | packages-sourcevision:analyzers |
 | `packages/sourcevision/src/cli/commands/constants.ts` | source | types | packages-sourcevision:cli |
@@ -1257,420 +1261,422 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/tests/unit/util/sort.test.ts` | test |  | packages-sourcevision:analyzers |
 | `packages/sourcevision/tsconfig.json` | config |  | packages-sourcevision:root |
 | `packages/sourcevision/vitest.config.ts` | config |  | packages-sourcevision:root |
-| `packages/web/BROWSER_ERROR_CODE_5.md` | docs |  | web |
-| `packages/web/MEMORY_PROFILE.md` | docs |  | web |
-| `packages/web/SourceVision-F.png` | asset |  | web |
-| `packages/web/SourceVision.png` | asset |  | web |
-| `packages/web/build.js` | source | config | web |
-| `packages/web/dev.js` | source | config | web |
-| `packages/web/package.json` | config |  | web |
-| `packages/web/src/cli/index.ts` | source | entrypoint | web-viewer |
+| `packages/web/BROWSER_ERROR_CODE_5.md` | docs |  | web-build-infrastructure |
+| `packages/web/MEMORY_PROFILE.md` | docs |  | web-build-infrastructure |
+| `packages/web/SourceVision-F.png` | asset |  | web-build-infrastructure |
+| `packages/web/SourceVision.png` | asset |  | web-build-infrastructure |
+| `packages/web/build.js` | source | config | web-build-infrastructure |
+| `packages/web/dev.js` | source | config | web-build-infrastructure |
+| `packages/web/package.json` | config |  | web-build-infrastructure |
+| `packages/web/src/cli/index.ts` | source | entrypoint | web-dashboard |
 | `packages/web/src/landing/index.html` | other |  | web-landing |
 | `packages/web/src/landing/landing.css` | other |  | web-landing |
 | `packages/web/src/landing/landing.ts` | source | entrypoint | web-landing |
-| `packages/web/src/public.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/schema/v1.ts` | source | schema | web-viewer |
-| `packages/web/src/server/aggregation-cache.ts` | source | service | web-viewer |
-| `packages/web/src/server/concurrent-execution-metrics.ts` | source | service | web-viewer |
-| `packages/web/src/server/domain-gateway.ts` | source | gateway | web-viewer |
-| `packages/web/src/server/incremental-task-usage.ts` | source | service | web-server |
-| `packages/web/src/server/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/server/mcp-deps.ts` | source | gateway | web-viewer |
-| `packages/web/src/server/port.ts` | source | utility | web-viewer |
-| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | utility | web-viewer |
-| `packages/web/src/server/process-memory-tracker.ts` | source | service | web-viewer |
-| `packages/web/src/server/rex-gateway.ts` | source | gateway | web-viewer |
-| `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-config.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-data.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-features.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-hench.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-integrations.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-notion.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-project.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-rex.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-search.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-sourcevision.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-static.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-status.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-token-usage.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-validation.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/routes-workflow.ts` | source | route-handler | web-viewer |
-| `packages/web/src/server/search-index.ts` | source | service | web-viewer |
-| `packages/web/src/server/start.ts` | source | service | web-viewer |
-| `packages/web/src/server/types.ts` | source | types | web-viewer |
-| `packages/web/src/server/usage-cleanup-scheduler.ts` | source | service | web-server |
-| `packages/web/src/server/websocket.ts` | source | service | web-unit |
-| `packages/web/src/server/ws-health-tracker.ts` | source | service | web-unit |
-| `packages/web/src/shared/data-files.ts` | source | types | web-viewer |
-| `packages/web/src/shared/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/shared/node-culler.ts` | source | utility | web-viewer |
-| `packages/web/src/shared/request-dedup.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/bootstrap.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/breadcrumb.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/concurrency-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/config-footer.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/constants.ts` | source | types | web-viewer |
-| `packages/web/src/viewer/components/copy-link-button.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/crash-recovery-banner.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/collapsible-section.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/findings-list.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/health-gauge.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/mini-charts.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/tree-view.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/data-display/zone-map.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/degradation-banner.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/detail-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/elapsed-time.ts` | source | component | web |
-| `packages/web/src/viewer/components/faq.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/favicon.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/guide.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/logos.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/memory-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/memory-warning.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/notion-schema-wizard.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/polling-suspension-indicator.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/add-item-form.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/analyze-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/batch-import-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/compute.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/delete-confirmation.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/execution-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/facet-filter.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/inline-add-form.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/inline-status-picker.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/lazy-children.ts` | source | component | web |
-| `packages/web/src/viewer/components/prd-tree/levels.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts` | source | component | web |
-| `packages/web/src/viewer/components/prd-tree/merge-preview.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/prd-tree.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/progressive-loader.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/proposal-editor.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/prune-confirmation.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/reorganize-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/smart-add-input.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/task-utilization.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/tree-differ.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/tree-search.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/tree-utils.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/types.ts` | source | types | web-viewer |
-| `packages/web/src/viewer/components/prd-tree/virtual-scroll.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/refresh-queue-status.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/rex-task-link.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/search-filter.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/search-overlay.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/sidebar.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/status-indicators.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/theme-toggle.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/throttle-controls.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/ws-health-panel.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/components/zone-slideout.ts` | source | component | web-viewer |
-| `packages/web/src/viewer/darkmode_logo.png` | asset |  | logo |
-| `packages/web/src/viewer/graph/physics.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/graph/renderer.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/hooks/use-app-data.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-crash-recovery.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-dom-performance-monitor.ts` | source | hook | dom |
-| `packages/web/src/viewer/hooks/use-facet-state.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-feature-toggle.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-file-edges.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-graceful-degradation.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-memory-monitor.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-pan-zoom.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-persistent-filter.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-polling-suspension.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-polling.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-prd-actions.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-prd-data.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-prd-deep-link.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-prd-websocket.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-project-metadata.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-project-status.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-refresh-throttle.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-subzone-edges.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-tab-visibility.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-tick.ts` | source | hook | web |
-| `packages/web/src/viewer/hooks/use-toast.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/hooks/use-zone-drag.ts` | source | hook | web-viewer |
-| `packages/web/src/viewer/index.html` | other |  | logo |
-| `packages/web/src/viewer/lightmode_logo.png` | asset |  | logo |
-| `packages/web/src/viewer/loader.ts` | source | service | web-viewer |
-| `packages/web/src/viewer/main.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/messaging/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/messaging/message-throttle.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/crash-detector.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/dom-performance-monitor.ts` | source | utility | dom |
-| `packages/web/src/viewer/performance/dom-update-gate.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/graceful-degradation.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/performance/memory-monitor.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/refresh-throttle.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/response-buffer-gate.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/performance/update-batcher.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/polling/polling-manager.ts` | source | service | web-viewer |
-| `packages/web/src/viewer/polling/polling-restart.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/polling-state.ts` | source | store | web-viewer |
-| `packages/web/src/viewer/polling/tab-visibility.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/tick-timer.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/route-state.ts` | source | route-handler | web-viewer |
-| `packages/web/src/viewer/schema-compat.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/styles/a11y.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/analysis.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/badges.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/base.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/branding.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/breadcrumb.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/call-graph-explorer.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/cards.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/components.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/copy-link.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/crash-recovery.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/degradation-banner.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/detail.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/faq.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/feature-toggles.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/forms.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/graph.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/hench-config.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/hench-runs.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/hench-templates.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/index.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/integration-config.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/layout.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/memory-warning.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/notion-config.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/overview.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/polling-suspension.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/pr-markdown.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/prd-tree.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/refresh-queue.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/responsive.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/rex-dashboard.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/routes.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/search-overlay.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/tables.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/task-audit.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/task-link.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/token-usage.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/tokens.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/utils.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/validation.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/zone-map.css` | other |  | web-viewer |
-| `packages/web/src/viewer/styles/zone-slideout.css` | other |  | web-viewer |
-| `packages/web/src/viewer/types.ts` | source | types | web-viewer |
-| `packages/web/src/viewer/usage/constants.ts` | source | types | web-viewer |
-| `packages/web/src/viewer/usage/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/utils.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/validate.ts` | source | schema | web-viewer |
-| `packages/web/src/viewer/views/analysis.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/architecture.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/domain-hench.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/domain-rex.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/domain-settings.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/domain-sourcevision.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/enrichment-thresholds.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/feature-toggles.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/files.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/graph.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/hench-config.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/hench-runs.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/hench-templates.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/integration-config.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/notion-config.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/overview.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/pr-markdown.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/prd.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/problems.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/rex-dashboard.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/routes.ts` | source | route-handler | web-viewer |
-| `packages/web/src/viewer/views/sourcevision-tabs.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/suggestions.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/task-audit.ts` | source | page | web |
-| `packages/web/src/viewer/views/token-usage.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/validation.ts` | source | schema | web-viewer |
-| `packages/web/src/viewer/views/view-registry.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/zone-types.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/views/zones.ts` | source | page | web-viewer |
-| `packages/web/src/viewer/visualization/colors.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/visualization/flow.ts` | source | utility | web-viewer |
-| `packages/web/src/viewer/visualization/index.ts` | source | entrypoint | web-viewer |
-| `packages/web/src/viewer/visualization/metrics.ts` | source | utility | web-viewer |
-| `packages/web/tests/integration/background-suspension-recovery.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/memory-aware-polling-suspension.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/messaging-stack.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/pr-markdown-refresh.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/pr-markdown-tab-parity.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/request-dedup.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/smart-add-dispatch.test.ts` | test |  | web-viewer |
-| `packages/web/tests/integration/token-usage-route-regression.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/aggregation-cache.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/boundary-check.test.ts` | test |  | web-unit |
-| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/dev-reload.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/incremental-task-usage.test.ts` | test |  | web-server |
-| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/port.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-adaptive.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-config.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-audit.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-concurrency.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-config.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-execute.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-health.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-heartbeat.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-memory.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-shutdown.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-hench-templates.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-notion.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-project.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-requirements.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-rex.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-search.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-sourcevision.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-status.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-token-usage.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-validation.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/routes-workflow.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/scope.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/search-index.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/shutdown-handler.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts` | test |  | web-server |
-| `packages/web/tests/unit/server/websocket.test.ts` | test |  | web-unit |
-| `packages/web/tests/unit/server/ws-health-integration.test.ts` | test |  | web-unit |
-| `packages/web/tests/unit/server/ws-health-tracker.test.ts` | test |  | web-unit |
-| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/add-item-form.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/bar-chart.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/batch-import-panel.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/call-rate-limiter.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/copy-link-button.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/crash-recovery-banner.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/degradation-banner.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/deletion-state-updates.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/detail-panel.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts` | test |  | dom |
-| `packages/web/tests/unit/viewer/dom-update-gate.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/execution-panel-polling.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/favicon.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/fetch-pipeline.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/flow-data-builders.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/graceful-degradation.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | hench |
-| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | hench |
-| `packages/web/tests/unit/viewer/hench-config.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/label-utils.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/large-tree-performance.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/lazy-children.test.ts` | test |  | web |
-| `packages/web/tests/unit/viewer/listener-lifecycle.test.ts` | test |  | web |
-| `packages/web/tests/unit/viewer/loader-memory.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/loader-polling.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/memory-monitor.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/memory-warning.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/message-coalescer.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/message-throttle.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/multi-select.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/node-culler.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/node-culling-integration.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/persistent-filter.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/polling-manager.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/polling-state.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/pr-markdown.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/prd-tree-compute.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/prd-tree.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/progressive-loader.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/progressive-loading-integration.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/prune-diff-tree.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/refresh-throttle.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/request-dedup.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/response-buffer-gate.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/search-overlay.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/sidebar.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/smart-add-input.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/status-indicators-memory.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/status-indicators-polling.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/status-indicators.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tab-visibility.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/task-detail-failure.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/task-detail-requirements.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/task-detail-usage.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tick-timer.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tick-visibility-gate.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tree-differ.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tree-event-delegate.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tree-search.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tree-utils-deletion.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/tree-view.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/update-batcher.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/usage-polling.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/use-polling-suspension.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/virtual-scroll.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/ws-pipeline.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/zone-drill-down.test.ts` | test |  | web-viewer |
-| `packages/web/tests/unit/viewer/zone-inline-subzones.test.ts` | test |  | web-viewer |
-| `packages/web/tsconfig.json` | config |  | web |
-| `packages/web/vitest.config.ts` | config |  | web |
-| `pnpm-lock.yaml` | generated |  | root |
-| `pnpm-workspace.yaml` | other |  | root |
-| `pr-check.js` | source | service | root |
-| `prd.md` | docs |  | root |
-| `refresh-artifacts.js` | source | utility | root |
-| `refresh-plan.js` | source | service | root |
-| `refresh-validate.js` | source | service | root |
-| `tests/e2e/architecture-policy.test.js` | test |  | e2e |
-| `tests/e2e/cli-ci.test.js` | test |  | e2e |
-| `tests/e2e/cli-config.test.js` | test |  | e2e |
-| `tests/e2e/cli-delegation.test.js` | test |  | e2e |
-| `tests/e2e/cli-dev.test.js` | test |  | e2e |
-| `tests/e2e/cli-errors.test.js` | test |  | e2e |
-| `tests/e2e/cli-init.test.js` | test |  | e2e |
-| `tests/e2e/cli-orchestration.test.js` | test |  | e2e |
-| `tests/e2e/cli-pr-check.test.js` | test |  | e2e |
-| `tests/e2e/cli-refresh.test.js` | test |  | e2e |
-| `tests/e2e/cli-start.test.js` | test |  | e2e |
-| `tests/e2e/cli-tool-resolution.test.js` | test |  | e2e |
-| `tests/e2e/cli-web.test.js` | test |  | e2e |
-| `tests/e2e/domain-isolation.test.js` | test |  | e2e |
-| `tests/unit/help.test.js` | test |  | root |
-| `tests/unit/refresh-artifacts.test.js` | test |  | root |
-| `tests/unit/refresh-plan.test.js` | test |  | root |
-| `tests/unit/refresh-validate.test.js` | test |  | root |
-| `tsconfig.base.json` | config |  | root |
-| `vitest.config.js` | config |  | root |
-| `web.js` | source | service | root |
+| `packages/web/src/public.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/schema/v1.ts` | source | schema | web-dashboard |
+| `packages/web/src/server/aggregation-cache.ts` | source | service | web-dashboard |
+| `packages/web/src/server/concurrent-execution-metrics.ts` | source | service | web-dashboard |
+| `packages/web/src/server/domain-gateway.ts` | source | gateway | web-dashboard |
+| `packages/web/src/server/incremental-task-usage.ts` | source | service | task-usage-tracking |
+| `packages/web/src/server/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/server/mcp-deps.ts` | source | gateway | web-dashboard |
+| `packages/web/src/server/port.ts` | source | utility | web-dashboard |
+| `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | utility | web-dashboard |
+| `packages/web/src/server/process-memory-tracker.ts` | source | service | web-dashboard |
+| `packages/web/src/server/rex-gateway.ts` | source | gateway | web-dashboard |
+| `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-config.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-data.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-features.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-hench.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-integrations.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-notion.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-project.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-rex.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-search.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-sourcevision.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-static.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-status.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-token-usage.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-validation.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/routes-workflow.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/server/search-index.ts` | source | service | web-dashboard |
+| `packages/web/src/server/start.ts` | source | service | web-dashboard |
+| `packages/web/src/server/types.ts` | source | types | web-dashboard |
+| `packages/web/src/server/usage-cleanup-scheduler.ts` | source | service | task-usage-tracking |
+| `packages/web/src/server/websocket.ts` | source | service | websocket-infrastructure |
+| `packages/web/src/server/ws-health-tracker.ts` | source | service | websocket-infrastructure |
+| `packages/web/src/shared/data-files.ts` | source | types | web-dashboard |
+| `packages/web/src/shared/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/shared/node-culler.ts` | source | utility | web-dashboard |
+| `packages/web/src/shared/request-dedup.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/bootstrap.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/breadcrumb.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/concurrency-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/config-footer.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/constants.ts` | source | types | web-dashboard |
+| `packages/web/src/viewer/components/copy-link-button.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/crash-recovery-banner.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/collapsible-section.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/findings-list.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/health-gauge.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/mini-charts.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/tree-view.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/data-display/zone-map.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/degradation-banner.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/detail-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/elapsed-time.ts` | source | component | web-build-infrastructure |
+| `packages/web/src/viewer/components/faq.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/favicon.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/guide.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/logos.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/memory-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/memory-warning.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/notion-schema-wizard.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/polling-suspension-indicator.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/add-item-form.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/analyze-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/batch-import-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/compute.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/delete-confirmation.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/execution-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/facet-filter.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/inline-add-form.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/inline-status-picker.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/lazy-children.ts` | source | component | web-build-infrastructure |
+| `packages/web/src/viewer/components/prd-tree/levels.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts` | source | component | web-build-infrastructure |
+| `packages/web/src/viewer/components/prd-tree/merge-preview.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/prd-tree.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/progressive-loader.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/proposal-editor.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/prune-confirmation.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/reorganize-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/smart-add-input.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/task-utilization.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/tree-differ.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/tree-search.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/tree-utils.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/types.ts` | source | types | web-dashboard |
+| `packages/web/src/viewer/components/prd-tree/virtual-scroll.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/refresh-queue-status.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/rex-task-link.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/search-filter.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/search-overlay.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/sidebar.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/status-indicators.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/theme-toggle.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/throttle-controls.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/ws-health-panel.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/components/zone-slideout.ts` | source | component | web-dashboard |
+| `packages/web/src/viewer/darkmode_logo.png` | asset |  | viewer-static-assets |
+| `packages/web/src/viewer/graph/physics.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/graph/renderer.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/hooks/use-app-data.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-crash-recovery.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-delete-actions.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-dom-performance-monitor.ts` | source | hook | dom-performance-monitoring |
+| `packages/web/src/viewer/hooks/use-facet-state.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-feature-toggle.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-file-edges.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-graceful-degradation.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-item-selection.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-memory-monitor.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-pan-zoom.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-persistent-filter.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-polling-suspension.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-polling.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-prd-actions.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-prd-data.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-prd-deep-link.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-prd-websocket.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-project-metadata.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-project-status.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-refresh-throttle.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-subzone-edges.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-tab-visibility.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-tick.ts` | source | hook | web-build-infrastructure |
+| `packages/web/src/viewer/hooks/use-toast.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/hooks/use-zone-drag.ts` | source | hook | web-dashboard |
+| `packages/web/src/viewer/index.html` | other |  | viewer-static-assets |
+| `packages/web/src/viewer/lightmode_logo.png` | asset |  | viewer-static-assets |
+| `packages/web/src/viewer/loader.ts` | source | service | web-dashboard |
+| `packages/web/src/viewer/main.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/messaging/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/messaging/message-throttle.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/crash-detector.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/dom-performance-monitor.ts` | source | utility | dom-performance-monitoring |
+| `packages/web/src/viewer/performance/dom-update-gate.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/graceful-degradation.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/performance/memory-monitor.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/refresh-throttle.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/response-buffer-gate.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/performance/update-batcher.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/polling/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/polling/polling-manager.ts` | source | service | web-dashboard |
+| `packages/web/src/viewer/polling/polling-restart.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/polling/polling-state.ts` | source | store | web-dashboard |
+| `packages/web/src/viewer/polling/tab-visibility.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/polling/tick-timer.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/route-state.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/viewer/schema-compat.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/styles/a11y.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/analysis.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/badges.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/base.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/branding.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/breadcrumb.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/call-graph-explorer.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/cards.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/components.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/copy-link.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/crash-recovery.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/degradation-banner.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/detail.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/faq.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/feature-toggles.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/forms.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/graph.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/hench-config.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/hench-runs.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/hench-templates.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/index.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/integration-config.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/layout.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/memory-warning.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/notion-config.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/overview.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/polling-suspension.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/pr-markdown.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/prd-tree.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/refresh-queue.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/responsive.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/rex-dashboard.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/routes.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/search-overlay.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/tables.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/task-audit.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/task-link.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/token-usage.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/tokens.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/utils.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/validation.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/zone-map.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/styles/zone-slideout.css` | other |  | web-dashboard |
+| `packages/web/src/viewer/types.ts` | source | types | web-dashboard |
+| `packages/web/src/viewer/usage/constants.ts` | source | types | web-dashboard |
+| `packages/web/src/viewer/usage/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/utils.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/validate.ts` | source | schema | web-dashboard |
+| `packages/web/src/viewer/views/analysis.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/architecture.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/domain-hench.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/domain-rex.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/domain-settings.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/domain-sourcevision.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/enrichment-thresholds.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/feature-toggles.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/files.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/graph.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/hench-config.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/hench-runs.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/hench-templates.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/integration-config.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/notion-config.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/overview.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/pr-markdown.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/prd.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/problems.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/rex-dashboard.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/routes.ts` | source | route-handler | web-dashboard |
+| `packages/web/src/viewer/views/sourcevision-tabs.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/suggestions.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/task-audit.ts` | source | page | web-build-infrastructure |
+| `packages/web/src/viewer/views/token-usage.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/validation.ts` | source | schema | web-dashboard |
+| `packages/web/src/viewer/views/view-registry.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/zone-types.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/views/zones.ts` | source | page | web-dashboard |
+| `packages/web/src/viewer/visualization/colors.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/visualization/flow.ts` | source | utility | web-dashboard |
+| `packages/web/src/viewer/visualization/index.ts` | source | entrypoint | web-dashboard |
+| `packages/web/src/viewer/visualization/metrics.ts` | source | utility | web-dashboard |
+| `packages/web/tests/integration/background-suspension-recovery.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/memory-aware-polling-suspension.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/messaging-stack.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/pr-markdown-refresh.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/pr-markdown-tab-parity.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/request-dedup.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/smart-add-dispatch.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/integration/token-usage-route-regression.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/aggregation-cache.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/boundary-check.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/dev-reload.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/incremental-task-usage.test.ts` | test |  | task-usage-tracking |
+| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/port.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-adaptive.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-config.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-audit.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-concurrency.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-config.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-execute.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-health.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-heartbeat.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-memory.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-shutdown.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-hench-templates.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-notion.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-project.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-requirements.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-rex.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-search.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-sourcevision.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-status.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-token-usage.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-validation.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/routes-workflow.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/scope.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/search-index.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/shutdown-handler.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts` | test |  | task-usage-tracking |
+| `packages/web/tests/unit/server/websocket.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/server/ws-health-integration.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/server/ws-health-tracker.test.ts` | test |  | websocket-infrastructure |
+| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/add-item-form.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/bar-chart.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/batch-import-panel.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/call-rate-limiter.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/copy-link-button.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/crash-recovery-banner.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/degradation-banner.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/deletion-state-updates.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/detail-panel.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts` | test |  | dom-performance-monitoring |
+| `packages/web/tests/unit/viewer/dom-update-gate.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/execution-panel-polling.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/favicon.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/fetch-pipeline.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/flow-data-builders.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/graceful-degradation.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | autonomous-agent |
+| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | autonomous-agent |
+| `packages/web/tests/unit/viewer/hench-config.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/label-utils.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/large-tree-performance.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/lazy-children.test.ts` | test |  | web-build-infrastructure |
+| `packages/web/tests/unit/viewer/listener-lifecycle.test.ts` | test |  | web-build-infrastructure |
+| `packages/web/tests/unit/viewer/loader-memory.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/loader-polling.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/memory-monitor.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/memory-warning.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/message-coalescer.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/message-throttle.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/multi-select.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/node-culler.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/node-culling-integration.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/persistent-filter.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/polling-manager.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/polling-state.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/pr-markdown.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/prd-tree-compute.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/prd-tree.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/progressive-loader.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/progressive-loading-integration.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/prune-diff-tree.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/refresh-throttle.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/request-dedup.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/response-buffer-gate.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/search-overlay.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/sidebar.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/smart-add-input.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/status-indicators-memory.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/status-indicators-polling.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/status-indicators.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tab-visibility.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/task-detail-failure.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/task-detail-requirements.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/task-detail-usage.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tick-timer.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tick-visibility-gate.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tree-differ.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tree-event-delegate.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tree-search.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tree-utils-deletion.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/tree-view.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/update-batcher.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/usage-polling.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/use-polling-suspension.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/virtual-scroll.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/ws-pipeline.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/zone-drill-down.test.ts` | test |  | web-dashboard |
+| `packages/web/tests/unit/viewer/zone-inline-subzones.test.ts` | test |  | web-dashboard |
+| `packages/web/tsconfig.json` | config |  | web-build-infrastructure |
+| `packages/web/vitest.config.ts` | config |  | web-build-infrastructure |
+| `pnpm-lock.yaml` | generated |  | monorepo-orchestration |
+| `pnpm-workspace.yaml` | other |  | monorepo-orchestration |
+| `pr-check.js` | source | service | monorepo-orchestration |
+| `prd.md` | docs |  | monorepo-orchestration |
+| `refresh-artifacts.js` | source | utility | monorepo-orchestration |
+| `refresh-plan.js` | source | service | monorepo-orchestration |
+| `refresh-validate.js` | source | service | monorepo-orchestration |
+| `tests/e2e/architecture-policy.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-ci.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-config.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-delegation.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-dev.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-errors.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-init.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-orchestration.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-pr-check.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-refresh.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-start.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-tool-resolution.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-web.test.js` | test |  | e2e-tests |
+| `tests/e2e/domain-isolation.test.js` | test |  | e2e-tests |
+| `tests/unit/help.test.js` | test |  | monorepo-orchestration |
+| `tests/unit/refresh-artifacts.test.js` | test |  | monorepo-orchestration |
+| `tests/unit/refresh-plan.test.js` | test |  | monorepo-orchestration |
+| `tests/unit/refresh-validate.test.js` | test |  | monorepo-orchestration |
+| `tsconfig.base.json` | config |  | monorepo-orchestration |
+| `vitest.config.js` | config |  | monorepo-orchestration |
+| `web.js` | source | service | monorepo-orchestration |
 
 ## Tooling
 

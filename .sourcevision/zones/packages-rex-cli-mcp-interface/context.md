@@ -9,7 +9,7 @@ Files: 40, Cohesion: 0.47, Coupling: 0.53
 Risk: healthy (score: 0.53)
 Description: User-facing CLI infrastructure: command routing, chunked review workflow, MCP server integration, output formatting, token usage tracking, and error handling.
 Entry points: packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/chunked-review.ts, packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/token-format.ts, packages/rex/src/cli/commands/usage.ts, packages/rex/src/cli/commands/verify.ts, packages/rex/src/cli/errors.ts, packages/rex/src/cli/mcp.ts, packages/rex/src/cli/output.ts, packages/rex/src/core/reshape.ts, packages/rex/src/core/stats.ts, packages/rex/src/core/token-usage.ts
-Lines: 14175
+Lines: 14230
 
 </zone>
 
@@ -31,8 +31,8 @@ packages/rex/src/cli/commands/update.ts (TypeScript, 197 lines, source)
 packages/rex/src/cli/commands/usage.ts (TypeScript, 248 lines, source)
 packages/rex/src/cli/commands/verify.ts (TypeScript, 108 lines, source)
 packages/rex/src/cli/errors.ts (TypeScript, 142 lines, source)
-packages/rex/src/cli/help.ts (TypeScript, 615 lines, source)
-packages/rex/src/cli/index.ts (TypeScript, 415 lines, source)
+packages/rex/src/cli/help.ts (TypeScript, 616 lines, source)
+packages/rex/src/cli/index.ts (TypeScript, 469 lines, source)
 packages/rex/src/cli/mcp-tools.ts (TypeScript, 623 lines, source)
 packages/rex/src/cli/mcp.ts (TypeScript, 226 lines, source)
 packages/rex/src/cli/output.ts (TypeScript, 77 lines, source)
@@ -198,6 +198,6 @@ Incoming (other zones → this zone):
 - cli-mcp-interface shares the dual-threshold fragility pattern with recommendation-scanning (cohesion below 0.5, coupling above 0.5 simultaneously). Both zones should be addressed in the same refactoring pass since they are structurally linked via bidirectional imports.
 - Token telemetry is CLI-layer-only. Move token consumption tracking to a cross-cutting concern at the llm-client foundation layer so domain analysis operations can emit telemetry without depending on CLI infrastructure.
 - chunked-review-state.ts is a one-off stateful workflow implementation with no shared contract. Extract a WorkflowStep or StatefulCommand interface to prevent this pattern from being re-implemented ad-hoc in future multi-step commands.
-- [call graph] 1547 internal calls, 202 outgoing, 349 incoming (cohesion: 0.88, coupling: 0.12)
+- [call graph] 1552 internal calls, 202 outgoing, 351 incoming (cohesion: 0.88, coupling: 0.12)
 
 </insights>

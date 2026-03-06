@@ -11741,6 +11741,7 @@
         "formatTimestamp",
         "renderTree",
         "filterCompleted",
+        "filterDeleted",
         "formatStats"
       ]
     },
@@ -17329,6 +17330,14 @@
     },
     {
       "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/routes-adaptive.ts",
       "type": "static",
       "symbols": [
@@ -17492,6 +17501,14 @@
     },
     {
       "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "CollectAllIdsFn"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/websocket.ts",
       "type": "static",
       "symbols": [
@@ -17521,22 +17538,6 @@
       "symbols": [
         "IncrementalTaskUsageAggregator",
         "TaskUsageAccumulator"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "type": "static",
-      "symbols": [
-        "collectAllIds"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "type": "type",
-      "symbols": [
-        "PRDDocument"
       ]
     },
     {
@@ -18648,6 +18649,25 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "collectSubtreeIds",
+        "removeItemById"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
       "to": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "type": "static",
@@ -18728,6 +18748,31 @@
         "MemoryLevel",
         "DegradableFeature",
         "DegradationState"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-item-selection.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-item-selection.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocumentData",
+        "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-item-selection.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "DetailItem"
       ]
     },
     {
@@ -18832,9 +18877,7 @@
       "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
       "type": "static",
       "symbols": [
-        "findItemById",
-        "collectSubtreeIds",
-        "removeItemById"
+        "findItemById"
       ]
     },
     {
@@ -18846,6 +18889,22 @@
         "PRDItemData",
         "TaskUsageSummary",
         "WeeklyBudgetResolution"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+      "type": "static",
+      "symbols": [
+        "useDeleteActions"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "to": "packages/web/src/viewer/hooks/use-item-selection.ts",
+      "type": "static",
+      "symbols": [
+        "useItemSelection"
       ]
     },
     {
@@ -22010,6 +22069,14 @@
     },
     {
       "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
       "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
       "type": "static",
       "symbols": [
@@ -22027,7 +22094,8 @@
       "type": "type",
       "symbols": [
         "OrphanedEntry",
-        "CleanupResult"
+        "CleanupResult",
+        "CollectAllIdsFn"
       ]
     },
     {
@@ -24036,11 +24104,13 @@
         "packages/web/src/viewer/components/zone-slideout.ts",
         "packages/web/src/viewer/hooks/use-app-data.ts",
         "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+        "packages/web/src/viewer/hooks/use-delete-actions.ts",
         "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
         "packages/web/src/viewer/hooks/use-facet-state.ts",
         "packages/web/src/viewer/hooks/use-feature-toggle.ts",
         "packages/web/src/viewer/hooks/use-file-edges.ts",
         "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
+        "packages/web/src/viewer/hooks/use-item-selection.ts",
         "packages/web/src/viewer/hooks/use-memory-monitor.ts",
         "packages/web/src/viewer/hooks/use-pan-zoom.ts",
         "packages/web/src/viewer/hooks/use-persistent-filter.ts",
@@ -24734,7 +24804,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2556,
+    "totalEdges": 2564,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],
@@ -24820,6 +24890,6 @@
         "count": 11
       }
     ],
-    "avgImportsPerFile": 3.4
+    "avgImportsPerFile": 3.41
   }
 }

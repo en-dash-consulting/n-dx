@@ -1,175 +1,9 @@
 {
   "zones": [
     {
-      "id": ".rex",
-      "name": ".rex",
-      "description": "8 files, primarily JSON, Other, Markdown",
-      "files": [
-        ".rex/acknowledged-findings.json",
-        ".rex/archive.json",
-        ".rex/config.json",
-        ".rex/execution-log.1.jsonl",
-        ".rex/execution-log.jsonl",
-        ".rex/pending-proposals.json",
-        ".rex/prd.json",
-        ".rex/workflow.md"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "All files are pure data (JSON/JSONL/Markdown) with no imports, producing correct isolation — no application code should live here",
-        "The presence of both execution-log.jsonl and execution-log.1.jsonl suggests log rotation is active; ensure the rotation strategy is documented to avoid unbounded log growth",
-        "workflow.md alongside machine-readable JSON provides a human-readable audit trail, which is a useful pattern for debugging agent runs",
-        "Zero coupling is expected and correct — these are data files, not modules. Any import edges into this zone would indicate a structural problem.",
-        "Two execution log files (execution-log.jsonl, execution-log.1.jsonl) indicate log rotation; confirm the rotation limit is configured to prevent unbounded disk growth in long-running projects.",
-        "pending-proposals.json and acknowledged-findings.json form a lightweight review workflow; this pattern cleanly separates proposed changes from accepted state in prd.json.",
-        "rex-runtime-state is the only zone in the entire graph that is both a leaf (no outgoing edges) and a root (no incoming edges) — it is a true island, which is correct for a data-files-only zone and confirms no application code has accidentally imported from it",
-        "rex-runtime-state is a fully isolated island (no import edges in either direction) — any future edge appearing here should be treated as a structural regression and blocked in CI.",
-        "'rex-runtime-state' is the only zone named after runtime state rather than a functional or package role — all other zones use functional names (hench-agent-engine, architecture-documentation) or package names (web-package-shell). This naming inconsistency makes the zone harder to locate by role.",
-        "Rename zone 'rex-runtime-state' to 'rex-persistence' or 'rex-data-store' to match the functional naming convention used by every other zone. The current name describes deployment state rather than architectural role, making it inconsistent with zone discovery patterns."
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "docs",
-      "name": "Docs",
-      "description": "16 files, primarily Markdown",
-      "files": [
-        "docs/2026-03-03-refresh-orchestration-memory-analysis.md",
-        "docs/level-refactor-and-steward-plan.md",
-        "docs/level-system-reference.md",
-        "docs/memory-architecture.md",
-        "docs/memory-improvements.md",
-        "docs/memory-os-behavior.md",
-        "docs/memory-risks-and-flaws.md",
-        "docs/prd-steward-vision.md",
-        "docs/process-lifecycle-audit.md",
-        "docs/resource-allocation-catalog.md",
-        "docs/rex-smart-add-duplicate-detection.md",
-        "docs/signal-handling-audit.md",
-        "docs/viewer-architecture.md",
-        "docs/viewer-audit.md",
-        "docs/web-zone-architecture.md",
-        "docs/zone-naming-conventions.md"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Documents cover memory architecture, PRD stewardship, and level-system reference — these are high-value artifacts for onboarding and architectural governance",
-        "Several files reference 'memory' concerns (memory-architecture.md, memory-improvements.md, memory-os-behavior.md, memory-risks-and-flaws.md), suggesting active design work on a memory subsystem worth tracking as a formal PRD feature",
-        "Zero coupling is ideal for a docs zone; no production code should import from here",
-        "Four memory-focused documents indicate a concentrated area of active design; consider consolidating into a single reference doc once decisions stabilize to reduce maintenance burden.",
-        "The 2026-03-03 date-prefixed analysis file suggests a growing set of dated design notes; a lightweight ADR (Architecture Decision Record) convention would make this history easier to navigate.",
-        "Perfect cohesion and zero coupling are correct — documentation should never be a module dependency, and this zone achieves that cleanly.",
-        "The architecture-documentation zone is the only zone with a date-prefixed file (2026-03-03-refresh-orchestration-memory-analysis.md) alongside undated files — this mixed convention means the zone has two incompatible organizational schemes for the same category of content, making chronological vs. topical retrieval ambiguous.",
-        "Standardize documentation file naming: either date-prefix all analysis/decision files (ADR convention) or use no date prefixes and rely on git history. The current mix of one dated file among undated peers creates an inconsistent retrieval experience and will worsen as the docs zone grows."
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "dom",
-      "name": "Dom",
-      "description": "3 files, primarily TypeScript",
-      "files": [
-        "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
-        "packages/web/src/viewer/performance/dom-performance-monitor.ts",
-        "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts"
-      ],
-      "entryPoints": [],
-      "cohesion": 0.67,
-      "coupling": 0.33,
-      "insights": [
-        "The two-file split between a raw monitor class and a React hook wrapper follows good separation of concerns — the monitor is independently testable without React.",
-        "With only 3 files and a single import from web-viewer, this zone is a self-contained leaf; if the monitor grows, consider whether it belongs inside the viewer zone rather than as a separate community.",
-        "The test file covers the utility directly, but a hook-level test is absent — consider adding one to validate the React integration path.",
-        "Cohesion of 0.75 is solid for a 3-file zone; the slight gap is the test file not importing the hook, which is expected and not a concern.",
-        "Single outbound coupling to web-viewer keeps this zone cleanly subordinate — no risk of circular dependencies.",
-        "The call-graph metrics (cohesion: 1, coupling: 0) contradict the community-detection metrics (cohesion: 0.75, coupling: 0.25) — the discrepancy indicates the 0.25 coupling comes from type-only imports erased at compile time, not from runtime functional dependencies. The zone is more decoupled at runtime than the import graph suggests.",
-        "use-dom-performance-monitor.ts physically lives inside packages/web/src/viewer/hooks/ — a directory that belongs to the web-viewer zone — yet is classified in dom-performance-monitor. Developers browsing web-viewer source will encounter this file and have no indication it belongs to a separate zone, creating navigational confusion.",
-        "Internal call volume of 248 vs 1 outgoing gives a cohesion-to-coupling ratio of 248:1, the strongest ratio in this batch — this is strong quantitative evidence that the zone boundary is correctly drawn at a genuine architectural seam.",
-        "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts is physically nested inside the web-viewer directory tree but classified in the dom-performance-monitor zone. This physical/logical mismatch means the file is invisible to zone-aware tooling when browsing web-viewer source. Move it to a dedicated packages/web/src/dom-performance-monitor/ directory to align physical location with zone boundary, or absorb the zone into web-viewer entirely.",
-        "The zone is named after the implementation class (dom-performance-monitor) rather than the consumer-facing API surface (use-dom-performance-monitor hook). Zones named after internal implementation details rather than their public contract can mislead consumers about what the zone actually exposes to callers.",
-        "The test file dom-performance-monitor.test.ts shares the same base name as the utility class, making the naming asymmetry with the untested hook invisible at a glance — a contributor scanning file names would see apparent parity between source and test when coverage is actually incomplete.",
-        "Rename the zone from 'dom-performance-monitor' to 'dom-performance-monitor-hook' or 'use-dom-performance-monitor' to reflect that the hook is the public surface, not the internal class. Zone IDs named after implementation internals drift from their public API over time.",
-        "Zone \"dom\" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/hooks/dom/ and moving related files there",
-        "[call graph] 248 internal calls, 1 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ],
-      "riskMetrics": {
-        "cohesion": 0.67,
-        "coupling": 0.33,
-        "riskScore": 0.32999999999999996,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "e2e",
-      "name": "E2e",
-      "description": "14 files, primarily JavaScript",
-      "files": [
-        "tests/e2e/architecture-policy.test.js",
-        "tests/e2e/cli-ci.test.js",
-        "tests/e2e/cli-config.test.js",
-        "tests/e2e/cli-delegation.test.js",
-        "tests/e2e/cli-dev.test.js",
-        "tests/e2e/cli-errors.test.js",
-        "tests/e2e/cli-init.test.js",
-        "tests/e2e/cli-orchestration.test.js",
-        "tests/e2e/cli-pr-check.test.js",
-        "tests/e2e/cli-refresh.test.js",
-        "tests/e2e/cli-start.test.js",
-        "tests/e2e/cli-tool-resolution.test.js",
-        "tests/e2e/cli-web.test.js",
-        "tests/e2e/domain-isolation.test.js"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect cohesion (1.0) and zero coupling confirm this zone is correctly isolated — test code imports nothing from production packages at the community-detection level.",
-        "The breadth of coverage (architecture policy, delegation, orchestration, sync, dev server) signals mature end-to-end confidence in the CLI contract; keep these tests as the canonical regression gate for any cli.js changes.",
-        "With 14+ files all at the top-level tests/e2e/, consider grouping by domain (e.g. tests/e2e/cli/, tests/e2e/policy/) if the suite continues to grow to make triage faster.",
-        "Zero coupling to production zones is the correct property for an e2e suite — tests invoke the CLI as a black box rather than importing internals.",
-        "Architecture-policy test living alongside CLI tests is a good pattern; ensures structural constraints are verified in the same CI pass as behavioral ones.",
-        "The cli-e2e-tests zone treats the CLI as a black-box contract boundary — zero imports from production zones means any internal refactor is invisible to the test suite, which is the correct property for an integration gate.",
-        "cli-e2e-tests is the only zone in the entire codebase that achieves both perfect cohesion (1.0) and perfect isolation (coupling 0) at scale (14 files). It should be used as the reference model when onboarding new test suites — any future e2e suite that imports from production zones should be treated as a structural defect rather than a convenience.",
-        "The architecture-policy test co-located with CLI behavioral tests means a single CI job validates both structural constraints and behavioral contracts simultaneously. This is an efficient guard against regressions in either dimension but couples the policy enforcement cadence to the CLI release cadence — if CLI tests become slow, policy checks slow down too. Consider whether policy tests warrant a separate, faster CI step as the suite grows.",
-        "All 14 test files in cli-e2e-tests use the .js extension while every package-level test (unit, integration) uses .ts. This cross-tier language inconsistency is an implicit convention (e2e tests as black-box shell scripts vs typed unit tests) that is nowhere documented — future contributors will choose the wrong extension without guidance.",
-        "architecture-policy.test.js enforces structural code constraints, not CLI behavior, yet it is named and co-located identically to cli-*.test.js behavioral tests. A contributor triaging a failing suite cannot distinguish a policy violation from a behavioral regression without reading the file content.",
-        "Rename architecture-policy.test.js to policy-architecture.test.js or relocate it to tests/policy/ to visually distinguish structural enforcement from CLI behavioral tests. Co-location with cli-*.test.js creates a false equivalence between two categorically different test concerns.",
-        "Document the implicit convention that e2e tests use .js (black-box CLI invocation) while package tests use .ts (typed unit/integration). Add a comment in tests/e2e/ README or enforce via the architecture-policy test itself to prevent future contributors from adding .ts files to the e2e suite.",
-        "The architecture-policy test runs inside the CLI e2e suite, coupling policy enforcement cadence and reliability to CLI build availability. Extract structural policy tests into a standalone tests/policy/ suite that runs without spawning CLI processes — this makes policy checks fast enough to run as a pre-commit hook independently of e2e infrastructure.",
-        "[call graph] 367 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "hench",
-      "name": "Hench",
-      "description": "157 files, primarily TypeScript, JSON, Other",
+      "id": "autonomous-agent",
+      "name": "Autonomous Agent",
+      "description": "The hench package: autonomous task execution via agent loops, tool dispatch, brief generation, and run recording against the rex PRD.",
       "files": [
         "packages/hench/Hench-F.png",
         "packages/hench/Hench.png",
@@ -1966,21 +1800,13 @@
       ],
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "At 159 files with perfect cohesion and zero detected coupling to other zones, hench is a well-encapsulated domain — all cross-package imports are expected to flow through rex-gateway.ts per the gateway pattern",
-        "The agent/analysis/ subdirectory (adaptive.ts, review.ts, spin.ts) signals a multi-strategy analysis layer; ensure these strategies are tested independently to prevent regression when adding new analysis modes",
-        "Zero coupling despite being the execution layer that drives rex and llm-client suggests the gateway pattern is working correctly — verify rex-gateway.ts is the sole import boundary",
-        "159 files with cohesion 1.0 and coupling 0.0 is the largest self-contained zone in the codebase — this is a strong signal that the gateway pattern is being enforced correctly.",
-        "The agent/analysis/ module trio (adaptive, review, spin) represents distinct reasoning strategies; documenting when each is invoked will help maintainers understand the agent's decision logic.",
-        "Hench images (Hench.png, Hench-F.png) and README.md colocated with source is consistent with the package-level documentation pattern used across the monorepo.",
-        "Zone \"hench-agent-engine\" has files across 31 directories — consider consolidating under a dedicated directory",
-        "Despite being the execution layer that drives rex, hench-agent-engine shows zero outgoing edges to any other zone in this graph — all cross-package calls are absorbed by the gateway pattern, making hench the strongest example of gateway enforcement in the codebase",
-        "hench-agent-engine achieves complete zone isolation (coupling 0) while being the highest-activity runtime zone — this is the strongest validation that the gateway pattern scales to large packages (159 files) without leaking import edges.",
-        "The agent/analysis/ trio (adaptive.ts, review.ts, spin.ts) is the highest-risk area for hidden inter-strategy coupling — if any two strategies share mutable state or call each other, the gateway pattern cannot protect against that internal cycle",
-        "hench-agent-engine spans 31 directories within a single detected zone. At 159 files this exceeds the practical review threshold for a single zone — sub-zones such as agent/analysis, prd, and store likely represent distinct bounded contexts that are invisible to the current zone graph.",
-        "The hench zone has 2838 internal calls and zero outgoing call graph edges — for the 'execution layer' that drives rex tasks, this means all external interactions are dynamically dispatched (LLM API calls, subprocess spawns) rather than statically traceable imports. This makes hench the only execution-tier zone that is invisible to static call graph analysis, which is architecturally correct but means call graph metrics alone cannot validate hench's external behavior.",
-        "hench is the only package with a gateway (rex-gateway.ts) but no equivalent pattern for the LLM client — llm-client calls in hench are presumably direct, not gatewayed. If hench ever needs a second LLM vendor or adds sourcevision as a dependency, the absence of an llm-client gateway will require a reactive rather than proactive refactor.",
-        "Add an llm-client-gateway.ts alongside rex-gateway.ts in hench to make the LLM client dependency surface explicit and auditable. Currently all llm-client imports in hench are scattered across leaf files, which violates the gateway convention already applied to the rex dependency.",
-        "Zone \"hench\" has files across 31 directories — consider consolidating under a dedicated directory",
+        "At 159 files, this is the largest single-package zone — ensure internal modularity (agent/, prd/, tools/ subdirs) is reflected in clear intra-package boundaries",
+        "Cohesion of 1 with zero coupling to other zones is ideal for an execution-layer package; the rex-gateway.ts pattern correctly concentrates all cross-package imports",
+        "Review files (review.ts), adaptive analysis (adaptive.ts), and spin detection (spin.ts) suggest mature loop-quality heuristics that should be covered by integration tests to prevent regressions",
+        "Perfect cohesion (1.0) and zero external coupling confirm the rex-gateway pattern is working as intended for this package.",
+        "159 files in a single zone suggests the internal structure is dense; sourcevision may benefit from per-subdirectory zone hints to surface finer-grained architectural boundaries within hench.",
+        "Agent analysis files (adaptive.ts, review.ts, spin.ts) represent domain-specific loop heuristics — documenting their interaction order would help contributors understand the agent's decision pipeline.",
+        "Zone \"autonomous-agent\" has files across 31 directories — consider consolidating under a dedicated directory",
         "[call graph] 2838 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -1992,30 +1818,120 @@
       }
     },
     {
-      "id": "logo",
-      "name": "Logo",
-      "description": "3 files, primarily Other, HTML",
+      "id": "dom-performance-monitoring",
+      "name": "DOM Performance Monitoring",
+      "description": "Encapsulates the DOM performance monitoring utility and its React hook abstraction for the viewer.",
       "files": [
-        "packages/web/src/viewer/darkmode_logo.png",
-        "packages/web/src/viewer/index.html",
-        "packages/web/src/viewer/lightmode_logo.png"
+        "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+        "packages/web/src/viewer/performance/dom-performance-monitor.ts",
+        "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 0.67,
+      "coupling": 0.33,
+      "insights": [
+        "Small, focused zone with clean separation between the core utility (dom-performance-monitor.ts) and its React hook wrapper (use-dom-performance-monitor.ts) — a good pattern for testability.",
+        "The zone has no entry point and is consumed by web-viewer via a single import, suggesting it could reasonably be absorbed into the web-viewer zone unless it grows further.",
+        "Test co-location alongside both the utility and hook is good practice and contributes to the respectable cohesion score of 0.67.",
+        "Cohesion of 0.67 and coupling of 0.33 are healthy for a 3-file zone; no structural changes needed.",
+        "Zone has no declared entry point — if web-viewer imports this directly by path, consider formalizing a public.ts export to make the surface explicit.",
+        "At 3 files, this zone sits at the minimum useful size; monitor whether it grows organically or should be folded into web-viewer.",
+        "[call graph] 248 internal calls, 1 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 0.67,
+        "coupling": 0.33,
+        "riskScore": 0.32999999999999996,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "e2e-tests",
+      "name": "End-to-End Test Suite",
+      "description": "Comprehensive CLI and architecture E2E tests covering orchestration, delegation, error handling, config, and web server behavior.",
+      "files": [
+        "tests/e2e/architecture-policy.test.js",
+        "tests/e2e/cli-ci.test.js",
+        "tests/e2e/cli-config.test.js",
+        "tests/e2e/cli-delegation.test.js",
+        "tests/e2e/cli-dev.test.js",
+        "tests/e2e/cli-errors.test.js",
+        "tests/e2e/cli-init.test.js",
+        "tests/e2e/cli-orchestration.test.js",
+        "tests/e2e/cli-pr-check.test.js",
+        "tests/e2e/cli-refresh.test.js",
+        "tests/e2e/cli-start.test.js",
+        "tests/e2e/cli-tool-resolution.test.js",
+        "tests/e2e/cli-web.test.js",
+        "tests/e2e/domain-isolation.test.js"
       ],
       "entryPoints": [],
       "cohesion": 1,
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "Perfect cohesion and zero coupling are expected and appropriate for static binary and HTML assets",
-        "The presence of dual-mode logos (lightmode/darkmode) indicates theme-switching support is built into the viewer shell",
-        "These assets should be verified as correctly referenced by the viewer build output to avoid broken image references in production",
-        "Dual-mode logo assets (lightmode_logo.png, darkmode_logo.png) correctly support theme switching at the asset level — no code changes needed.",
-        "Ensure the build pipeline copies or hashes these static assets correctly so logo references in index.html resolve after bundling.",
-        "This zone is purely presentational with no logic; it will remain stable unless branding changes, making it a low-maintenance artefact.",
-        "Serves as the static shell for the viewer sub-application while web-landing-page serves the marketing/entry surface — the two static zones represent parallel, non-overlapping entry points into the web package",
-        "viewer-shell-assets and web-landing-page are parallel static entry points with no coupling between them or to any logic zone. This two-entry-point structure is clean; verify that their build outputs are kept independent to avoid accidental asset bundling across the two surfaces.",
-        "index.html statically references asset paths that are resolved only after the build pipeline runs — any mismatch between HTML asset references and build output paths creates a broken runtime dependency that is invisible to the import graph and uncatchable by zone-level analysis",
-        "index.html contains hard-coded asset paths (logo filenames) that must stay in sync with build output — there is no compile-time verification that these references resolve, creating a latent deployment breakage risk invisible to the module graph",
-        "Zone \"logo\" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/logo/ and moving related files there"
+        "Perfect cohesion (1.0) and zero coupling confirm these tests operate at the process boundary — spawning real CLI processes rather than importing production modules, which provides maximum integration confidence.",
+        "Test coverage spans CLI orchestration, per-command delegation, architecture policy enforcement, and web server lifecycle, indicating good breadth across the monorepo's public surface.",
+        "Zero coupling is appropriate here, but verify that architecture-policy.test.js actively enforces import-graph rules (e.g., no cross-tier violations) so it remains a living constraint rather than documentation.",
+        "Perfect cohesion and zero coupling are ideal for an E2E suite — these tests correctly treat the CLI as a black box.",
+        "14 E2E test files with no shared fixtures module detected; if setup/teardown logic is duplicated across files, a shared helper could reduce maintenance burden.",
+        "architecture-policy.test.js should be reviewed periodically to ensure it encodes current tier boundaries; policy tests that are not updated alongside architectural changes become stale and misleading.",
+        "[call graph] 367 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "monorepo-orchestration",
+      "name": "Monorepo Orchestration",
+      "description": "Root-level entry points and configuration that coordinate the three-package pipeline (sourcevision → rex → hench) without importing from any package directly.",
+      "files": [
+        ".gitignore",
+        ".npmrc",
+        "CLAUDE.md",
+        "CODEX.md",
+        "PACKAGE_GUIDELINES.md",
+        "README.md",
+        "ci.js",
+        "claude-integration.js",
+        "cli.js",
+        "config.js",
+        "help.js",
+        "n-dx.png",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "pr-check.js",
+        "prd.md",
+        "refresh-artifacts.js",
+        "refresh-plan.js",
+        "refresh-validate.js",
+        "tests/unit/help.test.js",
+        "tests/unit/refresh-artifacts.test.js",
+        "tests/unit/refresh-plan.test.js",
+        "tests/unit/refresh-validate.test.js",
+        "tsconfig.base.json",
+        "vitest.config.js",
+        "web.js"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Orchestration layer correctly avoids library imports by spawning CLIs, preserving the four-tier hierarchy",
+        "ci.js and claude-integration.js serve distinct roles (validation pipeline vs. AI integration) and could be documented as separate concerns",
+        "The 27-file zone mixes config files, markdown docs, and executable scripts — consider whether non-executable root files (tsconfig, .npmrc) belong in a dedicated config subgroup",
+        "Zero coupling to any other zone is the intended design for an orchestration layer — this is healthy and should be preserved.",
+        "claude-integration.js classified as a service at root level suggests it may contain reusable logic that could migrate into a dedicated package if complexity grows.",
+        "No declared entry points despite containing executable scripts (ci.js, cli.js, web.js) — sourcevision may need path hints to correctly classify these as entry points.",
+        "[call graph] 418 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
         "cohesion": 1,
@@ -2323,7 +2239,7 @@
         "cli-mcp-interface shares the dual-threshold fragility pattern with recommendation-scanning (cohesion below 0.5, coupling above 0.5 simultaneously). Both zones should be addressed in the same refactoring pass since they are structurally linked via bidirectional imports.",
         "Token telemetry is CLI-layer-only. Move token consumption tracking to a cross-cutting concern at the llm-client foundation layer so domain analysis operations can emit telemetry without depending on CLI infrastructure.",
         "chunked-review-state.ts is a one-off stateful workflow implementation with no shared contract. Extract a WorkflowStep or StatefulCommand interface to prevent this pattern from being re-implemented ad-hoc in future multi-step commands.",
-        "[call graph] 1547 internal calls, 202 outgoing, 349 incoming (cohesion: 0.88, coupling: 0.12)"
+        "[call graph] 1552 internal calls, 202 outgoing, 351 incoming (cohesion: 0.88, coupling: 0.12)"
       ],
       "riskMetrics": {
         "cohesion": 0.47,
@@ -3284,7 +3200,7 @@
         "The 25 entry points in prd-analysis-core map to no documented public contract — any consumer can import any internal file directly, and nothing distinguishes stable public API from internal implementation details. Without a formal public.ts, the 'public surface' grows implicitly with every new file added.",
         "consolidation-guard.ts and smart-add-duplicates.ts are runtime defensive guards against data shape violations. Tightening the schema types in src/schema/v1.ts (narrower union types, branded IDs, non-optional fields) would move these checks to compile time and eliminate the need for the runtime guards entirely.",
         "25 entry points with no public.ts means the public API surface grows by default with every new file. Add a src/public.ts barrel that explicitly controls what is exported, matching the pattern used by other packages in this monorepo.",
-        "[call graph] 2450 internal calls, 296 outgoing, 223 incoming (cohesion: 0.89, coupling: 0.11)"
+        "[call graph] 2473 internal calls, 298 outgoing, 223 incoming (cohesion: 0.89, coupling: 0.11)"
       ],
       "riskMetrics": {
         "cohesion": 0.5,
@@ -4225,57 +4141,38 @@
       "depth": 1
     },
     {
-      "id": "root",
-      "name": "Root",
-      "description": "27 files, primarily JavaScript, Markdown, Other",
+      "id": "project-documentation",
+      "name": "Project Documentation",
+      "description": "Architecture decision records, design analyses, and long-form reference documentation for the n-dx system and its memory/PRD subsystems.",
       "files": [
-        ".gitignore",
-        ".npmrc",
-        "CLAUDE.md",
-        "CODEX.md",
-        "PACKAGE_GUIDELINES.md",
-        "README.md",
-        "ci.js",
-        "claude-integration.js",
-        "cli.js",
-        "config.js",
-        "help.js",
-        "n-dx.png",
-        "package.json",
-        "pnpm-lock.yaml",
-        "pnpm-workspace.yaml",
-        "pr-check.js",
-        "prd.md",
-        "refresh-artifacts.js",
-        "refresh-plan.js",
-        "refresh-validate.js",
-        "tests/unit/help.test.js",
-        "tests/unit/refresh-artifacts.test.js",
-        "tests/unit/refresh-plan.test.js",
-        "tests/unit/refresh-validate.test.js",
-        "tsconfig.base.json",
-        "vitest.config.js",
-        "web.js"
+        "docs/2026-03-03-refresh-orchestration-memory-analysis.md",
+        "docs/level-refactor-and-steward-plan.md",
+        "docs/level-system-reference.md",
+        "docs/memory-architecture.md",
+        "docs/memory-improvements.md",
+        "docs/memory-os-behavior.md",
+        "docs/memory-risks-and-flaws.md",
+        "docs/prd-steward-vision.md",
+        "docs/process-lifecycle-audit.md",
+        "docs/resource-allocation-catalog.md",
+        "docs/rex-smart-add-duplicate-detection.md",
+        "docs/signal-handling-audit.md",
+        "docs/viewer-architecture.md",
+        "docs/viewer-audit.md",
+        "docs/web-zone-architecture.md",
+        "docs/zone-naming-conventions.md"
       ],
       "entryPoints": [],
       "cohesion": 1,
       "coupling": 0,
       "insights": [
         "High cohesion (1) — files are tightly interconnected",
-        "Orchestration scripts (cli.js, ci.js, web.js) delegate to package CLIs without importing library code — this enforces the four-tier dependency hierarchy described in CLAUDE.md",
-        "Root-level config files (.npmrc, package.json, tsconfig) serve as the single source of truth for monorepo-wide tooling settings",
-        "claude-integration.js classified as a service at the root level suggests a cross-cutting integration concern that may benefit from being documented or moved into a dedicated package",
-        "Perfect cohesion (1.0) and zero coupling reflect correct orchestration-layer design — root scripts spawn CLIs without importing domain packages directly.",
-        "claude-integration.js at the root level sits outside the established four-tier hierarchy; document its role or migrate it into the hench or llm-client package to keep the architecture explicit.",
-        "27 files in the root zone is relatively large; periodic review can prevent config drift and catch files that belong in a package.",
-        "Forms the apex of the four-tier hierarchy with zero incoming edges from any other zone — confirming it is a pure consumer that nothing depends on, which is structurally correct for an orchestration layer",
-        "project-orchestration-root has zero incoming imports from all other zones, confirming its position as the dependency-graph sink — this is the correct topology for an orchestration tier and should be enforced by lint rules to prevent accidental inversion.",
-        "claude-integration.js is unclassified in the four-tier hierarchy — it is neither a domain package nor a pure orchestration script, making it an implicit fifth tier that violates the documented architecture",
-        "claude-integration.js sits at the root level outside the four-tier dependency hierarchy defined in CLAUDE.md. It is classified as a 'service' but is not delegated to from cli.js the way other orchestration scripts delegate to package CLIs. Its actual import surface and responsibilities are undocumented, making it an invisible coupling risk at the orchestration tier.",
-        "claude-integration.js is the only file in the stable-core cluster without a corresponding CLI delegation pattern — every other root script (cli.js, web.js, ci.js) spawns a subprocess, but claude-integration.js acts as a library shim, making it architecturally ambiguous between orchestration and foundation tiers",
-        "The root zone contains 27 files but zero incoming call graph edges from any other zone, yet has 418 internal calls — this means all intra-zone coupling is between config/tooling files that call each other, not between orchestration scripts and domain code, which is the correct structural pattern",
-        "claude-integration.js is the sole file in the orchestration tier that behaves as a library (imported) rather than a CLI runner (spawned). Document this explicitly in CLAUDE.md or migrate it to llm-client/hench. Leaving it undocumented means future contributors may model new cross-cutting concerns on it, gradually eroding the four-tier boundary.",
-        "[call graph] 418 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+        "16 markdown files with cohesion 1 and no coupling confirms docs are a pure leaf zone — no risk of entanglement with source code",
+        "Several files focus on memory architecture (memory-architecture.md, memory-improvements.md, memory-os-behavior.md, memory-risks-and-flaws.md) suggesting the memory system is a significant design concern worth a dedicated ADR",
+        "The 2026-03-03-refresh-orchestration-memory-analysis.md naming convention (date-prefixed) is good for temporal ADRs but inconsistent with the other files — standardize on either date-prefixed or topic-only naming",
+        "Date-prefixed file naming is used inconsistently — most docs are topic-named while at least one uses a date prefix, making chronological vs. thematic navigation ambiguous.",
+        "Concentration of memory-related docs (4+ files) suggests the memory subsystem design has iterated heavily; a single authoritative reference doc would help new contributors.",
+        "Zero coupling to source zones is correct — documentation should never be imported by production code."
       ],
       "riskMetrics": {
         "cohesion": 1,
@@ -4286,9 +4183,105 @@
       }
     },
     {
-      "id": "web",
-      "name": "Web",
-      "description": "16 files, primarily TypeScript, Markdown, Other",
+      "id": "rex-runtime-state",
+      "name": "Rex Runtime State",
+      "description": "Persistent runtime data for the rex PRD tracker: project config, the live PRD tree, execution logs, pending proposals, and workflow state.",
+      "files": [
+        ".rex/acknowledged-findings.json",
+        ".rex/archive.json",
+        ".rex/config.json",
+        ".rex/execution-log.1.jsonl",
+        ".rex/execution-log.jsonl",
+        ".rex/pending-proposals.json",
+        ".rex/prd.json",
+        ".rex/workflow.md"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "All files are data artifacts (JSON/JSONL/Markdown), not source code — this zone has no production logic and should never be a dependency of other zones",
+        "Dual execution log files (execution-log.1.jsonl and execution-log.jsonl) suggest a rotation scheme that should be documented so consumers don't accidentally read stale logs",
+        "pending-proposals.json and acknowledged-findings.json represent transient review state; archiving old proposals to archive.json is good hygiene",
+        "Zone contains only data files with zero coupling — correct isolation for mutable runtime state that tools read and write directly.",
+        "workflow.md duplicates some state already encoded in prd.json; keeping these in sync manually is a potential consistency risk as the PRD evolves.",
+        "execution-log rotation (log.1.jsonl) is implicit; a documented retention policy would prevent unbounded log growth in long-running projects."
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "task-usage-tracking",
+      "name": "Task Usage Tracking",
+      "description": "Server-side services for recording and cleaning up per-task token/usage metrics incrementally over time.",
+      "files": [
+        "packages/web/src/server/incremental-task-usage.ts",
+        "packages/web/src/server/usage-cleanup-scheduler.ts",
+        "packages/web/tests/unit/server/incremental-task-usage.test.ts",
+        "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts"
+      ],
+      "entryPoints": [
+        "packages/web/src/server/incremental-task-usage.ts",
+        "packages/web/src/server/usage-cleanup-scheduler.ts"
+      ],
+      "cohesion": 0.5,
+      "coupling": 0.5,
+      "insights": [
+        "Cohesion of 0.5 is moderate — the two services (incremental recording and scheduled cleanup) are related but could be tightened by co-locating their shared types or a common usage model",
+        "Both source files are entry points, meaning they are independently loaded rather than composed through a single facade — a thin index module could make intent clearer",
+        "Unit tests are co-located in this zone (4 files total), providing good coverage confidence for these accounting services",
+        "Cohesion of 0.5 is acceptable but indicates the two services share limited internal structure; a shared UsageRecord type or store would raise cohesion.",
+        "The cleanup scheduler imports back into web-viewer (per cross-zone import graph), creating a dependency inversion — the scheduler should depend on an interface, not the viewer zone.",
+        "Tests are included in this zone alongside production code, confirming the zone name should reflect production purpose (task-usage-tracking) rather than a test suffix.",
+        "[call graph] 100 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 0.5,
+        "coupling": 0.5,
+        "riskScore": 0.5,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "viewer-static-assets",
+      "name": "Viewer Static Assets",
+      "description": "Raw static assets (light/dark logo PNGs and the viewer's root HTML shell) that are bundled directly into the dashboard viewer at build time.",
+      "files": [
+        "packages/web/src/viewer/darkmode_logo.png",
+        "packages/web/src/viewer/index.html",
+        "packages/web/src/viewer/lightmode_logo.png"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "With cohesion 1.0 and zero coupling, this zone is a pure asset bundle — no logic lives here and no other zone depends on it at the module level",
+        "The dual lightmode/darkmode logo PNGs indicate theme-aware branding is handled at the asset level rather than via CSS filters, which is correct for PNG assets but may need updating if SVG logos are adopted",
+        "index.html is the viewer entry shell; ensure its script/link tags stay aligned with the build output manifest so asset hashing doesn't break references",
+        "Zero coupling and perfect cohesion confirm this is a pure static asset zone with no runtime logic — ideal for independent caching and CDN delivery.",
+        "Maintaining separate lightmode and darkmode PNG files requires manual synchronization on any branding update; SVG with CSS variables would eliminate this duplication.",
+        "index.html is the root shell for the viewer SPA; changes to build output filenames must be reflected here to avoid broken asset references in production."
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "web-build-infrastructure",
+      "name": "Web Build Infrastructure",
+      "description": "Build tooling, package metadata, and shared viewer components (elapsed-time, task-audit) that sit outside the main web-viewer bundle.",
       "files": [
         "packages/web/BROWSER_ERROR_CODE_5.md",
         "packages/web/MEMORY_PROFILE.md",
@@ -4314,24 +4307,13 @@
       "cohesion": 0.77,
       "coupling": 0.23,
       "insights": [
-        "With 4 imports flowing into web-viewer and 2 coming back from web-viewer, this zone acts as a thin coordination layer — keep it focused on wiring, not logic",
-        "elapsed-time.ts and task-audit.ts are entry-point components in this zone while the bulk of viewer code lives in web-viewer; evaluate whether these belong in web-viewer to reduce the split",
-        "Cohesion of 0.79 is healthy, but the presence of both production components and package-level config files (build.js, dev.js) in one zone suggests the community detection is grouping heterogeneous concerns — no action needed but worth monitoring",
-        "Zone \"web-package-shell\" has files across 6 directories — consider consolidating under a dedicated directory",
-        "elapsed-time.ts and task-audit.ts are classified as entry points in this zone but logically belong to the viewer layer — consider moving them into web-viewer to consolidate the component surface.",
-        "Cohesion of 0.79 with coupling of 0.21 is within healthy bounds; the bidirectional import relationship with web-viewer (4 out, 2 in) should be watched to ensure it doesn't become circular.",
-        "BROWSER_ERROR_CODE_5.md and MEMORY_PROFILE.md in this zone suggest past debugging artifacts; review whether these are still relevant or can be removed to keep the package root clean.",
-        "web-package-shell participates in a bidirectional import cycle with web-viewer (4 out, 2 back) — this constitutes a circular zone dependency that should be broken by extracting shared types or interfaces into a neutral third zone",
-        "The 2 reverse imports from web-viewer back into web-package-shell likely represent shared component or utility re-use; identifying and extracting these into a dedicated shared zone would eliminate the cycle without restructuring either package",
-        "web-package-shell ↔ web-viewer bidirectional import cycle (4+2 crossings) is a circular zone dependency — extract the 2 symbols imported by web-viewer from web-package-shell into a neutral shared zone to restore unidirectional flow.",
-        "build.js and dev.js (config files) colocated with elapsed-time.ts and task-audit.ts (runtime components) in one zone means any change to either class of files triggers unnecessary review of the other — a symptom of the zone grouping heterogeneous concerns",
-        "elapsed-time.ts and task-audit.ts are production viewer components classified as entry points inside web-package-shell, while the bulk of viewer code lives in web-viewer. This split means a single logical component surface has two zone owners, which breaks the assumption that a zone is the unit of independent deployment or testing.",
-        "web-package-shell mixes package-level tooling files (build.js, dev.js, package.json) with runtime component files (elapsed-time.ts, task-audit.ts) in one zone. Tooling files and runtime components have completely different change drivers and reviewers — they should not share a zone boundary.",
-        "web-server (cohesion 0.63, bidirectional cycle with web-viewer) is the only zone in the codebase that simultaneously has cohesion below 0.7 AND participates in a bidirectional import cycle — this combination makes it the single highest-fragility zone in the project. Low cohesion means its internal seams are unclear; bidirectional coupling means it cannot be changed without negotiating with web-viewer. Every other zone with coupling has cohesion above 0.75.",
-        "The zone named 'web-unit' (cohesion 0.5, 6 files) receives 6 imports from web-viewer with no reverse imports — its name implies unit tests, but it contains production components consumed exclusively by web-viewer. This name/role mismatch causes navigational confusion: developers expecting unit test utilities will find production component files.",
-        "web-server is the only zone combining cohesion < 0.7 with an active bidirectional import cycle. Absorbing web-server into web-viewer would resolve one cycle, eliminate the lowest-cohesion zone with coupling, and reduce web-viewer's bidirectional cycle count from 2 to 1. Prioritize web-server absorption before any other web cluster refactor.",
-        "Rename zone 'web-unit' to 'web-shared-components' or 'web-viewer-utils' to reflect its actual role as a production utility module for web-viewer. The current name implies test infrastructure and will mislead contributors searching for test helpers.",
-        "Zone \"web\" has files across 6 directories — consider consolidating under a dedicated directory",
+        "Cohesion of 0.77 is healthy but the mix of build scripts (build.js, dev.js), package files, images, and viewer components suggests two distinct concerns that may separate as the package grows",
+        "elapsed-time.ts and task-audit.ts are classified as entry points, meaning other zones import them directly — verify these components are intentionally public rather than accidentally exposed",
+        "The web zone acts as a bridge (web → web-viewer with 4 imports) while also being a target (web-viewer → web with 2 reverse imports), creating a mild bidirectional relationship worth monitoring",
+        "Zone \"web-build-infrastructure\" has files across 6 directories — consider consolidating under a dedicated directory",
+        "Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer→web: 2) create a soft cycle risk; extracting shared primitives into a dedicated shared zone would eliminate this.",
+        "elapsed-time.ts and task-audit.ts are entry points but live in a build-infrastructure zone — if they are reusable UI primitives, they belong in web-viewer or a dedicated components zone.",
+        "BROWSER_ERROR_CODE_5.md and MEMORY_PROFILE.md in the web package root are debugging artifacts that should either be moved to docs/ or removed to keep the package root clean.",
         "[call graph] 59 internal calls, 1 outgoing, 0 incoming (cohesion: 0.98, coupling: 0.02)"
       ],
       "riskMetrics": {
@@ -4343,133 +4325,9 @@
       }
     },
     {
-      "id": "web-landing",
-      "name": "Web Landing",
-      "description": "3 files, primarily HTML, CSS, TypeScript",
-      "files": [
-        "packages/web/src/landing/index.html",
-        "packages/web/src/landing/landing.css",
-        "packages/web/src/landing/landing.ts"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect cohesion and zero coupling indicate this is a clean, isolated artefact with no shared dependencies",
-        "The three-file structure (index.html, landing.css, landing.ts) is appropriately minimal for a static entry page",
-        "No entrypoints detected by the analyzer suggests this may be a build-time asset that is bundled independently",
-        "Perfect isolation (cohesion: 1, coupling: 0) is ideal for a static page — no changes needed.",
-        "Verify that landing.ts is included in the web package build configuration; the absence of a detected entrypoint may indicate it is excluded from the main bundle graph.",
-        "If the landing page ever needs shared branding tokens or utilities, introduce a deliberate dependency rather than duplicating styles.",
-        "Together with viewer-shell-assets, forms a static presentation tier that is fully decoupled from both the application logic tier (dashboard-mcp-server) and the service tier (task-usage-tracking, websocket-realtime-layer) — the two static zones collectively have zero inter-zone coupling",
-        "The two static zones serve orthogonal entry points (landing page vs viewer shell) and do not import from each other, which is the correct relationship for independent deployment units",
-        "web-landing-page and viewer-shell-assets together form a static presentation tier with zero inter-zone coupling — a clean architectural boundary separating presentational assets from application logic.",
-        "landing.ts has zero detected imports but is classified as an entrypoint — if it references DOM APIs or global state shared with the main application bundle, that coupling would be invisible to the static import graph and could cause runtime conflicts undetectable by zone analysis",
-        "[call graph] 10 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "web-server",
-      "name": "Web Server",
-      "description": "4 files, primarily TypeScript",
-      "files": [
-        "packages/web/src/server/incremental-task-usage.ts",
-        "packages/web/src/server/usage-cleanup-scheduler.ts",
-        "packages/web/tests/unit/server/incremental-task-usage.test.ts",
-        "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts"
-      ],
-      "entryPoints": [
-        "packages/web/src/server/incremental-task-usage.ts",
-        "packages/web/src/server/usage-cleanup-scheduler.ts"
-      ],
-      "cohesion": 0.4,
-      "coupling": 0.6,
-      "insights": [
-        "High coupling (0.6) — 2 imports target \"web-viewer\"",
-        "Moderate cohesion (0.63) and coupling (0.38) are acceptable for a small service cluster, but the zone only has 4 files — merging it back into the main web zone would simplify navigation",
-        "Bidirectional imports with dashboard-mcp-server (2 each way) create a coupling loop that could be resolved by having the scheduler depend on the tracker unidirectionally",
-        "Both source files have corresponding unit tests co-located in the same zone, which is good for discoverability",
-        "Bidirectional imports between this zone and dashboard-mcp-server (2 imports in each direction) create a coupling cycle; consider inverting the dependency or introducing an event/callback boundary.",
-        "At only 4 files, this zone is a candidate for consolidation into the parent web zone to reduce fragmentation.",
-        "The cleanup scheduler paired with an incremental recorder is a sound separation of concerns for analytics data management.",
-        "Is the only zone in the web package that forms a cycle with another zone, making it the sole structural violation of the DAG property in the inter-zone graph",
-        "The bidirectional coupling distinguishes it from websocket-realtime-layer, which accepts inbound imports from dashboard-mcp-server unidirectionally — two different coupling patterns exist among the functional satellites",
-        "task-usage-tracking is the only zone creating a cycle in the web package inter-zone graph (bidirectional with dashboard-mcp-server). All other inter-zone edges are unidirectional. Resolving this cycle would make the full web zone graph a DAG.",
-        "The bidirectional cycle with dashboard-mcp-server is most likely caused by the cleanup scheduler requiring application-level infrastructure (timer registration, shutdown hooks) owned by the hub — dependency injection at construction time (passing a timer interface into the scheduler) would sever the back-edge without extracting a new module",
-        "The two source files have asymmetric roles: incremental-task-usage.ts is a pure recorder (data-in) while usage-cleanup-scheduler.ts is an orchestrator (data-out trigger) — these asymmetric roles suggest different ownership and reinforce that the scheduler's back-import into dashboard-mcp-server is the specific edge to cut",
-        "usage-cleanup-scheduler.ts imports from dashboard-mcp-server to access infrastructure it should receive via constructor injection — inverting this dependency is the minimal targeted fix for the only cycle in the web package inter-zone graph",
-        "This zone is the only zone in the project that simultaneously fails both cohesion (0.63 < 0.7 threshold) AND has non-trivial coupling (0.38) — it meets the dual fragility criterion described in the severity guide, making it the highest-risk small zone in the codebase",
-        "The name incremental-task-usage.ts is ambiguous — 'incremental' is a vague qualifier that does not communicate the recorder/write role of the file; the paired usage-cleanup-scheduler.ts has a more descriptive name, creating an asymmetric naming convention within the same zone",
-        "task-usage-tracking is the only zone with BOTH cohesion below 0.7 (0.63) AND coupling above 0.3 (0.38) simultaneously — this dual fragility makes it the highest structural risk among small zones. Resolve the bidirectional cycle with dashboard-mcp-server via constructor injection as previously identified, then re-evaluate whether cohesion improves once the back-edge is removed.",
-        "Rename incremental-task-usage.ts to task-usage-recorder.ts to create a symmetric naming pair with usage-cleanup-scheduler.ts. Both files are now named by their role (recorder, scheduler) rather than by an implementation detail ('incremental'), which improves navigability and onboarding clarity.",
-        "[call graph] 100 internal calls, 1 outgoing, 1 incoming (cohesion: 0.99, coupling: 0.01)"
-      ],
-      "riskMetrics": {
-        "cohesion": 0.4,
-        "coupling": 0.6,
-        "riskScore": 0.6,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "web-unit",
-      "name": "Web Unit",
-      "description": "5 files, primarily TypeScript",
-      "files": [
-        "packages/web/src/server/websocket.ts",
-        "packages/web/src/server/ws-health-tracker.ts",
-        "packages/web/tests/unit/server/boundary-check.test.ts",
-        "packages/web/tests/unit/server/websocket.test.ts",
-        "packages/web/tests/unit/server/ws-health-integration.test.ts",
-        "packages/web/tests/unit/server/ws-health-tracker.test.ts"
-      ],
-      "entryPoints": [
-        "packages/web/src/server/websocket.ts",
-        "packages/web/src/server/ws-health-tracker.ts"
-      ],
-      "cohesion": 0.25,
-      "coupling": 0.75,
-      "insights": [
-        "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
-        "Cohesion (0.5) and coupling (0.5) are borderline — the 6 inbound imports from dashboard-mcp-server dominate this zone's coupling profile and suggest it should live inside that zone",
-        "Four test files for two source files indicates thorough test coverage of the real-time layer, including a boundary-check test for edge cases",
-        "The ws-health-integration test suggests there is meaningful stateful interaction between the WebSocket server and health tracker worth preserving as the zone grows",
-        "Coupling of 0.5 driven by 6 imports from dashboard-mcp-server suggests this cluster is a natural sub-module of that zone rather than an independent architectural boundary.",
-        "Four test files covering two source modules, including an integration test, reflects strong testing discipline for the real-time communication layer.",
-        "boundary-check.test.ts is a useful safety net for WebSocket edge cases; ensure it covers reconnection and graceful shutdown scenarios.",
-        "Unlike task-usage-tracking, websocket-realtime-layer has zero outgoing inter-zone imports despite being a functional service zone — it is a pure downstream consumer and forms a clean unidirectional dependency with dashboard-mcp-server",
-        "The contrast between websocket-realtime-layer (clean directional) and task-usage-tracking (cyclic) illustrates two distinct coupling anti-patterns that emerged from the same community detection pass",
-        "websocket-realtime-layer has 6 inbound imports from dashboard-mcp-server and 0 outgoing — it is a pure downstream leaf. This is architecturally clean; the only concern is whether the community detection boundary reflects a real architectural seam or is an artifact of graph partitioning.",
-        "boundary-check.test.ts is named for cross-zone boundary behavior rather than a specific unit, suggesting it may be testing interactions that span websocket.ts and server infrastructure owned by dashboard-mcp-server — if so, it is a misplaced integration test masquerading as a unit test",
-        "The zone has 4 test files but 0 outgoing inter-zone imports, meaning all 6 inbound imports from dashboard-mcp-server are one-directional — this pure-leaf status means the zone could be promoted to a sub-zone of dashboard-mcp-server with zero restructuring of production code, only test file moves",
-        "boundary-check.test.ts is co-located in the unit test directory but its name implies cross-boundary integration behavior — if it exercises interactions between websocket.ts and dashboard-mcp-server internals it belongs in an integration test directory to prevent false confidence in unit isolation",
-        "websocket-realtime-layer has cohesion 0.5 AND coupling 0.5 — it meets the dual fragility criterion (both below 0.6 and both non-trivial), making it the second highest-risk zone by the combined fragility metric alongside task-usage-tracking",
-        "ws-health-tracker.ts is a cross-cutting health/monitoring concern; co-locating it with the WebSocket transport implementation (websocket.ts) couples two orthogonal responsibilities in one zone — health tracking is conceptually closer to the metrics infrastructure in dashboard-mcp-server than to WebSocket I/O",
-        "websocket-realtime-layer has both cohesion 0.5 and coupling 0.5 — the dual fragility threshold described in the severity guide. ws-health-tracker.ts (monitoring concern) and websocket.ts (transport concern) are orthogonal responsibilities. Either absorb this zone into dashboard-mcp-server as a sub-zone (eliminating the 6 inbound import edges) or split ws-health-tracker.ts into the metrics infrastructure alongside concurrent-execution-metrics.ts.",
-        "ws-health-integration.test.ts is located in tests/unit/server/ but its name declares it as an integration test. This placement gives false unit-test confidence in CI: if it exercises cross-boundary behavior between websocket.ts and dashboard-mcp-server infrastructure, a unit test failure in isolation may not reproduce in the full integration run. Move it to tests/integration/server/.",
-        "[call graph] 76 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)"
-      ],
-      "riskMetrics": {
-        "cohesion": 0.25,
-        "coupling": 0.75,
-        "riskScore": 0.75,
-        "riskLevel": "catastrophic",
-        "failsThreshold": true
-      }
-    },
-    {
-      "id": "web-viewer",
-      "name": "Web Viewer",
-      "description": "349 files, primarily TypeScript, CSS",
+      "id": "web-dashboard",
+      "name": "Web Dashboard",
+      "description": "The primary web application zone encompassing the full-stack dashboard: HTTP/MCP server, React viewer components, data aggregation, gateways, and CLI entrypoint.",
       "files": [
         "packages/web/src/cli/index.ts",
         "packages/web/src/public.ts",
@@ -4574,10 +4432,12 @@
         "packages/web/src/viewer/graph/renderer.ts",
         "packages/web/src/viewer/hooks/use-app-data.ts",
         "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+        "packages/web/src/viewer/hooks/use-delete-actions.ts",
         "packages/web/src/viewer/hooks/use-facet-state.ts",
         "packages/web/src/viewer/hooks/use-feature-toggle.ts",
         "packages/web/src/viewer/hooks/use-file-edges.ts",
         "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
+        "packages/web/src/viewer/hooks/use-item-selection.ts",
         "packages/web/src/viewer/hooks/use-memory-monitor.ts",
         "packages/web/src/viewer/hooks/use-pan-zoom.ts",
         "packages/web/src/viewer/hooks/use-persistent-filter.ts",
@@ -5008,6 +4868,12 @@
         },
         {
           "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+          "to": "packages/web/src/viewer/types.ts",
+          "fromZone": "web-viewer/web-3",
+          "toZone": "web-viewer/web-viewer"
+        },
+        {
+          "from": "packages/web/src/viewer/hooks/use-item-selection.ts",
           "to": "packages/web/src/viewer/types.ts",
           "fromZone": "web-viewer/web-3",
           "toZone": "web-viewer/web-viewer"
@@ -5844,7 +5710,7 @@
         {
           "id": "web-viewer/web-3",
           "name": "Web Viewer/web 3",
-          "description": "62 files, primarily TypeScript",
+          "description": "64 files, primarily TypeScript",
           "files": [
             "packages/web/src/viewer/components/guide.ts",
             "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
@@ -5874,8 +5740,10 @@
             "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
             "packages/web/src/viewer/components/prd-tree/types.ts",
             "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
+            "packages/web/src/viewer/hooks/use-delete-actions.ts",
             "packages/web/src/viewer/hooks/use-facet-state.ts",
             "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+            "packages/web/src/viewer/hooks/use-item-selection.ts",
             "packages/web/src/viewer/hooks/use-persistent-filter.ts",
             "packages/web/src/viewer/hooks/use-polling.ts",
             "packages/web/src/viewer/hooks/use-prd-actions.ts",
@@ -6086,7 +5954,7 @@
             {
               "id": "web-viewer/web-3/web-viewer",
               "name": "Web Viewer/web 3/web Viewer",
-              "description": "50 files, primarily TypeScript",
+              "description": "52 files, primarily TypeScript",
               "files": [
                 "packages/web/src/viewer/components/prd-tree/add-item-form.ts",
                 "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
@@ -6110,7 +5978,9 @@
                 "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
                 "packages/web/src/viewer/components/prd-tree/types.ts",
                 "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
+                "packages/web/src/viewer/hooks/use-delete-actions.ts",
                 "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+                "packages/web/src/viewer/hooks/use-item-selection.ts",
                 "packages/web/src/viewer/hooks/use-persistent-filter.ts",
                 "packages/web/src/viewer/hooks/use-polling.ts",
                 "packages/web/src/viewer/hooks/use-prd-actions.ts",
@@ -6150,8 +6020,8 @@
                 "packages/web/src/viewer/polling/index.ts",
                 "packages/web/src/viewer/views/prd.ts"
               ],
-              "cohesion": 0.92,
-              "coupling": 0.08,
+              "cohesion": 0.93,
+              "coupling": 0.07,
               "depth": 2,
               "subCrossings": [
                 {
@@ -6162,15 +6032,15 @@
                 },
                 {
                   "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
                   "fromZone": "web-viewer/web-3/web-viewer/use",
                   "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
                   "from": "packages/web/src/viewer/hooks/use-prd-data.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/types.ts",
                   "fromZone": "web-viewer/web-3/web-viewer/use",
-                  "toZone": "web-viewer/web-3/web-viewer/web-unit"
+                  "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
                   "from": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
@@ -6191,10 +6061,52 @@
                   "toZone": "web-viewer/web-3/web-viewer/use"
                 },
                 {
-                  "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+                  "from": "packages/web/src/viewer/components/prd-tree/delete-confirmation.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
                   "fromZone": "web-viewer/web-3/web-viewer/web",
-                  "toZone": "web-viewer/web-3/web-viewer/web-unit"
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/hooks/use-item-selection.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+                  "to": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/src/viewer/views/prd.ts",
+                  "to": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
+                },
+                {
+                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web",
+                  "toZone": "web-viewer/web-3/web-viewer/web-2"
                 },
                 {
                   "from": "packages/web/src/viewer/views/prd.ts",
@@ -6203,51 +6115,39 @@
                   "toZone": "web-viewer/web-3/web-viewer/web-viewer"
                 },
                 {
-                  "from": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
-                  "toZone": "web-viewer/web-3/web-viewer/web"
-                },
-                {
-                  "from": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
+                  "from": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
                   "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
                   "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
-                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+                  "from": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
+                  "toZone": "web-viewer/web-3/web-viewer/web"
+                },
+                {
+                  "from": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+                  "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
+                  "toZone": "web-viewer/web-3/web-viewer/web"
+                },
+                {
+                  "from": "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
                   "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
                   "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
-                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
-                  "toZone": "web-viewer/web-3/web-viewer/web"
-                },
-                {
-                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
-                  "toZone": "web-viewer/web-3/web-viewer/web"
-                },
-                {
-                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
-                  "to": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
-                  "toZone": "web-viewer/web-3/web-viewer/web"
-                },
-                {
-                  "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+                  "from": "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
                   "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
                   "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
-                  "from": "packages/web/tests/unit/viewer/tree-differ.test.ts",
+                  "from": "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts",
                   "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-                  "fromZone": "web-viewer/web-3/web-viewer/web-unit",
+                  "fromZone": "web-viewer/web-3/web-viewer/web-2",
                   "toZone": "web-viewer/web-3/web-viewer/web"
                 },
                 {
@@ -6321,18 +6221,18 @@
                     "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
                     "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
                     "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+                    "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
                     "packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts",
-                    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
                     "packages/web/src/viewer/components/prd-tree/types.ts",
                     "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
                     "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+                    "packages/web/src/viewer/hooks/use-item-selection.ts",
                     "packages/web/src/viewer/hooks/use-persistent-filter.ts",
                     "packages/web/src/viewer/hooks/use-prd-actions.ts",
-                    "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
                     "packages/web/src/viewer/hooks/use-toast.ts",
                     "packages/web/src/viewer/views/prd.ts",
                     "packages/web/tests/unit/viewer/add-item-form.test.ts",
-                    "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
+                    "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
                     "packages/web/tests/unit/viewer/multi-select.test.ts",
                     "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
                     "packages/web/tests/unit/viewer/persistent-filter.test.ts",
@@ -6344,38 +6244,41 @@
                     "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
                     "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
                     "packages/web/tests/unit/viewer/task-detail-usage.test.ts",
+                    "packages/web/tests/unit/viewer/tree-differ.test.ts",
                     "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
-                    "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts",
                     "packages/web/tests/unit/viewer/virtual-scroll.test.ts"
                   ],
                   "entryPoints": [
                     "packages/web/src/viewer/components/prd-tree/compute.ts",
                     "packages/web/src/viewer/components/prd-tree/levels.ts",
                     "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
-                    "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
                     "packages/web/src/viewer/components/prd-tree/smart-add-input.ts",
-                    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                    "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
                     "packages/web/src/viewer/components/prd-tree/types.ts",
                     "packages/web/src/viewer/views/prd.ts"
                   ],
-                  "cohesion": 0.89,
-                  "coupling": 0.11,
+                  "cohesion": 0.82,
+                  "coupling": 0.18,
                   "depth": 3
                 },
                 {
-                  "id": "web-viewer/web-3/web-viewer/web-unit",
-                  "name": "Web Viewer/web 3/web Viewer/web Unit",
-                  "description": "3 files, primarily TypeScript",
+                  "id": "web-viewer/web-3/web-viewer/web-2",
+                  "name": "Web Viewer/web 3/web Viewer/web 2",
+                  "description": "5 files, primarily TypeScript",
                   "files": [
-                    "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
-                    "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
-                    "packages/web/tests/unit/viewer/tree-differ.test.ts"
+                    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                    "packages/web/src/viewer/hooks/use-delete-actions.ts",
+                    "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+                    "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
+                    "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts"
                   ],
                   "entryPoints": [
-                    "packages/web/src/viewer/components/prd-tree/tree-differ.ts"
+                    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+                    "packages/web/src/viewer/hooks/use-delete-actions.ts",
+                    "packages/web/src/viewer/hooks/use-prd-deep-link.ts"
                   ],
-                  "cohesion": 1,
-                  "coupling": 0,
+                  "cohesion": 0.29,
+                  "coupling": 0.71,
                   "depth": 3
                 },
                 {
@@ -7406,33 +7309,15 @@
       ],
       "insights": [
         "High cohesion (0.98) — files are tightly interconnected",
-        "Contains 57% of project files (349/611) — subdivided into 7 sub-zones",
-        "High cohesion (0.99) — files are tightly interconnected",
-        "Contains 57% of project files (349/611) — subdivided into 7 sub-zones",
-        "Contains 57% of project files (349/610) — subdivided into 7 sub-zones",
-        "With 349 files and cohesion of 0.99, this zone is architecturally cohesive but enormous — consider whether viewer components, server infrastructure, and MCP tooling could be split into sub-zones for navigability",
-        "The gateway pattern (rex-gateway.ts, domain-gateway.ts, mcp-deps.ts) cleanly isolates cross-package dependencies, making the dependency surface auditable",
-        "Near-zero coupling (0.01) with the rest of the codebase is a strong signal that boundaries are well-drawn",
-        "Zone is extremely large (349 files) with excellent cohesion — the monolithic size is manageable now but worth monitoring as the package grows.",
-        "Gateway modules (rex-gateway.ts, domain-gateway.ts) correctly centralize all cross-package runtime imports per the project's gateway convention.",
-        "6 imports from this zone into web-unit and 2 into web-server suggest those small satellite zones may be fragments of this zone that were separated by the community detection algorithm.",
-        "Zone \"dashboard-mcp-server\" has files across 21 directories — consider consolidating under a dedicated directory",
-        "Acts as the hub in a hub-and-spoke topology for the entire web package — all functional satellite zones (task-usage-tracking, websocket-realtime-layer) ultimately depend on it, with only the static asset zones fully decoupled",
-        "The 6398 internal calls vs 23 outgoing calls ratio (277:1) makes this the most self-contained zone in the project — external coupling is negligible relative to internal activity",
-        "The single cycle in the entire web package inter-zone graph runs through this zone (↔ task-usage-tracking); breaking it would make the full zone graph a DAG",
-        "dashboard-mcp-server is the sole hub in a hub-and-spoke topology: all 3 functional satellite zones point inward. This is structurally sound but creates a single point of fragility — changes to dashboard-mcp-server can ripple to all satellites simultaneously.",
-        "Internal call density (6398 calls) vastly exceeds cross-zone traffic (26 total). The zone is effectively a self-contained monolith within the web package; consider whether the 7 sub-zones provide enough navigational structure.",
-        "The 7 internal sub-zones are not surfaced in the current zone analysis output, meaning the tooling navigates this 349-file zone as a flat list — sub-zone boundaries exist in the data model but are invisible during analysis, which defeats their purpose as navigational landmarks",
-        "The gateway modules (rex-gateway.ts, domain-gateway.ts, mcp-deps.ts) are the only files in this zone explicitly designed to limit coupling growth, but there is no enforcement mechanism (lint rule or CI check) preventing leaf files from importing directly across package boundaries, making the gateway convention fragile under rapid development",
-        "No automated enforcement (ESLint no-restricted-imports or equivalent) prevents leaf files from bypassing gateway modules and importing directly from rex or sourcevision — the gateway convention is documentation-only and will drift under sustained development pressure",
-        "7 sub-zones are declared but not rendered in zone analysis output, making the 349-file zone appear flat to any tool consuming zone data — sub-zone metadata is present but not actionable without tooling support",
-        "Zone name 'dashboard-mcp-server' implies MCP server infrastructure scope but the zone spans 349 files covering UI components, viewer logic, React hooks, and server code — the name understates the zone's true scope and will systematically mislead contributors triaging files",
-        "mcp-deps.ts is classified as a gateway in the zone file list but does not follow the *-gateway.ts naming convention used by rex-gateway.ts and domain-gateway.ts — it is less discoverable as a gateway module and breaks the implicit naming contract",
-        "concurrent-execution-metrics.ts and aggregation-cache.ts are server-infrastructure concerns co-located in the hub zone with no dedicated sub-zone — if task-usage-tracking was extracted for being a usage-analytics concern, concurrent metrics deserves the same treatment for consistency",
-        "Rename mcp-deps.ts to mcp-gateway.ts (or deps-gateway.ts) to match the *-gateway.ts naming convention established by rex-gateway.ts and domain-gateway.ts. A developer scanning src/server/ for gateways will not recognize mcp-deps.ts as one.",
-        "Zone name 'dashboard-mcp-server' should be updated to reflect the zone's actual scope (full web package application layer). The current name implies a narrow MCP server role but the zone owns 349 files including all viewer, component, and dashboard logic — the mismatch will cause systematic mis-categorization when contributors use the zone name to reason about file placement.",
-        "Zone \"web-viewer\" has files across 21 directories — consider consolidating under a dedicated directory",
-        "[call graph] 6483 internal calls, 23 outgoing, 3 incoming (cohesion: 1, coupling: 0)"
+        "Contains 57% of project files (351/612) — subdivided into 7 sub-zones",
+        "At 351 files this zone dominates the web package; consider whether the server and viewer halves have grown large enough to warrant formal separation into distinct zones",
+        "The rex-gateway and domain-gateway files cleanly isolate all cross-package runtime imports, which is the intended gateway pattern",
+        "Cohesion of 0.98 confirms the server and viewer are tightly coupled by design — polling, websocket, and MCP concerns all converge here",
+        "Zone cohesion is excellent (0.98) with near-zero external coupling (0.02), indicating a well-bounded module with minimal leakage.",
+        "351 files in a single zone is a significant surface area; as the codebase grows, consider whether server infrastructure and viewer UI warrant explicit sub-zone boundaries.",
+        "Gateway files (rex-gateway.ts, domain-gateway.ts, mcp-deps.ts) are co-located in the zone, making the cross-package dependency surface explicit and auditable.",
+        "Zone \"web-dashboard\" has files across 21 directories — consider consolidating under a dedicated directory",
+        "[call graph] 6495 internal calls, 23 outgoing, 2 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
         "cohesion": 0.98,
@@ -7441,14 +7326,80 @@
         "riskLevel": "healthy",
         "failsThreshold": false
       }
+    },
+    {
+      "id": "web-landing",
+      "name": "Web Landing Page",
+      "description": "Self-contained static landing page (HTML + CSS + TypeScript entrypoint) served before the main dashboard application loads.",
+      "files": [
+        "packages/web/src/landing/index.html",
+        "packages/web/src/landing/landing.css",
+        "packages/web/src/landing/landing.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Perfect cohesion (1.0) and zero coupling make this zone fully isolated — it could be extracted into a standalone static bundle without touching the rest of the app",
+        "The single TypeScript entrypoint suggests minimal interactivity; if the landing page grows in complexity, consider a shared design-token layer with the main viewer",
+        "No cross-zone imports mean changes here carry zero risk of regressions elsewhere",
+        "Zero coupling and perfect cohesion indicate this zone is architecturally clean and fully self-contained.",
+        "Three files (HTML, CSS, TS) represent a minimal footprint; the landing page is easy to maintain and deploy independently.",
+        "No shared style or token layer exists between web-landing and web-dashboard; ensure any brand or color changes are kept in sync manually.",
+        "[call graph] 10 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "websocket-infrastructure",
+      "name": "WebSocket Infrastructure",
+      "description": "WebSocket server implementation and connection health tracking for real-time push updates from the server to the dashboard viewer.",
+      "files": [
+        "packages/web/src/server/websocket.ts",
+        "packages/web/src/server/ws-health-tracker.ts",
+        "packages/web/tests/unit/server/boundary-check.test.ts",
+        "packages/web/tests/unit/server/websocket.test.ts",
+        "packages/web/tests/unit/server/ws-health-integration.test.ts",
+        "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+      ],
+      "entryPoints": [
+        "packages/web/src/server/websocket.ts",
+        "packages/web/src/server/ws-health-tracker.ts"
+      ],
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "insights": [
+        "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
+        "Low cohesion (0.25) and high coupling (0.75) are warning-level signals — the four test files dominate the zone and likely pull in external fixtures or shared utilities that fragment the graph",
+        "Separating ws-health-tracker tests from websocket tests into separate files suggests the health tracking concern is distinct enough to merit its own service module",
+        "The boundary-check.test.ts file name is generic and may be testing edge cases that belong in a higher-level integration suite rather than a unit zone",
+        "Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmentation — likely caused by test files importing broadly from the rest of the web package.",
+        "Only 2 of 6 files are production source; the test-to-source ratio inflates coupling scores and suggests the zone boundary is defined by test co-location rather than domain cohesion.",
+        "websocket.ts and ws-health-tracker.ts represent a clean two-layer design (protocol vs. health), which is a positive architectural separation even if the zone metrics are noisy.",
+        "[call graph] 76 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 0.25,
+        "coupling": 0.75,
+        "riskScore": 0.75,
+        "riskLevel": "catastrophic",
+        "failsThreshold": true
+      }
     }
   ],
   "crossings": [
     {
       "from": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "to": "packages/web/src/viewer/polling/polling-state.ts",
-      "fromZone": "dom",
-      "toZone": "web-viewer"
+      "fromZone": "dom-performance-monitoring",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/llm-client/src/api-provider.ts",
@@ -14097,239 +14048,150 @@
       "to": "packages/sourcevision/src/schema/validate.ts",
       "fromZone": "packages-sourcevision:unit",
       "toZone": "packages-sourcevision:e2e"
+    },
+    {
+      "from": "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "fromZone": "task-usage-tracking",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tick.ts",
       "to": "packages/web/src/viewer/polling/index.ts",
-      "fromZone": "web",
-      "toZone": "web-viewer"
+      "fromZone": "web-build-infrastructure",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/web/src/viewer/views/task-audit.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
-      "fromZone": "web",
-      "toZone": "web-viewer"
+      "fromZone": "web-build-infrastructure",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/web/src/viewer/views/task-audit.ts",
       "to": "packages/web/src/viewer/components/rex-task-link.ts",
-      "fromZone": "web",
-      "toZone": "web-viewer"
+      "fromZone": "web-build-infrastructure",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/web/src/viewer/views/task-audit.ts",
       "to": "packages/web/src/viewer/types.ts",
-      "fromZone": "web",
-      "toZone": "web-viewer"
-    },
-    {
-      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "fromZone": "web-server",
-      "toZone": "web-viewer"
-    },
-    {
-      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "fromZone": "web-server",
-      "toZone": "web-viewer"
+      "fromZone": "web-build-infrastructure",
+      "toZone": "web-dashboard"
     },
     {
       "from": "packages/web/tests/unit/server/type-consistency.test.ts",
       "to": "packages/rex/src/schema/v1.ts",
-      "fromZone": "web-viewer",
+      "fromZone": "web-dashboard",
       "toZone": "packages-rex:prd-analysis-core"
     },
     {
       "from": "packages/web/tests/unit/server/type-consistency.test.ts",
       "to": "packages/rex/src/schema/v1.ts",
-      "fromZone": "web-viewer",
+      "fromZone": "web-dashboard",
       "toZone": "packages-rex:prd-analysis-core"
-    },
-    {
-      "from": "packages/web/src/viewer/components/active-tasks-panel.ts",
-      "to": "packages/web/src/viewer/components/elapsed-time.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web"
-    },
-    {
-      "from": "packages/web/src/viewer/views/domain-rex.ts",
-      "to": "packages/web/src/viewer/views/task-audit.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web"
     },
     {
       "from": "packages/web/src/server/routes-hench.ts",
       "to": "packages/web/src/server/incremental-task-usage.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-server"
+      "fromZone": "web-dashboard",
+      "toZone": "task-usage-tracking"
     },
     {
       "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-server"
+      "fromZone": "web-dashboard",
+      "toZone": "task-usage-tracking"
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "fromZone": "web-dashboard",
+      "toZone": "task-usage-tracking"
+    },
+    {
+      "from": "packages/web/src/viewer/components/active-tasks-panel.ts",
+      "to": "packages/web/src/viewer/components/elapsed-time.ts",
+      "fromZone": "web-dashboard",
+      "toZone": "web-build-infrastructure"
+    },
+    {
+      "from": "packages/web/src/viewer/views/domain-rex.ts",
+      "to": "packages/web/src/viewer/views/task-audit.ts",
+      "fromZone": "web-dashboard",
+      "toZone": "web-build-infrastructure"
     },
     {
       "from": "packages/web/src/public.ts",
       "to": "packages/web/src/server/websocket.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     },
     {
       "from": "packages/web/src/server/index.ts",
       "to": "packages/web/src/server/websocket.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     },
     {
       "from": "packages/web/src/server/routes-hench.ts",
       "to": "packages/web/src/server/websocket.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     },
     {
       "from": "packages/web/src/server/routes-rex.ts",
       "to": "packages/web/src/server/websocket.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     },
     {
       "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/websocket.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     },
     {
       "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/ws-health-tracker.ts",
-      "fromZone": "web-viewer",
-      "toZone": "web-unit"
+      "fromZone": "web-dashboard",
+      "toZone": "websocket-infrastructure"
     }
   ],
   "unzoned": [
     ".github/workflows/ci.yml",
-    ".hench/config.json",
-    ".hench/locks/45093.lock"
+    ".hench/config.json"
   ],
   "insights": [
-    "Bidirectional coupling: \"web\" ↔ \"web-viewer\" (4+2 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (2+2 crossings) — consider extracting shared interface",
-    "Size imbalance: largest zone has 349 files vs smallest with 3 — uneven decomposition",
-    "Bidirectional coupling: \"dashboard-mcp-server\" ↔ \"web-package-shell\" (2+4 crossings) — consider extracting shared interface",
-    "Bidirectional coupling: \"dashboard-mcp-server\" ↔ \"task-usage-tracking\" (2+2 crossings) — consider extracting shared interface",
-    "Size imbalance: largest zone has 349 files vs smallest with 3 — uneven decomposition",
-    "The hench and .rex zones both achieve cohesion 1.0 with coupling 0.0, confirming the gateway pattern is enforcing clean package boundaries across the two most critical runtime zones",
-    "The web zone's bidirectional relationship with web-viewer (4 imports out, 2 back) is the only potential coupling concern in this batch — monitor for drift toward circularity as the viewer grows",
-    "Docs and .rex zones are correctly data-only with no import edges, which is the expected steady state for documentation and persisted runtime state",
-    "Three small satellite zones (web-landing-page, task-usage-tracking, websocket-realtime-layer) orbit the massive dashboard-mcp-server zone — the community detection algorithm fragmented what may be a single cohesive web package; consider whether consolidation would improve navigability",
-    "The bidirectional import cycle between task-usage-tracking and dashboard-mcp-server is the only structural concern in this batch; all other cross-zone dependencies are unidirectional",
-    "The web package as a whole demonstrates excellent external isolation — coupling to the broader codebase is near zero, which makes the package straightforward to test and evolve independently",
-    "The dom-performance-monitor zone feeds into web-viewer via a single import, forming a clean unidirectional dependency — monitor utilities flow up into the viewer, never the reverse.",
-    "All test zones (cli-e2e-tests, dom-performance-monitor test file) are either fully decoupled or only import the specific unit under test, indicating disciplined test authoring with no cross-cutting test helpers bleeding into production import graphs.",
-    "The overall zone graph is notably clean: leaf zones like dom-performance-monitor and cli-e2e-tests have low or zero coupling, while the central web-viewer zone acts as the expected hub absorbing imports from dom, web-server, and web.",
-    "All 5 zones in this batch achieve cohesion at or above 0.79 — no low-cohesion zones detected, indicating that community detection is producing semantically meaningful groupings.",
-    "Zero cross-zone coupling for root, .rex, docs, and hench zones demonstrates that the four-tier orchestration hierarchy described in CLAUDE.md is being upheld structurally, not just by convention.",
-    "The web zone is the only zone in this batch with detected coupling (0.21), which is appropriate given it is the integration point between server and viewer layers.",
-    "dashboard-mcp-server (349 files, cohesion 0.99) absorbs the vast majority of the web package's logic; the three satellite zones together add only 13 more files, suggesting the algorithmic split may not reflect meaningful architectural boundaries.",
-    "All zones in this batch belong to the web package; no cross-package coupling is present, confirming the web package respects the four-tier dependency hierarchy defined in CLAUDE.md.",
-    "The task-usage-tracking ↔ dashboard-mcp-server coupling cycle is the only inter-zone warning in this batch and should be resolved to preserve clean unidirectional data flow in the analytics subsystem.",
-    "With all test-only zones showing coupling of 0, the project has strong boundary discipline between test and production code at the module-graph level.",
-    "The dom-performance-monitor zone is a strong candidate for eventual absorption into web-viewer given its single outbound import and small size — worth revisiting if a fourth file is added.",
-    "packages/web/tests/unit/viewer/ contains files from 4 zones (dashboard-mcp-server, dom-performance-monitor, hench-agent-engine, web-package-shell) — consider grouping into subdirectories to clarify architectural boundaries",
-    "The zone graph splits cleanly into two clusters: a stable core (project-orchestration-root, hench-agent-engine, rex-runtime-state, architecture-documentation) with coupling 0 across all four, and a coupled web cluster (web-package-shell, web-viewer, web-server, web-unit, web-landing, dom) with multiple inter-zone edges — this two-cluster topology is healthy as long as the web cluster does not grow edges into the stable core.",
-    "web-viewer acts as the hub of the web cluster with at least 4 distinct import relationships (web→web-viewer, web-viewer→web, web-viewer→web-server, web-server→web-viewer, dom→web-viewer, web-viewer→web-unit) — it is the single highest-coupling node in the graph and should be monitored for further fan-out.",
-    "web-server ↔ web-viewer bidirectional coupling (2+2) represents a circular dependency between two non-trivial zones — this is distinct from the web-package-shell cycle and must be resolved independently, likely by extracting the shared contract (types or interfaces) into a dedicated boundary module.",
-    "web-unit has the lowest cohesion in the entire codebase (0.5) while receiving 6 imports from web-viewer — this combination indicates web-unit is functioning as an informal shared-utilities zone without being designed as one; formalizing it with a clear public API would improve both its cohesion score and web-viewer's coupling clarity.",
-    "The dom zone's single unidirectional import into web-viewer is the cleanest inter-zone relationship in the web cluster — it models the ideal pattern (small focused utility zone with one consumer) that other satellite zones (web-unit, web-server) should aspire to.",
-    "No zone in the stable core (hench, rex-runtime-state, docs, root) imports from any zone in the web cluster — this confirms the four-tier hierarchy is upheld at the import-graph level, not just by convention.",
-    "The web package inter-zone graph has exactly one directed cycle (task-usage-tracking ↔ dashboard-mcp-server) and is otherwise a DAG — making it a near-acyclic architecture with a single, targeted fix needed",
-    "A clean two-tier structure exists within the satellite zones: static asset zones (web-landing-page, viewer-shell-assets) have coupling 0, while functional service zones (task-usage-tracking, websocket-realtime-layer) have non-zero coupling. The static tier never depends on the service tier, which is correct.",
-    "websocket-realtime-layer (pure downstream, unidirectional) and task-usage-tracking (bidirectional cycle) represent the two archetypes of satellite coupling — one is a structural ideal, the other is the sole structural defect in the web package",
-    "The hub-and-spoke topology of dashboard-mcp-server as hub with 3 functional satellites is a recognizable pattern; the risk is that the hub accumulates responsibilities indefinitely. The gateway modules (rex-gateway.ts, domain-gateway.ts) are the correct mechanism to prevent uncontrolled coupling growth at the hub boundary.",
-    "All cross-zone import volumes are small (1–6 imports per edge) while internal call volumes are large (76–6398). This low-bandwidth inter-zone interface pattern is a strong indicator that zone boundaries were drawn at high-level module seams rather than at fine-grained file dependencies.",
-    "The web-server ↔ web-viewer bidirectional import (2 outgoing + 2 incoming) is a separate cycle from the web ↔ web-viewer cycle and compounds the circular dependency risk within the web package; two independent cycles in the same package is a structural warning.",
-    "web-unit has cohesion 0.5 — the lowest in the codebase — and is exclusively consumed by web-viewer (6 imports, no reverse). This low cohesion combined with being a pure dependency of one zone suggests web-unit was fragmented by the community detection algorithm rather than representing a genuine architectural boundary; absorbing it into web-viewer would eliminate the coupling without loss of clarity.",
-    "The web package contains two confirmed bidirectional import pairs (web ↔ web-viewer and web-server ↔ web-viewer), forming interlocking cycles. Combined, these mean no single zone in the web package can be extracted or replaced without touching at least two others — this is the highest-risk structural pattern in the codebase.",
-    "Across the entire zone graph, all non-web zones (root, .rex, docs, hench, logo, cli-e2e-tests) have coupling of 0.0, while all coupling and all cycles are contained within the web package. This clean external/internal split means the web package can be refactored in isolation without risk to the rest of the system.",
-    "dom-performance-monitor is the only non-web-package zone with any outbound coupling (1 import to web-viewer), and that single edge is unidirectional. This makes it the sole bridge between the analysis/agent tier and the web tier at the module-graph level — worth noting as the natural seam if the web package were ever split into a separate deployable.",
-    "Two circular dependencies exist in the web cluster: web-package-shell ↔ web-viewer and web-server ↔ web-viewer. Both must be resolved to prevent build-order ambiguity and to enable independent testing of each zone.",
-    "web-viewer is the highest fan-out node in the codebase with edges to at least 4 other zones — set an explicit import-count budget for this zone to prevent it from becoming an unmanageable god-module over time.",
-    "web-unit cohesion of 0.5 is the lowest in the project; with 6 inbound imports from web-viewer it is de facto a shared-utilities zone — formalize this role with a documented public API and raise its cohesion target to ≥0.8.",
-    "The stable-core cluster (4 zones, all coupling=0) and the web cluster (7 zones, multiple bidirectional edges) are completely decoupled from each other — this macro-level separation is a strong architectural property worth preserving explicitly in onboarding documentation.",
-    "The web package inter-zone graph is a near-DAG with exactly one cycle. Resolving the task-usage-tracking ↔ dashboard-mcp-server bidirectional dependency would make the full graph a strict DAG, which is the ideal steady-state for this architecture.",
-    "Static asset zones (web-landing-page, viewer-shell-assets) and functional service zones (task-usage-tracking, websocket-realtime-layer) form two distinct tiers within the satellite cluster. The static tier correctly has zero coupling to the service tier, confirming clean separation between presentation assets and runtime logic.",
-    "All inter-zone edges in the web package carry 1–6 imports. This uniformly low cross-zone import volume (with dashboard-mcp-server's 6398 internal calls dwarfing all inter-zone traffic) is a strong signal that zone boundaries are drawn at genuine architectural seams rather than arbitrary file groupings.",
-    "All structural complexity (cycles, low cohesion, bidirectional coupling) is confined to the web package. Every other top-level zone is acyclic with cohesion ≥ 0.75. The web package is the sole architectural risk surface in the project.",
-    "The call graph reveals a bidirectional call relationship within the rex package: packages-rex:prd-analysis-core → packages-rex:cli-mcp-interface (237 calls) and packages-rex:cli-mcp-interface → packages-rex:prd-analysis-core (100 calls). This internal cycle within rex mirrors the external coupling problems in the web cluster and is a latent structural risk if either sub-zone needs to be extracted or replaced independently.",
-    "The call graph also reveals a bidirectional call relationship within sourcevision: packages-sourcevision:analyzers-3 → packages-sourcevision:unit (570 calls) and packages-sourcevision:unit → packages-sourcevision:analyzers (187 calls). A 570-call outbound edge combined with a 187-call return edge in a domain package suggests the two sub-zones share logic that belongs in a third, shared module — the absence of a dedicated shared module forces the cycle.",
-    "web-server has only 4 files and cohesion 0.63 — the second-lowest cohesion in the project. A 4-file zone with sub-0.7 cohesion is a strong signal the community detection algorithm fragmented a coherent concern across two zones. web-server is a candidate for absorption into the adjacent web-viewer zone, which would also eliminate one side of the web-server ↔ web-viewer bidirectional cycle.",
-    "The three smallest zones by file count (web-landing: 3 files, logo: 3 files, web-server: 4 files) contribute only 10 files total to the zone graph. Of these, web-server is the only one with coupling; web-landing and logo have cohesion 1.0 and coupling 0.0, suggesting they are correctly isolated static-asset zones rather than misclassified files.",
-    "web-viewer is the sole node in the web cluster with inbound edges from four independent zones (web-package-shell, web-server, web-unit, dom) and outbound edges to three (web-package-shell, web-server, web-unit). This 7-edge fan-in/fan-out profile makes web-viewer a structural chokepoint: any refactoring of any adjacent zone must negotiate with web-viewer, and any bug in web-viewer's public API has 4-zone blast radius.",
-    "The packages-rex internal call graph cycle (prd-analysis-core ↔ cli-mcp-interface, 337 total cross-calls) and the packages-sourcevision internal call graph cycle (analyzers-3 ↔ unit, 757 total cross-calls) together indicate that both domain packages have hidden internal coupling that the zone-level graph does not expose. These cycles should be investigated before either package's internal modules are promoted to public API surfaces.",
-    "The call graph exposes two hidden bidirectional call relationships outside the web package: packages-rex:prd-analysis-core ↔ packages-rex:cli-mcp-interface (237+100 calls) and packages-sourcevision:analyzers-3 → packages-sourcevision:unit (570 calls) with packages-sourcevision:unit → packages-sourcevision:analyzers (187 calls) in the reverse direction — these intra-package cycles are masked by the zone-level coupling metric and represent structural risk invisible in the per-zone analysis",
-    "The zone detection algorithm surfaces coupling between top-level zones but cannot detect cycles within a zone's internal sub-zones — the two bidirectional call relationships in rex and sourcevision (visible only in the raw call graph data) demonstrate that the zone-level DAG property can hold while intra-zone cycles remain undetected and unaddressed",
-    "All three gateways in the codebase (rex-gateway.ts, domain-gateway.ts, mcp-deps.ts) are concentrated in a single package (web/src/server/) with no equivalent gateway discipline enforced in hench or any other consumer — if hench adds a second upstream dependency (beyond rex), the gateway pattern will need to be applied there proactively rather than reactively",
-    "The packages-rex:prd-analysis-core → packages-rex:cli-mcp-interface call volume (237 calls) is more than double the reverse direction (100 calls), suggesting the CLI/MCP layer is calling back into core for data that should be pushed down or cached — this asymmetric bidirectional call pattern is a strong indicator of missing abstraction at the rex package boundary",
-    "The dom-performance-monitor coupling of 0.25 is the only non-zero coupling in the stable-core cluster (all other non-web zones are 0.0), and it is caused entirely by type-level imports rather than runtime dependencies. If type imports were excluded from coupling calculation, the stable-core cluster would achieve universal coupling=0, making it a strict dependency sink at all levels.",
-    "The physical directory structure of packages/web/src/ does not map cleanly to zone boundaries: dom-performance-monitor files live inside viewer/ subdirectories while belonging to a separate zone. This divergence between filesystem hierarchy and architectural zones will increase as the codebase grows — establishing a convention that zone boundaries align with top-level src/ subdirectories (not nested paths) would prevent future misclassifications.",
-    "cli-e2e-tests (14 files, coupling 0) and dom-performance-monitor (3 files, coupling 0.25 via types only) represent the two archetypes of peripheral zones: a large fully-isolated test zone and a small partially-coupled utility zone. Neither poses a structural risk, but the dom-performance-monitor pattern (small utility zone physically co-located with its consumer) is the more fragile archetype — it is one file addition away from justifying absorption into web-viewer.",
-    "Across the entire zone graph, all measured coupling is contained in one package (web). The stable-core zones (hench, rex, docs, root, .rex, logo, cli-e2e-tests) form a collectively acyclic, zero-coupling subgraph. This means all future architectural risk materializes exclusively in the web package — investment in web package structural health (resolving the two bidirectional cycles, formalizing web-unit's public API) has disproportionate impact on overall project health.",
-    "packages-rex:prd-analysis-core and packages-rex:cli-mcp-interface form a bidirectional call cycle (237 + 100 = 337 cross-calls). MCP interface layers should be pure adapters that call into the domain — reverse calls from the domain back into the CLI/MCP layer indicate the domain has taken a dependency on presentation-tier logic, which inverts the four-tier hierarchy within the rex package.",
-    "packages-sourcevision:analyzers-3 and packages-sourcevision:unit form a bidirectional call cycle (570 + 187 = 757 cross-calls). At 757 total cross-calls this is the highest-volume internal cycle in the codebase. The volume suggests shared logic (types, utilities, or base classes) is currently duplicated or scattered between the two sub-zones rather than extracted into a dedicated shared module.",
-    "web-viewer participates in two independent bidirectional import cycles simultaneously: one with web-package-shell (4+2 imports) and one with web-server (2+2 imports). Because both cycles share web-viewer as a common node, resolving either cycle in isolation does not restore a DAG — both must be resolved together, making web-viewer the blocking dependency for the entire web cluster's structural cleanup.",
-    "web-unit (cohesion 0.5, 6 files) receives all its imports from a single consumer (web-viewer) with zero reverse imports. A zone with cohesion below 0.6 that exists solely to serve one other zone is not a genuine architectural boundary — it is an artifact of file fragmentation. Absorbing web-unit into web-viewer would raise web-viewer's internal cohesion and eliminate one inter-zone edge without any loss of architectural clarity.",
-    "packages-rex:prd-analysis-core and packages-rex:cli-mcp-interface have a bidirectional call relationship (237 outgoing, 100 incoming) — this intra-package cycle in the rex domain layer is invisible to zone-level coupling metrics and violates the expectation that CLI/MCP is a pure consumer of core domain logic",
-    "packages-sourcevision:unit and packages-sourcevision:analyzers form a bidirectional call pair (570 + 187 calls) — the high call volume in both directions suggests the unit-test helpers and analyzer implementations have become mutually entangled, which will make either side difficult to refactor independently",
-    "Gateway modules exist only in the web package; hench imports from rex through rex-gateway.ts but there is no equivalent enforcement for any future second upstream dependency hench might acquire — the pattern is applied inconsistently across consumers",
-    "Zone boundaries do not align with the physical directory hierarchy inside packages/web/src/. Files from dom-performance-monitor zone are nested inside viewer/ subdirectories, and tests/unit/viewer/ contains files from 4 different zones. This misalignment means filesystem navigation and zone-aware analysis give inconsistent answers about where a file 'belongs'. Establish a hard convention: each zone's files must live under a dedicated top-level subdirectory within src/ and tests/, enforced via the architecture-policy test.",
-    "The call graph uses 'packages-rex:' and 'packages-sourcevision:' path-based prefixes for internal sub-zones, while top-level zone IDs use descriptive names (rex-runtime-state, hench-agent-engine). This dual naming scheme means a developer cross-referencing a call graph edge with a zone analysis must mentally translate between two incompatible identifier formats — a tooling inconsistency worth surfacing in documentation or resolving by aligning sub-zone IDs to the same descriptive naming convention.",
-    "web-server is the only zone in the entire project that combines both low cohesion (0.63, second lowest) and active bidirectional coupling. All other coupled zones have cohesion above 0.75. This makes web-server the uniquely fragile zone in the codebase — low cohesion means its internal split is unclear, and the bidirectional cycle means any change requires coordinating with web-viewer. No other zone presents this compound risk profile.",
-    "The 88-call edge from packages-llm-client:unit to packages-llm-client:src is the only call graph edge where a zone named 'unit' calls into a zone named 'src' — consistent with test code calling production code. However, the 'unit' zone naming in llm-client conflicts with the top-level 'web-unit' zone name, which contains production components rather than tests. The project uses 'unit' to mean two different things (test suite vs. production module), creating a naming collision that will worsen as both packages grow.",
-    "The stable-core cluster (root, rex-runtime-state, architecture-documentation, hench-agent-engine) achieves coupling=0 universally while the web cluster contains all coupling and all cycles. This clean separation means the architectural risk budget is entirely consumed by one package. Establishing a formal 'web package structural health' metric tracked in CI (bidirectional cycle count, lowest-cohesion zone score) would make regression visible before it accumulates.",
-    "The two bidirectional cycles in the web cluster (web-package-shell ↔ web-viewer and web-server ↔ web-viewer) share web-viewer as a common node, meaning they cannot be resolved independently — fixing one cycle without simultaneously addressing the other risks shifting import paths in ways that create a third cycle. A coordinated single-pass refactor (extract shared types, absorb web-server) is the only safe resolution sequence.",
-    "The sourcevision 4-phase pipeline (Inventory → Imports → Zones → Components) has its bidirectional call cycle concentrated in the Zones and Components phases (analyzers-3 ↔ unit, 757 cross-calls). If the two later phases are entangled, incremental reanalysis (e.g., re-running only the Components phase after a file change) is structurally unsafe — the phase boundary is not a true isolation point. This limits future optimization of the pipeline's incremental analysis capability.",
-    "packages-llm-client:unit → packages-llm-client:src (88 calls in the call graph) establishes llm-client as a third package with intra-package directional call coupling, alongside rex (337 total cross-calls) and sourcevision (757 total cross-calls). All three domain/foundation packages have hidden internal coupling invisible to zone-level metrics — this is a systemic pattern, not an isolated occurrence in two packages.",
-    "The three gateway modules in web/src/server/ follow two different naming conventions: rex-gateway.ts and domain-gateway.ts use the *-gateway.ts suffix while mcp-deps.ts uses a *-deps.ts suffix. A developer adding a fourth gateway has two conflicting naming precedents to choose from — standardize on one suffix via a naming rule in PACKAGE_GUIDELINES.md before a fourth gateway is added.",
-    "The dual fragility criterion (cohesion < 0.7 AND coupling > 0.3 simultaneously) is met by exactly two zones: task-usage-tracking (0.63/0.38) and websocket-realtime-layer (0.5/0.5). All other zones are either high-cohesion or low-coupling, but not both-fragile. These two zones should be the first structural targets in any web package refactor.",
-    "Across all four identified intra-package call cycles (rex: 337 calls, sourcevision: 757 calls, llm-client: 88 calls, plus the web inter-zone cycle), none are surfaced by the per-zone cohesion/coupling metrics — zone-level metrics have a consistent blind spot for intra-zone cycles. A complementary cycle-detection check at the sub-zone call-graph level would catch all four of these cases that the current tooling misses.",
-    "Zone naming in the web package is split between two incompatible conventions: package-prefix names (web-viewer, web-server, web-unit, web-landing) and content-descriptor names (dom-performance-monitor, logo). A contributor cannot determine zone ownership from zone ID alone without knowing which convention applies. Establish a single taxonomy — either all zones use package-prefix (web-dom-monitor, web-logo) or all use content descriptors — and enforce it in the architecture-policy test.",
-    "The cli-e2e-tests zone is the only zone where test files use .js instead of .ts. This is the correct choice for black-box CLI invocation tests, but the convention is implicit and undocumented. Any new top-level test suite added to tests/ will face an undocumented choice of language, and the wrong choice (.ts for e2e, .js for unit tests) would introduce inconsistency without triggering any existing lint or policy check.",
-    "The architecture-policy test is the sole mechanism enforcing structural constraints across the entire codebase, yet it lives inside a behavioral test zone (cli-e2e-tests) and has no dedicated CI step. If cli-e2e tests are skipped, throttled, or made environment-dependent, all structural enforcement silently degrades. The policy test warrants its own CI job with explicit pass/fail visibility separate from behavioral coverage.",
-    "Across all zones, the only naming inconsistency pattern is in test file naming: zone utility tests mirror the utility filename (dom-performance-monitor.test.ts) while hooks in the same zone lack a corresponding test file. Codifying a zone-completeness rule (every exported public symbol in a zone must have a corresponding test file) would make coverage gaps structurally visible rather than discoverable only by manual audit.",
-    "Establish a formal CI gate on web package structural health: track bidirectional cycle count (currently 2) and minimum zone cohesion (currently 0.5 for web-unit). Any PR that increases cycle count or decreases minimum cohesion below its current value should require explicit architectural review. This turns the implicit 'web is the sole risk surface' property into an enforced invariant.",
-    "The call graph sub-zone naming scheme ('packages-rex:prd-analysis-core') and zone ID naming scheme ('rex-runtime-state') are incompatible identifier formats for the same codebase. Align sub-zone IDs to the descriptive convention used by top-level zones, or document the translation rule explicitly in CONTEXT.md so that consumers of both analysis outputs can cross-reference without manual interpretation.",
-    "'web-unit' (production components) and 'packages-llm-client:unit' (test suite) both use 'unit' in their zone identifiers but mean opposite things. Establish and document a project-wide convention: 'unit' in a zone name means test suite only, and production utility modules use 'shared', 'utils', or 'common'. Apply this retroactively to 'web-unit' to eliminate the ambiguity.",
-    "Add *-gateway.ts as the canonical suffix for all gateway modules in PACKAGE_GUIDELINES.md and rename mcp-deps.ts to follow the convention. With three gateways today and the project growing, inconsistent naming will cause a fourth gateway to be placed with the wrong suffix by default — standardize now while the surface is small.",
-    "The dual fragility criterion (cohesion AND coupling both non-trivial) is the most actionable structural metric not currently tracked in any CI or dashboard view. Adding a health check that flags zones where cohesion < 0.7 AND coupling > 0.3 simultaneously would have caught both task-usage-tracking and websocket-realtime-layer as first-class issues rather than leaving them as buried zone-level observations.",
-    "The call graph reveals intra-package bidirectional cycles in rex, sourcevision, AND llm-client — three of the four non-web packages. This is a systemic pattern indicating that all packages were developed without enforcing DAG ordering within their internal sub-modules. A per-package internal cycle check (e.g. madge --circular per package) added to CI would prevent new intra-package cycles from forming silently.",
-    "Adopt a single zone naming taxonomy enforced in the architecture-policy test: either all zones use a package-prefix (web-*, rex-*, hench-*) or all use content-descriptors, but not both. The current mix (web-viewer vs dom-performance-monitor in the same package) makes zone ownership unreadable from IDs alone.",
-    "The architecture-policy test is the only structural enforcement mechanism in the project but runs without a dedicated CI step and shares failure signal with CLI behavioral tests. Promote it to a standalone CI job that runs on every PR independently of the e2e suite so that structural regressions are always visible regardless of e2e suite status.",
-    "The implicit convention that e2e test files use .js and package tests use .ts is undocumented and unenforced. Add a rule to the architecture-policy test that rejects .ts files under tests/e2e/ and .js files under packages/*/tests/ to make the convention explicit and machine-checked.",
-    "SYSTEMIC ENFORCEMENT GAP: Findings 7, 8, 9, and 12 all independently arrive at the same root cause — structural invariants exist as code (architecture-policy test, gateway pattern, cycle freedom) but none are enforced as dedicated CI gates. This is not four separate suggestions; it is one organizational failure manifesting in four places. The correct fix is a single CI job addition, not four separate work items.",
-    "NAMING FRAGMENTATION IS PERVASIVE AND SYSTEMIC: Findings 4, 5, 6, and 10 each identify a separate namespace that uses an ad-hoc convention — zone IDs, gateway file suffixes, sub-zone identifiers, and package scope prefixes. Taken together they indicate the project lacks a single authoritative naming document that all conventions defer to. PACKAGE_GUIDELINES.md exists but does not cover zone IDs or sub-zone identifiers; CONTEXT.md covers neither. One consolidated naming spec would resolve all four findings.",
-    "WEB PACKAGE IS THE SOLE STRUCTURAL RISK SURFACE: Findings 0, 3, 7, 11, 14, 15, 19, 20, 22, 23 — 10 of 24 findings — are scoped exclusively to the web package. No other package contributes more than 2 findings. This concentration is not coincidental: web is the only package that imports from all domain layers (rex, sourcevision, hench), making it structurally exposed by design. The risk is real but contained; the correct mitigation is the CI gate from finding 7, not decomposition.",
-    "DEAD EXPORT ACCUMULATION PATTERN: Findings 14–20 identify 7 potentially unused exports across 6 files in hench, sourcevision, and web. The exports span polling restart state, module loading, glob matching, branch lifecycle detection, PRD resolvers, cache instances, and node listeners. This scatter pattern — unused symbols across many unrelated files — is characteristic of incremental API churn without a corresponding cleanup pass, not a design problem in any individual module.",
-    "CONTRADICTION — FAN-IN SEVERITY INVERSION: Finding 2 rated 'warning' for schema/index.ts at 22 callers; finding 13 rated 'info' for walkTree at 29 callers. The higher-fan-in symbol received lower severity. Both are central modules used as intended. Severity 2 should be downgraded to 'info' to restore consistency (captured in severityUpdates).",
-    "INTRA-PACKAGE CYCLES ARE A CROSS-PACKAGE PATTERN: Finding 9 documents bidirectional cycles in rex, sourcevision, and llm-client. Finding 0 documents bidirectional coupling between two web sub-zones. Together these show that cycle tolerance is an ambient project norm, not an isolated incident. A single madge --circular sweep added to CI (one command, one threshold) would enforce DAG ordering project-wide without requiring per-package fixes first.",
-    "packages/web/tests/unit/viewer/ contains files from 4 zones (dom, hench, web, web-viewer) — consider grouping into subdirectories to clarify architectural boundaries",
-    "Consolidate findings 4, 5, 6, and 10 into a single work item: author a NAMING.md (or extend PACKAGE_GUIDELINES.md) that specifies: (a) zone ID convention (content-descriptor vs package-prefix — pick one), (b) sub-zone ID format aligned with zone IDs, (c) gateway module suffix (*-gateway.ts canonical), (d) 'unit' reserved for test zones only. This one document eliminates all four naming findings.",
-    "Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Actions job named 'structural-health' that runs (1) the existing architecture-policy test in isolation, (2) madge --circular per package, and (3) a zone-metrics check that fails if any zone has cohesion < 0.7 AND coupling > 0.3. This single job enforces the invariants described across three separate findings.",
-    "The architecture enforces inter-package DAG ordering (four-tier hierarchy, gateway pattern) but applies no equivalent discipline to intra-package module ordering. This asymmetry means cross-package structure is auditable but internal package structure is opaque. Adding `madge --circular` per package in CI closes the gap without changing any existing code.",
-    "Seven potentially unused exports (findings 14–20) across 6 files suggest no periodic dead-code audit exists. A project-wide pass using the existing call-graph data (already computed by sourcevision) to flag zero-incoming-call exports would surface all of these in one step and establish a repeatable process.",
-    "The web package's structural complexity (bidirectional coupling, lowest cohesion zone at 0.5, two god-function candidates, 142-call module pair, multiple dead exports) is fully explained by its architectural role: it is the only package that integrates all other packages. This is not an accident of implementation — it is load-bearing complexity. The correct response is metric tracking with enforced thresholds (finding 7), not decomposition.",
-    "Inter-package structure is rigorously governed (gateway pattern, four-tier DAG, documented conventions) but intra-package module ordering has no equivalent enforcement. This asymmetry means cross-package boundaries are auditable while internal package structure is opaque — the single largest structural governance gap in the project.",
-    "All web-package metric findings (bidirectional coupling, lower cohesion, god-function hook, dead exports, tightly coupled module pair) share a single architectural cause: web is the sole integration layer for all other packages. Treating these as individual defects would be incorrect; the correct frame is metric-tracked load-bearing complexity with enforced thresholds.",
-    "The seven dead-export findings across six files are a symptom of one missing process: no CI gate on zero-incoming-call public exports. Sourcevision already computes the required data during analysis; the gap is enforcement, not detection.",
-    "The two highest fan-in modules — packages/rex/src/schema/index.ts (22 callers) and packages/rex/src/core/tree.ts:walkTree (29 callers) — define the project's highest-risk change surface. Neither is a design flaw; both are expected hub types. Together they are the two files most deserving of focused regression test coverage.",
-    "The two god-function findings have fundamentally different risk profiles: a CLI dispatch main orchestrating 48 commands is structurally mandated by its role, whereas a React hook aggregating 39 callees is not — only usePRDActions warrants active monitoring for further growth.",
-    "Global finding 0 (bidirectional web↔web-viewer coupling, severity: warning) directly contradicts global finding 16 (LLM analysis: web's structural complexity is load-bearing and intentional, correct response is metric tracking). Finding 16 is correct: 6 total crossings from a deliberate integration package is expected behavior, not a defect. The coupling should be tracked via enforced thresholds as recommended in finding 5, not treated as a warning-level structural problem.",
-    "Global finding 2 (fan-in hotspot: packages/rex/src/schema/index.ts flagged as warning) contradicts the barrel-export convention documented in CLAUDE.md ('Public API: src/public.ts → exports[\".\"] in package.json — all 5 packages follow this'). Schema index files are explicitly designed to be the canonical import point; 22 callers is the intended outcome of the pattern, not a hotspot defect. The finding correctly identifies that changes here have wide impact, but warning severity is inappropriate for a module whose high fan-in is a deliberate design consequence.",
-    "The structural-health CI job proposed in global finding 5 (madge --circular + zone-metrics check) should add a third sub-check: a fan-in threshold (e.g., > 30 callers) applied exclusively to non-index, non-barrel files. This correctly flags future walkTree-class hotspots while exempting schema/index.ts and similar barrel exports that are designed for wide import. The distinction — barrel vs non-barrel — can be approximated by excluding files named index.ts or public.ts.",
-    "Seven potentially unused exports across six files (packages/web/src/viewer/polling/polling-restart.ts: 3 exports; packages/web/src/viewer/loader.ts: 2 exports; packages/hench/src/shared/glob.ts: simpleGlobMatch; packages/sourcevision/src/analyzers/branch-work-filter.ts: detectBranchLifecycle; packages/sourcevision/src/cli/commands/prd-epic-resolver.ts: resolveWorkedEpicTitlesForRange; packages/web/src/server/routes-token-usage.ts: getAggregationCacheInstance) share one root cause: no CI gate enforces that non-test public exports remain reachable. Sourcevision's call-graph already tracks this data; adding a CI step that fails on zero-incoming-call exports in non-test, non-barrel files would surface and prevent all of these without new tooling.",
-    "The naming-convention gap (finding 4) and the structural-health CI gap (finding 5) are the only two findings that, if addressed, would prevent recurrence of multiple other findings: naming conventions would prevent new zone-ID inconsistencies; CI enforcement would prevent new dead exports, new circular dependencies, and new cohesion/coupling regressions. Prioritizing these two meta-level work items yields higher long-term leverage than fixing any individual instance finding.",
+    "Bidirectional coupling: \"web-build-infrastructure\" ↔ \"web-dashboard\" (4+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"task-usage-tracking\" ↔ \"web-dashboard\" (1+3 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 351 files vs smallest with 3 — uneven decomposition",
+    "The four-tier dependency hierarchy (orchestration → execution → domain → foundation) is well-enforced: root has zero coupling, hench is isolated, and the rex-gateway pattern contains cross-package imports",
+    "The web layer is the only place with bidirectional zone coupling (web ↔ web-viewer); all other inter-zone relationships are strictly directional",
+    "Three zones (root, .rex, docs) have perfect cohesion and zero coupling — these are correctly isolated leaf zones with no entanglement risk",
+    "The web-unit zone (cohesion: 0.25) referenced in cross-zone imports is a low-cohesion concern outside this batch; its imports from web-viewer suggest test utilities are scattered rather than colocated",
+    "Sourcevision's community detection has correctly separated concerns at the package boundary level (hench, web, web-viewer as distinct zones) while keeping runtime state (.rex) isolated from source code",
+    "The web-viewer zone at 351 files is by far the largest in this batch and absorbs both server infrastructure and UI viewer code; the cross-zone import pattern (web-viewer → web-server, web-viewer → web-unit) suggests the viewer zone acts as a hub, which risks becoming a god zone as the dashboard grows",
+    "websocket-infrastructure has the lowest cohesion (0.25) and highest coupling (0.75) of any zone in this batch — the structural weakness is driven by test files importing outside their zone boundary, which is a recurring pattern worth addressing via test-scoped zone isolation",
+    "The back-edge from web-server (task-usage-tracking) into web-viewer should be audited: a tracking/scheduler service depending on the main application zone inverts the expected dependency direction and could create initialization order issues",
+    "web-landing and viewer-static-assets are both small, perfectly cohesive islands with zero coupling — they are healthy satellites that could be independently deployed or cached without touching the core dashboard",
+    "Cross-zone imports flow predominantly from web-viewer outward (to web-unit, web-server, web), confirming web-dashboard is the correct architectural hub; the single reverse import (web-server → web-viewer) is the only anomaly worth resolving",
+    "The dom-performance-monitoring zone is a clean leaf node consumed only by web-viewer; its small size and low coupling make it a candidate for eventual absorption into web-viewer if it does not grow.",
+    "The e2e-tests zone is fully decoupled from all other zones, which is architecturally correct — E2E tests should validate the system at process boundaries, not via module imports.",
+    "The web-viewer zone is the dominant hub in the cross-zone import graph, pulling in dom, web-unit, web-server, and web; any instability in web-viewer's public API has outsized ripple effects and warrants careful change management.",
+    "web-server imports from web-viewer (1 import) while web-viewer also imports from web-server (3 imports) — this bidirectional relationship should be reviewed to ensure it does not become a hidden cycle; dependency injection or a shared-types layer may be needed if it tightens.",
+    "Overall zone graph is acyclic with one exception: the web ↔ web-viewer bidirectional relationship. All other cross-zone imports are unidirectional, which is excellent for a monorepo of this complexity.",
+    "web-unit has cohesion 0.25 (below the 0.4 warning threshold) and receives imports from web-viewer — test utilities should be colocated with their production counterparts or extracted into a dedicated test-support zone.",
+    "The hench package (159 files, cohesion 1.0) and web-viewer (351 files, cohesion 0.98) are the two largest zones; both maintain excellent cohesion despite their size, validating the gateway pattern.",
+    "Four of five zones in this batch belong to the web package, reflecting that the web package is the most structurally complex part of the codebase and the primary site of architectural risk.",
+    "The web-unit zone's low cohesion (0.25) combined with high coupling (0.75) stands out as the only zone in this batch breaching warning thresholds; refactoring its test imports to use local stubs rather than pulling from the broader web-viewer zone would resolve this.",
+    "web-landing and viewer-static-assets together represent the static/presentation layer of the web package, cleanly separated from server logic — this separation is a positive structural pattern worth preserving as the dashboard evolves.",
+    "All production zones show cohesion ≥ 0.67 and coupling ≤ 0.33, indicating a well-partitioned codebase with no structural hotspots requiring immediate attention.",
+    "The mutual import relationship between web-viewer and web-server warrants monitoring; if additional cross-imports are added, introduce a shared-types or events package to break the potential cycle rather than deepening the bidirectional dependency.",
+    "The e2e-tests zone covers CLI orchestration and architecture policy but does not appear to include MCP server E2E tests; as MCP becomes a primary integration surface, adding E2E coverage for the HTTP transport would improve confidence.",
+    "packages/web/tests/unit/viewer/ contains files from 4 zones (autonomous-agent, dom-performance-monitoring, web-build-infrastructure, web-dashboard) — consider grouping into subdirectories to clarify architectural boundaries",
     "[call graph] 570 calls: \"packages-sourcevision:analyzers-3\" → \"packages-sourcevision:unit\"",
-    "[call graph] 237 calls: \"packages-rex:prd-analysis-core\" → \"packages-rex:cli-mcp-interface\"",
+    "[call graph] 239 calls: \"packages-rex:prd-analysis-core\" → \"packages-rex:cli-mcp-interface\"",
     "[call graph] 187 calls: \"packages-sourcevision:unit\" → \"packages-sourcevision:analyzers\"",
     "[call graph] 100 calls: \"packages-rex:cli-mcp-interface\" → \"packages-rex:prd-analysis-core\"",
     "[call graph] 88 calls: \"packages-llm-client:unit\" → \"packages-llm-client:src\""
@@ -14338,37 +14200,142 @@
     {
       "type": "observation",
       "pass": 0,
-      "scope": ".rex",
+      "scope": "autonomous-agent",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 0,
-      "scope": "docs",
-      "text": "High cohesion (1) — files are tightly interconnected",
+      "pass": 1,
+      "scope": "autonomous-agent",
+      "text": "159 files in a single zone suggests the internal structure is dense; sourcevision may benefit from per-subdirectory zone hints to surface finer-grained architectural boundaries within hench.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "autonomous-agent",
+      "text": "Agent analysis files (adaptive.ts, review.ts, spin.ts) represent domain-specific loop heuristics — documenting their interaction order would help contributors understand the agent's decision pipeline.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "autonomous-agent",
+      "text": "Perfect cohesion (1.0) and zero external coupling confirm the rex-gateway pattern is working as intended for this package.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "e2e",
+      "scope": "e2e-tests",
       "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "e2e-tests",
+      "text": "14 E2E test files with no shared fixtures module detected; if setup/teardown logic is duplicated across files, a shared helper could reduce maintenance burden.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "e2e-tests",
+      "text": "Perfect cohesion and zero coupling are ideal for an E2E suite — these tests correctly treat the CLI as a black box.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "e2e-tests",
+      "text": "architecture-policy.test.js should be reviewed periodically to ensure it encodes current tier boundaries; policy tests that are not updated alongside architectural changes become stale and misleading.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"web\" ↔ \"web-viewer\" (4+2 crossings) — consider extracting shared interface",
+      "text": "Bidirectional coupling: \"task-usage-tracking\" ↔ \"web-dashboard\" (1+3 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Size imbalance: largest zone has 349 files vs smallest with 3 — uneven decomposition",
+      "text": "Bidirectional coupling: \"web-build-infrastructure\" ↔ \"web-dashboard\" (4+2 crossings) — consider extracting shared interface",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "global",
+      "text": "Size imbalance: largest zone has 351 files vs smallest with 3 — uneven decomposition",
       "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "All production zones show cohesion ≥ 0.67 and coupling ≤ 0.33, indicating a well-partitioned codebase with no structural hotspots requiring immediate attention.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "Four of five zones in this batch belong to the web package, reflecting that the web package is the most structurally complex part of the codebase and the primary site of architectural risk.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "Overall zone graph is acyclic with one exception: the web ↔ web-viewer bidirectional relationship. All other cross-zone imports are unidirectional, which is excellent for a monorepo of this complexity.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "The e2e-tests zone covers CLI orchestration and architecture policy but does not appear to include MCP server E2E tests; as MCP becomes a primary integration surface, adding E2E coverage for the HTTP transport would improve confidence.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "The hench package (159 files, cohesion 1.0) and web-viewer (351 files, cohesion 0.98) are the two largest zones; both maintain excellent cohesion despite their size, validating the gateway pattern.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "The mutual import relationship between web-viewer and web-server warrants monitoring; if additional cross-imports are added, introduce a shared-types or events package to break the potential cycle rather than deepening the bidirectional dependency.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "The web-unit zone's low cohesion (0.25) combined with high coupling (0.75) stands out as the only zone in this batch breaching warning thresholds; refactoring its test imports to use local stubs rather than pulling from the broader web-viewer zone would resolve this.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "web-landing and viewer-static-assets together represent the static/presentation layer of the web package, cleanly separated from server logic — this separation is a positive structural pattern worth preserving as the dashboard evolves.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "global",
+      "text": "web-unit has cohesion 0.25 (below the 0.4 warning threshold) and receives imports from web-viewer — test utilities should be colocated with their production counterparts or extracted into a dedicated test-support zone.",
+      "severity": "warning"
     },
     {
       "type": "observation",
@@ -14386,22 +14353,148 @@
     {
       "type": "observation",
       "pass": 0,
-      "scope": "hench",
+      "scope": "monorepo-orchestration",
       "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 0,
-      "scope": "logo",
-      "text": "High cohesion (1) — files are tightly interconnected",
+      "pass": 1,
+      "scope": "monorepo-orchestration",
+      "text": "No declared entry points despite containing executable scripts (ci.js, cli.js, web.js) — sourcevision may need path hints to correctly classify these as entry points.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "monorepo-orchestration",
+      "text": "Zero coupling to any other zone is the intended design for an orchestration layer — this is healthy and should be preserved.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "monorepo-orchestration",
+      "text": "claude-integration.js classified as a service at root level suggests it may contain reusable logic that could migrate into a dedicated package if complexity grows.",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "root",
+      "scope": "project-documentation",
       "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "project-documentation",
+      "text": "Concentration of memory-related docs (4+ files) suggests the memory subsystem design has iterated heavily; a single authoritative reference doc would help new contributors.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "project-documentation",
+      "text": "Date-prefixed file naming is used inconsistently — most docs are topic-named while at least one uses a date prefix, making chronological vs. thematic navigation ambiguous.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "project-documentation",
+      "text": "Zero coupling to source zones is correct — documentation should never be imported by production code.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "rex-runtime-state",
+      "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "rex-runtime-state",
+      "text": "Zone contains only data files with zero coupling — correct isolation for mutable runtime state that tools read and write directly.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "rex-runtime-state",
+      "text": "execution-log rotation (log.1.jsonl) is implicit; a documented retention policy would prevent unbounded log growth in long-running projects.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "rex-runtime-state",
+      "text": "workflow.md duplicates some state already encoded in prd.json; keeping these in sync manually is a potential consistency risk as the PRD evolves.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "viewer-static-assets",
+      "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "viewer-static-assets",
+      "text": "Maintaining separate lightmode and darkmode PNG files requires manual synchronization on any branding update; SVG with CSS variables would eliminate this duplication.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "viewer-static-assets",
+      "text": "Zero coupling and perfect cohesion confirm this is a pure static asset zone with no runtime logic — ideal for independent caching and CDN delivery.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "viewer-static-assets",
+      "text": "index.html is the root shell for the viewer SPA; changes to build output filenames must be reflected here to avoid broken asset references in production.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "web-dashboard",
+      "text": "Contains 57% of project files (351/612) — subdivided into 7 sub-zones",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "web-dashboard",
+      "text": "High cohesion (0.98) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-dashboard",
+      "text": "351 files in a single zone is a significant surface area; as the codebase grows, consider whether server infrastructure and viewer UI warrant explicit sub-zone boundaries.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-dashboard",
+      "text": "Gateway files (rex-gateway.ts, domain-gateway.ts, mcp-deps.ts) are co-located in the zone, making the cross-package dependency surface explicit and auditable.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-dashboard",
+      "text": "Zone cohesion is excellent (0.98) with near-zero external coupling (0.02), indicating a well-bounded module with minimal leakage.",
       "severity": "info"
     },
     {
@@ -14413,79 +14506,65 @@
     },
     {
       "type": "observation",
-      "pass": 0,
-      "scope": "web-server",
-      "text": "High coupling (0.6) — 2 imports target \"web-viewer\"",
-      "severity": "warning"
+      "pass": 1,
+      "scope": "web-landing",
+      "text": "No shared style or token layer exists between web-landing and web-dashboard; ensure any brand or color changes are kept in sync manually.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-landing",
+      "text": "Three files (HTML, CSS, TS) represent a minimal footprint; the landing page is easy to maintain and deploy independently.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-landing",
+      "text": "Zero coupling and perfect cohesion indicate this zone is architecturally clean and fully self-contained.",
+      "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "web-unit",
+      "scope": "websocket-infrastructure",
       "text": "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
       "severity": "warning"
     },
     {
       "type": "observation",
-      "pass": 0,
-      "scope": "web-viewer",
-      "text": "Contains 57% of project files (349/611) — subdivided into 7 sub-zones",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "web-viewer",
-      "text": "High cohesion (0.98) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "dom",
-      "text": "Zone \"dom\" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/hooks/dom/ and moving related files there",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "global",
-      "text": "packages/web/tests/unit/viewer/ contains files from 4 zones (dom, hench, web, web-viewer) — consider grouping into subdirectories to clarify architectural boundaries",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Consolidate findings 4, 5, 6, and 10 into a single work item: author a NAMING.md (or extend PACKAGE_GUIDELINES.md) that specifies: (a) zone ID convention (content-descriptor vs package-prefix — pick one), (b) sub-zone ID format aligned with zone IDs, (c) gateway module suffix (*-gateway.ts canonical), (d) 'unit' reserved for test zones only. This one document eliminates all four naming findings.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Actions job named 'structural-health' that runs (1) the existing architecture-policy test in isolation, (2) madge --circular per package, and (3) a zone-metrics check that fails if any zone has cohesion < 0.7 AND coupling > 0.3. This single job enforces the invariants described across three separate findings.",
+      "pass": 1,
+      "scope": "websocket-infrastructure",
+      "text": "Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmentation — likely caused by test files importing broadly from the rest of the web package.",
       "severity": "warning"
     },
     {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Global finding 0 (bidirectional web↔web-viewer coupling, severity: warning) directly contradicts global finding 16 (LLM analysis: web's structural complexity is load-bearing and intentional, correct response is metric tracking). Finding 16 is correct: 6 total crossings from a deliberate integration package is expected behavior, not a defect. The coupling should be tracked via enforced thresholds as recommended in finding 5, not treated as a warning-level structural problem.",
+      "type": "observation",
+      "pass": 1,
+      "scope": "websocket-infrastructure",
+      "text": "Only 2 of 6 files are production source; the test-to-source ratio inflates coupling scores and suggests the zone boundary is defined by test co-location rather than domain cohesion.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "websocket-infrastructure",
+      "text": "websocket.ts and ws-health-tracker.ts represent a clean two-layer design (protocol vs. health), which is a positive architectural separation even if the zone metrics are noisy.",
       "severity": "info"
     },
     {
       "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Global finding 2 (fan-in hotspot: packages/rex/src/schema/index.ts flagged as warning) contradicts the barrel-export convention documented in CLAUDE.md ('Public API: src/public.ts → exports[\".\"] in package.json — all 5 packages follow this'). Schema index files are explicitly designed to be the canonical import point; 22 callers is the intended outcome of the pattern, not a hotspot defect. The finding correctly identifies that changes here have wide impact, but warning severity is inappropriate for a module whose high fan-in is a deliberate design consequence.",
+      "pass": 0,
+      "scope": "autonomous-agent",
+      "text": "Zone \"autonomous-agent\" has files across 31 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
       "type": "suggestion",
-      "pass": 5,
+      "pass": 0,
       "scope": "global",
-      "text": "The structural-health CI job proposed in global finding 5 (madge --circular + zone-metrics check) should add a third sub-check: a fan-in threshold (e.g., > 30 callers) applied exclusively to non-index, non-barrel files. This correctly flags future walkTree-class hotspots while exempting schema/index.ts and similar barrel exports that are designed for wide import. The distinction — barrel vs non-barrel — can be approximated by excluding files named index.ts or public.ts.",
+      "text": "packages/web/tests/unit/viewer/ contains files from 4 zones (autonomous-agent, dom-performance-monitoring, web-build-infrastructure, web-dashboard) — consider grouping into subdirectories to clarify architectural boundaries",
       "severity": "info"
     },
     {
@@ -14575,96 +14654,110 @@
       "type": "suggestion",
       "pass": 0,
       "scope": "global",
-      "text": "4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:task-selection, packages-rex:fix-command, web-unit, packages-rex:recommendation-scanning — mandatory refactoring recommended before further development",
+      "text": "4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:task-selection, packages-rex:fix-command, websocket-infrastructure, packages-rex:recommendation-scanning — mandatory refactoring recommended before further development",
       "severity": "warning",
       "related": [
         "packages-rex:task-selection",
         "packages-rex:fix-command",
-        "web-unit",
+        "websocket-infrastructure",
         "packages-rex:recommendation-scanning"
       ]
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "hench",
-      "text": "Zone \"hench\" has files across 31 directories — consider consolidating under a dedicated directory",
+      "scope": "web-build-infrastructure",
+      "text": "Zone \"web-build-infrastructure\" has files across 6 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "logo",
-      "text": "Zone \"logo\" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/logo/ and moving related files there",
+      "scope": "web-dashboard",
+      "text": "Zone \"web-dashboard\" has files across 21 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "web",
-      "text": "Zone \"web\" has files across 6 directories — consider consolidating under a dedicated directory",
+      "type": "observation",
+      "pass": 1,
+      "scope": "dom-performance-monitoring",
+      "text": "At 3 files, this zone sits at the minimum useful size; monitor whether it grows organically or should be folded into web-viewer.",
       "severity": "info"
     },
     {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "web-viewer",
-      "text": "Zone \"web-viewer\" has files across 21 directories — consider consolidating under a dedicated directory",
+      "type": "observation",
+      "pass": 1,
+      "scope": "dom-performance-monitoring",
+      "text": "Cohesion of 0.67 and coupling of 0.33 are healthy for a 3-file zone; no structural changes needed.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 5,
-      "scope": "global",
-      "text": "Seven potentially unused exports (findings 14–20) across 6 files suggest no periodic dead-code audit exists. A project-wide pass using the existing call-graph data (already computed by sourcevision) to flag zero-incoming-call exports would surface all of these in one step and establish a repeatable process.",
+      "type": "observation",
+      "pass": 1,
+      "scope": "dom-performance-monitoring",
+      "text": "Zone has no declared entry point — if web-viewer imports this directly by path, consider formalizing a public.ts export to make the surface explicit.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 5,
-      "scope": "global",
-      "text": "Seven potentially unused exports across six files (packages/web/src/viewer/polling/polling-restart.ts: 3 exports; packages/web/src/viewer/loader.ts: 2 exports; packages/hench/src/shared/glob.ts: simpleGlobMatch; packages/sourcevision/src/analyzers/branch-work-filter.ts: detectBranchLifecycle; packages/sourcevision/src/cli/commands/prd-epic-resolver.ts: resolveWorkedEpicTitlesForRange; packages/web/src/server/routes-token-usage.ts: getAggregationCacheInstance) share one root cause: no CI gate enforces that non-test public exports remain reachable. Sourcevision's call-graph already tracks this data; adding a CI step that fails on zero-incoming-call exports in non-test, non-barrel files would surface and prevent all of these without new tooling.",
+      "type": "observation",
+      "pass": 1,
+      "scope": "task-usage-tracking",
+      "text": "Cohesion of 0.5 is acceptable but indicates the two services share limited internal structure; a shared UsageRecord type or store would raise cohesion.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "task-usage-tracking",
+      "text": "Tests are included in this zone alongside production code, confirming the zone name should reflect production purpose (task-usage-tracking) rather than a test suffix.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "task-usage-tracking",
+      "text": "The cleanup scheduler imports back into web-viewer (per cross-zone import graph), creating a dependency inversion — the scheduler should depend on an interface, not the viewer zone.",
       "severity": "warning"
     },
     {
-      "type": "pattern",
-      "pass": 5,
-      "scope": "global",
-      "text": "The architecture enforces inter-package DAG ordering (four-tier hierarchy, gateway pattern) but applies no equivalent discipline to intra-package module ordering. This asymmetry means cross-package structure is auditable but internal package structure is opaque. Adding `madge --circular` per package in CI closes the gap without changing any existing code.",
-      "severity": "warning"
-    },
-    {
-      "type": "pattern",
-      "pass": 5,
-      "scope": "global",
-      "text": "The naming-convention gap (finding 4) and the structural-health CI gap (finding 5) are the only two findings that, if addressed, would prevent recurrence of multiple other findings: naming conventions would prevent new zone-ID inconsistencies; CI enforcement would prevent new dead exports, new circular dependencies, and new cohesion/coupling regressions. Prioritizing these two meta-level work items yields higher long-term leverage than fixing any individual instance finding.",
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-build-infrastructure",
+      "text": "BROWSER_ERROR_CODE_5.md and MEMORY_PROFILE.md in the web package root are debugging artifacts that should either be moved to docs/ or removed to keep the package root clean.",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 5,
-      "scope": "global",
-      "text": "The web package's structural complexity (bidirectional coupling, lowest cohesion zone at 0.5, two god-function candidates, 142-call module pair, multiple dead exports) is fully explained by its architectural role: it is the only package that integrates all other packages. This is not an accident of implementation — it is load-bearing complexity. The correct response is metric tracking with enforced thresholds (finding 7), not decomposition.",
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-build-infrastructure",
+      "text": "Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer→web: 2) create a soft cycle risk; extracting shared primitives into a dedicated shared zone would eliminate this.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 1,
+      "scope": "web-build-infrastructure",
+      "text": "elapsed-time.ts and task-audit.ts are entry points but live in a build-infrastructure zone — if they are reusable UI primitives, they belong in web-viewer or a dedicated components zone.",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 0,
       "scope": "global",
-      "text": "God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions",
+      "text": "God function: cmdAnalyze in packages/rex/src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions",
       "severity": "warning",
       "related": [
-        "packages/rex/src/cli/index.ts"
+        "packages/rex/src/cli/commands/analyze.ts"
       ]
     },
     {
       "type": "anti-pattern",
       "pass": 0,
       "scope": "global",
-      "text": "God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions",
+      "text": "God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions",
       "severity": "warning",
       "related": [
-        "packages/web/src/viewer/hooks/use-prd-actions.ts"
+        "config.js"
       ]
     },
     {
@@ -14695,8 +14788,8 @@
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "web-unit",
-      "text": "Zone \"Web Unit\" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
+      "scope": "websocket-infrastructure",
+      "text": "Zone \"WebSocket Infrastructure\" (websocket-infrastructure) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
       "severity": "critical"
     },
     {
@@ -14707,21 +14800,25 @@
       "severity": "warning"
     }
   ],
-  "enrichmentPass": 4,
+  "enrichmentPass": 1,
   "metaEvaluationCount": 14,
-  "structureHash": "3d8f5bd5cabd3ea0",
+  "structureHash": "d08789a87fc81508",
   "zoneContentHashes": {
-    "root": "c5d5a50643440ab7",
-    ".rex": "fe985b0fbace9aa2",
-    "docs": "8bb7e6c5f03173fa",
-    "hench": "8701f7e5bdbcb667",
-    "web": "edfa070703e900d5",
-    "web-viewer": "4b36e6083688b92d",
+    "monorepo-orchestration": "c5d5a50643440ab7",
+    "rex-runtime-state": "44b29984797859e5",
+    "project-documentation": "8bb7e6c5f03173fa",
+    "autonomous-agent": "8701f7e5bdbcb667",
+    "web-build-infrastructure": "edfa070703e900d5",
+    "web-dashboard": "1617912e10e00bf2",
     "web-landing": "4d39762e762abf24",
-    "web-server": "350b1becb195bee6",
-    "web-unit": "7a8885802e7ef345",
-    "logo": "de394943d6b2be85",
-    "dom": "433e272763ea80cd",
-    "e2e": "b95ce4702f3da6db"
+    "task-usage-tracking": "74a8668203fe8cc6",
+    "websocket-infrastructure": "7a8885802e7ef345",
+    "viewer-static-assets": "de394943d6b2be85",
+    "dom-performance-monitoring": "433e272763ea80cd",
+    "e2e-tests": "b95ce4702f3da6db"
+  },
+  "lastReset": {
+    "from": 4,
+    "to": 1
   }
 }

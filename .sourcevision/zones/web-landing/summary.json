@@ -1,7 +1,7 @@
 {
   "id": "web-landing",
-  "name": "Web Landing",
-  "description": "3 files, primarily HTML, CSS, TypeScript",
+  "name": "Web Landing Page",
+  "description": "Self-contained static landing page (HTML + CSS + TypeScript entrypoint) served before the main dashboard application loads.",
   "files": [
     "packages/web/src/landing/index.html",
     "packages/web/src/landing/landing.css",

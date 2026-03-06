@@ -2,7 +2,7 @@
 
 **Branch:** `sourcevision0304`
 **Base:** `main`
-**Completed items:** 60
+**Completed items:** 73
 
 | Epic | Completed |
 |------|-----------|
@@ -14,6 +14,9 @@
 | SourceVision UI Import Graph Enhancement | 3 |
 | PR Build Pipeline and Code Quality Automation | 2 |
 | Rex UI Task Management Enhancement | 3 |
+| Rex UI Task Management Enhancement | 3 |
+| Rex UI Task Management Enhancement | 2 |
+| Analyze pipeline improvements | 2 |
 
 ## ⚠️ Breaking Changes
 
@@ -67,8 +70,22 @@
 - **Rex UI Task Management Enhancement**
 - **Identify and fix smart-add command name mismatch between web UI and rex CLI** [critical]
   The Rex Dashboard Smart Add box triggers an API call to the rex CLI using the subcommand 'smart-add', but the CLI no longer registers that name — likely renamed or restructured during a prior refactor. Trace the full call path from the web UI input handler through the web server API route to the rex CLI invocation, identify the correct current command name (e.g. 'add --smart' or similar), and update the web server route or API client to use the correct invocation. Verify the fix does not break the CLI's own smart-add entry point if it is invoked directly.
+- **Address suggestion issues (1 findings)** [critical]
+  - Zone "Schema Validation" (packages-rex:schema-validation) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- **Rex UI Task Management Enhancement**
+- **Fix Smart Add CLI command argument construction in Rex Dashboard** [critical]
+  The Rex Dashboard Smart Add feature builds a shell command like `rex add --format=json <description>` before dispatching it to the CLI. A regression is causing the description argument to be concatenated with unrelated UI state (e.g. the current search query or last-focused task title), producing a malformed command such as `rex add --format=json limit Tag selection options in the rex task UI search area`. Trace the command-builder code path, identify the source of the stale string injection, and fix the argument assembly so only the user-entered description is forwarded.
+- **Rex UI Task Management Enhancement**
+- **Analyze pipeline improvements**
 
 ## Completed Work
+
+### Analyze pipeline improvements
+
+**Hide completed items by default in status views**
+- Suppress deleted items from rex status CLI output by default
+
+- Hide completed items by default in status views *(feature)*
 
 ### Duplicate-aware Proposal Override for rex add
 
@@ -140,6 +157,22 @@
   - Clearing the search input restores the full unfiltered tree
   - Search state is not persisted across page reloads
 - Extend Rex task search with tag and status facets
+- Limit tag filter options in Rex task search to tags present in the current PRD
+
+**Smart Add Command Construction and Submission UX Fix**
+- 🔶 **Fix Smart Add CLI command argument construction in Rex Dashboard**
+  The Rex Dashboard Smart Add feature builds a shell command like `rex add --format=json <description>` before dispatching it to the CLI. A regression is causing the description argument to be concatenated with unrelated UI state (e.g. the current search query or last-focused task title), producing a malformed command such as `rex add --format=json limit Tag selection options in the rex task UI search area`. Trace the command-builder code path, identify the source of the stale string injection, and fix the argument assembly so only the user-entered description is forwarded.
+  - Submitting a Smart Add description dispatches exactly `rex add --format=json <user-description>` with no extra text appended
+  - The error 'Command failed: … add --format=json <unrelated-text>' no longer appears in the dashboard for any input
+  - Verified by submitting a short description while a different task or search term is visible on screen — the dispatched command contains only the typed description
+  - Existing Smart Add integration test suite passes without modification
+- Prevent Smart Add form auto-submission and require explicit user action
+  The Smart Add input form in the Rex Dashboard currently submits automatically — either on each keystroke (reactive binding) or on Enter key press — before the user has finished composing their description. This makes it impossible to type multi-word or multi-clause ideas without triggering a premature submission. The form should only submit when the user explicitly clicks the Submit button (or equivalent deliberate action). Debouncing alone is insufficient; the trigger must be user-initiated.
+  - Typing any text into the Smart Add input does not trigger proposal generation or CLI dispatch
+  - Pressing Enter while focused in the Smart Add input does not submit the form
+  - The form submits only when the user activates the designated Submit/Generate button
+  - A user can type, pause, edit, and resume typing before submitting without any interim API calls or errors
+  - Submission button is visually distinct and reachable via keyboard (Tab + Enter/Space)
 
 **Smart Add Command Regression Fix**
 - 🔶 **Identify and fix smart-add command name mismatch between web UI and rex CLI**
@@ -163,6 +196,9 @@
 - Ability to edit epic/feature/task details in the side panel *(feature)*
 - Rex Task Search *(feature)*
   Add search functionality to the Rex tasks web UI so users can quickly locate tasks, epics, and features by title, description, tags, or status without manually scanning the full PRD tree.
+- Smart Add Command Construction and Submission UX Fix *(feature)*
+  Two related regressions in the Rex Dashboard Smart Add form: (1) the CLI command is being built incorrectly, appending stale or unrelated text from the UI (e.g. a previous task title) to the `add` subcommand arguments, causing a command-not-found failure; (2) the form auto-submits on every keystroke or Enter press rather than waiting for the user to finish composing their input.
+- Rex Task Search *(feature)*
 
 ### SourceVision UI Import Graph Enhancement
 
@@ -273,6 +309,11 @@
 - 🔶 **SourceVision UI Import Graph Enhancement** *(epic)*
 - 🔶 **PR Build Pipeline and Code Quality Automation** *(epic)*
 - 🔶 **Rex UI Task Management Enhancement** *(epic)*
+- 🔶 **Address suggestion issues (1 findings)** *(feature)*
+  - Zone "Schema Validation" (packages-rex:schema-validation) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- 🔶 **Rex UI Task Management Enhancement** *(epic)*
+- 🔶 **Rex UI Task Management Enhancement** *(epic)*
+- 🔶 **Analyze pipeline improvements** *(epic)*
 - Address observation issues (3 findings) *(feature)*
   - 5 circular dependency chains detected — see imports.json for details
 - The message zone's low cohesion (0.45) combined with being the most-imported zone in the web layer suggests it has grown into a catch-all communication module; splitting it into typed message definitions and transport utilities would improve cohesion and make the import graph more precise.
@@ -318,4 +359,13 @@
   - Existing integration test (smart-add-duplicate-outcomes.test.ts) continues to pass
   - New test: cross-level match is rejected (e.g. proposed epic with same title as existing task does NOT produce a duplicate match)
   - New test: merge with level-matched duplicates correctly merges fields and adds non-duplicate children under the right parent
+- Address observation issues (5 findings) *(feature)*
+  - Bidirectional coupling: "dashboard-mcp-server" ↔ "web-package-shell" (2+4 crossings) — consider extracting shared interface
+- The task-usage-tracking ↔ dashboard-mcp-server coupling cycle is the only inter-zone warning in this batch and should be resolved to preserve clean unidirectional data flow in the analytics subsystem.
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
+- Bidirectional imports between this zone and dashboard-mcp-server (2 imports in each direction) create a coupling cycle; consider inverting the dependency or introducing an event/callback boundary.
+- Coupling of 0.5 driven by 6 imports from dashboard-mcp-server suggests this cluster is a natural sub-module of that zone rather than an independent architectural boundary.
+- Address anti-pattern issues (2 findings) *(feature)*
+  - God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions
+- God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions
 

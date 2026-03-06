@@ -7,33 +7,27 @@
 
 Project: n-dx
 Git: feature/integrate-codex @ 21786d2
-Files: 1034, Lines: 346710
-Languages: TypeScript(873) CSS(44) Markdown(32) JavaScript(31) JSON(30)
+Files: 1035, Lines: 347213
+Languages: TypeScript(875) CSS(44) Markdown(32) JavaScript(31) JSON(30)
 Zones: 35, Described: 35
-Import edges: 2556, External packages: 18
+Import edges: 2564, External packages: 18
 
 </architecture>
 
 <zones>
 
-[.rex] .rex (8 files, coh=1.00 coup=0.00)
-  8 files, primarily JSON, Other, Markdown
-  files: .rex/acknowledged-findings.json, .rex/archive.json, .rex/config.json, .rex/execution-log.1.jsonl, .rex/execution-log.jsonl, .rex/pending-proposals.json, .rex/prd.json, .rex/workflow.md
-[docs] Docs (16 files, coh=1.00 coup=0.00)
-  16 files, primarily Markdown
-  files: docs/2026-03-03-refresh-orchestration-memory-analysis.md, docs/level-refactor-and-steward-plan.md, docs/level-system-reference.md, docs/memory-architecture.md, docs/memory-improvements.md, docs/memory-os-behavior.md, docs/memory-risks-and-flaws.md, docs/prd-steward-vision.md, docs/process-lifecycle-audit.md, docs/resource-allocation-catalog.md +6
-[dom] Dom (3 files, coh=0.67 coup=0.33)
-  3 files, primarily TypeScript
-  files: packages/web/src/viewer/hooks/use-dom-performance-monitor.ts [hook], packages/web/src/viewer/performance/dom-performance-monitor.ts [utility], packages/web/tests/unit/viewer/dom-performance-monitor.test.ts
-[e2e] E2e (14 files, coh=1.00 coup=0.00)
-  14 files, primarily JavaScript
-  files: tests/e2e/architecture-policy.test.js, tests/e2e/cli-ci.test.js, tests/e2e/cli-config.test.js, tests/e2e/cli-delegation.test.js, tests/e2e/cli-dev.test.js, tests/e2e/cli-errors.test.js, tests/e2e/cli-init.test.js, tests/e2e/cli-orchestration.test.js, tests/e2e/cli-pr-check.test.js, tests/e2e/cli-refresh.test.js +4
-[hench] Hench (159 files, coh=1.00 coup=0.00)
-  157 files, primarily TypeScript, JSON, Other
+[autonomous-agent] Autonomous Agent (159 files, coh=1.00 coup=0.00)
+  The hench package: autonomous task execution via agent loops, tool dispatch, brief generation, and run recording against the rex PRD.
   files: packages/hench/Hench-F.png, packages/hench/Hench.png, packages/hench/README.md, packages/hench/package-lock.json, packages/hench/package.json, packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/spin.ts [service], packages/hench/src/agent/analysis/stuck.ts [service], packages/hench/src/agent/analysis/summary.ts [service] +149
-[logo] Logo (3 files, coh=1.00 coup=0.00)
-  3 files, primarily Other, HTML
-  files: packages/web/src/viewer/darkmode_logo.png, packages/web/src/viewer/index.html, packages/web/src/viewer/lightmode_logo.png
+[dom-performance-monitoring] DOM Performance Monitoring (3 files, coh=0.67 coup=0.33)
+  Encapsulates the DOM performance monitoring utility and its React hook abstraction for the viewer.
+  files: packages/web/src/viewer/hooks/use-dom-performance-monitor.ts [hook], packages/web/src/viewer/performance/dom-performance-monitor.ts [utility], packages/web/tests/unit/viewer/dom-performance-monitor.test.ts
+[e2e-tests] End-to-End Test Suite (14 files, coh=1.00 coup=0.00)
+  Comprehensive CLI and architecture E2E tests covering orchestration, delegation, error handling, config, and web server behavior.
+  files: tests/e2e/architecture-policy.test.js, tests/e2e/cli-ci.test.js, tests/e2e/cli-config.test.js, tests/e2e/cli-delegation.test.js, tests/e2e/cli-dev.test.js, tests/e2e/cli-errors.test.js, tests/e2e/cli-init.test.js, tests/e2e/cli-orchestration.test.js, tests/e2e/cli-pr-check.test.js, tests/e2e/cli-refresh.test.js +4
+[monorepo-orchestration] Monorepo Orchestration (27 files, coh=1.00 coup=0.00)
+  Root-level entry points and configuration that coordinate the three-package pipeline (sourcevision → rex → hench) without importing from any package directly.
+  files: .gitignore, .npmrc, CLAUDE.md, CODEX.md, PACKAGE_GUIDELINES.md, README.md, ci.js [entrypoint], claude-integration.js [service], cli.js [entrypoint], config.js [config] +17
 [packages-llm-client:root] Root (4 files, coh=1.00 coup=0.00)
   4 files, primarily JSON, TypeScript
   files: packages/llm-client/package-lock.json, packages/llm-client/package.json, packages/llm-client/tsconfig.json, packages/llm-client/vitest.config.ts
@@ -87,7 +81,7 @@ Import edges: 2556, External packages: 18
   files: packages/sourcevision/src/analyzers/callgraph.ts [service], packages/sourcevision/src/analyzers/components.ts [service], packages/sourcevision/src/analyzers/imports.ts [service], packages/sourcevision/src/analyzers/index.ts [entrypoint], packages/sourcevision/src/analyzers/inventory.ts [service], packages/sourcevision/src/analyzers/route-detection.ts [route-handler], packages/sourcevision/src/util/paths.ts [utility], packages/sourcevision/tests/unit/analyzers/callgraph.test.ts, packages/sourcevision/tests/unit/analyzers/components.test.ts, packages/sourcevision/tests/unit/analyzers/imports.test.ts +1
 [packages-sourcevision:analyzers-3] Analyzers 3 (6 files, coh=0.43 coup=0.57)
   6 files, primarily TypeScript
-  files: packages/sourcevision/src/analyzers/louvain.ts [utility], packages/sourcevision/src/analyzers/zone-hash.ts [utility], packages/sourcevision/src/analyzers/zones.ts, packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts, packages/sourcevision/tests/unit/analyzers/zone-size-policy.test.ts, packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts
+  files: packages/sourcevision/src/analyzers/louvain.ts [utility], packages/sourcevision/src/analyzers/zone-hash.ts [utility], packages/sourcevision/src/analyzers/zones.ts [service], packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts, packages/sourcevision/tests/unit/analyzers/zone-size-policy.test.ts, packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts
 [packages-sourcevision:cli] Cli (26 files, coh=0.71 coup=0.29)
   26 files, primarily TypeScript
   files: packages/sourcevision/src/analyzers/branch-work-collector.ts [service], packages/sourcevision/src/analyzers/manifest.ts [service], packages/sourcevision/src/cli/commands/constants.ts [types], packages/sourcevision/src/cli/commands/export-pdf.ts [cli-command], packages/sourcevision/src/cli/commands/git-credential-helper.ts [cli-command], packages/sourcevision/src/cli/commands/init.ts [cli-command], packages/sourcevision/src/cli/commands/pr-markdown.ts [cli-command], packages/sourcevision/src/cli/commands/prd-epic-resolver.ts [cli-command], packages/sourcevision/src/cli/commands/reset.ts [cli-command], packages/sourcevision/src/cli/commands/validate.ts [cli-command] +16
@@ -103,25 +97,31 @@ Import edges: 2556, External packages: 18
 [packages-sourcevision:unit] Unit (28 files, coh=0.57 coup=0.43)
   28 files, primarily TypeScript
   files: packages/sourcevision/src/analyzers/branch-work-classifier.ts [service], packages/sourcevision/src/analyzers/branch-work-filter.ts [utility], packages/sourcevision/src/analyzers/branch-work-store.ts [store], packages/sourcevision/src/analyzers/risk-scoring.ts [service], packages/sourcevision/src/analyzers/workspace-aggregate.ts [service], packages/sourcevision/src/cli/commands/workspace.ts [cli-command], packages/sourcevision/src/cli/mcp.ts [service], packages/sourcevision/src/generators/pr-markdown-template.ts [service], packages/sourcevision/src/public.ts [entrypoint], packages/sourcevision/src/schema/data-files.ts [schema] +18
-[root] Root (27 files, coh=1.00 coup=0.00)
-  27 files, primarily JavaScript, Markdown, Other
-  files: .gitignore, .npmrc, CLAUDE.md, CODEX.md, PACKAGE_GUIDELINES.md, README.md, ci.js [entrypoint], claude-integration.js [service], cli.js [entrypoint], config.js [config] +17
-[web] Web (16 files, coh=0.77 coup=0.23)
-  16 files, primarily TypeScript, Markdown, Other
-  files: packages/web/BROWSER_ERROR_CODE_5.md, packages/web/MEMORY_PROFILE.md, packages/web/SourceVision-F.png, packages/web/SourceVision.png, packages/web/build.js [config], packages/web/dev.js [config], packages/web/package.json, packages/web/src/viewer/components/elapsed-time.ts [component], packages/web/src/viewer/components/prd-tree/lazy-children.ts [component], packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts [component] +6
-[web-landing] Web Landing (3 files, coh=1.00 coup=0.00)
-  3 files, primarily HTML, CSS, TypeScript
-  files: packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [entrypoint]
-[web-server] Web Server (4 files, coh=0.40 coup=0.60)
-  4 files, primarily TypeScript
+[project-documentation] Project Documentation (16 files, coh=1.00 coup=0.00)
+  Architecture decision records, design analyses, and long-form reference documentation for the n-dx system and its memory/PRD subsystems.
+  files: docs/2026-03-03-refresh-orchestration-memory-analysis.md, docs/level-refactor-and-steward-plan.md, docs/level-system-reference.md, docs/memory-architecture.md, docs/memory-improvements.md, docs/memory-os-behavior.md, docs/memory-risks-and-flaws.md, docs/prd-steward-vision.md, docs/process-lifecycle-audit.md, docs/resource-allocation-catalog.md +6
+[rex-runtime-state] Rex Runtime State (8 files, coh=1.00 coup=0.00)
+  Persistent runtime data for the rex PRD tracker: project config, the live PRD tree, execution logs, pending proposals, and workflow state.
+  files: .rex/acknowledged-findings.json, .rex/archive.json, .rex/config.json, .rex/execution-log.1.jsonl, .rex/execution-log.jsonl, .rex/pending-proposals.json, .rex/prd.json, .rex/workflow.md
+[task-usage-tracking] Task Usage Tracking (4 files, coh=0.50 coup=0.50)
+  Server-side services for recording and cleaning up per-task token/usage metrics incrementally over time.
   files: packages/web/src/server/incremental-task-usage.ts [service], packages/web/src/server/usage-cleanup-scheduler.ts [service], packages/web/tests/unit/server/incremental-task-usage.test.ts, packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts
-[web-unit] Web Unit (6 files, coh=0.25 coup=0.75)
-  5 files, primarily TypeScript
+[viewer-static-assets] Viewer Static Assets (3 files, coh=1.00 coup=0.00)
+  Raw static assets (light/dark logo PNGs and the viewer's root HTML shell) that are bundled directly into the dashboard viewer at build time.
+  files: packages/web/src/viewer/darkmode_logo.png, packages/web/src/viewer/index.html, packages/web/src/viewer/lightmode_logo.png
+[web-build-infrastructure] Web Build Infrastructure (16 files, coh=0.77 coup=0.23)
+  Build tooling, package metadata, and shared viewer components (elapsed-time, task-audit) that sit outside the main web-viewer bundle.
+  files: packages/web/BROWSER_ERROR_CODE_5.md, packages/web/MEMORY_PROFILE.md, packages/web/SourceVision-F.png, packages/web/SourceVision.png, packages/web/build.js [config], packages/web/dev.js [config], packages/web/package.json, packages/web/src/viewer/components/elapsed-time.ts [component], packages/web/src/viewer/components/prd-tree/lazy-children.ts [component], packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts [component] +6
+[web-dashboard] Web Dashboard (351 files, coh=0.98 coup=0.02)
+  The primary web application zone encompassing the full-stack dashboard: HTTP/MCP server, React viewer components, data aggregation, gateways, and CLI entrypoint.
+  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/public.ts [entrypoint], packages/web/src/schema/v1.ts [schema], packages/web/src/server/aggregation-cache.ts [service], packages/web/src/server/concurrent-execution-metrics.ts [service], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility], packages/web/src/server/pr-markdown-refresh-diagnostics.ts [utility] +341
+[web-landing] Web Landing Page (3 files, coh=1.00 coup=0.00)
+  Self-contained static landing page (HTML + CSS + TypeScript entrypoint) served before the main dashboard application loads.
+  files: packages/web/src/landing/index.html, packages/web/src/landing/landing.css, packages/web/src/landing/landing.ts [entrypoint]
+[websocket-infrastructure] WebSocket Infrastructure (6 files, coh=0.25 coup=0.75)
+  WebSocket server implementation and connection health tracking for real-time push updates from the server to the dashboard viewer.
   files: packages/web/src/server/websocket.ts [service], packages/web/src/server/ws-health-tracker.ts [service], packages/web/tests/unit/server/boundary-check.test.ts, packages/web/tests/unit/server/websocket.test.ts, packages/web/tests/unit/server/ws-health-integration.test.ts, packages/web/tests/unit/server/ws-health-tracker.test.ts
-[web-viewer] Web Viewer (349 files, coh=0.98 coup=0.02)
-  349 files, primarily TypeScript, CSS
-  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/public.ts [entrypoint], packages/web/src/schema/v1.ts [schema], packages/web/src/server/aggregation-cache.ts [service], packages/web/src/server/concurrent-execution-metrics.ts [service], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/index.ts [entrypoint], packages/web/src/server/mcp-deps.ts [gateway], packages/web/src/server/port.ts [utility], packages/web/src/server/pr-markdown-refresh-diagnostics.ts [utility] +339
-[unzoned] 3 files: .github/workflows/ci.yml, .hench/config.json, .hench/locks/45093.lock
+[unzoned] 2 files: .github/workflows/ci.yml, .hench/config.json
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -272,20 +272,22 @@ Server routes: 106 endpoints in 14 handler(s)
 
 <findings>
 
-[warning] Bidirectional coupling: "web" ↔ "web-viewer" (4+2 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "task-usage-tracking" ↔ "web-dashboard" (1+3 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "web-build-infrastructure" ↔ "web-dashboard" (4+2 crossings) — consider extracting shared interface
+[warning] The mutual import relationship between web-viewer and web-server warrants monitoring; if additional cross-imports are added, introduce a shared-types or events package to break the potential cycle rather than deepening the bidirectional dependency.
+[warning] The web-unit zone's low cohesion (0.25) combined with high coupling (0.75) stands out as the only zone in this batch breaching warning thresholds; refactoring its test imports to use local stubs rather than pulling from the broader web-viewer zone would resolve this.
+[warning] web-unit has cohesion 0.25 (below the 0.4 warning threshold) and receives imports from web-viewer — test utilities should be colocated with their production counterparts or extracted into a dedicated test-support zone.
 [warning] Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
-[warning] High coupling (0.6) — 2 imports target "web-viewer" [web-server]
-[warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone [web-unit]
-[warning] Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Actions job named 'structural-health' that runs (1) the existing architecture-policy test in isolation, (2) madge --circular per package, and (3) a zone-metrics check that fails if any zone has cohesion < 0.7 AND coupling > 0.3. This single job enforces the invariants described across three separate findings.
-[warning] 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:task-selection, packages-rex:fix-command, web-unit, packages-rex:recommendation-scanning — mandatory refactoring recommended before further development
-[warning] Seven potentially unused exports across six files (packages/web/src/viewer/polling/polling-restart.ts: 3 exports; packages/web/src/viewer/loader.ts: 2 exports; packages/hench/src/shared/glob.ts: simpleGlobMatch; packages/sourcevision/src/analyzers/branch-work-filter.ts: detectBranchLifecycle; packages/sourcevision/src/cli/commands/prd-epic-resolver.ts: resolveWorkedEpicTitlesForRange; packages/web/src/server/routes-token-usage.ts: getAggregationCacheInstance) share one root cause: no CI gate enforces that non-test public exports remain reachable. Sourcevision's call-graph already tracks this data; adding a CI step that fails on zero-incoming-call exports in non-test, non-barrel files would surface and prevent all of these without new tooling.
-[warning] The architecture enforces inter-package DAG ordering (four-tier hierarchy, gateway pattern) but applies no equivalent discipline to intra-package module ordering. This asymmetry means cross-package structure is auditable but internal package structure is opaque. Adding `madge --circular` per package in CI closes the gap without changing any existing code.
-[warning] God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions
-[warning] God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions
+[warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone [websocket-infrastructure]
+[warning] Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmentation — likely caused by test files importing broadly from the rest of the web package. [websocket-infrastructure]
+[warning] Only 2 of 6 files are production source; the test-to-source ratio inflates coupling scores and suggests the zone boundary is defined by test co-location rather than domain cohesion. [websocket-infrastructure]
+[warning] 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:task-selection, packages-rex:fix-command, websocket-infrastructure, packages-rex:recommendation-scanning — mandatory refactoring recommended before further development
+[warning] The cleanup scheduler imports back into web-viewer (per cross-zone import graph), creating a dependency inversion — the scheduler should depend on an interface, not the viewer zone. [task-usage-tracking]
+[warning] Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer→web: 2) create a soft cycle risk; extracting shared primitives into a dedicated shared zone would eliminate this. [web-build-infrastructure]
+[warning] God function: cmdAnalyze in packages/rex/src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions
+[warning] God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions
 [critical] Zone "Task Selection & Scoring" (packages-rex:task-selection) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention [packages-rex:task-selection]
-[critical] Zone "Fix Command Pipeline" (packages-rex:fix-command) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention [packages-rex:fix-command]
-[critical] Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention [web-unit]
-[warning] Zone "Recommendation Scanning" (packages-rex:recommendation-scanning) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development [packages-rex:recommendation-scanning]
+... +3 more
 
 </findings>
 
@@ -301,25 +303,34 @@ Server routes: 106 endpoints in 14 handler(s)
 [high] Zone "Fix Command Pipeline" (packages-rex:fix-command) has catastrophic risk (s…
   files: packages/rex/src/cli/commands/fix.ts, packages/rex/src/core/fix.ts, packages/rex/tests/unit/cli/commands/fix.test.ts
   category: fix
-[high] Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, …
+[high] Zone "WebSocket Infrastructure" (websocket-infrastructure) has catastrophic ris…
   files: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts, packages/web/tests/unit/server/boundary-check.test.ts
   category: fix
 [high] Low cohesion (0.25) — files are loosely related, consider splitting this zone
   files: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts, packages/web/tests/unit/server/boundary-check.test.ts
   category: refactor
+[high] Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmenta…
+  files: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts, packages/web/tests/unit/server/boundary-check.test.ts
+  category: refactor
+[high] Only 2 of 6 files are production source; the test-to-source ratio inflates coup…
+  files: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts, packages/web/tests/unit/server/boundary-check.test.ts
+  category: refactor
 [high] Zone "Recommendation Scanning" (packages-rex:recommendation-scanning) has criti…
   files: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/extract.ts, packages/rex/src/analyze/reconcile.ts
   category: refactor
-[high] High coupling (0.6) — 2 imports target "web-viewer"
+[medium] God function: cmdAnalyze in packages/rex/src/cli/commands/a… (+1 related)
+  category: refactor
+[medium] The cleanup scheduler imports back into web-viewer (per cross-zone import graph…
   files: packages/web/src/server/incremental-task-usage.ts, packages/web/src/server/usage-cleanup-scheduler.ts, packages/web/tests/unit/server/incremental-task-usage.test.ts
   category: refactor
-[medium] God function: main in packages/rex/src/cli/index.ts calls 4… (+1 related)
+[medium] Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer…
+  files: packages/web/BROWSER_ERROR_CODE_5.md, packages/web/MEMORY_PROFILE.md, packages/web/SourceVision-F.png
   category: refactor
-[medium] Seven potentially unused exports across six files (packages… (+1 related)
-  category: extract
-[medium] Consolidate findings 7, 8, and 9 into a single CI work item: add one GitHub Act…
+[medium] Bidirectional coupling: "task-usage-tracking" ↔ "web-dashboard" (1+3 crossings)…
   category: refactor
-[medium] Bidirectional coupling: "web" ↔ "web-viewer" (4+2 crossings) — consider extract…
+[medium] Bidirectional coupling: "web-build-infrastructure" ↔ "web-dashboard" (4+2 cross…
+  category: refactor
+[medium] The mutual import relationship between web-viewer and web-server warrants monit…
   category: refactor
 
 </next-steps>

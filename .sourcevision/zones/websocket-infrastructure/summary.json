@@ -1,0 +1,28 @@
+{
+  "id": "websocket-infrastructure",
+  "name": "WebSocket Infrastructure",
+  "description": "WebSocket server implementation and connection health tracking for real-time push updates from the server to the dashboard viewer.",
+  "files": [
+    "packages/web/src/server/websocket.ts",
+    "packages/web/src/server/ws-health-tracker.ts",
+    "packages/web/tests/unit/server/boundary-check.test.ts",
+    "packages/web/tests/unit/server/websocket.test.ts",
+    "packages/web/tests/unit/server/ws-health-integration.test.ts",
+    "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/websocket.ts",
+    "packages/web/src/server/ws-health-tracker.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 6,
+  "lineCount": 1561,
+  "riskMetrics": {
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "web-viewer/web-viewer/web-viewer",
+  "name": "Web Viewer/web Viewer/web Viewer",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/copy-link-button.ts",
+    "packages/web/src/viewer/components/memory-panel.ts",
+    "packages/web/src/viewer/components/rex-task-link.ts",
+    "packages/web/src/viewer/components/throttle-controls.ts",
+    "packages/web/src/viewer/components/ws-health-panel.ts",
+    "packages/web/src/viewer/views/hench-runs.ts",
+    "packages/web/tests/unit/viewer/copy-link-button.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/copy-link-button.ts",
+    "packages/web/src/viewer/components/rex-task-link.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "cohesion": 0.72,
+  "coupling": 0.28,
+  "fileCount": 9,
+  "lineCount": 2931
+}

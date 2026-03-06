@@ -1,0 +1,33 @@
+{
+  "id": "e2e-tests",
+  "name": "End-to-End Test Suite",
+  "description": "Comprehensive CLI and architecture E2E tests covering orchestration, delegation, error handling, config, and web server behavior.",
+  "files": [
+    "tests/e2e/architecture-policy.test.js",
+    "tests/e2e/cli-ci.test.js",
+    "tests/e2e/cli-config.test.js",
+    "tests/e2e/cli-delegation.test.js",
+    "tests/e2e/cli-dev.test.js",
+    "tests/e2e/cli-errors.test.js",
+    "tests/e2e/cli-init.test.js",
+    "tests/e2e/cli-orchestration.test.js",
+    "tests/e2e/cli-pr-check.test.js",
+    "tests/e2e/cli-refresh.test.js",
+    "tests/e2e/cli-start.test.js",
+    "tests/e2e/cli-tool-resolution.test.js",
+    "tests/e2e/cli-web.test.js",
+    "tests/e2e/domain-isolation.test.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 14,
+  "lineCount": 4274,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}
