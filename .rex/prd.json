@@ -18260,11 +18260,12 @@
     {
       "id": "b8205144-f216-4461-8ae7-c8a0c66007fd",
       "title": "Address observation issues (5 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- Bidirectional coupling: \"dashboard-mcp-server\" ↔ \"web-package-shell\" (2+4 crossings) — consider extracting shared interface\n- The task-usage-tracking ↔ dashboard-mcp-server coupling cycle is the only inter-zone warning in this batch and should be resolved to preserve clean unidirectional data flow in the analytics subsystem.\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects\n- Bidirectional imports between this zone and dashboard-mcp-server (2 imports in each direction) create a coupling cycle; consider inverting the dependency or introducing an event/callback boundary.\n- Coupling of 0.5 driven by 6 imports from dashboard-mcp-server suggests this cluster is a natural sub-module of that zone rather than an independent architectural boundary.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-03-06T18:22:07.771Z",
       "recommendationMeta": {
         "findingHashes": [
           "30b2889a35bd",
@@ -18278,16 +18279,19 @@
           "warning": 5
         },
         "findingCount": 5
-      }
+      },
+      "completedAt": "2026-03-06T18:27:04.517Z"
     },
     {
       "id": "d2a70fe9-3e21-41a6-aca5-7ea4c47e1ac8",
       "title": "Address anti-pattern issues (2 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions\n- God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-03-06T18:14:50.750Z",
+      "completedAt": "2026-03-06T18:21:32.613Z",
       "recommendationMeta": {
         "findingHashes": [
           "8e1afee1274d",
@@ -18327,6 +18331,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-06T18:14:07.851Z",
+      "completedAt": "2026-03-06T18:14:07.851Z",
       "children": [
         {
           "id": "7de88f8c-5bee-4b9e-9532-7f134c7244ed",
@@ -18397,9 +18403,7 @@
             "createdAt": "2026-03-06T17:26:10.279Z"
           }
         }
-      ],
-      "startedAt": "2026-03-06T18:14:07.851Z",
-      "completedAt": "2026-03-06T18:14:07.851Z"
+      ]
     },
     {
       "id": "d357994f-13c1-488f-b839-0c7b2c710903",

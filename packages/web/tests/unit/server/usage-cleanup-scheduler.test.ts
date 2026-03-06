@@ -23,8 +23,10 @@ import {
   DEFAULT_CLEANUP_INTERVAL_MS,
   type OrphanedEntry,
   type CleanupResult,
+  type CollectAllIdsFn,
 } from "../../../src/server/usage-cleanup-scheduler.js";
 import { IncrementalTaskUsageAggregator } from "../../../src/server/incremental-task-usage.js";
+import { collectAllIds } from "../../../src/server/rex-gateway.js";
 
 describe("UsageCleanupScheduler", () => {
   let tmpDir: string;
@@ -281,7 +283,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds });
 
       expect(result.prdAvailable).toBe(true);
       expect(result.totalOrphaned).toBe(1);
@@ -303,7 +305,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds });
 
       expect(result.totalOrphaned).toBe(0);
       expect(result.orphanedEntries).toEqual([]);
@@ -319,6 +321,7 @@ describe("UsageCleanupScheduler", () => {
       const result = await runCleanupCycle({
         aggregator,
         rexDir: missingRexDir,
+        collectAllIds,
       });
 
       expect(result.prdAvailable).toBe(false);
@@ -337,7 +340,7 @@ describe("UsageCleanupScheduler", () => {
       const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, logPath });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath });
 
       const logContent = await readFile(logPath, "utf-8");
       const entry = JSON.parse(logContent.trim());
@@ -353,7 +356,7 @@ describe("UsageCleanupScheduler", () => {
       const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, logPath });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath });
 
       // Log file should not exist since there were no orphans
       const { existsSync } = await import("node:fs");
@@ -369,7 +372,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, broadcast });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, broadcast });
 
       expect(broadcasts).toHaveLength(1);
       const msg = broadcasts[0] as Record<string, unknown>;
@@ -386,7 +389,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, broadcast });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, broadcast });
 
       expect(broadcasts).toHaveLength(0);
     });
@@ -398,7 +401,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds });
 
       // Verify run files still exist on disk
       const { existsSync } = await import("node:fs");
@@ -415,7 +418,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds });
 
       expect(result.totalOrphaned).toBe(2);
       expect(result.totalTokensRemoved).toBe(
