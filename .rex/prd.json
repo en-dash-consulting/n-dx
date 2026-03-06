@@ -17988,6 +17988,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-06T17:05:15.210Z",
+      "completedAt": "2026-03-06T17:05:15.210Z",
       "children": [
         {
           "id": "7834908d-fabe-4ecd-8784-058f7d0140f0",
@@ -18054,24 +18056,24 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-03-06T17:05:15.210Z",
-      "completedAt": "2026-03-06T17:05:15.210Z"
+      ]
     },
     {
       "id": "37383cf7-8f86-47dd-a508-ddff174d5c3b",
       "title": "SourceVision UI Import Graph Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "09c29ff9-de59-49d7-a1a7-66120c7cb933",
           "title": "Zone Slideout Interaction Regression Fix",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The SourceVision Zones graph no longer opens the detail slideout panel when clicking zone nodes or the info button — instead, clicks collapse the node. The info button also lacks visual affordance indicating it reveals more information. This feature restores correct click behavior and improves the info button's discoverability.",
           "source": "smart-add",
+          "startedAt": "2026-03-06T17:07:35.610Z",
+          "completedAt": "2026-03-06T17:07:35.610Z",
           "children": [
             {
               "id": "a76a7559-0dc6-4bb8-bcf5-866f39ab4f50",
@@ -18100,7 +18102,7 @@
             {
               "id": "aee318ff-ac6b-476c-8414-075f04c4e988",
               "title": "Improve info button visual affordance on zone nodes",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The info button on zone nodes is not visually clear enough for users to understand it reveals additional details. Update the button's icon, tooltip, and styling to make its purpose obvious — it should look like an interactive 'more info' control, not a passive label or toggle.",
               "acceptanceCriteria": [
@@ -18116,11 +18118,15 @@
                 "ux",
                 "zones"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T17:06:09.948Z",
+              "completedAt": "2026-03-06T17:07:35.408Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-03-06T17:07:35.696Z",
+      "completedAt": "2026-03-06T17:07:35.696Z"
     },
     {
       "id": "8eb17701-e2db-46c7-bdf2-1f6104a71bc5",
