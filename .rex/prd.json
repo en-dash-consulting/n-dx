@@ -18070,7 +18070,7 @@
             {
               "id": "a76a7559-0dc6-4bb8-bcf5-866f39ab4f50",
               "title": "Restore zone node click and info button routing to slideout panel",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Clicking a zone node or its info button currently collapses the node instead of opening the detail slideout panel. Audit the click event handlers on zone graph nodes and the info button, identify where the event is being consumed or incorrectly routed, and restore the behavior so node clicks open the slideout. The 'Load more' action should similarly not collapse the node.",
               "acceptanceCriteria": [
@@ -18087,7 +18087,9 @@
                 "bug",
                 "zones"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T16:53:24.233Z",
+              "completedAt": "2026-03-06T16:58:26.189Z"
             },
             {
               "id": "aee318ff-ac6b-476c-8414-075f04c4e988",

@@ -882,6 +882,7 @@ function ZoneBox({
   matchingFiles,
   fileConnections,
   expandedSubZoneIds,
+  onToggle,
   onSelectZone,
   onSelectFile,
   onDblClickFile,
@@ -897,6 +898,7 @@ function ZoneBox({
   matchingFiles: Set<string>;
   fileConnections: FileConnectionMap;
   expandedSubZoneIds?: Set<string>;
+  onToggle: () => void;
   onSelectZone: () => void;
   onSelectFile: (path: string) => void;
   onDblClickFile: (path: string) => void;
@@ -1053,12 +1055,29 @@ function ZoneBox({
       `${zone.internalCalls + zone.crossZoneCalls} calls`,
       zone.crossZoneCalls > 0 ? ` \u00B7 ${zone.crossZoneCalls} cross-zone` : "",
     ),
-    h("text", {
-      class: "cg-zone-expand-icon",
-      x: box.x + box.w - 18,
-      y: box.y + 22,
-      "text-anchor": "end",
-    }, expanded ? "\u25B4" : "\u25BE"),
+    h("g", {
+      class: "cg-zone-toggle-btn",
+      onMouseDown: (e: Event) => e.stopPropagation(),
+      onClick: (e: Event) => { e.stopPropagation(); onToggle(); },
+      style: "cursor: pointer;",
+    },
+      h("rect", {
+        x: box.x + box.w - 32,
+        y: box.y + 6,
+        width: 24,
+        height: 22,
+        rx: 4,
+        fill: "transparent",
+        style: "pointer-events: all;",
+      }),
+      h("text", {
+        class: "cg-zone-expand-icon",
+        x: box.x + box.w - 18,
+        y: box.y + 22,
+        "text-anchor": "end",
+        style: "pointer-events: none;",
+      }, expanded ? "\u25B4" : "\u25BE"),
+    ),
 
     // Drill-down badge — visible only for zones with sub-zones
     zone.hasDrillDown && zone.subZones && onDrillDown
@@ -1312,24 +1331,26 @@ function ZoneDiagram({
   const handleMouseUp = useCallback((_e: MouseEvent) => {
     const clickedZoneId = zoneDrag.endDrag();
     if (clickedZoneId) {
-      onToggleZone(clickedZoneId);
+      const zone = zoneById.get(clickedZoneId);
+      if (zone) onSelectZone(zone);
       return;
     }
     panZoom.endPan();
-  }, [zoneDrag, panZoom, onToggleZone]);
+  }, [zoneDrag, panZoom, zoneById, onSelectZone]);
 
   // Global mouseup listener for edge cases (mouse released outside SVG)
   useEffect(() => {
     const onUp = () => {
       const clickedZoneId = zoneDrag.endDrag();
       if (clickedZoneId) {
-        onToggleZone(clickedZoneId);
+        const zone = zoneById.get(clickedZoneId);
+        if (zone) onSelectZone(zone);
       }
       panZoom.endPan();
     };
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
-  }, [zoneDrag, panZoom, onToggleZone]);
+  }, [zoneDrag, panZoom, zoneById, onSelectZone]);
 
   if (zones.length === 0) return null;
 
@@ -1467,6 +1488,7 @@ function ZoneDiagram({
             matchingFiles: matchingFilesByZone.get(zone.id) ?? new Set(),
             fileConnections,
             expandedSubZoneIds: expandedSubZones.get(zone.id),
+            onToggle: () => onToggleZone(zone.id),
             onSelectZone: () => onSelectZone(zone),
             onSelectFile,
             onDblClickFile,
