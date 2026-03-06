@@ -5,11 +5,13 @@ import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 
 /** Flush Preact's microtask queue so state updates and effects are applied to the DOM.
  *  Preact schedules effects via requestAnimationFrame which jsdom polyfills as setTimeout(0).
- *  We need two ticks: one for Preact's internal scheduling, one for the effect callbacks. */
+ *  We need multiple ticks: for Preact's internal scheduling, effect callbacks, and any
+ *  secondary effects triggered by state changes in hooks (e.g. fetch-based hooks). */
 function flush(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0)).then(
-    () => new Promise((r) => setTimeout(r, 0))
-  );
+  return new Promise((r) => setTimeout(r, 0))
+    .then(() => new Promise((r) => setTimeout(r, 0)))
+    .then(() => new Promise((r) => setTimeout(r, 0)))
+    .then(() => new Promise((r) => setTimeout(r, 0)));
 }
 
 describe("Sidebar", () => {

@@ -741,7 +741,6 @@ async function handleConfig(rest) {
     console.error(formatError(err));
     process.exit(1);
   }
-  process.exit(0);
 }
 
 function handleHelp(rest) {
