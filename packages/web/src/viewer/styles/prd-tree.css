@@ -4668,6 +4668,18 @@
   opacity: 0.9;
 }
 
+.smart-add-btn-generate {
+  margin-top: var(--space-2);
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  align-self: flex-end;
+}
+
+.smart-add-btn-generate:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
 /* Compact variant (dashboard embedding) */
 .smart-add-panel-compact {
   padding: var(--space-3);

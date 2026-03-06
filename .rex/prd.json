@@ -18309,6 +18309,7 @@
       "priority": "critical",
       "source": "sourcevision",
       "startedAt": "2026-03-06T17:29:29.566Z",
+      "completedAt": "2026-03-06T17:54:39.954Z",
       "recommendationMeta": {
         "findingHashes": [
           "6d076775b051"
@@ -18318,28 +18319,29 @@
           "critical": 1
         },
         "findingCount": 1
-      },
-      "completedAt": "2026-03-06T17:54:39.954Z"
+      }
     },
     {
       "id": "e9641f3c-2913-4e47-a9e4-bb95ebe92291",
       "title": "Rex UI Task Management Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "7de88f8c-5bee-4b9e-9532-7f134c7244ed",
           "title": "Smart Add Command Construction and Submission UX Fix",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Two related regressions in the Rex Dashboard Smart Add form: (1) the CLI command is being built incorrectly, appending stale or unrelated text from the UI (e.g. a previous task title) to the `add` subcommand arguments, causing a command-not-found failure; (2) the form auto-submits on every keystroke or Enter press rather than waiting for the user to finish composing their input.",
           "source": "smart-add",
+          "startedAt": "2026-03-06T18:14:07.762Z",
+          "completedAt": "2026-03-06T18:14:07.762Z",
           "children": [
             {
               "id": "7185db68-f9b1-473a-982d-1d169dd5d880",
               "title": "Fix Smart Add CLI command argument construction in Rex Dashboard",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The Rex Dashboard Smart Add feature builds a shell command like `rex add --format=json <description>` before dispatching it to the CLI. A regression is causing the description argument to be concatenated with unrelated UI state (e.g. the current search query or last-focused task title), producing a malformed command such as `rex add --format=json limit Tag selection options in the rex task UI search area`. Trace the command-builder code path, identify the source of the stale string injection, and fix the argument assembly so only the user-entered description is forwarded.",
               "acceptanceCriteria": [
@@ -18355,12 +18357,14 @@
                 "rex-ui",
                 "cli"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T17:55:45.464Z",
+              "completedAt": "2026-03-06T18:09:27.902Z"
             },
             {
               "id": "ebb0e5f8-32e7-4494-a680-8b16ac5603e5",
               "title": "Prevent Smart Add form auto-submission and require explicit user action",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The Smart Add input form in the Rex Dashboard currently submits automatically — either on each keystroke (reactive binding) or on Enter key press — before the user has finished composing their description. This makes it impossible to type multi-word or multi-clause ideas without triggering a premature submission. The form should only submit when the user explicitly clicks the Submit button (or equivalent deliberate action). Debouncing alone is insufficient; the trigger must be user-initiated.",
               "acceptanceCriteria": [
@@ -18377,7 +18381,9 @@
                 "rex-ui",
                 "form"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:10:04.254Z",
+              "completedAt": "2026-03-06T18:14:07.584Z"
             }
           ],
           "overrideMarker": {
@@ -18391,7 +18397,9 @@
             "createdAt": "2026-03-06T17:26:10.279Z"
           }
         }
-      ]
+      ],
+      "startedAt": "2026-03-06T18:14:07.851Z",
+      "completedAt": "2026-03-06T18:14:07.851Z"
     },
     {
       "id": "d357994f-13c1-488f-b839-0c7b2c710903",
