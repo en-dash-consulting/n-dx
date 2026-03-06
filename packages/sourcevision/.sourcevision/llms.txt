@@ -6,11 +6,11 @@
 ## Project Overview
 
 - **Files**: 141
-- **Lines of code**: 45,234
+- **Lines of code**: 45,512
 - **Languages**: TypeScript (128), JSON (7), Markdown (3), Other (3)
 - **Zones**: 9 (9 with descriptions)
 - **Git**: main @ 63d150a
-- **Analyzed**: 2026-03-06T02:15:12.629Z
+- **Analyzed**: 2026-03-06T14:07:26.145Z
 
 ## Architecture Zones
 
@@ -125,8 +125,8 @@
 
 ### Patterns
 
-- The three files src/schema/v1.ts, src/schema/index.ts, and src/analyzers/zones.ts are corroborated by findings 0, 1, 9, and 10 as the shared root cause of system-wide coupling elevation. Extracting exactly these three files into a dedicated 'schema-foundation' zone with an explicit zero-outgoing-production-coupling policy is the single highest-leverage structural change available: it directly addresses the bidirectional cycle in finding 0, the hub signal in finding 1, and the absence of a stable base layer in finding 9 in one bounded operation. [critical]
-- Zones 'cli' (cohesion 0.71, coupling 0.29) and 'analyzers' (cohesion 0.67, coupling 0.33) already satisfy the target health quadrant — contradicting finding 7. These two zones should serve as the internal reference implementations when evaluating whether proposed zone boundary changes improve or degrade architectural health. [info]
+- Global finding 11 (heuristic) and cli zone finding 1 (LLM analysis) independently identify registerMcpTools in src/cli/mcp.ts as a god function with 36 outgoing calls. The corroboration across two independent analysis methods confirms this is a real structural issue. The prescribed remedy — in-file decomposition into named sub-registrar functions grouped by capability domain — is bounded and does not require a file split or public API change. [warning]
+- Louvain over-partitioning of src/analyzers/ produced three zones (analyzers, analyzers-2, analyzers-3) where one semantic zone exists. The absence of meaningful enrichment names for analyzers-2 and analyzers-3, combined with the high inter-zone coupling from analyzers-3 back to analyzers (10 crossings, coupling 0.57), are artifacts of this fragmentation. Coupling warnings for analyzers-3 and e2e that cite 'analyzers-2' as a target should be weighted accordingly — they measure intra-domain edges, not genuine cross-concern dependencies. [info]
 
 ### Observations
 
@@ -140,7 +140,7 @@
 - Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extracting shared interface [warning]
 - Hub: src/analyzers/zones.ts is imported by 4 zones — cross-cutting dependency [info]
 - Size imbalance: largest zone has 39 files vs smallest with 2 — uneven decomposition [info]
-- ... and 2 more
+- ... and 3 more
 
 ### Suggestions
 
@@ -149,7 +149,6 @@
 - registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API. [warning] (cli)
 - Zone "fixtures" has files across 5 directories — consider consolidating under a dedicated directory [info] (fixtures)
 - src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Moving branch-work-collector.ts from cli-infrastructure to the branch-work-analytics zone is a concrete, minimal first step that validates the prefix-to-zone affinity policy described in finding 6 before any broader lint rule is introduced. It reduces the bidirectional crossing count between analysis-engine and branch-work-analytics (finding 0) by one edge at zero architectural risk. [info]
 - Hub function: info in src/cli/output.ts is called from 9 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - Potentially unused export: detectBranchLifecycle in src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed [info]
 - Potentially unused export: resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts has no incoming calls — verify if still needed [info]
@@ -158,10 +157,6 @@
 ## Next Steps
 
 Prioritized work items derived from analysis:
-
-### High Priority
-
-1. **The three files src/schema/v1.ts, src/schema/index.ts, and src/analyzers/zones.…**
 
 ### Medium Priority
 
@@ -184,6 +179,8 @@ Prioritized work items derived from analysis:
 
 1. **registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed int…**
    Files: `src/analyzers/branch-work-collector.ts`, `src/analyzers/manifest.ts`, `src/cli/commands/constants.ts`
+
+1. **Global finding 11 (heuristic) and cli zone finding 1 (LLM analysis) independent…**
 
 1. **Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extrac…**
 
@@ -209,8 +206,6 @@ Prioritized work items derived from analysis:
 
 1. **src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3…**
 
-1. **Moving branch-work-collector.ts from cli-infrastructure to the branch-work-anal…**
-
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
@@ -232,8 +227,8 @@ Prioritized work items derived from analysis:
 | `src/analyzers/callgraph-findings.ts` | source | service | analyzers |
 | `src/analyzers/callgraph.ts` | source | service | analyzers-2 |
 | `src/analyzers/classify.ts` | source | service | analyzers |
-| `src/analyzers/claude-client.ts` | source | gateway | analyzers |
-| `src/analyzers/completion-reader.ts` | source | service | analyzers |
+| `src/analyzers/claude-client.ts` | source | service | analyzers |
+| `src/analyzers/completion-reader.ts` | source | utility | analyzers |
 | `src/analyzers/components.ts` | source | service | analyzers-2 |
 | `src/analyzers/context.ts` | source | service | analyzers |
 | `src/analyzers/enrich-batch.ts` | source | service | analyzers |
@@ -246,17 +241,17 @@ Prioritized work items derived from analysis:
 | `src/analyzers/inventory.ts` | source | service | analyzers-2 |
 | `src/analyzers/llms-txt.ts` | source | service | analyzers |
 | `src/analyzers/louvain.ts` | source | utility | analyzers-3 |
-| `src/analyzers/manifest.ts` | source | store | cli |
+| `src/analyzers/manifest.ts` | source | service | cli |
 | `src/analyzers/next-steps.ts` | source | service | analyzers |
 | `src/analyzers/risk-scoring.ts` | source | service | unit |
 | `src/analyzers/route-detection.ts` | source | route-handler | analyzers-2 |
 | `src/analyzers/server-route-detection.ts` | source | service | analyzers |
 | `src/analyzers/token-usage.ts` | source | utility | analyzers |
 | `src/analyzers/workspace-aggregate.ts` | source | service | unit |
-| `src/analyzers/workspace-crossings.ts` | source | utility | analyzers |
+| `src/analyzers/workspace-crossings.ts` | source | service | analyzers |
 | `src/analyzers/workspace.ts` | source | service | analyzers |
 | `src/analyzers/zone-hash.ts` | source | utility | analyzers-3 |
-| `src/analyzers/zone-output.ts` | source | utility | analyzers |
+| `src/analyzers/zone-output.ts` | source | service | analyzers |
 | `src/analyzers/zones.ts` | source | service | analyzers-3 |
 | `src/cli/commands/analyze-phases.ts` | source | cli-command | analyzers |
 | `src/cli/commands/analyze.ts` | source | cli-command | analyzers |
@@ -270,9 +265,9 @@ Prioritized work items derived from analysis:
 | `src/cli/commands/validate.ts` | source | cli-command | cli |
 | `src/cli/commands/workspace.ts` | source | cli-command | unit |
 | `src/cli/errors.ts` | source | utility | cli |
-| `src/cli/help.ts` | source | cli-command | cli |
+| `src/cli/help.ts` | source | utility | cli |
 | `src/cli/index.ts` | source | entrypoint | cli |
-| `src/cli/mcp.ts` | source | cli-command | unit |
+| `src/cli/mcp.ts` | source | service | unit |
 | `src/cli/output.ts` | source | utility | cli |
 | `src/cli/serve.ts` | source | cli-command | cli |
 | `src/constants.ts` | source | types | cli |
@@ -356,3 +351,10 @@ Prioritized work items derived from analysis:
 | `tsconfig.json` | config |  | root |
 | `tsconfig.tsbuildinfo` | config |  | root |
 | `vitest.config.ts` | config |  | root |
+
+## Tooling
+
+This project uses n-dx for codebase analysis (Sourcevision) and requirement
+tracking (Rex). MCP tools are available for interactive access to analysis
+data and PRD management. Skills available: /plan, /status, /capture,
+/zone, /work, /configure.

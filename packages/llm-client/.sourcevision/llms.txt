@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (42), JSON (3)
 - **Zones**: 4 (4 with descriptions)
 - **Git**: feature/integrate-codex @ 3acc839
-- **Analyzed**: 2026-03-06T02:07:10.059Z
+- **Analyzed**: 2026-03-06T13:53:54.257Z
 
 ## Architecture Zones
 
@@ -82,7 +82,9 @@
 - Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists, so llm-provider-core imports upward into llm-cli-utilities to access shared config and token shapes. This single missing layer is the origin of all three compounding risks in finding 11. It should be tracked as one work unit, not five separate issues. [critical]
 - Findings 3 and 9 are complementary and do not contradict each other. Finding 3 (four zones is appropriate granularity) operates at the inter-zone level; finding 9 (HTTP and subprocess strategies are co-located without sub-boundary) operates at the intra-zone level. Both are correct simultaneously. Finding 3 does not imply that all intra-zone organization is optimal. [info]
 - Findings 7 (critical, positive boundary) and 2 (info, positive entry-point pattern) share the same underlying characteristic — both describe architectural properties that are working correctly and should be preserved. Neither warrants any action. They should be treated as invariants to protect during the types-extraction refactor described in finding 14, not as issues to address. [info]
+- The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves. [warning]
 - The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope. [warning]
+- The sequential work unit in finding 16 has an implicit risk: if the new shared types zone is introduced before confirming which symbols are consumed bidirectionally, it may absorb too many definitions and become a second general-purpose zone — recreating the same zone-boundary ambiguity at one level down. The guard against this is finding 17's prerequisite: scope the new zone to exactly the symbols that eliminate the 3 reverse edges and nothing more. A zone containing only types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts (all already classified as 'types' archetype) would satisfy this constraint with no risk of scope creep. [info]
 
 ### Relationships
 
@@ -106,6 +108,7 @@
 - Document the one-to-one test-to-module mapping convention used in llm-provider-tests in a PACKAGE_GUIDELINES.md or test/README.md entry — this implicit convention is enforced only by social norms and will silently erode as the package grows. Codifying it prevents new contributors from breaking the mapping during refactors. [info]
 - The 3 reverse imports (llm-provider-core → llm-cli-utilities) combined with zero utility test coverage and implicit session↔auth coupling form a compounding risk cluster: a single change to auth.ts or a utility config shape can silently break provider construction with no test signal at any layer. Treat these three issues as a single fix unit: extract shared types, add a utility test zone, and add a session-auth integration test simultaneously. [warning]
 - The compounding risk cluster (finding 11, now critical) should be resolved as a single sequential work unit: step 1 — introduce a new zero-dependency zone containing only shared provider config shapes and token structs, update llm-provider-core and llm-cli-utilities to import downward from it, eliminating the 3 reverse edges; step 2 — add a test zone for llm-cli-utilities with at minimum one test per exported utility to close the coverage gap identified in finding 5; step 3 — add one integration-level test asserting that a constructed session contains a valid auth token, making the session–auth coupling in finding 11 regression-protected. Steps must be done in this order: the types extraction in step 1 defines the stable interface that steps 2 and 3 test against. [critical]
+- The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify. [warning]
 - The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down. [critical]
 - Manually assign a domain-specific name to this zone (e.g. 'llm-cli-utilities') in the sourcevision configuration. The automated enrichment failure combined with the zone's size means every consumer reading the architecture map gets no signal about what this zone does. A name is zero-cost and eliminates the ambiguity that compounds the architectural risks in global findings 8 and 11. [warning] (src-2)
 
@@ -131,11 +134,13 @@ Prioritized work items derived from analysis:
 1. **Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…**
    Files: `src/auth.ts`, `src/config.ts`, `src/exec.ts`
 
-1. **The asymmetry between test coverage (core only) and source … (+1 related)**
+1. **The asymmetry between test coverage (core only) and source … (+2 related)**
 
 1. **HTTP and subprocess provider strategies (api-provider vs cli-provider/codex-cli…**
 
 1. **The 3 reverse imports (llm-provider-core → llm-cli-utilities) combined with zer…**
+
+1. **The concrete prerequisite step for finding 17 is: inspect the import lines in a…**
 
 1. **Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting …**
 
@@ -154,7 +159,7 @@ Prioritized work items derived from analysis:
 | `package-lock.json` | generated |  | root |
 | `package.json` | config |  | root |
 | `src/api-provider.ts` | source | service | src |
-| `src/auth.ts` | source | utility | src-2 |
+| `src/auth.ts` | source | service | src-2 |
 | `src/cli-provider.ts` | source | service | src |
 | `src/codex-cli-provider.ts` | source | service | src |
 | `src/config.ts` | source | config | src-2 |
@@ -169,7 +174,7 @@ Prioritized work items derived from analysis:
 | `src/project-config.ts` | source | config | src-2 |
 | `src/project-dirs.ts` | source | types | src-2 |
 | `src/provider-interface.ts` | source | types | src |
-| `src/provider-registry.ts` | source | service | src |
+| `src/provider-registry.ts` | source | store | src |
 | `src/provider-session.ts` | source | service | src |
 | `src/public.ts` | source | entrypoint | src-2 |
 | `src/suggest.ts` | source | utility | src-2 |
@@ -196,3 +201,10 @@ Prioritized work items derived from analysis:
 | `tests/unit/types.test.ts` | test |  | unit |
 | `tsconfig.json` | config |  | root |
 | `vitest.config.ts` | config |  | root |
+
+## Tooling
+
+This project uses n-dx for codebase analysis (Sourcevision) and requirement
+tracking (Rex). MCP tools are available for interactive access to analysis
+data and PRD management. Skills available: /plan, /status, /capture,
+/zone, /work, /configure.

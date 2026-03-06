@@ -518,21 +518,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Implements the LLMProvider interface to create API-based LLM clients — API client and business logic orchestration.",
+          "detail": "Implements the Anthropic SDK-based client: API calls, retry logic, error classification — service layer business logic.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/auth.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Authentication detection and validation helpers (detectCliAvailability, validateApiKey, diagnoseAuth) with no state — shared utility functions.",
+          "detail": "Auth detection, validation, and diagnostics — orchestrates credential probing and produces structured results.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Implements the LLMProvider interface to create CLI-based LLM clients — service layer wrapping the Claude CLI.",
+          "detail": "CLI-based Claude client: spawns the binary, parses output, handles retries — service layer around an external process.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Implements ClaudeClient for the Codex CLI provider — service layer for a specific LLM backend.",
+          "detail": "Codex CLI client: spawns `codex exec`, reads output file, handles retries — same service pattern as cli-provider.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Factory module that orchestrates provider selection and client creation based on auth mode — service layer orchestration.",
+          "detail": "Factory that auto-detects and instantiates the correct provider — core service entry point for client creation.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Low-level shell execution primitives (exec, spawn, ProcessPool) with high fan-in — shared infrastructure utility.",
+          "detail": "Centralized process execution helpers (exec, spawnTool, spawnManaged, ProcessPool) shared across packages — high fan-in utility layer.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "CLI help text formatting functions (formatHelp, bold, cyan, etc.) — shared presentation utility with no state.",
+          "detail": "Shared CLI help formatting and ANSI color utilities consumed by all package CLIs.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Single canonical JSON serialization helper — small shared utility.",
+          "detail": "Single canonical JSON serialization helper — minimal pure utility.",
           "weight": 0.7
         }
       ]
@@ -644,7 +644,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Top-level LLM client factory (createLLMClient, detectLLMAuthMode) that routes to vendor-specific providers — service layer entry point.",
+          "detail": "Vendor-neutral factory (createLLMClient) orchestrating Claude vs Codex provider selection.",
           "weight": 0.7
         }
       ]
@@ -658,7 +658,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Loads and resolves LLM configuration (loadLLMConfig) — configuration module.",
+          "detail": "Loads and parses `.n-dx.json` into an LLMConfig object — pure configuration loading module.",
           "weight": 0.7
         }
       ]
@@ -672,7 +672,7 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Type definitions for LLMVendor, LLMConfig, CodexConfig, LLMClient — pure type companion file.",
+          "detail": "Vendor-neutral type aliases and interfaces (LLMConfig, CodexConfig, LLMClient, LLMVendor) with no logic.",
           "weight": 0.7
         }
       ]
@@ -700,7 +700,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Project-level config loading and merging utilities (loadProjectOverrides, mergeWithOverrides) — configuration module.",
+          "detail": "Config loading utilities: deepMerge, loadProjectOverrides, mergeWithOverrides — shared config infrastructure.",
           "weight": 0.7
         }
       ]
@@ -714,7 +714,7 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Exports PROJECT_DIRS constants and ProjectDir type — constants and type definitions, no logic.",
+          "detail": "Pure constants: PROJECT_DIRS enum-like object with canonical dot-directory names — no logic.",
           "weight": 0.7
         }
       ]
@@ -728,21 +728,21 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Defines LLMProvider, ProviderInfo, StreamChunk, and related interfaces — pure type/interface definitions.",
+          "detail": "Core interface definitions (LLMProvider, ProviderInfo, StreamChunk, ProviderCapability) — pure contracts with no implementation.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/provider-registry.ts",
-      "archetype": "service",
+      "archetype": "store",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "store",
           "signalKind": "path",
-          "detail": "Manages a registry of provider factories with lookup and instantiation logic — service layer for provider lifecycle.",
+          "detail": "ProviderRegistry class with a singleton defaultRegistry — stateful registration store with high fan-in across the package.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Manages a provider session with lifecycle (createProviderSession, ProviderSession) — stateful service wrapping provider and registry.",
+          "detail": "ProviderSession manages active provider state and vendor switching — stateful session orchestration service.",
           "weight": 0.7
         }
       ]
@@ -784,7 +784,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Edit-distance and command typo suggestion helpers — shared utility with no dependencies or state.",
+          "detail": "Levenshtein-based typo suggestion helpers shared across CLI packages — pure utility functions.",
           "weight": 0.7
         }
       ]
@@ -798,7 +798,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Parses token usage from API and CLI output formats — shared parsing utility consumed by multiple providers.",
+          "detail": "Token usage parsing helpers for API and CLI response formats — pure transformation utilities.",
           "weight": 0.7
         }
       ]
@@ -823,9 +823,10 @@
     "totalUnclassified": 0,
     "byArchetype": {
       "service": 7,
-      "utility": 7,
       "config": 3,
+      "utility": 6,
       "types": 4,
+      "store": 1,
       "entrypoint": 1
     },
     "bySource": {

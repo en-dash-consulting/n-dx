@@ -292,23 +292,23 @@
     },
     {
       "path": "src/analyzers/llms-txt.ts",
-      "size": 9880,
+      "size": 10467,
       "language": "TypeScript",
-      "lineCount": 277,
-      "hash": "01f87f455fd291436d9b82c852d04a70572d03a4a6ab0f43517bf96139cd4eee",
+      "lineCount": 287,
+      "hash": "496764bef947d7ab9edf1354ddc31fb3551eb8c1fb7e748b953fb6910f126e9b",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1772432095839
+      "lastModified": 1772775925094
     },
     {
       "path": "src/analyzers/louvain.ts",
-      "size": 23603,
+      "size": 26946,
       "language": "TypeScript",
-      "lineCount": 702,
-      "hash": "fb76c4b36b5096aa857c88fba9910512fdcefcb1af82bed9973f2f9a68fdc17c",
+      "lineCount": 804,
+      "hash": "43bc9930051d782bba068660bdb5a2693b06fb08f211f2c5116e85f239fc4419",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1772682844164
+      "lastModified": 1772765488983
     },
     {
       "path": "src/analyzers/manifest.ts",
@@ -422,13 +422,13 @@
     },
     {
       "path": "src/analyzers/zones.ts",
-      "size": 62728,
+      "size": 62816,
       "language": "TypeScript",
-      "lineCount": 1793,
-      "hash": "80e359a20823adda81af9204e67678bed46cc23a44a309c88a4c81c90876a3cd",
+      "lineCount": 1795,
+      "hash": "301cd187ca96591d6edd4ee3b7ae669f76e02459dd6165b14e2ff4a9272baede",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1772686840179
+      "lastModified": 1772765488983
     },
     {
       "path": "src/cli/commands/analyze-phases.ts",
@@ -572,13 +572,13 @@
     },
     {
       "path": "src/cli/mcp.ts",
-      "size": 17352,
+      "size": 18122,
       "language": "TypeScript",
       "lineCount": 555,
-      "hash": "dc1253cb4c45018cb056111b5adc59b984150f2749f431b2cdcb182a42e49d67",
+      "hash": "acab72a77a395122aebc77470245a6d1c08ba73437701470ce3aeed3bf3605ed",
       "role": "source",
       "category": "cli",
-      "lastModified": 1772682844167
+      "lastModified": 1772776015521
     },
     {
       "path": "src/cli/output.ts",
@@ -1152,13 +1152,13 @@
     },
     {
       "path": "tests/unit/analyzers/zone-detection.test.ts",
-      "size": 64313,
+      "size": 69661,
       "language": "TypeScript",
-      "lineCount": 1652,
-      "hash": "3f27efb78ba064acca27ac809c9e1ceefcede6b3de376aa5d6ed9fc2dceddf0b",
+      "lineCount": 1816,
+      "hash": "166352f005505cde0ac49ade7ce5ab8ec18960329e7188c286fe7e614ece4b3c",
       "role": "test",
       "category": "tests",
-      "lastModified": 1772682844171
+      "lastModified": 1772765488983
     },
     {
       "path": "tests/unit/analyzers/zone-enrichment.test.ts",
@@ -1395,10 +1395,10 @@
       "size": 83851,
       "language": "Other",
       "lineCount": 1,
-      "hash": "679e75506f7bf957562368ebfe1c3418ea03473ba01bd8547da3a3694b70e644",
+      "hash": "570b46fd7b50e4f4185e6a856b905f6b1395daeed828367cdfc3157bee439e1d",
       "role": "config",
       "category": "root",
-      "lastModified": 1772689697839
+      "lastModified": 1772776041640
     },
     {
       "path": "vitest.config.ts",
@@ -1413,7 +1413,7 @@
   ],
   "summary": {
     "totalFiles": 141,
-    "totalLines": 45234,
+    "totalLines": 45512,
     "byLanguage": {
       "JSON": 7,
       "Markdown": 3,

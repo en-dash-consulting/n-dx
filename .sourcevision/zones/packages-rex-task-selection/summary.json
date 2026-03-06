@@ -1,0 +1,29 @@
+{
+  "id": "packages-rex:task-selection",
+  "name": "Task Selection & Scoring",
+  "description": "The next-task selection algorithm including scoring, feature filtering, requirements prioritization, and the CLI command that exposes it.",
+  "files": [
+    "packages/rex/src/cli/commands/next.ts",
+    "packages/rex/src/core/next-task.ts",
+    "packages/rex/tests/unit/core/feature-filtered-task.test.ts",
+    "packages/rex/tests/unit/core/next-task-matching.test.ts",
+    "packages/rex/tests/unit/core/next-task-scoring.test.ts",
+    "packages/rex/tests/unit/core/next-task.test.ts",
+    "packages/rex/tests/unit/core/requirements-prioritization.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/next.ts",
+    "packages/rex/src/core/next-task.ts"
+  ],
+  "cohesion": 0.41,
+  "coupling": 0.59,
+  "fileCount": 7,
+  "lineCount": 2456,
+  "riskMetrics": {
+    "cohesion": 0.41,
+    "coupling": 0.59,
+    "riskScore": 0.5900000000000001,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

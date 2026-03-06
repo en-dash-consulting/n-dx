@@ -1122,6 +1122,7 @@
         "louvainPhase1",
         "mergeBidirectionalCoupling",
         "mergeSmallCommunities",
+        "mergeSatelliteCommunities",
         "capZoneCount",
         "splitLargeCommunities"
       ]
@@ -2925,6 +2926,7 @@
         "addDirectoryProximityEdges",
         "louvainPhase1",
         "mergeSmallCommunities",
+        "mergeSatelliteCommunities",
         "splitLargeCommunities",
         "splitByDirectory"
       ]

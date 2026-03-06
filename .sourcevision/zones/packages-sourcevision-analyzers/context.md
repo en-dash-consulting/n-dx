@@ -9,7 +9,7 @@ Files: 39, Cohesion: 0.67, Coupling: 0.33
 Risk: healthy (score: 0.33)
 Description: 39 files, primarily TypeScript
 Entry points: packages/sourcevision/src/analyzers/callgraph-findings.ts, packages/sourcevision/src/analyzers/claude-client.ts, packages/sourcevision/src/analyzers/context.ts, packages/sourcevision/src/analyzers/enrich-parsing.ts, packages/sourcevision/src/analyzers/enrich.ts, packages/sourcevision/src/analyzers/llms-txt.ts, packages/sourcevision/src/analyzers/next-steps.ts, packages/sourcevision/src/analyzers/server-route-detection.ts, packages/sourcevision/src/analyzers/token-usage.ts, packages/sourcevision/src/analyzers/workspace-crossings.ts, packages/sourcevision/src/analyzers/workspace.ts, packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/util/merge.ts, packages/sourcevision/src/util/sort.ts
-Lines: 12622
+Lines: 12632
 
 </zone>
 
@@ -26,7 +26,7 @@ packages/sourcevision/src/analyzers/enrich-config.ts (TypeScript, 243 lines, sou
 packages/sourcevision/src/analyzers/enrich-parsing.ts (TypeScript, 456 lines, source)
 packages/sourcevision/src/analyzers/enrich-per-zone.ts (TypeScript, 384 lines, source)
 packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 350 lines, source)
-packages/sourcevision/src/analyzers/llms-txt.ts (TypeScript, 277 lines, source)
+packages/sourcevision/src/analyzers/llms-txt.ts (TypeScript, 287 lines, source)
 packages/sourcevision/src/analyzers/next-steps.ts (TypeScript, 246 lines, source)
 packages/sourcevision/src/analyzers/server-route-detection.ts (TypeScript, 255 lines, source)
 packages/sourcevision/src/analyzers/token-usage.ts (TypeScript, 50 lines, source)

@@ -94,6 +94,7 @@ Incoming (other zones → this zone):
 - The zone name 'file-analysis-pipeline' follows a verb-noun-noun pattern unlike other zone names; if route-detection.ts is corrected or moved, the remaining files are all file-centric analyzers and the name would remain accurate, but it should be confirmed as intentional post-refactor.
 - Zone cohesion (0.54) and coupling (0.46) are both near the 0.5 threshold; any net addition of cross-zone imports will tip it into the high-coupling-low-cohesion fragile quadrant currently occupied by schema-validation and zone-detection-engine. Flag this zone for monitoring in CI metric tracking before it degrades further.
 - route-detection.ts sits inside a zone named 'file-analysis-pipeline' whose other members are all generic file analyzers; the filename implies route-specific knowledge that is domain-narrower than the zone's stated scope. Confirm after archetype correction whether it belongs in a dedicated route-analysis zone or if the zone name should be broadened to 'file-and-route-analysis-pipeline'.
+- Zone name 'Analyzers 2' and the parallel 'Analyzers 3' zone indicate Louvain over-partitioned the src/analyzers/ directory into artificial sub-clusters. No coherent independent theme was found during enrichment, confirming these are fragmentation artifacts rather than genuine semantic boundaries.
 - [call graph] 384 internal calls, 7 outgoing, 34 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>

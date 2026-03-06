@@ -1,0 +1,29 @@
+{
+  "id": "task-selection",
+  "name": "Task Selection & Scoring",
+  "description": "The next-task selection algorithm including scoring, feature filtering, requirements prioritization, and the CLI command that exposes it.",
+  "files": [
+    "src/cli/commands/next.ts",
+    "src/core/next-task.ts",
+    "tests/unit/core/feature-filtered-task.test.ts",
+    "tests/unit/core/next-task-matching.test.ts",
+    "tests/unit/core/next-task-scoring.test.ts",
+    "tests/unit/core/next-task.test.ts",
+    "tests/unit/core/requirements-prioritization.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/next.ts",
+    "src/core/next-task.ts"
+  ],
+  "cohesion": 0.41,
+  "coupling": 0.59,
+  "fileCount": 7,
+  "lineCount": 2456,
+  "riskMetrics": {
+    "cohesion": 0.41,
+    "coupling": 0.59,
+    "riskScore": 0.5900000000000001,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

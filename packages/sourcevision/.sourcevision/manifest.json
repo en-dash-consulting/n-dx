@@ -1,45 +1,45 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-03-06T02:15:12.629Z",
+  "analyzedAt": "2026-03-06T14:07:26.145Z",
   "gitSha": "63d150ae28616003380c385586352d8a928bb9bf",
   "gitBranch": "main",
   "targetPath": "/Users/nick/development/endash/n-dx/sourcevision",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:10:50.651Z",
-      "completedAt": "2026-03-06T02:10:50.685Z"
+      "startedAt": "2026-03-06T14:04:32.385Z",
+      "completedAt": "2026-03-06T14:04:32.413Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:10:50.685Z",
-      "completedAt": "2026-03-06T02:10:50.781Z"
+      "startedAt": "2026-03-06T14:04:32.413Z",
+      "completedAt": "2026-03-06T14:04:32.507Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:13:59.439Z",
-      "completedAt": "2026-03-06T02:15:12.324Z"
+      "startedAt": "2026-03-06T14:05:47.241Z",
+      "completedAt": "2026-03-06T14:07:25.827Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:15:12.325Z",
-      "completedAt": "2026-03-06T02:15:12.339Z"
+      "startedAt": "2026-03-06T14:07:25.827Z",
+      "completedAt": "2026-03-06T14:07:25.853Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:15:12.339Z",
-      "completedAt": "2026-03-06T02:15:12.629Z"
+      "startedAt": "2026-03-06T14:07:25.853Z",
+      "completedAt": "2026-03-06T14:07:26.145Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:10:50.782Z",
-      "completedAt": "2026-03-06T02:13:59.438Z"
+      "startedAt": "2026-03-06T14:04:32.507Z",
+      "completedAt": "2026-03-06T14:05:47.240Z"
     }
   },
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 4,
+    "calls": 3,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",

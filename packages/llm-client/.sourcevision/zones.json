@@ -150,6 +150,7 @@
         "Establish a file-naming prefix or directory grouping convention that maps visibly to the zone name — e.g. group files under src/config/, src/auth/, src/cli/ subdirectories. The current flat structure with a zone name that does not appear in any filename makes zone membership invisible to contributors and tooling.",
         "The combination of 42% file concentration, generic name, and being the destination of 23 upward import crossings makes this zone the highest-priority candidate for renaming and internal boundary documentation — not splitting, since global finding 3 confirms four zones is appropriate granularity.",
         "Manually assign a domain-specific name to this zone (e.g. 'llm-cli-utilities') in the sourcevision configuration. The automated enrichment failure combined with the zone's size means every consumer reading the architecture map gets no signal about what this zone does. A name is zero-cost and eliminates the ambiguity that compounds the architectural risks in global findings 8 and 11.",
+        "File archetype classification reveals 6 distinct archetypes within this zone (service, utility, config, types, store, entrypoint). A zone spanning all six archetypes is functionally heterogeneous by definition — this is independent corroboration of the automated enrichment failure and the size warning. The proposed name 'llm-cli-utilities' (src-2/2) accurately describes the utility/config subset but understates the zone's true scope, which also contains provider services and shared type files.",
         "[call graph] 269 internal calls, 0 outgoing, 4 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -555,6 +556,14 @@
     "The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down.",
     "Findings 7 (critical, positive boundary) and 2 (info, positive entry-point pattern) share the same underlying characteristic — both describe architectural properties that are working correctly and should be preserved. Neither warrants any action. They should be treated as invariants to protect during the types-extraction refactor described in finding 14, not as issues to address.",
     "The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope.",
+    "Five independent analysis methods (heuristic edge-counting in finding 0, LLM zone naming failure in src-2/1, cross-zone relationship analysis in finding 4, anti-pattern detection in finding 8, root-cause synthesis in finding 12) converge on the same structural gap without any method contradicting another. This level of cross-method agreement is the highest-confidence signal in the dataset — the missing zero-dependency types layer is a confirmed architectural deficiency, not a speculative one.",
+    "The zone named 'llm-cli-utilities' by LLM analysis (pass 5) contains files classified as service, utility, config, types, store, and entrypoint archetypes. The LLM could not name this zone precisely because it conflates six functionally distinct concerns under one Louvain community label. The correct interpretation is not that the zone should be split (finding 3 says four zones is appropriate granularity) but that the shared type files currently grouped here are what create the reverse coupling — they belong in a lower layer that both zones import from.",
+    "Global finding 7 is labeled 'critical' in the source data but its text describes a strictly positive property: no runtime import from the package-root zone. Per the evaluation constraint that positive findings must carry severity 'info', this is a metadata mislabeling — the finding content is correct, only the severity is wrong. Corrected via severityUpdates.",
+    "Global finding 11 is labeled 'warning' in the source data but finding 12 explicitly states it is 'now critical' and identifies it as the convergence point of findings 0, 4, 6, 8, and 11. It is the most actionable single finding in the dataset and the correct entry point for remediation planning. Upgraded via severityUpdates.",
+    "No finding contradicts another. Finding 13 already resolves the apparent tension between findings 3 and 9. Finding 14 already resolves the apparent overlap between findings 7 and 2. The only inconsistency in the input data is finding 7's severity label, which is a metadata error, not a logical contradiction between findings.",
+    "The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify.",
+    "The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves.",
+    "The sequential work unit in finding 16 has an implicit risk: if the new shared types zone is introduced before confirming which symbols are consumed bidirectionally, it may absorb too many definitions and become a second general-purpose zone — recreating the same zone-boundary ambiguity at one level down. The guard against this is finding 17's prerequisite: scope the new zone to exactly the symbols that eliminate the 3 reverse edges and nothing more. A zone containing only types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts (all already classified as 'types' archetype) would satisfy this constraint with no risk of scope creep.",
     "[call graph] 88 calls: \"unit\" → \"src\""
   ],
   "findings": [
@@ -702,8 +711,22 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
+      "text": "The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
       "text": "The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope.",
       "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "The sequential work unit in finding 16 has an implicit risk: if the new shared types zone is introduced before confirming which symbols are consumed bidirectionally, it may absorb too many definitions and become a second general-purpose zone — recreating the same zone-boundary ambiguity at one level down. The guard against this is finding 17's prerequisite: scope the new zone to exactly the symbols that eliminate the 3 reverse edges and nothing more. A zone containing only types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts (all already classified as 'types' archetype) would satisfy this constraint with no risk of scope creep.",
+      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -711,6 +734,13 @@
       "scope": "global",
       "text": "The compounding risk cluster (finding 11, now critical) should be resolved as a single sequential work unit: step 1 — introduce a new zero-dependency zone containing only shared provider config shapes and token structs, update llm-provider-core and llm-cli-utilities to import downward from it, eliminating the 3 reverse edges; step 2 — add a test zone for llm-cli-utilities with at minimum one test per exported utility to close the coverage gap identified in finding 5; step 3 — add one integration-level test asserting that a constructed session contains a valid auth token, making the session–auth coupling in finding 11 regression-protected. Steps must be done in this order: the types extraction in step 1 defines the stable interface that steps 2 and 3 test against.",
       "severity": "critical"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify.",
+      "severity": "warning"
     },
     {
       "type": "suggestion",
@@ -728,7 +758,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 2,
+  "metaEvaluationCount": 3,
   "structureHash": "b67064233d99c70c",
   "zoneContentHashes": {
     "root": "ba8bddb6ce77ae93",

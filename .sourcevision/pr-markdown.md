@@ -2,7 +2,14 @@
 
 **Branch:** `sourcevision0304`
 **Base:** `main`
-**Completed items:** 23
+**Completed items:** 45
+
+| Epic | Completed |
+|------|-----------|
+| Rex Token Usage & LLM Utilization UX Overhaul | 4 |
+| Web UI Design and User Experience Enhancement | 4 |
+| Rex UI Task Management Enhancement | 3 |
+| Duplicate-aware Proposal Override for rex add | 3 |
 
 ## ⚠️ Breaking Changes
 
@@ -41,8 +48,75 @@
 - The message zone has no formal public interface file (e.g., types.ts or protocol.ts) that declares the contract between its 5 files and its 6 consumers. Its low cohesion (0.45) combined with high inbound traffic means consumers are importing individual implementation files rather than a stable surface, making the zone brittle to internal reorganization.
 - web-integration's name implies it is an adapter between web-viewer and the lower infrastructure zones (message, web), but web-viewer imports message and web directly rather than through web-integration. web-integration is therefore a parallel consumer, not a facade — its architectural role is misleading and contributors may add redundant integration logic to both web-integration and web-viewer independently.
 - web-viewer has no internal gateway consolidating its cross-zone imports, unlike hench (rex-gateway.ts) and web server (rex-gateway.ts, domain-gateway.ts). With 4+ cross-zone import paths, scattered call-site imports mean any upstream API change (message, web-integration, web) requires a grep across 329 files to find all affected sites rather than a single gateway edit.
+- **Address suggestion issues (3 findings)** [critical]
+  - 2 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:e2e, packages-rex:usage — mandatory refactoring recommended before further development
+- Zone "E2e" (packages-rex:e2e) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- Zone "Usage" (packages-rex:usage) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- **Web UI Design and User Experience Enhancement**
+- **Rex UI Task Management Enhancement**
+- **Duplicate-aware Proposal Override for rex add**
 
 ## Completed Work
+
+### Duplicate-aware Proposal Override for rex add
+
+**Orphaned Parent Cleanup After Smart-Add Merge**
+- Fix orphaned epic creation in smart-add merge path
+  Trace the merge execution path in the smart-add pipeline to identify where the proposed parent epic is instantiated before merge resolution completes. The bug produces an empty or single-child epic that is structurally disconnected after the merge target absorbs the child item. The fix should defer or suppress parent creation when a merge is confirmed, or clean up any empty containers after the merge operation settles. Verify the fix against both cross-level and same-level merge scenarios.
+  - Performing a smart-add merge does not create a new top-level epic that has no children after the operation completes
+  - If a parent epic was legitimately created as part of the merge (e.g. to group merged children), it is retained with its children intact
+  - Running `rex validate` after a merge produces no orphaned-node errors
+  - Existing merge behavior for same-level and cross-level matches is unchanged
+- Add regression tests for orphaned parent scenarios in smart-add merge
+
+- Orphaned Parent Cleanup After Smart-Add Merge *(feature)*
+  When the smart-add merge path is applied, the proposed parent epic container can be written to the PRD before the merge target is resolved, leaving it as an empty or childless node. This feature covers the fix and regression coverage.
+
+### Rex Token Usage & LLM Utilization UX Overhaul
+
+**Task-Level Usage Visibility and Budget Context**
+- Add 'showTokenBudget' feature toggle with default-off configuration
+  Introduce a new feature toggle key (e.g. `showTokenBudget`) in the n-dx feature toggle system. It must default to false so token budget UI is hidden out-of-the-box. The toggle should be accessible via `ndx config` and the existing feature toggle configuration section in the web UI. Document the toggle in CLI help.
+  - A `showTokenBudget` toggle key exists in the feature toggle schema and defaults to false
+  - `ndx config` can read and write the toggle
+  - The web UI feature toggle configuration section lists and toggles `showTokenBudget`
+  - CLI help text references the new toggle
+- Conditionally hide token budget in task line items and detail panel based on toggle
+  In the Rex task list and detail side panel, gate all token-budget-specific UI (budget bar, budget percentage chip, budget limit label) behind the `showTokenBudget` feature toggle. When the toggle is off these elements must not render at all — not just hidden via CSS. Token usage counts (already present) are unaffected.
+  - When `showTokenBudget` is false, no budget bar, budget percentage, or budget limit label appears on task line items
+  - When `showTokenBudget` is false, no budget-related fields appear in the task detail side panel
+  - When `showTokenBudget` is true, budget UI renders as before
+  - Toggling the setting live (without page reload) updates the display
+- Render non-zero token usage as a compact badge on task line items
+  On every Rex task line item, display a small token usage badge (e.g. '1.2k tokens') when the task has accumulated non-zero usage. The badge must appear regardless of the `showTokenBudget` toggle — it is always visible when there is usage to show. Use a neutral chip style distinct from status badges. Zero-usage tasks show no badge.
+  - Tasks with non-zero token usage display a compact usage badge on the line item
+  - Tasks with zero token usage show no badge
+  - The badge renders when `showTokenBudget` is false
+  - The badge renders when `showTokenBudget` is true
+  - Badge value is human-readable (e.g. '1.2k', '45k') with a token icon or label
+- Improve hench run association and token burn display in task detail panel
+
+### Rex UI Task Management Enhancement
+
+**Ctrl/Shift Multi-Select for Task Items**
+- Implement ctrl/shift multi-select interaction on Rex task list items
+
+- Ctrl/Shift Multi-Select for Task Items *(feature)*
+  Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.
+- Ability to edit epic/feature/task details in the side panel *(feature)*
+
+### Web UI Design and User Experience Enhancement
+
+**FAQ FAB Placement and Role Separation**
+- Relocate global FAQ FAB to bottom-left toolbar beside theme switcher
+
+**Sidebar Active State on Initial Load**
+- Sync sidebar active state with current route on initial page load
+
+- FAQ FAB Placement and Role Separation *(feature)*
+  Clarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.
+- Sidebar Active State on Initial Load *(feature)*
+  Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.
 
 ### (Ungrouped)
 
@@ -114,6 +188,13 @@
 - The message zone has no formal public interface file (e.g., types.ts or protocol.ts) that declares the contract between its 5 files and its 6 consumers. Its low cohesion (0.45) combined with high inbound traffic means consumers are importing individual implementation files rather than a stable surface, making the zone brittle to internal reorganization.
 - web-integration's name implies it is an adapter between web-viewer and the lower infrastructure zones (message, web), but web-viewer imports message and web directly rather than through web-integration. web-integration is therefore a parallel consumer, not a facade — its architectural role is misleading and contributors may add redundant integration logic to both web-integration and web-viewer independently.
 - web-viewer has no internal gateway consolidating its cross-zone imports, unlike hench (rex-gateway.ts) and web server (rex-gateway.ts, domain-gateway.ts). With 4+ cross-zone import paths, scattered call-site imports mean any upstream API change (message, web-integration, web) requires a grep across 329 files to find all affected sites rather than a single gateway edit.
+- 🔶 **Address suggestion issues (3 findings)** *(feature)*
+  - 2 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:e2e, packages-rex:usage — mandatory refactoring recommended before further development
+- Zone "E2e" (packages-rex:e2e) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- Zone "Usage" (packages-rex:usage) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- 🔶 **Web UI Design and User Experience Enhancement** *(epic)*
+- 🔶 **Rex UI Task Management Enhancement** *(epic)*
+- 🔶 **Duplicate-aware Proposal Override for rex add** *(epic)*
 - Address observation issues (3 findings) *(feature)*
   - 5 circular dependency chains detected — see imports.json for details
 - The message zone's low cohesion (0.45) combined with being the most-imported zone in the web layer suggests it has grown into a catch-all communication module; splitting it into typed message definitions and transport utilities would improve cohesion and make the import graph more precise.
@@ -125,4 +206,38 @@
   - web-viewer bypasses web-integration for 4 of its 6 message-zone imports, importing message directly rather than through the integration layer. This partial bypass means web-integration is not enforcing a stable interface over message for web-viewer, leaving web-viewer exposed to message internals directly.
 - web-viewer simultaneously imports from web, web-integration, viewer-call-rate-limiter, and viewer-message-flow-control — it is the hub of all non-zero coupling in the web layer; if web-viewer grows further, these four inbound dependency paths will become increasingly difficult to untangle
 - web-integration acts as an implicit middleware hub: it imports from both message and web while being imported by web-viewer. This three-way relay role is not documented and risks becoming a catch-all as the codebase grows. Define a clear responsibility boundary for this zone.
+- Address observation issues (3 findings) *(feature)*
+  - 1 circular dependency chain detected — see imports.json for details
+- Bidirectional coupling: "web" ↔ "web-viewer" (4+2 crossings) — consider extracting shared interface
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
+- Address pattern issues (2 findings) *(feature)*
+  - Findings 0 and 11 are independently generated by different analysis methods and both identify the same unresolved circular dependency as a real structural issue. The specific actionable gap is file-pair localization: neither finding names the exact files forming the cycle. Run a targeted traversal of imports.json filtering for cycle edges where both endpoints fall within the web-viewer zone (338-file interior) to identify the specific pair before attempting a fix. Until localized, the build-correctness risk flagged in finding 11 cannot be resolved.
+- Findings 1, web-server zone finding 0, and global finding 5 converge on one root cause: the web package zone structure was grown incrementally without a consistent model. The three concrete symptoms are bidirectional coupling between web-dashboard-application and web-package-root (2+4 crossings), a 4-file web-server satellite with 0.63 cohesion and 0.38 coupling that imports bidirectionally with web-viewer (2+2 crossings), and zone names that mix 'web-viewer', 'panel', 'dom', 'logo' prefixes within a single package. These are three manifestations of the same structural deficit, not three independent problems. Addressing the naming convention (finding 5) and the satellite merge (web-server finding 0) would simultaneously improve the coupling metric tracked in finding 1.
+- Address anti-pattern issues (1 findings) *(feature)*
+  - God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions
+- Fix cross-level matching in smart-add duplicate merge
+  The smart-add duplicate detection (`matchProposalNodeToPRD` in `smart-add-duplicates.ts`) walks the entire PRD tree and scores every item against each proposal node with no level filtering. A proposed epic can match an existing task, a proposed feature can match an existing epic, etc. This causes two failure modes:
+
+1. **Crash + partial state** — A proposed epic matches an existing task/feature. The merge target ID is used as `epicId` in `acceptProposals`. When it tries to add a new feature under this "epic" (actually a task), `insertChild` rejects the hierarchy mismatch (`tree.ts:65`), `addItem` throws (`file-adapter.ts:50`), and the loop aborts mid-way. Items added before the crash are already persisted → partial, broken PRD.
+
+2. **Silent structural corruption** — A proposed feature matches an existing epic. The merge target ID becomes `featureId`. New tasks are added with `featureId` = an epic ID. Since `LEVEL_HIERARCHY.task` allows parent `["feature", "epic"]`, `insertChild` succeeds — but tasks become direct children of the epic, orphaned from any feature grouping.
+
+**Fix required (3 parts):**
+
+1. **Primary: Add level filtering to `matchProposalNodeToPRD`** (`smart-add-duplicates.ts:288-323`) — only match epic↔epic, feature↔feature, task↔task. Add a guard in `scoreNodeAgainstItem` or in the caller's loop: skip items whose `level` doesn't match `node.kind`.
+
+2. **Secondary: Validate merge targets in `acceptProposals`** (`smart-add.ts:~791-880`) — before using a merge target ID as a parent, verify the existing item has the expected level. If not, fall back to creating a new item instead of silently using the wrong parent.
+
+3. **Optional: Batch mutations for atomicity** — currently each `store.addItem()` individually loads/saves the document. If any add fails mid-loop, previously persisted items stay → inconsistent partial state. Consider collecting all mutations and saving once at the end.
+
+**Key files:**
+- `packages/rex/src/cli/commands/smart-add-duplicates.ts` — `matchProposalNodeToPRD` (lines 288-323), `scoreNodeAgainstItem` (lines 213-250)
+- `packages/rex/src/cli/commands/smart-add.ts` — `acceptProposals` (lines ~787-883), `applyDuplicateProposalMerges` (lines 458-533)
+- `packages/rex/src/store/file-adapter.ts` — `addItem` (lines 45-56)
+- `packages/rex/src/core/tree.ts` — `insertChild` (lines 50-78)
+  - matchProposalNodeToPRD only matches nodes against PRD items of the same level (epic↔epic, feature↔feature, task↔task)
+  - acceptProposals validates merge target level before using it as a parent, falls back to creation on mismatch
+  - Existing integration test (smart-add-duplicate-outcomes.test.ts) continues to pass
+  - New test: cross-level match is rejected (e.g. proposed epic with same title as existing task does NOT produce a duplicate match)
+  - New test: merge with level-matched duplicates correctly merges fields and adds non-duplicate children under the right parent
 

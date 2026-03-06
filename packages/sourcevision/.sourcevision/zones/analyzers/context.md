@@ -9,7 +9,7 @@ Files: 39, Cohesion: 0.67, Coupling: 0.33
 Risk: healthy (score: 0.33)
 Description: 39 files, primarily TypeScript
 Entry points: src/analyzers/callgraph-findings.ts, src/analyzers/claude-client.ts, src/analyzers/context.ts, src/analyzers/enrich-parsing.ts, src/analyzers/enrich.ts, src/analyzers/llms-txt.ts, src/analyzers/next-steps.ts, src/analyzers/server-route-detection.ts, src/analyzers/token-usage.ts, src/analyzers/workspace-crossings.ts, src/analyzers/workspace.ts, src/cli/commands/analyze.ts, src/export/pdf-report.ts, src/schema/index.ts, src/util/merge.ts, src/util/sort.ts
-Lines: 12622
+Lines: 12632
 
 </zone>
 
@@ -26,7 +26,7 @@ src/analyzers/enrich-config.ts (TypeScript, 243 lines, source)
 src/analyzers/enrich-parsing.ts (TypeScript, 456 lines, source)
 src/analyzers/enrich-per-zone.ts (TypeScript, 384 lines, source)
 src/analyzers/enrich.ts (TypeScript, 350 lines, source)
-src/analyzers/llms-txt.ts (TypeScript, 277 lines, source)
+src/analyzers/llms-txt.ts (TypeScript, 287 lines, source)
 src/analyzers/next-steps.ts (TypeScript, 246 lines, source)
 src/analyzers/server-route-detection.ts (TypeScript, 255 lines, source)
 src/analyzers/token-usage.ts (TypeScript, 50 lines, source)

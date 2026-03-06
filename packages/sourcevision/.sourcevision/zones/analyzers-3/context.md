@@ -9,16 +9,16 @@ Files: 6, Cohesion: 0.43, Coupling: 0.57
 Risk: healthy (score: 0.57)
 Description: 6 files, primarily TypeScript
 Entry points: src/analyzers/zone-hash.ts, src/analyzers/zones.ts
-Lines: 5460
+Lines: 5728
 
 </zone>
 
 <files>
 
-src/analyzers/louvain.ts (TypeScript, 702 lines, source)
+src/analyzers/louvain.ts (TypeScript, 804 lines, source)
 src/analyzers/zone-hash.ts (TypeScript, 26 lines, source)
-src/analyzers/zones.ts (TypeScript, 1793 lines, source)
-tests/unit/analyzers/zone-detection.test.ts (TypeScript, 1652 lines, test)
+src/analyzers/zones.ts (TypeScript, 1795 lines, source)
+tests/unit/analyzers/zone-detection.test.ts (TypeScript, 1816 lines, test)
 tests/unit/analyzers/zone-size-policy.test.ts (TypeScript, 302 lines, test)
 tests/unit/analyzers/zone-subdivision.test.ts (TypeScript, 985 lines, test)
 
@@ -27,10 +27,10 @@ tests/unit/analyzers/zone-subdivision.test.ts (TypeScript, 985 lines, test)
 <imports>
 
 Internal:
-  src/analyzers/zones.ts → src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeBidirectionalCoupling, mergeSmallCommunities, capZoneCount, splitLargeCommunities}
+  src/analyzers/zones.ts → src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeBidirectionalCoupling, mergeSmallCommunities, mergeSatelliteCommunities, capZoneCount, splitLargeCommunities}
   src/analyzers/zones.ts → src/analyzers/zone-hash.ts {computeGlobalContentHash}
   src/analyzers/zones.ts → src/analyzers/zone-hash.ts {computeGlobalContentHash}
-  tests/unit/analyzers/zone-detection.test.ts → src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeSmallCommunities, splitLargeCommunities, splitByDirectory}
+  tests/unit/analyzers/zone-detection.test.ts → src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeSmallCommunities, mergeSatelliteCommunities, splitLargeCommunities, splitByDirectory}
   tests/unit/analyzers/zone-detection.test.ts → src/analyzers/zones.ts {deriveZoneId, deriveZoneName, disambiguateZoneId, deriveZoneIdFromFilenames, analyzeZones, assignByProximity, SUBDIVISION_THRESHOLD}
   tests/unit/analyzers/zone-size-policy.test.ts → src/analyzers/louvain.ts {buildUndirectedGraph, splitLargeCommunities, louvainPhase1, mergeSmallCommunities, capZoneCount}
   tests/unit/analyzers/zone-size-policy.test.ts → src/analyzers/zones.ts {analyzeZones}
@@ -76,6 +76,7 @@ Incoming (other zones → this zone):
 - The '-engine' suffix is shared only by 'analysis-engine' and 'zone-detection-engine'; the other two zones use '-pipeline' and '-validation' suffixes. No consistent zone-name suffix convention is documented, making zone purpose harder to infer from the name alone across the full zone map.
 - zone-detection-engine's cohesion score (0.43) is misleadingly low given its architecturally clean profile (strictly unidirectional imports, single algorithmic responsibility). Document explicitly that this zone's cohesion is suppressed by co-membership with its own unit tests, not by coupling debt — otherwise automated health reports will incorrectly flag it as a refactoring candidate alongside the genuinely fragile schema-validation zone.
 - Establish a documented naming convention for zone IDs: both 'analysis-engine' and 'zone-detection-engine' use an '-engine' suffix but other zones do not. Standardizing on a pattern (e.g., noun-phrase describing primary responsibility, no suffix) would make the zone map self-describing without requiring zone-level documentation to interpret names.
-- [call graph] 232 internal calls, 583 outgoing, 50 incoming (cohesion: 0.28, coupling: 0.72)
+- The high coupling metric (0.57) with 10 imports targeting 'analyzers' is likely an artifact of artificial zone fragmentation — these files share a parent directory with the main analyzers zone and were separated by the clustering algorithm, not by architectural intent.
+- [call graph] 237 internal calls, 583 outgoing, 50 incoming (cohesion: 0.29, coupling: 0.71)
 
 </insights>

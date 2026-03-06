@@ -1,0 +1,27 @@
+{
+  "id": "rex-runtime-state",
+  "name": "Rex Runtime State",
+  "description": "Live project management state — PRD tree, execution logs, acknowledged findings, and pending proposals — written and read exclusively by the rex CLI and MCP server.",
+  "files": [
+    ".rex/acknowledged-findings.json",
+    ".rex/archive.json",
+    ".rex/config.json",
+    ".rex/execution-log.1.jsonl",
+    ".rex/execution-log.jsonl",
+    ".rex/pending-proposals.json",
+    ".rex/prd.json",
+    ".rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 23699,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "fix-command",
+  "name": "Fix Command Pipeline",
+  "description": "The fix CLI command and its underlying core repair logic, co-located with their unit tests.",
+  "files": [
+    "src/cli/commands/fix.ts",
+    "src/core/fix.ts",
+    "tests/unit/cli/commands/fix.test.ts",
+    "tests/unit/core/fix.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/fix.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 4,
+  "lineCount": 1230,
+  "riskMetrics": {
+    "cohesion": 0.4,
+    "coupling": 0.6,
+    "riskScore": 0.6,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

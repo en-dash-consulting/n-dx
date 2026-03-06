@@ -164,6 +164,7 @@
         "The zone name 'file-analysis-pipeline' follows a verb-noun-noun pattern unlike other zone names; if route-detection.ts is corrected or moved, the remaining files are all file-centric analyzers and the name would remain accurate, but it should be confirmed as intentional post-refactor.",
         "Zone cohesion (0.54) and coupling (0.46) are both near the 0.5 threshold; any net addition of cross-zone imports will tip it into the high-coupling-low-cohesion fragile quadrant currently occupied by schema-validation and zone-detection-engine. Flag this zone for monitoring in CI metric tracking before it degrades further.",
         "route-detection.ts sits inside a zone named 'file-analysis-pipeline' whose other members are all generic file analyzers; the filename implies route-specific knowledge that is domain-narrower than the zone's stated scope. Confirm after archetype correction whether it belongs in a dedicated route-analysis zone or if the zone name should be broadened to 'file-and-route-analysis-pipeline'.",
+        "Zone name 'Analyzers 2' and the parallel 'Analyzers 3' zone indicate Louvain over-partitioned the src/analyzers/ directory into artificial sub-clusters. No coherent independent theme was found during enrichment, confirming these are fragmentation artifacts rather than genuine semantic boundaries.",
         "[call graph] 384 internal calls, 7 outgoing, 34 incoming (cohesion: 0.98, coupling: 0.02)"
       ],
       "riskMetrics": {
@@ -212,7 +213,8 @@
         "The '-engine' suffix is shared only by 'analysis-engine' and 'zone-detection-engine'; the other two zones use '-pipeline' and '-validation' suffixes. No consistent zone-name suffix convention is documented, making zone purpose harder to infer from the name alone across the full zone map.",
         "zone-detection-engine's cohesion score (0.43) is misleadingly low given its architecturally clean profile (strictly unidirectional imports, single algorithmic responsibility). Document explicitly that this zone's cohesion is suppressed by co-membership with its own unit tests, not by coupling debt — otherwise automated health reports will incorrectly flag it as a refactoring candidate alongside the genuinely fragile schema-validation zone.",
         "Establish a documented naming convention for zone IDs: both 'analysis-engine' and 'zone-detection-engine' use an '-engine' suffix but other zones do not. Standardizing on a pattern (e.g., noun-phrase describing primary responsibility, no suffix) would make the zone map self-describing without requiring zone-level documentation to interpret names.",
-        "[call graph] 232 internal calls, 583 outgoing, 50 incoming (cohesion: 0.28, coupling: 0.72)"
+        "The high coupling metric (0.57) with 10 imports targeting 'analyzers' is likely an artifact of artificial zone fragmentation — these files share a parent directory with the main analyzers zone and were separated by the clustering algorithm, not by architectural intent.",
+        "[call graph] 237 internal calls, 583 outgoing, 50 incoming (cohesion: 0.29, coupling: 0.71)"
       ],
       "riskMetrics": {
         "cohesion": 0.43,
@@ -283,6 +285,7 @@
         "branch-work-collector.ts uses the 'branch-work-' domain prefix while every other file in this zone uses CLI-scoped names — the naming inconsistency is a reliable indicator the file is misplaced; move it to branch-work-analytics where its prefix convention matches",
         "Zone \"cli\" has files across 7 directories — consider consolidating under a dedicated directory",
         "registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API.",
+        "Zone-level cohesion (0.71) and coupling (0.29) metrics are healthy in aggregate, but mask a within-zone file-level anti-pattern: registerMcpTools in src/cli/mcp.ts. Zone-aggregate metrics and file-level code quality are orthogonal — a zone can satisfy health thresholds while containing individual problematic functions.",
         "[call graph] 362 internal calls, 5 outgoing, 88 incoming (cohesion: 0.99, coupling: 0.01)"
       ],
       "riskMetrics": {
@@ -1281,6 +1284,14 @@
     "Moving branch-work-collector.ts from cli-infrastructure to the branch-work-analytics zone is a concrete, minimal first step that validates the prefix-to-zone affinity policy described in finding 6 before any broader lint rule is introduced. It reduces the bidirectional crossing count between analysis-engine and branch-work-analytics (finding 0) by one edge at zero architectural risk.",
     "Zones 'cli' (cohesion 0.71, coupling 0.29) and 'analyzers' (cohesion 0.67, coupling 0.33) already satisfy the target health quadrant — contradicting finding 7. These two zones should serve as the internal reference implementations when evaluating whether proposed zone boundary changes improve or degrade architectural health.",
     "The three files src/schema/v1.ts, src/schema/index.ts, and src/analyzers/zones.ts are corroborated by findings 0, 1, 9, and 10 as the shared root cause of system-wide coupling elevation. Extracting exactly these three files into a dedicated 'schema-foundation' zone with an explicit zero-outgoing-production-coupling policy is the single highest-leverage structural change available: it directly addresses the bidirectional cycle in finding 0, the hub signal in finding 1, and the absence of a stable base layer in finding 9 in one bounded operation.",
+    "The three zones 'analyzers', 'analyzers-2', and 'analyzers-3' all draw from src/analyzers/. The generic names and the analyzers-3 high-coupling artifact are downstream consequences of Louvain over-partitioning a single semantic domain. These should be interpreted as one zone's internal structure, not as three independent coupling problems.",
+    "Global finding 11 (heuristic: registerMcpTools calls 36 functions) and cli zone finding 1 (LLM: same function, same prescription) are independent corroboration of the same root cause. This dual-source convergence confirms the god-function is a genuine structural problem, not a metric artifact.",
+    "Global finding 9 (critical, schema-foundation zone extraction) subsumes global findings 0, 1, and the elevated coupling in analyzers-3 and e2e as downstream symptoms. The bidirectional cycle and hub metrics are evidence for finding 9, not independent problems of equal weight. Resolution of finding 9 is the single intervention most likely to improve multiple other metrics simultaneously.",
+    "The apparent contradiction in global finding 10 ('cli and analyzers satisfy target health quadrant') versus cli zone finding 1 ('registerMcpTools should be decomposed') is not a true contradiction. Zone-level cohesion/coupling aggregates across all files and cannot surface per-function anti-patterns. Both findings are correct at their respective scopes and should be acted on independently.",
+    "The internal 'finding 7' referenced in global finding 10's LLM pass corresponds to internal numbering from that analysis session, not to the current global finding 7 (info() fan-in). Global finding 10's conclusion stands without contradiction from any current finding.",
+    "The two dead-export candidates (detectBranchLifecycle in src/analyzers/branch-work-filter.ts, resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts) should be verified for dynamic or string-based invocations before removal, since the static call-graph scan cannot detect those patterns. If confirmed unused after that check, both can be deleted outright to narrow the public API surface.",
+    "Louvain over-partitioning of src/analyzers/ produced three zones (analyzers, analyzers-2, analyzers-3) where one semantic zone exists. The absence of meaningful enrichment names for analyzers-2 and analyzers-3, combined with the high inter-zone coupling from analyzers-3 back to analyzers (10 crossings, coupling 0.57), are artifacts of this fragmentation. Coupling warnings for analyzers-3 and e2e that cite 'analyzers-2' as a target should be weighted accordingly — they measure intra-domain edges, not genuine cross-concern dependencies.",
+    "Global finding 11 (heuristic) and cli zone finding 1 (LLM analysis) independently identify registerMcpTools in src/cli/mcp.ts as a god function with 36 outgoing calls. The corroboration across two independent analysis methods confirms this is a real structural issue. The prescribed remedy — in-file decomposition into named sub-registrar functions grouped by capability domain — is bounded and does not require a file split or public API change.",
     "[call graph] 570 calls: \"analyzers-3\" → \"unit\"",
     "[call graph] 187 calls: \"unit\" → \"analyzers\"",
     "[call graph] 73 calls: \"analyzers\" → \"cli\"",
@@ -1360,6 +1371,13 @@
     },
     {
       "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "The two dead-export candidates (detectBranchLifecycle in src/analyzers/branch-work-filter.ts, resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts) should be verified for dynamic or string-based invocations before removal, since the static call-graph scan cannot detect those patterns. If confirmed unused after that check, both can be deleted outright to narrow the public API surface.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
       "pass": 0,
       "scope": "global",
       "text": "Fan-in hotspot: src/cli/output.ts receives calls from 13 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects",
@@ -1415,13 +1433,6 @@
     },
     {
       "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Moving branch-work-collector.ts from cli-infrastructure to the branch-work-analytics zone is a concrete, minimal first step that validates the prefix-to-zone affinity policy described in finding 6 before any broader lint rule is introduced. It reduces the bidirectional crossing count between analysis-engine and branch-work-analytics (finding 0) by one edge at zero architectural risk.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
       "pass": 0,
       "scope": "global",
       "text": "Hub function: info in src/cli/output.ts is called from 9 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
@@ -1464,14 +1475,14 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
-      "text": "The three files src/schema/v1.ts, src/schema/index.ts, and src/analyzers/zones.ts are corroborated by findings 0, 1, 9, and 10 as the shared root cause of system-wide coupling elevation. Extracting exactly these three files into a dedicated 'schema-foundation' zone with an explicit zero-outgoing-production-coupling policy is the single highest-leverage structural change available: it directly addresses the bidirectional cycle in finding 0, the hub signal in finding 1, and the absence of a stable base layer in finding 9 in one bounded operation.",
-      "severity": "critical"
+      "text": "Global finding 11 (heuristic) and cli zone finding 1 (LLM analysis) independently identify registerMcpTools in src/cli/mcp.ts as a god function with 36 outgoing calls. The corroboration across two independent analysis methods confirms this is a real structural issue. The prescribed remedy — in-file decomposition into named sub-registrar functions grouped by capability domain — is bounded and does not require a file split or public API change.",
+      "severity": "warning"
     },
     {
       "type": "pattern",
       "pass": 5,
       "scope": "global",
-      "text": "Zones 'cli' (cohesion 0.71, coupling 0.29) and 'analyzers' (cohesion 0.67, coupling 0.33) already satisfy the target health quadrant — contradicting finding 7. These two zones should serve as the internal reference implementations when evaluating whether proposed zone boundary changes improve or degrade architectural health.",
+      "text": "Louvain over-partitioning of src/analyzers/ produced three zones (analyzers, analyzers-2, analyzers-3) where one semantic zone exists. The absence of meaningful enrichment names for analyzers-2 and analyzers-3, combined with the high inter-zone coupling from analyzers-3 back to analyzers (10 crossings, coupling 0.57), are artifacts of this fragmentation. Coupling warnings for analyzers-3 and e2e that cite 'analyzers-2' as a target should be weighted accordingly — they measure intra-domain edges, not genuine cross-concern dependencies.",
       "severity": "info"
     },
     {
@@ -1486,16 +1497,16 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 1,
+  "metaEvaluationCount": 2,
   "structureHash": "f32b1cbf85e49a7a",
   "zoneContentHashes": {
     ".claude": "ae7d308f88d1a243",
-    "root": "b4305a0a7ce079d0",
-    "analyzers": "84d4d2288364120a",
-    "unit": "78423ffcafe30db0",
+    "root": "b03d945caa0c97f9",
+    "analyzers": "bb2f8d8d99e95c6c",
+    "unit": "a95427ff997d10e8",
     "cli": "1bc4f08e5790b91e",
     "analyzers-2": "da36c8f03ebb11ae",
-    "analyzers-3": "38044c6d6378b1e8",
+    "analyzers-3": "1e6f4fb51d04e031",
     "e2e": "bd9d20f7751dde8b",
     "fixtures": "365918b33dddecc2"
   }

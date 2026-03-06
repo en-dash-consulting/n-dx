@@ -1,40 +1,40 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-03-06T02:23:55.947Z",
+  "analyzedAt": "2026-03-06T15:09:46.541Z",
   "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2",
   "gitBranch": "feature/integrate-codex",
   "targetPath": "/Users/ryankeith/work-internal/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:15:12.680Z",
-      "completedAt": "2026-03-06T02:15:12.790Z"
+      "startedAt": "2026-03-06T14:07:26.193Z",
+      "completedAt": "2026-03-06T14:07:26.307Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:15:12.790Z",
-      "completedAt": "2026-03-06T02:15:13.306Z"
+      "startedAt": "2026-03-06T14:07:26.307Z",
+      "completedAt": "2026-03-06T14:07:26.834Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:15:13.306Z",
-      "completedAt": "2026-03-06T02:22:34.917Z"
+      "startedAt": "2026-03-06T14:07:26.835Z",
+      "completedAt": "2026-03-06T14:10:49.157Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:22:34.917Z",
-      "completedAt": "2026-03-06T02:23:53.707Z"
+      "startedAt": "2026-03-06T14:10:49.157Z",
+      "completedAt": "2026-03-06T15:09:44.337Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:23:53.708Z",
-      "completedAt": "2026-03-06T02:23:53.836Z"
+      "startedAt": "2026-03-06T15:09:44.337Z",
+      "completedAt": "2026-03-06T15:09:44.467Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-03-06T02:23:53.836Z",
-      "completedAt": "2026-03-06T02:23:55.947Z"
+      "startedAt": "2026-03-06T15:09:44.467Z",
+      "completedAt": "2026-03-06T15:09:46.541Z"
     }
   },
   "children": [
@@ -56,7 +56,7 @@
   ],
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 8,
+    "calls": 19,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",

@@ -10,6 +10,15 @@
     },
     {
       "from": "cli.js",
+      "to": "claude-integration.js",
+      "type": "static",
+      "symbols": [
+        "setupClaudeIntegration",
+        "printClaudeSetupSummary"
+      ]
+    },
+    {
+      "from": "cli.js",
       "to": "config.js",
       "type": "static",
       "symbols": [
@@ -5211,19 +5220,19 @@
     },
     {
       "from": "packages/rex/src/analyze/extract.ts",
+      "to": "packages/rex/src/analyze/llm-bridge.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/extract.ts",
       "to": "packages/rex/src/analyze/propose.ts",
       "type": "type",
       "symbols": [
         "Proposal",
         "ProposalTask"
-      ]
-    },
-    {
-      "from": "packages/rex/src/analyze/extract.ts",
-      "to": "packages/rex/src/analyze/reason.ts",
-      "type": "static",
-      "symbols": [
-        "spawnClaude"
       ]
     },
     {
@@ -5594,6 +5603,23 @@
       ]
     },
     {
+      "from": "packages/rex/src/analyze/llm-bridge.ts",
+      "to": "packages/rex/src/analyze/analyze-shared.ts",
+      "type": "static",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "DEFAULT_CODEX_MODEL"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/llm-bridge.ts",
+      "to": "packages/rex/src/analyze/analyze-shared.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeResult"
+      ]
+    },
+    {
       "from": "packages/rex/src/analyze/modify-reason.ts",
       "to": "packages/rex/src/analyze/propose.ts",
       "type": "type",
@@ -5705,7 +5731,6 @@
       "type": "static",
       "symbols": [
         "DEFAULT_MODEL",
-        "DEFAULT_CODEX_MODEL",
         "emptyAnalyzeTokenUsage",
         "accumulateTokenUsage",
         "extractJson",
@@ -5732,6 +5757,27 @@
       "symbols": [
         "extractFromText",
         "extractFromMarkdown"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/reason.ts",
+      "to": "packages/rex/src/analyze/llm-bridge.ts",
+      "type": "reexport",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode",
+        "getLLMVendor",
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "packages/rex/src/analyze/reason.ts",
+      "to": "packages/rex/src/analyze/llm-bridge.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
       ]
     },
     {
@@ -6104,6 +6150,15 @@
     },
     {
       "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "preflightBudgetCheck",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
       "to": "packages/rex/src/cli/errors.ts",
       "type": "static",
       "symbols": [
@@ -6127,15 +6182,6 @@
       "type": "static",
       "symbols": [
         "parseIntSafe"
-      ]
-    },
-    {
-      "from": "packages/rex/src/cli/commands/analyze.ts",
-      "to": "packages/rex/src/core/token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "preflightBudgetCheck",
-        "formatBudgetWarnings"
       ]
     },
     {
@@ -7275,6 +7321,15 @@
     },
     {
       "from": "packages/rex/src/cli/commands/status.ts",
+      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status.ts",
       "to": "packages/rex/src/cli/errors.ts",
       "type": "static",
       "symbols": [
@@ -7340,9 +7395,7 @@
       "type": "static",
       "symbols": [
         "aggregateTokenUsage",
-        "formatAggregateTokenUsage",
-        "checkBudget",
-        "formatBudgetWarnings"
+        "checkBudget"
       ]
     },
     {
@@ -7444,6 +7497,32 @@
       "symbols": [
         "SyncDirection",
         "SyncReport"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/token-format.ts",
+      "to": "packages/rex/src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/token-format.ts",
+      "to": "packages/rex/src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage",
+        "BudgetCheckResult"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/token-format.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
       ]
     },
     {
@@ -7560,6 +7639,15 @@
     },
     {
       "from": "packages/rex/src/cli/commands/usage.ts",
+      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/usage.ts",
       "to": "packages/rex/src/cli/errors.ts",
       "type": "static",
       "symbols": [
@@ -7583,13 +7671,11 @@
       "type": "static",
       "symbols": [
         "aggregateTokenUsage",
-        "formatAggregateTokenUsage",
         "estimateCost",
         "collectTokenEvents",
         "groupByCommand",
         "groupByTimePeriod",
-        "checkBudget",
-        "formatBudgetWarnings"
+        "checkBudget"
       ]
     },
     {
@@ -9159,14 +9245,6 @@
       ]
     },
     {
-      "from": "packages/rex/src/core/token-usage.ts",
-      "to": "packages/rex/src/store/index.ts",
-      "type": "dynamic",
-      "symbols": [
-        "resolveStore"
-      ]
-    },
-    {
       "from": "packages/rex/src/core/transitions.ts",
       "to": "packages/rex/src/schema/index.ts",
       "type": "type",
@@ -10678,6 +10756,70 @@
     },
     {
       "from": "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/cli/commands/init.ts",
+      "type": "static",
+      "symbols": [
+        "cmdInit"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "cmdSmartAdd"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/cli/commands/validate.ts",
+      "type": "static",
+      "symbols": [
+        "cmdValidate"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
       "to": "packages/rex/src/store/index.ts",
       "type": "static",
       "symbols": [
@@ -12548,6 +12690,15 @@
     },
     {
       "from": "packages/rex/tests/unit/core/token-usage.test.ts",
+      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/token-usage.test.ts",
       "to": "packages/rex/src/core/token-usage.ts",
       "type": "static",
       "symbols": [
@@ -12555,7 +12706,6 @@
         "extractHenchTokenUsage",
         "extractSvTokenUsage",
         "aggregateTokenUsage",
-        "formatAggregateTokenUsage",
         "estimateCost",
         "extractRexTokenEvents",
         "extractHenchTokenEvents",
@@ -12564,8 +12714,7 @@
         "groupByCommand",
         "groupByTimePeriod",
         "periodKey",
-        "checkBudget",
-        "formatBudgetWarnings"
+        "checkBudget"
       ]
     },
     {
@@ -14173,6 +14322,7 @@
         "louvainPhase1",
         "mergeBidirectionalCoupling",
         "mergeSmallCommunities",
+        "mergeSatelliteCommunities",
         "capZoneCount",
         "splitLargeCommunities"
       ]
@@ -15976,6 +16126,7 @@
         "addDirectoryProximityEdges",
         "louvainPhase1",
         "mergeSmallCommunities",
+        "mergeSatelliteCommunities",
         "splitLargeCommunities",
         "splitByDirectory"
       ]
@@ -18094,6 +18245,14 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/prd-tree/task-detail.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "NavigateTo"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
       "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
@@ -18209,6 +18368,14 @@
       "type": "static",
       "symbols": [
         "ConfigFooter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/components/faq.ts",
+      "type": "static",
+      "symbols": [
+        "GlobalFAQ"
       ]
     },
     {
@@ -20193,6 +20360,14 @@
       "type": "static",
       "symbols": [
         "PruneConfirmation"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/prd.ts",
+      "to": "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+      "type": "static",
+      "symbols": [
+        "useFeatureToggle"
       ]
     },
     {
@@ -22511,6 +22686,14 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/multi-select.test.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/node-culler.test.ts",
       "to": "packages/web/src/shared/node-culler.ts",
       "type": "static",
@@ -23459,7 +23642,7 @@
         "packages/hench/src/store/project-config.ts",
         "packages/hench/src/tools/rex.ts",
         "packages/hench/src/types/output.ts",
-        "packages/rex/src/analyze/reason.ts",
+        "packages/rex/src/analyze/llm-bridge.ts",
         "packages/rex/src/analyze/scanners.ts",
         "packages/rex/src/cli/commands/constants.ts",
         "packages/rex/src/cli/commands/recommend.ts",
@@ -23559,11 +23742,13 @@
       "package": "child_process",
       "importedBy": [
         "ci.js",
+        "claude-integration.js",
         "cli.js",
         "pr-check.js",
         "web.js"
       ],
       "symbols": [
+        "execSync",
         "spawn"
       ]
     },
@@ -23580,6 +23765,7 @@
       "package": "fs",
       "importedBy": [
         "ci.js",
+        "claude-integration.js",
         "cli.js",
         "pr-check.js",
         "refresh-artifacts.js",
@@ -23594,6 +23780,7 @@
         "readFileSync",
         "statSync",
         "unlink",
+        "unlinkSync",
         "writeFile",
         "writeFileSync"
       ]
@@ -23621,6 +23808,7 @@
       "package": "path",
       "importedBy": [
         "ci.js",
+        "claude-integration.js",
         "cli.js",
         "pr-check.js",
         "refresh-artifacts.js",
@@ -23702,6 +23890,7 @@
         "packages/web/src/viewer/hooks/use-app-data.ts",
         "packages/web/src/viewer/hooks/use-crash-recovery.ts",
         "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+        "packages/web/src/viewer/hooks/use-feature-toggle.ts",
         "packages/web/src/viewer/hooks/use-file-edges.ts",
         "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
         "packages/web/src/viewer/hooks/use-memory-monitor.ts",
@@ -23948,6 +24137,7 @@
       "package": "url",
       "importedBy": [
         "ci.js",
+        "claude-integration.js",
         "cli.js",
         "pr-check.js"
       ],
@@ -24060,6 +24250,7 @@
         "packages/rex/tests/integration/claude-config.test.ts",
         "packages/rex/tests/integration/project-config.test.ts",
         "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
+        "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
         "packages/rex/tests/integration/store-roundtrip.test.ts",
         "packages/rex/tests/unit/analyze/acknowledge.test.ts",
         "packages/rex/tests/unit/analyze/consolidation-guard.test.ts",
@@ -24298,6 +24489,7 @@
         "packages/web/tests/unit/viewer/memory-warning.test.ts",
         "packages/web/tests/unit/viewer/message-coalescer.test.ts",
         "packages/web/tests/unit/viewer/message-throttle.test.ts",
+        "packages/web/tests/unit/viewer/multi-select.test.ts",
         "packages/web/tests/unit/viewer/node-culler.test.ts",
         "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
         "packages/web/tests/unit/viewer/persistent-filter.test.ts",
@@ -24392,17 +24584,10 @@
     }
   ],
   "summary": {
-    "totalEdges": 2517,
+    "totalEdges": 2539,
     "totalExternal": 18,
-    "circularCount": 1,
-    "circulars": [
-      {
-        "cycle": [
-          "packages/rex/src/analyze/reason.ts",
-          "packages/rex/src/analyze/extract.ts"
-        ]
-      }
-    ],
+    "circularCount": 0,
+    "circulars": [],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
@@ -24414,11 +24599,11 @@
       },
       {
         "path": "packages/rex/src/store/index.ts",
-        "count": 30
+        "count": 31
       },
       {
         "path": "packages/rex/src/cli/commands/constants.ts",
-        "count": 28
+        "count": 29
       },
       {
         "path": "packages/rex/src/cli/output.ts",
@@ -24430,7 +24615,7 @@
       },
       {
         "path": "packages/rex/src/analyze/reason.ts",
-        "count": 24
+        "count": 23
       },
       {
         "path": "packages/web/src/viewer/components/logos.ts",
@@ -24485,6 +24670,6 @@
         "count": 11
       }
     ],
-    "avgImportsPerFile": 3.4
+    "avgImportsPerFile": 3.41
   }
 }

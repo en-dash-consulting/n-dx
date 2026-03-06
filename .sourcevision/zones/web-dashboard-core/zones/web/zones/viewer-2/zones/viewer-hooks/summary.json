@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web/viewer-2/viewer-hooks",
+  "name": "Web Viewer/web/viewer 2/viewer Hooks",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
+    "packages/web/src/viewer/hooks/use-polling.ts",
+    "packages/web/src/viewer/hooks/use-prd-data.ts",
+    "packages/web/src/viewer/polling/index.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/prd-tree/task-utilization.ts",
+    "packages/web/src/viewer/hooks/use-polling.ts",
+    "packages/web/src/viewer/hooks/use-prd-data.ts",
+    "packages/web/src/viewer/polling/index.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 4,
+  "lineCount": 330
+}
