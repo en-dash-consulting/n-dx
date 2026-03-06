@@ -1932,8 +1932,8 @@ async function handleSmartAddPreview(
       return true;
     }
 
-    // Use rex CLI smart-add with --format=json (no --accept = preview mode)
-    const args = ["smart-add", "--format=json"];
+    // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode)
+    const args = ["add", "--format=json"];
     if (input.parentId) args.push("--parent", input.parentId);
     args.push(input.text.trim());
     args.push(ctx.projectDir);
@@ -2079,8 +2079,8 @@ async function handleBatchImport(
         itemSources.push(item.source ?? fileName);
       }
 
-      // Build rex CLI args: smart-add --format=json --file=<f1> --file=<f2> ...
-      const args = ["smart-add", "--format=json"];
+      // Build rex CLI args: add --format=json --file=<f1> --file=<f2> ...
+      const args = ["add", "--format=json"];
       if (input.parentId) args.push("--parent", input.parentId);
       if (input.accept) args.push("--accept");
       for (const fp of filePaths) {
