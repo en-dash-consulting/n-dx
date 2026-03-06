@@ -17,6 +17,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "preact/hooks";
 import type { PRDItemData, ItemStatus } from "./types.js";
 import { itemMatchesFilter } from "./compute.js";
+import { itemMatchesSearch } from "./tree-search.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -78,11 +79,17 @@ export function flattenVisibleTree(
   expanded: Set<string>,
   activeStatuses: Set<ItemStatus>,
   depth: number = 0,
+  searchVisibleIds?: Set<string>,
 ): FlatNode[] {
   const result: FlatNode[] = [];
 
   for (const item of items) {
     if (!itemMatchesFilter(item, activeStatuses)) continue;
+
+    // When a search is active, skip items not in the visible set.
+    if (searchVisibleIds && searchVisibleIds.size > 0) {
+      if (!itemMatchesSearch(item, searchVisibleIds)) continue;
+    }
 
     const children = item.children ?? [];
     const hasChildren = children.length > 0;
@@ -91,7 +98,7 @@ export function flattenVisibleTree(
     result.push({ item, depth, isExpanded, hasChildren });
 
     if (hasChildren && isExpanded) {
-      const childNodes = flattenVisibleTree(children, expanded, activeStatuses, depth + 1);
+      const childNodes = flattenVisibleTree(children, expanded, activeStatuses, depth + 1, searchVisibleIds);
       for (const cn of childNodes) result.push(cn);
     }
   }

@@ -17,7 +17,7 @@
 
 import { h, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { PRDTree, StatusFilter } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
@@ -34,6 +34,7 @@ import { usePRDActions } from "../hooks/use-prd-actions.js";
 import { usePRDDeepLink } from "../hooks/use-prd-deep-link.js";
 import { usePersistentFilter } from "../hooks/use-persistent-filter.js";
 import { useFeatureToggle } from "../hooks/use-feature-toggle.js";
+import { searchTree } from "../components/prd-tree/tree-search.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -79,6 +80,37 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Status filter (persists across view switches) ────────────
   const { activeStatuses, setActiveStatuses } = usePersistentFilter();
+
+  // ── Inline tree search ──────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const searchResult = useMemo(
+    () => data ? searchTree(data.items, searchQuery) : null,
+    [data, searchQuery],
+  );
+
+  // Keyboard shortcut: Ctrl+F / Cmd+F to focus the search input
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        // Only intercept when the PRD view is rendered (data exists)
+        if (!data) return;
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [data]);
+
+  // Clear search on Escape when input is focused
+  const handleSearchKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      (e.target as HTMLInputElement).blur();
+    }
+  }, []);
 
   // ── Deep-link resolution ───────────────────────────────────────
   const { deepLinkError, setDeepLinkError, highlightedTaskId, deepLinkExpandIds } =
@@ -201,8 +233,33 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         })
       : null,
 
-    // Sticky filter bar — consolidated above the tree
+    // Sticky filter bar — search input + status filter
     h("div", { class: "prd-filter-bar" },
+      h("div", { class: "prd-search-row" },
+        h("input", {
+          ref: searchInputRef,
+          class: "prd-search-input",
+          type: "search",
+          placeholder: "Search tasks\u2026 (Ctrl+F)",
+          value: searchQuery,
+          "aria-label": "Search PRD tree",
+          onInput: (e: Event) => setSearchQuery((e.target as HTMLInputElement).value),
+          onKeyDown: handleSearchKeyDown,
+        }),
+        searchQuery && searchResult
+          ? h("span", { class: "prd-search-count", "aria-live": "polite" },
+              `${searchResult.matchCount} match${searchResult.matchCount !== 1 ? "es" : ""}`,
+            )
+          : null,
+        searchQuery
+          ? h("button", {
+              class: "prd-search-clear",
+              onClick: () => { setSearchQuery(""); searchInputRef.current?.focus(); },
+              "aria-label": "Clear search",
+              title: "Clear search",
+            }, "\u00d7")
+          : null,
+      ),
       h(StatusFilter, { activeStatuses, onChange: setActiveStatuses }),
     ),
 
@@ -224,6 +281,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       onUpdateItem: actions.handleItemUpdate,
       deletingItemId: actions.deletingItemId,
       activeStatuses,
+      searchQuery: searchQuery || undefined,
+      searchVisibleIds: searchResult?.visibleIds,
+      searchMatchIds: searchResult?.matchIds,
     }),
 
     // Bulk actions bar (floating at bottom)

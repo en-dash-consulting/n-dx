@@ -32,6 +32,7 @@ import { resolveTaskUtilization } from "./task-utilization.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
 import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT } from "./virtual-scroll.js";
 import type { FlatNode } from "./virtual-scroll.js";
+import { highlightSearchText } from "./tree-search.js";
 
 /** Levels that can have children added via inline form. */
 const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
@@ -203,6 +204,10 @@ interface NodeRowProps {
   canDelete?: boolean;
   /** Whether this item is currently being deleted (API in-flight). */
   isDeleting?: boolean;
+  /** Active search query for text highlighting. */
+  searchQuery?: string;
+  /** Whether this node directly matches the search query. */
+  isSearchMatch?: boolean;
 }
 
 /**
@@ -239,12 +244,14 @@ class NodeRow extends Component<NodeRowProps> {
     // taskUsage is an object — reference check (new object ⇒ re-render)
     if (p.taskUsage !== nextProps.taskUsage) return true;
     if (p.weeklyBudget !== nextProps.weeklyBudget) return true;
+    if (p.searchQuery !== nextProps.searchQuery) return true;
+    if (p.isSearchMatch !== nextProps.isSearchMatch) return true;
     // All props match — skip render
     return false;
   }
 
   render() {
-    const { item, taskUsage, weeklyBudget, showTokenBudget, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting } = this.props;
+    const { item, taskUsage, weeklyBudget, showTokenBudget, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
@@ -261,7 +268,7 @@ class NodeRow extends Component<NodeRowProps> {
     return h(
       "div",
       {
-        class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""} prd-level-${item.level}`,
+        class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""}${isSearchMatch ? " prd-node-search-match" : ""} prd-level-${item.level}`,
         style: `padding-left: ${indent + 8}px`,
         // Data attributes for delegated event handling
         "data-node-id": item.id,
@@ -285,8 +292,10 @@ class NodeRow extends Component<NodeRowProps> {
       h(StatusIndicator, { status: item.status }),
       // Level badge
       h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
-      // Title
-      h("span", { class: "prd-node-title", title: item.title }, item.title),
+      // Title (with search highlighting when query is active)
+      h("span", { class: "prd-node-title", title: item.title },
+        ...(searchQuery ? highlightSearchText(item.title, searchQuery) : [item.title]),
+      ),
       // Priority
       item.priority
         ? h(PriorityBadge, { priority: item.priority })
@@ -498,6 +507,21 @@ export interface PRDTreeProps {
    */
   activeStatuses?: Set<ItemStatus>;
   /**
+   * Search query for inline tree filtering. When set, only matching items
+   * and their ancestors are shown, with matched text highlighted.
+   */
+  searchQuery?: string;
+  /**
+   * Set of item IDs visible during search (matches + ancestors).
+   * When provided alongside searchQuery, filters the flat tree.
+   */
+  searchVisibleIds?: Set<string>;
+  /**
+   * Set of item IDs that directly matched the search query.
+   * Used to apply a visual highlight class to matched rows.
+   */
+  searchMatchIds?: Set<string>;
+  /**
    * @deprecated Virtual scrolling replaces progressive loading.
    * This prop is accepted for backward compatibility but has no effect.
    */
@@ -519,7 +543,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, chunkSize }: PRDTreeProps) {
+export function PRDTree({ document: doc, taskUsageById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -560,9 +584,22 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, showTokenB
   // ── Virtual scroll ────────────────────────────────────────────────
   // Flatten the tree into a linear array respecting expansion and filter
   // state, then render only items within the viewport + buffer zone.
+  // Search: auto-expand ancestors of matches so they're visible
+  useEffect(() => {
+    if (!searchVisibleIds || searchVisibleIds.size === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      // Expand all ancestors — searchVisibleIds includes ancestor IDs
+      for (const id of searchVisibleIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [searchVisibleIds]);
+
   const flatNodes = useMemo(
-    () => flattenVisibleTree(doc.items, expanded, activeStatuses),
-    [doc.items, expanded, activeStatuses],
+    () => flattenVisibleTree(doc.items, expanded, activeStatuses, 0, searchVisibleIds),
+    [doc.items, expanded, activeStatuses, searchVisibleIds],
   );
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -762,6 +799,8 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, showTokenB
             nodeRef: isHL ? deepLinkNodeRef : undefined,
             canDelete,
             isDeleting: deletingItemId === item.id,
+            searchQuery,
+            isSearchMatch: searchMatchIds?.has(item.id),
           }),
           // Inline add form — rendered below the parent node
           isInlineAddActive && onInlineAddSubmit
