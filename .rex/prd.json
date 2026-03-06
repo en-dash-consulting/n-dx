@@ -17642,6 +17642,129 @@
       "source": "manual",
       "startedAt": "2026-03-06T06:04:33.772Z",
       "completedAt": "2026-03-06T06:09:55.004Z"
+    },
+    {
+      "id": "8949fec3-1433-4c50-9c2a-ce0002414470",
+      "title": "Web UI Design and User Experience Enhancement",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "1b9353a7-41d8-4f55-947c-1aedaadc5932",
+          "title": "Sidebar Active State on Initial Load",
+          "status": "pending",
+          "level": "feature",
+          "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
+              "title": "Sync sidebar active state with current route on initial page load",
+              "status": "pending",
+              "level": "task",
+              "description": "When the web UI loads or is refreshed, the sidebar should immediately highlight the nav item corresponding to the current URL hash or route, rather than defaulting to no selection or the wrong item. This involves reading the initial route from the URL at mount time and applying the active state before the first render.",
+              "acceptanceCriteria": [
+                "Loading the app at any valid route URL shows the correct sidebar item highlighted on first render",
+                "Refreshing the page on any view retains the correct active sidebar item",
+                "Direct URL navigation (e.g. pasting a deep link) highlights the matching sidebar item",
+                "No visible flash of incorrect or missing active state on load"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "navigation",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4909cee2-05f2-47b8-a9dd-a9e7006532e0",
+      "title": "Web UI Design and User Experience Enhancement",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "814e1bad-c2cc-4646-b49f-e09f10fc9bcb",
+          "title": "FAQ FAB Placement and Role Separation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Clarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "3560e79d-0a36-4ce6-949d-5834403e5f2c",
+              "title": "Relocate global FAQ FAB to bottom-left toolbar beside theme switcher",
+              "status": "pending",
+              "level": "task",
+              "description": "Move the global FAQ floating action button out of its current position and into the bottom-left corner of the UI, directly adjacent to the existing theme switcher control. The page-specific FAQ FAB must remain in the top-right and must not be affected by this change. Update any positioning styles, z-index stacking, and layout containers that govern the bottom-left toolbar so the two controls sit flush without overlap.",
+              "acceptanceCriteria": [
+                "Global FAQ FAB renders in the bottom-left corner of the viewport at all supported viewport widths",
+                "Global FAQ FAB is visually adjacent to the theme switcher with consistent spacing matching the design system",
+                "Page-specific FAQ FAB remains in the top-right corner and is visually and functionally unchanged",
+                "No overlap or collision between the global FAQ FAB and theme switcher at narrow viewport widths",
+                "Both FABs remain accessible (keyboard-focusable, correct aria-label) after the move",
+                "Existing FAQ FAB click handlers and modal/panel behavior are preserved"
+              ],
+              "priority": "low",
+              "tags": [
+                "ui",
+                "layout",
+                "faq",
+                "accessibility"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c8fbd011-06cb-48a1-9c6d-03a50c00b5a0",
+      "title": "Rex UI Task Management Enhancement",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "0e4d20ed-72d6-49a0-9717-7a2e27c53766",
+          "title": "Ctrl/Shift Multi-Select for Task Items",
+          "status": "pending",
+          "level": "feature",
+          "description": "Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "710ef0e2-8b4e-4bf0-bd3f-6261808131a2",
+              "title": "Implement ctrl/shift multi-select interaction on Rex task list items",
+              "level": "task",
+              "status": "pending",
+              "source": "smart-add",
+              "description": "Remove checkbox inputs from task list items and replace with pointer+keyboard modifier selection logic. Ctrl+click should toggle individual item selection; shift+click should extend the selection range from the last-clicked anchor item. The selected set should be tracked in component state and visually indicated via highlight styling rather than a checkbox. Deselect-all should occur on a plain click with no modifier.",
+              "acceptanceCriteria": [
+                "Clicking a task item with no modifier selects only that item and deselects all others",
+                "Ctrl+click (Cmd+click on macOS) toggles the clicked item's selection without affecting other selected items",
+                "Shift+click selects the contiguous range between the anchor item and the clicked item",
+                "Selected items are visually distinguished (e.g. highlighted row background) with no checkbox element rendered",
+                "All existing bulk actions that previously relied on checkbox selection continue to work with the new selection set",
+                "Keyboard accessibility: Space or Enter on a focused item toggles its selection; Shift+Arrow extends range selection",
+                "Plain click anywhere outside the task list clears the selection"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "rex",
+                "ux"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }
