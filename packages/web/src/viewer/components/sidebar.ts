@@ -4,6 +4,7 @@ import type { Manifest, Zones } from "../../schema/v1.js";
 import type { ViewId } from "../types.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
+import { GlobalFAQ } from "./faq.js";
 import {
   useProjectStatus,
   SvFreshnessIndicator,
@@ -407,6 +408,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarThemeToggle, null),
+            h(GlobalFAQ, null),
             h("button", {
               class: "sidebar-control-btn sidebar-collapse-btn",
               onClick: onToggleSidebar,

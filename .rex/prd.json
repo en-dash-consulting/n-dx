@@ -17749,22 +17749,24 @@
     {
       "id": "4909cee2-05f2-47b8-a9dd-a9e7006532e0",
       "title": "Web UI Design and User Experience Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "814e1bad-c2cc-4646-b49f-e09f10fc9bcb",
           "title": "FAQ FAB Placement and Role Separation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Clarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.",
           "source": "smart-add",
+          "startedAt": "2026-03-06T07:57:25.089Z",
+          "completedAt": "2026-03-06T07:57:25.089Z",
           "children": [
             {
               "id": "3560e79d-0a36-4ce6-949d-5834403e5f2c",
               "title": "Relocate global FAQ FAB to bottom-left toolbar beside theme switcher",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Move the global FAQ floating action button out of its current position and into the bottom-left corner of the UI, directly adjacent to the existing theme switcher control. The page-specific FAQ FAB must remain in the top-right and must not be affected by this change. Update any positioning styles, z-index stacking, and layout containers that govern the bottom-left toolbar so the two controls sit flush without overlap.",
               "acceptanceCriteria": [
@@ -17782,7 +17784,9 @@
                 "faq",
                 "accessibility"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:55:16.344Z",
+              "completedAt": "2026-03-06T07:57:24.894Z"
             }
           ]
         },
@@ -17793,6 +17797,8 @@
           "level": "feature",
           "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.",
           "source": "smart-add",
+          "startedAt": "2026-03-06T07:54:44.479Z",
+          "completedAt": "2026-03-06T07:54:44.479Z",
           "children": [
             {
               "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
@@ -17816,11 +17822,11 @@
               "startedAt": "2026-03-06T07:52:49.267Z",
               "completedAt": "2026-03-06T07:54:44.278Z"
             }
-          ],
-          "startedAt": "2026-03-06T07:54:44.479Z",
-          "completedAt": "2026-03-06T07:54:44.479Z"
+          ]
         }
-      ]
+      ],
+      "startedAt": "2026-03-06T07:57:25.175Z",
+      "completedAt": "2026-03-06T07:57:25.175Z"
     },
     {
       "id": "c8fbd011-06cb-48a1-9c6d-03a50c00b5a0",

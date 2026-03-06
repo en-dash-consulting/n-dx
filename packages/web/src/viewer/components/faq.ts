@@ -230,6 +230,50 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
 }
 
 /**
+ * Global FAQ button — lives in the sidebar footer toolbar (bottom-left).
+ * Opens the full FAQ modal without view-contextual auto-expansion.
+ */
+export function GlobalFAQ() {
+  const [open, setOpen] = useState(false);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
+
+  return h(Fragment, null,
+    h("button", {
+      class: "sidebar-control-btn global-faq-btn",
+      onClick: () => setOpen(true),
+      title: "Help & FAQ",
+      "aria-label": "Open help and FAQ",
+    },
+      h("svg", {
+        width: 14,
+        height: 14,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "1.5",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "aria-hidden": "true",
+      },
+        h("circle", { cx: 8, cy: 8, r: 7 }),
+        h("path", { d: "M5.5 6a2.5 2.5 0 0 1 4.9.5c0 1.5-2.4 2-2.4 3" }),
+        h("circle", { cx: 8, cy: 12, r: 0.5, fill: "currentColor", stroke: "none" }),
+      ),
+    ),
+    open ? h(FAQModal, { onClose: () => setOpen(false), initialSection: null }) : null,
+  );
+}
+
+/**
  * Header FAQ button — contextual entry point in the content area header.
  * Auto-expands the FAQ section relevant to the current view.
  */
