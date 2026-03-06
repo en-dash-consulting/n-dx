@@ -658,18 +658,19 @@ async function savePending(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
-  await writeFile(filePath, JSON.stringify({ proposals, parentId }, null, 2));
+  await writeFile(filePath, JSON.stringify({ proposals, parentId, prdHash }, null, 2));
 }
 
 async function loadPending(
   dir: string,
-): Promise<{ proposals: Proposal[]; parentId?: string } | null> {
+): Promise<{ proposals: Proposal[]; parentId?: string; prdHash?: string } | null> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
   try {
     const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string };
+    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string; prdHash?: string };
   } catch {
     return null;
   }
@@ -1135,9 +1136,10 @@ async function maybeCacheSmartAddProposals(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   if (await hasRexDir(dir)) {
-    await savePending(dir, proposals, parentId);
+    await savePending(dir, proposals, parentId, prdHash);
   }
 }
 
