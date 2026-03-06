@@ -10218,10 +10218,21 @@
           "title": "Task-Level Usage Visibility and Budget Context",
           "status": "completed",
           "level": "feature",
-          "description": "Expose accurate accumulated token usage on each task, including budget-relative context to support prioritization decisions.",
+          "description": "Introduce a feature toggle (default off) that controls whether token budget information appears on Rex task line items and in the side panel. Regardless of the toggle, non-zero token usage should render as a compact badge. Improve the hench run association surface so the run and its token burn are clearly surfaced alongside the task.",
           "source": "smart-add",
           "startedAt": "2026-02-21T08:19:46.249Z",
           "completedAt": "2026-02-21T08:19:46.249Z",
+          "mergedProposals": [
+            {
+              "proposalNodeKey": "p0:feature:0",
+              "proposalTitle": "Token Budget Visibility Toggle and Task-Level Token Display",
+              "proposalKind": "feature",
+              "reason": "semantic_title",
+              "score": 0.717391304347826,
+              "mergedAt": "2026-03-06T06:57:32.440Z",
+              "source": "smart-add"
+            }
+          ],
           "children": [
             {
               "id": "010a83aa-122c-41a0-94a4-27015cb6e1ae",
@@ -10266,6 +10277,90 @@
               "source": "smart-add",
               "startedAt": "2026-02-21T08:19:32.961Z",
               "completedAt": "2026-02-21T08:19:46.194Z"
+            },
+            {
+              "id": "49bbec5f-c725-4bfa-8c3c-755a6aabe30f",
+              "title": "Add 'showTokenBudget' feature toggle with default-off configuration",
+              "status": "pending",
+              "level": "task",
+              "description": "Introduce a new feature toggle key (e.g. `showTokenBudget`) in the n-dx feature toggle system. It must default to false so token budget UI is hidden out-of-the-box. The toggle should be accessible via `ndx config` and the existing feature toggle configuration section in the web UI. Document the toggle in CLI help.",
+              "acceptanceCriteria": [
+                "A `showTokenBudget` toggle key exists in the feature toggle schema and defaults to false",
+                "`ndx config` can read and write the toggle",
+                "The web UI feature toggle configuration section lists and toggles `showTokenBudget`",
+                "CLI help text references the new toggle"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "config",
+                "feature-toggle"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "5f605950-00bc-41c0-800a-f62f381a82a8",
+              "title": "Conditionally hide token budget in task line items and detail panel based on toggle",
+              "status": "pending",
+              "level": "task",
+              "description": "In the Rex task list and detail side panel, gate all token-budget-specific UI (budget bar, budget percentage chip, budget limit label) behind the `showTokenBudget` feature toggle. When the toggle is off these elements must not render at all — not just hidden via CSS. Token usage counts (already present) are unaffected.",
+              "acceptanceCriteria": [
+                "When `showTokenBudget` is false, no budget bar, budget percentage, or budget limit label appears on task line items",
+                "When `showTokenBudget` is false, no budget-related fields appear in the task detail side panel",
+                "When `showTokenBudget` is true, budget UI renders as before",
+                "Toggling the setting live (without page reload) updates the display"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "feature-toggle"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "499fa24f-b0bd-4627-8099-f1c5c5233df4",
+              "title": "Render non-zero token usage as a compact badge on task line items",
+              "status": "pending",
+              "level": "task",
+              "description": "On every Rex task line item, display a small token usage badge (e.g. '1.2k tokens') when the task has accumulated non-zero usage. The badge must appear regardless of the `showTokenBudget` toggle — it is always visible when there is usage to show. Use a neutral chip style distinct from status badges. Zero-usage tasks show no badge.",
+              "acceptanceCriteria": [
+                "Tasks with non-zero token usage display a compact usage badge on the line item",
+                "Tasks with zero token usage show no badge",
+                "The badge renders when `showTokenBudget` is false",
+                "The badge renders when `showTokenBudget` is true",
+                "Badge value is human-readable (e.g. '1.2k', '45k') with a token icon or label"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "ui",
+                "token-usage"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "e95e1878-7f00-4f9d-880f-fb830bb59ce2",
+              "title": "Improve hench run association and token burn display in task detail panel",
+              "status": "pending",
+              "level": "task",
+              "description": "In the Rex task detail side panel, surface the associated hench run(s) more prominently: show the run ID or summary, execution time, and per-run token burn. When multiple runs exist, list them in reverse chronological order with individual burn totals. Deep-link each run entry to the Hench Runs view. This gives users direct visibility into how much of a task's token cost came from each execution.",
+              "acceptanceCriteria": [
+                "The task detail panel lists all hench runs associated with the task",
+                "Each run entry shows: run ID (or timestamp), status, and token burn for that run",
+                "Runs are ordered most-recent first",
+                "Each run entry is a clickable deep-link to the Hench Runs view for that run",
+                "If no runs are associated, the section is hidden or shows 'No runs yet'",
+                "Total token burn across all runs matches the task-level usage badge value"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "hench",
+                "ui",
+                "token-usage"
+              ],
+              "source": "smart-add"
             }
           ]
         },
@@ -17644,45 +17739,6 @@
       "completedAt": "2026-03-06T06:09:55.004Z"
     },
     {
-      "id": "8949fec3-1433-4c50-9c2a-ce0002414470",
-      "title": "Web UI Design and User Experience Enhancement",
-      "status": "pending",
-      "level": "epic",
-      "source": "smart-add",
-      "children": [
-        {
-          "id": "1b9353a7-41d8-4f55-947c-1aedaadc5932",
-          "title": "Sidebar Active State on Initial Load",
-          "status": "pending",
-          "level": "feature",
-          "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.",
-          "source": "smart-add",
-          "children": [
-            {
-              "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
-              "title": "Sync sidebar active state with current route on initial page load",
-              "status": "pending",
-              "level": "task",
-              "description": "When the web UI loads or is refreshed, the sidebar should immediately highlight the nav item corresponding to the current URL hash or route, rather than defaulting to no selection or the wrong item. This involves reading the initial route from the URL at mount time and applying the active state before the first render.",
-              "acceptanceCriteria": [
-                "Loading the app at any valid route URL shows the correct sidebar item highlighted on first render",
-                "Refreshing the page on any view retains the correct active sidebar item",
-                "Direct URL navigation (e.g. pasting a deep link) highlights the matching sidebar item",
-                "No visible flash of incorrect or missing active state on load"
-              ],
-              "priority": "medium",
-              "tags": [
-                "web",
-                "navigation",
-                "ux"
-              ],
-              "source": "smart-add"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "4909cee2-05f2-47b8-a9dd-a9e7006532e0",
       "title": "Web UI Design and User Experience Enhancement",
       "status": "pending",
@@ -17721,6 +17777,36 @@
               "source": "smart-add"
             }
           ]
+        },
+        {
+          "id": "1b9353a7-41d8-4f55-947c-1aedaadc5932",
+          "title": "Sidebar Active State on Initial Load",
+          "status": "pending",
+          "level": "feature",
+          "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
+              "title": "Sync sidebar active state with current route on initial page load",
+              "status": "pending",
+              "level": "task",
+              "description": "When the web UI loads or is refreshed, the sidebar should immediately highlight the nav item corresponding to the current URL hash or route, rather than defaulting to no selection or the wrong item. This involves reading the initial route from the URL at mount time and applying the active state before the first render.",
+              "acceptanceCriteria": [
+                "Loading the app at any valid route URL shows the correct sidebar item highlighted on first render",
+                "Refreshing the page on any view retains the correct active sidebar item",
+                "Direct URL navigation (e.g. pasting a deep link) highlights the matching sidebar item",
+                "No visible flash of incorrect or missing active state on load"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "navigation",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
         }
       ]
     },
@@ -17742,9 +17828,8 @@
             {
               "id": "710ef0e2-8b4e-4bf0-bd3f-6261808131a2",
               "title": "Implement ctrl/shift multi-select interaction on Rex task list items",
-              "level": "task",
               "status": "pending",
-              "source": "smart-add",
+              "level": "task",
               "description": "Remove checkbox inputs from task list items and replace with pointer+keyboard modifier selection logic. Ctrl+click should toggle individual item selection; shift+click should extend the selection range from the last-clicked anchor item. The selected set should be tracked in component state and visually indicated via highlight styling rather than a checkbox. Deselect-all should occur on a plain click with no modifier.",
               "acceptanceCriteria": [
                 "Clicking a task item with no modifier selects only that item and deselects all others",
@@ -17760,7 +17845,84 @@
                 "web",
                 "rex",
                 "ux"
-              ]
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "8de98d96-3ee3-47bd-be66-46d1bb7e25b8",
+          "title": "Ability to edit epic/feature/task details in the side panel",
+          "status": "pending",
+          "level": "feature"
+        }
+      ]
+    },
+    {
+      "id": "4c081a10-9a55-48e7-a9de-68ca2f1de243",
+      "title": "Duplicate-aware Proposal Override for rex add",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "8e04e63b-854c-4e25-9689-3a261ed2d20d",
+          "title": "Orphaned Parent Cleanup After Smart-Add Merge",
+          "status": "pending",
+          "level": "feature",
+          "description": "When the smart-add merge path is applied, the proposed parent epic container can be written to the PRD before the merge target is resolved, leaving it as an empty or childless node. This feature covers the fix and regression coverage.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "556276b8-b57e-434e-a98a-b3033e2c7bc2",
+              "title": "Fix orphaned epic creation in smart-add merge path",
+              "status": "pending",
+              "level": "task",
+              "description": "Trace the merge execution path in the smart-add pipeline to identify where the proposed parent epic is instantiated before merge resolution completes. The bug produces an empty or single-child epic that is structurally disconnected after the merge target absorbs the child item. The fix should defer or suppress parent creation when a merge is confirmed, or clean up any empty containers after the merge operation settles. Verify the fix against both cross-level and same-level merge scenarios.",
+              "acceptanceCriteria": [
+                "Performing a smart-add merge does not create a new top-level epic that has no children after the operation completes",
+                "If a parent epic was legitimately created as part of the merge (e.g. to group merged children), it is retained with its children intact",
+                "Running `rex validate` after a merge produces no orphaned-node errors",
+                "Existing merge behavior for same-level and cross-level matches is unchanged"
+              ],
+              "priority": "high",
+              "tags": [
+                "bug",
+                "smart-add",
+                "merge"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "3adce9c5-d919-465c-affb-1c09b1ee5c16",
+              "title": "Add regression tests for orphaned parent scenarios in smart-add merge",
+              "level": "task",
+              "status": "pending",
+              "source": "smart-add",
+              "description": "Add unit and integration tests that reproduce the orphaned-epic condition before the fix and confirm it stays resolved. Tests should cover: (1) merge into an existing item where the proposed parent is new, (2) cross-level merge where the parent already exists, and (3) merge followed by `rex validate` asserting a clean PRD.",
+              "acceptanceCriteria": [
+                "A test reproducing the orphaned-epic bug exists and fails on the pre-fix code path",
+                "The same test passes after the fix is applied",
+                "A cross-level merge regression test confirms no empty containers are left",
+                "`rex validate` is called as part of at least one integration test and returns no structural errors"
+              ],
+              "priority": "medium",
+              "tags": [
+                "testing",
+                "smart-add",
+                "merge",
+                "regression"
+              ],
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:c7fd1ec7-b523-44e1-b6ba-81d5925af64e",
+                "matchedItemId": "c7fd1ec7-b523-44e1-b6ba-81d5925af64e",
+                "matchedItemTitle": "Add regression tests for malformed and partial Codex outputs",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-03-06T07:00:37.480Z"
+              }
             }
           ]
         }

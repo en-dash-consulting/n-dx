@@ -64,3 +64,8 @@
 {"timestamp":"2026-03-06T06:36:44.637Z","event":"smart_add_accept","detail":"Added 3 items from smart add"}
 {"timestamp":"2026-03-06T06:38:06.507Z","event":"smart_add_accept","detail":"Added 3 items from smart add"}
 {"timestamp":"2026-03-06T06:39:22.124Z","event":"smart_add_accept","detail":"Added 3 items from smart add"}
+{"timestamp":"2026-03-06T06:57:32.929Z","event":"smart_add_accept","detail":"Added 5 items from smart add (1 duplicate merge(s))"}
+{"timestamp":"2026-03-06T07:00:37.810Z","event":"smart_add_accept","detail":"Added 4 items from smart add (1 duplicate override marker(s))"}
+{"timestamp":"2026-03-06T07:01:07.895Z","event":"item_deleted","itemId":"dca75d7a-5b88-46bb-85cb-147e95ce8fbc","detail":"Deleted epic \"Rex UI Task Management Enhancement\" and its descendants (via web)"}
+{"timestamp":"2026-03-06T07:01:59.954Z","event":"items_merged","itemId":"4909cee2-05f2-47b8-a9dd-a9e7006532e0","detail":"Merged 2 items into \"4909cee2-05f2-47b8-a9dd-a9e7006532e0\". Absorbed: 8949fec3-1433-4c50-9c2a-ce0002414470. 1 children reparented, 0 dependency refs rewritten (via web)."}
+{"timestamp":"2026-03-06T07:03:56.468Z","event":"item_added","itemId":"8de98d96-3ee3-47bd-be66-46d1bb7e25b8","detail":"Added feature: Ability to edit epic/feature/task details in the side panel (via web)"}
