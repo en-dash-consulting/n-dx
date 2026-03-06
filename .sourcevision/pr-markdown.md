@@ -2,7 +2,7 @@
 
 **Branch:** `sourcevision0304`
 **Base:** `main`
-**Completed items:** 45
+**Completed items:** 60
 
 | Epic | Completed |
 |------|-----------|
@@ -10,6 +10,10 @@
 | Web UI Design and User Experience Enhancement | 4 |
 | Rex UI Task Management Enhancement | 3 |
 | Duplicate-aware Proposal Override for rex add | 3 |
+| Rex UI Task Management Enhancement | 3 |
+| SourceVision UI Import Graph Enhancement | 3 |
+| PR Build Pipeline and Code Quality Automation | 2 |
+| Rex UI Task Management Enhancement | 3 |
 
 ## ⚠️ Breaking Changes
 
@@ -32,6 +36,8 @@
 - Three-way naming conflict: source files use 'message-' prefix, zone ID is 'viewer-message-flow-control', import graph alias is 'message'. Establish a single canonical name (recommend 'messaging-primitives') and propagate it to all three: filenames, zone ID in zones.json, and the import graph key in imports.json.
 - Zone "CLI End-to-End Test Suite" (packages-rex:cli-e2e-test-suite) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
 - Zone "Token Usage Analytics" (packages-rex:token-usage-analytics) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- **Smart Add Command Regression Fix**
+  The Rex Dashboard Smart Add input throws 'Unknown command: smart-add' once the character count threshold is met. The web UI is invoking a rex CLI subcommand name that no longer matches the registered command, breaking the real-time proposal flow entirely.
 
 ## Major Changes
 
@@ -55,6 +61,12 @@
 - **Web UI Design and User Experience Enhancement**
 - **Rex UI Task Management Enhancement**
 - **Duplicate-aware Proposal Override for rex add**
+- **Rex UI Task Management Enhancement**
+- **SourceVision UI Import Graph Enhancement**
+- **PR Build Pipeline and Code Quality Automation**
+- **Rex UI Task Management Enhancement**
+- **Identify and fix smart-add command name mismatch between web UI and rex CLI** [critical]
+  The Rex Dashboard Smart Add box triggers an API call to the rex CLI using the subcommand 'smart-add', but the CLI no longer registers that name — likely renamed or restructured during a prior refactor. Trace the full call path from the web UI input handler through the web server API route to the rex CLI invocation, identify the correct current command name (e.g. 'add --smart' or similar), and update the web server route or API client to use the correct invocation. Verify the fix does not break the CLI's own smart-add entry point if it is invoked directly.
 
 ## Completed Work
 
@@ -71,6 +83,22 @@
 
 - Orphaned Parent Cleanup After Smart-Add Merge *(feature)*
   When the smart-add merge path is applied, the proposed parent epic container can be written to the PRD before the merge target is resolved, leaving it as an empty or childless node. This feature covers the fix and regression coverage.
+
+### PR Build Pipeline and Code Quality Automation
+
+**GitHub Actions CI Pipeline**
+- Create GitHub Actions workflow replacing bitbucket-pipelines.yml
+  Write a .github/workflows/ci.yml that replicates the PR validation pipeline currently defined in bitbucket-pipelines.yml. The workflow should trigger on pull_request and push-to-main events, install pnpm and Node dependencies, run the build, typecheck, and PRD validation steps (pnpm build, pnpm typecheck, node ci.js), and report failures clearly. The existing bitbucket-pipelines.yml should be removed once the GitHub Actions workflow is confirmed working.
+  - .github/workflows/ci.yml exists and triggers on pull_request (all branches) and push to main
+  - Workflow installs correct Node version and pnpm, restores node_modules via cache
+  - pnpm build runs across all packages with no skipped packages
+  - pnpm typecheck runs across all packages and fails the job on type errors
+  - node ci.js (or ndx ci .) runs and fails the job when PRD validation fails
+  - bitbucket-pipelines.yml is removed from the repository
+  - A passing workflow run is confirmed in GitHub Actions UI
+
+- GitHub Actions CI Pipeline *(feature)*
+  Replace the existing Bitbucket Pipelines configuration with an equivalent GitHub Actions workflow that runs build, typecheck, and PRD validation on pull requests and pushes to main.
 
 ### Rex Token Usage & LLM Utilization UX Overhaul
 
@@ -101,9 +129,55 @@
 **Ctrl/Shift Multi-Select for Task Items**
 - Implement ctrl/shift multi-select interaction on Rex task list items
 
+**Rex Task Search**
+- Implement task search input and filtering engine in Rex UI
+  Add a search input to the Rex dashboard that filters the visible PRD tree in real time. The filtering engine should match against task/feature/epic titles and descriptions using case-insensitive substring matching, keeping matching ancestors visible to preserve tree context. Results should highlight matched text and auto-expand collapsed sections that contain matches.
+  - Search input is visible and focused on keyboard shortcut (e.g. Ctrl+F / Cmd+F or a dedicated keybinding)
+  - Typing in the search input filters the PRD tree to show only items whose title or description contains the query (case-insensitive)
+  - Ancestor nodes (epics, features) of matching tasks remain visible to provide tree context
+  - Matched text is visually highlighted within each result
+  - Sections containing matches are automatically expanded
+  - Clearing the search input restores the full unfiltered tree
+  - Search state is not persisted across page reloads
+- Extend Rex task search with tag and status facets
+
+**Smart Add Command Regression Fix**
+- 🔶 **Identify and fix smart-add command name mismatch between web UI and rex CLI**
+  The Rex Dashboard Smart Add box triggers an API call to the rex CLI using the subcommand 'smart-add', but the CLI no longer registers that name — likely renamed or restructured during a prior refactor. Trace the full call path from the web UI input handler through the web server API route to the rex CLI invocation, identify the correct current command name (e.g. 'add --smart' or similar), and update the web server route or API client to use the correct invocation. Verify the fix does not break the CLI's own smart-add entry point if it is invoked directly.
+  - Typing in the Smart Add box in the Rex Dashboard no longer produces an 'Unknown command' error at any character count
+  - Proposal generation triggers successfully and returns results in the Smart Add panel
+  - The rex CLI 'rex --help' output confirms the invoked subcommand or flag exists
+  - No regression in the CLI smart-add workflow when invoked directly from the terminal
+  - Web server API route for smart-add returns a 200-range response with proposal data
+- Add integration test covering Smart Add web-to-CLI command dispatch
+  There is currently no test that exercises the full web UI → web server → rex CLI invocation path for the smart-add feature, which allowed a command name regression to ship undetected. Add an integration test that confirms the web server's smart-add endpoint constructs and dispatches the correct CLI command, and that a well-formed response is returned when the rex package handles the request.
+  - Integration test exists that mounts the web server smart-add route and asserts the correct rex command is invoked
+  - Test fails when the command name is set to 'smart-add' (reproducing the bug) and passes with the correct command
+  - Test is added to the standard CI test suite and runs without additional setup
+  - Test covers at least one happy-path proposal response and one error case (invalid input)
+
+- ⚠️ **Smart Add Command Regression Fix** *(feature)*
+  The Rex Dashboard Smart Add input throws 'Unknown command: smart-add' once the character count threshold is met. The web UI is invoking a rex CLI subcommand name that no longer matches the registered command, breaking the real-time proposal flow entirely.
 - Ctrl/Shift Multi-Select for Task Items *(feature)*
   Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.
 - Ability to edit epic/feature/task details in the side panel *(feature)*
+- Rex Task Search *(feature)*
+  Add search functionality to the Rex tasks web UI so users can quickly locate tasks, epics, and features by title, description, tags, or status without manually scanning the full PRD tree.
+
+### SourceVision UI Import Graph Enhancement
+
+**Zone Slideout Interaction Regression Fix**
+- Restore zone node click and info button routing to slideout panel
+  Clicking a zone node or its info button currently collapses the node instead of opening the detail slideout panel. Audit the click event handlers on zone graph nodes and the info button, identify where the event is being consumed or incorrectly routed, and restore the behavior so node clicks open the slideout. The 'Load more' action should similarly not collapse the node.
+  - Clicking a zone node opens the detail slideout panel instead of collapsing the node
+  - Clicking the info button on a zone node opens the detail slideout panel
+  - The 'Load more' action expands data inline without collapsing the node
+  - Collapsing a node only occurs when explicitly triggered via a dedicated collapse affordance
+  - Slideout opens with correct zone data matching the clicked node
+- Improve info button visual affordance on zone nodes
+
+- Zone Slideout Interaction Regression Fix *(feature)*
+  The SourceVision Zones graph no longer opens the detail slideout panel when clicking zone nodes or the info button — instead, clicks collapse the node. The info button also lacks visual affordance indicating it reveals more information. This feature restores correct click behavior and improves the info button's discoverability.
 
 ### Web UI Design and User Experience Enhancement
 
@@ -195,6 +269,10 @@
 - 🔶 **Web UI Design and User Experience Enhancement** *(epic)*
 - 🔶 **Rex UI Task Management Enhancement** *(epic)*
 - 🔶 **Duplicate-aware Proposal Override for rex add** *(epic)*
+- 🔶 **Rex UI Task Management Enhancement** *(epic)*
+- 🔶 **SourceVision UI Import Graph Enhancement** *(epic)*
+- 🔶 **PR Build Pipeline and Code Quality Automation** *(epic)*
+- 🔶 **Rex UI Task Management Enhancement** *(epic)*
 - Address observation issues (3 findings) *(feature)*
   - 5 circular dependency chains detected — see imports.json for details
 - The message zone's low cohesion (0.45) combined with being the most-imported zone in the web layer suggests it has grown into a catch-all communication module; splitting it into typed message definitions and transport utilities would improve cohesion and make the import graph more precise.

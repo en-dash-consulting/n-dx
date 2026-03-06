@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Unit Analyze/unit/schema (`unit-analyze/unit/schema`)
-Files: 3, Cohesion: 0.19, Coupling: 0.81
+Files: 3, Cohesion: 0.29, Coupling: 0.71
 Description: 3 files, primarily TypeScript
 Entry points: src/schema/index.ts, src/schema/levels.ts, src/schema/v1.ts
 Lines: 662

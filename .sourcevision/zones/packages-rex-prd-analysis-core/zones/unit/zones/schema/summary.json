@@ -12,8 +12,8 @@
     "src/schema/levels.ts",
     "src/schema/v1.ts"
   ],
-  "cohesion": 0.19,
-  "coupling": 0.81,
+  "cohesion": 0.29,
+  "coupling": 0.71,
   "fileCount": 3,
   "lineCount": 0
 }

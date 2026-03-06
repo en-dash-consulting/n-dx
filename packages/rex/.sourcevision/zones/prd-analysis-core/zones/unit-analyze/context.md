@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Unit Analyze/unit Analyze (`unit-analyze/unit-analyze`)
-Files: 4, Cohesion: 0.33, Coupling: 0.67
+Files: 4, Cohesion: 0.22, Coupling: 0.78
 Description: 4 files, primarily TypeScript
 Entry points: src/analyze/dedupe.ts, src/cli/commands/smart-add-duplicates.ts
 Lines: 1577

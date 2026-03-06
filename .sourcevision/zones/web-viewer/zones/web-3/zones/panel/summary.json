@@ -1,0 +1,20 @@
+{
+  "id": "web-viewer/web-3/panel",
+  "name": "Web Viewer/web 3/panel",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/batch-import-panel.ts",
+    "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
+    "packages/web/src/viewer/views/analysis.ts",
+    "packages/web/tests/unit/viewer/batch-import-panel.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
+    "packages/web/src/viewer/views/analysis.ts"
+  ],
+  "cohesion": 0.8,
+  "coupling": 0.2,
+  "fileCount": 5,
+  "lineCount": 2241
+}

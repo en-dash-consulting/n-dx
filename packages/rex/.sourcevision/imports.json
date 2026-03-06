@@ -5154,6 +5154,18 @@
       ]
     },
     {
+      "from": "src/schema/validate.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "VALID_STATUSES",
+        "VALID_LEVELS",
+        "VALID_PRIORITIES",
+        "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES"
+      ]
+    },
+    {
       "from": "src/store/adapter-registry.ts",
       "to": "src/core/canonical.ts",
       "type": "static",
@@ -8377,7 +8389,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 886,
+    "totalEdges": 887,
     "totalExternal": 5,
     "circularCount": 0,
     "circulars": [],
@@ -8451,18 +8463,18 @@
         "count": 7
       },
       {
+        "path": "src/schema/v1.ts",
+        "count": 7
+      },
+      {
         "path": "src/schema/validate.ts",
         "count": 7
       },
       {
         "path": "src/analyze/reshape-reason.ts",
         "count": 6
-      },
-      {
-        "path": "src/schema/v1.ts",
-        "count": 6
       }
     ],
-    "avgImportsPerFile": 4.36
+    "avgImportsPerFile": 4.35
   }
 }

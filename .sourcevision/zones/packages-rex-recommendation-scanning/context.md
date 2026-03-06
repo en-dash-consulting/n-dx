@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Recommendation Scanning (`packages-rex:recommendation-scanning`)
-Files: 19, Cohesion: 0.47, Coupling: 0.53
-Risk: healthy (score: 0.53)
+Files: 19, Cohesion: 0.33, Coupling: 0.67
+Risk: critical (score: 0.67)
 Description: Implements the recommendation pipeline: scanning projects for PRD candidates, extracting and reconciling proposals, detecting conflicts, and creating items from accepted recommendations.
 Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/extract.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/recommend.ts, packages/rex/src/recommend/create-from-recommendations.ts
 Lines: 9440
@@ -80,8 +80,16 @@ Incoming (other zones → this zone):
 
 </imports>
 
+<findings>
+
+[suggestion] [warning] Zone "Recommendation Scanning" (packages-rex:recommendation-scanning) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development
+
+</findings>
+
 <insights>
 
+- Low cohesion (0.33) — files are loosely related, consider splitting this zone
+- High coupling (0.67) — 23 imports target "prd-analysis-core"
 - High coupling (0.53) — 23 imports target "prd-analysis-core"
 - At cohesion 0.47 and coupling 0.53, this zone sits at the boundary — files here straddle recommendation logic and general analysis utilities, which explains the moderate scores.
 - The 23 imports from unit-analyze and 12 exports back to unit-analyze suggest this zone is tightly paired with the core analysis pipeline and may benefit from merging or clearer interface contracts.

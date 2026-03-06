@@ -5,8 +5,8 @@
 <zone>
 
 Zone: CLI & MCP Interface (`cli-mcp-interface`)
-Files: 40, Cohesion: 0.49, Coupling: 0.51
-Risk: healthy (score: 0.51)
+Files: 40, Cohesion: 0.47, Coupling: 0.53
+Risk: healthy (score: 0.53)
 Description: User-facing CLI infrastructure: command routing, chunked review workflow, MCP server integration, output formatting, token usage tracking, and error handling.
 Entry points: src/analyze/reshape-reason.ts, src/cli/commands/chunked-review.ts, src/cli/commands/constants.ts, src/cli/commands/init.ts, src/cli/commands/token-format.ts, src/cli/commands/usage.ts, src/cli/commands/verify.ts, src/cli/errors.ts, src/cli/mcp.ts, src/cli/output.ts, src/core/reshape.ts, src/core/stats.ts, src/core/token-usage.ts
 Lines: 14175
@@ -177,7 +177,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [warning] 13 entry points — wide API surface, consider consolidating exports
-[observation] [warning] High coupling (0.51) — 58 imports target "prd-analysis-core"
+[observation] [warning] High coupling (0.53) — 58 imports target "prd-analysis-core"
 [observation] [warning] Reverse imports from prd-analysis-core back into the cli zone (35 imports) break the expected CLI→Domain dependency direction. Extract any shared utilities or types into a neutral module to restore layering.
 [observation] [info] Token usage tracking (token-usage.ts, token-format.ts) co-located with command routing and MCP infrastructure is a natural fit — these are all cross-cutting CLI concerns rather than domain logic.
 [suggestion] [info] Zone "cli-mcp-interface" has files across 9 directories — consider consolidating under a dedicated directory
@@ -192,6 +192,8 @@ Incoming (other zones → this zone):
 
 <insights>
 
+- High coupling (0.53) — 58 imports target "prd-analysis-core"
+- 13 entry points — wide API surface, consider consolidating exports
 - High coupling (0.51) — 58 imports target "prd-analysis-core"
 - 13 entry points — wide API surface, consider consolidating exports
 - The bidirectional import relationship with prd-analysis-core (58 outbound, 35 inbound) is an architectural red flag — CLI should depend on domain, but domain importing from CLI suggests shared utilities or types that should be extracted to a neutral foundation layer.

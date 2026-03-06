@@ -5,33 +5,37 @@
 <zone>
 
 Zone: Hench/unit/agent (`hench/unit/agent`)
-Files: 79, Cohesion: 0.83, Coupling: 0.17
-Description: 79 files, primarily TypeScript
-Entry points: packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/process/index.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/store/index.ts, packages/hench/src/store/project-config.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/rex.ts
-Lines: 24644
+Files: 82, Cohesion: 0.87, Coupling: 0.13
+Description: 82 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/process/index.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/store/project-config.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/rex.ts
+Lines: 23719
 
 </zone>
 
 <files>
 
 packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
-packages/hench/src/agent/analysis/review.ts (TypeScript, 110 lines, source)
 packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
-packages/hench/src/agent/analysis/stuck.ts (TypeScript, 70 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
-packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
 packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1031 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 90 lines, source)
 packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 354 lines, source)
 packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 396 lines, source)
 packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
-packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 141 lines, source)
 packages/hench/src/agent/planning/brief.ts (TypeScript, 353 lines, source)
 packages/hench/src/agent/planning/prompt.ts (TypeScript, 76 lines, source)
 packages/hench/src/cli/commands/config.ts (TypeScript, 584 lines, source)
+packages/hench/src/cli/commands/constants.ts (TypeScript, 55 lines, source)
 packages/hench/src/cli/commands/init.ts (TypeScript, 28 lines, source)
 packages/hench/src/cli/commands/run.ts (TypeScript, 1096 lines, source)
+packages/hench/src/cli/commands/show.ts (TypeScript, 114 lines, source)
+packages/hench/src/cli/commands/status.ts (TypeScript, 76 lines, source)
+packages/hench/src/cli/commands/task-lookup.ts (TypeScript, 83 lines, source)
+packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
+packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
+packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
+packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
 packages/hench/src/prd/ops.ts (TypeScript, 5 lines, source)
 packages/hench/src/prd/rex-gateway.ts (TypeScript, 63 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
@@ -47,7 +51,6 @@ packages/hench/src/process/process-memory-tracker.ts (TypeScript, 416 lines, sou
 packages/hench/src/public.ts (TypeScript, 260 lines, source)
 packages/hench/src/schema/index.ts (TypeScript, 44 lines, source)
 packages/hench/src/schema/v1.ts (TypeScript, 289 lines, source)
-packages/hench/src/schema/validate.ts (TypeScript, 193 lines, source)
 packages/hench/src/store/index.ts (TypeScript, 39 lines, source)
 packages/hench/src/store/project-config.ts (TypeScript, 123 lines, source)
 packages/hench/src/store/run-archiver.ts (TypeScript, 285 lines, source)
@@ -64,20 +67,21 @@ packages/hench/tests/unit/agent/cli-retry.test.ts (TypeScript, 229 lines, test)
 packages/hench/tests/unit/agent/codex-normalization.test.ts (TypeScript, 144 lines, test)
 packages/hench/tests/unit/agent/heartbeat.test.ts (TypeScript, 129 lines, test)
 packages/hench/tests/unit/agent/prompt.test.ts (TypeScript, 100 lines, test)
-packages/hench/tests/unit/agent/review.test.ts (TypeScript, 372 lines, test)
 packages/hench/tests/unit/agent/shared-lifecycle.test.ts (TypeScript, 348 lines, test)
 packages/hench/tests/unit/agent/spin-detection.test.ts (TypeScript, 58 lines, test)
-packages/hench/tests/unit/agent/stuck.test.ts (TypeScript, 203 lines, test)
 packages/hench/tests/unit/agent/summary.test.ts (TypeScript, 241 lines, test)
 packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
 packages/hench/tests/unit/agent/token-tracking.test.ts (TypeScript, 301 lines, test)
-packages/hench/tests/unit/agent/token-usage-regression.test.ts (TypeScript, 65 lines, test)
-packages/hench/tests/unit/agent/token-usage.test.ts (TypeScript, 451 lines, test)
 packages/hench/tests/unit/agent/workflow.test.ts (TypeScript, 388 lines, test)
 packages/hench/tests/unit/cli/commands/config.test.ts (TypeScript, 211 lines, test)
+packages/hench/tests/unit/cli/commands/constants.test.ts (TypeScript, 42 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic.test.ts (TypeScript, 529 lines, test)
-packages/hench/tests/unit/cli/commands/run-loop.test.ts (TypeScript, 231 lines, test)
+packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts (TypeScript, 157 lines, test)
+packages/hench/tests/unit/cli/commands/task-lookup.test.ts (TypeScript, 24 lines, test)
+packages/hench/tests/unit/cli/errors.test.ts (TypeScript, 234 lines, test)
+packages/hench/tests/unit/cli/help.test.ts (TypeScript, 101 lines, test)
+packages/hench/tests/unit/cli/output.test.ts (TypeScript, 120 lines, test)
 packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts (TypeScript, 872 lines, test)
 packages/hench/tests/unit/process/exec.test.ts (TypeScript, 115 lines, test)
 packages/hench/tests/unit/process/lifecycle.test.ts (TypeScript, 511 lines, test)
@@ -86,7 +90,6 @@ packages/hench/tests/unit/process/memory-monitor.test.ts (TypeScript, 401 lines,
 packages/hench/tests/unit/process/memory-throttle.test.ts (TypeScript, 426 lines, test)
 packages/hench/tests/unit/process/pool.test.ts (TypeScript, 855 lines, test)
 packages/hench/tests/unit/process/process-memory-tracker.test.ts (TypeScript, 440 lines, test)
-packages/hench/tests/unit/schema/validate.test.ts (TypeScript, 603 lines, test)
 packages/hench/tests/unit/store/claude-config.test.ts (TypeScript, 184 lines, test)
 packages/hench/tests/unit/store/run-archiver.test.ts (TypeScript, 365 lines, test)
 packages/hench/tests/unit/store/run-change-detector.test.ts (TypeScript, 383 lines, test)
@@ -100,31 +103,13 @@ packages/hench/tests/unit/tools/rex.test.ts (TypeScript, 248 lines, test)
 
 Internal:
   packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
-  packages/hench/src/agent/analysis/review.ts → packages/hench/src/process/index.ts {execStdout}
-  packages/hench/src/agent/analysis/stuck.ts → packages/hench/src/schema/index.ts {RunRecord}
   packages/hench/src/agent/analysis/summary.ts → packages/hench/src/schema/v1.ts {ToolCallRecord, RunSummaryData, CommandRecord, TestRecord}
   packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/schema/v1.ts {RunRecord, RunStatus, HenchConfig}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {ReviewResult, ReviewDiff}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliLoopOptions, CliLoopResult}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/loop.ts {AgentLoopOptions, AgentLoopResult}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/planning/brief.ts {assembleTaskBrief, formatTaskBrief, getActionableTasks, collectEpicTaskIds, TaskNotActionableError}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/planning/brief.ts {AssembleBriefOptions, ActionableTask}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/planning/prompt.ts {buildSystemPrompt}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/spin.ts {isSpinningRun}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, captureStartingHead, runReviewGate, finalizeRun, handleRunFailure}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/shared.ts {SharedLoopOptions}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {mapCodexUsageToTokenUsage, parseTokenUsage, parseStreamTokenUsage}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/index.ts {saveRun}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
@@ -137,13 +122,11 @@ Internal:
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, captureStartingHead, runReviewGate, finalizeRun, handleRunFailure, handleBudgetExceeded}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/shared.ts {SharedLoopOptions}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
-  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/process/memory-monitor.ts {SystemMemoryMonitor}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RunRecord, TurnTokenUsage}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/store/index.ts {saveRun}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, loadLLMConfig, resolveApiKey, resolveLLMVendor}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/tools/rex.ts {rexToolHandlers}
-  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {Heartbeat}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/planning/brief.ts {assembleTaskBrief, formatTaskBrief}
@@ -155,25 +138,49 @@ Internal:
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/index.ts {saveRun}
   packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/tools/rex.ts {toolRexUpdateStatus, toolRexAppendLog}
   packages/hench/src/agent/lifecycle/token-budget.ts → packages/hench/src/schema/index.ts {TokenUsage}
-  packages/hench/src/agent/lifecycle/token-usage.ts → packages/hench/src/schema/index.ts {TokenUsage}
   packages/hench/src/agent/planning/brief.ts → packages/hench/src/prd/rex-gateway.ts {findNextTask, findActionableTasks, collectCompletedIds, findItem, walkTree, collectRequirements, isWorkItem}
   packages/hench/src/agent/planning/brief.ts → packages/hench/src/schema/index.ts {TaskBrief, TaskBriefTask, TaskBriefParent, TaskBriefSibling, TaskBriefProject, TaskBriefLogEntry, TaskBriefRequirement}
   packages/hench/src/agent/planning/prompt.ts → packages/hench/src/schema/index.ts {HenchConfig, TaskBriefProject}
+  packages/hench/src/cli/commands/config.ts → packages/hench/src/cli/errors.ts {CLIError}
+  packages/hench/src/cli/commands/config.ts → packages/hench/src/cli/output.ts {info, result}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/index.ts {validateConfig, formatValidationErrors}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/v1.ts {HenchConfig, GuardConfig, RetryConfig, Provider}
+  packages/hench/src/cli/commands/constants.ts → packages/hench/src/cli/errors.ts {CLIError}
+  packages/hench/src/cli/commands/init.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
+  packages/hench/src/cli/commands/init.ts → packages/hench/src/cli/output.ts {info}
   packages/hench/src/cli/commands/init.ts → packages/hench/src/store/index.ts {ensureHenchDir, configExists, initConfig}
-  packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/analysis/stuck.ts {getStuckTaskIds}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {collectEpicTaskIds}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {getActionableTasks, collectEpicTaskIds}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR, safeParseInt, safeParseNonNegInt}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/cli/errors.ts {CLIError, EpicNotFoundError, requireLLMCLI}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/cli/output.ts {info, output}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {walkTree}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {resolveStore, findNextTask, findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/process/limiter.ts {ProcessLimiter}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/process/memory-throttle.ts {MemoryThrottle}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/store/index.ts {loadConfig, listRuns}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath}
+  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
+  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/task-lookup.ts {lookupTaskInRex, formatTaskLine}
+  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/output.ts {info, result}
+  packages/hench/src/cli/commands/show.ts → packages/hench/src/store/index.ts {loadRun}
+  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR, safeParseInt}
+  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/task-lookup.ts {batchLookupTasksInRex, formatTaskLine}
+  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/output.ts {info, result}
+  packages/hench/src/cli/commands/status.ts → packages/hench/src/store/index.ts {listRuns}
+  packages/hench/src/cli/commands/task-lookup.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/config.ts {cmdConfig}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/constants.ts {usage}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/init.ts {cmdInit}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/run.ts {cmdRun}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/errors.ts {CLIError, handleCLIError, requireHenchDir}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/help.ts {showCommandHelp}
+  packages/hench/src/cli/index.ts → packages/hench/src/cli/output.ts {setQuiet}
   packages/hench/src/prd/ops.ts → packages/hench/src/prd/rex-gateway.ts {*}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {execShell}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {ExecShellOptions}
@@ -225,8 +232,6 @@ Internal:
   packages/hench/src/public.ts → packages/hench/src/store/run-retention.ts {RetentionConfig, RetentionResult, PreservedUsageStats, RetentionLogEntry}
   packages/hench/src/schema/index.ts → packages/hench/src/schema/v1.ts {HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG}
   packages/hench/src/schema/index.ts → packages/hench/src/schema/v1.ts {GuardConfig, PolicyLimitsConfig, RetryConfig, HenchConfig, Provider, RunStatus, ToolCallRecord, TokenUsage, TurnTokenUsage, CommandRecord, TestRecord, PostRunTestRecord, SummaryCounts, RunSummaryData, RunMemoryStats, RunRecord, TaskBrief, TaskBriefTask, TaskBriefParent, TaskBriefSibling, TaskBriefProject, TaskBriefLogEntry, TaskBriefRequirement}
-  packages/hench/src/schema/index.ts → packages/hench/src/schema/validate.ts {HenchConfigSchema, RunRecordSchema, validateConfig, validateRunRecord, formatValidationErrors}
-  packages/hench/src/schema/index.ts → packages/hench/src/schema/validate.ts {ValidationResult}
   packages/hench/src/schema/v1.ts → packages/hench/src/process/memory-monitor.ts {MemoryMonitorConfig}
   packages/hench/src/schema/v1.ts → packages/hench/src/process/memory-throttle.ts {MemoryThrottleConfig}
   packages/hench/src/schema/v1.ts → packages/hench/src/process/pool.ts {RuntimePoolConfig}
@@ -241,7 +246,6 @@ Internal:
   packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding}
   packages/hench/src/tools/rex.ts → packages/hench/src/process/index.ts {execShellCmd}
   packages/hench/tests/e2e/cli-init.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG, HENCH_SCHEMA_VERSION}
-  packages/hench/tests/e2e/cli-init.test.ts → packages/hench/src/schema/validate.ts {HenchConfigSchema}
   packages/hench/tests/unit/agent/adaptive.test.ts → packages/hench/src/agent/analysis/adaptive.ts {analyzeAdaptive, collectMetrics, getAutoApplicable, _resetIdCounter, DEFAULT_ADAPTIVE_SETTINGS}
   packages/hench/tests/unit/agent/adaptive.test.ts → packages/hench/src/agent/analysis/adaptive.ts {AdaptiveSettings}
   packages/hench/tests/unit/agent/adaptive.test.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
@@ -258,13 +262,10 @@ Internal:
   packages/hench/tests/unit/agent/prompt.test.ts → packages/hench/src/agent/planning/prompt.ts {buildSystemPrompt}
   packages/hench/tests/unit/agent/prompt.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
   packages/hench/tests/unit/agent/prompt.test.ts → packages/hench/src/schema/v1.ts {TaskBriefProject}
-  packages/hench/tests/unit/agent/review.test.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
   packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
   packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
   packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, handleRunFailure, handleBudgetExceeded}
   packages/hench/tests/unit/agent/spin-detection.test.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, isSpinningRun, DEFAULT_SPIN_THRESHOLD}
-  packages/hench/tests/unit/agent/stuck.test.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, getStuckTaskIds, isStuckTask}
-  packages/hench/tests/unit/agent/stuck.test.ts → packages/hench/src/schema/v1.ts {RunRecord}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/schema/v1.ts {ToolCallRecord}
   packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
@@ -273,22 +274,27 @@ Internal:
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {processStreamLine}
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliRunResult}
   packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/schema/v1.ts {TurnTokenUsage}
-  packages/hench/tests/unit/agent/token-usage-regression.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage}
-  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
-  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats, _resetIdCounter}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {WorkflowSuggestion}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/cli/commands/config.ts {getConfigValue, setConfigValue, coerceValue, previewChange, formatConfigDisplay, CONFIG_FIELDS}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/schema/v1.ts {HenchConfig}
+  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/commands/constants.ts {safeParseInt}
+  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/errors.ts {CLIError}
   packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {getOrderedEpics, printEpicByEpicSummary}
   packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicRunSummary, EpicScopeInfo}
   packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {listEpics, findEpicByIdOrTitle, resolveEpicFlag, collectEpicTaskIds, getEpicScopeInfo}
   packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicScopeInfo}
-  packages/hench/tests/unit/cli/commands/run-loop.test.ts → packages/hench/src/cli/commands/run.ts {shouldContinueLoop, loopPause}
-  packages/hench/tests/unit/cli/commands/run-loop.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
-  packages/hench/tests/unit/cli/commands/run-loop.test.ts → packages/hench/src/schema/validate.ts {validateConfig}
+  packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/errors.ts {EpicNotFoundError}
+  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
+  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
+  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/schema/index.ts {RunRecord}
+  packages/hench/tests/unit/cli/commands/task-lookup.test.ts → packages/hench/src/cli/commands/task-lookup.ts {formatTaskLine}
+  packages/hench/tests/unit/cli/errors.test.ts → packages/hench/src/agent/planning/brief.ts {TaskNotActionableError}
+  packages/hench/tests/unit/cli/errors.test.ts → packages/hench/src/cli/errors.ts {CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI}
+  packages/hench/tests/unit/cli/help.test.ts → packages/hench/src/cli/help.ts {showCommandHelp}
+  packages/hench/tests/unit/cli/output.test.ts → packages/hench/src/cli/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
   packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/tests/unit/process/exec.test.ts → packages/hench/src/process/exec.ts {exec, execStdout, execShellCmd, getCurrentHead}
   packages/hench/tests/unit/process/lifecycle.test.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -301,8 +307,6 @@ Internal:
   packages/hench/tests/unit/process/pool.test.ts → packages/hench/src/process/pool.ts {RuntimePool, PoolExhaustedError, DEFAULT_RUNTIME_POOL_CONFIG}
   packages/hench/tests/unit/process/pool.test.ts → packages/hench/src/process/pool.ts {WorkerHandle, WorkerFactory, PooledRuntime, RuntimePoolConfig, RuntimePoolStatus}
   packages/hench/tests/unit/process/process-memory-tracker.test.ts → packages/hench/src/process/process-memory-tracker.ts {ProcessMemoryTracker, DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG}
-  packages/hench/tests/unit/schema/validate.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
-  packages/hench/tests/unit/schema/validate.test.ts → packages/hench/src/schema/validate.ts {validateConfig, validateRunRecord, formatValidationErrors, HenchConfigSchema, RunRecordSchema}
   packages/hench/tests/unit/store/claude-config.test.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, resolveApiKey, resolveCliPath}
   packages/hench/tests/unit/store/claude-config.test.ts → packages/hench/src/store/project-config.ts {ClaudeConfig}
   packages/hench/tests/unit/store/run-archiver.test.ts → packages/hench/src/store/run-archiver.ts {archiveOldRuns, identifyArchivableRuns, compressRunFile, readCompressedJSON, loadArchivalConfig, DEFAULT_ARCHIVAL_CONFIG}
@@ -319,30 +323,28 @@ Internal:
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  hench/unit/agent/agent → hench/unit/agent/agent-lifecycle: 2
-  hench/unit/agent/agent → hench/unit/agent/cli: 2
-  hench/unit/agent/agent → hench/unit/agent/process: 11
-  hench/unit/agent/agent-lifecycle → hench/unit/agent/process: 1
-  hench/unit/agent/cli → hench/unit/agent/agent: 1
-  hench/unit/agent/cli → hench/unit/agent/process: 10
-  hench/unit/agent/cli → hench/unit/agent/store: 1
-  hench/unit/agent/process → hench/unit/agent/agent: 1
-  hench/unit/agent/process → hench/unit/agent/agent-lifecycle: 2
-  hench/unit/agent/process → hench/unit/agent/cli: 5
-  hench/unit/agent/process → hench/unit/agent/store: 9
-  hench/unit/agent/store → hench/unit/agent/process: 1
+  hench/unit/agent/agent → hench/unit/agent/cli: 5
+  hench/unit/agent/agent → hench/unit/agent/process: 13
+  hench/unit/agent/agent → hench/unit/agent/store: 8
+  hench/unit/agent/cli → hench/unit/agent/agent: 2
+  hench/unit/agent/cli → hench/unit/agent/process: 9
+  hench/unit/agent/cli → hench/unit/agent/store: 2
+  hench/unit/agent/process → hench/unit/agent/agent: 3
+  hench/unit/agent/process → hench/unit/agent/cli: 2
+  hench/unit/agent/process → hench/unit/agent/store: 7
+  hench/unit/agent/store → hench/unit/agent/agent: 2
+  hench/unit/agent/store → hench/unit/agent/process: 3
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 5 sub-zone(s):
+This zone has 4 sub-zone(s):
 
-- **Hench/unit/agent/agent** (`hench/unit/agent/agent`): 5 files, cohesion 0.35, coupling 0.65
-- **Hench/unit/agent/agent Lifecycle** (`hench/unit/agent/agent-lifecycle`): 3 files, cohesion 0.33, coupling 0.67
-- **Hench/unit/agent/cli** (`hench/unit/agent/cli`): 10 files, cohesion 0.52, coupling 0.48
-- **Hench/unit/agent/process** (`hench/unit/agent/process`): 55 files, cohesion 0.83, coupling 0.17
-- **Hench/unit/agent/store** (`hench/unit/agent/store`): 6 files, cohesion 0.53, coupling 0.47
+- **Hench/unit/agent/agent** (`hench/unit/agent/agent`): 13 files, cohesion 0.42, coupling 0.58
+- **Hench/unit/agent/cli** (`hench/unit/agent/cli`): 9 files, cohesion 0.38, coupling 0.62
+- **Hench/unit/agent/process** (`hench/unit/agent/process`): 51 files, cohesion 0.78, coupling 0.22
+- **Hench/unit/agent/store** (`hench/unit/agent/store`): 9 files, cohesion 0.33, coupling 0.67
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

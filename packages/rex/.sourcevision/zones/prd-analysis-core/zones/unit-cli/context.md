@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Unit Analyze/unit Cli (`unit-analyze/unit-cli`)
-Files: 11, Cohesion: 0.77, Coupling: 0.23
+Files: 11, Cohesion: 0.63, Coupling: 0.38
 Description: 11 files, primarily TypeScript
 Entry points: src/cli/commands/validate.ts, src/core/structural.ts
 Lines: 4935

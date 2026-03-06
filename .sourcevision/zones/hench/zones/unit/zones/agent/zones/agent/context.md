@@ -5,30 +5,55 @@
 <zone>
 
 Zone: Hench/unit/agent/agent (`hench/unit/agent/agent`)
-Files: 5, Cohesion: 0.35, Coupling: 0.65
-Description: 5 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts
-Lines: 830
+Files: 13, Cohesion: 0.42, Coupling: 0.58
+Description: 13 files, primarily TypeScript
+Entry points: packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/token-budget.ts
+Lines: 3222
 
 </zone>
 
 <files>
 
-packages/hench/src/agent/analysis/review.ts (TypeScript, 110 lines, source)
-packages/hench/src/agent/analysis/stuck.ts (TypeScript, 70 lines, source)
-packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
-packages/hench/tests/unit/agent/review.test.ts (TypeScript, 372 lines, test)
-packages/hench/tests/unit/agent/stuck.test.ts (TypeScript, 203 lines, test)
+packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1031 lines, source)
+packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 90 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 354 lines, source)
+packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 396 lines, source)
+packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
+packages/hench/tests/unit/agent/cli-retry.test.ts (TypeScript, 229 lines, test)
+packages/hench/tests/unit/agent/codex-normalization.test.ts (TypeScript, 144 lines, test)
+packages/hench/tests/unit/agent/heartbeat.test.ts (TypeScript, 129 lines, test)
+packages/hench/tests/unit/agent/shared-lifecycle.test.ts (TypeScript, 348 lines, test)
+packages/hench/tests/unit/agent/spin-detection.test.ts (TypeScript, 58 lines, test)
+packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
+packages/hench/tests/unit/agent/token-tracking.test.ts (TypeScript, 301 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {ReviewResult, ReviewDiff}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
-  packages/hench/tests/unit/agent/review.test.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
-  packages/hench/tests/unit/agent/stuck.test.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, getStuckTaskIds, isStuckTask}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/spin.ts {isSpinningRun}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, captureStartingHead, runReviewGate, finalizeRun, handleRunFailure}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/shared.ts {SharedLoopOptions}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, captureStartingHead, runReviewGate, finalizeRun, handleRunFailure, handleBudgetExceeded}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/shared.ts {SharedLoopOptions}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {Heartbeat}
+  packages/hench/tests/unit/agent/cli-retry.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {isTransientError, computeDelay, buildRetryNotice}
+  packages/hench/tests/unit/agent/codex-normalization.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {normalizeCodexResponse}
+  packages/hench/tests/unit/agent/heartbeat.test.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat, HEARTBEAT_INTERVAL_MS}
+  packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
+  packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
+  packages/hench/tests/unit/agent/shared-lifecycle.test.ts → packages/hench/src/agent/lifecycle/shared.ts {prepareBrief, executeDryRun, transitionToInProgress, initRunRecord, handleRunFailure, handleBudgetExceeded}
+  packages/hench/tests/unit/agent/spin-detection.test.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, isSpinningRun, DEFAULT_SPIN_THRESHOLD}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
+  packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {processStreamLine}
+  packages/hench/tests/unit/agent/token-tracking.test.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliRunResult}
 
 </imports>

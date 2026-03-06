@@ -5,8 +5,8 @@
 <zone>
 
 Zone: PRD Tree Lifecycle (`prd-tree-lifecycle`)
-Files: 48, Cohesion: 0.51, Coupling: 0.49
-Risk: healthy (score: 0.49)
+Files: 48, Cohesion: 0.46, Coupling: 0.54
+Risk: healthy (score: 0.54)
 Description: Core domain operations for mutating, traversing, and maintaining the PRD tree: moves, removals, merges, parent completion, health checks, reorganization, and sync engine.
 Entry points: src/cli/commands/health.ts, src/cli/commands/reorganize.ts, src/core/dag.ts, src/core/delete.ts, src/core/facets.ts, src/core/health.ts, src/core/keywords.ts, src/core/merge.ts, src/core/move.ts, src/core/parent-completion.ts, src/core/parent-reset.ts, src/core/prune.ts, src/core/remove-epic.ts, src/core/remove-feature.ts, src/core/remove-task.ts, src/core/reorganize-executor.ts, src/core/reorganize.ts, src/core/requirements.ts, src/core/sync-engine.ts, src/core/sync.ts, src/core/timestamps.ts, src/core/tree.ts, src/core/verify.ts, src/public.ts
 Lines: 13446
@@ -187,6 +187,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [warning] 24 entry points — wide API surface, consider consolidating exports
+[observation] [warning] High coupling (0.54) — 67 imports target "prd-analysis-core"
 [observation] [warning] 67 imports from this zone into unit-analyze combined with 18 reverse imports creates a near-cycle between the two largest zones; shared types should be owned at a lower layer to eliminate the reverse dependency.
 [observation] [info] public.ts acts as the package API gateway — keeping it lean and intentional prevents accidental surface area growth as the zone expands.
 [observation] [info] sync-engine.ts and analytics.ts appear architecturally distinct from tree mutation operations; extracting them would improve zone cohesion and make the domain boundary clearer.
@@ -200,6 +201,8 @@ Incoming (other zones → this zone):
 
 <insights>
 
+- High coupling (0.54) — 67 imports target "prd-analysis-core"
+- 24 entry points — wide API surface, consider consolidating exports
 - 24 entry points — wide API surface, consider consolidating exports
 - With 24 entry points and 48 files this is the broadest domain zone — health.ts, sync-engine.ts, and analytics.ts are architecturally distinct from tree mutation and could be extracted into focused sub-zones to improve cohesion.
 - public.ts as an entry point signals this zone defines the package's outward API surface; changes here have downstream impact on hench and web consumers and warrant extra care.

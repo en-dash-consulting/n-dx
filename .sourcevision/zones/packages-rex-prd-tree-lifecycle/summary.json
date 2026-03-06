@@ -78,14 +78,14 @@
     "packages/rex/src/core/verify.ts",
     "packages/rex/src/public.ts"
   ],
-  "cohesion": 0.51,
-  "coupling": 0.49,
+  "cohesion": 0.46,
+  "coupling": 0.54,
   "fileCount": 48,
   "lineCount": 13446,
   "riskMetrics": {
-    "cohesion": 0.51,
-    "coupling": 0.49,
-    "riskScore": 0.49,
+    "cohesion": 0.46,
+    "coupling": 0.54,
+    "riskScore": 0.54,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

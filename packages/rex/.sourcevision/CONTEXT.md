@@ -6,43 +6,43 @@
 <architecture>
 
 Project: rex
-Files: 241, Lines: 85208
+Files: 241, Lines: 85202
 Languages: TypeScript(223) JSON(9) Other(4) Markdown(4) Text(1)
 Zones: 10, Described: 10
-Import edges: 886, External packages: 5
+Import edges: 887, External packages: 5
 
 </architecture>
 
 <zones>
 
-[cli-mcp-interface] CLI & MCP Interface (40 files, coh=0.49 coup=0.51)
+[cli-mcp-interface] CLI & MCP Interface (40 files, coh=0.47 coup=0.53)
   User-facing CLI infrastructure: command routing, chunked review workflow, MCP server integration, output formatting, token usage tracking, and error handling.
   files: src/analyze/reshape-reason.ts [utility], src/cli/commands/adapter.ts [cli-command], src/cli/commands/chunked-review-state.ts [cli-command], src/cli/commands/chunked-review.ts [cli-command], src/cli/commands/constants.ts [types], src/cli/commands/init.ts [cli-command], src/cli/commands/move.ts [cli-command], src/cli/commands/prune.ts [cli-command], src/cli/commands/remove.ts [cli-command], src/cli/commands/report.ts [cli-command] +30
-[fix-command] Fix Command Pipeline (4 files, coh=0.40 coup=0.60)
+[fix-command] Fix Command Pipeline (4 files, coh=0.25 coup=0.75)
   The fix CLI command and its underlying core repair logic, co-located with their unit tests.
   files: src/cli/commands/fix.ts [cli-command], src/core/fix.ts [utility], tests/unit/cli/commands/fix.test.ts, tests/unit/core/fix.test.ts
-[prd-analysis-core] PRD Analysis Core (69 files, coh=0.52 coup=0.48)
+[prd-analysis-core] PRD Analysis Core (69 files, coh=0.50 coup=0.50)
   The central domain hub: PRD schema definitions, the full analysis pipeline (decompose, dedupe, diff, validate), core structural transitions, and the primary CLI commands for analyzing, adding, and managing PRD items.
   files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [utility], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/file-validation.ts [utility], src/analyze/guided.ts [service], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [service], src/analyze/modify-reason.ts [utility] +59
-[prd-storage-adapters] PRD Storage & Sync Adapters (23 files, coh=0.60 coup=0.40)
+[prd-storage-adapters] PRD Storage & Sync Adapters (23 files, coh=0.50 coup=0.50)
   Persistence layer providing pluggable storage adapters, sync contracts, integration schemas for Jira and Notion, and the sync CLI command.
   files: src/cli/commands/sync.ts [cli-command], src/core/canonical.ts [utility], src/store/adapter-registry.ts [store], src/store/contracts.ts [store], src/store/file-adapter.ts [store], src/store/index.ts [entrypoint], src/store/integration-schema.ts [store], src/store/integration-schemas/index.ts [entrypoint], src/store/integration-schemas/jira.ts [store], src/store/integration-schemas/notion.ts [store] +13
-[prd-tree-lifecycle] PRD Tree Lifecycle (48 files, coh=0.51 coup=0.49)
+[prd-tree-lifecycle] PRD Tree Lifecycle (48 files, coh=0.46 coup=0.54)
   Core domain operations for mutating, traversing, and maintaining the PRD tree: moves, removals, merges, parent completion, health checks, reorganization, and sync engine.
   files: src/cli/commands/health.ts [cli-command], src/cli/commands/reorganize.ts [cli-command], src/core/analytics.ts [utility], src/core/code-coverage.ts [utility], src/core/dag.ts [utility], src/core/delete.ts [utility], src/core/facets.ts [utility], src/core/health.ts [utility], src/core/keywords.ts [utility], src/core/merge.ts [utility] +38
 [project-root-config] Project Root Configuration (9 files, coh=1.00 coup=0.00)
   Top-level project scaffolding including documentation, AI-readable context files, and build/test configuration shared across the monorepo.
   files: README.md, Rex-F.png, Rex.png, context.md, llms.txt, package-lock.json, package.json, tsconfig.json, vitest.config.ts
-[recommendation-scanning] Recommendation Scanning (19 files, coh=0.47 coup=0.53)
+[recommendation-scanning] Recommendation Scanning (19 files, coh=0.33 coup=0.67)
   Implements the recommendation pipeline: scanning projects for PRD candidates, extracting and reconciling proposals, detecting conflicts, and creating items from accepted recommendations.
   files: src/analyze/acknowledge.ts [service], src/analyze/extract.ts [service], src/analyze/reconcile.ts [service], src/analyze/scanners.ts [service], src/cli/commands/recommend.ts [cli-command], src/recommend/conflict-detection.ts [utility], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types], tests/unit/analyze/acknowledge.test.ts, tests/unit/analyze/extract-llm-mock.test.ts +9
 [rex-project-state] Rex Project State (4 files, coh=1.00 coup=0.00)
   Runtime data directory holding the live PRD, execution log, workflow state, and project configuration for a rex-managed project.
   files: .rex/config.json, .rex/execution-log.jsonl, .rex/prd.json, .rex/workflow.md
-[schema-validation] Schema Validation (16 files, coh=0.29 coup=0.71)
+[schema-validation] Schema Validation (16 files, coh=1.00 coup=0.00)
   PRD schema validation logic and the end-to-end CLI tests that exercise the full command surface against real file system operations.
   files: src/schema/validate.ts [schema], tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts, tests/e2e/cli-import.test.ts, tests/e2e/cli-init.test.ts, tests/e2e/cli-prune.test.ts, tests/e2e/cli-quiet.test.ts, tests/e2e/cli-recommend.test.ts, tests/e2e/cli-smart-add.test.ts, tests/e2e/cli-sync.test.ts +6
-[task-selection] Task Selection & Scoring (7 files, coh=0.41 coup=0.59)
+[task-selection] Task Selection & Scoring (7 files, coh=0.17 coup=0.83)
   The next-task selection algorithm including scoring, feature filtering, requirements prioritization, and the CLI command that exposes it.
   files: src/cli/commands/next.ts [cli-command], src/core/next-task.ts [utility], tests/unit/core/feature-filtered-task.test.ts, tests/unit/core/next-task-matching.test.ts, tests/unit/core/next-task-scoring.test.ts, tests/unit/core/next-task.test.ts, tests/unit/core/requirements-prioritization.test.ts
 [unzoned] 2 files: .claude/settings.local.json, tests/fixtures/token-usage-regression.json
@@ -70,9 +70,10 @@ Most imported:
 <findings>
 
 [warning] 13 entry points — wide API surface, consider consolidating exports [cli-mcp-interface]
-[warning] High coupling (0.51) — 58 imports target "prd-analysis-core" [cli-mcp-interface]
+[warning] High coupling (0.53) — 58 imports target "prd-analysis-core" [cli-mcp-interface]
 [warning] Reverse imports from prd-analysis-core back into the cli zone (35 imports) break the expected CLI→Domain dependency direction. Extract any shared utilities or types into a neutral module to restore layering. [cli-mcp-interface]
-[warning] High coupling (0.6) — 3 imports target "prd-analysis-core" [fix-command]
+[warning] High coupling (0.75) — 3 imports target "prd-analysis-core" [fix-command]
+[warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone [fix-command]
 [warning] Coupling at 0.6 sits at the warning threshold; confirm src/core/fix.ts imports are limited to the immediate domain and do not pull in broad tree or sync utilities. [fix-command]
 [warning] Bidirectional coupling: "cli-mcp-interface" ↔ "prd-analysis-core" (58+35 crossings) — consider extracting shared interface
 [warning] Fan-in hotspot: src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
@@ -80,49 +81,42 @@ Most imported:
 [warning] With 69 files and 25 entry points, this zone is the dependency hub of the system. High fan-in from cli, core, store, and unit zones means changes here have wide blast radius — consider treating public API surface (schema/index.ts, analyze/index.ts) as a formal contract. [prd-analysis-core]
 [warning] 9 entry points — wide API surface, consider consolidating exports [prd-storage-adapters]
 [warning] 24 entry points — wide API surface, consider consolidating exports [prd-tree-lifecycle]
+[warning] High coupling (0.54) — 67 imports target "prd-analysis-core" [prd-tree-lifecycle]
 [warning] 67 imports from this zone into unit-analyze combined with 18 reverse imports creates a near-cycle between the two largest zones; shared types should be owned at a lower layer to eliminate the reverse dependency. [prd-tree-lifecycle]
-[warning] High coupling (0.53) — 23 imports target "prd-analysis-core" [recommendation-scanning]
-[warning] Bidirectional imports with unit-analyze (12 outbound, 23 inbound) indicate shared state or shared types that haven't been cleanly factored into a neutral boundary module. [recommendation-scanning]
-[warning] Cohesion at 0.47 is at the warning threshold — the mix of CLI command (recommend.ts), domain service (create-from-recommendations.ts), and utility files (conflict-detection.ts) suggests this zone blends layers that could be separated. [recommendation-scanning]
-... +39 more
+[warning] High coupling (0.67) — 23 imports target "prd-analysis-core" [recommendation-scanning]
+... +34 more
 
 </findings>
 
 <next-steps>
 
-[high] Fan-in hotspot: src/schema/index.ts receives calls from 22 files — high-impact …
-  category: refactor
 [high] prd-analysis-core has zero unidirectional dependencies — al… (+3 related)
   files: src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts
   category: fix
-[high] validate.ts has no unit-test counterpart in its zone; cover… (+1 related)
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
-  category: extract
+[high] Fan-in hotspot: src/schema/index.ts receives calls from 22 files — high-impact …
+  category: refactor
+[high] acknowledge.ts, extract.ts, reconcile.ts, and scanners.ts r… (+1 related)
+  files: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts
+  category: refactor
 [high] prd-tree-lifecycle participates in bidirectional coupling w… (+1 related)
   files: src/cli/commands/health.ts, src/cli/commands/reorganize.ts, src/core/analytics.ts
   category: fix
-[high] Zone "Schema Validation" (schema-validation) has catastrophic risk (score: 0.71…
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
+[high] Zone "Task Selection & Scoring" (task-selection) has catastrophic risk (score: …
+  files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
   category: fix
-[high] validate.ts is the sole production file in a 15-test-file E2E cluster, with no …
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
+[high] High coupling (0.83) — 7 imports target "prd-analysis-core"
+  files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
   category: refactor
-[high] Zone health metrics for schema-validation are unreliable as structural indicato…
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
+[high] Low cohesion (0.17) — files are loosely related, consider splitting this zone
+  files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
   category: refactor
-[high] High coupling (0.71) — 1 imports target "prd-analysis-core"
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
+[high] Zone "Fix Command Pipeline" (fix-command) has catastrophic risk (score: 0.75, c…
+  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
+  category: fix
+[high] High coupling (0.75) — 3 imports target "prd-analysis-core"
+  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
   category: refactor
-[high] Low cohesion (0.29) — files are loosely related, consider splitting this zone
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
-  category: refactor
-[high] Cohesion 0.29 / coupling 0.71 exceed warning thresholds but are architecturally…
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
-  category: refactor
-[high] src/schema/validate.ts being grouped with E2E tests rather than the core zone s…
-  files: src/schema/validate.ts, tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts
-  category: refactor
-[high] High coupling (0.6) — 3 imports target "prd-analysis-core"
+[high] Low cohesion (0.25) — files are loosely related, consider splitting this zone
   files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
   category: refactor
 [high] Coupling at 0.6 sits at the warning threshold; confirm src/core/fix.ts imports …
@@ -131,8 +125,14 @@ Most imported:
 [high] recommendation-scanning is the only zone with both cohesion below 0.5 and coupl…
   files: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts
   category: fix
-[high] cli-mcp-interface participates in bidirectional coupling with three separate zo…
-  files: src/analyze/reshape-reason.ts, src/cli/commands/adapter.ts, src/cli/commands/chunked-review-state.ts
-  category: fix
+[high] recommendation-scanning participates in bidirectional coupling with both prd-an…
+  files: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts
+  category: extract
+[high] Zone "Recommendation Scanning" (recommendation-scanning) has critical risk (sco…
+  files: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts
+  category: refactor
+[high] High coupling (0.67) — 23 imports target "prd-analysis-core"
+  files: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts
+  category: refactor
 
 </next-steps>

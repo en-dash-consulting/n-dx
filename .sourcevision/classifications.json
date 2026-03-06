@@ -4113,17 +4113,9 @@
     },
     {
       "path": "packages/sourcevision/src/analyzers/zones.ts",
-      "archetype": "service",
-      "confidence": 0.7,
-      "source": "llm",
-      "evidence": [
-        {
-          "archetypeId": "service",
-          "signalKind": "path",
-          "detail": "Core Louvain-based zone detection analyzer — main business logic orchestration for architectural zone analysis.",
-          "weight": 0.7
-        }
-      ]
+      "archetype": null,
+      "confidence": 0,
+      "source": "algorithmic"
     },
     {
       "path": "packages/sourcevision/src/cli/commands/analyze-phases.ts",
@@ -5610,6 +5602,20 @@
       ]
     },
     {
+      "path": "packages/web/src/viewer/components/prd-tree/facet-filter.ts",
+      "archetype": "component",
+      "confidence": 0.6,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "component",
+          "signalKind": "directory",
+          "detail": "path contains \"/components/\"",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
       "path": "packages/web/src/viewer/components/prd-tree/index.ts",
       "archetype": "entrypoint",
       "secondaryArchetypes": [
@@ -5885,6 +5891,20 @@
       ]
     },
     {
+      "path": "packages/web/src/viewer/components/prd-tree/tree-search.ts",
+      "archetype": "component",
+      "confidence": 0.6,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "component",
+          "signalKind": "directory",
+          "detail": "path contains \"/components/\"",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
       "path": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
       "archetype": "component",
       "confidence": 0.6,
@@ -6133,6 +6153,20 @@
     },
     {
       "path": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+      "archetype": "hook",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "hook",
+          "signalKind": "directory",
+          "detail": "path contains \"/hooks/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "packages/web/src/viewer/hooks/use-facet-state.ts",
       "archetype": "hook",
       "confidence": 0.8,
       "source": "algorithmic",
@@ -7453,11 +7487,11 @@
     }
   ],
   "summary": {
-    "totalClassified": 483,
-    "totalUnclassified": 0,
+    "totalClassified": 485,
+    "totalUnclassified": 1,
     "byArchetype": {
       "entrypoint": 37,
-      "service": 96,
+      "service": 95,
       "config": 8,
       "cli-command": 49,
       "utility": 107,
@@ -7466,13 +7500,13 @@
       "schema": 12,
       "store": 21,
       "route-handler": 20,
-      "component": 60,
-      "hook": 24,
+      "component": 62,
+      "hook": 25,
       "page": 28
     },
     "bySource": {
-      "llm": 185,
-      "algorithmic": 298
+      "llm": 184,
+      "algorithmic": 302
     }
   }
 }

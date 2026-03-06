@@ -24,14 +24,14 @@
     "packages/web/src/viewer/components/elapsed-time.ts",
     "packages/web/src/viewer/views/task-audit.ts"
   ],
-  "cohesion": 0.79,
-  "coupling": 0.21,
+  "cohesion": 0.77,
+  "coupling": 0.23,
   "fileCount": 16,
   "lineCount": 3352,
   "riskMetrics": {
-    "cohesion": 0.79,
-    "coupling": 0.21,
-    "riskScore": 0.20999999999999996,
+    "cohesion": 0.77,
+    "coupling": 0.23,
+    "riskScore": 0.22999999999999998,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

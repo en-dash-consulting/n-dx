@@ -11,15 +11,15 @@
   "entryPoints": [
     "src/cli/commands/fix.ts"
   ],
-  "cohesion": 0.4,
-  "coupling": 0.6,
+  "cohesion": 0.25,
+  "coupling": 0.75,
   "fileCount": 4,
   "lineCount": 1230,
   "riskMetrics": {
-    "cohesion": 0.4,
-    "coupling": 0.6,
-    "riskScore": 0.6,
-    "riskLevel": "healthy",
-    "failsThreshold": false
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
   }
 }

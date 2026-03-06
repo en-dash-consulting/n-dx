@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/unit/schema (`hench/unit/schema`)
-Files: 5, Cohesion: 0.47, Coupling: 0.53
+Files: 5, Cohesion: 0.38, Coupling: 0.63
 Description: 5 files, primarily TypeScript
 Entry points: packages/hench/src/cli/commands/template.ts, packages/hench/src/schema/templates.ts
 Lines: 1061

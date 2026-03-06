@@ -23,15 +23,15 @@
   "entryPoints": [
     "packages/rex/src/schema/validate.ts"
   ],
-  "cohesion": 0.29,
-  "coupling": 0.71,
+  "cohesion": 1,
+  "coupling": 0,
   "fileCount": 16,
-  "lineCount": 3609,
+  "lineCount": 3603,
   "riskMetrics": {
-    "cohesion": 0.29,
-    "coupling": 0.71,
-    "riskScore": 0.71,
-    "riskLevel": "catastrophic",
-    "failsThreshold": true
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
   }
 }

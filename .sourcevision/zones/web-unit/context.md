@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Web Unit (`web-unit`)
-Files: 6, Cohesion: 0.50, Coupling: 0.50
-Risk: healthy (score: 0.50)
+Files: 6, Cohesion: 0.25, Coupling: 0.75
+Risk: catastrophic (score: 0.75)
 Description: 5 files, primarily TypeScript
 Entry points: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts
 Lines: 1561
@@ -38,22 +38,32 @@ Incoming (other zones → this zone):
 
 </imports>
 
+<findings>
+
+[observation] [warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone
+[suggestion] [critical] Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention
+
+</findings>
+
 <insights>
 
-- Cohesion of 0.5 is borderline — websocket.ts and ws-health-tracker.ts are related but serve distinct concerns (transport vs. health monitoring) and could eventually split
-- The boundary-check test file suggests edge-case coverage for connection limits or threshold behavior, indicating active reliability engineering in this layer
-- High coupling (0.5) relative to zone size (6 files) signals that these services are tightly consumed by the main dashboard zone and should not be refactored in isolation
-- Cohesion of 0.5 is at the low boundary — if the WebSocket transport and health tracker diverge in responsibilities over time, splitting them into separate zones would improve clarity.
-- Four test files for two source files indicates thorough coverage of the real-time transport layer, which is a reliability-sensitive component.
-- Coupling of 0.5 with 6 imports from web-dashboard-application means changes here can ripple broadly; a stable interface contract (e.g., an explicit export surface) would reduce breakage risk.
-- No lateral imports to task-usage-analytics or prd-analysis-input-panels despite all three being wired into the same hub — the real-time transport layer correctly avoids depending on analytics or UI panel concerns
-- Spoke isolation is intact: the WebSocket layer does not import from other satellite zones. Given its high coupling (0.5) to web-dashboard-application, any future extraction of the WebSocket interface should target the hub boundary, not lateral zone relationships.
-- boundary-check.test.ts does not follow the naming convention of the other three test files (which are named after their subject: websocket.test.ts, ws-health-tracker.test.ts, ws-health-integration.test.ts) — its generic name suggests it may be testing cross-zone contracts or package-level boundaries rather than WebSocket-specific behavior
-- boundary-check.test.ts is likely a misplaced file: its name implies cross-zone or package-boundary testing rather than WebSocket infrastructure behavior. If it imports from zones outside websocket-health-infrastructure, it belongs in an integration or e2e test directory, not collocated with the WebSocket unit tests.
-- This is the only zone in the entire codebase that simultaneously satisfies the fragile-zone risk profile defined in the severity guide: cohesion ≤ 0.63 (actual: 0.5) AND coupling ≥ 0.38 (actual: 0.5). Every other zone with high coupling also has high cohesion, and every other low-cohesion zone has low coupling. This zone is uniquely fragile by both measures at once.
-- The zone name 'websocket-health-infrastructure' inverts the actual importance of its members: websocket.ts is the core real-time transport (primary concern), while ws-health-tracker.ts is a monitoring layer built on top of it (secondary concern). The name emphasizes the secondary concern and obscures the primary one, making the zone harder to discover and reason about.
-- Zone satisfies both fragile-zone conditions simultaneously (cohesion 0.5, coupling 0.5) — the only such zone in the codebase. Treat as a warning-priority refactor target: either split websocket.ts (transport) from ws-health-tracker.ts (monitoring) into separate zones, or document an explicit stability contract for the combined surface to prevent further cohesion degradation.
-- Rename zone from 'websocket-health-infrastructure' to 'websocket-transport' or 'realtime-transport-layer' to reflect that the WebSocket transport is the primary concern and health tracking is a secondary overlay. Current name causes the zone to be mis-scoped in any zone-listing context.
+- Low cohesion (0.25) — files are loosely related, consider splitting this zone
+- Cohesion (0.5) and coupling (0.5) are borderline — the 6 inbound imports from dashboard-mcp-server dominate this zone's coupling profile and suggest it should live inside that zone
+- Four test files for two source files indicates thorough test coverage of the real-time layer, including a boundary-check test for edge cases
+- The ws-health-integration test suggests there is meaningful stateful interaction between the WebSocket server and health tracker worth preserving as the zone grows
+- Coupling of 0.5 driven by 6 imports from dashboard-mcp-server suggests this cluster is a natural sub-module of that zone rather than an independent architectural boundary.
+- Four test files covering two source modules, including an integration test, reflects strong testing discipline for the real-time communication layer.
+- boundary-check.test.ts is a useful safety net for WebSocket edge cases; ensure it covers reconnection and graceful shutdown scenarios.
+- Unlike task-usage-tracking, websocket-realtime-layer has zero outgoing inter-zone imports despite being a functional service zone — it is a pure downstream consumer and forms a clean unidirectional dependency with dashboard-mcp-server
+- The contrast between websocket-realtime-layer (clean directional) and task-usage-tracking (cyclic) illustrates two distinct coupling anti-patterns that emerged from the same community detection pass
+- websocket-realtime-layer has 6 inbound imports from dashboard-mcp-server and 0 outgoing — it is a pure downstream leaf. This is architecturally clean; the only concern is whether the community detection boundary reflects a real architectural seam or is an artifact of graph partitioning.
+- boundary-check.test.ts is named for cross-zone boundary behavior rather than a specific unit, suggesting it may be testing interactions that span websocket.ts and server infrastructure owned by dashboard-mcp-server — if so, it is a misplaced integration test masquerading as a unit test
+- The zone has 4 test files but 0 outgoing inter-zone imports, meaning all 6 inbound imports from dashboard-mcp-server are one-directional — this pure-leaf status means the zone could be promoted to a sub-zone of dashboard-mcp-server with zero restructuring of production code, only test file moves
+- boundary-check.test.ts is co-located in the unit test directory but its name implies cross-boundary integration behavior — if it exercises interactions between websocket.ts and dashboard-mcp-server internals it belongs in an integration test directory to prevent false confidence in unit isolation
+- websocket-realtime-layer has cohesion 0.5 AND coupling 0.5 — it meets the dual fragility criterion (both below 0.6 and both non-trivial), making it the second highest-risk zone by the combined fragility metric alongside task-usage-tracking
+- ws-health-tracker.ts is a cross-cutting health/monitoring concern; co-locating it with the WebSocket transport implementation (websocket.ts) couples two orthogonal responsibilities in one zone — health tracking is conceptually closer to the metrics infrastructure in dashboard-mcp-server than to WebSocket I/O
+- websocket-realtime-layer has both cohesion 0.5 and coupling 0.5 — the dual fragility threshold described in the severity guide. ws-health-tracker.ts (monitoring concern) and websocket.ts (transport concern) are orthogonal responsibilities. Either absorb this zone into dashboard-mcp-server as a sub-zone (eliminating the 6 inbound import edges) or split ws-health-tracker.ts into the metrics infrastructure alongside concurrent-execution-metrics.ts.
+- ws-health-integration.test.ts is located in tests/unit/server/ but its name declares it as an integration test. This placement gives false unit-test confidence in CI: if it exercises cross-boundary behavior between websocket.ts and dashboard-mcp-server infrastructure, a unit test failure in isolation may not reproduce in the full integration run. Move it to tests/integration/server/.
 - [call graph] 76 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)
 
 </insights>

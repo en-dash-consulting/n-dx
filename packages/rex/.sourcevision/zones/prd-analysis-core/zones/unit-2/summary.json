@@ -10,8 +10,8 @@
   "entryPoints": [
     "src/analyze/guided.ts"
   ],
-  "cohesion": 0.33,
-  "coupling": 0.67,
+  "cohesion": 1,
+  "coupling": 0,
   "fileCount": 3,
   "lineCount": 711
 }

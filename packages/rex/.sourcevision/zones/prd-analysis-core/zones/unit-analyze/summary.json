@@ -12,8 +12,8 @@
     "src/analyze/dedupe.ts",
     "src/cli/commands/smart-add-duplicates.ts"
   ],
-  "cohesion": 0.33,
-  "coupling": 0.67,
+  "cohesion": 0.22,
+  "coupling": 0.78,
   "fileCount": 4,
   "lineCount": 1577
 }

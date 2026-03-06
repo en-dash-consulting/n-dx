@@ -61,9 +61,11 @@
         "src/core/stats.ts",
         "src/core/token-usage.ts"
       ],
-      "cohesion": 0.49,
-      "coupling": 0.51,
+      "cohesion": 0.47,
+      "coupling": 0.53,
       "insights": [
+        "High coupling (0.53) — 58 imports target \"prd-analysis-core\"",
+        "13 entry points — wide API surface, consider consolidating exports",
         "High coupling (0.51) — 58 imports target \"prd-analysis-core\"",
         "13 entry points — wide API surface, consider consolidating exports",
         "The bidirectional import relationship with prd-analysis-core (58 outbound, 35 inbound) is an architectural red flag — CLI should depend on domain, but domain importing from CLI suggests shared utilities or types that should be extracted to a neutral foundation layer.",
@@ -87,9 +89,9 @@
         "[call graph] 1547 internal calls, 202 outgoing, 349 incoming (cohesion: 0.88, coupling: 0.12)"
       ],
       "riskMetrics": {
-        "cohesion": 0.49,
-        "coupling": 0.51,
-        "riskScore": 0.51,
+        "cohesion": 0.47,
+        "coupling": 0.53,
+        "riskScore": 0.53,
         "riskLevel": "healthy",
         "failsThreshold": false
       }
@@ -107,9 +109,11 @@
       "entryPoints": [
         "src/cli/commands/fix.ts"
       ],
-      "cohesion": 0.4,
-      "coupling": 0.6,
+      "cohesion": 0.25,
+      "coupling": 0.75,
       "insights": [
+        "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
+        "High coupling (0.75) — 3 imports target \"prd-analysis-core\"",
         "High coupling (0.6) — 3 imports target \"prd-analysis-core\"",
         "Production files src/cli/commands/fix.ts and src/core/fix.ts are tightly paired — the test files mirror this structure, making the zone naturally cohesive despite mixing production and test content.",
         "At the boundary of warning thresholds (cohesion: 0.4, coupling: 0.6), verify that src/core/fix.ts does not reach broadly into unrelated domain modules.",
@@ -124,11 +128,11 @@
         "[call graph] 136 internal calls, 15 outgoing, 1 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
-        "cohesion": 0.4,
-        "coupling": 0.6,
-        "riskScore": 0.6,
-        "riskLevel": "healthy",
-        "failsThreshold": false
+        "cohesion": 0.25,
+        "coupling": 0.75,
+        "riskScore": 0.75,
+        "riskLevel": "catastrophic",
+        "failsThreshold": true
       }
     },
     {
@@ -233,8 +237,8 @@
         "src/schema/v1.ts",
         "src/store/project-config.ts"
       ],
-      "cohesion": 0.52,
-      "coupling": 0.48,
+      "cohesion": 0.5,
+      "coupling": 0.5,
       "subCrossings": [
         {
           "from": "src/analyze/index.ts",
@@ -546,8 +550,8 @@
             "src/schema/v1.ts",
             "src/store/project-config.ts"
           ],
-          "cohesion": 0.84,
-          "coupling": 0.16,
+          "cohesion": 0.87,
+          "coupling": 0.13,
           "depth": 1,
           "subCrossings": [
             {
@@ -895,8 +899,8 @@
                 "src/cli/validate-input.ts",
                 "src/store/project-config.ts"
               ],
-              "cohesion": 0.83,
-              "coupling": 0.17,
+              "cohesion": 0.82,
+              "coupling": 0.18,
               "depth": 2
             },
             {
@@ -951,8 +955,8 @@
                 "src/schema/levels.ts",
                 "src/schema/v1.ts"
               ],
-              "cohesion": 0.19,
-              "coupling": 0.81,
+              "cohesion": 0.29,
+              "coupling": 0.71,
               "depth": 2
             }
           ]
@@ -969,8 +973,8 @@
           "entryPoints": [
             "src/analyze/guided.ts"
           ],
-          "cohesion": 0.33,
-          "coupling": 0.67,
+          "cohesion": 1,
+          "coupling": 0,
           "depth": 1
         },
         {
@@ -987,8 +991,8 @@
             "src/analyze/dedupe.ts",
             "src/cli/commands/smart-add-duplicates.ts"
           ],
-          "cohesion": 0.33,
-          "coupling": 0.67,
+          "cohesion": 0.22,
+          "coupling": 0.78,
           "depth": 1
         },
         {
@@ -1012,8 +1016,8 @@
             "src/cli/commands/validate.ts",
             "src/core/structural.ts"
           ],
-          "cohesion": 0.77,
-          "coupling": 0.23,
+          "cohesion": 0.63,
+          "coupling": 0.38,
           "depth": 1
         }
       ],
@@ -1042,9 +1046,9 @@
         "[call graph] 2450 internal calls, 296 outgoing, 202 incoming (cohesion: 0.89, coupling: 0.11)"
       ],
       "riskMetrics": {
-        "cohesion": 0.52,
-        "coupling": 0.48,
-        "riskScore": 0.48,
+        "cohesion": 0.5,
+        "coupling": 0.5,
+        "riskScore": 0.5,
         "riskLevel": "healthy",
         "failsThreshold": false
       }
@@ -1089,8 +1093,8 @@
         "src/store/integration-schemas/jira.ts",
         "src/store/integration-schemas/notion.ts"
       ],
-      "cohesion": 0.6,
-      "coupling": 0.4,
+      "cohesion": 0.5,
+      "coupling": 0.5,
       "insights": [
         "9 entry points — wide API surface, consider consolidating exports",
         "Cohesion of 0.6 is the highest in this batch — the adapter registry, contracts, integration schemas, and sync CLI are tightly unified around a single storage abstraction, making this the healthiest structural unit.",
@@ -1107,9 +1111,9 @@
         "[call graph] 231 internal calls, 48 outgoing, 57 incoming (cohesion: 0.83, coupling: 0.17)"
       ],
       "riskMetrics": {
-        "cohesion": 0.6,
-        "coupling": 0.4,
-        "riskScore": 0.4,
+        "cohesion": 0.5,
+        "coupling": 0.5,
+        "riskScore": 0.5,
         "riskLevel": "healthy",
         "failsThreshold": false
       }
@@ -1194,9 +1198,11 @@
         "src/core/verify.ts",
         "src/public.ts"
       ],
-      "cohesion": 0.51,
-      "coupling": 0.49,
+      "cohesion": 0.46,
+      "coupling": 0.54,
       "insights": [
+        "High coupling (0.54) — 67 imports target \"prd-analysis-core\"",
+        "24 entry points — wide API surface, consider consolidating exports",
         "24 entry points — wide API surface, consider consolidating exports",
         "With 24 entry points and 48 files this is the broadest domain zone — health.ts, sync-engine.ts, and analytics.ts are architecturally distinct from tree mutation and could be extracted into focused sub-zones to improve cohesion.",
         "public.ts as an entry point signals this zone defines the package's outward API surface; changes here have downstream impact on hench and web consumers and warrant extra care.",
@@ -1214,9 +1220,9 @@
         "[call graph] 1596 internal calls, 108 outgoing, 127 incoming (cohesion: 0.94, coupling: 0.06)"
       ],
       "riskMetrics": {
-        "cohesion": 0.51,
-        "coupling": 0.49,
-        "riskScore": 0.49,
+        "cohesion": 0.46,
+        "coupling": 0.54,
+        "riskScore": 0.54,
         "riskLevel": "healthy",
         "failsThreshold": false
       }
@@ -1287,9 +1293,11 @@
         "src/cli/commands/recommend.ts",
         "src/recommend/create-from-recommendations.ts"
       ],
-      "cohesion": 0.47,
-      "coupling": 0.53,
+      "cohesion": 0.33,
+      "coupling": 0.67,
       "insights": [
+        "Low cohesion (0.33) — files are loosely related, consider splitting this zone",
+        "High coupling (0.67) — 23 imports target \"prd-analysis-core\"",
         "High coupling (0.53) — 23 imports target \"prd-analysis-core\"",
         "At cohesion 0.47 and coupling 0.53, this zone sits at the boundary — files here straddle recommendation logic and general analysis utilities, which explains the moderate scores.",
         "The 23 imports from unit-analyze and 12 exports back to unit-analyze suggest this zone is tightly paired with the core analysis pipeline and may benefit from merging or clearer interface contracts.",
@@ -1310,11 +1318,11 @@
         "[call graph] 663 internal calls, 72 outgoing, 4 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
-        "cohesion": 0.47,
-        "coupling": 0.53,
-        "riskScore": 0.53,
-        "riskLevel": "healthy",
-        "failsThreshold": false
+        "cohesion": 0.33,
+        "coupling": 0.67,
+        "riskScore": 0.6699999999999999,
+        "riskLevel": "critical",
+        "failsThreshold": true
       }
     },
     {
@@ -1370,9 +1378,12 @@
       "entryPoints": [
         "src/schema/validate.ts"
       ],
-      "cohesion": 0.29,
-      "coupling": 0.71,
+      "cohesion": 1,
+      "coupling": 0,
       "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Low cohesion (0) — files are loosely related, consider splitting this zone",
+        "High coupling (1) — 2 imports target \"prd-analysis-core\"",
         "Low cohesion (0.29) — files are loosely related, consider splitting this zone",
         "High coupling (0.71) — 1 imports target \"prd-analysis-core\"",
         "src/schema/validate.ts is the sole production file grouped with 15 test files — per the '-tests' naming convention the zone is named after its production domain (schema validation) rather than its test content.",
@@ -1390,14 +1401,14 @@
         "schema-validation has the worst combined metrics in the codebase (cohesion 0.29, coupling 0.71) yet is not immediately actionable because the metrics reflect test-file inclusion artifacts rather than production coupling — flagging it as a structural risk without qualifying this distinction would lead to misguided refactoring effort.",
         "Zone health metrics for schema-validation are unreliable as structural indicators because 15 of 16 files are E2E tests whose cross-CLI imports are expected behavior, not defects. Exclude E2E test files from zone coupling calculations or track them in a separate test-zone metric to avoid false positive warnings.",
         "validate.ts is named with the 'validate' verb prefix while its zone is named 'schema-validation' — the zone name uses a noun-phrase pattern while the file uses a verb pattern. Align to one convention: either schema-validator.ts (noun) or keep validate.ts and rename the zone to 'schema-validate' for verb-object consistency with 'fix-command'.",
-        "[call graph] 309 internal calls, 1 outgoing, 22 incoming (cohesion: 1, coupling: 0)"
+        "[call graph] 314 internal calls, 1 outgoing, 22 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
-        "cohesion": 0.29,
-        "coupling": 0.71,
-        "riskScore": 0.71,
-        "riskLevel": "catastrophic",
-        "failsThreshold": true
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
       }
     },
     {
@@ -1417,9 +1428,11 @@
         "src/cli/commands/next.ts",
         "src/core/next-task.ts"
       ],
-      "cohesion": 0.41,
-      "coupling": 0.59,
+      "cohesion": 0.17,
+      "coupling": 0.83,
       "insights": [
+        "Low cohesion (0.17) — files are loosely related, consider splitting this zone",
+        "High coupling (0.83) — 7 imports target \"prd-analysis-core\"",
         "High coupling (0.59) — 7 imports target \"prd-analysis-core\"",
         "Five dedicated test files covering scoring, matching, filtering, and requirements prioritization reflect strong coverage for a decision-critical algorithm — a healthy engineering pattern.",
         "next-task.ts and its CLI wrapper are the only production files, keeping the zone focused despite mixing production and test code.",
@@ -1432,11 +1445,11 @@
         "[call graph] 444 internal calls, 24 outgoing, 4 incoming (cohesion: 0.95, coupling: 0.05)"
       ],
       "riskMetrics": {
-        "cohesion": 0.41,
-        "coupling": 0.59,
-        "riskScore": 0.5900000000000001,
-        "riskLevel": "healthy",
-        "failsThreshold": false
+        "cohesion": 0.17,
+        "coupling": 0.83,
+        "riskScore": 0.83,
+        "riskLevel": "catastrophic",
+        "failsThreshold": true
       }
     }
   ],
@@ -3674,6 +3687,12 @@
       "toZone": "prd-tree-lifecycle"
     },
     {
+      "from": "src/schema/validate.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "schema-validation",
+      "toZone": "prd-analysis-core"
+    },
+    {
       "from": "tests/e2e/cli-init.test.ts",
       "to": "src/schema/v1.ts",
       "fromZone": "schema-validation",
@@ -3784,6 +3803,8 @@
     "Bidirectional coupling: \"cli-mcp-interface\" ↔ \"task-selection\" (2+2 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"cli-mcp-interface\" ↔ \"fix-command\" (1+2 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"cli-mcp-interface\" ↔ \"recommendation-scanning\" (1+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"prd-analysis-core\" ↔ \"schema-validation\" (1+2 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 69 files vs smallest with 4 — uneven decomposition",
     "Bidirectional coupling: \"prd-analysis-core\" ↔ \"schema-validation\" (1+1 crossings) — consider extracting shared interface",
     "Size imbalance: largest zone has 69 files vs smallest with 4 — uneven decomposition",
     "The most significant architectural issue in this batch is the bidirectional coupling between cli and prd-analysis-core (93 total cross-imports in both directions) and between core and prd-analysis-core (85 total) — these pairs behave more like merged zones than layered ones.",
@@ -3861,7 +3882,7 @@
       "type": "observation",
       "pass": 0,
       "scope": "cli-mcp-interface",
-      "text": "High coupling (0.51) — 58 imports target \"prd-analysis-core\"",
+      "text": "High coupling (0.53) — 58 imports target \"prd-analysis-core\"",
       "severity": "warning"
     },
     {
@@ -3882,7 +3903,14 @@
       "type": "observation",
       "pass": 0,
       "scope": "fix-command",
-      "text": "High coupling (0.6) — 3 imports target \"prd-analysis-core\"",
+      "text": "High coupling (0.75) — 3 imports target \"prd-analysis-core\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "fix-command",
+      "text": "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
       "severity": "warning"
     },
     {
@@ -3984,6 +4012,13 @@
     },
     {
       "type": "observation",
+      "pass": 0,
+      "scope": "prd-tree-lifecycle",
+      "text": "High coupling (0.54) — 67 imports target \"prd-analysis-core\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
       "pass": 1,
       "scope": "prd-tree-lifecycle",
       "text": "67 imports from this zone into unit-analyze combined with 18 reverse imports creates a near-cycle between the two largest zones; shared types should be owned at a lower layer to eliminate the reverse dependency.",
@@ -4021,7 +4056,14 @@
       "type": "observation",
       "pass": 0,
       "scope": "recommendation-scanning",
-      "text": "High coupling (0.53) — 23 imports target \"prd-analysis-core\"",
+      "text": "High coupling (0.67) — 23 imports target \"prd-analysis-core\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "recommendation-scanning",
+      "text": "Low cohesion (0.33) — files are loosely related, consider splitting this zone",
       "severity": "warning"
     },
     {
@@ -4056,42 +4098,21 @@
       "type": "observation",
       "pass": 0,
       "scope": "schema-validation",
-      "text": "High coupling (0.71) — 1 imports target \"prd-analysis-core\"",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "schema-validation",
-      "text": "Low cohesion (0.29) — files are loosely related, consider splitting this zone",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "schema-validation",
-      "text": "Cohesion 0.29 / coupling 0.71 exceed warning thresholds but are architecturally expected for E2E suites — the underlying issue is src/schema/validate.ts being pulled into a test-dominated cluster rather than a production one.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "schema-validation",
-      "text": "Wide E2E coverage across adapter, analyze, import, init, prune, and recommend commands is a healthy sign of end-to-end test investment in the CLI surface.",
+      "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "schema-validation",
-      "text": "src/schema/validate.ts being grouped with E2E tests rather than the core zone suggests it is primarily exercised by tests; verify it is also imported from production paths (e.g., rex init or add commands) to confirm correct architectural placement.",
+      "pass": 0,
+      "scope": "task-selection",
+      "text": "High coupling (0.83) — 7 imports target \"prd-analysis-core\"",
       "severity": "warning"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "task-selection",
-      "text": "High coupling (0.59) — 7 imports target \"prd-analysis-core\"",
+      "text": "Low cohesion (0.17) — files are loosely related, consider splitting this zone",
       "severity": "warning"
     },
     {
@@ -4145,48 +4166,6 @@
     },
     {
       "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Document the alias-to-zone-ID mapping (unit-analyze=prd-analysis-core, core=prd-tree-lifecycle, store=prd-storage-adapters, cli=cli-mcp-interface) in the sourcevision CONTEXT.md or zone metadata. Without this mapping, cross-zone import counts in reports are ambiguous.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Establish an intra-package gateway convention mirroring the inter-package gateway pattern in CLAUDE.md: each zone exposes a single index.ts barrel, and all cross-zone imports within rex must go through that barrel. This makes zone API surfaces explicit and enforceable by lint rule without requiring a full monorepo split.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Standardize zone naming to a single noun-phrase convention matching the production domain purpose. Current mixed conventions (verb-object, noun-phrase, domain-layer compound) make the zone map inconsistent and reduce its utility as a navigation aid. Proposed: fix-command → 'prd-fix', task-selection → 'task-selection' (already correct), schema-validation → 'schema-validation' (already noun-phrase, but the 'validation' suffix differs from 'fix-command' verb pattern). Document the chosen convention in CLAUDE.md alongside the zone topology rules.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "The four-tier hierarchy (Orchestration → Execution → Domain → Foundation) documented in CLAUDE.md has no corresponding zone below the current domain tier to absorb shared types. The missing Foundation zone means cross-domain type sharing is achieved by importing from peer or upper zones, which is the structural root cause of all confirmed architectural inversions. Adding a src/foundation/ zone as the lowest tier — containing only types, constants, and zero logic — would make the four-tier model mechanically enforceable with import boundary linting.",
-      "severity": "critical"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "The two dual-threshold fragile zones (recommendation-scanning, cli-mcp-interface) share a bidirectional import relationship. Refactor them together in a single pass rather than sequentially: extract their shared types into a neutral boundary module, then sever the bidirectional links from both sides simultaneously.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "The zone health scoring model (cohesion/coupling) does not distinguish test-file imports from production-file imports. This causes systematic false positives for zones with strong unit test coverage. Before acting on any coupling warning for zones containing unit or E2E test files, decompose the coupling score into test-only and production-only contributions to confirm the warning is from production coupling rather than test coverage density.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
       "pass": 0,
       "scope": "global",
       "text": "Hub function: walkTree in src/core/tree.ts is called from 29 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
@@ -4196,6 +4175,18 @@
         "src/analyze/diff.ts",
         "src/analyze/reason.ts",
         "src/analyze/reconcile.ts"
+      ]
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "global",
+      "text": "3 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): task-selection, fix-command, recommendation-scanning — mandatory refactoring recommended before further development",
+      "severity": "warning",
+      "related": [
+        "task-selection",
+        "fix-command",
+        "recommendation-scanning"
       ]
     },
     {
@@ -4255,6 +4246,13 @@
       "severity": "critical"
     },
     {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "recommendation-scanning",
+      "text": "Zone \"Recommendation Scanning\" (recommendation-scanning) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
+      "severity": "warning"
+    },
+    {
       "type": "pattern",
       "pass": 2,
       "scope": "cli-mcp-interface",
@@ -4274,13 +4272,6 @@
       "scope": "prd-tree-lifecycle",
       "text": "prd-tree-lifecycle participates in bidirectional coupling with four other zones concurrently; no other zone has this many simultaneous bidirectional relationships. This multi-way entanglement makes it impossible to refactor any one relationship without disturbing the others.",
       "severity": "critical"
-    },
-    {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "schema-validation",
-      "text": "validate.ts has no unit-test counterpart in its zone; coverage arrives only through 15 E2E tests. E2E tests validate observable CLI behavior but do not cover internal validation branches — edge-case schema errors may be invisible until they surface in integration paths.",
-      "severity": "warning"
     },
     {
       "type": "relationship",
@@ -4329,13 +4320,6 @@
       "pass": 2,
       "scope": "recommendation-scanning",
       "text": "recommendation-scanning participates in bidirectional coupling with both prd-analysis-core AND prd-tree-lifecycle simultaneously, making it a bridge zone rather than a leaf — changes in either hub ripple through it.",
-      "severity": "warning"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "schema-validation",
-      "text": "The schema-validation zone is structurally decoupled from prd-storage-adapters despite validate.ts likely being called during store write paths. If the two are not directly linked in the import graph, schema enforcement may be applied inconsistently across different persistence codepaths.",
       "severity": "warning"
     },
     {
@@ -4402,13 +4386,6 @@
       "severity": "warning"
     },
     {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "schema-validation",
-      "text": "validate.ts is the sole production file in a 15-test-file E2E cluster, with no unit-test zone pairing and zero cross-imports from prd-storage-adapters despite schema enforcement being a write-path concern. The file is structurally misplaced and its internal logic branches are invisible to unit testing.",
-      "severity": "warning"
-    },
-    {
       "type": "suggestion",
       "pass": 4,
       "scope": "fix-command",
@@ -4421,6 +4398,13 @@
       "scope": "fix-command",
       "text": "Zone name 'fix-command' uses verb-object pattern while 'task-selection' uses noun-phrase pattern — the two leaf command zones have inconsistent naming conventions. Standardize: either both use verb-object ('fix-command', 'next-command') or both use noun-phrase ('issue-fix', 'task-selection').",
       "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "fix-command",
+      "text": "Zone \"Fix Command Pipeline\" (fix-command) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
+      "severity": "critical"
     },
     {
       "type": "suggestion",
@@ -4439,30 +4423,16 @@
     {
       "type": "suggestion",
       "pass": 4,
-      "scope": "schema-validation",
-      "text": "Zone health metrics for schema-validation are unreliable as structural indicators because 15 of 16 files are E2E tests whose cross-CLI imports are expected behavior, not defects. Exclude E2E test files from zone coupling calculations or track them in a separate test-zone metric to avoid false positive warnings.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "schema-validation",
-      "text": "validate.ts is named with the 'validate' verb prefix while its zone is named 'schema-validation' — the zone name uses a noun-phrase pattern while the file uses a verb pattern. Align to one convention: either schema-validator.ts (noun) or keep validate.ts and rename the zone to 'schema-validate' for verb-object consistency with 'fix-command'.",
+      "scope": "task-selection",
+      "text": "Five unit test files for a single production file (next-task.ts) gives strong coverage but also means the test:production file ratio is 5:1. As more scoring scenarios are added, consider whether requirements-prioritization.test.ts and feature-filtered-task.test.ts warrant splitting next-task.ts into focused sub-modules (scorer.ts, filter.ts) to make the zone's production structure match its test structure.",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "schema-validation",
-      "text": "Zone \"Schema Validation\" (schema-validation) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention",
-      "severity": "critical"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
       "scope": "task-selection",
-      "text": "Five unit test files for a single production file (next-task.ts) gives strong coverage but also means the test:production file ratio is 5:1. As more scoring scenarios are added, consider whether requirements-prioritization.test.ts and feature-filtered-task.test.ts warrant splitting next-task.ts into focused sub-modules (scorer.ts, filter.ts) to make the zone's production structure match its test structure.",
-      "severity": "info"
+      "text": "Zone \"Task Selection & Scoring\" (task-selection) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention",
+      "severity": "critical"
     },
     {
       "type": "anti-pattern",
@@ -4499,6 +4469,6 @@
     "prd-tree-lifecycle": "b04eeb35feb92987",
     "task-selection": "dd41dcebe61e336f",
     "prd-storage-adapters": "f2f9f6f3f24b32bb",
-    "schema-validation": "9cd2c33d69d10c82"
+    "schema-validation": "72108ce64909d1b5"
   }
 }

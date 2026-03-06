@@ -13,8 +13,8 @@
   "entryPoints": [
     "packages/hench/src/store/config.ts"
   ],
-  "cohesion": 0.29,
-  "coupling": 0.71,
+  "cohesion": 1,
+  "coupling": 0,
   "fileCount": 6,
   "lineCount": 999
 }

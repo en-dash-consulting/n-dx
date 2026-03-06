@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/guard (`hench/guard`)
-Files: 10, Cohesion: 0.90, Coupling: 0.10
+Files: 10, Cohesion: 0.86, Coupling: 0.14
 Description: 10 files, primarily TypeScript
 Entry points: packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts
 Lines: 1802

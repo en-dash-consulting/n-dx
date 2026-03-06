@@ -59,8 +59,8 @@
     "src/cli/validate-input.ts",
     "src/store/project-config.ts"
   ],
-  "cohesion": 0.83,
-  "coupling": 0.17,
+  "cohesion": 0.82,
+  "coupling": 0.18,
   "fileCount": 36,
   "lineCount": 0
 }

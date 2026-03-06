@@ -18266,6 +18266,7 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-06T18:22:07.771Z",
+      "completedAt": "2026-03-06T18:27:04.517Z",
       "recommendationMeta": {
         "findingHashes": [
           "30b2889a35bd",
@@ -18279,8 +18280,7 @@
           "warning": 5
         },
         "findingCount": 5
-      },
-      "completedAt": "2026-03-06T18:27:04.517Z"
+      }
     },
     {
       "id": "d2a70fe9-3e21-41a6-aca5-7ea4c47e1ac8",
@@ -18408,21 +18408,25 @@
     {
       "id": "d357994f-13c1-488f-b839-0c7b2c710903",
       "title": "Rex UI Task Management Enhancement",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-06T18:30:26.347Z",
+      "completedAt": "2026-03-06T18:30:26.347Z",
       "children": [
         {
           "id": "4068a2f4-c73e-4e7a-b038-0c9d2ad52303",
           "title": "Rex Task Search",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-03-06T18:30:26.261Z",
+          "completedAt": "2026-03-06T18:30:26.261Z",
           "children": [
             {
               "id": "6b7536e1-7c34-4906-be43-74e715c267dc",
               "title": "Limit tag filter options in Rex task search to tags present in the current PRD",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The tag facet selector in the Rex task search area currently shows an unbounded or static list of tag options. It should instead derive its options dynamically from the set of tags actually used across all tasks in the current PRD tree, so users only see relevant, actionable choices. Tags with zero matching tasks in the current view should be omitted or visually disabled.",
               "acceptanceCriteria": [
@@ -18439,7 +18443,9 @@
                 "search",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:27:52.549Z",
+              "completedAt": "2026-03-06T18:30:26.097Z"
             }
           ]
         }
@@ -18448,21 +18454,25 @@
     {
       "id": "d7e35684-e88e-4f57-a231-661a93b290b2",
       "title": "Analyze pipeline improvements",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-06T18:39:02.535Z",
+      "completedAt": "2026-03-06T18:39:02.535Z",
       "children": [
         {
           "id": "35e5b979-bfe3-4025-8445-72711d8686be",
           "title": "Hide completed items by default in status views",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-03-06T18:39:02.444Z",
+          "completedAt": "2026-03-06T18:39:02.444Z",
           "children": [
             {
               "id": "1cf7f490-d6e1-4232-bb90-c9fcbe06a6af",
               "title": "Suppress deleted items from rex status CLI output by default",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Deleted items clutter the rex status tree and provide no actionable signal to the user. The status command should omit items with a 'deleted' status from its default output, matching the existing behavior for completed items. A flag (e.g. --show-deleted or --all) should allow users to opt back in if needed.",
               "acceptanceCriteria": [
@@ -18478,7 +18488,9 @@
                 "rex",
                 "status"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:31:09.396Z",
+              "completedAt": "2026-03-06T18:39:02.245Z"
             }
           ]
         }

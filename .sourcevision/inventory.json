@@ -1,6 +1,16 @@
 {
   "files": [
     {
+      "path": ".github/workflows/ci.yml",
+      "size": 1029,
+      "language": "YAML",
+      "lineCount": 49,
+      "hash": "b1cacfae0beab6537694707f1673f9518c6288131512c9b8d2cfe83fafff3794",
+      "role": "build",
+      "category": ".github",
+      "lastModified": 1772815606118
+    },
+    {
       "path": ".gitignore",
       "size": 138,
       "language": "Other",
@@ -19,6 +29,16 @@
       "role": "other",
       "category": ".hench",
       "lastModified": 1772682844021
+    },
+    {
+      "path": ".hench/locks/45093.lock",
+      "size": 61,
+      "language": "Other",
+      "lineCount": 4,
+      "hash": "2e50a7544d961cc8a554c1191e24e10b86eb18f3beacd8fc229da2f260240fef",
+      "role": "other",
+      "category": ".hench",
+      "lastModified": 1772818169233
     },
     {
       "path": ".npmrc",
@@ -72,13 +92,13 @@
     },
     {
       "path": ".rex/execution-log.jsonl",
-      "size": 30925,
+      "size": 42466,
       "language": "Other",
-      "lineCount": 119,
-      "hash": "5357d94bd0720216985eb32025398eee87fbf1677f18134e20f4521025eee075",
+      "lineCount": 169,
+      "hash": "50482c4db867cba4a4a67d8a2815e8dcff7805cfc3e1b1381cf1b5dbaed2c980",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772783881369
+      "lastModified": 1772818169625
     },
     {
       "path": ".rex/pending-proposals.json",
@@ -92,13 +112,13 @@
     },
     {
       "path": ".rex/prd.json",
-      "size": 904796,
+      "size": 933345,
       "language": "JSON",
-      "lineCount": 17966,
-      "hash": "ec804c94e959fcbbd1ec818cf91d84a4b3445fcc6444d2d9aa8b3774a9ca9f91",
+      "lineCount": 18475,
+      "hash": "ff1c1c93881188f6f153479935f3ef63af75349f3e668880558ace1c4a34c40f",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772783881303
+      "lastModified": 1772818169625
     },
     {
       "path": ".rex/workflow.md",
@@ -147,16 +167,6 @@
       "lineCount": 355,
       "hash": "71d523a1c657fa7e85298f08a97d4f11277843f71e3736d54208553c2eb3d1c7",
       "role": "docs",
-      "category": "root",
-      "lastModified": 1772682844098
-    },
-    {
-      "path": "bitbucket-pipelines.yml",
-      "size": 956,
-      "language": "YAML",
-      "lineCount": 27,
-      "hash": "15153716c85921f14b48696cb5cb2c7bf8fce9b07485d8ade4b619ef4618a22d",
-      "role": "other",
       "category": "root",
       "lastModified": 1772682844098
     },
@@ -3482,13 +3492,13 @@
     },
     {
       "path": "packages/rex/src/schema/validate.ts",
-      "size": 4837,
+      "size": 5027,
       "language": "TypeScript",
-      "lineCount": 172,
-      "hash": "25a896ae0dafc4cd44198c43ed98851d3507f52f7df860af96c0f0dc880ef776",
+      "lineCount": 166,
+      "hash": "836cad5c2291e3964c7446b216263750a6760e4fc4be8183c4af55ac3d36e80b",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844145
+      "lastModified": 1772818271863
     },
     {
       "path": "packages/rex/src/store/adapter-registry.ts",
@@ -5212,13 +5222,13 @@
     },
     {
       "path": "packages/sourcevision/src/analyzers/zones.ts",
-      "size": 62816,
+      "size": 63476,
       "language": "TypeScript",
-      "lineCount": 1795,
-      "hash": "301cd187ca96591d6edd4ee3b7ae669f76e02459dd6165b14e2ff4a9272baede",
+      "lineCount": 1807,
+      "hash": "ea7a0299b06bb2a598650a07ec298fa2b76683d8e291ab34d5c510c3f51a50ab",
       "role": "source",
       "category": "sourcevision",
-      "lastModified": 1772765488983
+      "lastModified": 1772819456214
     },
     {
       "path": "packages/sourcevision/src/cli/commands/analyze-phases.ts",
@@ -6512,13 +6522,13 @@
     },
     {
       "path": "packages/web/src/server/routes-rex.ts",
-      "size": 97201,
+      "size": 97190,
       "language": "TypeScript",
       "lineCount": 3074,
-      "hash": "0f809759f4d08d1f9ac9cb6dca8b8f585dd9c3d68257c36675e45d16b29096d9",
+      "hash": "6494daa84e8239cdcd66643131b4e87900fc154f44e53728c425fb25bf441a95",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844176
+      "lastModified": 1772815233045
     },
     {
       "path": "packages/web/src/server/routes-search.ts",
@@ -7011,14 +7021,24 @@
       "lastModified": 1772687781506
     },
     {
-      "path": "packages/web/src/viewer/components/prd-tree/index.ts",
-      "size": 674,
+      "path": "packages/web/src/viewer/components/prd-tree/facet-filter.ts",
+      "size": 6134,
       "language": "TypeScript",
-      "lineCount": 20,
-      "hash": "0ff60fed311b377847ed98353841e607de20cd0489a88d4fab1b5d345ba08ebb",
+      "lineCount": 165,
+      "hash": "2cd001d3a7c2123fcc232c761376f645febbdc9088a5b03e5a4941df41ed2f88",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844181
+      "lastModified": 1772816566860
+    },
+    {
+      "path": "packages/web/src/viewer/components/prd-tree/index.ts",
+      "size": 782,
+      "language": "TypeScript",
+      "lineCount": 22,
+      "hash": "cb24cfc8cba7052969f0ea5f6be20333aaccea8c6bf88d7e0428ef70259a27ce",
+      "role": "source",
+      "category": "web",
+      "lastModified": 1772816623826
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/inline-add-form.ts",
@@ -7082,13 +7102,13 @@
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
-      "size": 31020,
+      "size": 32679,
       "language": "TypeScript",
-      "lineCount": 797,
-      "hash": "ce064c12b5b86ea2faee23b8c3b91d3804d6a475ca08b5ad5fb6e7f2ddc30310",
+      "lineCount": 836,
+      "hash": "3b9cd10bdd15defd092da4c798415e5460bcdc8474ba7d74539f30e398b0344e",
       "role": "source",
       "category": "web",
-      "lastModified": 1772783437539
+      "lastModified": 1772815822991
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
@@ -7201,6 +7221,16 @@
       "lastModified": 1772783437539
     },
     {
+      "path": "packages/web/src/viewer/components/prd-tree/tree-search.ts",
+      "size": 7934,
+      "language": "TypeScript",
+      "lineCount": 242,
+      "hash": "9ac76b5e1a0601e4e29b731b5b45e51fc88c0659ddb34cd40fc556d059f4daba",
+      "role": "source",
+      "category": "web",
+      "lastModified": 1772816542703
+    },
+    {
       "path": "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
       "size": 3441,
       "language": "TypeScript",
@@ -7222,13 +7252,13 @@
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
-      "size": 9706,
+      "size": 10007,
       "language": "TypeScript",
-      "lineCount": 272,
-      "hash": "04348e13650029b3d6ea7119967cbe18637d7f74745aa3384c7d78e833024a70",
+      "lineCount": 279,
+      "hash": "200c7a48f79b63804dadabe4989f5a51b5e498a82ee278232c34e5d9715cc018",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844184
+      "lastModified": 1772815762248
     },
     {
       "path": "packages/web/src/viewer/components/refresh-queue-status.ts",
@@ -7389,6 +7419,16 @@
       "role": "source",
       "category": "web",
       "lastModified": 1772682844186
+    },
+    {
+      "path": "packages/web/src/viewer/hooks/use-facet-state.ts",
+      "size": 5101,
+      "language": "TypeScript",
+      "lineCount": 154,
+      "hash": "e00925e7c85f6dcd4ac8cda4f55bc7faef4183a0888ea9b52df4d21285b650a7",
+      "role": "source",
+      "category": "web",
+      "lastModified": 1772816589257
     },
     {
       "path": "packages/web/src/viewer/hooks/use-feature-toggle.ts",
@@ -7952,13 +7992,13 @@
     },
     {
       "path": "packages/web/src/viewer/styles/call-graph-explorer.css",
-      "size": 7566,
+      "size": 7663,
       "language": "CSS",
       "lineCount": 309,
-      "hash": "d34f56a7df3367eea6f7a0d3040aabf086ac4ea36e2df95ddc040ca5b3cd79b6",
+      "hash": "0dc10e032e24b4f4e24c498cbea2f782f39ad35129aca3255c1b49ad337842fd",
       "role": "other",
       "category": "web",
-      "lastModified": 1772682844191
+      "lastModified": 1772816832903
     },
     {
       "path": "packages/web/src/viewer/styles/cards.css",
@@ -8172,13 +8212,13 @@
     },
     {
       "path": "packages/web/src/viewer/styles/prd-tree.css",
-      "size": 117606,
+      "size": 122167,
       "language": "CSS",
-      "lineCount": 5454,
-      "hash": "5a7e6a53f235efef42c3483cc4d3ef8f7b69bbf52fddc60052b7f25dcaacc91b",
+      "lineCount": 5659,
+      "hash": "8ff5b17f7e313f57b925f089020c154aacf37e290831bfa82424ab9a4b31b1a8",
       "role": "other",
       "category": "web",
-      "lastModified": 1772783437539
+      "lastModified": 1772816644552
     },
     {
       "path": "packages/web/src/viewer/styles/refresh-queue.css",
@@ -8542,13 +8582,13 @@
     },
     {
       "path": "packages/web/src/viewer/views/prd.ts",
-      "size": 9971,
+      "size": 13325,
       "language": "TypeScript",
-      "lineCount": 255,
-      "hash": "f1eb3f819740171b25c844198ed509431b92c14b3c1ca4c597bc0361b9a37019",
+      "lineCount": 340,
+      "hash": "4030f293d3341db4671b84721fc38550548d9539197108b95533f1611ba4c247",
       "role": "source",
       "category": "web",
-      "lastModified": 1772783437540
+      "lastModified": 1772816617008
     },
     {
       "path": "packages/web/src/viewer/views/problems.ts",
@@ -8662,13 +8702,13 @@
     },
     {
       "path": "packages/web/src/viewer/views/zones.ts",
-      "size": 58582,
+      "size": 59314,
       "language": "TypeScript",
-      "lineCount": 1840,
-      "hash": "32ae856251c5e3e2b02269822c081712fd42e3cf4dfbc321bede79246225ee2d",
+      "lineCount": 1863,
+      "hash": "a36cb12a3d9e339356653e3b60d73935e081c91ec90d9cdb973ae6a6648e75e6",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844198
+      "lastModified": 1772816821076
     },
     {
       "path": "packages/web/src/viewer/visualization/colors.ts",
@@ -8769,6 +8809,16 @@
       "role": "test",
       "category": "web",
       "lastModified": 1772688985482
+    },
+    {
+      "path": "packages/web/tests/integration/smart-add-dispatch.test.ts",
+      "size": 9176,
+      "language": "TypeScript",
+      "lineCount": 274,
+      "hash": "2847ba8296ef0e3a32b213c12836c776a57a1e3a0fb883aa6348ece1916c7809",
+      "role": "test",
+      "category": "web",
+      "lastModified": 1772815468921
     },
     {
       "path": "packages/web/tests/integration/token-usage-route-regression.test.ts",
@@ -9891,6 +9941,16 @@
       "lastModified": 1772682844209
     },
     {
+      "path": "packages/web/tests/unit/viewer/tree-search.test.ts",
+      "size": 14624,
+      "language": "TypeScript",
+      "lineCount": 415,
+      "hash": "413f019e77b3ee5dfa2e8165d0b073204b3fe915ba52318f5ffdc07ce1a09a7e",
+      "role": "test",
+      "category": "web",
+      "lastModified": 1772816681311
+    },
+    {
       "path": "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts",
       "size": 4552,
       "language": "TypeScript",
@@ -10282,38 +10342,40 @@
     }
   ],
   "summary": {
-    "totalFiles": 1028,
-    "totalLines": 344508,
+    "totalFiles": 1034,
+    "totalLines": 346710,
     "byLanguage": {
-      "Other": 17,
+      "YAML": 3,
+      "Other": 18,
       "JSON": 30,
       "Markdown": 32,
-      "YAML": 3,
       "JavaScript": 31,
-      "TypeScript": 868,
+      "TypeScript": 873,
       "Text": 1,
       "HTML": 2,
       "CSS": 44
     },
     "byRole": {
+      "build": 1,
       "config": 20,
       "other": 59,
       "docs": 32,
-      "source": 483,
+      "source": 486,
       "asset": 11,
       "generated": 5,
-      "test": 418
+      "test": 420
     },
     "byCategory": {
-      "root": 24,
-      ".hench": 1,
+      ".github": 1,
+      "root": 23,
+      ".hench": 2,
       ".rex": 8,
       "docs": 16,
       "hench": 157,
       "llm-client": 45,
       "rex": 240,
       "sourcevision": 138,
-      "web": 381,
+      "web": 386,
       "tests": 18
     }
   }

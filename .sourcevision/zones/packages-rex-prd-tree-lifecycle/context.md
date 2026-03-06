@@ -5,8 +5,8 @@
 <zone>
 
 Zone: PRD Tree Lifecycle (`packages-rex:prd-tree-lifecycle`)
-Files: 48, Cohesion: 0.51, Coupling: 0.49
-Risk: healthy (score: 0.49)
+Files: 48, Cohesion: 0.46, Coupling: 0.54
+Risk: healthy (score: 0.54)
 Description: Core domain operations for mutating, traversing, and maintaining the PRD tree: moves, removals, merges, parent completion, health checks, reorganization, and sync engine.
 Entry points: packages/rex/src/cli/commands/health.ts, packages/rex/src/cli/commands/reorganize.ts, packages/rex/src/core/dag.ts, packages/rex/src/core/delete.ts, packages/rex/src/core/facets.ts, packages/rex/src/core/health.ts, packages/rex/src/core/keywords.ts, packages/rex/src/core/merge.ts, packages/rex/src/core/move.ts, packages/rex/src/core/parent-completion.ts, packages/rex/src/core/parent-reset.ts, packages/rex/src/core/prune.ts, packages/rex/src/core/remove-epic.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/remove-task.ts, packages/rex/src/core/reorganize-executor.ts, packages/rex/src/core/reorganize.ts, packages/rex/src/core/requirements.ts, packages/rex/src/core/sync-engine.ts, packages/rex/src/core/sync.ts, packages/rex/src/core/timestamps.ts, packages/rex/src/core/tree.ts, packages/rex/src/core/verify.ts, packages/rex/src/public.ts
 Lines: 13446
@@ -186,6 +186,8 @@ Incoming (other zones → this zone):
 
 <insights>
 
+- High coupling (0.54) — 67 imports target "prd-analysis-core"
+- 24 entry points — wide API surface, consider consolidating exports
 - 24 entry points — wide API surface, consider consolidating exports
 - With 24 entry points and 48 files this is the broadest domain zone — health.ts, sync-engine.ts, and analytics.ts are architecturally distinct from tree mutation and could be extracted into focused sub-zones to improve cohesion.
 - public.ts as an entry point signals this zone defines the package's outward API surface; changes here have downstream impact on hench and web consumers and warrant extra care.

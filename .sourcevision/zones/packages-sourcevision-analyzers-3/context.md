@@ -9,7 +9,7 @@ Files: 6, Cohesion: 0.43, Coupling: 0.57
 Risk: healthy (score: 0.57)
 Description: 6 files, primarily TypeScript
 Entry points: packages/sourcevision/src/analyzers/zone-hash.ts, packages/sourcevision/src/analyzers/zones.ts
-Lines: 5728
+Lines: 5740
 
 </zone>
 
@@ -17,7 +17,7 @@ Lines: 5728
 
 packages/sourcevision/src/analyzers/louvain.ts (TypeScript, 804 lines, source)
 packages/sourcevision/src/analyzers/zone-hash.ts (TypeScript, 26 lines, source)
-packages/sourcevision/src/analyzers/zones.ts (TypeScript, 1795 lines, source)
+packages/sourcevision/src/analyzers/zones.ts (TypeScript, 1807 lines, source)
 packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts (TypeScript, 1816 lines, test)
 packages/sourcevision/tests/unit/analyzers/zone-size-policy.test.ts (TypeScript, 302 lines, test)
 packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts (TypeScript, 985 lines, test)

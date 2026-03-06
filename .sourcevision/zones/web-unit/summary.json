@@ -14,15 +14,15 @@
     "packages/web/src/server/websocket.ts",
     "packages/web/src/server/ws-health-tracker.ts"
   ],
-  "cohesion": 0.5,
-  "coupling": 0.5,
+  "cohesion": 0.25,
+  "coupling": 0.75,
   "fileCount": 6,
   "lineCount": 1561,
   "riskMetrics": {
-    "cohesion": 0.5,
-    "coupling": 0.5,
-    "riskScore": 0.5,
-    "riskLevel": "healthy",
-    "failsThreshold": false
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
   }
 }

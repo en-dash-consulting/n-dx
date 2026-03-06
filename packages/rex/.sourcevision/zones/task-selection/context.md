@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Task Selection & Scoring (`task-selection`)
-Files: 7, Cohesion: 0.41, Coupling: 0.59
-Risk: healthy (score: 0.59)
+Files: 7, Cohesion: 0.17, Coupling: 0.83
+Risk: catastrophic (score: 0.83)
 Description: The next-task selection algorithm including scoring, feature filtering, requirements prioritization, and the CLI command that exposes it.
 Entry points: src/cli/commands/next.ts, src/core/next-task.ts
 Lines: 2456
@@ -49,16 +49,20 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [warning] High coupling (0.59) — 7 imports target "prd-analysis-core"
+[observation] [warning] High coupling (0.83) — 7 imports target "prd-analysis-core"
+[observation] [warning] Low cohesion (0.17) — files are loosely related, consider splitting this zone
 [observation] [info] Coupling approaching 0.6 is structurally expected for a task-scoring algorithm that reads broadly across the PRD tree; this is not immediately actionable but should be monitored.
 [observation] [info] requirements-prioritization.test.ts alongside next-task tests suggests requirements logic is central to selection; ensure requirements.ts in the core zone does not duplicate scoring concerns handled here.
 [relationship] [info] task-selection and fix-command are both dependency-graph leaves with no downstream consumers — these two zones define the correct command-module pattern (consume, never export to other zones) and their structure should guide future command additions.
 [suggestion] [info] Five unit test files for a single production file (next-task.ts) gives strong coverage but also means the test:production file ratio is 5:1. As more scoring scenarios are added, consider whether requirements-prioritization.test.ts and feature-filtered-task.test.ts warrant splitting next-task.ts into focused sub-modules (scorer.ts, filter.ts) to make the zone's production structure match its test structure.
+[suggestion] [critical] Zone "Task Selection & Scoring" (task-selection) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention
 
 </findings>
 
 <insights>
 
+- Low cohesion (0.17) — files are loosely related, consider splitting this zone
+- High coupling (0.83) — 7 imports target "prd-analysis-core"
 - High coupling (0.59) — 7 imports target "prd-analysis-core"
 - Five dedicated test files covering scoring, matching, filtering, and requirements prioritization reflect strong coverage for a decision-critical algorithm — a healthy engineering pattern.
 - next-task.ts and its CLI wrapper are the only production files, keeping the zone focused despite mixing production and test code.

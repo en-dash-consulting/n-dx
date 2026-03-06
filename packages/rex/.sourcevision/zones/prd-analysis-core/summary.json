@@ -100,14 +100,14 @@
     "src/schema/v1.ts",
     "src/store/project-config.ts"
   ],
-  "cohesion": 0.52,
-  "coupling": 0.48,
+  "cohesion": 0.5,
+  "coupling": 0.5,
   "fileCount": 69,
   "lineCount": 31133,
   "riskMetrics": {
-    "cohesion": 0.52,
-    "coupling": 0.48,
-    "riskScore": 0.48,
+    "cohesion": 0.5,
+    "coupling": 0.5,
+    "riskScore": 0.5,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

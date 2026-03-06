@@ -5,8 +5,8 @@
 <zone>
 
 Zone: PRD Storage & Sync Adapters (`packages-rex:prd-storage-adapters`)
-Files: 23, Cohesion: 0.60, Coupling: 0.40
-Risk: healthy (score: 0.40)
+Files: 23, Cohesion: 0.50, Coupling: 0.50
+Risk: healthy (score: 0.50)
 Description: Persistence layer providing pluggable storage adapters, sync contracts, integration schemas for Jira and Notion, and the sync CLI command.
 Entry points: packages/rex/src/cli/commands/sync.ts, packages/rex/src/core/canonical.ts, packages/rex/src/store/adapter-registry.ts, packages/rex/src/store/contracts.ts, packages/rex/src/store/index.ts, packages/rex/src/store/integration-schema.ts, packages/rex/src/store/integration-schemas/index.ts, packages/rex/src/store/integration-schemas/jira.ts, packages/rex/src/store/integration-schemas/notion.ts
 Lines: 6376

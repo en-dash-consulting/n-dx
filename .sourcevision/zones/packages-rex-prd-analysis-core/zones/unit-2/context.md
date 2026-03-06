@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Unit Analyze/unit 2 (`unit-analyze/unit-2`)
-Files: 3, Cohesion: 0.33, Coupling: 0.67
+Files: 3, Cohesion: 1.00, Coupling: 0.00
 Description: 3 files, primarily TypeScript
 Entry points: src/analyze/guided.ts
 Lines: 0

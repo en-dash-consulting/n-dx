@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Web (`web`)
-Files: 16, Cohesion: 0.79, Coupling: 0.21
-Risk: healthy (score: 0.21)
+Files: 16, Cohesion: 0.77, Coupling: 0.23
+Risk: healthy (score: 0.23)
 Description: 16 files, primarily TypeScript, Markdown, Other
 Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/views/task-audit.ts
 Lines: 3352
@@ -53,25 +53,29 @@ Incoming (other zones → this zone):
 <findings>
 
 [suggestion] [info] Zone "web" has files across 6 directories — consider consolidating under a dedicated directory
-[pattern] [warning] Findings 1, web-server zone finding 0, and global finding 5 converge on one root cause: the web package zone structure was grown incrementally without a consistent model. The three concrete symptoms are bidirectional coupling between web-dashboard-application and web-package-root (2+4 crossings), a 4-file web-server satellite with 0.63 cohesion and 0.38 coupling that imports bidirectionally with web-viewer (2+2 crossings), and zone names that mix 'web-viewer', 'panel', 'dom', 'logo' prefixes within a single package. These are three manifestations of the same structural deficit, not three independent problems. Addressing the naming convention (finding 5) and the satellite merge (web-server finding 0) would simultaneously improve the coupling metric tracked in finding 1.
 
 </findings>
 
 <insights>
 
-- With entry points at elapsed-time.ts and task-audit.ts, this zone contains components that are imported by web-viewer, creating a subtle inward-dependency: web-viewer → web means the root zone is both a config layer and a leaf component provider, which mixes two concerns.
-- Cohesion of 0.79 reflects the heterogeneous membership (build scripts, package.json, PNG assets, and TS components) — consider whether the TS components would be better co-located inside src/viewer/ to fully separate build config from runtime code.
-- The web zone exports into web-viewer (2 imports), while web-viewer also imports back into web — this bidirectional relationship (web ↔ web-viewer) warrants review to confirm it isn't a soft circular dependency at the module level.
-- Zone "web-package-root" has files across 6 directories — consider consolidating under a dedicated directory
-- Bidirectional imports between web and web-viewer (web → web-viewer: 4, web-viewer → web: 2) may indicate a soft circular dependency; audit whether the components in web's root could be moved into web-viewer to eliminate the back-edge.
-- Mixing build configuration files (build.js, dev.js, package.json) with runtime TypeScript components (elapsed-time.ts, task-audit.ts) in the same zone reduces cohesion; relocating the TS components into src/viewer/ would sharpen the boundary.
-- PNG asset files (SourceVision-F.png, SourceVision.png) and markdown docs (BROWSER_ERROR_CODE_5.md, MEMORY_PROFILE.md) grouped with source files is a natural artifact of flat package roots — no action needed, but worth noting when interpreting cohesion scores.
-- elapsed-time.ts and task-audit.ts are TypeScript components living under src/viewer/components/ but assigned to web-package-root rather than web-viewer. This misassignment means changes to these components will not be captured by web-viewer's coupling metrics, creating a blind spot in architectural analysis.
-- src/viewer/components/elapsed-time.ts and src/viewer/components/task-audit.ts are physically inside the viewer source tree but zone-classified under web-package-root. This misplacement causes their coupling contributions to be attributed to the root zone rather than web-viewer, silently underreporting web-viewer's true coupling surface.
-- A package-root zone should ideally have coupling ≈ 0 (it contains build config, not imported production modules). web-package-root's coupling of 0.21 is entirely attributable to the two misassigned viewer components (elapsed-time.ts, task-audit.ts) — meaning the root's coupling score measures component import activity, not build-config import activity. The metric is not meaningful for its stated scope.
-- The misassigned components (elapsed-time.ts, task-audit.ts) inflate web-package-root's coupling score to 0.21 and simultaneously underreport web-viewer's coupling surface. Correct the zone classification for both files to web-viewer to restore metric accuracy for both zones simultaneously.
+- With 4 imports flowing into web-viewer and 2 coming back from web-viewer, this zone acts as a thin coordination layer — keep it focused on wiring, not logic
+- elapsed-time.ts and task-audit.ts are entry-point components in this zone while the bulk of viewer code lives in web-viewer; evaluate whether these belong in web-viewer to reduce the split
+- Cohesion of 0.79 is healthy, but the presence of both production components and package-level config files (build.js, dev.js) in one zone suggests the community detection is grouping heterogeneous concerns — no action needed but worth monitoring
+- Zone "web-package-shell" has files across 6 directories — consider consolidating under a dedicated directory
+- elapsed-time.ts and task-audit.ts are classified as entry points in this zone but logically belong to the viewer layer — consider moving them into web-viewer to consolidate the component surface.
+- Cohesion of 0.79 with coupling of 0.21 is within healthy bounds; the bidirectional import relationship with web-viewer (4 out, 2 in) should be watched to ensure it doesn't become circular.
+- BROWSER_ERROR_CODE_5.md and MEMORY_PROFILE.md in this zone suggest past debugging artifacts; review whether these are still relevant or can be removed to keep the package root clean.
+- web-package-shell participates in a bidirectional import cycle with web-viewer (4 out, 2 back) — this constitutes a circular zone dependency that should be broken by extracting shared types or interfaces into a neutral third zone
+- The 2 reverse imports from web-viewer back into web-package-shell likely represent shared component or utility re-use; identifying and extracting these into a dedicated shared zone would eliminate the cycle without restructuring either package
+- web-package-shell ↔ web-viewer bidirectional import cycle (4+2 crossings) is a circular zone dependency — extract the 2 symbols imported by web-viewer from web-package-shell into a neutral shared zone to restore unidirectional flow.
+- build.js and dev.js (config files) colocated with elapsed-time.ts and task-audit.ts (runtime components) in one zone means any change to either class of files triggers unnecessary review of the other — a symptom of the zone grouping heterogeneous concerns
+- elapsed-time.ts and task-audit.ts are production viewer components classified as entry points inside web-package-shell, while the bulk of viewer code lives in web-viewer. This split means a single logical component surface has two zone owners, which breaks the assumption that a zone is the unit of independent deployment or testing.
+- web-package-shell mixes package-level tooling files (build.js, dev.js, package.json) with runtime component files (elapsed-time.ts, task-audit.ts) in one zone. Tooling files and runtime components have completely different change drivers and reviewers — they should not share a zone boundary.
+- web-server (cohesion 0.63, bidirectional cycle with web-viewer) is the only zone in the codebase that simultaneously has cohesion below 0.7 AND participates in a bidirectional import cycle — this combination makes it the single highest-fragility zone in the project. Low cohesion means its internal seams are unclear; bidirectional coupling means it cannot be changed without negotiating with web-viewer. Every other zone with coupling has cohesion above 0.75.
+- The zone named 'web-unit' (cohesion 0.5, 6 files) receives 6 imports from web-viewer with no reverse imports — its name implies unit tests, but it contains production components consumed exclusively by web-viewer. This name/role mismatch causes navigational confusion: developers expecting unit test utilities will find production component files.
+- web-server is the only zone combining cohesion < 0.7 with an active bidirectional import cycle. Absorbing web-server into web-viewer would resolve one cycle, eliminate the lowest-cohesion zone with coupling, and reduce web-viewer's bidirectional cycle count from 2 to 1. Prioritize web-server absorption before any other web cluster refactor.
+- Rename zone 'web-unit' to 'web-shared-components' or 'web-viewer-utils' to reflect its actual role as a production utility module for web-viewer. The current name implies test infrastructure and will mislead contributors searching for test helpers.
 - Zone "web" has files across 6 directories — consider consolidating under a dedicated directory
-- Findings 1, web-server zone finding 0, and global finding 5 converge on one root cause: the web package zone structure was grown incrementally without a consistent model. The three concrete symptoms are bidirectional coupling between web-dashboard-application and web-package-root (2+4 crossings), a 4-file web-server satellite with 0.63 cohesion and 0.38 coupling that imports bidirectionally with web-viewer (2+2 crossings), and zone names that mix 'web-viewer', 'panel', 'dom', 'logo' prefixes within a single package. These are three manifestations of the same structural deficit, not three independent problems. Addressing the naming convention (finding 5) and the satellite merge (web-server finding 0) would simultaneously improve the coupling metric tracked in finding 1.
 - [call graph] 59 internal calls, 1 outgoing, 0 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>

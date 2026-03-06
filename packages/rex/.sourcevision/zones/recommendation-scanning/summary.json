@@ -31,15 +31,15 @@
     "src/cli/commands/recommend.ts",
     "src/recommend/create-from-recommendations.ts"
   ],
-  "cohesion": 0.47,
-  "coupling": 0.53,
+  "cohesion": 0.33,
+  "coupling": 0.67,
   "fileCount": 19,
   "lineCount": 9440,
   "riskMetrics": {
-    "cohesion": 0.47,
-    "coupling": 0.53,
-    "riskScore": 0.53,
-    "riskLevel": "healthy",
-    "failsThreshold": false
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
   }
 }

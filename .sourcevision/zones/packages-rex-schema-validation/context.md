@@ -5,17 +5,17 @@
 <zone>
 
 Zone: Schema Validation (`packages-rex:schema-validation`)
-Files: 16, Cohesion: 0.29, Coupling: 0.71
-Risk: catastrophic (score: 0.71)
+Files: 16, Cohesion: 1.00, Coupling: 0.00
+Risk: healthy (score: 0.00)
 Description: PRD schema validation logic and the end-to-end CLI tests that exercise the full command surface against real file system operations.
 Entry points: packages/rex/src/schema/validate.ts
-Lines: 3609
+Lines: 3603
 
 </zone>
 
 <files>
 
-packages/rex/src/schema/validate.ts (TypeScript, 172 lines, source)
+packages/rex/src/schema/validate.ts (TypeScript, 166 lines, source)
 packages/rex/tests/e2e/cli-adapter.test.ts (TypeScript, 266 lines, test)
 packages/rex/tests/e2e/cli-analyze.test.ts (TypeScript, 685 lines, test)
 packages/rex/tests/e2e/cli-import.test.ts (TypeScript, 123 lines, test)
@@ -41,7 +41,7 @@ Internal:
   packages/rex/tests/unit/schema/validate.test.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry, formatValidationErrors}
 
 Outgoing (this zone → other zones):
-  → packages-rex:prd-analysis-core: packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts
+  → packages-rex:prd-analysis-core: packages/rex/src/schema/validate.ts → packages/rex/src/schema/v1.ts; packages/rex/src/schema/validate.ts → packages/rex/src/schema/v1.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts
 
 Incoming (other zones → this zone):
   ← packages-rex:cli-mcp-interface: packages/rex/src/cli/commands/report.ts → packages/rex/src/schema/validate.ts; packages/rex/src/cli/commands/report.ts → packages/rex/src/schema/validate.ts
@@ -51,14 +51,11 @@ Incoming (other zones → this zone):
 
 </imports>
 
-<findings>
-
-[suggestion] [critical] Zone "Schema Validation" (packages-rex:schema-validation) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
-
-</findings>
-
 <insights>
 
+- High cohesion (1) — files are tightly interconnected
+- Low cohesion (0) — files are loosely related, consider splitting this zone
+- High coupling (1) — 2 imports target "prd-analysis-core"
 - Low cohesion (0.29) — files are loosely related, consider splitting this zone
 - High coupling (0.71) — 1 imports target "prd-analysis-core"
 - src/schema/validate.ts is the sole production file grouped with 15 test files — per the '-tests' naming convention the zone is named after its production domain (schema validation) rather than its test content.
@@ -76,6 +73,6 @@ Incoming (other zones → this zone):
 - schema-validation has the worst combined metrics in the codebase (cohesion 0.29, coupling 0.71) yet is not immediately actionable because the metrics reflect test-file inclusion artifacts rather than production coupling — flagging it as a structural risk without qualifying this distinction would lead to misguided refactoring effort.
 - Zone health metrics for schema-validation are unreliable as structural indicators because 15 of 16 files are E2E tests whose cross-CLI imports are expected behavior, not defects. Exclude E2E test files from zone coupling calculations or track them in a separate test-zone metric to avoid false positive warnings.
 - validate.ts is named with the 'validate' verb prefix while its zone is named 'schema-validation' — the zone name uses a noun-phrase pattern while the file uses a verb pattern. Align to one convention: either schema-validator.ts (noun) or keep validate.ts and rename the zone to 'schema-validate' for verb-object consistency with 'fix-command'.
-- [call graph] 309 internal calls, 1 outgoing, 22 incoming (cohesion: 1, coupling: 0)
+- [call graph] 314 internal calls, 1 outgoing, 22 incoming (cohesion: 1, coupling: 0)
 
 </insights>

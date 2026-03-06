@@ -38,14 +38,14 @@
     "src/store/integration-schemas/jira.ts",
     "src/store/integration-schemas/notion.ts"
   ],
-  "cohesion": 0.6,
-  "coupling": 0.4,
+  "cohesion": 0.5,
+  "coupling": 0.5,
   "fileCount": 23,
   "lineCount": 6376,
   "riskMetrics": {
-    "cohesion": 0.6,
-    "coupling": 0.4,
-    "riskScore": 0.4,
+    "cohesion": 0.5,
+    "coupling": 0.5,
+    "riskScore": 0.5,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

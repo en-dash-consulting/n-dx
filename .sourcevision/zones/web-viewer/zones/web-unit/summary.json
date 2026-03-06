@@ -24,8 +24,8 @@
     "packages/web/src/shared/request-dedup.ts",
     "packages/web/src/viewer/messaging/index.ts"
   ],
-  "cohesion": 0.88,
-  "coupling": 0.13,
+  "cohesion": 0.81,
+  "coupling": 0.19,
   "fileCount": 16,
   "lineCount": 4377
 }

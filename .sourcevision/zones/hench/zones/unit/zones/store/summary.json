@@ -12,8 +12,8 @@
     "packages/hench/src/store/json.ts",
     "packages/hench/src/store/runs.ts"
   ],
-  "cohesion": 0.4,
-  "coupling": 0.6,
+  "cohesion": 0.33,
+  "coupling": 0.67,
   "fileCount": 4,
   "lineCount": 430
 }

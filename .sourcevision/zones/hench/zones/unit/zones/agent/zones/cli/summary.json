@@ -1,7 +1,7 @@
 {
   "id": "hench/unit/agent/cli",
   "name": "Hench/unit/agent/cli",
-  "description": "10 files, primarily TypeScript",
+  "description": "9 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/planning/brief.ts",
     "packages/hench/src/cli/commands/run.ts",
@@ -11,7 +11,6 @@
     "packages/hench/tests/unit/agent/brief.test.ts",
     "packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts",
     "packages/hench/tests/unit/cli/commands/run-epic.test.ts",
-    "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
     "packages/hench/tests/unit/tools/rex.test.ts"
   ],
   "entryPoints": [
@@ -19,8 +18,8 @@
     "packages/hench/src/cli/commands/run.ts",
     "packages/hench/src/tools/rex.ts"
   ],
-  "cohesion": 0.52,
-  "coupling": 0.48,
-  "fileCount": 10,
-  "lineCount": 4558
+  "cohesion": 0.38,
+  "coupling": 0.62,
+  "fileCount": 9,
+  "lineCount": 4327
 }

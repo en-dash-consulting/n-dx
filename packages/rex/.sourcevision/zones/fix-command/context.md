@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Fix Command Pipeline (`fix-command`)
-Files: 4, Cohesion: 0.40, Coupling: 0.60
-Risk: healthy (score: 0.60)
+Files: 4, Cohesion: 0.25, Coupling: 0.75
+Risk: catastrophic (score: 0.75)
 Description: The fix CLI command and its underlying core repair logic, co-located with their unit tests.
 Entry points: src/cli/commands/fix.ts
 Lines: 1230
@@ -43,17 +43,21 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [warning] High coupling (0.6) — 3 imports target "prd-analysis-core"
+[observation] [warning] High coupling (0.75) — 3 imports target "prd-analysis-core"
+[observation] [warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone
 [observation] [warning] Coupling at 0.6 sits at the warning threshold; confirm src/core/fix.ts imports are limited to the immediate domain and do not pull in broad tree or sync utilities.
 [observation] [info] Zone contains both production source files and unit tests — the name reflects production purpose per the '-tests' suffix convention, which is correct.
 [relationship] [info] fix-command is a dependency-graph leaf: zero outbound cross-zone exports, imports only from prd-analysis-core. This is the correct topology for a command implementation and should be the reference pattern for other command zones.
 [suggestion] [info] Near-threshold coupling (0.6) in a 4-file zone will likely cross the warning boundary when additional test cases are added, since unit test imports count toward coupling. Consider excluding intra-zone test→production imports from coupling calculations to keep metrics meaningful for small, well-tested command zones.
 [suggestion] [info] Zone name 'fix-command' uses verb-object pattern while 'task-selection' uses noun-phrase pattern — the two leaf command zones have inconsistent naming conventions. Standardize: either both use verb-object ('fix-command', 'next-command') or both use noun-phrase ('issue-fix', 'task-selection').
+[suggestion] [critical] Zone "Fix Command Pipeline" (fix-command) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention
 
 </findings>
 
 <insights>
 
+- Low cohesion (0.25) — files are loosely related, consider splitting this zone
+- High coupling (0.75) — 3 imports target "prd-analysis-core"
 - High coupling (0.6) — 3 imports target "prd-analysis-core"
 - Production files src/cli/commands/fix.ts and src/core/fix.ts are tightly paired — the test files mirror this structure, making the zone naturally cohesive despite mixing production and test content.
 - At the boundary of warning thresholds (cohesion: 0.4, coupling: 0.6), verify that src/core/fix.ts does not reach broadly into unrelated domain modules.

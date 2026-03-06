@@ -19,8 +19,8 @@
     "src/cli/commands/validate.ts",
     "src/core/structural.ts"
   ],
-  "cohesion": 0.77,
-  "coupling": 0.23,
+  "cohesion": 0.63,
+  "coupling": 0.38,
   "fileCount": 11,
   "lineCount": 0
 }

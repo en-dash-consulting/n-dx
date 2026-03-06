@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Unit Analyze/unit (`unit-analyze/unit`)
-Files: 51, Cohesion: 0.84, Coupling: 0.16
+Files: 51, Cohesion: 0.87, Coupling: 0.13
 Description: 51 files, primarily TypeScript
 Entry points: src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/file-validation.ts, src/analyze/index.ts, src/analyze/llm-bridge.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/validate-modification.ts, src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/format-loe.ts, src/cli/commands/smart-add.ts, src/cli/commands/status.ts, src/core/cascade-reset.ts, src/core/notion-map.ts, src/core/transitions.ts, src/schema/index.ts, src/schema/levels.ts, src/schema/v1.ts, src/store/project-config.ts
 Lines: 23910
@@ -226,10 +226,10 @@ Cross-dependencies between sub-zones:
 
 This zone has 4 sub-zone(s):
 
-- **Unit Analyze/unit/analyze** (`unit-analyze/unit/analyze`): 36 files, cohesion 0.83, coupling 0.17
+- **Unit Analyze/unit/analyze** (`unit-analyze/unit/analyze`): 36 files, cohesion 0.82, coupling 0.18
 - **Unit Analyze/unit/cli** (`unit-analyze/unit/cli`): 9 files, cohesion 1, coupling 0
 - **Unit Analyze/unit/core** (`unit-analyze/unit/core`): 3 files, cohesion 0, coupling 1
-- **Unit Analyze/unit/schema** (`unit-analyze/unit/schema`): 3 files, cohesion 0.19, coupling 0.81
+- **Unit Analyze/unit/schema** (`unit-analyze/unit/schema`): 3 files, cohesion 0.29, coupling 0.71
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

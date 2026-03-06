@@ -12,8 +12,8 @@
     "packages/hench/src/agent/lifecycle/task-display.ts",
     "packages/hench/src/types/output.ts"
   ],
-  "cohesion": 0.42,
-  "coupling": 0.58,
+  "cohesion": 0.36,
+  "coupling": 0.64,
   "fileCount": 4,
   "lineCount": 226
 }

@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/unit/agent 2 (`hench/unit/agent-2`)
-Files: 6, Cohesion: 0.29, Coupling: 0.71
+Files: 6, Cohesion: 1.00, Coupling: 0.00
 Description: 6 files, primarily TypeScript
 Entry points: packages/hench/src/store/config.ts
 Lines: 999

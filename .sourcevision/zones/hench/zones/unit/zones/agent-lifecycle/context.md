@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/unit/agent Lifecycle (`hench/unit/agent-lifecycle`)
-Files: 4, Cohesion: 0.42, Coupling: 0.58
+Files: 4, Cohesion: 0.36, Coupling: 0.64
 Description: 4 files, primarily TypeScript
 Entry points: packages/hench/src/agent/lifecycle/task-display.ts, packages/hench/src/types/output.ts
 Lines: 226

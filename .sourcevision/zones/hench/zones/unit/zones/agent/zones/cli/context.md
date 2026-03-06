@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/agent/cli (`hench/unit/agent/cli`)
-Files: 10, Cohesion: 0.52, Coupling: 0.48
-Description: 10 files, primarily TypeScript
+Files: 9, Cohesion: 0.38, Coupling: 0.62
+Description: 9 files, primarily TypeScript
 Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/tools/rex.ts
-Lines: 4558
+Lines: 4327
 
 </zone>
 
@@ -22,7 +22,6 @@ packages/hench/src/tools/rex.ts (TypeScript, 254 lines, source)
 packages/hench/tests/unit/agent/brief.test.ts (TypeScript, 1531 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic.test.ts (TypeScript, 529 lines, test)
-packages/hench/tests/unit/cli/commands/run-loop.test.ts (TypeScript, 231 lines, test)
 packages/hench/tests/unit/tools/rex.test.ts (TypeScript, 248 lines, test)
 
 </files>
@@ -42,7 +41,6 @@ Internal:
   packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicRunSummary, EpicScopeInfo}
   packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {listEpics, findEpicByIdOrTitle, resolveEpicFlag, collectEpicTaskIds, getEpicScopeInfo}
   packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicScopeInfo}
-  packages/hench/tests/unit/cli/commands/run-loop.test.ts → packages/hench/src/cli/commands/run.ts {shouldContinueLoop, loopPause}
   packages/hench/tests/unit/tools/rex.test.ts → packages/hench/src/tools/rex.ts {toolRexUpdateStatus, toolRexAppendLog, toolRexAddSubtask}
 
 </imports>

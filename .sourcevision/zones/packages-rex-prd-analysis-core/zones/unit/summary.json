@@ -78,8 +78,8 @@
     "src/schema/v1.ts",
     "src/store/project-config.ts"
   ],
-  "cohesion": 0.84,
-  "coupling": 0.16,
+  "cohesion": 0.87,
+  "coupling": 0.13,
   "fileCount": 51,
   "lineCount": 0
 }

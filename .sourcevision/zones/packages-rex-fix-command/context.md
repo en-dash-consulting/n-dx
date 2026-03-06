@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Fix Command Pipeline (`packages-rex:fix-command`)
-Files: 4, Cohesion: 0.40, Coupling: 0.60
-Risk: healthy (score: 0.60)
+Files: 4, Cohesion: 0.25, Coupling: 0.75
+Risk: catastrophic (score: 0.75)
 Description: The fix CLI command and its underlying core repair logic, co-located with their unit tests.
 Entry points: packages/rex/src/cli/commands/fix.ts
 Lines: 1230
@@ -41,8 +41,16 @@ Incoming (other zones → this zone):
 
 </imports>
 
+<findings>
+
+[suggestion] [critical] Zone "Fix Command Pipeline" (packages-rex:fix-command) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention
+
+</findings>
+
 <insights>
 
+- Low cohesion (0.25) — files are loosely related, consider splitting this zone
+- High coupling (0.75) — 3 imports target "prd-analysis-core"
 - High coupling (0.6) — 3 imports target "prd-analysis-core"
 - Production files src/cli/commands/fix.ts and src/core/fix.ts are tightly paired — the test files mirror this structure, making the zone naturally cohesive despite mixing production and test content.
 - At the boundary of warning thresholds (cohesion: 0.4, coupling: 0.6), verify that src/core/fix.ts does not reach broadly into unrelated domain modules.

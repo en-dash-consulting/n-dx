@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/unit/store (`hench/unit/store`)
-Files: 4, Cohesion: 0.40, Coupling: 0.60
+Files: 4, Cohesion: 0.33, Coupling: 0.67
 Description: 4 files, primarily TypeScript
 Entry points: packages/hench/src/store/json.ts, packages/hench/src/store/runs.ts
 Lines: 430

@@ -1,0 +1,20 @@
+{
+  "id": "hench/unit/agent-analysis",
+  "name": "Hench/unit/agent Analysis",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/review.ts",
+    "packages/hench/src/agent/analysis/stuck.ts",
+    "packages/hench/src/agent/index.ts",
+    "packages/hench/tests/unit/agent/review.test.ts",
+    "packages/hench/tests/unit/agent/stuck.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/review.ts",
+    "packages/hench/src/agent/analysis/stuck.ts"
+  ],
+  "cohesion": 0.27,
+  "coupling": 0.73,
+  "fileCount": 5,
+  "lineCount": 830
+}

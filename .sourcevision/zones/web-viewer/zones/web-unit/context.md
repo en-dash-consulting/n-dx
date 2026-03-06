@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Unit (`web-viewer/web-unit`)
-Files: 16, Cohesion: 0.88, Coupling: 0.13
+Files: 16, Cohesion: 0.81, Coupling: 0.19
 Description: 16 files, primarily TypeScript
 Entry points: packages/web/src/shared/request-dedup.ts, packages/web/src/viewer/messaging/index.ts
 Lines: 4377

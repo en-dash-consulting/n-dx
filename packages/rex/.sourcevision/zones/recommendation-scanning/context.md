@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Recommendation Scanning (`recommendation-scanning`)
-Files: 19, Cohesion: 0.47, Coupling: 0.53
-Risk: healthy (score: 0.53)
+Files: 19, Cohesion: 0.33, Coupling: 0.67
+Risk: critical (score: 0.67)
 Description: Implements the recommendation pipeline: scanning projects for PRD candidates, extracting and reconciling proposals, detecting conflicts, and creating items from accepted recommendations.
 Entry points: src/analyze/acknowledge.ts, src/analyze/extract.ts, src/analyze/reconcile.ts, src/analyze/scanners.ts, src/cli/commands/recommend.ts, src/recommend/create-from-recommendations.ts
 Lines: 9440
@@ -82,12 +82,14 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [warning] High coupling (0.53) — 23 imports target "prd-analysis-core"
+[observation] [warning] High coupling (0.67) — 23 imports target "prd-analysis-core"
+[observation] [warning] Low cohesion (0.33) — files are loosely related, consider splitting this zone
 [observation] [warning] Bidirectional imports with unit-analyze (12 outbound, 23 inbound) indicate shared state or shared types that haven't been cleanly factored into a neutral boundary module.
 [observation] [warning] Cohesion at 0.47 is at the warning threshold — the mix of CLI command (recommend.ts), domain service (create-from-recommendations.ts), and utility files (conflict-detection.ts) suggests this zone blends layers that could be separated.
 [suggestion] [info] Zone "recommendation-scanning" has files across 6 directories — consider consolidating under a dedicated directory
 [suggestion] [info] Zone name uses verb-gerund pattern ('recommendation-scanning') while all peer zones use noun phrases. Rename to 'recommendation-engine' for consistency.
 [suggestion] [critical] recommendation-scanning is the only zone with both cohesion below 0.5 and coupling above 0.5 simultaneously — it is the most fragile zone by definition. Prioritize splitting it before prd-analysis-core refactoring, as its bridging role between two hubs amplifies any change in either.
+[suggestion] [warning] Zone "Recommendation Scanning" (recommendation-scanning) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development
 [relationship] [warning] recommendation-scanning participates in bidirectional coupling with both prd-analysis-core AND prd-tree-lifecycle simultaneously, making it a bridge zone rather than a leaf — changes in either hub ripple through it.
 [anti-pattern] [warning] acknowledge.ts, extract.ts, reconcile.ts, and scanners.ts reside in src/analyze/ alongside prd-analysis-core files but belong to a different zone — zone boundaries are invisible at the filesystem level, making them impossible to enforce via directory-based lint rules.
 [anti-pattern] [warning] src/analyze/scanners.ts and src/analyze/extract.ts make direct LLM calls (spawnClaude) while also being consumed by prd-analysis-core — LLM I/O is scattered across two zones in the same directory, preventing either zone from being tested in isolation.
@@ -96,6 +98,8 @@ Incoming (other zones → this zone):
 
 <insights>
 
+- Low cohesion (0.33) — files are loosely related, consider splitting this zone
+- High coupling (0.67) — 23 imports target "prd-analysis-core"
 - High coupling (0.53) — 23 imports target "prd-analysis-core"
 - At cohesion 0.47 and coupling 0.53, this zone sits at the boundary — files here straddle recommendation logic and general analysis utilities, which explains the moderate scores.
 - The 23 imports from unit-analyze and 12 exports back to unit-analyze suggest this zone is tightly paired with the core analysis pipeline and may benefit from merging or clearer interface contracts.

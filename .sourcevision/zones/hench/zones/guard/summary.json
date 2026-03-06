@@ -18,8 +18,8 @@
     "packages/hench/src/guard/index.ts",
     "packages/hench/src/guard/paths.ts"
   ],
-  "cohesion": 0.9,
-  "coupling": 0.1,
+  "cohesion": 0.86,
+  "coupling": 0.14,
   "fileCount": 10,
   "lineCount": 1802
 }

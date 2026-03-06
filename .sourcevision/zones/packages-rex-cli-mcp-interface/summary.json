@@ -59,14 +59,14 @@
     "packages/rex/src/core/stats.ts",
     "packages/rex/src/core/token-usage.ts"
   ],
-  "cohesion": 0.49,
-  "coupling": 0.51,
+  "cohesion": 0.47,
+  "coupling": 0.53,
   "fileCount": 40,
   "lineCount": 14175,
   "riskMetrics": {
-    "cohesion": 0.49,
-    "coupling": 0.51,
-    "riskScore": 0.51,
+    "cohesion": 0.47,
+    "coupling": 0.53,
+    "riskScore": 0.53,
     "riskLevel": "healthy",
     "failsThreshold": false
   }
