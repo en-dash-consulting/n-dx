@@ -265,6 +265,16 @@ export function generateLlmsTxt(
   }
   lines.push("");
 
+  // ── Tooling ──────────────────────────────────────────────────────────────
+
+  lines.push("## Tooling");
+  lines.push("");
+  lines.push("This project uses n-dx for codebase analysis (Sourcevision) and requirement");
+  lines.push("tracking (Rex). MCP tools are available for interactive access to analysis");
+  lines.push("data and PRD management. Skills available: /plan, /status, /capture,");
+  lines.push("/zone, /work, /configure.");
+  lines.push("");
+
   return lines.join("\n");
 }
 
