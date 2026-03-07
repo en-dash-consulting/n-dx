@@ -5,29 +5,29 @@
 <zone>
 
 Zone: Web Viewer/web/unit/server 2 (`web-viewer/web/unit/server-2`)
-Files: 4, Cohesion: 0.44, Coupling: 0.56
-Description: 4 files, primarily TypeScript
-Entry points: packages/web/src/server/port.ts
-Lines: 592
+Files: 5, Cohesion: 0.50, Coupling: 0.50
+Description: 5 files, primarily TypeScript
+Entry points: packages/web/src/server/routes-sourcevision.ts
+Lines: 1941
 
 </zone>
 
 <files>
 
-packages/web/src/public.ts (TypeScript, 53 lines, source)
-packages/web/src/server/index.ts (TypeScript, 40 lines, source)
-packages/web/src/server/port.ts (TypeScript, 195 lines, source)
-packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
+packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
+packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
+packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
+packages/web/tests/unit/server/routes-sourcevision.test.ts (TypeScript, 369 lines, test)
+packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
-  packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
-  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
+  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {classifyPRMarkdownRefreshFailureCode}
+  packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {buildPRMarkdownRefreshFailure, classifyPRMarkdownRefreshFailureCode, classifyPRMarkdownRefreshPreflightCode, GIT_CREDENTIAL_HELPER_COMMAND, getPRMarkdownRefreshRemediationHints, resolvePRMarkdownRefreshPreflightErrorContract, resolvePRMarkdownRefreshGuidance, shouldUsePRMarkdownFallback, shouldUsePRMarkdownFallbackForCode, validatePRMarkdownRefreshPreflightErrorContract}
+  packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
+  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
 
 </imports>

@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/agent/process (`hench/unit/agent/process`)
-Files: 51, Cohesion: 0.78, Coupling: 0.22
-Description: 51 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/process/index.ts, packages/hench/src/process/limiter.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/process/memory-throttle.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/store/run-change-detector.ts, packages/hench/src/tools/exec-shell.ts
-Lines: 13891
+Files: 37, Cohesion: 0.75, Coupling: 0.25
+Description: 37 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/process/index.ts, packages/hench/src/process/limiter.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/process/memory-throttle.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/tools/exec-shell.ts
+Lines: 11783
 
 </zone>
 
@@ -17,16 +17,9 @@ Lines: 13891
 packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
+packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
 packages/hench/src/agent/planning/prompt.ts (TypeScript, 76 lines, source)
 packages/hench/src/cli/commands/config.ts (TypeScript, 584 lines, source)
-packages/hench/src/cli/commands/constants.ts (TypeScript, 55 lines, source)
-packages/hench/src/cli/commands/show.ts (TypeScript, 114 lines, source)
-packages/hench/src/cli/commands/status.ts (TypeScript, 76 lines, source)
-packages/hench/src/cli/commands/task-lookup.ts (TypeScript, 83 lines, source)
-packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
-packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
-packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
-packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
@@ -41,20 +34,14 @@ packages/hench/src/public.ts (TypeScript, 260 lines, source)
 packages/hench/src/schema/index.ts (TypeScript, 44 lines, source)
 packages/hench/src/schema/v1.ts (TypeScript, 289 lines, source)
 packages/hench/src/store/run-archiver.ts (TypeScript, 285 lines, source)
-packages/hench/src/store/run-change-detector.ts (TypeScript, 237 lines, source)
 packages/hench/src/tools/exec-shell.ts (TypeScript, 50 lines, source)
 packages/hench/tests/e2e/cli-init.test.ts (TypeScript, 135 lines, test)
 packages/hench/tests/unit/agent/adaptive.test.ts (TypeScript, 531 lines, test)
 packages/hench/tests/unit/agent/prompt.test.ts (TypeScript, 100 lines, test)
 packages/hench/tests/unit/agent/summary.test.ts (TypeScript, 241 lines, test)
+packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
 packages/hench/tests/unit/agent/workflow.test.ts (TypeScript, 388 lines, test)
 packages/hench/tests/unit/cli/commands/config.test.ts (TypeScript, 211 lines, test)
-packages/hench/tests/unit/cli/commands/constants.test.ts (TypeScript, 42 lines, test)
-packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts (TypeScript, 157 lines, test)
-packages/hench/tests/unit/cli/commands/task-lookup.test.ts (TypeScript, 24 lines, test)
-packages/hench/tests/unit/cli/errors.test.ts (TypeScript, 234 lines, test)
-packages/hench/tests/unit/cli/help.test.ts (TypeScript, 101 lines, test)
-packages/hench/tests/unit/cli/output.test.ts (TypeScript, 120 lines, test)
 packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts (TypeScript, 872 lines, test)
 packages/hench/tests/unit/process/exec.test.ts (TypeScript, 115 lines, test)
 packages/hench/tests/unit/process/lifecycle.test.ts (TypeScript, 511 lines, test)
@@ -64,7 +51,6 @@ packages/hench/tests/unit/process/memory-throttle.test.ts (TypeScript, 426 lines
 packages/hench/tests/unit/process/pool.test.ts (TypeScript, 855 lines, test)
 packages/hench/tests/unit/process/process-memory-tracker.test.ts (TypeScript, 440 lines, test)
 packages/hench/tests/unit/store/run-archiver.test.ts (TypeScript, 365 lines, test)
-packages/hench/tests/unit/store/run-change-detector.test.ts (TypeScript, 383 lines, test)
 
 </files>
 
@@ -74,27 +60,11 @@ Internal:
   packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
   packages/hench/src/agent/analysis/summary.ts → packages/hench/src/schema/v1.ts {ToolCallRecord, RunSummaryData, CommandRecord, TestRecord}
   packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/schema/v1.ts {RunRecord, RunStatus, HenchConfig}
+  packages/hench/src/agent/lifecycle/token-budget.ts → packages/hench/src/schema/index.ts {TokenUsage}
   packages/hench/src/agent/planning/prompt.ts → packages/hench/src/schema/index.ts {HenchConfig, TaskBriefProject}
-  packages/hench/src/cli/commands/config.ts → packages/hench/src/cli/errors.ts {CLIError}
-  packages/hench/src/cli/commands/config.ts → packages/hench/src/cli/output.ts {info, result}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/index.ts {validateConfig, formatValidationErrors}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/v1.ts {HenchConfig, GuardConfig, RetryConfig, Provider}
-  packages/hench/src/cli/commands/constants.ts → packages/hench/src/cli/errors.ts {CLIError}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/task-lookup.ts {lookupTaskInRex, formatTaskLine}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/output.ts {info, result}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR, safeParseInt}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/task-lookup.ts {batchLookupTasksInRex, formatTaskLine}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/output.ts {info, result}
-  packages/hench/src/cli/commands/task-lookup.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/config.ts {cmdConfig}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/constants.ts {usage}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/errors.ts {CLIError, handleCLIError, requireHenchDir}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/help.ts {showCommandHelp}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/output.ts {setQuiet}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {execShell}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {ExecShellOptions}
   packages/hench/src/process/index.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
@@ -117,6 +87,7 @@ Internal:
   packages/hench/src/process/memory-monitor.ts → packages/hench/src/process/memory-throttle.ts {SystemMemoryReader}
   packages/hench/src/public.ts → packages/hench/src/agent/analysis/adaptive.ts {DEFAULT_ADAPTIVE_SETTINGS}
   packages/hench/src/public.ts → packages/hench/src/agent/analysis/adaptive.ts {AdaptiveSettings, AdjustmentCategory, AdjustmentPriority, ProjectMetrics, WorkflowAdjustment, AdjustmentNotification, AdaptiveAnalysis}
+  packages/hench/src/public.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
   packages/hench/src/public.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/src/public.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetricsConfig, ExecutionMetricsSnapshot, TaskResourceMetrics, UtilizationPatterns, ExecutionMetricsSummary}
   packages/hench/src/public.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -134,8 +105,6 @@ Internal:
   packages/hench/src/public.ts → packages/hench/src/schema/v1.ts {HenchConfig, GuardConfig, PolicyLimitsConfig, MemoryThrottleConfig, MemoryMonitorConfig, RuntimePoolConfig, RetryConfig, Provider, RunRecord, RunStatus, ToolCallRecord, TokenUsage, TurnTokenUsage, CommandRecord, TestRecord, SummaryCounts, PostRunTestRecord, RunSummaryData, TaskBrief, TaskBriefTask, TaskBriefParent, TaskBriefSibling, TaskBriefProject, TaskBriefLogEntry}
   packages/hench/src/public.ts → packages/hench/src/store/run-archiver.ts {archiveOldRuns, identifyArchivableRuns, compressRunFile, readCompressedJSON, loadArchivalConfig, DEFAULT_ARCHIVAL_CONFIG}
   packages/hench/src/public.ts → packages/hench/src/store/run-archiver.ts {ArchivalConfig, ArchivalResult, CompressedFileResult}
-  packages/hench/src/public.ts → packages/hench/src/store/run-change-detector.ts {RunChangeDetector}
-  packages/hench/src/public.ts → packages/hench/src/store/run-change-detector.ts {FileSnapshot, AggregationCheckpoint, RunFileChange, DeltaResult}
   packages/hench/src/schema/index.ts → packages/hench/src/schema/v1.ts {HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG}
   packages/hench/src/schema/index.ts → packages/hench/src/schema/v1.ts {GuardConfig, PolicyLimitsConfig, RetryConfig, HenchConfig, Provider, RunStatus, ToolCallRecord, TokenUsage, TurnTokenUsage, CommandRecord, TestRecord, PostRunTestRecord, SummaryCounts, RunSummaryData, RunMemoryStats, RunRecord, TaskBrief, TaskBriefTask, TaskBriefParent, TaskBriefSibling, TaskBriefProject, TaskBriefLogEntry, TaskBriefRequirement}
   packages/hench/src/schema/v1.ts → packages/hench/src/process/memory-monitor.ts {MemoryMonitorConfig}
@@ -151,21 +120,15 @@ Internal:
   packages/hench/tests/unit/agent/prompt.test.ts → packages/hench/src/schema/v1.ts {TaskBriefProject}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/schema/v1.ts {ToolCallRecord}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/schema/v1.ts {TokenUsage}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats, _resetIdCounter}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {WorkflowSuggestion}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/cli/commands/config.ts {getConfigValue, setConfigValue, coerceValue, previewChange, formatConfigDisplay, CONFIG_FIELDS}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
   packages/hench/tests/unit/cli/commands/config.test.ts → packages/hench/src/schema/v1.ts {HenchConfig}
-  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/commands/constants.ts {safeParseInt}
-  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/errors.ts {CLIError}
-  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
-  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
-  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/schema/index.ts {RunRecord}
-  packages/hench/tests/unit/cli/commands/task-lookup.test.ts → packages/hench/src/cli/commands/task-lookup.ts {formatTaskLine}
-  packages/hench/tests/unit/cli/errors.test.ts → packages/hench/src/cli/errors.ts {CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI}
-  packages/hench/tests/unit/cli/help.test.ts → packages/hench/src/cli/help.ts {showCommandHelp}
-  packages/hench/tests/unit/cli/output.test.ts → packages/hench/src/cli/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
   packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/tests/unit/process/exec.test.ts → packages/hench/src/process/exec.ts {exec, execStdout, execShellCmd, getCurrentHead}
   packages/hench/tests/unit/process/lifecycle.test.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -180,7 +143,5 @@ Internal:
   packages/hench/tests/unit/process/process-memory-tracker.test.ts → packages/hench/src/process/process-memory-tracker.ts {ProcessMemoryTracker, DEFAULT_PROCESS_MEMORY_TRACKER_CONFIG}
   packages/hench/tests/unit/store/run-archiver.test.ts → packages/hench/src/store/run-archiver.ts {archiveOldRuns, identifyArchivableRuns, compressRunFile, readCompressedJSON, loadArchivalConfig, DEFAULT_ARCHIVAL_CONFIG}
   packages/hench/tests/unit/store/run-archiver.test.ts → packages/hench/src/store/run-archiver.ts {ArchivalConfig}
-  packages/hench/tests/unit/store/run-change-detector.test.ts → packages/hench/src/store/run-change-detector.ts {RunChangeDetector}
-  packages/hench/tests/unit/store/run-change-detector.test.ts → packages/hench/src/store/run-change-detector.ts {AggregationCheckpoint, RunFileChange, DeltaResult}
 
 </imports>

@@ -5,31 +5,30 @@
 <zone>
 
 Zone: Web Viewer/web 2 (`web-viewer/web-2`)
-Files: 44, Cohesion: 0.65, Coupling: 0.35
-Description: 44 files, primarily TypeScript
-Entry points: packages/web/src/viewer/bootstrap.ts, packages/web/src/viewer/components/crash-recovery-banner.ts, packages/web/src/viewer/components/degradation-banner.ts, packages/web/src/viewer/components/memory-warning.ts, packages/web/src/viewer/components/prd-tree/execution-panel.ts, packages/web/src/viewer/components/refresh-queue-status.ts, packages/web/src/viewer/components/status-indicators.ts, packages/web/src/viewer/hooks/use-graceful-degradation.ts, packages/web/src/viewer/hooks/use-memory-monitor.ts, packages/web/src/viewer/hooks/use-prd-websocket.ts, packages/web/src/viewer/hooks/use-refresh-throttle.ts, packages/web/src/viewer/performance/graceful-degradation.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/polling-manager.ts
-Lines: 14212
+Files: 43, Cohesion: 0.68, Coupling: 0.32
+Description: 43 files, primarily TypeScript
+Entry points: packages/web/src/viewer/bootstrap.ts, packages/web/src/viewer/components/degradation-banner.ts, packages/web/src/viewer/components/memory-warning.ts, packages/web/src/viewer/components/prd-tree/execution-panel.ts, packages/web/src/viewer/components/refresh-queue-status.ts, packages/web/src/viewer/hooks/use-graceful-degradation.ts, packages/web/src/viewer/hooks/use-memory-monitor.ts, packages/web/src/viewer/hooks/use-prd-websocket.ts, packages/web/src/viewer/hooks/use-refresh-throttle.ts, packages/web/src/viewer/performance/graceful-degradation.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/polling-manager.ts
+Lines: 15157
 
 </zone>
 
 <files>
 
 packages/web/src/viewer/bootstrap.ts (TypeScript, 38 lines, source)
-packages/web/src/viewer/components/crash-recovery-banner.ts (TypeScript, 92 lines, source)
 packages/web/src/viewer/components/degradation-banner.ts (TypeScript, 100 lines, source)
 packages/web/src/viewer/components/memory-warning.ts (TypeScript, 83 lines, source)
 packages/web/src/viewer/components/prd-tree/execution-panel.ts (TypeScript, 406 lines, source)
 packages/web/src/viewer/components/refresh-queue-status.ts (TypeScript, 98 lines, source)
-packages/web/src/viewer/components/status-indicators.ts (TypeScript, 219 lines, source)
+packages/web/src/viewer/hooks/use-dom-performance-monitor.ts (TypeScript, 175 lines, source)
 packages/web/src/viewer/hooks/use-graceful-degradation.ts (TypeScript, 74 lines, source)
 packages/web/src/viewer/hooks/use-memory-monitor.ts (TypeScript, 126 lines, source)
 packages/web/src/viewer/hooks/use-prd-websocket.ts (TypeScript, 157 lines, source)
-packages/web/src/viewer/hooks/use-project-status.ts (TypeScript, 185 lines, source)
 packages/web/src/viewer/hooks/use-refresh-throttle.ts (TypeScript, 108 lines, source)
 packages/web/src/viewer/hooks/use-tab-visibility.ts (TypeScript, 73 lines, source)
+packages/web/src/viewer/performance/dom-performance-monitor.ts (TypeScript, 505 lines, source)
 packages/web/src/viewer/performance/dom-update-gate.ts (TypeScript, 353 lines, source)
 packages/web/src/viewer/performance/graceful-degradation.ts (TypeScript, 227 lines, source)
-packages/web/src/viewer/performance/index.ts (TypeScript, 64 lines, source)
+packages/web/src/viewer/performance/index.ts (TypeScript, 95 lines, source)
 packages/web/src/viewer/performance/memory-monitor.ts (TypeScript, 327 lines, source)
 packages/web/src/viewer/performance/refresh-throttle.ts (TypeScript, 364 lines, source)
 packages/web/src/viewer/performance/response-buffer-gate.ts (TypeScript, 258 lines, source)
@@ -39,8 +38,8 @@ packages/web/src/viewer/polling/tab-visibility.ts (TypeScript, 411 lines, source
 packages/web/src/viewer/polling/tick-visibility-gate.ts (TypeScript, 218 lines, source)
 packages/web/tests/integration/background-suspension-recovery.test.ts (TypeScript, 930 lines, test)
 packages/web/tests/integration/memory-aware-polling-suspension.test.ts (TypeScript, 1032 lines, test)
-packages/web/tests/unit/viewer/crash-recovery-banner.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/unit/viewer/degradation-banner.test.ts (TypeScript, 150 lines, test)
+packages/web/tests/unit/viewer/dom-performance-monitor.test.ts (TypeScript, 1011 lines, test)
 packages/web/tests/unit/viewer/dom-update-gate.test.ts (TypeScript, 942 lines, test)
 packages/web/tests/unit/viewer/execution-panel-polling.test.ts (TypeScript, 210 lines, test)
 packages/web/tests/unit/viewer/graceful-degradation.test.ts (TypeScript, 402 lines, test)
@@ -53,11 +52,11 @@ packages/web/tests/unit/viewer/refresh-throttle.test.ts (TypeScript, 531 lines, 
 packages/web/tests/unit/viewer/response-buffer-gate.test.ts (TypeScript, 590 lines, test)
 packages/web/tests/unit/viewer/status-indicators-memory.test.ts (TypeScript, 297 lines, test)
 packages/web/tests/unit/viewer/status-indicators-polling.test.ts (TypeScript, 210 lines, test)
-packages/web/tests/unit/viewer/status-indicators.test.ts (TypeScript, 379 lines, test)
 packages/web/tests/unit/viewer/tab-visibility.test.ts (TypeScript, 693 lines, test)
 packages/web/tests/unit/viewer/tick-visibility-gate.test.ts (TypeScript, 609 lines, test)
 packages/web/tests/unit/viewer/update-batcher.test.ts (TypeScript, 537 lines, test)
 packages/web/tests/unit/viewer/usage-polling.test.ts (TypeScript, 209 lines, test)
+packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts (TypeScript, 372 lines, test)
 
 </files>
 
@@ -67,20 +66,18 @@ Internal:
   packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager}
   packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor}
   packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/tick-visibility-gate.ts {createTickVisibilityGate}
-  packages/web/src/viewer/components/crash-recovery-banner.ts → packages/web/src/viewer/performance/index.ts {SavedNavigationState}
   packages/web/src/viewer/components/degradation-banner.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, DegradableFeature}
   packages/web/src/viewer/components/memory-warning.ts → packages/web/src/viewer/performance/index.ts {formatBytes, formatRatio}
   packages/web/src/viewer/components/memory-warning.ts → packages/web/src/viewer/performance/index.ts {MemorySnapshot, MemoryLevel}
   packages/web/src/viewer/components/prd-tree/execution-panel.ts → packages/web/src/viewer/performance/index.ts {isFeatureDisabled, onDegradationChange}
   packages/web/src/viewer/components/refresh-queue-status.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, RefreshQueueState}
-  packages/web/src/viewer/components/status-indicators.ts → packages/web/src/viewer/hooks/use-project-status.ts {useProjectStatus}
-  packages/web/src/viewer/components/status-indicators.ts → packages/web/src/viewer/hooks/use-project-status.ts {ProjectStatus, SourceVisionStatus, RexStatus, HenchStatus}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, recordRender, recordUpdate, measureOperation, computeSummary, resetDOMPerformanceMonitor, countDOMNodes, readHeapUsage}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, DOMPerformanceConfig, RenderTiming, UpdateComparison, PerformanceSummary}
   packages/web/src/viewer/hooks/use-graceful-degradation.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, stopDegradation, onDegradationChange, getDegradationState, isFeatureDisabled}
   packages/web/src/viewer/hooks/use-graceful-degradation.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, DegradableFeature, DegradationState}
   packages/web/src/viewer/hooks/use-memory-monitor.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, stopMemoryMonitor, onSnapshot, getLatestSnapshot, getSnapshotHistory, resetMemoryMonitor}
   packages/web/src/viewer/hooks/use-memory-monitor.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemorySnapshot, MemoryLevel, MemoryThresholds}
   packages/web/src/viewer/hooks/use-prd-websocket.ts → packages/web/src/viewer/performance/index.ts {createUpdateBatcher, createDomUpdateGate, createResponseBufferGate}
-  packages/web/src/viewer/hooks/use-project-status.ts → packages/web/src/viewer/performance/index.ts {isFeatureDisabled, onDegradationChange}
   packages/web/src/viewer/hooks/use-refresh-throttle.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, RefreshQueueState, RefreshPriority}
   packages/web/src/viewer/hooks/use-refresh-throttle.ts → packages/web/src/viewer/performance/refresh-throttle.ts {startRefreshThrottle, stopRefreshThrottle, onQueueChange, getQueueState, enqueueRefresh, getRecommendedInterval, resetRefreshThrottle}
   packages/web/src/viewer/hooks/use-tab-visibility.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, stopTabVisibilityMonitor, onVisibilityChange, getTabVisibilitySnapshot, getVisibilityCapabilities}
@@ -90,6 +87,7 @@ Internal:
   packages/web/src/viewer/performance/dom-update-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
   packages/web/src/viewer/performance/graceful-degradation.ts → packages/web/src/viewer/performance/memory-monitor.ts {onSnapshot, getCurrentLevel, getLatestSnapshot}
   packages/web/src/viewer/performance/graceful-degradation.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemoryLevel, MemorySnapshot}
+  packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {countDOMNodes, readHeapUsage, formatDuration, formatNodeCount, formatDelta, recordRender, recordUpdate, measureOperation, takeDOMSnapshot, computeSummary, onDOMSnapshot, setObservedContainer, startDOMPerformanceMonitor, stopDOMPerformanceMonitor, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, getObservedContainer, resetDOMPerformanceMonitor, DOMNodeSnapshot, RenderTiming, UpdateComparison, PerformanceSummary, DOMPerformanceConfig, DOMSnapshotHandler}
   packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/dom-update-gate.ts {createDomUpdateGate, DomUpdateGate, DomUpdateGateConfig}
   packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/graceful-degradation.ts {isFeatureDisabled, onDegradationChange, DegradableFeature, DegradationState, DegradationChangeHandler}
   packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/memory-monitor.ts {formatBytes, formatRatio, MemorySnapshot, MemoryLevel}
@@ -113,10 +111,11 @@ Internal:
   packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/performance/refresh-throttle.ts {startRefreshThrottle, getQueueState, enqueueRefresh, getRecommendedInterval, resetRefreshThrottle}
   packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isSuspended, isPollerActive, getRegisteredPollers, getPollerCount, resetPollingManager}
   packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
-  packages/web/tests/unit/viewer/crash-recovery-banner.test.ts → packages/web/src/viewer/components/crash-recovery-banner.ts {CrashRecoveryBanner}
   packages/web/tests/unit/viewer/degradation-banner.test.ts → packages/web/src/viewer/components/degradation-banner.ts {DegradationBanner}
   packages/web/tests/unit/viewer/degradation-banner.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {DegradableFeature}
   packages/web/tests/unit/viewer/degradation-banner.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemoryLevel}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {countDOMNodes, readHeapUsage, formatDuration, formatNodeCount, formatDelta, recordRender, recordUpdate, measureOperation, takeDOMSnapshot, computeSummary, startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, setObservedContainer, getObservedContainer, resetDOMPerformanceMonitor}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, RenderTiming, UpdateComparison, PerformanceSummary}
   packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/performance/dom-update-gate.ts {createDomUpdateGate}
   packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/performance/dom-update-gate.ts {DomUpdateGate}
   packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/performance/update-batcher.ts {createUpdateBatcher}
@@ -149,7 +148,6 @@ Internal:
   packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
   packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
   packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
-  packages/web/tests/unit/viewer/status-indicators.test.ts → packages/web/src/viewer/components/status-indicators.ts {SvFreshnessIndicator, RexCompletionIndicator, HenchActivityIndicator}
   packages/web/tests/unit/viewer/tab-visibility.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, stopTabVisibilityMonitor, getTabVisibility, getTabVisibilitySnapshot, isTabVisible, onVisibilityChange, resetTabVisibility, detectVisibilityAPI, getVisibilityCapabilities, getTransitionHistory}
   packages/web/tests/unit/viewer/tab-visibility.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot, TabVisibilityState}
   packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
@@ -159,5 +157,8 @@ Internal:
   packages/web/tests/unit/viewer/update-batcher.test.ts → packages/web/src/viewer/performance/update-batcher.ts {UpdateBatcher}
   packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
   packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/hooks/use-dom-performance-monitor.ts {useDOMPerformanceMonitor}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/hooks/use-dom-performance-monitor.ts {UseDOMPerformanceMonitorResult}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {resetDOMPerformanceMonitor, getLatestDOMSnapshot, getObservedContainer, getRenderTimings, getUpdateComparisons, getDOMSnapshotHistory}
 
 </imports>

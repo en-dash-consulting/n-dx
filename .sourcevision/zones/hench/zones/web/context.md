@@ -7,13 +7,13 @@
 Zone: Hench/web (`hench/web`)
 Files: 2, Cohesion: 1.00, Coupling: 0.00
 Description: 2 files, primarily TypeScript
-Lines: 1010
+Lines: 201
 
 </zone>
 
 <files>
 
-packages/web/tests/unit/viewer/graph-interaction.test.ts (TypeScript, 716 lines, test)
-packages/web/tests/unit/viewer/graph-zoom.test.ts (TypeScript, 294 lines, test)
+packages/web/tests/integration/boundary-check.test.ts (TypeScript, 84 lines, test)
+packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 117 lines, test)
 
 </files>

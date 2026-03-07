@@ -44,6 +44,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
+[pattern] [info] Zone finding 0 (coupling warning to analyzers-2) is confirmed as a false positive by two independent sources: zone finding 1 (LLM) and global finding 10 (heuristic cross-check). E2e tests importing from the analyzers domain is correct by design. Severity should be treated as info.
 [pattern] [info] Zone finding 0 (warning: coupling 0.57 to 'analyzers-2') is contradicted by global finding 10. E2e tests coupling to what is semantically one analyzers domain is expected; the warning severity is not justified. The coupling flag measures intra-domain edges that Louvain partitioned into separate zone identifiers, not genuine cross-concern dependencies.
 
 </findings>
@@ -71,6 +72,7 @@ Incoming (other zones → this zone):
 - Codify the implicit convention surfaced by this zone: production zones may co-locate unit tests (as file-analysis-pipeline and zone-detection-engine do) but must not contain integration or e2e tests. Adding a lint or zone-membership rule enforcing this boundary would prevent schema-validation's pattern from recurring in new zones.
 - Coupling to 'analyzers-2' reflects intra-domain edges within the Louvain-fragmented analyzers cluster, not a structural dependency risk
 - Zone finding 0 (warning: coupling 0.57 to 'analyzers-2') is contradicted by global finding 10. E2e tests coupling to what is semantically one analyzers domain is expected; the warning severity is not justified. The coupling flag measures intra-domain edges that Louvain partitioned into separate zone identifiers, not genuine cross-concern dependencies.
+- Zone finding 0 (coupling warning to analyzers-2) is confirmed as a false positive by two independent sources: zone finding 1 (LLM) and global finding 10 (heuristic cross-check). E2e tests importing from the analyzers domain is correct by design. Severity should be treated as info.
 - [call graph] 87 internal calls, 10 outgoing, 11 incoming (cohesion: 0.9, coupling: 0.1)
 
 </insights>

@@ -9,7 +9,7 @@ Files: 6, Cohesion: 0.31, Coupling: 0.69
 Risk: critical (score: 0.69)
 Description: 6 files, primarily TypeScript
 Entry points: src/analyzers/zone-hash.ts, src/analyzers/zones.ts
-Lines: 5740
+Lines: 5863
 
 </zone>
 
@@ -17,8 +17,8 @@ Lines: 5740
 
 src/analyzers/louvain.ts (TypeScript, 804 lines, source)
 src/analyzers/zone-hash.ts (TypeScript, 26 lines, source)
-src/analyzers/zones.ts (TypeScript, 1807 lines, source)
-tests/unit/analyzers/zone-detection.test.ts (TypeScript, 1816 lines, test)
+src/analyzers/zones.ts (TypeScript, 1884 lines, source)
+tests/unit/analyzers/zone-detection.test.ts (TypeScript, 1862 lines, test)
 tests/unit/analyzers/zone-size-policy.test.ts (TypeScript, 302 lines, test)
 tests/unit/analyzers/zone-subdivision.test.ts (TypeScript, 985 lines, test)
 
@@ -31,7 +31,7 @@ Internal:
   src/analyzers/zones.ts → src/analyzers/zone-hash.ts {computeGlobalContentHash}
   src/analyzers/zones.ts → src/analyzers/zone-hash.ts {computeGlobalContentHash}
   tests/unit/analyzers/zone-detection.test.ts → src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeSmallCommunities, mergeSatelliteCommunities, splitLargeCommunities, splitByDirectory}
-  tests/unit/analyzers/zone-detection.test.ts → src/analyzers/zones.ts {deriveZoneId, deriveZoneName, disambiguateZoneId, deriveZoneIdFromFilenames, analyzeZones, assignByProximity, SUBDIVISION_THRESHOLD}
+  tests/unit/analyzers/zone-detection.test.ts → src/analyzers/zones.ts {deriveZoneId, deriveZoneName, disambiguateZoneId, deriveZoneIdFromFilenames, analyzeZones, assignByProximity, applyZonePins, SUBDIVISION_THRESHOLD}
   tests/unit/analyzers/zone-size-policy.test.ts → src/analyzers/louvain.ts {buildUndirectedGraph, splitLargeCommunities, louvainPhase1, mergeSmallCommunities, capZoneCount}
   tests/unit/analyzers/zone-size-policy.test.ts → src/analyzers/zones.ts {analyzeZones}
   tests/unit/analyzers/zone-subdivision.test.ts → src/analyzers/zones.ts {analyzeZones, computeStructureHash, computeZoneContentHash, computeGlobalContentHash, subdivideZone, runZonePipeline, SUBDIVISION_THRESHOLD, MAX_SUBDIVISION_DEPTH}
@@ -53,7 +53,7 @@ Incoming (other zones → this zone):
 [observation] [warning] Generic zone name "Analyzers 3" — enrichment did not assign a meaningful name reflecting this zone's domain purpose
 [observation] [warning] High coupling (0.69) — 10 imports target "analyzers"
 [observation] [warning] Low cohesion (0.31) — files are loosely related, consider splitting this zone
-[pattern] [info] Zone finding 1 (warning: coupling 0.57 to 'analyzers') is a false positive. Global finding 10 identifies this as intra-domain noise caused by Louvain splitting one semantic zone into three. The 10 cross-zone imports are edges within a single coherent analyzers domain, not genuine cross-concern dependencies. Treat as info-only.
+[pattern] [info] Zone finding 4 (critical risk, score 0.69) is overstated. Three independent sources — zone finding 3 (LLM), global finding 5 (LLM), and global finding 10 (heuristic cross-check) — identify the coupling and low-cohesion scores as Louvain over-partitioning artifacts. The constraint against escalating single-heuristic findings applies in reverse: three sources of corroboration for a false-positive justify downgrading from critical to info. No file-level refactoring is warranted; subdirectory organization of src/analyzers/ addresses the root cause.
 [suggestion] [warning] Zone "Analyzers 3" (analyzers-3) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development
 
 </findings>
@@ -85,6 +85,8 @@ Incoming (other zones → this zone):
 - The high coupling metric (0.57) with 10 imports targeting 'analyzers' is likely an artifact of artificial zone fragmentation — these files share a parent directory with the main analyzers zone and were separated by the clustering algorithm, not by architectural intent.
 - Coupling to 'analyzers' is an artifact of Louvain over-partitioning; these files belong to the same semantic domain as analyzers and analyzers-2
 - Zone finding 1 (warning: coupling 0.57 to 'analyzers') is a false positive. Global finding 10 identifies this as intra-domain noise caused by Louvain splitting one semantic zone into three. The 10 cross-zone imports are edges within a single coherent analyzers domain, not genuine cross-concern dependencies. Treat as info-only.
-- [call graph] 237 internal calls, 583 outgoing, 50 incoming (cohesion: 0.29, coupling: 0.71)
+- All three metric-based warnings (coupling, low cohesion, critical risk score) are Louvain artifacts with no independent corroboration. The LLM pass (finding 3) and global findings 5 and 10 each independently confirm this.
+- Zone finding 4 (critical risk, score 0.69) is overstated. Three independent sources — zone finding 3 (LLM), global finding 5 (LLM), and global finding 10 (heuristic cross-check) — identify the coupling and low-cohesion scores as Louvain over-partitioning artifacts. The constraint against escalating single-heuristic findings applies in reverse: three sources of corroboration for a false-positive justify downgrading from critical to info. No file-level refactoring is warranted; subdirectory organization of src/analyzers/ addresses the root cause.
+- [call graph] 244 internal calls, 583 outgoing, 50 incoming (cohesion: 0.3, coupling: 0.7)
 
 </insights>

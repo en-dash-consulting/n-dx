@@ -31,14 +31,14 @@
       "lastModified": 1772682844021
     },
     {
-      "path": ".hench/locks/71932.lock",
-      "size": 61,
+      "path": ".hench/locks/406.lock",
+      "size": 59,
       "language": "Other",
       "lineCount": 4,
-      "hash": "2fc0d48a2d9ba9222a37dedcb0a4f76274b8955da6966d76444dc1c22263d98e",
+      "hash": "bb18899753fe122baba1f6981e8ac78a366051729b854c427a8fb0fd8b2d5411",
       "role": "other",
       "category": ".hench",
-      "lastModified": 1772853342794
+      "lastModified": 1772904075082
     },
     {
       "path": ".npmrc",
@@ -92,13 +92,13 @@
     },
     {
       "path": ".rex/execution-log.jsonl",
-      "size": 95521,
+      "size": 99836,
       "language": "Other",
-      "lineCount": 392,
-      "hash": "694f41b91bb123651e80ae93d01cb64a11c55c7d1e524599cc2c1a1af54e6d6b",
+      "lineCount": 409,
+      "hash": "33ad3aa52dd5606a7fb0edb92aa7503a48ec5c7767562306403f07efe1e8c339",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772853781553
+      "lastModified": 1772904637577
     },
     {
       "path": ".rex/pending-proposals.json",
@@ -112,13 +112,13 @@
     },
     {
       "path": ".rex/prd.json",
-      "size": 992545,
+      "size": 996892,
       "language": "JSON",
-      "lineCount": 19289,
-      "hash": "94de3d3c72ad65e12e1159d1270eaaaf296f013a88ac7bee7578f3fc21c07c07",
+      "lineCount": 19377,
+      "hash": "02b2127e94db324dd31a34f71aa99023f8e2838ea510a71a126edf00de3b4e7a",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772853781553
+      "lastModified": 1772904637577
     },
     {
       "path": ".rex/workflow.md",
@@ -542,13 +542,13 @@
     },
     {
       "path": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "size": 33953,
+      "size": 37333,
       "language": "TypeScript",
-      "lineCount": 1031,
-      "hash": "881435faaef2d54167cd1fe1bea61d2ca02220d0c1c7e4c793ceb45360d9f1f4",
+      "lineCount": 1168,
+      "hash": "b41c88fa7ba54192b0f3f113e2181c9c976a868f706afb7dc808ba6eafa2b893",
       "role": "source",
       "category": "hench",
-      "lastModified": 1772682844101
+      "lastModified": 1772904590496
     },
     {
       "path": "packages/hench/src/agent/lifecycle/heartbeat.ts",
@@ -5202,23 +5202,23 @@
     },
     {
       "path": "packages/sourcevision/src/analyzers/zones.ts",
-      "size": 65991,
+      "size": 66436,
       "language": "TypeScript",
-      "lineCount": 1876,
-      "hash": "7c718dd8d11e6040cba8844a8353edc38e87d65c04140c161e20033b66620ec5",
+      "lineCount": 1884,
+      "hash": "6ed77b8a5c24ceda7027c4c86aab2079f1245bee9bdccabdf1c74f2977bc4edf",
       "role": "source",
       "category": "sourcevision",
-      "lastModified": 1772845635680
+      "lastModified": 1772855330655
     },
     {
       "path": "packages/sourcevision/src/cli/commands/analyze-phases.ts",
-      "size": 24058,
+      "size": 24185,
       "language": "TypeScript",
-      "lineCount": 545,
-      "hash": "bc9728cdd682eb4736d6185c099481fd531be3233b7dd3b4ff552ec92994165b",
+      "lineCount": 549,
+      "hash": "0b59b6e18a6d01994609b276ef985c57d1d4cac9a83230945051c543cd5c4315",
       "role": "source",
       "category": "sourcevision",
-      "lastModified": 1772845647598
+      "lastModified": 1772855339479
     },
     {
       "path": "packages/sourcevision/src/cli/commands/analyze.ts",
@@ -10181,6 +10181,26 @@
       "lastModified": 1772682844211
     },
     {
+      "path": "scripts/check-gateway-regex.mjs",
+      "size": 0,
+      "language": "JavaScript",
+      "lineCount": 0,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "role": "build",
+      "category": "scripts",
+      "lastModified": 1772904373654
+    },
+    {
+      "path": "scripts/check-gateway-test.mjs",
+      "size": 64,
+      "language": "JavaScript",
+      "lineCount": 1,
+      "hash": "9d79df1ba57311f35d16531dd9002e6ed4999e7964c3dacc26cb4cbf50b5f296",
+      "role": "build",
+      "category": "scripts",
+      "lastModified": 1772904373654
+    },
+    {
       "path": "scripts/hench-callgraph-analysis.mjs",
       "size": 5965,
       "language": "JavaScript",
@@ -10199,26 +10219,6 @@
       "role": "build",
       "category": "scripts",
       "lastModified": 1772846315632
-    },
-    {
-      "path": "tests/check-gateway-regex.mjs",
-      "size": 0,
-      "language": "JavaScript",
-      "lineCount": 0,
-      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "role": "test",
-      "category": "tests",
-      "lastModified": 1772841905249
-    },
-    {
-      "path": "tests/check-gateway-test.mjs",
-      "size": 64,
-      "language": "JavaScript",
-      "lineCount": 1,
-      "hash": "9d79df1ba57311f35d16531dd9002e6ed4999e7964c3dacc26cb4cbf50b5f296",
-      "role": "test",
-      "category": "tests",
-      "lastModified": 1772841941433
     },
     {
       "path": "tests/e2e/architecture-policy.test.js",
@@ -10483,7 +10483,7 @@
   ],
   "summary": {
     "totalFiles": 1048,
-    "totalLines": 341676,
+    "totalLines": 341930,
     "byLanguage": {
       "YAML": 3,
       "Other": 18,
@@ -10496,13 +10496,13 @@
       "CSS": 44
     },
     "byRole": {
-      "build": 3,
+      "build": 5,
       "config": 20,
       "other": 60,
       "docs": 31,
       "source": 488,
       "asset": 11,
-      "test": 434,
+      "test": 432,
       "generated": 1
     },
     "byCategory": {
@@ -10516,8 +10516,8 @@
       "rex": 239,
       "sourcevision": 137,
       "web": 393,
-      "scripts": 2,
-      "tests": 25
+      "scripts": 4,
+      "tests": 23
     }
   }
 }

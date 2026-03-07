@@ -5,9 +5,9 @@
 <zone>
 
 Zone: Hench/hench (`hench/hench`)
-Files: 7, Cohesion: 1.00, Coupling: 0.00
-Description: 7 files, primarily JSON, Other, Markdown
-Lines: 2148
+Files: 6, Cohesion: 1.00, Coupling: 0.00
+Description: 6 files, primarily Other, JSON, Markdown
+Lines: 178
 
 </zone>
 
@@ -16,7 +16,6 @@ Lines: 2148
 packages/hench/Hench-F.png (Other, 0 lines, asset)
 packages/hench/Hench.png (Other, 0 lines, asset)
 packages/hench/README.md (Markdown, 108 lines, docs)
-packages/hench/package-lock.json (JSON, 1970 lines, generated)
 packages/hench/package.json (JSON, 38 lines, config)
 packages/hench/tsconfig.json (JSON, 8 lines, config)
 packages/hench/vitest.config.ts (TypeScript, 24 lines, config)

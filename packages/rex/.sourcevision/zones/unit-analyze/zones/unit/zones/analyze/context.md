@@ -8,7 +8,7 @@ Zone: Unit Analyze/unit/analyze (`unit-analyze/unit/analyze`)
 Files: 36, Cohesion: 0.82, Coupling: 0.18
 Description: 36 files, primarily TypeScript
 Entry points: src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/diff.ts, src/analyze/file-validation.ts, src/analyze/index.ts, src/analyze/llm-bridge.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/validate-modification.ts, src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/format-loe.ts, src/cli/commands/smart-add.ts, src/cli/commands/status.ts, src/cli/validate-input.ts, src/store/project-config.ts
-Lines: 15263
+Lines: 15307
 
 </zone>
 
@@ -26,7 +26,7 @@ src/analyze/propose.ts (TypeScript, 360 lines, source)
 src/analyze/reason.ts (TypeScript, 1765 lines, source)
 src/analyze/validate-modification.ts (TypeScript, 218 lines, source)
 src/cli/commands/add.ts (TypeScript, 150 lines, source)
-src/cli/commands/analyze.ts (TypeScript, 739 lines, source)
+src/cli/commands/analyze.ts (TypeScript, 783 lines, source)
 src/cli/commands/decomposition-review.ts (TypeScript, 323 lines, source)
 src/cli/commands/format-loe.ts (TypeScript, 45 lines, source)
 src/cli/commands/smart-add.ts (TypeScript, 1671 lines, source)

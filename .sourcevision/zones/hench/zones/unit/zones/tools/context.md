@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/tools (`hench/unit/tools`)
-Files: 9, Cohesion: 0.77, Coupling: 0.23
-Description: 9 files, primarily TypeScript
-Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/shell.ts
-Lines: 1070
+Files: 12, Cohesion: 0.78, Coupling: 0.22
+Description: 12 files, primarily TypeScript
+Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/index.ts, packages/hench/src/tools/shell.ts
+Lines: 1862
 
 </zone>
 
@@ -19,10 +19,13 @@ packages/hench/src/tools/contracts.ts (TypeScript, 73 lines, source)
 packages/hench/src/tools/dispatch.ts (TypeScript, 262 lines, source)
 packages/hench/src/tools/files.ts (TypeScript, 135 lines, source)
 packages/hench/src/tools/git.ts (TypeScript, 53 lines, source)
+packages/hench/src/tools/index.ts (TypeScript, 33 lines, source)
 packages/hench/src/tools/shell.ts (TypeScript, 17 lines, source)
+packages/hench/src/tools/test-runner.ts (TypeScript, 318 lines, source)
 packages/hench/tests/unit/tools/dispatch-memory.test.ts (TypeScript, 146 lines, test)
 packages/hench/tests/unit/tools/files.test.ts (TypeScript, 130 lines, test)
 packages/hench/tests/unit/tools/git.test.ts (TypeScript, 246 lines, test)
+packages/hench/tests/unit/tools/test-runner.test.ts (TypeScript, 441 lines, test)
 
 </files>
 
@@ -37,6 +40,12 @@ Internal:
   packages/hench/src/tools/dispatch.ts → packages/hench/src/tools/shell.ts {toolRunCommand}
   packages/hench/src/tools/files.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
   packages/hench/src/tools/git.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/dispatch.ts {TOOL_DEFINITIONS, dispatchTool}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/files.ts {toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/git.ts {toolGit}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/shell.ts {toolRunCommand}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/test-runner.ts {runPostTaskTests, findRelevantTests, isTestFile, candidateTestPaths, detectRunner, buildScopedCommand}
+  packages/hench/src/tools/index.ts → packages/hench/src/tools/test-runner.ts {PostRunTestResult, TestRunnerOptions}
   packages/hench/src/tools/shell.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
   packages/hench/tests/unit/tools/dispatch-memory.test.ts → packages/hench/src/tools/contracts.ts {ToolContext}
   packages/hench/tests/unit/tools/dispatch-memory.test.ts → packages/hench/src/tools/dispatch.ts {dispatchTool}
@@ -44,5 +53,6 @@ Internal:
   packages/hench/tests/unit/tools/files.test.ts → packages/hench/src/tools/files.ts {toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles}
   packages/hench/tests/unit/tools/git.test.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
   packages/hench/tests/unit/tools/git.test.ts → packages/hench/src/tools/git.ts {toolGit}
+  packages/hench/tests/unit/tools/test-runner.test.ts → packages/hench/src/tools/test-runner.ts {isTestFile, candidateTestPaths, findRelevantTests, detectRunner, buildScopedCommand, runPostTaskTests}
 
 </imports>

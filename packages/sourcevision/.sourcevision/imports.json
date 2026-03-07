@@ -840,7 +840,8 @@
       "to": "src/schema/v1.ts",
       "type": "type",
       "symbols": [
-        "ZoneRiskMetrics"
+        "ZoneRiskMetrics",
+        "RiskJustificationEntry"
       ]
     },
     {
@@ -1467,6 +1468,14 @@
       "symbols": [
         "DATA_FILES",
         "SUPPLEMENTARY_FILES"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "RiskJustificationEntry"
       ]
     },
     {
@@ -2942,6 +2951,7 @@
         "deriveZoneIdFromFilenames",
         "analyzeZones",
         "assignByProximity",
+        "applyZonePins",
         "SUBDIVISION_THRESHOLD"
       ]
     },
@@ -3614,7 +3624,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 349,
+    "totalEdges": 350,
     "totalExternal": 7,
     "circularCount": 0,
     "circulars": [],
@@ -3700,6 +3710,6 @@
         "count": 4
       }
     ],
-    "avgImportsPerFile": 3.26
+    "avgImportsPerFile": 3.27
   }
 }

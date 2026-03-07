@@ -6,11 +6,11 @@
 ## Project Overview
 
 - **Files**: 141
-- **Lines of code**: 45,524
+- **Lines of code**: 45,833
 - **Languages**: TypeScript (128), JSON (7), Markdown (3), Other (3)
 - **Zones**: 9 (9 with descriptions)
 - **Git**: main @ 63d150a
-- **Analyzed**: 2026-03-06T21:54:44.586Z
+- **Analyzed**: 2026-03-07T15:05:24.589Z
 
 ## Architecture Zones
 
@@ -88,7 +88,7 @@
 28 files, primarily TypeScript
 
 - Files: 28
-- Cohesion: 0.43, Coupling: 0.57
+- Cohesion: 0.42, Coupling: 0.58
 - Entry points: src/analyzers/branch-work-classifier.ts, src/analyzers/risk-scoring.ts, src/cli/commands/workspace.ts, src/cli/mcp.ts, src/generators/pr-markdown-template.ts (+3 more)
 - Detail: `.sourcevision/zones/unit/context.md`
 
@@ -121,13 +121,18 @@
 
 ### Anti-patterns
 
+- The 6 crossings in the analyzers→unit direction (the minority direction in global finding 0) are the only surviving potential layering violation after removing Louvain artifacts. If any of these 6 imports in src/analyzers/ production files target test utilities, unit-only types, or test fixtures, the shared types should be extracted to a neutral location (e.g. src/types/ or src/shared/) accessible to both layers without creating a prod→test dependency. These 6 specific edges should be audited before any refactoring of the analyzers domain. [warning]
 - God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
 
-- Zone finding 1 (warning: coupling 0.57 to 'analyzers') is a false positive. Global finding 10 identifies this as intra-domain noise caused by Louvain splitting one semantic zone into three. The 10 cross-zone imports are edges within a single coherent analyzers domain, not genuine cross-concern dependencies. Treat as info-only. [info] (analyzers-3)
+- Zone finding 1 (coupling warning 0.52, 15 imports to analyzers) is a Louvain partitioning artifact corroborated by global finding 10. The 15 crossings are intra-domain edges within one coherent analyzers domain that the algorithm split across zone boundaries. No refactoring of coupling is warranted; the actionable fix is structural (subdirectory organization of src/analyzers/). [info] (analyzers-2)
+- Zone finding 4 (critical risk, score 0.69) is overstated. Three independent sources — zone finding 3 (LLM), global finding 5 (LLM), and global finding 10 (heuristic cross-check) — identify the coupling and low-cohesion scores as Louvain over-partitioning artifacts. The constraint against escalating single-heuristic findings applies in reverse: three sources of corroboration for a false-positive justify downgrading from critical to info. No file-level refactoring is warranted; subdirectory organization of src/analyzers/ addresses the root cause. [info] (analyzers-3)
+- Zone finding 0 (coupling warning to analyzers-2) is confirmed as a false positive by two independent sources: zone finding 1 (LLM) and global finding 10 (heuristic cross-check). E2e tests importing from the analyzers domain is correct by design. Severity should be treated as info. [info] (e2e)
 - Zone finding 0 (warning: coupling 0.57 to 'analyzers-2') is contradicted by global finding 10. E2e tests coupling to what is semantically one analyzers domain is expected; the warning severity is not justified. The coupling flag measures intra-domain edges that Louvain partitioned into separate zone identifiers, not genuine cross-concern dependencies. [info] (e2e)
-- The bidirectional coupling between 'analyzers' and 'unit' (global finding 0: 6+27 crossings) is asymmetric in a meaningful way: the 27 crossings in the unit→analyzers direction are expected test-to-implementation imports and should not be counted as architectural risk. Only the 6 crossings in the analyzers→unit direction (production code importing from test/unit code) would represent a genuine layering violation worth investigating. [info]
+- Organizing src/analyzers/ into semantic subdirectories (e.g. src/analyzers/zones/, src/analyzers/imports/, src/analyzers/components/) is corroborated by three independent sources: global finding 7 (LLM highest-leverage suggestion), global finding 4 (heuristic: 5 zones share src/analyzers/), and the two generic-name warnings for analyzers-2 and analyzers-3. This single structural change collapses three artificial zones into one coherent domain, eliminates the false-positive coupling and low-cohesion warnings, enables meaningful zone naming without manual enrichment, and removes the need for the contradictions documented in global findings 5 and 6. No API surface changes are required — only directory layout and import path updates. [warning]
+- The contradiction between analyzers-3 finding 1 (warning) and global finding 10 (info) and the contradiction between e2e finding 0 (warning) and global finding 10 are both resolved in favor of global finding 10. In both cases, the automated heuristic assigned warning severity to intra-domain edges that the Louvain algorithm happened to route across artificial zone boundaries. The LLM analysis pass correctly identified these as false positives. The automated heuristic findings are not wrong in their measurements but wrong in their interpretation due to the zone boundary artifact. [info]
+- Zone finding 0 (coupling warning 0.57, 27 imports to analyzers) should be treated as info: per global finding 11, the 27 crossings are unit-test files importing their implementations under test — structurally correct by design. Only the reverse direction (analyzers production code importing from unit-scope modules) would constitute a real layering violation. [info] (unit)
 
 ### Observations
 
@@ -140,7 +145,7 @@
 - Low cohesion (0.31) — files are loosely related, consider splitting this zone [warning] (analyzers-3)
 - High cohesion (1) — files are tightly interconnected [info] (e2e)
 - High cohesion (1) — files are tightly interconnected [info] (fixtures)
-- Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extracting shared interface [warning]
+- Bidirectional coupling: "analyzers" ↔ "unit" (7+27 crossings) — consider extracting shared interface [warning]
 - ... and 5 more
 
 ### Suggestions
@@ -150,12 +155,11 @@
 - registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API. [warning] (cli)
 - Zone "fixtures" has files across 5 directories — consider consolidating under a dedicated directory [info] (fixtures)
 - src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Analyzers-3 zone finding 1 (warning severity) directly contradicts global finding 10 (info severity). Global finding 10 is correct: the 10 crossings from analyzers-3 to analyzers are intra-domain edges produced by Louvain over-partitioning, not a real architectural coupling risk. The coupling warning for analyzers-3 overstates the risk and should be treated as informational. [info]
-- E2e zone finding 0 (warning severity) contradicts global finding 10. Test files that exercise analyzer functionality will naturally import from the analyzers domain; coupling to 'analyzers-2' is an artifact of the algorithm-induced zone split, not a structural anti-pattern. Warning severity is not justified. [info]
-- The highest-leverage single action across all 25 findings is organizing src/analyzers/ into semantic subdirectories (e.g. src/analyzers/zones/, src/analyzers/imports/, src/analyzers/components/). This resolves the Louvain over-partitioning root cause, eliminates the false-positive coupling warnings for analyzers-3 and e2e, provides meaningful zone names without manual enrichment, and is consistent with global finding 5. No API surface changes are required. [info]
 - Hub function: info in src/cli/output.ts is called from 9 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - Potentially unused export: detectBranchLifecycle in src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed [info]
-- ... and 3 more
+- Potentially unused export: resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts has no incoming calls — verify if still needed [info]
+- Zone "unit" has files across 11 directories — consider consolidating under a dedicated directory [info] (unit)
+- Zone "Analyzers 3" (analyzers-3) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development [warning] (analyzers-3)
 
 ## Next Steps
 
@@ -177,7 +181,7 @@ Prioritized work items derived from analysis:
 
 ### Medium Priority
 
-1. **High coupling (0.57) — 27 imports target "analyzers"**
+1. **High coupling (0.58) — 27 imports target "analyzers"**
    Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
 
 1. **Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name r…**
@@ -186,7 +190,7 @@ Prioritized work items derived from analysis:
 1. **High coupling (0.52) — 15 imports target "analyzers"**
    Files: `src/analyzers/callgraph.ts`, `src/analyzers/components.ts`, `src/analyzers/imports.ts`
 
-1. **God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — co…**
+1. **The 6 crossings in the analyzers→unit direction (the minori… (+1 related)**
 
 1. **registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed int…**
    Files: `src/analyzers/branch-work-collector.ts`, `src/analyzers/manifest.ts`, `src/cli/commands/constants.ts`
@@ -194,7 +198,9 @@ Prioritized work items derived from analysis:
 1. **16 entry points — wide API surface, consider consolidating exports**
    Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/classify.ts`
 
-1. **Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extrac…**
+1. **Organizing src/analyzers/ into semantic subdirectories (e.g. src/analyzers/zone…**
+
+1. **Bidirectional coupling: "analyzers" ↔ "unit" (7+27 crossings) — consider extrac…**
 
 ### Low Priority
 
@@ -217,10 +223,6 @@ Prioritized work items derived from analysis:
    Files: `tests/fixtures/remix-app/app/routes/_auth.login.tsx`, `tests/fixtures/remix-app/app/routes/_auth.tsx`, `tests/fixtures/remix-app/app/routes/_index.tsx`
 
 1. **src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3…**
-
-1. **Analyzers-3 zone finding 1 (warning severity) directly contradicts global findi…**
-
-1. **E2e zone finding 0 (warning severity) contradicts global finding 10. Test files…**
 
 ## File Inventory
 
@@ -251,20 +253,20 @@ Prioritized work items derived from analysis:
 | `src/analyzers/enrich-config.ts` | source | config | analyzers |
 | `src/analyzers/enrich-parsing.ts` | source | utility | analyzers |
 | `src/analyzers/enrich-per-zone.ts` | source | service | analyzers |
-| `src/analyzers/enrich.ts` | source | entrypoint | analyzers |
+| `src/analyzers/enrich.ts` | source | service | analyzers |
 | `src/analyzers/imports.ts` | source | service | analyzers-2 |
 | `src/analyzers/index.ts` | source | entrypoint | analyzers-2 |
 | `src/analyzers/inventory.ts` | source | service | analyzers-2 |
 | `src/analyzers/llms-txt.ts` | source | service | analyzers |
 | `src/analyzers/louvain.ts` | source | utility | analyzers-3 |
 | `src/analyzers/manifest.ts` | source | service | cli |
-| `src/analyzers/next-steps.ts` | source | utility | analyzers |
-| `src/analyzers/risk-scoring.ts` | source | utility | unit |
+| `src/analyzers/next-steps.ts` | source | service | analyzers |
+| `src/analyzers/risk-scoring.ts` | source | service | unit |
 | `src/analyzers/route-detection.ts` | source | route-handler | analyzers-2 |
-| `src/analyzers/server-route-detection.ts` | source | utility | analyzers |
+| `src/analyzers/server-route-detection.ts` | source | service | analyzers |
 | `src/analyzers/token-usage.ts` | source | utility | analyzers |
 | `src/analyzers/workspace-aggregate.ts` | source | service | unit |
-| `src/analyzers/workspace-crossings.ts` | source | utility | analyzers |
+| `src/analyzers/workspace-crossings.ts` | source | service | analyzers |
 | `src/analyzers/workspace.ts` | source | service | analyzers |
 | `src/analyzers/zone-hash.ts` | source | utility | analyzers-3 |
 | `src/analyzers/zone-output.ts` | source | service | analyzers |

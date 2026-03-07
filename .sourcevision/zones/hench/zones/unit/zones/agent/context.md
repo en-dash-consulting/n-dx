@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/agent (`hench/unit/agent`)
-Files: 82, Cohesion: 0.87, Coupling: 0.13
+Files: 82, Cohesion: 0.84, Coupling: 0.16
 Description: 82 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/planning/brief.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/process/index.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/store/project-config.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/rex.ts
-Lines: 23719
+Lines: 24032
 
 </zone>
 
@@ -18,9 +18,9 @@ packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
 packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1031 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1168 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 90 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 354 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 427 lines, source)
 packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 396 lines, source)
 packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
 packages/hench/src/agent/planning/brief.ts (TypeScript, 353 lines, source)
@@ -36,8 +36,7 @@ packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
 packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
 packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
 packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
-packages/hench/src/prd/ops.ts (TypeScript, 5 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 63 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 81 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
@@ -82,6 +81,7 @@ packages/hench/tests/unit/cli/commands/task-lookup.test.ts (TypeScript, 24 lines
 packages/hench/tests/unit/cli/errors.test.ts (TypeScript, 234 lines, test)
 packages/hench/tests/unit/cli/help.test.ts (TypeScript, 101 lines, test)
 packages/hench/tests/unit/cli/output.test.ts (TypeScript, 120 lines, test)
+packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 90 lines, test)
 packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts (TypeScript, 872 lines, test)
 packages/hench/tests/unit/process/exec.test.ts (TypeScript, 115 lines, test)
 packages/hench/tests/unit/process/lifecycle.test.ts (TypeScript, 511 lines, test)
@@ -111,7 +111,6 @@ Internal:
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/shared.ts {SharedLoopOptions}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/index.ts {saveRun}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {LLMVendor}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/tools/rex.ts {toolRexUpdateStatus, toolRexAppendLog}
@@ -181,7 +180,6 @@ Internal:
   packages/hench/src/cli/index.ts → packages/hench/src/cli/errors.ts {CLIError, handleCLIError, requireHenchDir}
   packages/hench/src/cli/index.ts → packages/hench/src/cli/help.ts {showCommandHelp}
   packages/hench/src/cli/index.ts → packages/hench/src/cli/output.ts {setQuiet}
-  packages/hench/src/prd/ops.ts → packages/hench/src/prd/rex-gateway.ts {*}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {execShell}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {ExecShellOptions}
   packages/hench/src/process/index.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
@@ -295,6 +293,7 @@ Internal:
   packages/hench/tests/unit/cli/errors.test.ts → packages/hench/src/cli/errors.ts {CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI}
   packages/hench/tests/unit/cli/help.test.ts → packages/hench/src/cli/help.ts {showCommandHelp}
   packages/hench/tests/unit/cli/output.test.ts → packages/hench/src/cli/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
+  packages/hench/tests/unit/prd/rex-gateway.test.ts → packages/hench/src/prd/rex-gateway.ts {*}
   packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/tests/unit/process/exec.test.ts → packages/hench/src/process/exec.ts {exec, execStdout, execShellCmd, getCurrentHead}
   packages/hench/tests/unit/process/lifecycle.test.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -324,27 +323,30 @@ Internal:
 
 Cross-dependencies between sub-zones:
   hench/unit/agent/agent → hench/unit/agent/cli: 5
+  hench/unit/agent/agent → hench/unit/agent/cli-commands: 4
   hench/unit/agent/agent → hench/unit/agent/process: 13
-  hench/unit/agent/agent → hench/unit/agent/store: 8
+  hench/unit/agent/agent → hench/unit/agent/store: 3
   hench/unit/agent/cli → hench/unit/agent/agent: 2
-  hench/unit/agent/cli → hench/unit/agent/process: 9
-  hench/unit/agent/cli → hench/unit/agent/store: 2
-  hench/unit/agent/process → hench/unit/agent/agent: 3
-  hench/unit/agent/process → hench/unit/agent/cli: 2
-  hench/unit/agent/process → hench/unit/agent/store: 7
+  hench/unit/agent/cli → hench/unit/agent/cli-commands: 5
+  hench/unit/agent/cli → hench/unit/agent/process: 5
+  hench/unit/agent/cli → hench/unit/agent/store: 1
+  hench/unit/agent/cli-commands → hench/unit/agent/cli: 2
+  hench/unit/agent/cli-commands → hench/unit/agent/process: 2
+  hench/unit/agent/process → hench/unit/agent/agent: 2
+  hench/unit/agent/process → hench/unit/agent/cli-commands: 8
   hench/unit/agent/store → hench/unit/agent/agent: 2
-  hench/unit/agent/store → hench/unit/agent/process: 3
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 4 sub-zone(s):
+This zone has 5 sub-zone(s):
 
-- **Hench/unit/agent/agent** (`hench/unit/agent/agent`): 13 files, cohesion 0.42, coupling 0.58
-- **Hench/unit/agent/cli** (`hench/unit/agent/cli`): 9 files, cohesion 0.38, coupling 0.62
-- **Hench/unit/agent/process** (`hench/unit/agent/process`): 51 files, cohesion 0.78, coupling 0.22
-- **Hench/unit/agent/store** (`hench/unit/agent/store`): 9 files, cohesion 0.33, coupling 0.67
+- **Hench/unit/agent/agent** (`hench/unit/agent/agent`): 11 files, cohesion 0.37, coupling 0.63
+- **Hench/unit/agent/cli** (`hench/unit/agent/cli`): 9 files, cohesion 0.33, coupling 0.67
+- **Hench/unit/agent/cli Commands** (`hench/unit/agent/cli-commands`): 22 files, cohesion 0.77, coupling 0.23
+- **Hench/unit/agent/process** (`hench/unit/agent/process`): 37 files, cohesion 0.75, coupling 0.25
+- **Hench/unit/agent/store** (`hench/unit/agent/store`): 3 files, cohesion 1, coupling 0
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

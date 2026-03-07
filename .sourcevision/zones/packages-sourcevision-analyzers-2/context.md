@@ -91,6 +91,8 @@ Incoming (other zones → this zone):
 - Zone cohesion (0.54) and coupling (0.46) are both near the 0.5 threshold; any net addition of cross-zone imports will tip it into the high-coupling-low-cohesion fragile quadrant currently occupied by schema-validation and zone-detection-engine. Flag this zone for monitoring in CI metric tracking before it degrades further.
 - route-detection.ts sits inside a zone named 'file-analysis-pipeline' whose other members are all generic file analyzers; the filename implies route-specific knowledge that is domain-narrower than the zone's stated scope. Confirm after archetype correction whether it belongs in a dedicated route-analysis zone or if the zone name should be broadened to 'file-and-route-analysis-pipeline'.
 - Zone name 'Analyzers 2' and the parallel 'Analyzers 3' zone indicate Louvain over-partitioned the src/analyzers/ directory into artificial sub-clusters. No coherent independent theme was found during enrichment, confirming these are fragmentation artifacts rather than genuine semantic boundaries.
+- Coupling metric inflated by Louvain over-partitioning; not a genuine cross-concern dependency.
+- Zone finding 1 (coupling warning 0.52, 15 imports to analyzers) is a Louvain partitioning artifact corroborated by global finding 10. The 15 crossings are intra-domain edges within one coherent analyzers domain that the algorithm split across zone boundaries. No refactoring of coupling is warranted; the actionable fix is structural (subdirectory organization of src/analyzers/).
 - [call graph] 384 internal calls, 7 outgoing, 34 incoming (cohesion: 0.98, coupling: 0.02)
 
 </insights>

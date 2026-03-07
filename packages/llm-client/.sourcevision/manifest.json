@@ -1,40 +1,40 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-03-06T21:50:23.181Z",
+  "analyzedAt": "2026-03-07T15:00:10.670Z",
   "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad",
   "gitBranch": "feature/integrate-codex",
   "targetPath": "/Users/ryankeith/work-internal/bravo/packages/llm-client",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:47:08.112Z",
-      "completedAt": "2026-03-06T21:47:08.119Z"
+      "startedAt": "2026-03-07T14:57:38.151Z",
+      "completedAt": "2026-03-07T14:57:38.161Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:47:08.120Z",
-      "completedAt": "2026-03-06T21:47:08.183Z"
+      "startedAt": "2026-03-07T14:57:38.161Z",
+      "completedAt": "2026-03-07T14:57:38.225Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:47:08.183Z",
-      "completedAt": "2026-03-06T21:47:58.308Z"
+      "startedAt": "2026-03-07T14:57:38.225Z",
+      "completedAt": "2026-03-07T14:58:33.571Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:47:58.309Z",
-      "completedAt": "2026-03-06T21:50:23.087Z"
+      "startedAt": "2026-03-07T14:58:33.572Z",
+      "completedAt": "2026-03-07T15:00:10.570Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:50:23.088Z",
-      "completedAt": "2026-03-06T21:50:23.094Z"
+      "startedAt": "2026-03-07T15:00:10.570Z",
+      "completedAt": "2026-03-07T15:00:10.577Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-03-06T21:50:23.094Z",
-      "completedAt": "2026-03-06T21:50:23.181Z"
+      "startedAt": "2026-03-07T15:00:10.578Z",
+      "completedAt": "2026-03-07T15:00:10.670Z"
     }
   },
   "zoneOutputs": true,

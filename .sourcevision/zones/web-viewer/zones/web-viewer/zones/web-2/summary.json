@@ -1,22 +1,23 @@
 {
   "id": "web-viewer/web-viewer/web-2",
   "name": "Web Viewer/web Viewer/web 2",
-  "description": "8 files, primarily TypeScript",
+  "description": "6 files, primarily TypeScript",
   "files": [
+    "packages/web/src/viewer/components/config-footer.ts",
     "packages/web/src/viewer/components/faq.ts",
-    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
-    "packages/web/src/viewer/components/search-overlay.ts",
-    "packages/web/src/viewer/main.ts",
-    "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
-    "packages/web/tests/integration/token-usage-route-regression.test.ts",
-    "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
-    "packages/web/tests/unit/viewer/search-overlay.test.ts"
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/components/theme-toggle.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts",
+    "packages/web/tests/unit/viewer/sidebar.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/components/faq.ts"
+    "packages/web/src/viewer/components/faq.ts",
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/components/theme-toggle.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts"
   ],
-  "cohesion": 0.35,
-  "coupling": 0.65,
-  "fileCount": 8,
-  "lineCount": 2196
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 6,
+  "lineCount": 1669
 }

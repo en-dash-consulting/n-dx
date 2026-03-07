@@ -9,14 +9,14 @@ Files: 48, Cohesion: 0.46, Coupling: 0.54
 Risk: healthy (score: 0.54)
 Description: 48 files, primarily TypeScript
 Entry points: src/cli/commands/health.ts, src/cli/commands/reorganize.ts, src/core/dag.ts, src/core/delete.ts, src/core/facets.ts, src/core/health.ts, src/core/keywords.ts, src/core/merge.ts, src/core/move.ts, src/core/parent-completion.ts, src/core/parent-reset.ts, src/core/prune.ts, src/core/remove-epic.ts, src/core/remove-feature.ts, src/core/remove-task.ts, src/core/reorganize-executor.ts, src/core/reorganize.ts, src/core/requirements.ts, src/core/sync-engine.ts, src/core/sync.ts, src/core/timestamps.ts, src/core/tree.ts, src/core/verify.ts, src/public.ts
-Lines: 13446
+Lines: 13508
 
 </zone>
 
 <files>
 
 src/cli/commands/health.ts (TypeScript, 28 lines, source)
-src/cli/commands/reorganize.ts (TypeScript, 306 lines, source)
+src/cli/commands/reorganize.ts (TypeScript, 364 lines, source)
 src/core/analytics.ts (TypeScript, 118 lines, source)
 src/core/code-coverage.ts (TypeScript, 122 lines, source)
 src/core/dag.ts (TypeScript, 84 lines, source)
@@ -41,7 +41,7 @@ src/core/sync.ts (TypeScript, 276 lines, source)
 src/core/timestamps.ts (TypeScript, 65 lines, source)
 src/core/tree.ts (TypeScript, 105 lines, source)
 src/core/verify.ts (TypeScript, 327 lines, source)
-src/public.ts (TypeScript, 358 lines, source)
+src/public.ts (TypeScript, 362 lines, source)
 tests/unit/core/dag.test.ts (TypeScript, 120 lines, test)
 tests/unit/core/facets.test.ts (TypeScript, 221 lines, test)
 tests/unit/core/health.test.ts (TypeScript, 373 lines, test)
@@ -72,7 +72,7 @@ Internal:
   src/cli/commands/health.ts → src/core/health.ts {computeHealthScore, formatHealthScore}
   src/cli/commands/reorganize.ts → src/core/reorganize-executor.ts {applyProposals, formatApplyResult}
   src/cli/commands/reorganize.ts → src/core/reorganize.ts {detectReorganizations, formatReorganizationPlan}
-  src/cli/commands/reorganize.ts → src/core/reorganize.ts {ReorganizationProposal}
+  src/cli/commands/reorganize.ts → src/core/reorganize.ts {ReorganizationProposal, ReorganizationPlan}
   src/core/code-coverage.ts → src/core/tree.ts {walkTree}
   src/core/dag.ts → src/core/tree.ts {walkTree, collectAllIds}
   src/core/delete.ts → src/core/tree.ts {findItem, removeFromTree, walkTree}
@@ -169,9 +169,9 @@ Internal:
 Outgoing (this zone → other zones):
   → cli: src/cli/commands/health.ts → src/cli/commands/constants.ts; src/cli/commands/health.ts → src/cli/output.ts; src/cli/commands/reorganize.ts → src/analyze/reshape-reason.ts; src/cli/commands/reorganize.ts → src/cli/commands/constants.ts; src/cli/commands/reorganize.ts → src/cli/errors.ts; src/cli/commands/reorganize.ts → src/cli/output.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/core/analytics.ts → src/core/stats.ts; src/core/analytics.ts → src/core/stats.ts; src/core/move.ts → src/cli/errors.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/cli/mcp.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/stats.ts; src/public.ts → src/core/stats.ts; tests/unit/core/move.test.ts → src/cli/errors.ts; tests/unit/core/tree-hardened.test.ts → src/core/stats.ts; tests/unit/core/tree.test.ts → src/core/stats.ts
   → e2e: tests/unit/core/requirements.test.ts → src/schema/validate.ts
-  → store: src/cli/commands/health.ts → src/store/index.ts; src/cli/commands/reorganize.ts → src/store/index.ts; src/core/sync-engine.ts → src/store/contracts.ts; src/public.ts → src/store/contracts.ts; src/public.ts → src/store/index.ts; src/public.ts → src/store/integration-schema.ts; src/public.ts → src/store/integration-schema.ts; src/public.ts → src/store/integration-schemas/index.ts; src/public.ts → src/store/integration-schemas/jira.ts; src/public.ts → src/store/integration-schemas/notion.ts; tests/unit/core/sync-engine.test.ts → src/store/contracts.ts
+  → store: src/cli/commands/health.ts → src/store/index.ts; src/cli/commands/reorganize.ts → src/store/index.ts; src/cli/commands/reorganize.ts → src/store/index.ts; src/core/sync-engine.ts → src/store/contracts.ts; src/public.ts → src/store/contracts.ts; src/public.ts → src/store/index.ts; src/public.ts → src/store/integration-schema.ts; src/public.ts → src/store/integration-schema.ts; src/public.ts → src/store/integration-schemas/index.ts; src/public.ts → src/store/integration-schemas/jira.ts; src/public.ts → src/store/integration-schemas/notion.ts; tests/unit/core/sync-engine.test.ts → src/store/contracts.ts
   → unit: src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/recommend/create-from-recommendations.ts; src/public.ts → src/recommend/create-from-recommendations.ts
-  → unit-analyze: src/cli/commands/reorganize.ts → src/analyze/reason.ts; src/cli/commands/reorganize.ts → src/store/project-config.ts; src/core/analytics.ts → src/schema/index.ts; src/core/analytics.ts → src/schema/index.ts; src/core/code-coverage.ts → src/schema/v1.ts; src/core/dag.ts → src/schema/index.ts; src/core/delete.ts → src/schema/index.ts; src/core/facets.ts → src/schema/v1.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; src/core/merge.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/parent-completion.ts → src/schema/index.ts; src/core/parent-reset.ts → src/schema/index.ts; src/core/prune.ts → src/schema/index.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/reorganize-executor.ts → src/schema/index.ts; src/core/reorganize.ts → src/analyze/dedupe.ts; src/core/reorganize.ts → src/core/structural.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/requirements.ts → src/schema/v1.ts; src/core/scope-creep.ts → src/schema/levels.ts; src/core/scope-creep.ts → src/schema/v1.ts; src/core/sync-engine.ts → src/schema/index.ts; src/core/sync.ts → src/schema/index.ts; src/core/timestamps.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/core/verify.ts → src/schema/index.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/core/cascade-reset.ts; src/public.ts → src/schema/levels.ts; src/public.ts → src/schema/levels.ts; src/public.ts → src/schema/v1.ts; src/public.ts → src/schema/v1.ts; tests/unit/core/dag.test.ts → src/schema/index.ts; tests/unit/core/facets.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts; tests/unit/core/merge.test.ts → src/schema/index.ts; tests/unit/core/move.test.ts → src/schema/index.ts; tests/unit/core/parent-completion.test.ts → src/schema/index.ts; tests/unit/core/parent-reset.test.ts → src/schema/index.ts; tests/unit/core/prune.test.ts → src/schema/v1.ts; tests/unit/core/remove-epic.test.ts → src/schema/index.ts; tests/unit/core/remove-feature.test.ts → src/schema/index.ts; tests/unit/core/remove-task.test.ts → src/schema/index.ts; tests/unit/core/reorganize-executor.test.ts → src/schema/index.ts; tests/unit/core/reorganize.test.ts → src/schema/index.ts; tests/unit/core/requirements.test.ts → src/schema/v1.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync.test.ts → src/schema/index.ts; tests/unit/core/tree-hardened.test.ts → src/schema/index.ts; tests/unit/core/tree.test.ts → src/schema/index.ts; tests/unit/core/verify.test.ts → src/schema/index.ts
+  → unit-analyze: src/cli/commands/reorganize.ts → src/analyze/reason.ts; src/cli/commands/reorganize.ts → src/schema/index.ts; src/cli/commands/reorganize.ts → src/store/project-config.ts; src/core/analytics.ts → src/schema/index.ts; src/core/analytics.ts → src/schema/index.ts; src/core/code-coverage.ts → src/schema/v1.ts; src/core/dag.ts → src/schema/index.ts; src/core/delete.ts → src/schema/index.ts; src/core/facets.ts → src/schema/v1.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; src/core/merge.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/parent-completion.ts → src/schema/index.ts; src/core/parent-reset.ts → src/schema/index.ts; src/core/prune.ts → src/schema/index.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/reorganize-executor.ts → src/schema/index.ts; src/core/reorganize.ts → src/analyze/dedupe.ts; src/core/reorganize.ts → src/core/structural.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/requirements.ts → src/schema/v1.ts; src/core/scope-creep.ts → src/schema/levels.ts; src/core/scope-creep.ts → src/schema/v1.ts; src/core/sync-engine.ts → src/schema/index.ts; src/core/sync.ts → src/schema/index.ts; src/core/timestamps.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/core/verify.ts → src/schema/index.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/propose.ts; src/public.ts → src/core/cascade-reset.ts; src/public.ts → src/schema/levels.ts; src/public.ts → src/schema/levels.ts; src/public.ts → src/schema/v1.ts; src/public.ts → src/schema/v1.ts; tests/unit/core/dag.test.ts → src/schema/index.ts; tests/unit/core/facets.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts; tests/unit/core/merge.test.ts → src/schema/index.ts; tests/unit/core/move.test.ts → src/schema/index.ts; tests/unit/core/parent-completion.test.ts → src/schema/index.ts; tests/unit/core/parent-reset.test.ts → src/schema/index.ts; tests/unit/core/prune.test.ts → src/schema/v1.ts; tests/unit/core/remove-epic.test.ts → src/schema/index.ts; tests/unit/core/remove-feature.test.ts → src/schema/index.ts; tests/unit/core/remove-task.test.ts → src/schema/index.ts; tests/unit/core/reorganize-executor.test.ts → src/schema/index.ts; tests/unit/core/reorganize.test.ts → src/schema/index.ts; tests/unit/core/requirements.test.ts → src/schema/v1.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync.test.ts → src/schema/index.ts; tests/unit/core/tree-hardened.test.ts → src/schema/index.ts; tests/unit/core/tree.test.ts → src/schema/index.ts; tests/unit/core/verify.test.ts → src/schema/index.ts
   → unit-core: src/public.ts → src/core/next-task.ts; src/public.ts → src/core/next-task.ts
 
 Incoming (other zones → this zone):
@@ -187,12 +187,14 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [warning] 24 entry points — wide API surface, consider consolidating exports
-[observation] [warning] High coupling (0.54) — 67 imports target "unit-analyze"
+[observation] [warning] High coupling (0.54) — 69 imports target "unit-analyze"
 
 </findings>
 
 <insights>
 
+- High coupling (0.54) — 69 imports target "unit-analyze"
+- 24 entry points — wide API surface, consider consolidating exports
 - High coupling (0.54) — 67 imports target "unit-analyze"
 - 24 entry points — wide API surface, consider consolidating exports
 - High coupling (0.54) — 67 imports target "prd-analysis-core"
@@ -211,6 +213,6 @@ Incoming (other zones → this zone):
 - analytics.ts and code-coverage.ts reside in src/core/ giving them a false membership signal in the domain layer — the directory path implies they are domain tree concerns, but they are telemetry/measurement utilities. Files whose logical purpose contradicts their directory placement create misleading zone membership and make the src/core/ directory ambiguous about its own scope.
 - src/core/analytics.ts and src/core/code-coverage.ts have misleading placement: the src/core/ directory name implies PRD domain logic, but these files are telemetry utilities. Relocating them to src/telemetry/ or src/metrics/ would disambiguate the core/ directory scope and make their extraction from prd-tree-lifecycle structurally visible without changing any interfaces.
 - prd-tree-lifecycle (48 files) and unit-analyze (69 files) together represent approximately 50% of all source files concentrated in 2 zones. This asymmetric distribution reduces the zone map's navigational value — zones should ideally be within 2–3x of each other in file count. Splitting prd-tree-lifecycle along its already-identified sub-concerns (tree mutation vs. lifecycle orchestration vs. telemetry) would bring zone sizes closer to the 7–23 file range seen in healthier zones.
-- [call graph] 1596 internal calls, 108 outgoing, 127 incoming (cohesion: 0.94, coupling: 0.06)
+- [call graph] 1602 internal calls, 108 outgoing, 127 incoming (cohesion: 0.94, coupling: 0.06)
 
 </insights>

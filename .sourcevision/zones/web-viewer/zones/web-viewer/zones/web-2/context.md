@@ -5,35 +5,31 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web 2 (`web-viewer/web-viewer/web-2`)
-Files: 8, Cohesion: 0.35, Coupling: 0.65
-Description: 8 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/faq.ts
-Lines: 2196
+Files: 6, Cohesion: 0.50, Coupling: 0.50
+Description: 6 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/faq.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/hooks/use-project-metadata.ts
+Lines: 1669
 
 </zone>
 
 <files>
 
+packages/web/src/viewer/components/config-footer.ts (TypeScript, 181 lines, source)
 packages/web/src/viewer/components/faq.ts (TypeScript, 321 lines, source)
-packages/web/src/viewer/components/polling-suspension-indicator.ts (TypeScript, 65 lines, source)
-packages/web/src/viewer/components/search-overlay.ts (TypeScript, 621 lines, source)
-packages/web/src/viewer/main.ts (TypeScript, 198 lines, source)
-packages/web/tests/integration/pr-markdown-tab-parity.test.ts (TypeScript, 236 lines, test)
-packages/web/tests/integration/token-usage-route-regression.test.ts (TypeScript, 200 lines, test)
-packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts (TypeScript, 114 lines, test)
-packages/web/tests/unit/viewer/search-overlay.test.ts (TypeScript, 441 lines, test)
+packages/web/src/viewer/components/sidebar.ts (TypeScript, 434 lines, source)
+packages/web/src/viewer/components/theme-toggle.ts (TypeScript, 36 lines, source)
+packages/web/src/viewer/hooks/use-project-metadata.ts (TypeScript, 79 lines, source)
+packages/web/tests/unit/viewer/sidebar.test.ts (TypeScript, 618 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/main.ts → packages/web/src/viewer/components/faq.ts {HeaderFAQ}
-  packages/web/src/viewer/main.ts → packages/web/src/viewer/components/polling-suspension-indicator.ts {PollingSuspensionIndicator}
-  packages/web/src/viewer/main.ts → packages/web/src/viewer/components/search-overlay.ts {SearchOverlay, useSearchOverlay}
-  packages/web/tests/integration/pr-markdown-tab-parity.test.ts → packages/web/src/viewer/main.ts {*}
-  packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/src/viewer/main.ts {*}
-  packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts → packages/web/src/viewer/components/polling-suspension-indicator.ts {PollingSuspensionIndicator}
-  packages/web/tests/unit/viewer/search-overlay.test.ts → packages/web/src/viewer/components/search-overlay.ts {SearchOverlay, useSearchOverlay}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/config-footer.ts {ConfigFooter}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/faq.ts {GlobalFAQ}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/theme-toggle.ts {SidebarThemeToggle}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
+  packages/web/tests/unit/viewer/sidebar.test.ts → packages/web/src/viewer/components/sidebar.ts {Sidebar}
 
 </imports>

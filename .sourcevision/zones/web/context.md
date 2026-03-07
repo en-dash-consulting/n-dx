@@ -5,77 +5,44 @@
 <zone>
 
 Zone: Web (`web`)
-Files: 16, Cohesion: 0.77, Coupling: 0.23
-Risk: healthy (score: 0.23)
-Description: 16 files, primarily TypeScript, Markdown, Other
-Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/views/task-audit.ts
-Lines: 3352
+Files: 7, Cohesion: 0.59, Coupling: 0.41
+Risk: healthy (score: 0.41)
+Description: 16 files, primarily TypeScript, Other, JavaScript
+Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/polling/tick-timer.ts, packages/web/src/viewer/route-state.ts, packages/web/src/viewer/views/task-audit.ts
+Lines: 433
 
 </zone>
 
 <files>
 
-packages/web/BROWSER_ERROR_CODE_5.md (Markdown, 580 lines, docs)
-packages/web/MEMORY_PROFILE.md (Markdown, 531 lines, docs)
 packages/web/SourceVision-F.png (Other, 0 lines, asset)
 packages/web/SourceVision.png (Other, 0 lines, asset)
 packages/web/build.js (JavaScript, 225 lines, source)
 packages/web/dev.js (JavaScript, 114 lines, source)
 packages/web/package.json (JSON, 50 lines, config)
-packages/web/src/viewer/components/elapsed-time.ts (TypeScript, 51 lines, source)
-packages/web/src/viewer/components/prd-tree/lazy-children.ts (TypeScript, 93 lines, source)
-packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts (TypeScript, 225 lines, source)
-packages/web/src/viewer/hooks/use-tick.ts (TypeScript, 90 lines, source)
-packages/web/src/viewer/views/task-audit.ts (TypeScript, 637 lines, source)
-packages/web/tests/unit/viewer/lazy-children.test.ts (TypeScript, 295 lines, test)
-packages/web/tests/unit/viewer/listener-lifecycle.test.ts (TypeScript, 417 lines, test)
 packages/web/tsconfig.json (JSON, 11 lines, config)
 packages/web/vitest.config.ts (TypeScript, 33 lines, config)
 
 </files>
 
-<imports>
-
-Internal:
-  packages/web/src/viewer/components/elapsed-time.ts → packages/web/src/viewer/hooks/use-tick.ts {useTick}
-  packages/web/src/viewer/views/task-audit.ts → packages/web/src/viewer/components/elapsed-time.ts {ElapsedTime}
-  packages/web/tests/unit/viewer/lazy-children.test.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildren, UNMOUNT_DELAY_MS}
-  packages/web/tests/unit/viewer/listener-lifecycle.test.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerLifecycleManager}
-
-Outgoing (this zone → other zones):
-  → web-viewer: packages/web/src/viewer/hooks/use-tick.ts → packages/web/src/viewer/polling/index.ts; packages/web/src/viewer/views/task-audit.ts → packages/web/src/viewer/components/logos.ts; packages/web/src/viewer/views/task-audit.ts → packages/web/src/viewer/components/rex-task-link.ts; packages/web/src/viewer/views/task-audit.ts → packages/web/src/viewer/types.ts
-
-Incoming (other zones → this zone):
-  ← web-viewer: packages/web/src/viewer/components/active-tasks-panel.ts → packages/web/src/viewer/components/elapsed-time.ts; packages/web/src/viewer/views/domain-rex.ts → packages/web/src/viewer/views/task-audit.ts
-
-</imports>
-
-<findings>
-
-[suggestion] [info] Zone "web" has files across 6 directories — consider consolidating under a dedicated directory
-
-</findings>
-
 <insights>
 
-- With 4 imports flowing into web-viewer and 2 coming back from web-viewer, this zone acts as a thin coordination layer — keep it focused on wiring, not logic
-- elapsed-time.ts and task-audit.ts are entry-point components in this zone while the bulk of viewer code lives in web-viewer; evaluate whether these belong in web-viewer to reduce the split
-- Cohesion of 0.79 is healthy, but the presence of both production components and package-level config files (build.js, dev.js) in one zone suggests the community detection is grouping heterogeneous concerns — no action needed but worth monitoring
-- Zone "web-package-shell" has files across 6 directories — consider consolidating under a dedicated directory
-- elapsed-time.ts and task-audit.ts are classified as entry points in this zone but logically belong to the viewer layer — consider moving them into web-viewer to consolidate the component surface.
-- Cohesion of 0.79 with coupling of 0.21 is within healthy bounds; the bidirectional import relationship with web-viewer (4 out, 2 in) should be watched to ensure it doesn't become circular.
-- BROWSER_ERROR_CODE_5.md and MEMORY_PROFILE.md in this zone suggest past debugging artifacts; review whether these are still relevant or can be removed to keep the package root clean.
-- web-package-shell participates in a bidirectional import cycle with web-viewer (4 out, 2 back) — this constitutes a circular zone dependency that should be broken by extracting shared types or interfaces into a neutral third zone
-- The 2 reverse imports from web-viewer back into web-package-shell likely represent shared component or utility re-use; identifying and extracting these into a dedicated shared zone would eliminate the cycle without restructuring either package
-- web-package-shell ↔ web-viewer bidirectional import cycle (4+2 crossings) is a circular zone dependency — extract the 2 symbols imported by web-viewer from web-package-shell into a neutral shared zone to restore unidirectional flow.
-- build.js and dev.js (config files) colocated with elapsed-time.ts and task-audit.ts (runtime components) in one zone means any change to either class of files triggers unnecessary review of the other — a symptom of the zone grouping heterogeneous concerns
-- elapsed-time.ts and task-audit.ts are production viewer components classified as entry points inside web-package-shell, while the bulk of viewer code lives in web-viewer. This split means a single logical component surface has two zone owners, which breaks the assumption that a zone is the unit of independent deployment or testing.
-- web-package-shell mixes package-level tooling files (build.js, dev.js, package.json) with runtime component files (elapsed-time.ts, task-audit.ts) in one zone. Tooling files and runtime components have completely different change drivers and reviewers — they should not share a zone boundary.
-- web-server (cohesion 0.63, bidirectional cycle with web-viewer) is the only zone in the codebase that simultaneously has cohesion below 0.7 AND participates in a bidirectional import cycle — this combination makes it the single highest-fragility zone in the project. Low cohesion means its internal seams are unclear; bidirectional coupling means it cannot be changed without negotiating with web-viewer. Every other zone with coupling has cohesion above 0.75.
-- The zone named 'web-unit' (cohesion 0.5, 6 files) receives 6 imports from web-viewer with no reverse imports — its name implies unit tests, but it contains production components consumed exclusively by web-viewer. This name/role mismatch causes navigational confusion: developers expecting unit test utilities will find production component files.
-- web-server is the only zone combining cohesion < 0.7 with an active bidirectional import cycle. Absorbing web-server into web-viewer would resolve one cycle, eliminate the lowest-cohesion zone with coupling, and reduce web-viewer's bidirectional cycle count from 2 to 1. Prioritize web-server absorption before any other web cluster refactor.
-- Rename zone 'web-unit' to 'web-shared-components' or 'web-viewer-utils' to reflect its actual role as a production utility module for web-viewer. The current name implies test infrastructure and will mislead contributors searching for test helpers.
-- Zone "web" has files across 6 directories — consider consolidating under a dedicated directory
-- [call graph] 59 internal calls, 1 outgoing, 0 incoming (cohesion: 0.98, coupling: 0.02)
+- The zone hint explicitly identifies that viewer files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are misplaced here alongside build.js and dev.js — these viewer files should be classified under web-viewer.
+- Cohesion of 0.59 reflects this structural mismatch: build scripts and UI components have different roles and should not share a community.
+- Once viewer entry points are correctly attributed to the web-viewer zone, this zone should collapse to a small, high-cohesion set of pure build/config files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts).
+- Viewer entry points (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are community-detected into this build-config zone but belong in web-viewer per the developer's zone hints — apply zone pins to correct the attribution.
+- Cohesion of 0.59 is above the low-cohesion warning threshold but reflects the structural mismatch between build scripts and UI components sharing a detected community.
+- build.js and dev.js are correctly identified as executable entrypoints (not static config); this distinction matters for CI tooling that scans for runnable scripts.
+- The 0.41 coupling coefficient is the highest in this batch and is entirely attributable to misclassified viewer files — once zone pins reclassify those files into web-viewer, this zone's coupling will drop to 0, making all zones in this batch ≤ 0.25.
+- The coupling in this zone is an artifact of classification error, not genuine architectural coupling between build infrastructure and UI components — this distinguishes it from 'real' coupling warnings elsewhere.
+- This zone's 0.41 coupling is a classification artifact: the viewer files that generate cross-zone imports do not logically belong here. Post-correction, this zone becomes a zero-coupling build config cluster, restoring the expected architectural shape.
+- The misattributed viewer files carry web-viewer→web-server import edges into this zone, making build infrastructure appear coupled to the server layer — a false positive that obscures the true dependency topology until zone pins are applied.
+- After zone pins move viewer files to web-viewer, the residual zone will contain only 5 build/config files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts). At this size, future Louvain runs may re-absorb these files into an adjacent zone — a zone pin should be applied to the build-config cluster itself, not just to the misattributed viewer files.
+- No zone pin stabilizes the build-config cluster itself — only the misattributed viewer files are candidates for pinning. After reclassification, the 5 remaining files have no import edges connecting them to each other, meaning Louvain has no structural signal to keep them together and may fragment or re-merge them incorrectly in subsequent analyses.
+- This zone is the only zone in the codebase with BOTH cohesion below 0.65 AND coupling above 0.30 simultaneously, making it the single highest-risk zone by the combined fragility criterion. Even though the coupling is identified as a classification artifact, the zone is currently in a fragile state and any analysis run before zone pins are applied will produce misleading health metrics.
+- SourceVision-F.png and SourceVision.png in this zone are logo assets, paralleling Hench-F.png/Hench.png in autonomous-agent. Both sets of logo assets are absorbed into their respective package code zones rather than the dedicated logo zone — this is a consistent misattribution pattern across two zones that a single logo-zone pin policy would resolve.
+- This is the only zone with both cohesion < 0.65 and coupling > 0.30 — the combined fragility criterion. While the coupling is a classification artifact, the zone will report as high-risk on every analysis run until zone pins are applied. Prioritize applying viewer-file zone pins before the next analysis cycle to eliminate the false-positive fragility signal.
+- SourceVision-F.png and SourceVision.png are logo assets misattributed to the build-config zone, matching the same pattern as Hench-F.png/Hench.png in autonomous-agent. Define a monorepo-wide zone-pin policy for all *-F.png and *.png logo assets to consistently route them to the logo zone regardless of which package directory they reside in.
+- [call graph] 21 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

@@ -2,7 +2,7 @@
 
 **Branch:** `feature/sv-fixes-0306`
 **Base:** `main`
-**Completed items:** 40
+**Completed items:** 43
 
 | Epic | Completed |
 |------|-----------|
@@ -75,6 +75,10 @@
 - **Repository Governance and Community Standards**
 - **Address suggestion issues (1 findings)** [critical]
   - Zone "Crash Recovery" (crash-recovery) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- **Address suggestion issues (3 findings)** [critical]
+  - Move check-gateway-regex.mjs and check-gateway-test.mjs to the top-level scripts/ directory (which already exists as its own zone). This single change resolves three compounding issues simultaneously: it eliminates the cohesion-1 metric artifact in web-landing (finding 4), removes the gateway-filename namespace collision flagged in finding 6, and correctly co-locates the files with other governance/CI scripts where they semantically belong. No rename is required if the files are relocated to scripts/ — the naming ambiguity only exists because they share a directory with production landing assets.
+- Set the archetype of landing.ts to [entrypoint] in sourcevision metadata. Findings 3 and 5 independently identify the same misclassification: a file that bootstraps the landing page is currently typed as [service], which excludes it from entrypoint-based dead-code detection and bundle entry audits. The fix is a one-line archetype override — no code change required.
+- Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
 
 ## Completed Work
 
@@ -215,6 +219,10 @@
 - 🔶 **Repository Governance and Community Standards** *(epic)*
 - 🔶 **Address suggestion issues (1 findings)** *(feature)*
   - Zone "Crash Recovery" (crash-recovery) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
+- 🔶 **Address suggestion issues (3 findings)** *(feature)*
+  - Move check-gateway-regex.mjs and check-gateway-test.mjs to the top-level scripts/ directory (which already exists as its own zone). This single change resolves three compounding issues simultaneously: it eliminates the cohesion-1 metric artifact in web-landing (finding 4), removes the gateway-filename namespace collision flagged in finding 6, and correctly co-locates the files with other governance/CI scripts where they semantically belong. No rename is required if the files are relocated to scripts/ — the naming ambiguity only exists because they share a directory with production landing assets.
+- Set the archetype of landing.ts to [entrypoint] in sourcevision metadata. Findings 3 and 5 independently identify the same misclassification: a file that bootstraps the landing page is currently typed as [service], which excludes it from entrypoint-based dead-code detection and bundle entry audits. The fix is a one-line archetype override — no code change required.
+- Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
 - Address observation issues (8 findings) *(feature)*
   - Bidirectional coupling: "task-usage-tracking" ↔ "web-dashboard" (1+3 crossings) — consider extracting shared interface
 - Bidirectional coupling: "web-build-infrastructure" ↔ "web-dashboard" (4+2 crossings) — consider extracting shared interface
@@ -263,6 +271,18 @@
 - Cohesion of 0.58 is below the ideal threshold because viewer UI components (elapsed-time.ts, use-tick.ts, route-state.ts, task-audit.ts) are co-classified with build scripts — reclassifying them into web-viewer would restore cohesion for both zones.
 - Address anti-pattern issues (1 findings) *(feature)*
   - God function: agentLoop in packages/hench/src/agent/lifecycle/loop.ts calls 38 unique functions — consider decomposing into smaller, focused functions
+- Address observation issues (9 findings) *(feature)*
+  - High coupling (0.71) — 3 imports target "web-dashboard"
+- Low cohesion (0.29) — files are loosely related, consider splitting this zone
+- The mutual three-import dependency between crash-recovery and web-dashboard creates a cycle at the zone level; restructure so crash-detector.ts is a pure utility imported by the viewer, with no reverse dependency from crash-recovery back into the dashboard.
+- Zone cohesion of 0.29 and coupling of 0.71 indicates the crash-recovery files are more tightly connected to external zones than to each other; consider whether crash-detector.ts and use-crash-recovery.ts belong in separate zones (utility vs. hook) or should be merged into the web-dashboard zone they depend on.
+- This zone conflates two unrelated concerns: web-viewer graph interaction tests and monorepo dev-analysis scripts. It is an algorithmic artifact, not a real architectural unit.
+- Bidirectional coupling: "web-build-tooling" ↔ "web-dashboard" (9+3 crossings) — consider extracting shared interface
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
+- tests/check-gateway-regex.mjs and tests/check-gateway-test.mjs are developer-utility scripts unrelated to the landing page; they should be re-homed to the developer-utilities zone to keep this zone semantically coherent.
+- Five viewer UI files (elapsed-time.ts, use-tick.ts, lazy-children.ts, listener-lifecycle.ts, task-audit.ts) are grouped with build infrastructure by the import graph but belong architecturally in the web-viewer zone per developer hints — setting explicit zone pins for these files would correct the misclassification.
 - Address anti-pattern issues (1 findings) *(feature)*
   - God function: cmdReorganize in packages/rex/src/cli/commands/reorganize.ts calls 38 unique functions — consider decomposing into smaller, focused functions
+- Address anti-pattern issues (1 findings) *(feature)*
+  - God function: cliLoop in packages/hench/src/agent/lifecycle/cli-loop.ts calls 36 unique functions — consider decomposing into smaller, focused functions
 

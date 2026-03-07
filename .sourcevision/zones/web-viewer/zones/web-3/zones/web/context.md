@@ -5,33 +5,234 @@
 <zone>
 
 Zone: Web Viewer/web 3/web (`web-viewer/web-3/web`)
-Files: 7, Cohesion: 0.17, Coupling: 0.83
-Description: 7 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/prd-tree/status-filter.ts, packages/web/src/viewer/components/prd-tree/tree-search.ts, packages/web/src/viewer/hooks/use-facet-state.ts
-Lines: 1814
+Files: 56, Cohesion: 0.87, Coupling: 0.13
+Description: 56 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/prd-tree/add-item-form.ts, packages/web/src/viewer/components/prd-tree/compute.ts, packages/web/src/viewer/components/prd-tree/facet-filter.ts, packages/web/src/viewer/components/prd-tree/index.ts, packages/web/src/viewer/components/prd-tree/levels.ts, packages/web/src/viewer/components/prd-tree/tree-differ.ts, packages/web/src/viewer/components/prd-tree/tree-utils.ts, packages/web/src/viewer/components/prd-tree/types.ts, packages/web/src/viewer/hooks/use-persistent-filter.ts, packages/web/src/viewer/hooks/use-prd-actions.ts, packages/web/src/viewer/hooks/use-prd-data.ts, packages/web/src/viewer/hooks/use-prd-deep-link.ts, packages/web/src/viewer/views/analysis.ts
+Lines: 17736
 
 </zone>
 
 <files>
 
 packages/web/src/viewer/components/guide.ts (TypeScript, 151 lines, source)
+packages/web/src/viewer/components/prd-tree/add-item-form.ts (TypeScript, 325 lines, source)
+packages/web/src/viewer/components/prd-tree/analyze-panel.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/components/prd-tree/batch-import-panel.ts (TypeScript, 626 lines, source)
+packages/web/src/viewer/components/prd-tree/compute.ts (TypeScript, 140 lines, source)
+packages/web/src/viewer/components/prd-tree/facet-filter.ts (TypeScript, 306 lines, source)
+packages/web/src/viewer/components/prd-tree/index.ts (TypeScript, 31 lines, source)
+packages/web/src/viewer/components/prd-tree/inline-add-form.ts (TypeScript, 241 lines, source)
+packages/web/src/viewer/components/prd-tree/inline-status-picker.ts (TypeScript, 136 lines, source)
+packages/web/src/viewer/components/prd-tree/lazy-children.ts (TypeScript, 93 lines, source)
+packages/web/src/viewer/components/prd-tree/levels.ts (TypeScript, 87 lines, source)
+packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts (TypeScript, 225 lines, source)
+packages/web/src/viewer/components/prd-tree/prd-tree.ts (TypeScript, 836 lines, source)
+packages/web/src/viewer/components/prd-tree/progressive-loader.ts (TypeScript, 356 lines, source)
+packages/web/src/viewer/components/prd-tree/proposal-editor.ts (TypeScript, 704 lines, source)
+packages/web/src/viewer/components/prd-tree/smart-add-input.ts (TypeScript, 604 lines, source)
 packages/web/src/viewer/components/prd-tree/status-filter.ts (TypeScript, 194 lines, source)
-packages/web/src/viewer/components/prd-tree/tree-search.ts (TypeScript, 242 lines, source)
-packages/web/src/viewer/hooks/use-facet-state.ts (TypeScript, 154 lines, source)
+packages/web/src/viewer/components/prd-tree/task-detail.ts (TypeScript, 1822 lines, source)
+packages/web/src/viewer/components/prd-tree/task-utilization.ts (TypeScript, 32 lines, source)
+packages/web/src/viewer/components/prd-tree/tree-differ.ts (TypeScript, 233 lines, source)
+packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts (TypeScript, 220 lines, source)
+packages/web/src/viewer/components/prd-tree/tree-utils.ts (TypeScript, 114 lines, source)
+packages/web/src/viewer/components/prd-tree/types.ts (TypeScript, 119 lines, source)
+packages/web/src/viewer/components/prd-tree/virtual-scroll.ts (TypeScript, 279 lines, source)
+packages/web/src/viewer/hooks/use-delete-actions.ts (TypeScript, 176 lines, source)
+packages/web/src/viewer/hooks/use-item-selection.ts (TypeScript, 172 lines, source)
+packages/web/src/viewer/hooks/use-persistent-filter.ts (TypeScript, 55 lines, source)
+packages/web/src/viewer/hooks/use-prd-actions.ts (TypeScript, 424 lines, source)
+packages/web/src/viewer/hooks/use-prd-data.ts (TypeScript, 215 lines, source)
+packages/web/src/viewer/hooks/use-prd-deep-link.ts (TypeScript, 100 lines, source)
+packages/web/src/viewer/views/analysis.ts (TypeScript, 156 lines, source)
 packages/web/tests/unit/viewer/accessibility.test.ts (TypeScript, 401 lines, test)
+packages/web/tests/unit/viewer/add-item-form.test.ts (TypeScript, 240 lines, test)
+packages/web/tests/unit/viewer/analyze-panel.test.ts (TypeScript, 214 lines, test)
+packages/web/tests/unit/viewer/batch-import-panel.test.ts (TypeScript, 372 lines, test)
+packages/web/tests/unit/viewer/deletion-state-updates.test.ts (TypeScript, 284 lines, test)
+packages/web/tests/unit/viewer/large-tree-performance.test.ts (TypeScript, 1001 lines, test)
+packages/web/tests/unit/viewer/lazy-children.test.ts (TypeScript, 295 lines, test)
+packages/web/tests/unit/viewer/listener-lifecycle.test.ts (TypeScript, 417 lines, test)
+packages/web/tests/unit/viewer/multi-select.test.ts (TypeScript, 169 lines, test)
+packages/web/tests/unit/viewer/node-culling-integration.test.ts (TypeScript, 209 lines, test)
+packages/web/tests/unit/viewer/persistent-filter.test.ts (TypeScript, 71 lines, test)
+packages/web/tests/unit/viewer/prd-tree-compute.test.ts (TypeScript, 483 lines, test)
+packages/web/tests/unit/viewer/prd-tree.test.ts (TypeScript, 368 lines, test)
+packages/web/tests/unit/viewer/progressive-loader.test.ts (TypeScript, 526 lines, test)
+packages/web/tests/unit/viewer/progressive-loading-integration.test.ts (TypeScript, 245 lines, test)
+packages/web/tests/unit/viewer/proposal-editor.test.ts (TypeScript, 289 lines, test)
+packages/web/tests/unit/viewer/smart-add-input.test.ts (TypeScript, 605 lines, test)
 packages/web/tests/unit/viewer/status-filter.test.ts (TypeScript, 257 lines, test)
-packages/web/tests/unit/viewer/tree-search.test.ts (TypeScript, 415 lines, test)
+packages/web/tests/unit/viewer/task-detail-failure.test.ts (TypeScript, 184 lines, test)
+packages/web/tests/unit/viewer/task-detail-requirements.test.ts (TypeScript, 311 lines, test)
+packages/web/tests/unit/viewer/task-detail-usage.test.ts (TypeScript, 80 lines, test)
+packages/web/tests/unit/viewer/tree-differ.test.ts (TypeScript, 394 lines, test)
+packages/web/tests/unit/viewer/tree-event-delegate.test.ts (TypeScript, 267 lines, test)
+packages/web/tests/unit/viewer/tree-utils-deletion.test.ts (TypeScript, 128 lines, test)
+packages/web/tests/unit/viewer/virtual-scroll.test.ts (TypeScript, 392 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/hooks/use-facet-state.ts → packages/web/src/viewer/components/prd-tree/tree-search.ts {SearchFacets}
+  packages/web/src/viewer/components/prd-tree/add-item-form.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemLevel, Priority}
+  packages/web/src/viewer/components/prd-tree/analyze-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/analyze-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/prd-tree/batch-import-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/batch-import-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/prd-tree/compute.ts → packages/web/src/viewer/components/prd-tree/levels.ts {isWorkItem}
+  packages/web/src/viewer/components/prd-tree/compute.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, BranchStats, ItemStatus}
+  packages/web/src/viewer/components/prd-tree/facet-filter.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanel}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanelProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/facet-filter.ts {FacetFilter}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/facet-filter.ts {FacetFilterProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildren, UNMOUNT_DELAY_MS}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildrenProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerLifecycleManager, useNodeListeners}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerRecord, ListenerLifecycleState}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTreeProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal, ProposalEditorProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInput}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInputProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {StatusFilter, defaultStatusFilter}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {StatusFilterProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, PRDDocumentData, ItemLevel, ItemStatus, Priority, BranchStats}
+  packages/web/src/viewer/components/prd-tree/inline-add-form.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemLevel, Priority}
+  packages/web/src/viewer/components/prd-tree/inline-status-picker.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/src/viewer/components/prd-tree/levels.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemLevel}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/compute.ts {computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/inline-add-form.ts {InlineAddForm}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/inline-add-form.ts {InlineAddInput}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/inline-status-picker.ts {InlineStatusPicker}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/levels.ts {isWorkItem, isRootLevel}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {defaultStatusFilter}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/task-utilization.ts {resolveTaskUtilization}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts {useTreeEventDelegation}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/virtual-scroll.ts {flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT}
+  packages/web/src/viewer/components/prd-tree/prd-tree.ts → packages/web/src/viewer/components/prd-tree/virtual-scroll.ts {FlatNode}
+  packages/web/src/viewer/components/prd-tree/progressive-loader.ts → packages/web/src/viewer/components/prd-tree/compute.ts {itemMatchesFilter}
+  packages/web/src/viewer/components/prd-tree/progressive-loader.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus}
+  packages/web/src/viewer/components/prd-tree/smart-add-input.ts → packages/web/src/viewer/components/prd-tree/levels.ts {isContainerLevel, isRootLevel, getLevelLabel}
+  packages/web/src/viewer/components/prd-tree/smart-add-input.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/smart-add-input.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/prd-tree/status-filter.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/src/viewer/components/prd-tree/task-detail.ts → packages/web/src/viewer/components/prd-tree/compute.ts {formatTimestamp}
+  packages/web/src/viewer/components/prd-tree/task-detail.ts → packages/web/src/viewer/components/prd-tree/levels.ts {isWorkItem, getLevelLabel, getChildLevel}
+  packages/web/src/viewer/components/prd-tree/task-detail.ts → packages/web/src/viewer/components/prd-tree/task-utilization.ts {resolveTaskUtilization}
+  packages/web/src/viewer/components/prd-tree/task-detail.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById}
+  packages/web/src/viewer/components/prd-tree/task-detail.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution}
+  packages/web/src/viewer/components/prd-tree/task-utilization.ts → packages/web/src/viewer/components/prd-tree/types.ts {TaskUtilizationSummary, WeeklyBudgetResolution, WeeklyBudgetSource}
+  packages/web/src/viewer/components/prd-tree/tree-differ.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {removeItemById}
+  packages/web/src/viewer/components/prd-tree/tree-differ.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, PRDDocumentData}
+  packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/src/viewer/components/prd-tree/tree-utils.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/src/viewer/components/prd-tree/virtual-scroll.ts → packages/web/src/viewer/components/prd-tree/compute.ts {itemMatchesFilter}
+  packages/web/src/viewer/components/prd-tree/virtual-scroll.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus}
+  packages/web/src/viewer/hooks/use-delete-actions.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, collectSubtreeIds, removeItemById}
+  packages/web/src/viewer/hooks/use-delete-actions.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData}
+  packages/web/src/viewer/hooks/use-item-selection.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById}
+  packages/web/src/viewer/hooks/use-item-selection.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData}
+  packages/web/src/viewer/hooks/use-persistent-filter.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {defaultStatusFilter}
+  packages/web/src/viewer/hooks/use-persistent-filter.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/add-item-form.ts {AddItemInput}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/inline-add-form.ts {InlineAddInput}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/task-detail.ts {TaskDetail}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/tree-differ.ts {applyItemUpdate}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData, TaskUsageSummary, WeeklyBudgetResolution}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/hooks/use-delete-actions.ts {useDeleteActions}
+  packages/web/src/viewer/hooks/use-prd-actions.ts → packages/web/src/viewer/hooks/use-item-selection.ts {useItemSelection}
+  packages/web/src/viewer/hooks/use-prd-data.ts → packages/web/src/viewer/components/prd-tree/task-utilization.ts {resolveTaskUtilization}
+  packages/web/src/viewer/hooks/use-prd-data.ts → packages/web/src/viewer/components/prd-tree/tree-differ.ts {diffDocument}
+  packages/web/src/viewer/hooks/use-prd-data.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, TaskUsageSummary, WeeklyBudgetResolution}
+  packages/web/src/viewer/hooks/use-prd-deep-link.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, getAncestorIds}
+  packages/web/src/viewer/hooks/use-prd-deep-link.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData}
+  packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/analyze-panel.ts {AnalyzePanel}
+  packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/index.ts {SmartAddInput, BatchImportPanel}
   packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/guide.ts {Guide}
+  packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
   packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {StatusFilter, defaultStatusFilter}
+  packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData}
+  packages/web/tests/unit/viewer/add-item-form.test.ts → packages/web/src/viewer/components/prd-tree/add-item-form.ts {AddItemForm}
+  packages/web/tests/unit/viewer/add-item-form.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/analyze-panel.test.ts → packages/web/src/viewer/components/prd-tree/analyze-panel.ts {AnalyzePanel}
+  packages/web/tests/unit/viewer/batch-import-panel.test.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanel, BatchItemRow}
+  packages/web/tests/unit/viewer/batch-import-panel.test.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchItem}
+  packages/web/tests/unit/viewer/deletion-state-updates.test.ts → packages/web/src/viewer/components/prd-tree/compute.ts {computeBranchStats, completionRatio}
+  packages/web/tests/unit/viewer/deletion-state-updates.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {removeItemById, collectSubtreeIds, findItemById}
+  packages/web/tests/unit/viewer/deletion-state-updates.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/compute.ts {computeBranchStats, completionRatio, filterTree}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/progressive-loader.ts {countVisibleNodes, sliceVisibleTree, PROGRESSIVE_THRESHOLD}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/tree-differ.ts {diffItems, diffDocument, applyItemUpdate}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, countDescendants, getAncestorIds, collectSubtreeIds}
+  packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, PRDDocumentData, ItemStatus, Priority}
+  packages/web/tests/unit/viewer/lazy-children.test.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildren, UNMOUNT_DELAY_MS}
+  packages/web/tests/unit/viewer/listener-lifecycle.test.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerLifecycleManager}
+  packages/web/tests/unit/viewer/multi-select.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/node-culling-integration.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/tests/unit/viewer/node-culling-integration.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData}
+  packages/web/tests/unit/viewer/persistent-filter.test.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {defaultStatusFilter}
+  packages/web/tests/unit/viewer/persistent-filter.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/tests/unit/viewer/persistent-filter.test.ts → packages/web/src/viewer/hooks/use-persistent-filter.ts {usePersistentFilter}
+  packages/web/tests/unit/viewer/prd-tree-compute.test.ts → packages/web/src/viewer/components/prd-tree/compute.ts {computeBranchStats, completionRatio, countChildStatuses, formatTimestamp, itemMatchesFilter, filterTree}
+  packages/web/tests/unit/viewer/prd-tree-compute.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus}
+  packages/web/tests/unit/viewer/prd-tree.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/tests/unit/viewer/prd-tree.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, ItemStatus}
+  packages/web/tests/unit/viewer/progressive-loader.test.ts → packages/web/src/viewer/components/prd-tree/progressive-loader.ts {countVisibleNodes, sliceVisibleTree, DEFAULT_CHUNK_SIZE, PROGRESSIVE_THRESHOLD, LoadMoreIndicator}
+  packages/web/tests/unit/viewer/progressive-loader.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus}
+  packages/web/tests/unit/viewer/progressive-loading-integration.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/tests/unit/viewer/progressive-loading-integration.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData}
+  packages/web/tests/unit/viewer/proposal-editor.test.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/tests/unit/viewer/proposal-editor.test.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/tests/unit/viewer/smart-add-input.test.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInput}
   packages/web/tests/unit/viewer/status-filter.test.ts → packages/web/src/viewer/components/prd-tree/status-filter.ts {StatusFilter, ALL_STATUSES, FILTER_PRESETS, activePresetKey, defaultStatusFilter}
-  packages/web/tests/unit/viewer/tree-search.test.ts → packages/web/src/viewer/components/prd-tree/tree-search.ts {searchTree, itemMatchesSearch, highlightSearchText, collectAllTags}
-  packages/web/tests/unit/viewer/tree-search.test.ts → packages/web/src/viewer/components/prd-tree/tree-search.ts {SearchFacets}
+  packages/web/tests/unit/viewer/status-filter.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {ItemStatus}
+  packages/web/tests/unit/viewer/task-detail-failure.test.ts → packages/web/src/viewer/components/prd-tree/task-detail.ts {TaskDetail}
+  packages/web/tests/unit/viewer/task-detail-failure.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/task-detail-requirements.test.ts → packages/web/src/viewer/components/prd-tree/task-detail.ts {TaskDetail}
+  packages/web/tests/unit/viewer/task-detail-requirements.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/task-detail-usage.test.ts → packages/web/src/viewer/components/prd-tree/task-detail.ts {TaskDetail}
+  packages/web/tests/unit/viewer/task-detail-usage.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/tree-differ.test.ts → packages/web/src/viewer/components/prd-tree/tree-differ.ts {diffItems, diffDocument, applyItemUpdate}
+  packages/web/tests/unit/viewer/tree-differ.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, PRDDocumentData}
+  packages/web/tests/unit/viewer/tree-event-delegate.test.ts → packages/web/src/viewer/components/prd-tree/prd-tree.ts {PRDTree}
+  packages/web/tests/unit/viewer/tree-event-delegate.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDDocumentData, PRDItemData}
+  packages/web/tests/unit/viewer/tree-utils-deletion.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {collectSubtreeIds, removeItemById}
+  packages/web/tests/unit/viewer/tree-utils-deletion.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData}
+  packages/web/tests/unit/viewer/virtual-scroll.test.ts → packages/web/src/viewer/components/prd-tree/types.ts {PRDItemData, ItemStatus}
+  packages/web/tests/unit/viewer/virtual-scroll.test.ts → packages/web/src/viewer/components/prd-tree/virtual-scroll.ts {flattenVisibleTree, computeVisibleRange, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT, DEFAULT_BUFFER_COUNT}
+  packages/web/tests/unit/viewer/virtual-scroll.test.ts → packages/web/src/viewer/components/prd-tree/virtual-scroll.ts {FlatNode}
 
 </imports>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  web-viewer/web-3/web/unit → web-viewer/web-3/web/viewer: 4
+  web-viewer/web-3/web/viewer → web-viewer/web-3/web/unit: 3
+  web-viewer/web-3/web/viewer → web-viewer/web-3/web/viewer-components: 2
+  web-viewer/web-3/web/viewer → web-viewer/web-3/web/viewer-hooks: 6
+  web-viewer/web-3/web/viewer-components → web-viewer/web-3/web/unit: 2
+  web-viewer/web-3/web/viewer-components → web-viewer/web-3/web/viewer: 6
+  web-viewer/web-3/web/viewer-hooks → web-viewer/web-3/web/viewer: 6
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 4 sub-zone(s):
+
+- **Web Viewer/web 3/web/unit** (`web-viewer/web-3/web/unit`): 4 files, cohesion 0, coupling 1
+- **Web Viewer/web 3/web/viewer** (`web-viewer/web-3/web/viewer`): 34 files, cohesion 0.82, coupling 0.18
+- **Web Viewer/web 3/web/viewer Components** (`web-viewer/web-3/web/viewer-components`): 13 files, cohesion 0.75, coupling 0.25
+- **Web Viewer/web 3/web/viewer Hooks** (`web-viewer/web-3/web/viewer-hooks`): 5 files, cohesion 0.33, coupling 0.67
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

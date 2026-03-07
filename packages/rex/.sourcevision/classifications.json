@@ -518,7 +518,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Handles acknowledgment logic as part of the analysis pipeline — business logic orchestration.",
+          "detail": "Handles acknowledging/confirming analysis results — business logic orchestration within the analyze pipeline.",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared infrastructure and helpers used across the analyze pipeline.",
+          "detail": "Shared helpers and infrastructure used across the analyze module.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Guard/validation logic to prevent invalid consolidation — pure utility with no orchestration.",
+          "detail": "Guard logic that validates or prevents invalid consolidation — a focused utility helper.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Decomposes PRD items as a discrete analysis step — business logic service.",
+          "detail": "Decomposition logic for analysis items — domain business logic.",
           "weight": 0.7
         }
       ]
@@ -574,7 +574,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Deduplication helper — stateless utility function.",
+          "detail": "Deduplication helper — a pure, reusable utility function.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Diffing helper — stateless utility computing differences between structures.",
+          "detail": "Diff computation between analysis states — a focused utility.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Extraction helper — stateless utility for pulling data from structures.",
+          "detail": "Extraction logic — a reusable helper used across the analyze pipeline.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "File validation logic — stateless utility for validating input files.",
+          "detail": "File validation helper — pure validation logic with no orchestration.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Guided analysis orchestration — coordinates multiple steps as a service layer module.",
+          "detail": "Orchestrates guided analysis flow — high-level business logic coordination.",
           "weight": 0.7
         }
       ]
@@ -651,14 +651,14 @@
     },
     {
       "path": "src/analyze/llm-bridge.ts",
-      "archetype": "service",
+      "archetype": "gateway",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "gateway",
           "signalKind": "path",
-          "detail": "Bridges analysis pipeline to the LLM API — acts as an API client/service.",
+          "detail": "Bridge to the LLM client — concentrates cross-package LLM imports into a single interface, matching the gateway pattern.",
           "weight": 0.7
         }
       ]
@@ -672,7 +672,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Handles modify-reason phase of the analysis pipeline — discrete business logic step.",
+          "detail": "Modification reasoning logic — domain business logic for the analyze pipeline.",
           "weight": 0.7
         }
       ]
@@ -686,7 +686,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Generates PRD proposals — core analysis service with orchestration logic.",
+          "detail": "Proposal generation — orchestrates domain logic to produce PRD proposals.",
           "weight": 0.7
         }
       ]
@@ -700,7 +700,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reasoning phase of the analysis pipeline — business logic service.",
+          "detail": "Core reasoning logic for analysis — domain business logic.",
           "weight": 0.7
         }
       ]
@@ -714,7 +714,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reconciles proposed changes against existing PRD — business logic orchestration.",
+          "detail": "Reconciliation of analysis results — domain business logic.",
           "weight": 0.7
         }
       ]
@@ -728,21 +728,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reshape-reason phase of the analysis pipeline — discrete business logic step.",
+          "detail": "Reshape reasoning logic — domain business logic for transforming analysis output.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/scanners.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Scanning utilities — stateless helpers for traversing/scanning project files.",
+          "detail": "Scanner implementations that read the project — service-layer data gathering.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Validates proposed modifications — stateless validation utility.",
+          "detail": "Validation helper for modifications — pure validation logic.",
           "weight": 0.7
         }
       ]
@@ -1201,14 +1201,14 @@
     },
     {
       "path": "src/cli/help.ts",
-      "archetype": "cli-command",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "cli-command",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "CLI help text output — a CLI command implementation.",
+          "detail": "CLI help text and formatting — a utility used by CLI commands.",
           "weight": 0.7
         }
       ]
@@ -1236,7 +1236,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Defines and registers MCP tool handlers — service-layer wiring for the MCP server.",
+          "detail": "MCP tool definitions and handler wiring — service-layer tool dispatch.",
           "weight": 0.7
         }
       ]
@@ -1250,7 +1250,7 @@
         {
           "archetypeId": "cli-command",
           "signalKind": "path",
-          "detail": "MCP subcommand handler — CLI command entry point for starting the MCP server.",
+          "detail": "MCP subcommand handler — a CLI command implementation.",
           "weight": 0.7
         }
       ]
@@ -1278,7 +1278,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Input validation for CLI arguments — stateless utility used at the command boundary.",
+          "detail": "CLI input validation helper — pure validation utility.",
           "weight": 0.7
         }
       ]
@@ -1789,14 +1789,14 @@
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "archetype": "service",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Detects conflicts in recommendations — business logic service.",
+          "detail": "Conflict detection logic for recommendations — a focused, reusable utility.",
           "weight": 0.7
         }
       ]
@@ -1810,7 +1810,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Creates PRD items from recommendations — orchestration service.",
+          "detail": "Creates PRD items from recommendations — domain business logic orchestration.",
           "weight": 0.7
         }
       ]
@@ -2081,7 +2081,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Default workflow configuration/state — configuration module with no runtime logic.",
+          "detail": "Default workflow configuration/settings module.",
           "weight": 0.7
         }
       ]
@@ -2091,10 +2091,11 @@
     "totalClassified": 109,
     "totalUnclassified": 0,
     "byArchetype": {
-      "service": 12,
-      "utility": 46,
+      "service": 11,
+      "utility": 47,
       "entrypoint": 6,
-      "cli-command": 30,
+      "gateway": 1,
+      "cli-command": 29,
       "types": 2,
       "schema": 3,
       "store": 9,

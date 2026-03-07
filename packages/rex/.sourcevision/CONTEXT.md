@@ -6,10 +6,10 @@
 <architecture>
 
 Project: rex
-Files: 241, Lines: 85450
+Files: 241, Lines: 85580
 Languages: TypeScript(223) JSON(9) Other(4) Markdown(4) Text(1)
 Zones: 10, Described: 10
-Import edges: 887, External packages: 5
+Import edges: 890, External packages: 5
 
 </architecture>
 
@@ -35,10 +35,10 @@ Import edges: 887, External packages: 5
   files: src/cli/commands/sync.ts [cli-command], src/core/canonical.ts [utility], src/store/adapter-registry.ts [store], src/store/contracts.ts [store], src/store/file-adapter.ts [store], src/store/index.ts [entrypoint], src/store/integration-schema.ts [store], src/store/integration-schemas/index.ts [entrypoint], src/store/integration-schemas/jira.ts [store], src/store/integration-schemas/notion.ts [store] +13
 [unit] Unit (19 files, coh=0.33 coup=0.67)
   19 files, primarily TypeScript
-  files: src/analyze/acknowledge.ts [service], src/analyze/extract.ts [utility], src/analyze/reconcile.ts [service], src/analyze/scanners.ts [utility], src/cli/commands/recommend.ts [cli-command], src/recommend/conflict-detection.ts [service], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types], tests/unit/analyze/acknowledge.test.ts, tests/unit/analyze/extract-llm-mock.test.ts +9
+  files: src/analyze/acknowledge.ts [service], src/analyze/extract.ts [utility], src/analyze/reconcile.ts [service], src/analyze/scanners.ts [service], src/cli/commands/recommend.ts [cli-command], src/recommend/conflict-detection.ts [utility], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types], tests/unit/analyze/acknowledge.test.ts, tests/unit/analyze/extract-llm-mock.test.ts +9
 [unit-analyze] Unit Analyze (69 files, coh=0.50 coup=0.50)
   69 files, primarily TypeScript
-  files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [utility], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/file-validation.ts [utility], src/analyze/guided.ts [service], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [service], src/analyze/modify-reason.ts [service] +59
+  files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [utility], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/file-validation.ts [utility], src/analyze/guided.ts [service], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [gateway], src/analyze/modify-reason.ts [service] +59
 [unit-cli] Unit Cli (4 files, coh=0.25 coup=0.75)
   4 files, primarily TypeScript
   files: src/cli/commands/fix.ts [cli-command], src/core/fix.ts [utility], tests/unit/cli/commands/fix.test.ts, tests/unit/core/fix.test.ts
@@ -55,8 +55,8 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 
 Most imported:
   src/core/tree.ts ← src/analyze/diff.ts, src/analyze/reason.ts, src/analyze/reconcile.ts, src/analyze/reshape-reason.ts, src/cli/commands/add.ts +45
-  src/schema/index.ts ← src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/decompose.ts +151
-  src/store/index.ts ← src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/fix.ts, src/cli/commands/health.ts, src/cli/commands/init.ts +30
+  src/schema/index.ts ← src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/decompose.ts +152
+  src/store/index.ts ← src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/fix.ts, src/cli/commands/health.ts, src/cli/commands/init.ts +31
   src/cli/commands/constants.ts ← src/cli/commands/adapter.ts, src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/fix.ts, src/cli/commands/health.ts +24
   src/cli/output.ts ← src/analyze/guided.ts, src/cli/commands/adapter.ts, src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/chunked-review.ts +22
   src/cli/errors.ts ← src/cli/commands/adapter.ts, src/cli/commands/add.ts, src/cli/commands/analyze.ts, src/cli/commands/move.ts, src/cli/commands/prune.ts +21
@@ -72,7 +72,7 @@ Most imported:
 [warning] 13 entry points — wide API surface, consider consolidating exports [cli]
 [warning] High coupling (0.53) — 58 imports target "unit-analyze" [cli]
 [warning] 24 entry points — wide API surface, consider consolidating exports [core]
-[warning] High coupling (0.54) — 67 imports target "unit-analyze" [core]
+[warning] High coupling (0.54) — 69 imports target "unit-analyze" [core]
 [warning] Bidirectional coupling: "cli" ↔ "unit-analyze" (58+35 crossings) — consider extracting shared interface
 [warning] Fan-in hotspot: src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects
 [warning] 9 entry points — wide API surface, consider consolidating exports [store]
@@ -83,8 +83,8 @@ Most imported:
 [warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone [unit-cli]
 [warning] High coupling (0.83) — 7 imports target "unit-analyze" [unit-core]
 [warning] Low cohesion (0.17) — files are loosely related, consider splitting this zone [unit-core]
-[warning] For the 3 at-risk zones (task-selection, fix-command, recommendation-scanning) in finding 6: each zone's high coupling likely reflects CLI handler code importing domain modules directly. Audit each zone for files that mix argument-parsing/output-formatting logic with domain calls, and move domain calls behind the existing gateway pattern already used in hench and web packages. This is a targeted change to existing files, not a structural reorganization.
-... +7 more
+[warning] The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition. [cli]
+... +6 more
 
 </findings>
 
@@ -124,13 +124,13 @@ Most imported:
 [medium] 24 entry points — wide API surface, consider consolidating exports
   files: src/cli/commands/health.ts, src/cli/commands/reorganize.ts, src/core/analytics.ts
   category: refactor
-[medium] High coupling (0.54) — 67 imports target "unit-analyze"
+[medium] High coupling (0.54) — 69 imports target "unit-analyze"
   files: src/cli/commands/health.ts, src/cli/commands/reorganize.ts, src/core/analytics.ts
   category: refactor
-[medium] 13 entry points — wide API surface, consider consolidating exports
+[medium] The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbou…
   files: src/analyze/reshape-reason.ts, src/cli/commands/adapter.ts, src/cli/commands/chunked-review-state.ts
   category: refactor
-[medium] High coupling (0.53) — 58 imports target "unit-analyze"
+[medium] 13 entry points — wide API surface, consider consolidating exports
   files: src/analyze/reshape-reason.ts, src/cli/commands/adapter.ts, src/cli/commands/chunked-review-state.ts
   category: refactor
 

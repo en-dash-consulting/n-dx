@@ -3,25 +3,24 @@
   "name": "Web Unit",
   "description": "5 files, primarily TypeScript",
   "files": [
-    "packages/web/src/server/websocket.ts",
-    "packages/web/src/server/ws-health-tracker.ts",
-    "packages/web/tests/unit/server/boundary-check.test.ts",
-    "packages/web/tests/unit/server/websocket.test.ts",
-    "packages/web/tests/unit/server/ws-health-integration.test.ts",
-    "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts",
+    "packages/web/tests/helpers/crash-detector-test-support.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts",
+    "packages/web/tests/unit/viewer/use-crash-recovery.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/server/websocket.ts",
-    "packages/web/src/server/ws-health-tracker.ts"
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts"
   ],
-  "cohesion": 0.25,
-  "coupling": 0.75,
-  "fileCount": 6,
-  "lineCount": 1561,
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 5,
+  "lineCount": 994,
   "riskMetrics": {
-    "cohesion": 0.25,
-    "coupling": 0.75,
-    "riskScore": 0.75,
+    "cohesion": 0.29,
+    "coupling": 0.71,
+    "riskScore": 0.71,
     "riskLevel": "catastrophic",
     "failsThreshold": true
   }

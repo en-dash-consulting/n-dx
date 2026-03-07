@@ -5,11 +5,11 @@
 <zone>
 
 Zone: Unit (`unit`)
-Files: 28, Cohesion: 0.43, Coupling: 0.57
-Risk: healthy (score: 0.57)
+Files: 28, Cohesion: 0.42, Coupling: 0.58
+Risk: healthy (score: 0.58)
 Description: 28 files, primarily TypeScript
 Entry points: src/analyzers/branch-work-classifier.ts, src/analyzers/risk-scoring.ts, src/cli/commands/workspace.ts, src/cli/mcp.ts, src/generators/pr-markdown-template.ts, src/schema/data-files.ts, src/schema/v1.ts, tests/unit/analyzers/zones-helpers.ts
-Lines: 11364
+Lines: 11513
 
 </zone>
 
@@ -18,14 +18,14 @@ Lines: 11364
 src/analyzers/branch-work-classifier.ts (TypeScript, 241 lines, source)
 src/analyzers/branch-work-filter.ts (TypeScript, 377 lines, source)
 src/analyzers/branch-work-store.ts (TypeScript, 146 lines, source)
-src/analyzers/risk-scoring.ts (TypeScript, 202 lines, source)
+src/analyzers/risk-scoring.ts (TypeScript, 250 lines, source)
 src/analyzers/workspace-aggregate.ts (TypeScript, 501 lines, source)
 src/cli/commands/workspace.ts (TypeScript, 193 lines, source)
 src/cli/mcp.ts (TypeScript, 555 lines, source)
 src/generators/pr-markdown-template.ts (TypeScript, 344 lines, source)
 src/public.ts (TypeScript, 112 lines, source)
 src/schema/data-files.ts (TypeScript, 13 lines, source)
-src/schema/v1.ts (TypeScript, 591 lines, source)
+src/schema/v1.ts (TypeScript, 608 lines, source)
 tests/unit/analyzers/branch-work-classifier.test.ts (TypeScript, 379 lines, test)
 tests/unit/analyzers/branch-work-filter.test.ts (TypeScript, 441 lines, test)
 tests/unit/analyzers/branch-work-store.test.ts (TypeScript, 343 lines, test)
@@ -33,7 +33,7 @@ tests/unit/analyzers/callgraph-findings.test.ts (TypeScript, 1305 lines, test)
 tests/unit/analyzers/dedup-findings.test.ts (TypeScript, 194 lines, test)
 tests/unit/analyzers/enrich-content-skip.test.ts (TypeScript, 348 lines, test)
 tests/unit/analyzers/next-steps.test.ts (TypeScript, 650 lines, test)
-tests/unit/analyzers/risk-scoring.test.ts (TypeScript, 227 lines, test)
+tests/unit/analyzers/risk-scoring.test.ts (TypeScript, 311 lines, test)
 tests/unit/analyzers/workspace-aggregate.test.ts (TypeScript, 702 lines, test)
 tests/unit/analyzers/zone-enrichment.test.ts (TypeScript, 862 lines, test)
 tests/unit/analyzers/zone-insights.test.ts (TypeScript, 880 lines, test)
@@ -52,7 +52,7 @@ Internal:
   src/analyzers/branch-work-classifier.ts → src/schema/v1.ts {BranchWorkRecordItem, BranchWorkEpicSummary, ChangeSignificance}
   src/analyzers/branch-work-filter.ts → src/schema/v1.ts {BranchWorkRecordItem}
   src/analyzers/branch-work-store.ts → src/schema/v1.ts {BranchWorkRecord}
-  src/analyzers/risk-scoring.ts → src/schema/v1.ts {ZoneRiskMetrics}
+  src/analyzers/risk-scoring.ts → src/schema/v1.ts {ZoneRiskMetrics, RiskJustificationEntry}
   src/analyzers/workspace-aggregate.ts → src/schema/data-files.ts {DATA_FILES, SUPPLEMENTARY_FILES}
   src/analyzers/workspace-aggregate.ts → src/schema/v1.ts {SCHEMA_VERSION}
   src/cli/commands/workspace.ts → src/analyzers/workspace-aggregate.ts {loadWorkspaceConfig, saveWorkspaceConfig, resolveMembers, writeWorkspaceOutput, getWorkspaceStatus}
@@ -95,7 +95,7 @@ Outgoing (this zone → other zones):
   → e2e: src/analyzers/branch-work-store.ts → src/schema/validate.ts; tests/unit/analyzers/branch-work-store.test.ts → src/schema/validate.ts
 
 Incoming (other zones → this zone):
-  ← analyzers: src/analyzers/workspace.ts → src/schema/data-files.ts; src/cli/commands/analyze-phases.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/analyzers/risk-scoring.ts; src/cli/commands/analyze.ts → src/schema/data-files.ts; src/schema/index.ts → src/schema/v1.ts; tests/unit/analyzers/token-usage.test.ts → src/schema/v1.ts
+  ← analyzers: src/analyzers/workspace.ts → src/schema/data-files.ts; src/cli/commands/analyze-phases.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/analyzers/risk-scoring.ts; src/cli/commands/analyze.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/schema/v1.ts; src/schema/index.ts → src/schema/v1.ts; tests/unit/analyzers/token-usage.test.ts → src/schema/v1.ts
   ← analyzers-3: tests/unit/analyzers/zone-detection.test.ts → tests/unit/analyzers/zones-helpers.ts; tests/unit/analyzers/zone-size-policy.test.ts → tests/unit/analyzers/zones-helpers.ts; tests/unit/analyzers/zone-subdivision.test.ts → tests/unit/analyzers/zones-helpers.ts
   ← cli: src/cli/commands/export-pdf.ts → src/schema/data-files.ts; src/cli/commands/init.ts → src/schema/v1.ts; src/cli/commands/pr-markdown.ts → src/analyzers/branch-work-classifier.ts; src/cli/commands/pr-markdown.ts → src/generators/pr-markdown-template.ts; src/cli/commands/pr-markdown.ts → src/schema/v1.ts; src/cli/commands/validate.ts → src/schema/data-files.ts; src/cli/index.ts → src/cli/commands/workspace.ts; src/cli/index.ts → src/cli/mcp.ts
   ← e2e: src/schema/validate.ts → src/schema/v1.ts
@@ -104,13 +104,15 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [warning] High coupling (0.57) — 27 imports target "analyzers"
+[observation] [warning] High coupling (0.58) — 27 imports target "analyzers"
 [suggestion] [info] Zone "unit" has files across 11 directories — consider consolidating under a dedicated directory
+[pattern] [info] Zone finding 0 (coupling warning 0.57, 27 imports to analyzers) should be treated as info: per global finding 11, the 27 crossings are unit-test files importing their implementations under test — structurally correct by design. Only the reverse direction (analyzers production code importing from unit-scope modules) would constitute a real layering violation.
 
 </findings>
 
 <insights>
 
+- High coupling (0.58) — 27 imports target "analyzers"
 - High coupling (0.57) — 27 imports target "analyzers"
 - The schema files (v1.ts, data-files.ts) are foundational types used across the whole package but are grouped here alongside feature-specific analytics; extracting schema into its own zone would reduce coupling pressure on consumers.
 - The MCP server (cli/mcp.ts) being here alongside domain analytics rather than in the CLI zone blurs the boundary between protocol surface and business logic — consider co-locating MCP with other CLI entry points.
@@ -130,6 +132,8 @@ Incoming (other zones → this zone):
 - Move pr-markdown-template.ts to cli-infrastructure alongside pr-markdown.ts — co-locating template with command removes one coupling edge between analytics and CLI without any behavioral change
 - Flag this zone as high-fragility: cohesion 0.57 + coupling 0.43 is the worst combined score in the package — any PR touching files in this zone has elevated risk of cascading breakage and should require additional review
 - Zone "unit" has files across 11 directories — consider consolidating under a dedicated directory
-- [call graph] 1315 internal calls, 268 outgoing, 575 incoming (cohesion: 0.83, coupling: 0.17)
+- The coupling metric (0.57) is dominated by test-to-implementation imports, which are expected by design and carry no architectural risk.
+- Zone finding 0 (coupling warning 0.57, 27 imports to analyzers) should be treated as info: per global finding 11, the 27 crossings are unit-test files importing their implementations under test — structurally correct by design. Only the reverse direction (analyzers production code importing from unit-scope modules) would constitute a real layering violation.
+- [call graph] 1337 internal calls, 268 outgoing, 575 incoming (cohesion: 0.83, coupling: 0.17)
 
 </insights>

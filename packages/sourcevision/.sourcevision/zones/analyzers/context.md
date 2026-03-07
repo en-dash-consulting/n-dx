@@ -9,7 +9,7 @@ Files: 39, Cohesion: 0.67, Coupling: 0.33
 Risk: healthy (score: 0.33)
 Description: 39 files, primarily TypeScript
 Entry points: src/analyzers/callgraph-findings.ts, src/analyzers/claude-client.ts, src/analyzers/context.ts, src/analyzers/enrich-parsing.ts, src/analyzers/enrich.ts, src/analyzers/llms-txt.ts, src/analyzers/next-steps.ts, src/analyzers/server-route-detection.ts, src/analyzers/token-usage.ts, src/analyzers/workspace-crossings.ts, src/analyzers/workspace.ts, src/cli/commands/analyze.ts, src/export/pdf-report.ts, src/schema/index.ts, src/util/merge.ts, src/util/sort.ts
-Lines: 12632
+Lines: 12669
 
 </zone>
 
@@ -33,8 +33,8 @@ src/analyzers/token-usage.ts (TypeScript, 50 lines, source)
 src/analyzers/workspace-crossings.ts (TypeScript, 297 lines, source)
 src/analyzers/workspace.ts (TypeScript, 296 lines, source)
 src/analyzers/zone-output.ts (TypeScript, 330 lines, source)
-src/cli/commands/analyze-phases.ts (TypeScript, 538 lines, source)
-src/cli/commands/analyze.ts (TypeScript, 329 lines, source)
+src/cli/commands/analyze-phases.ts (TypeScript, 549 lines, source)
+src/cli/commands/analyze.ts (TypeScript, 355 lines, source)
 src/export/pdf-report.ts (TypeScript, 563 lines, source)
 src/schema/index.ts (TypeScript, 23 lines, source)
 src/util/merge.ts (TypeScript, 186 lines, source)
@@ -174,7 +174,7 @@ Outgoing (this zone → other zones):
   → analyzers-3: src/analyzers/enrich.ts → src/analyzers/zone-hash.ts; src/cli/commands/analyze-phases.ts → src/analyzers/zones.ts
   → cli: src/analyzers/classify.ts → src/cli/output.ts; src/analyzers/enrich-batch.ts → src/cli/output.ts; src/analyzers/enrich-per-zone.ts → src/cli/output.ts; src/analyzers/workspace.ts → src/constants.ts; src/cli/commands/analyze-phases.ts → src/analyzers/manifest.ts; src/cli/commands/analyze-phases.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/analyzers/manifest.ts; src/cli/commands/analyze.ts → src/cli/commands/init.ts; src/cli/commands/analyze.ts → src/cli/commands/pr-markdown.ts; src/cli/commands/analyze.ts → src/cli/errors.ts; src/cli/commands/analyze.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/constants.ts
   → e2e: src/schema/index.ts → src/schema/validate.ts; src/schema/index.ts → src/schema/validate.ts
-  → unit: src/analyzers/workspace.ts → src/schema/data-files.ts; src/cli/commands/analyze-phases.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/analyzers/risk-scoring.ts; src/cli/commands/analyze.ts → src/schema/data-files.ts; src/schema/index.ts → src/schema/v1.ts; tests/unit/analyzers/token-usage.test.ts → src/schema/v1.ts
+  → unit: src/analyzers/workspace.ts → src/schema/data-files.ts; src/cli/commands/analyze-phases.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/analyzers/risk-scoring.ts; src/cli/commands/analyze.ts → src/schema/data-files.ts; src/cli/commands/analyze.ts → src/schema/v1.ts; src/schema/index.ts → src/schema/v1.ts; tests/unit/analyzers/token-usage.test.ts → src/schema/v1.ts
 
 Incoming (other zones → this zone):
   ← analyzers-2: src/analyzers/callgraph.ts → src/schema/index.ts; src/analyzers/callgraph.ts → src/util/sort.ts; src/analyzers/components.ts → src/analyzers/server-route-detection.ts; src/analyzers/components.ts → src/schema/index.ts; src/analyzers/components.ts → src/util/sort.ts; src/analyzers/imports.ts → src/schema/index.ts; src/analyzers/imports.ts → src/util/merge.ts; src/analyzers/imports.ts → src/util/sort.ts; src/analyzers/index.ts → src/analyzers/callgraph-findings.ts; src/analyzers/index.ts → src/analyzers/callgraph-findings.ts; src/analyzers/index.ts → src/analyzers/token-usage.ts; src/analyzers/inventory.ts → src/schema/index.ts; src/analyzers/inventory.ts → src/util/merge.ts; src/analyzers/inventory.ts → src/util/sort.ts; src/analyzers/route-detection.ts → src/schema/index.ts
@@ -212,6 +212,6 @@ Incoming (other zones → this zone):
 - Audit archetypes.ts import count across zones — if it is imported by 2+ zones it is already a de-facto cross-cutting hub and should be extracted to the shared-types foundation alongside v1.ts
 - Group enrich-batch.ts and enrich-config.ts into a src/analyzers/enrichment/ subdirectory — the shared prefix is an implicit sub-module boundary that should be made structural
 - Zone "analyzers" has files across 9 directories — consider consolidating under a dedicated directory
-- [call graph] 997 internal calls, 93 outgoing, 208 incoming (cohesion: 0.91, coupling: 0.09)
+- [call graph] 998 internal calls, 94 outgoing, 208 incoming (cohesion: 0.91, coupling: 0.09)
 
 </insights>

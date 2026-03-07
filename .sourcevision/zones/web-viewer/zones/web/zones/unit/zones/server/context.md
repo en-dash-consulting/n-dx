@@ -5,19 +5,22 @@
 <zone>
 
 Zone: Web Viewer/web/unit/server (`web-viewer/web/unit/server`)
-Files: 48, Cohesion: 0.91, Coupling: 0.09
-Description: 48 files, primarily TypeScript
-Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-rex.ts, packages/web/src/server/start.ts, packages/web/src/server/types.ts
-Lines: 20892
+Files: 52, Cohesion: 0.96, Coupling: 0.04
+Description: 52 files, primarily TypeScript
+Entry points: packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-rex.ts, packages/web/src/server/types.ts
+Lines: 21488
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
+packages/web/src/public.ts (TypeScript, 53 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
 packages/web/src/server/domain-gateway.ts (TypeScript, 19 lines, source)
+packages/web/src/server/index.ts (TypeScript, 40 lines, source)
 packages/web/src/server/mcp-deps.ts (TypeScript, 6 lines, source)
+packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
 packages/web/src/server/rex-gateway.ts (TypeScript, 89 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
@@ -28,17 +31,18 @@ packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
 packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 3074 lines, source)
+packages/web/src/server/routes-rex.ts (TypeScript, 3076 lines, source)
 packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
 packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 682 lines, source)
+packages/web/src/server/start.ts (TypeScript, 684 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
+packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
 packages/web/tests/unit/server/routes-adaptive.test.ts (TypeScript, 446 lines, test)
 packages/web/tests/unit/server/routes-config.test.ts (TypeScript, 234 lines, test)
 packages/web/tests/unit/server/routes-hench-audit.test.ts (TypeScript, 249 lines, test)
@@ -70,6 +74,16 @@ packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, 
 Internal:
   packages/web/src/cli/index.ts → packages/web/src/server/start.ts {startServer}
   packages/web/src/cli/index.ts → packages/web/src/server/types.ts {ViewerScope}
+  packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
+  packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
+  packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
+  packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
+  packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
+  packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
+  packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
+  packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
+  packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
+  packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
   packages/web/src/server/mcp-deps.ts → packages/web/src/server/domain-gateway.ts {*}
   packages/web/src/server/mcp-deps.ts → packages/web/src/server/rex-gateway.ts {*}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
@@ -115,6 +129,8 @@ Internal:
   packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
+  packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
+  packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
@@ -134,6 +150,8 @@ Internal:
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
+  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/start.ts {PORT_FILE}
   packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-config.test.ts → packages/web/src/server/routes-config.ts {handleConfigRoute, clearConfigCaches}

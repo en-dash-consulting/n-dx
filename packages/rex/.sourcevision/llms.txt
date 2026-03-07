@@ -6,10 +6,10 @@
 ## Project Overview
 
 - **Files**: 241
-- **Lines of code**: 85,450
+- **Lines of code**: 85,580
 - **Languages**: TypeScript (223), JSON (9), Other (4), Markdown (4), Text (1)
 - **Zones**: 10 (10 with descriptions)
-- **Analyzed**: 2026-03-06T21:52:06.522Z
+- **Analyzed**: 2026-03-07T15:02:19.610Z
 
 ## Architecture Zones
 
@@ -128,11 +128,12 @@
 
 ### Anti-patterns
 
-- God function: cmdAnalyze in src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions [warning]
+- God function: cmdRecommend in src/cli/commands/recommend.ts calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
 
-- Three independent findings (0, 6, 7) converge on the CLI-to-domain boundary as the primary structural risk: the cli-mcp-interface zone has bidirectional coupling with prd-analysis-core (93 total crossings), the main() dispatcher calls 48 unique functions, and 2 of the 3 at-risk zones (fix-command, task-selection) are CLI-adjacent. The actionable fix is to enforce a strict dispatch boundary in src/cli/index.ts: main() should delegate to per-command entry points that own their own domain calls, eliminating the fan-out that produces both the god-function metric and the cross-zone coupling. [warning]
+- Four independent findings (global-0, global-8, global-11, global-12) converge on the CLI-to-domain coupling as the sole high-confidence structural problem in production code. The actionable surface is narrow: src/cli/commands/analyze.ts (cmdAnalyze, 44 outgoing calls) and any cli-zone files that import unit-analyze internals without going through an explicit gateway. Addressing these two points eliminates the bidirectional coupling and resolves the god-function metric simultaneously. [warning]
+- Zone risk metrics are computed uniformly across test and production zones, causing test-to-implementation coupling to register as structural risk. Three zones — unit, unit-cli, unit-core — carry inflated or false-positive risk scores solely because their test files import the modules they test. Any automated risk threshold that fires on these zones should be suppressed or filtered when zone membership is predominantly test files. [info]
 
 ### Relationships
 
@@ -144,27 +145,27 @@
 - 13 entry points — wide API surface, consider consolidating exports [warning] (cli)
 - High coupling (0.53) — 58 imports target "unit-analyze" [warning] (cli)
 - 24 entry points — wide API surface, consider consolidating exports [warning] (core)
-- High coupling (0.54) — 67 imports target "unit-analyze" [warning] (core)
+- High coupling (0.54) — 69 imports target "unit-analyze" [warning] (core)
 - High cohesion (1) — files are tightly interconnected [info] (e2e)
 - Bidirectional coupling: "cli" ↔ "unit-analyze" (58+35 crossings) — consider extracting shared interface [warning]
 - Hub: src/cli/commands/constants.ts is imported by 6 zones — cross-cutting dependency [info]
 - Size imbalance: largest zone has 69 files vs smallest with 4 — uneven decomposition [info]
-- Fan-in hotspot: src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects [warning]
-- ... and 9 more
+- The e2e zone (cohesion 1, coupling 0) and the .rex zone (cohesion 1, coupling 0) represent the healthiest structural units in the codebase. Their self-contained topology confirms that full decoupling is achievable within this project's conventions and should be the target model for refactoring the CLI zone. [info]
+- ... and 10 more
 
 ### Suggestions
 
 - Zone "cli" has files across 9 directories — consider consolidating under a dedicated directory [info] (cli)
+- The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition. [warning] (cli)
 - src/analyze/ contains files from 3 zones (cli, unit, unit-analyze) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Finding 3 assigns 'warning' severity to src/schema/index.ts for 22-file fan-in, but this file is a barrel export (index.ts) whose entire purpose is aggregating and re-exporting schema types. High fan-in is the correct outcome for this pattern. Finding 5 correctly notes 'high fan-in expected for this module type' for walkTree — the same logic applies to schema/index.ts. The warning on finding 3 is unsupported; info is appropriate. [info]
-- Finding 5 simultaneously notes '(high fan-in expected for this module type)' and then suggests 'consider if responsibilities can be narrowed' — these are internally contradictory. If high fan-in is expected for a core tree utility, no refactoring signal follows from it. The suggestion to narrow responsibilities is not supported by the finding's own qualifier and should be disregarded absent corroborating evidence. [info]
-- For the 3 at-risk zones (task-selection, fix-command, recommendation-scanning) in finding 6: each zone's high coupling likely reflects CLI handler code importing domain modules directly. Audit each zone for files that mix argument-parsing/output-formatting logic with domain calls, and move domain calls behind the existing gateway pattern already used in hench and web packages. This is a targeted change to existing files, not a structural reorganization. [warning]
-- For the bidirectional coupling between cli-mcp-interface and prd-analysis-core (finding 0), corroborated by src/analyze/ spanning 3 zones (finding 4): introduce a thin shared-types or analyze-contracts module within src/analyze/ that both zones import. This converts bidirectional coupling into two unidirectional dependencies on a neutral module, without requiring file decomposition above the 2x threshold. [warning]
 - Hub function: walkTree in src/core/tree.ts is called from 29 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - 3 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): unit-core, unit-cli, unit — mandatory refactoring recommended before further development [warning]
 - Zone "store" has files across 8 directories — consider consolidating under a dedicated directory [info] (store)
 - Zone "unit" has files across 6 directories — consider consolidating under a dedicated directory [info] (unit)
-- ... and 4 more
+- Zone "Unit" (unit) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development [warning] (unit)
+- Zone "unit-analyze" has files across 12 directories — consider consolidating under a dedicated directory [info] (unit-analyze)
+- Zone "Unit Core" (unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention [critical] (unit-core)
+- ... and 1 more
 
 ## Next Steps
 
@@ -208,8 +209,11 @@ Prioritized work items derived from analysis:
 1. **24 entry points — wide API surface, consider consolidating exports**
    Files: `src/cli/commands/health.ts`, `src/cli/commands/reorganize.ts`, `src/core/analytics.ts`
 
-1. **High coupling (0.54) — 67 imports target "unit-analyze"**
+1. **High coupling (0.54) — 69 imports target "unit-analyze"**
    Files: `src/cli/commands/health.ts`, `src/cli/commands/reorganize.ts`, `src/core/analytics.ts`
+
+1. **The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbou…**
+   Files: `src/analyze/reshape-reason.ts`, `src/cli/commands/adapter.ts`, `src/cli/commands/chunked-review-state.ts`
 
 1. **13 entry points — wide API surface, consider consolidating exports**
    Files: `src/analyze/reshape-reason.ts`, `src/cli/commands/adapter.ts`, `src/cli/commands/chunked-review-state.ts`
@@ -217,7 +221,7 @@ Prioritized work items derived from analysis:
 1. **High coupling (0.53) — 58 imports target "unit-analyze"**
    Files: `src/analyze/reshape-reason.ts`, `src/cli/commands/adapter.ts`, `src/cli/commands/chunked-review-state.ts`
 
-1. **God function: cmdAnalyze in src/cli/commands/analyze.ts calls 44 unique functio…**
+1. **God function: cmdRecommend in src/cli/commands/recommend.ts calls 36 unique fun…**
 
 1. **9 entry points — wide API surface, consider consolidating exports**
    Files: `src/cli/commands/sync.ts`, `src/core/canonical.ts`, `src/store/adapter-registry.ts`
@@ -225,9 +229,7 @@ Prioritized work items derived from analysis:
 1. **25 entry points — wide API surface, consider consolidating exports**
    Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
 
-1. **Three independent findings (0, 6, 7) converge on the CLI-to-domain boundary as …**
-
-1. **For the 3 at-risk zones (task-selection, fix-command, recommendation-scanning) …**
+1. **Four independent findings (global-0, global-8, global-11, global-12) converge o…**
 
 ### Low Priority
 
@@ -246,10 +248,6 @@ Prioritized work items derived from analysis:
    Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
 
 1. **src/analyze/ contains files from 3 zones (cli, unit, unit-analyze) — consider g…**
-
-1. **Finding 3 assigns 'warning' severity to src/schema/index.ts for 22-file fan-in,…**
-
-1. **Finding 5 simultaneously notes '(high fan-in expected for this module type)' an…**
 
 ## File Inventory
 
@@ -277,13 +275,13 @@ Prioritized work items derived from analysis:
 | `src/analyze/file-validation.ts` | source | utility | unit-analyze |
 | `src/analyze/guided.ts` | source | service | unit-analyze |
 | `src/analyze/index.ts` | source | entrypoint | unit-analyze |
-| `src/analyze/llm-bridge.ts` | source | service | unit-analyze |
+| `src/analyze/llm-bridge.ts` | source | gateway | unit-analyze |
 | `src/analyze/modify-reason.ts` | source | service | unit-analyze |
 | `src/analyze/propose.ts` | source | service | unit-analyze |
 | `src/analyze/reason.ts` | source | service | unit-analyze |
 | `src/analyze/reconcile.ts` | source | service | unit |
 | `src/analyze/reshape-reason.ts` | source | service | cli |
-| `src/analyze/scanners.ts` | source | utility | unit |
+| `src/analyze/scanners.ts` | source | service | unit |
 | `src/analyze/validate-modification.ts` | source | utility | unit-analyze |
 | `src/cli/commands/adapter.ts` | source | cli-command | cli |
 | `src/cli/commands/add.ts` | source | cli-command | unit-analyze |
@@ -315,7 +313,7 @@ Prioritized work items derived from analysis:
 | `src/cli/commands/validate.ts` | source | cli-command | unit-analyze |
 | `src/cli/commands/verify.ts` | source | cli-command | cli |
 | `src/cli/errors.ts` | source | utility | cli |
-| `src/cli/help.ts` | source | cli-command | cli |
+| `src/cli/help.ts` | source | utility | cli |
 | `src/cli/index.ts` | source | entrypoint | cli |
 | `src/cli/mcp-tools.ts` | source | service | cli |
 | `src/cli/mcp.ts` | source | cli-command | cli |
@@ -357,7 +355,7 @@ Prioritized work items derived from analysis:
 | `src/core/tree.ts` | source | utility | core |
 | `src/core/verify.ts` | source | utility | core |
 | `src/public.ts` | source | entrypoint | core |
-| `src/recommend/conflict-detection.ts` | source | service | unit |
+| `src/recommend/conflict-detection.ts` | source | utility | unit |
 | `src/recommend/create-from-recommendations.ts` | source | service | unit |
 | `src/recommend/types.ts` | source | types | unit |
 | `src/schema/index.ts` | source | entrypoint | unit-analyze |

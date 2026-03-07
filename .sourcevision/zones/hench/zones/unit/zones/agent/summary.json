@@ -25,7 +25,6 @@
     "packages/hench/src/cli/help.ts",
     "packages/hench/src/cli/index.ts",
     "packages/hench/src/cli/output.ts",
-    "packages/hench/src/prd/ops.ts",
     "packages/hench/src/prd/rex-gateway.ts",
     "packages/hench/src/process/concurrent-execution-metrics.ts",
     "packages/hench/src/process/exec-shell.ts",
@@ -71,6 +70,7 @@
     "packages/hench/tests/unit/cli/errors.test.ts",
     "packages/hench/tests/unit/cli/help.test.ts",
     "packages/hench/tests/unit/cli/output.test.ts",
+    "packages/hench/tests/unit/prd/rex-gateway.test.ts",
     "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
     "packages/hench/tests/unit/process/exec.test.ts",
     "packages/hench/tests/unit/process/lifecycle.test.ts",
@@ -104,8 +104,8 @@
     "packages/hench/src/tools/exec-shell.ts",
     "packages/hench/src/tools/rex.ts"
   ],
-  "cohesion": 0.87,
-  "coupling": 0.13,
+  "cohesion": 0.84,
+  "coupling": 0.16,
   "fileCount": 82,
-  "lineCount": 23719
+  "lineCount": 24032
 }

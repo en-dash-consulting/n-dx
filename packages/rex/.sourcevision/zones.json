@@ -117,6 +117,7 @@
         "Token telemetry is CLI-layer-only. Move token consumption tracking to a cross-cutting concern at the llm-client foundation layer so domain analysis operations can emit telemetry without depending on CLI infrastructure.",
         "chunked-review-state.ts is a one-off stateful workflow implementation with no shared contract. Extract a WorkflowStep or StatefulCommand interface to prevent this pattern from being re-implemented ad-hoc in future multi-step commands.",
         "Zone \"cli\" has files across 9 directories — consider consolidating under a dedicated directory",
+        "The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.",
         "[call graph] 1552 internal calls, 202 outgoing, 351 incoming (cohesion: 0.88, coupling: 0.12)"
       ],
       "riskMetrics": {
@@ -210,6 +211,8 @@
       "cohesion": 0.46,
       "coupling": 0.54,
       "insights": [
+        "High coupling (0.54) — 69 imports target \"unit-analyze\"",
+        "24 entry points — wide API surface, consider consolidating exports",
         "High coupling (0.54) — 67 imports target \"unit-analyze\"",
         "24 entry points — wide API surface, consider consolidating exports",
         "High coupling (0.54) — 67 imports target \"prd-analysis-core\"",
@@ -228,7 +231,7 @@
         "analytics.ts and code-coverage.ts reside in src/core/ giving them a false membership signal in the domain layer — the directory path implies they are domain tree concerns, but they are telemetry/measurement utilities. Files whose logical purpose contradicts their directory placement create misleading zone membership and make the src/core/ directory ambiguous about its own scope.",
         "src/core/analytics.ts and src/core/code-coverage.ts have misleading placement: the src/core/ directory name implies PRD domain logic, but these files are telemetry utilities. Relocating them to src/telemetry/ or src/metrics/ would disambiguate the core/ directory scope and make their extraction from prd-tree-lifecycle structurally visible without changing any interfaces.",
         "prd-tree-lifecycle (48 files) and unit-analyze (69 files) together represent approximately 50% of all source files concentrated in 2 zones. This asymmetric distribution reduces the zone map's navigational value — zones should ideally be within 2–3x of each other in file count. Splitting prd-tree-lifecycle along its already-identified sub-concerns (tree mutation vs. lifecycle orchestration vs. telemetry) would bring zone sizes closer to the 7–23 file range seen in healthier zones.",
-        "[call graph] 1596 internal calls, 108 outgoing, 127 incoming (cohesion: 0.94, coupling: 0.06)"
+        "[call graph] 1602 internal calls, 108 outgoing, 127 incoming (cohesion: 0.94, coupling: 0.06)"
       ],
       "riskMetrics": {
         "cohesion": 0.46,
@@ -452,6 +455,7 @@
         "recommendation-scanning is the only zone with both cohesion below 0.5 and coupling above 0.5 simultaneously — it is the most fragile zone by definition. Prioritize splitting it before prd-analysis-core refactoring, as its bridging role between two hubs amplifies any change in either.",
         "Zone name uses verb-gerund pattern ('recommendation-scanning') while all peer zones use noun phrases. Rename to 'recommendation-engine' for consistency.",
         "Zone \"unit\" has files across 6 directories — consider consolidating under a dedicated directory",
+        "This zone contains unit test files. Coupling to unit-analyze is expected test-to-implementation imports, not a structural defect. Risk metrics derived from test-to-production coupling are false positives under the constraint that test-to-implementation coupling is correct by design.",
         "[call graph] 663 internal calls, 72 outgoing, 4 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
@@ -1371,7 +1375,7 @@
         "consolidation-guard.ts and smart-add-duplicates.ts are runtime defensive guards against data shape violations. Tightening the schema types in src/schema/v1.ts (narrower union types, branded IDs, non-optional fields) would move these checks to compile time and eliminate the need for the runtime guards entirely.",
         "25 entry points with no public.ts means the public API surface grows by default with every new file. Add a src/public.ts barrel that explicitly controls what is exported, matching the pattern used by other packages in this monorepo.",
         "Zone \"unit-analyze\" has files across 12 directories — consider consolidating under a dedicated directory",
-        "[call graph] 2473 internal calls, 298 outgoing, 202 incoming (cohesion: 0.89, coupling: 0.11)"
+        "[call graph] 2486 internal calls, 298 outgoing, 202 incoming (cohesion: 0.89, coupling: 0.11)"
       ],
       "riskMetrics": {
         "cohesion": 0.5,
@@ -1411,6 +1415,7 @@
         "fix-command and task-selection both have coupling scores near the 0.6 warning threshold partly because unit test files that import the module under test mechanically contribute to coupling. As these command zones grow more test coverage their coupling scores will drift past the threshold without any production-code change — the threshold will generate false alarms for well-tested command modules.",
         "Zone name 'fix-command' uses verb-object pattern while 'task-selection' uses noun-phrase pattern — the two leaf command zones have inconsistent naming conventions. Standardize: either both use verb-object ('fix-command', 'next-command') or both use noun-phrase ('issue-fix', 'task-selection').",
         "Near-threshold coupling (0.6) in a 4-file zone will likely cross the warning boundary when additional test cases are added, since unit test imports count toward coupling. Consider excluding intra-zone test→production imports from coupling calculations to keep metrics meaningful for small, well-tested command zones.",
+        "This is a test zone for CLI unit tests. The catastrophic risk score (0.75) is entirely attributable to test files importing CLI and domain implementation — the expected and correct pattern for unit tests. No architectural intervention is warranted.",
         "[call graph] 136 internal calls, 15 outgoing, 1 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
@@ -1453,6 +1458,7 @@
         "task-selection does not appear as an import source in the cross-zone table, confirming it is also a leaf consumer like fix-command. Despite near-warning coupling, the zone is architecturally well-positioned as a read-only consumer of the PRD tree.",
         "task-selection and fix-command are both dependency-graph leaves with no downstream consumers — these two zones define the correct command-module pattern (consume, never export to other zones) and their structure should guide future command additions.",
         "Five unit test files for a single production file (next-task.ts) gives strong coverage but also means the test:production file ratio is 5:1. As more scoring scenarios are added, consider whether requirements-prioritization.test.ts and feature-filtered-task.test.ts warrant splitting next-task.ts into focused sub-modules (scorer.ts, filter.ts) to make the zone's production structure match its test structure.",
+        "This is a test zone for core unit tests. The catastrophic risk score (0.83) reflects test files importing core implementation modules. This coupling is structurally correct and should not drive refactoring decisions.",
         "[call graph] 444 internal calls, 24 outgoing, 4 incoming (cohesion: 0.95, coupling: 0.05)"
       ],
       "riskMetrics": {
@@ -2330,6 +2336,12 @@
       "toZone": "store"
     },
     {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/store/index.ts",
+      "fromZone": "core",
+      "toZone": "store"
+    },
+    {
       "from": "src/core/sync-engine.ts",
       "to": "src/store/contracts.ts",
       "fromZone": "core",
@@ -2422,6 +2434,12 @@
     {
       "from": "src/cli/commands/reorganize.ts",
       "to": "src/analyze/reason.ts",
+      "fromZone": "core",
+      "toZone": "unit-analyze"
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/schema/index.ts",
       "fromZone": "core",
       "toZone": "unit-analyze"
     },
@@ -2668,6 +2686,12 @@
     {
       "from": "src/public.ts",
       "to": "src/analyze/file-validation.ts",
+      "fromZone": "core",
+      "toZone": "unit-analyze"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/propose.ts",
       "fromZone": "core",
       "toZone": "unit-analyze"
     },
@@ -3803,6 +3827,19 @@
     "Hub: src/cli/output.ts is imported by 6 zones — cross-cutting dependency",
     "Hub: src/core/tree.ts is imported by 6 zones — cross-cutting dependency",
     "Bidirectional coupling: \"cli\" ↔ \"unit-analyze\" (58+35 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"core\" ↔ \"unit-analyze\" (69+18 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"core\" (36+21 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"unit\" ↔ \"unit-analyze\" (23+12 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"store\" ↔ \"unit-analyze\" (22+8 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"store\" (21+3 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"core\" ↔ \"store\" (12+5 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"core\" ↔ \"unit\" (6+4 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"core\" ↔ \"unit-core\" (2+4 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"unit-core\" (2+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"unit-cli\" (1+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"unit\" (1+2 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"e2e\" ↔ \"unit-analyze\" (2+1 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 69 files vs smallest with 4 — uneven decomposition",
     "Bidirectional coupling: \"core\" ↔ \"unit-analyze\" (67+18 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"cli\" ↔ \"core\" (36+21 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"unit\" ↔ \"unit-analyze\" (23+12 crossings) — consider extracting shared interface",
@@ -3899,6 +3936,16 @@
     "For the bidirectional coupling between cli-mcp-interface and prd-analysis-core (finding 0), corroborated by src/analyze/ spanning 3 zones (finding 4): introduce a thin shared-types or analyze-contracts module within src/analyze/ that both zones import. This converts bidirectional coupling into two unidirectional dependencies on a neutral module, without requiring file decomposition above the 2x threshold.",
     "For the 3 at-risk zones (task-selection, fix-command, recommendation-scanning) in finding 6: each zone's high coupling likely reflects CLI handler code importing domain modules directly. Audit each zone for files that mix argument-parsing/output-formatting logic with domain calls, and move domain calls behind the existing gateway pattern already used in hench and web packages. This is a targeted change to existing files, not a structural reorganization.",
     "Three independent findings (0, 6, 7) converge on the CLI-to-domain boundary as the primary structural risk: the cli-mcp-interface zone has bidirectional coupling with prd-analysis-core (93 total crossings), the main() dispatcher calls 48 unique functions, and 2 of the 3 at-risk zones (fix-command, task-selection) are CLI-adjacent. The actionable fix is to enforce a strict dispatch boundary in src/cli/index.ts: main() should delegate to per-command entry points that own their own domain calls, eliminating the fan-out that produces both the god-function metric and the cross-zone coupling.",
+    "The zone detection algorithm is not test-aware. Three zones (unit, unit-cli, unit-core) are composed of unit test files, yet their coupling metrics are evaluated identically to production code zones. This causes all inter-zone coupling from test files to their implementation targets to register as structural risk, inflating risk scores and generating false-positive catastrophic/critical ratings. The two genuinely critical findings (unit-cli finding 2, unit-core finding 2) should be treated as info once test-zone status is recognized.",
+    "After discounting test-zone false positives, all remaining elevated-severity findings converge on a single production-code root cause: the CLI layer's coupling to the domain. Findings global-0 (bidirectional cli↔unit-analyze, 93 crossings), global-11 (CLI-to-domain boundary as primary risk), global-12 (cmdAnalyze god function, 44 calls), and global-8 (bidirectional cli-mcp-interface↔prd-analysis-core) are four independent signals pointing to the same structural problem. This convergence elevates the CLI coupling issue above any other concern in the codebase.",
+    "Contradiction resolved: global finding 3 (warning on src/schema/index.ts for 22-file fan-in) directly contradicts global finding 5 (which correctly identifies schema/index.ts as a barrel export where high fan-in is the intended outcome). Finding 5 is correct; finding 3's warning severity is unsupported. The schema barrel export is a hub by design, not by accident, and is correctly comparable to the walkTree pattern acknowledged in finding 9.",
+    "Contradiction resolved: global finding 9 notes walkTree's high fan-in is 'expected for this module type' and then immediately suggests narrowing its responsibilities — a self-contradictory prescription. Global finding 6 correctly identifies this contradiction. The suggestion to narrow walkTree's responsibilities has no independent evidentiary basis and should not drive action.",
+    "Global finding 10 ('3 zones exceed architectural risk thresholds — mandatory refactoring recommended') names unit-core, unit-cli, and unit. All three are test zones whose coupling metrics are expected test-to-implementation imports. The mandatory refactoring recommendation is a false positive produced by applying production-code thresholds to test code without adjustment. This finding is correctly downgraded to info.",
+    "The store zone's 9 entry points (finding store-0, warning) lacks corroboration from any other finding. A single heuristic observation of a wide API surface, without evidence of problematic coupling or god-function patterns, does not meet the threshold for a warning under the evaluation constraints. This finding should be treated as informational pending additional evidence.",
+    "The size imbalance between unit-analyze (69 files) and the smallest zones (4 files) partly reflects the test-zone decomposition issue: test files for analyze, cli, and core have been split into separate zones, while the implementation code for analyze remains unified. The imbalance metric (global finding 2) is therefore a measurement artifact of zone boundaries, not an independent signal of problematic structure.",
+    "The e2e zone (cohesion 1, coupling 0) and the .rex zone (cohesion 1, coupling 0) represent the healthiest structural units in the codebase. Their self-contained topology confirms that full decoupling is achievable within this project's conventions and should be the target model for refactoring the CLI zone.",
+    "Zone risk metrics are computed uniformly across test and production zones, causing test-to-implementation coupling to register as structural risk. Three zones — unit, unit-cli, unit-core — carry inflated or false-positive risk scores solely because their test files import the modules they test. Any automated risk threshold that fires on these zones should be suppressed or filtered when zone membership is predominantly test files.",
+    "Four independent findings (global-0, global-8, global-11, global-12) converge on the CLI-to-domain coupling as the sole high-confidence structural problem in production code. The actionable surface is narrow: src/cli/commands/analyze.ts (cmdAnalyze, 44 outgoing calls) and any cli-zone files that import unit-analyze internals without going through an explicit gateway. Addressing these two points eliminates the bidirectional coupling and resolves the god-function metric simultaneously.",
     "[call graph] 239 calls: \"unit-analyze\" → \"cli\"",
     "[call graph] 100 calls: \"cli\" → \"unit-analyze\"",
     "[call graph] 62 calls: \"cli\" → \"core\"",
@@ -3938,7 +3985,7 @@
       "type": "observation",
       "pass": 0,
       "scope": "core",
-      "text": "High coupling (0.54) — 67 imports target \"unit-analyze\"",
+      "text": "High coupling (0.54) — 69 imports target \"unit-analyze\"",
       "severity": "warning"
     },
     {
@@ -3967,6 +4014,13 @@
       "pass": 0,
       "scope": "global",
       "text": "Size imbalance: largest zone has 69 files vs smallest with 4 — uneven decomposition",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "The e2e zone (cohesion 1, coupling 0) and the .rex zone (cohesion 1, coupling 0) represent the healthiest structural units in the codebase. Their self-contained topology confirms that full decoupling is achievable within this project's conventions and should be the target model for refactoring the CLI zone.",
       "severity": "info"
     },
     {
@@ -4054,38 +4108,17 @@
     },
     {
       "type": "suggestion",
+      "pass": 5,
+      "scope": "cli",
+      "text": "The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
       "pass": 0,
       "scope": "global",
       "text": "src/analyze/ contains files from 3 zones (cli, unit, unit-analyze) — consider grouping into subdirectories to clarify architectural boundaries",
       "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Finding 3 assigns 'warning' severity to src/schema/index.ts for 22-file fan-in, but this file is a barrel export (index.ts) whose entire purpose is aggregating and re-exporting schema types. High fan-in is the correct outcome for this pattern. Finding 5 correctly notes 'high fan-in expected for this module type' for walkTree — the same logic applies to schema/index.ts. The warning on finding 3 is unsupported; info is appropriate.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "Finding 5 simultaneously notes '(high fan-in expected for this module type)' and then suggests 'consider if responsibilities can be narrowed' — these are internally contradictory. If high fan-in is expected for a core tree utility, no refactoring signal follows from it. The suggestion to narrow responsibilities is not supported by the finding's own qualifier and should be disregarded absent corroborating evidence.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "For the 3 at-risk zones (task-selection, fix-command, recommendation-scanning) in finding 6: each zone's high coupling likely reflects CLI handler code importing domain modules directly. Audit each zone for files that mix argument-parsing/output-formatting logic with domain calls, and move domain calls behind the existing gateway pattern already used in hench and web packages. This is a targeted change to existing files, not a structural reorganization.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "For the bidirectional coupling between cli-mcp-interface and prd-analysis-core (finding 0), corroborated by src/analyze/ spanning 3 zones (finding 4): introduce a thin shared-types or analyze-contracts module within src/analyze/ that both zones import. This converts bidirectional coupling into two unidirectional dependencies on a neutral module, without requiring file decomposition above the 2x threshold.",
-      "severity": "warning"
     },
     {
       "type": "suggestion",
@@ -4144,17 +4177,24 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
-      "text": "Three independent findings (0, 6, 7) converge on the CLI-to-domain boundary as the primary structural risk: the cli-mcp-interface zone has bidirectional coupling with prd-analysis-core (93 total crossings), the main() dispatcher calls 48 unique functions, and 2 of the 3 at-risk zones (fix-command, task-selection) are CLI-adjacent. The actionable fix is to enforce a strict dispatch boundary in src/cli/index.ts: main() should delegate to per-command entry points that own their own domain calls, eliminating the fan-out that produces both the god-function metric and the cross-zone coupling.",
+      "text": "Four independent findings (global-0, global-8, global-11, global-12) converge on the CLI-to-domain coupling as the sole high-confidence structural problem in production code. The actionable surface is narrow: src/cli/commands/analyze.ts (cmdAnalyze, 44 outgoing calls) and any cli-zone files that import unit-analyze internals without going through an explicit gateway. Addressing these two points eliminates the bidirectional coupling and resolves the god-function metric simultaneously.",
       "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Zone risk metrics are computed uniformly across test and production zones, causing test-to-implementation coupling to register as structural risk. Three zones — unit, unit-cli, unit-core — carry inflated or false-positive risk scores solely because their test files import the modules they test. Any automated risk threshold that fires on these zones should be suppressed or filtered when zone membership is predominantly test files.",
+      "severity": "info"
     },
     {
       "type": "anti-pattern",
       "pass": 0,
       "scope": "global",
-      "text": "God function: cmdAnalyze in src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions",
+      "text": "God function: cmdRecommend in src/cli/commands/recommend.ts calls 36 unique functions — consider decomposing into smaller, focused functions",
       "severity": "warning",
       "related": [
-        "src/cli/commands/analyze.ts"
+        "src/cli/commands/recommend.ts"
       ]
     },
     {
@@ -4184,16 +4224,16 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 2,
+  "metaEvaluationCount": 3,
   "structureHash": "114cfbd242d8402b",
   "zoneContentHashes": {
     ".rex": "30cd2299ea28339e",
-    "root": "82cd0d17a479af0e",
+    "root": "adcbc080db036453",
     "unit": "14a7cdf33439cb32",
-    "unit-analyze": "295556dfb7caff35",
+    "unit-analyze": "f6e9b367e31345eb",
     "cli": "a0f5344a8cb375ed",
     "unit-cli": "d36110bd7cfa0dc0",
-    "core": "b04eeb35feb92987",
+    "core": "ef7b7b0b820b547a",
     "unit-core": "dd41dcebe61e336f",
     "store": "f2f9f6f3f24b32bb",
     "e2e": "72108ce64909d1b5"

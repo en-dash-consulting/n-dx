@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web Viewer (`web-viewer/web-viewer/web-viewer`)
-Files: 9, Cohesion: 0.72, Coupling: 0.28
+Files: 9, Cohesion: 0.69, Coupling: 0.31
 Description: 9 files, primarily TypeScript
 Entry points: packages/web/src/viewer/components/copy-link-button.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/views/hench-runs.ts
 Lines: 2931

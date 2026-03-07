@@ -3,12 +3,12 @@
   "name": "Hench/web",
   "description": "2 files, primarily TypeScript",
   "files": [
-    "packages/web/tests/unit/viewer/graph-interaction.test.ts",
-    "packages/web/tests/unit/viewer/graph-zoom.test.ts"
+    "packages/web/tests/integration/boundary-check.test.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 2,
-  "lineCount": 1010
+  "lineCount": 201
 }

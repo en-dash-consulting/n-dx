@@ -1,12 +1,11 @@
 {
   "id": "hench/hench",
   "name": "Hench/hench",
-  "description": "7 files, primarily JSON, Other, Markdown",
+  "description": "6 files, primarily Other, JSON, Markdown",
   "files": [
     "packages/hench/Hench-F.png",
     "packages/hench/Hench.png",
     "packages/hench/README.md",
-    "packages/hench/package-lock.json",
     "packages/hench/package.json",
     "packages/hench/tsconfig.json",
     "packages/hench/vitest.config.ts"
@@ -14,6 +13,6 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 7,
-  "lineCount": 2148
+  "fileCount": 6,
+  "lineCount": 178
 }

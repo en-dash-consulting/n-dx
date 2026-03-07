@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web/unit (`web-viewer/web/unit`)
-Files: 60, Cohesion: 0.95, Coupling: 0.05
-Description: 60 files, primarily TypeScript
-Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts
-Lines: 24053
+Files: 66, Cohesion: 0.92, Coupling: 0.08
+Description: 66 files, primarily TypeScript
+Entry points: packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts, packages/web/src/viewer/views/graph.ts
+Lines: 27004
 
 </zone>
 
@@ -33,7 +33,7 @@ packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
 packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 3074 lines, source)
+packages/web/src/server/routes-rex.ts (TypeScript, 3076 lines, source)
 packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
 packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
@@ -41,8 +41,12 @@ packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 682 lines, source)
+packages/web/src/server/start.ts (TypeScript, 684 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
+packages/web/src/viewer/graph/index.ts (TypeScript, 35 lines, source)
+packages/web/src/viewer/graph/physics.ts (TypeScript, 443 lines, source)
+packages/web/src/viewer/graph/renderer.ts (TypeScript, 1636 lines, source)
+packages/web/src/viewer/views/graph.ts (TypeScript, 388 lines, source)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
@@ -74,6 +78,8 @@ packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, test)
+packages/web/tests/unit/viewer/graph-destroy.test.ts (TypeScript, 132 lines, test)
+packages/web/tests/unit/viewer/graph-layout.test.ts (TypeScript, 313 lines, test)
 
 </files>
 
@@ -143,6 +149,7 @@ Internal:
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
   packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
+  packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
@@ -160,6 +167,12 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
   packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, buildQuadTree, bhRepulsion, tick, PhysicsNode, PhysicsLink, QTNode, SimState, TickCallbacks}
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer, GraphNode, GraphLink, ZoneInfo, GraphRendererOptions}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {initZoneClusteredPositions, tick}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphNode, GraphLink, ZoneInfo}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
@@ -225,6 +238,10 @@ Internal:
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex.ts {shutdownRexExecution}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_PRIORITY_ORDER, GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_LEVELS, GATEWAY_VALID_STATUSES, GATEWAY_VALID_PRIORITIES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {tick}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, tick}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
 
 </imports>
 
@@ -233,11 +250,9 @@ Internal:
 Cross-dependencies between sub-zones:
   web-viewer/web/unit/server → web-viewer/web/unit/server-2: 1
   web-viewer/web/unit/server → web-viewer/web/unit/server-3: 1
-  web-viewer/web/unit/server → web-viewer/web/unit/server-4: 1
   web-viewer/web/unit/server-2 → web-viewer/web/unit/server: 7
-  web-viewer/web/unit/server-3 → web-viewer/web/unit/server: 7
-  web-viewer/web/unit/server-4 → web-viewer/web/unit/server: 5
-  web-viewer/web/unit/server-4 → web-viewer/web/unit/server-3: 1
+  web-viewer/web/unit/server-3 → web-viewer/web/unit/server: 5
+  web-viewer/web/unit/server-3 → web-viewer/web/unit/server-2: 1
 
 </sub-crossings>
 
@@ -245,10 +260,10 @@ Cross-dependencies between sub-zones:
 
 This zone has 4 sub-zone(s):
 
-- **Web Viewer/web/unit/server** (`web-viewer/web/unit/server`): 48 files, cohesion 0.91, coupling 0.09
-- **Web Viewer/web/unit/server 2** (`web-viewer/web/unit/server-2`): 4 files, cohesion 0.44, coupling 0.56
-- **Web Viewer/web/unit/server 3** (`web-viewer/web/unit/server-3`): 5 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/unit/server 4** (`web-viewer/web/unit/server-4`): 3 files, cohesion 1, coupling 0
+- **Web Viewer/web/unit/server** (`web-viewer/web/unit/server`): 52 files, cohesion 0.96, coupling 0.04
+- **Web Viewer/web/unit/server 2** (`web-viewer/web/unit/server-2`): 5 files, cohesion 0.5, coupling 0.5
+- **Web Viewer/web/unit/server 3** (`web-viewer/web/unit/server-3`): 3 files, cohesion 1, coupling 0
+- **Web Viewer/web/unit/viewer** (`web-viewer/web/unit/viewer`): 6 files, cohesion 1, coupling 0
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

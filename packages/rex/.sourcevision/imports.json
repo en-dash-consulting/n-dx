@@ -1875,7 +1875,8 @@
       "to": "src/core/reorganize.ts",
       "type": "type",
       "symbols": [
-        "ReorganizationProposal"
+        "ReorganizationProposal",
+        "ReorganizationPlan"
       ]
     },
     {
@@ -1896,10 +1897,26 @@
     },
     {
       "from": "src/cli/commands/reorganize.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
         "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/store/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
       ]
     },
     {
@@ -4363,6 +4380,17 @@
         "JsonValidationResult",
         "YamlValidationResult",
         "FileValidationErrorCode"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalEpic",
+        "ProposalFeature",
+        "ProposalTask"
       ]
     },
     {
@@ -8390,7 +8418,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 887,
+    "totalEdges": 890,
     "totalExternal": 5,
     "circularCount": 0,
     "circulars": [],
@@ -8476,6 +8504,6 @@
         "count": 6
       }
     ],
-    "avgImportsPerFile": 4.35
+    "avgImportsPerFile": 4.36
   }
 }

@@ -378,14 +378,6 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
-      "to": "packages/hench/src/store/index.ts",
-      "type": "static",
-      "symbols": [
-        "saveRun"
-      ]
-    },
-    {
-      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
       "to": "packages/hench/src/store/project-config.ts",
       "type": "static",
       "symbols": [
@@ -25160,7 +25152,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2594,
+    "totalEdges": 2593,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],

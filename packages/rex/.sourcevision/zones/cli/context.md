@@ -179,6 +179,7 @@ Incoming (other zones → this zone):
 [observation] [warning] 13 entry points — wide API surface, consider consolidating exports
 [observation] [warning] High coupling (0.53) — 58 imports target "unit-analyze"
 [suggestion] [info] Zone "cli" has files across 9 directories — consider consolidating under a dedicated directory
+[suggestion] [warning] The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.
 
 </findings>
 
@@ -209,6 +210,7 @@ Incoming (other zones → this zone):
 - Token telemetry is CLI-layer-only. Move token consumption tracking to a cross-cutting concern at the llm-client foundation layer so domain analysis operations can emit telemetry without depending on CLI infrastructure.
 - chunked-review-state.ts is a one-off stateful workflow implementation with no shared contract. Extract a WorkflowStep or StatefulCommand interface to prevent this pattern from being re-implemented ad-hoc in future multi-step commands.
 - Zone "cli" has files across 9 directories — consider consolidating under a dedicated directory
+- The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.
 - [call graph] 1552 internal calls, 202 outgoing, 351 incoming (cohesion: 0.88, coupling: 0.12)
 
 </insights>

@@ -5,65 +5,85 @@
 <zone>
 
 Zone: Web Unit (`web-unit`)
-Files: 6, Cohesion: 0.25, Coupling: 0.75
-Risk: catastrophic (score: 0.75)
+Files: 5, Cohesion: 0.29, Coupling: 0.71
+Risk: catastrophic (score: 0.71)
 Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/server/websocket.ts, packages/web/src/server/ws-health-tracker.ts
-Lines: 1561
+Entry points: packages/web/src/viewer/hooks/use-crash-recovery.ts, packages/web/src/viewer/performance/crash-detector.ts
+Lines: 994
 
 </zone>
 
 <files>
 
-packages/web/src/server/websocket.ts (TypeScript, 370 lines, source)
-packages/web/src/server/ws-health-tracker.ts (TypeScript, 275 lines, source)
-packages/web/tests/unit/server/boundary-check.test.ts (TypeScript, 84 lines, test)
-packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
-packages/web/tests/unit/server/ws-health-integration.test.ts (TypeScript, 154 lines, test)
-packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
+packages/web/src/viewer/hooks/use-crash-recovery.ts (TypeScript, 134 lines, source)
+packages/web/src/viewer/performance/crash-detector.ts (TypeScript, 297 lines, source)
+packages/web/tests/helpers/crash-detector-test-support.ts (TypeScript, 20 lines, test)
+packages/web/tests/unit/viewer/crash-detector.test.ts (TypeScript, 275 lines, test)
+packages/web/tests/unit/viewer/use-crash-recovery.test.ts (TypeScript, 268 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/server/websocket.ts → packages/web/src/server/ws-health-tracker.ts {WsHealthTracker, CleanupReason}
-  packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
-  packages/web/tests/unit/server/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager}
-  packages/web/tests/unit/server/ws-health-integration.test.ts → packages/web/src/server/ws-health-tracker.ts {WsHealthTracker}
-  packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/ws-health-tracker.ts {WsHealthTracker}
+  packages/web/src/viewer/hooks/use-crash-recovery.ts → packages/web/src/viewer/performance/crash-detector.ts {detectCrash, saveNavigationState, clearSavedNavigationState, markRecoveryShown, wasRecoveryShown, resetCrashDetector}
+  packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/src/viewer/performance/crash-detector.ts {detectCrash, saveNavigationState, clearSavedNavigationState, markRecoveryShown, wasRecoveryShown, getDetectionResult, clearCrashHistory, resetCrashDetector}
+  packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/src/viewer/performance/crash-detector.ts {CrashDetectionResult, SavedNavigationState}
+  packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/tests/helpers/crash-detector-test-support.ts {HEARTBEAT_KEY, NAV_STATE_KEY, CRASH_HISTORY_KEY, RECOVERY_SHOWN_KEY, CRASH_LOOP_WINDOW_MS, CRASH_LOOP_THRESHOLD, MAX_CRASH_HISTORY}
+  packages/web/tests/unit/viewer/use-crash-recovery.test.ts → packages/web/src/viewer/hooks/use-crash-recovery.ts {useCrashRecovery}
+  packages/web/tests/unit/viewer/use-crash-recovery.test.ts → packages/web/src/viewer/hooks/use-crash-recovery.ts {UseCrashRecoveryResult}
+  packages/web/tests/unit/viewer/use-crash-recovery.test.ts → packages/web/src/viewer/performance/crash-detector.ts {CrashDetectionResult, SavedNavigationState}
+
+Outgoing (this zone → other zones):
+  → web-viewer: packages/web/src/viewer/hooks/use-crash-recovery.ts → packages/web/src/viewer/performance/index.ts; packages/web/src/viewer/hooks/use-crash-recovery.ts → packages/web/src/viewer/types.ts; packages/web/src/viewer/performance/crash-detector.ts → packages/web/src/viewer/types.ts
 
 Incoming (other zones → this zone):
-  ← web-viewer: packages/web/src/public.ts → packages/web/src/server/websocket.ts; packages/web/src/server/index.ts → packages/web/src/server/websocket.ts; packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts; packages/web/src/server/routes-rex.ts → packages/web/src/server/websocket.ts; packages/web/src/server/start.ts → packages/web/src/server/websocket.ts; packages/web/src/server/start.ts → packages/web/src/server/ws-health-tracker.ts
+  ← web-viewer: packages/web/src/viewer/main.ts → packages/web/src/viewer/hooks/use-crash-recovery.ts; packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/crash-detector.ts; packages/web/tests/unit/viewer/crash-recovery-banner.test.ts → packages/web/src/viewer/performance/crash-detector.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone
-[suggestion] [critical] Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention
+[observation] [warning] High coupling (0.71) — 3 imports target "web-viewer"
+[observation] [warning] Low cohesion (0.29) — files are loosely related, consider splitting this zone
+[suggestion] [critical] Zone "Web Unit" (web-unit) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention
 
 </findings>
 
 <insights>
 
-- Low cohesion (0.25) — files are loosely related, consider splitting this zone
-- Cohesion (0.5) and coupling (0.5) are borderline — the 6 inbound imports from dashboard-mcp-server dominate this zone's coupling profile and suggest it should live inside that zone
-- Four test files for two source files indicates thorough test coverage of the real-time layer, including a boundary-check test for edge cases
-- The ws-health-integration test suggests there is meaningful stateful interaction between the WebSocket server and health tracker worth preserving as the zone grows
-- Coupling of 0.5 driven by 6 imports from dashboard-mcp-server suggests this cluster is a natural sub-module of that zone rather than an independent architectural boundary.
-- Four test files covering two source modules, including an integration test, reflects strong testing discipline for the real-time communication layer.
-- boundary-check.test.ts is a useful safety net for WebSocket edge cases; ensure it covers reconnection and graceful shutdown scenarios.
-- Unlike task-usage-tracking, websocket-realtime-layer has zero outgoing inter-zone imports despite being a functional service zone — it is a pure downstream consumer and forms a clean unidirectional dependency with dashboard-mcp-server
-- The contrast between websocket-realtime-layer (clean directional) and task-usage-tracking (cyclic) illustrates two distinct coupling anti-patterns that emerged from the same community detection pass
-- websocket-realtime-layer has 6 inbound imports from dashboard-mcp-server and 0 outgoing — it is a pure downstream leaf. This is architecturally clean; the only concern is whether the community detection boundary reflects a real architectural seam or is an artifact of graph partitioning.
-- boundary-check.test.ts is named for cross-zone boundary behavior rather than a specific unit, suggesting it may be testing interactions that span websocket.ts and server infrastructure owned by dashboard-mcp-server — if so, it is a misplaced integration test masquerading as a unit test
-- The zone has 4 test files but 0 outgoing inter-zone imports, meaning all 6 inbound imports from dashboard-mcp-server are one-directional — this pure-leaf status means the zone could be promoted to a sub-zone of dashboard-mcp-server with zero restructuring of production code, only test file moves
-- boundary-check.test.ts is co-located in the unit test directory but its name implies cross-boundary integration behavior — if it exercises interactions between websocket.ts and dashboard-mcp-server internals it belongs in an integration test directory to prevent false confidence in unit isolation
-- websocket-realtime-layer has cohesion 0.5 AND coupling 0.5 — it meets the dual fragility criterion (both below 0.6 and both non-trivial), making it the second highest-risk zone by the combined fragility metric alongside task-usage-tracking
-- ws-health-tracker.ts is a cross-cutting health/monitoring concern; co-locating it with the WebSocket transport implementation (websocket.ts) couples two orthogonal responsibilities in one zone — health tracking is conceptually closer to the metrics infrastructure in dashboard-mcp-server than to WebSocket I/O
-- websocket-realtime-layer has both cohesion 0.5 and coupling 0.5 — the dual fragility threshold described in the severity guide. ws-health-tracker.ts (monitoring concern) and websocket.ts (transport concern) are orthogonal responsibilities. Either absorb this zone into dashboard-mcp-server as a sub-zone (eliminating the 6 inbound import edges) or split ws-health-tracker.ts into the metrics infrastructure alongside concurrent-execution-metrics.ts.
-- ws-health-integration.test.ts is located in tests/unit/server/ but its name declares it as an integration test. This placement gives false unit-test confidence in CI: if it exercises cross-boundary behavior between websocket.ts and dashboard-mcp-server infrastructure, a unit test failure in isolation may not reproduce in the full integration run. Move it to tests/integration/server/.
-- [call graph] 76 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)
+- Low cohesion (0.29) — files are loosely related, consider splitting this zone
+- High coupling (0.71) — 3 imports target "web-viewer"
+- High cohesion (0.98) — files are tightly interconnected
+- Contains 60% of project files (374/628) — subdivided into 6 sub-zones
+- Cohesion of 0.59 reflects the developer hint: viewer components (elapsed-time.ts, use-tick.ts, task-audit.ts) are co-located here but architecturally belong in the web-viewer zone.
+- The bidirectional import relationship (10 imports web→web-viewer, 7 imports web-viewer→web) combined with misplaced viewer files is the root cause of the reduced cohesion and should be resolved by moving viewer source files to packages/web/src/viewer/ and ensuring zone detection picks them up under web-viewer.
+- build.js and dev.js are legitimate build-tooling entry points for this zone; once viewer components are relocated, the remaining files (build scripts, package.json, tsconfig.json) would form a clean, high-cohesion build-infrastructure zone.
+- Zone "web-build-tooling" has files across 7 directories — consider consolidating under a dedicated directory
+- Developer zone hints explicitly identify elapsed-time.ts, use-tick.ts, lazy-children.ts, listener-lifecycle.ts, and task-audit.ts as misclassified viewer components; relocating them to the web-viewer zone would raise cohesion and eliminate the bidirectional dependency cycle.
+- The mutual import cycle between this zone and web-viewer (10 + 7 cross-zone imports) is a structural smell; after viewer file relocation, imports should flow one-way from build tooling into the viewer, not back out.
+- build.js and dev.js are correctly classified as entrypoints; they should remain in this zone as the canonical build entry surface, separate from the runtime viewer application code.
+- 32 incoming call-graph edges despite being classified as build infrastructure confirms that misclassified viewer components (elapsed-time.ts, use-tick.ts, etc.) are being imported at runtime by peer zones, not just referenced by build scripts.
+- Call-graph cohesion (0.99) vs import-graph cohesion (0.59) divergence is a reliable signal: files within the zone are tightly coupled to each other internally, but the zone boundary itself is wrong — the low import-graph cohesion reflects incorrect zone membership, not internal disorganisation.
+- web-build-tooling has 32 incoming runtime call-graph edges — disproportionate for a build-infrastructure zone. This is caused by misclassified viewer components that are imported by web-viewer at runtime. Relocating them would drop incoming coupling to near zero.
+- The zone name 'web-build-tooling' is architecturally misleading: 5 runtime viewer components are currently classified here alongside build scripts. New developers adding viewer files will naturally place them in the wrong zone, perpetuating classification drift without any tooling guardrail to stop them.
+- The 32 incoming runtime call-graph edges into a zone named 'build-tooling' creates a false security: any caller assuming build-tooling files are dev-only dependencies and safe to tree-shake in production would silently break runtime behaviour.
+- Zone name 'web-build-tooling' is semantically incorrect for its current membership: it contains 5 production runtime viewer components (elapsed-time.ts, use-tick.ts, lazy-children.ts, listener-lifecycle.ts, task-audit.ts) alongside build scripts. The misleading name is an active source of zone classification drift and should be resolved by relocating the viewer files.
+- 32 incoming runtime call-graph edges into a zone classified as build infrastructure means production code has a hidden runtime dependency on files that appear to be dev-only tooling. Any optimization pass that treats build-tooling as non-runtime (tree-shaking, conditional bundling) would silently drop live UI components.
+- web-build-tooling is the only zone in the entire codebase with BOTH degraded cohesion (0.59) AND non-trivial coupling (0.41) simultaneously — every other zone has at least one of these metrics in a healthy range. This dual-metric failure makes it the highest-risk zone in the codebase by the joint criterion, not merely a classification inconvenience.
+- The zone's coupling score of 0.41 is almost entirely explained by the misclassified viewer components: once those files are relocated to web-viewer, both metrics should recover to near 1.0 cohesion and near 0.0 coupling simultaneously, making this a single-action fix with dual metric benefit.
+- web-build-tooling is the only zone with BOTH cohesion < 0.75 (0.59) AND coupling > 0 (0.41) — the dual-metric failure pattern that indicates highest fragility. Relocating the five misclassified viewer components is a single action that should restore both metrics simultaneously. Treat as a priority fix above other zone health issues.
+- After relocating misclassified viewer components, rename the zone from 'web-build-tooling' to 'web-build-scripts' or 'web-dev-infrastructure' to eliminate the semantic mismatch between the zone name and its actual runtime-vs-buildtime membership — the current name will continue to attract misclassification drift from developers who see 'build tooling' and place viewer build-time utilities here.
+- Cohesion of 0.98 with only 0.02 coupling is exceptional for a 357-file zone — the community detection algorithm found a very tight, self-contained cluster.
+- Gateway modules (domain-gateway.ts, rex-gateway.ts) are correctly co-located inside the zone rather than floating at a package boundary, keeping the cross-package import surface auditable.
+- Zone size (357 files) means it carries the entire web package surface; if sub-zones are not introduced, future refactors will have no algorithmic boundary to anchor on.
+- Zone "web-dashboard" has files across 22 directories — consider consolidating under a dedicated directory
+- aggregation-cache.ts encodes domain directory paths (.hench/runs, .rex/execution-log.jsonl, .sourcevision/manifest.json) as string literals instead of importing path constants from rex and sourcevision packages. If either domain package relocates its data files, the aggregation cache will silently use stale paths with no compile-time error. Inject the paths as constructor parameters or derive them from shared constants.
+- concurrent-execution-metrics.ts duplicates hench's ConcurrentExecutionMetrics to avoid a cross-tier import — a correct but undocumented convention. Add a comment in both files (web and hench) cross-referencing the sibling implementation and stating the reason for duplication, so future maintainers don't consolidate them through an architecture-violating import.
+- mcp-deps.ts is @deprecated but still exports from both rex-gateway.ts and domain-gateway.ts, creating a third enumerable aggregation point that violates the one-gateway-per-source-package rule. Audit callers and remove the file once all import sites are migrated — the deprecation notice is not enough if any active imports remain.
+- At 357 files and 0.81% external call rate, web-dashboard functions as a monolithic hub. The star topology it anchors is architecturally valid but means any zone decomposition must be done by sub-zone analysis within web-dashboard, not by extracting peer zones from outside it.
+- mcp-deps.ts is classified [utility] with no declared gateway role, but its name implies it aggregates MCP dependency imports. If it re-imports from rex-gateway.ts or domain-gateway.ts at runtime, it creates an implicit second aggregation layer inside the hub zone that bypasses the explicit gateway pattern and makes the cross-package import surface harder to audit.
+- packages/web/src/server/concurrent-execution-metrics.ts tracks server-level execution metrics but resides in web-dashboard rather than usage-analytics-service. Splitting analytics concerns between the hub zone and the dedicated analytics zone makes it harder to audit the full analytics surface and sets a precedent for future metrics landing in the hub by default.
+- [call graph] 81 internal calls, 0 outgoing, 1 incoming (cohesion: 1, coupling: 0)
 
 </insights>

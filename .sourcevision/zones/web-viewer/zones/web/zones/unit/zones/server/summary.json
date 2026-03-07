@@ -1,12 +1,15 @@
 {
   "id": "web-viewer/web/unit/server",
   "name": "Web Viewer/web/unit/server",
-  "description": "48 files, primarily TypeScript",
+  "description": "52 files, primarily TypeScript",
   "files": [
     "packages/web/src/cli/index.ts",
+    "packages/web/src/public.ts",
     "packages/web/src/server/concurrent-execution-metrics.ts",
     "packages/web/src/server/domain-gateway.ts",
+    "packages/web/src/server/index.ts",
     "packages/web/src/server/mcp-deps.ts",
+    "packages/web/src/server/port.ts",
     "packages/web/src/server/process-memory-tracker.ts",
     "packages/web/src/server/rex-gateway.ts",
     "packages/web/src/server/routes-adaptive.ts",
@@ -28,6 +31,7 @@
     "packages/web/src/server/types.ts",
     "packages/web/tests/integration/smart-add-dispatch.test.ts",
     "packages/web/tests/unit/server/dev-reload.test.ts",
+    "packages/web/tests/unit/server/port.test.ts",
     "packages/web/tests/unit/server/routes-adaptive.test.ts",
     "packages/web/tests/unit/server/routes-config.test.ts",
     "packages/web/tests/unit/server/routes-hench-audit.test.ts",
@@ -53,15 +57,13 @@
     "packages/web/tests/unit/server/type-consistency.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/server/rex-gateway.ts",
     "packages/web/src/server/routes-hench.ts",
     "packages/web/src/server/routes-mcp.ts",
     "packages/web/src/server/routes-rex.ts",
-    "packages/web/src/server/start.ts",
     "packages/web/src/server/types.ts"
   ],
-  "cohesion": 0.91,
-  "coupling": 0.09,
-  "fileCount": 48,
-  "lineCount": 20892
+  "cohesion": 0.96,
+  "coupling": 0.04,
+  "fileCount": 52,
+  "lineCount": 21488
 }

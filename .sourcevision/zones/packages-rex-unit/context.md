@@ -109,6 +109,7 @@ Incoming (other zones → this zone):
 - recommendation-scanning is the only zone with both cohesion below 0.5 and coupling above 0.5 simultaneously — it is the most fragile zone by definition. Prioritize splitting it before prd-analysis-core refactoring, as its bridging role between two hubs amplifies any change in either.
 - Zone name uses verb-gerund pattern ('recommendation-scanning') while all peer zones use noun phrases. Rename to 'recommendation-engine' for consistency.
 - Zone "unit" has files across 6 directories — consider consolidating under a dedicated directory
+- This zone contains unit test files. Coupling to unit-analyze is expected test-to-implementation imports, not a structural defect. Risk metrics derived from test-to-production coupling are false positives under the constraint that test-to-implementation coupling is correct by design.
 - [call graph] 663 internal calls, 72 outgoing, 4 incoming (cohesion: 0.9, coupling: 0.1)
 
 </insights>

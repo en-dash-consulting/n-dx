@@ -1,21 +1,22 @@
 {
   "id": "web-viewer/web-viewer/web/viewer-2",
   "name": "Web Viewer/web Viewer/web/viewer 2",
-  "description": "4 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
+    "packages/web/src/viewer/views/architecture.ts",
     "packages/web/src/viewer/views/enrichment-thresholds.ts",
     "packages/web/src/viewer/views/problems.ts",
     "packages/web/src/viewer/views/sourcevision-tabs.ts",
     "packages/web/src/viewer/views/suggestions.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/architecture.ts",
     "packages/web/src/viewer/views/problems.ts",
     "packages/web/src/viewer/views/sourcevision-tabs.ts",
     "packages/web/src/viewer/views/suggestions.ts"
   ],
-  "cohesion": 0.3,
-  "coupling": 0.7,
-  "fileCount": 4,
-  "lineCount": 230
+  "cohesion": 0.32,
+  "coupling": 0.68,
+  "fileCount": 5,
+  "lineCount": 333
 }

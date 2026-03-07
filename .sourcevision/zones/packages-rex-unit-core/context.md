@@ -67,6 +67,7 @@ Incoming (other zones → this zone):
 - task-selection does not appear as an import source in the cross-zone table, confirming it is also a leaf consumer like fix-command. Despite near-warning coupling, the zone is architecturally well-positioned as a read-only consumer of the PRD tree.
 - task-selection and fix-command are both dependency-graph leaves with no downstream consumers — these two zones define the correct command-module pattern (consume, never export to other zones) and their structure should guide future command additions.
 - Five unit test files for a single production file (next-task.ts) gives strong coverage but also means the test:production file ratio is 5:1. As more scoring scenarios are added, consider whether requirements-prioritization.test.ts and feature-filtered-task.test.ts warrant splitting next-task.ts into focused sub-modules (scorer.ts, filter.ts) to make the zone's production structure match its test structure.
+- This is a test zone for core unit tests. The catastrophic risk score (0.83) reflects test files importing core implementation modules. This coupling is structurally correct and should not drive refactoring decisions.
 - [call graph] 444 internal calls, 24 outgoing, 4 incoming (cohesion: 0.95, coupling: 0.05)
 
 </insights>

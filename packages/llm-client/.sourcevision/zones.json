@@ -155,6 +155,8 @@
         "File archetype classification reveals 6 distinct archetypes within this zone (service, utility, config, types, store, entrypoint). A zone spanning all six archetypes is functionally heterogeneous by definition — this is independent corroboration of the automated enrichment failure and the size warning. The proposed name 'llm-cli-utilities' (src-2/2) accurately describes the utility/config subset but understates the zone's true scope, which also contains provider services and shared type files.",
         "Zone name ambiguity and enrichment failure are independently confirmed by two separate mechanisms (size heuristic and LLM domain-label attempt), making the naming gap more certain than either signal alone. A manual name paired with a short zone README is the minimum viable fix — it costs nothing and eliminates the ambiguity that compounds every downstream risk in this zone.",
         "Add a short ZONE.md at the src-2 zone root documenting: (1) the domain name chosen to replace 'Src 2', (2) which file categories belong here vs the src zone, and (3) the boundary rule distinguishing them. This is the zero-cost mitigation for findings src-2/1 and global/16 and prevents misclassification by future contributors.",
+        "Zone name ambiguity is a documentation gap, not a structural defect — the underlying code is functional and the zone boundary is enforced by the import graph regardless of the label assigned to it.",
+        "src-2/2 and src-2/3 should be downgraded to info: both recommend zero-cost naming and documentation actions with no structural impact. Warning severity implies a defect requiring remediation; a missing zone name and README are process gaps, not architectural defects.",
         "[call graph] 269 internal calls, 0 outgoing, 4 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -576,6 +578,15 @@
     "The three prerequisite findings (17, 19, 20) and the resolution plan (18) form an implicit four-part work breakdown structure for the types-extraction refactor. They should be tracked as a single PRD task with four ordered subtasks rather than four independent findings. Treating them separately risks executing 18 without the scope constraints from 17, or skipping the prerequisite catalogue from 20, which finding 17 warns would recreate the zone-boundary ambiguity one level down.",
     "The compounding risk cluster (now critical: finding 11) is composed of three independently detectable issues — reverse import edges, zero utility test coverage, implicit session-auth coupling — each of which is sub-threshold for critical severity in isolation. The critical designation is justified only because all three co-occur in the same zone under the same change surface. This is a cluster-criticality pattern: individual metrics look acceptable, but their simultaneous presence on the same code path eliminates all defensive layers. This pattern should be checked explicitly whenever a single zone accumulates more than one warning-level finding.",
     "Findings src/0 (12 entry points in src zone) and global/2 (all zones follow single public entry point pattern) are mutually exclusive at the intra-package import level. If src has 12 files imported from src-2, the public.ts single-surface convention is being bypassed for 11 of them. The automated heuristic (src/0) is based on call-graph edge counting and is more precise than the LLM's general observation (global/2). Until the 12 entry points are audited, global/2 should not be relied upon as a confirmed invariant — it may describe intent rather than reality.",
+    "All five critical findings (global/8, 11, 12, 21, 23) converge on one root cause and one fix: introduce a zero-dependency shared types zone. The architecture debt is concentrated and tractable — a single well-scoped refactor eliminates all critical findings and most warnings simultaneously.",
+    "The cluster-criticality pattern (global/17) should be formalized as an explicit health-check rule: whenever a single zone accumulates three or more warning-level findings sharing the same change surface, treat the cluster as critical regardless of individual finding severity.",
+    "Findings 21 and 23 are action-plan suggestions, not problem observations — they describe how to resolve findings 8 and 11. Suggestions should not inherit critical severity from the problems they address; doing so inflates the apparent finding count and obscures that only one root cause exists.",
+    "The src/0 vs global/2 contradiction (12 entry points vs single entry-point pattern) is the only unresolved factual disagreement in the dataset. The call-graph edge count (src/0) is more authoritative than the LLM general observation (global/2). Until an import audit is performed, global/2 describes intent rather than confirmed reality and must not be used as an invariant to protect.",
+    "Global/7 (critical, positive boundary) and global/14 (info, positive entry-point pattern) are architectural invariants to preserve during the types-extraction refactor. They should be captured as lint rules or explicit structural tests rather than prose findings to prevent silent regression.",
+    "The exact symbols forcing the 3 reverse import edges from llm-provider-core into llm-cli-utilities are: ClaudeConfig, AuthMode, TokenUsage (from types.ts), LLMConfig, CodexConfig (from llm-types.ts), and the provider interface from provider-interface.ts — all already classified as 'types' archetype per global/15 and global/18. The new shared zone must contain exactly these files and no others. Logic-containing files (exec.ts, files.ts, config.ts resolver functions, token-usage.ts parsing helpers) must not move; only pure type/interface/constant definitions qualify.",
+    "Finding global/7 is a positive architectural property (no zone imports from package-root at runtime) and must carry 'info' severity per evaluation constraints. Its critical designation conflates a confirmed-good invariant with genuine structural problems in findings 8 and 11, distorting the severity distribution.",
+    "Finding global/6 describes a near-clean layered architecture that is 'one refactor away' from a strict DAG. The underlying problem (3 reverse edges) is already captured at appropriate severity in findings 4, 8, 11, and 12. Finding 6 is corroborating evidence, not an independent critical defect — retaining critical severity double-counts the same root cause.",
+    "The 32-finding analysis reduces to four ordered action items: (1) introduce a zero-dependency shared types zone containing types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts; (2) add a test zone for llm-cli-utilities with at least one test per export; (3) add a session-auth integration test making the implicit coupling regression-protected; (4) manually name the src-2 zone and add a zone README. Items 1–3 must be executed in sequence per global/21. Item 4 is independent. All remaining findings are either corroborating evidence for these four actions or positive invariants to preserve.",
     "[call graph] 88 calls: \"unit\" → \"src\""
   ],
   "findings": [
@@ -706,6 +717,27 @@
       "severity": "warning"
     },
     {
+      "type": "observation",
+      "pass": 5,
+      "scope": "src-2",
+      "text": "src-2/2 and src-2/3 should be downgraded to info: both recommend zero-cost naming and documentation actions with no structural impact. Warning severity implies a defect requiring remediation; a missing zone name and README are process gaps, not architectural defects.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Finding global/6 describes a near-clean layered architecture that is 'one refactor away' from a strict DAG. The underlying problem (3 reverse edges) is already captured at appropriate severity in findings 4, 8, 11, and 12. Finding 6 is corroborating evidence, not an independent critical defect — retaining critical severity double-counts the same root cause.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Finding global/7 is a positive architectural property (no zone imports from package-root at runtime) and must carry 'info' severity per evaluation constraints. Its critical designation conflates a confirmed-good invariant with genuine structural problems in findings 8 and 11, distorting the severity distribution.",
+      "severity": "info"
+    },
+    {
       "type": "pattern",
       "pass": 5,
       "scope": "global",
@@ -737,6 +769,13 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
+      "text": "The 32-finding analysis reduces to four ordered action items: (1) introduce a zero-dependency shared types zone containing types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts; (2) add a test zone for llm-cli-utilities with at least one test per export; (3) add a session-auth integration test making the implicit coupling regression-protected; (4) manually name the src-2 zone and add a zone README. Items 1–3 must be executed in sequence per global/21. Item 4 is independent. All remaining findings are either corroborating evidence for these four actions or positive invariants to preserve.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
       "text": "The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope.",
       "severity": "warning"
     },
@@ -745,7 +784,7 @@
       "pass": 5,
       "scope": "global",
       "text": "The compounding risk cluster (now critical: finding 11) is composed of three independently detectable issues — reverse import edges, zero utility test coverage, implicit session-auth coupling — each of which is sub-threshold for critical severity in isolation. The critical designation is justified only because all three co-occur in the same zone under the same change surface. This is a cluster-criticality pattern: individual metrics look acceptable, but their simultaneous presence on the same code path eliminates all defensive layers. This pattern should be checked explicitly whenever a single zone accumulates more than one warning-level finding.",
-      "severity": "info"
+      "severity": "warning"
     },
     {
       "type": "pattern",
@@ -786,6 +825,13 @@
       "type": "suggestion",
       "pass": 5,
       "scope": "global",
+      "text": "The exact symbols forcing the 3 reverse import edges from llm-provider-core into llm-cli-utilities are: ClaudeConfig, AuthMode, TokenUsage (from types.ts), LLMConfig, CodexConfig (from llm-types.ts), and the provider interface from provider-interface.ts — all already classified as 'types' archetype per global/15 and global/18. The new shared zone must contain exactly these files and no others. Logic-containing files (exec.ts, files.ts, config.ts resolver functions, token-usage.ts parsing helpers) must not move; only pure type/interface/constant definitions qualify.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
       "text": "The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down.",
       "severity": "critical"
     },
@@ -805,7 +851,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 4,
+  "metaEvaluationCount": 5,
   "structureHash": "b67064233d99c70c",
   "zoneContentHashes": {
     "root": "ba8bddb6ce77ae93",

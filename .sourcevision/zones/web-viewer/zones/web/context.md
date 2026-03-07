@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web (`web-viewer/web`)
-Files: 72, Cohesion: 0.96, Coupling: 0.04
-Description: 72 files, primarily TypeScript
-Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/shared/data-files.ts, packages/web/src/viewer/views/pr-markdown.ts
-Lines: 27991
+Files: 82, Cohesion: 0.94, Coupling: 0.06
+Description: 82 files, primarily TypeScript
+Entry points: packages/web/src/server/routes-mcp.ts, packages/web/src/shared/data-files.ts, packages/web/src/viewer/views/graph.ts, packages/web/src/viewer/views/pr-markdown.ts
+Lines: 32424
 
 </zone>
 
@@ -34,7 +34,7 @@ packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
 packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 3074 lines, source)
+packages/web/src/server/routes-rex.ts (TypeScript, 3076 lines, source)
 packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
 packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
@@ -43,14 +43,20 @@ packages/web/src/server/routes-token-usage.ts (TypeScript, 998 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 682 lines, source)
+packages/web/src/server/start.ts (TypeScript, 684 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
+packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
 packages/web/src/shared/data-files.ts (TypeScript, 20 lines, source)
 packages/web/src/shared/index.ts (TypeScript, 13 lines, source)
 packages/web/src/shared/node-culler.ts (TypeScript, 170 lines, source)
+packages/web/src/viewer/graph/index.ts (TypeScript, 35 lines, source)
+packages/web/src/viewer/graph/physics.ts (TypeScript, 443 lines, source)
+packages/web/src/viewer/graph/renderer.ts (TypeScript, 1636 lines, source)
+packages/web/src/viewer/views/graph.ts (TypeScript, 388 lines, source)
 packages/web/src/viewer/views/pr-markdown.ts (TypeScript, 466 lines, source)
 packages/web/tests/integration/pr-markdown-refresh.test.ts (TypeScript, 176 lines, test)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
+packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
 packages/web/tests/unit/server/aggregation-cache.test.ts (TypeScript, 492 lines, test)
 packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
@@ -84,6 +90,10 @@ packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, test)
+packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
+packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
+packages/web/tests/unit/viewer/graph-destroy.test.ts (TypeScript, 132 lines, test)
+packages/web/tests/unit/viewer/graph-layout.test.ts (TypeScript, 313 lines, test)
 packages/web/tests/unit/viewer/node-culler.test.ts (TypeScript, 350 lines, test)
 packages/web/tests/unit/viewer/pr-markdown.test.ts (TypeScript, 341 lines, test)
 
@@ -99,11 +109,13 @@ Internal:
   packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
+  packages/web/src/public.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
+  packages/web/src/server/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/mcp-deps.ts → packages/web/src/server/domain-gateway.ts {*}
   packages/web/src/server/mcp-deps.ts → packages/web/src/server/rex-gateway.ts {*}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
@@ -122,6 +134,7 @@ Internal:
   packages/web/src/server/routes-hench.ts → packages/web/src/server/routes-status.ts {clearStatusCache}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-mcp.ts → packages/web/src/server/domain-gateway.ts {createSourcevisionMcpServer}
@@ -136,6 +149,7 @@ Internal:
   packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {Priority, ItemLevel, ItemStatus, PRDItem, PRDDocument, TreeEntry, TreeStats, MergeValidation, EpicStats, PriorityDistribution, RequirementsSummary, ReshapeProposal}
   packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-search.ts → packages/web/src/server/search-index.ts {SearchIndex}
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {ServerContext}
@@ -161,6 +175,7 @@ Internal:
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
   packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
+  packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
@@ -179,15 +194,23 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
   packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
+  packages/web/src/server/start.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
   packages/web/src/server/start.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES}
   packages/web/src/shared/index.ts → packages/web/src/shared/data-files.ts {DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES}
   packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCuller}
   packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCullerOptions, NodeCullerState, VisibilityCallback}
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, buildQuadTree, bhRepulsion, tick, PhysicsNode, PhysicsLink, QTNode, SimState, TickCallbacks}
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer, GraphNode, GraphLink, ZoneInfo, GraphRendererOptions}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {initZoneClusteredPositions, tick}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphNode, GraphLink, ZoneInfo}
   packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/viewer/views/pr-markdown.ts {PRMarkdownView}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
   packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache, takeFingerprint, fingerprintsMatch}
   packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {SourceFingerprint}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
@@ -256,6 +279,12 @@ Internal:
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex.ts {shutdownRexExecution}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_PRIORITY_ORDER, GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_LEVELS, GATEWAY_VALID_STATUSES, GATEWAY_VALID_PRIORITIES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
+  packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
+  packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {tick}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, tick}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
   packages/web/tests/unit/viewer/node-culler.test.ts → packages/web/src/shared/node-culler.ts {NodeCuller}
   packages/web/tests/unit/viewer/node-culler.test.ts → packages/web/src/shared/node-culler.ts {VisibilityCallback}
   packages/web/tests/unit/viewer/pr-markdown.test.ts → packages/web/src/viewer/views/pr-markdown.ts {PRMarkdownView}
@@ -267,6 +296,7 @@ Internal:
 Cross-dependencies between sub-zones:
   web-viewer/web/integration → web-viewer/web/unit: 2
   web-viewer/web/unit → web-viewer/web/shared: 4
+  web-viewer/web/unit → web-viewer/web/unit-2: 5
   web-viewer/web/unit → web-viewer/web/unit-server: 1
   web-viewer/web/unit-server → web-viewer/web/unit: 3
 
@@ -274,12 +304,13 @@ Cross-dependencies between sub-zones:
 
 <sub-zones>
 
-This zone has 4 sub-zone(s):
+This zone has 5 sub-zone(s):
 
 - **Web Viewer/web/integration** (`web-viewer/web/integration`): 3 files, cohesion 1, coupling 0
 - **Web Viewer/web/shared** (`web-viewer/web/shared`): 4 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/unit** (`web-viewer/web/unit`): 60 files, cohesion 0.95, coupling 0.05
+- **Web Viewer/web/unit** (`web-viewer/web/unit`): 66 files, cohesion 0.92, coupling 0.08
   - Has 4 nested sub-zone(s)
+- **Web Viewer/web/unit 2** (`web-viewer/web/unit-2`): 4 files, cohesion 1, coupling 0
 - **Web Viewer/web/unit Server** (`web-viewer/web/unit-server`): 5 files, cohesion 0.5, coupling 0.5
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`

@@ -1,19 +1,17 @@
 {
   "id": "web-landing",
-  "name": "Web Landing Page",
-  "description": "Static landing page assets (HTML, CSS, TypeScript entry) alongside gateway-regex validation scripts that guard cross-package import conventions.",
+  "name": "Web Landing",
+  "description": "5 files, primarily TypeScript, HTML, CSS",
   "files": [
     "packages/web/src/landing/index.html",
     "packages/web/src/landing/landing.css",
-    "packages/web/src/landing/landing.ts",
-    "tests/check-gateway-regex.mjs",
-    "tests/check-gateway-test.mjs"
+    "packages/web/src/landing/landing.ts"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 5,
-  "lineCount": 1978,
+  "fileCount": 3,
+  "lineCount": 1977,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

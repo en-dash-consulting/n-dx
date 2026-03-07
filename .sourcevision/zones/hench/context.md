@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench (`hench`)
-Files: 159, Cohesion: 1.00, Coupling: 0.00
+Files: 157, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: 157 files, primarily TypeScript, JSON, Other
-Lines: 38234
+Description: 156 files, primarily TypeScript, Other, JSON
+Lines: 35684
 
 </zone>
 
@@ -17,7 +17,6 @@ Lines: 38234
 packages/hench/Hench-F.png (Other, 0 lines, asset)
 packages/hench/Hench.png (Other, 0 lines, asset)
 packages/hench/README.md (Markdown, 108 lines, docs)
-packages/hench/package-lock.json (JSON, 1970 lines, generated)
 packages/hench/package.json (JSON, 38 lines, config)
 packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
 packages/hench/src/agent/analysis/review.ts (TypeScript, 110 lines, source)
@@ -27,9 +26,9 @@ packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
 packages/hench/src/agent/completion.ts (TypeScript, 15 lines, source)
 packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1031 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1168 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 90 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 354 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 427 lines, source)
 packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 396 lines, source)
 packages/hench/src/agent/lifecycle/task-display.ts (TypeScript, 27 lines, source)
 packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
@@ -54,8 +53,7 @@ packages/hench/src/guard/contracts.ts (TypeScript, 33 lines, source)
 packages/hench/src/guard/index.ts (TypeScript, 166 lines, source)
 packages/hench/src/guard/paths.ts (TypeScript, 127 lines, source)
 packages/hench/src/guard/policy.ts (TypeScript, 252 lines, source)
-packages/hench/src/prd/ops.ts (TypeScript, 5 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 63 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 81 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
@@ -140,6 +138,7 @@ packages/hench/tests/unit/guard/commands.test.ts (TypeScript, 191 lines, test)
 packages/hench/tests/unit/guard/guard-integration.test.ts (TypeScript, 194 lines, test)
 packages/hench/tests/unit/guard/paths.test.ts (TypeScript, 166 lines, test)
 packages/hench/tests/unit/guard/policy.test.ts (TypeScript, 269 lines, test)
+packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 90 lines, test)
 packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts (TypeScript, 872 lines, test)
 packages/hench/tests/unit/process/exec.test.ts (TypeScript, 115 lines, test)
 packages/hench/tests/unit/process/lifecycle.test.ts (TypeScript, 511 lines, test)
@@ -171,8 +170,7 @@ packages/hench/tests/unit/tools/shell.test.ts (TypeScript, 317 lines, test)
 packages/hench/tests/unit/tools/test-runner.test.ts (TypeScript, 441 lines, test)
 packages/hench/tsconfig.json (JSON, 8 lines, config)
 packages/hench/vitest.config.ts (TypeScript, 24 lines, config)
-packages/web/tests/unit/viewer/graph-interaction.test.ts (TypeScript, 716 lines, test)
-packages/web/tests/unit/viewer/graph-zoom.test.ts (TypeScript, 294 lines, test)
+packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 117 lines, test)
 
 </files>
 
@@ -211,7 +209,6 @@ Internal:
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {mapCodexUsageToTokenUsage, parseTokenUsage, parseStreamTokenUsage}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/index.ts {saveRun}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {LLMVendor}
   packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/tools/rex.ts {toolRexUpdateStatus, toolRexAppendLog}
@@ -320,7 +317,6 @@ Internal:
   packages/hench/src/guard/index.ts → packages/hench/src/guard/policy.ts {PolicyEngine}
   packages/hench/src/guard/index.ts → packages/hench/src/guard/policy.ts {AuditEntry, SessionCounters, PolicyLimits, OperationType, AuditVerdict}
   packages/hench/src/guard/policy.ts → packages/hench/src/guard/paths.ts {GuardError}
-  packages/hench/src/prd/ops.ts → packages/hench/src/prd/rex-gateway.ts {*}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {execShell}
   packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {ExecShellOptions}
   packages/hench/src/process/index.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
@@ -537,6 +533,7 @@ Internal:
   packages/hench/tests/unit/guard/paths.test.ts → packages/hench/src/guard/paths.ts {validatePath, simpleGlobMatch, GuardError}
   packages/hench/tests/unit/guard/policy.test.ts → packages/hench/src/guard/paths.ts {GuardError}
   packages/hench/tests/unit/guard/policy.test.ts → packages/hench/src/guard/policy.ts {PolicyEngine, DEFAULT_POLICY_LIMITS}
+  packages/hench/tests/unit/prd/rex-gateway.test.ts → packages/hench/src/prd/rex-gateway.ts {*}
   packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/tests/unit/process/exec.test.ts → packages/hench/src/process/exec.ts {exec, execStdout, execShellCmd, getCurrentHead}
   packages/hench/tests/unit/process/lifecycle.test.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -596,41 +593,38 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Zone "hench" has files across 31 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "hench" has files across 32 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- At 159 files with perfect cohesion and zero detected coupling to other zones, hench is a well-encapsulated domain — all cross-package imports are expected to flow through rex-gateway.ts per the gateway pattern
-- The agent/analysis/ subdirectory (adaptive.ts, review.ts, spin.ts) signals a multi-strategy analysis layer; ensure these strategies are tested independently to prevent regression when adding new analysis modes
-- Zero coupling despite being the execution layer that drives rex and llm-client suggests the gateway pattern is working correctly — verify rex-gateway.ts is the sole import boundary
-- 159 files with cohesion 1.0 and coupling 0.0 is the largest self-contained zone in the codebase — this is a strong signal that the gateway pattern is being enforced correctly.
-- The agent/analysis/ module trio (adaptive, review, spin) represents distinct reasoning strategies; documenting when each is invoked will help maintainers understand the agent's decision logic.
-- Hench images (Hench.png, Hench-F.png) and README.md colocated with source is consistent with the package-level documentation pattern used across the monorepo.
-- Zone "hench-agent-engine" has files across 31 directories — consider consolidating under a dedicated directory
-- Despite being the execution layer that drives rex, hench-agent-engine shows zero outgoing edges to any other zone in this graph — all cross-package calls are absorbed by the gateway pattern, making hench the strongest example of gateway enforcement in the codebase
-- hench-agent-engine achieves complete zone isolation (coupling 0) while being the highest-activity runtime zone — this is the strongest validation that the gateway pattern scales to large packages (159 files) without leaking import edges.
-- The agent/analysis/ trio (adaptive.ts, review.ts, spin.ts) is the highest-risk area for hidden inter-strategy coupling — if any two strategies share mutable state or call each other, the gateway pattern cannot protect against that internal cycle
-- hench-agent-engine spans 31 directories within a single detected zone. At 159 files this exceeds the practical review threshold for a single zone — sub-zones such as agent/analysis, prd, and store likely represent distinct bounded contexts that are invisible to the current zone graph.
-- The hench zone has 2838 internal calls and zero outgoing call graph edges — for the 'execution layer' that drives rex tasks, this means all external interactions are dynamically dispatched (LLM API calls, subprocess spawns) rather than statically traceable imports. This makes hench the only execution-tier zone that is invisible to static call graph analysis, which is architecturally correct but means call graph metrics alone cannot validate hench's external behavior.
-- hench is the only package with a gateway (rex-gateway.ts) but no equivalent pattern for the LLM client — llm-client calls in hench are presumably direct, not gatewayed. If hench ever needs a second LLM vendor or adds sourcevision as a dependency, the absence of an llm-client gateway will require a reactive rather than proactive refactor.
-- Add an llm-client-gateway.ts alongside rex-gateway.ts in hench to make the LLM client dependency surface explicit and auditable. Currently all llm-client imports in hench are scattered across leaf files, which violates the gateway convention already applied to the rex dependency.
-- Zone "hench" has files across 31 directories — consider consolidating under a dedicated directory
-- [call graph] 2838 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- At 157 files, hench is the largest single zone; if community detection keeps it unified, that indicates strong internal cohesion across agent sub-systems (analysis, store, tools, CLI), which is a positive structural signal.
+- The gateway pattern via src/prd/rex-gateway.ts concentrates all cross-package imports from rex into one file, making the dependency surface auditable — this is the correct pattern per CLAUDE.md.
+- Perfect cohesion (1.0) and zero coupling validate that hench's external dependencies are correctly mediated through gateway modules rather than scattered direct imports.
+- The rex-gateway.ts pattern cleanly mediates all runtime rex imports; any new rex features consumed by hench should be routed through this file, not imported directly in agent logic.
+- The analysis/ sub-system (adaptive.ts, review.ts, spin.ts, stuck.ts) reflects a mature agent feedback loop with distinct behavioral states — this separation of concerns aids testability.
+- 157 files in one community-detected zone is large; monitor whether future growth causes the Louvain algorithm to split hench into sub-zones, which may require zone-pin adjustments.
+- Zone "autonomous-agent" has files across 32 directories — consider consolidating under a dedicated directory
+- The 2721:0 internal:external call ratio is the strongest single quantitative proof of the gateway pattern's effectiveness — no other zone in the codebase demonstrates this degree of import containment at this scale.
+- At 157 files and 2721 internal calls, hench's zero external coupling means the gateway file (rex-gateway.ts) is the sole choke point for all upstream rex API surface changes — a single-file blast radius for cross-package API migrations.
+- hench's rex-gateway.ts is the exclusive mediator for all 2721 internal calls that ultimately depend on rex — any breaking change in rex's public API requires updating exactly one file in hench, not hunting through 157 files.
+- The gateway pattern scales well to 157 files: zero coupling is maintained despite being the largest zone in the codebase, validating the pattern's effectiveness at non-trivial scale.
+- The rex-gateway.ts single-choke-point design means hench has no compile-time visibility into rex's full API surface — only the subset explicitly re-exported. If rex adds a new function that hench should use, the gateway acts as a discovery barrier: developers must remember to update the gateway before the new API is accessible, with no type-system prompt to do so.
+- hench's rex-gateway.ts re-exports a hand-curated subset of rex's public API; there is no automated check that the gateway stays in sync with rex's public.ts exports. A new rex export consumed anywhere in hench without a gateway update will bypass the gateway pattern silently.
+- The zone includes Hench-F.png and Hench.png — package logo image assets — co-located with 155 TypeScript source files. A separate 'logo' zone exists elsewhere in the codebase, suggesting logo assets should be attributed to that zone rather than absorbed into the code zone where Louvain community detection treats them as structurally equivalent to source files.
+- Hench-F.png and Hench.png are logo assets co-located in the autonomous-agent zone alongside 155 TypeScript files. A dedicated logo zone already exists in the codebase — apply zone pins to reclassify these assets there for consistency with how other package logos are attributed.
+- Zone "hench" has files across 32 directories — consider consolidating under a dedicated directory
+- [call graph] 2721 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  hench/guard → hench/tools: 1
-  hench/guard → hench/unit: 2
-  hench/tools → hench/guard: 1
-  hench/tools → hench/unit: 5
-  hench/unit → hench/guard: 1
-  hench/unit → hench/tools: 5
+  hench/guard → hench/unit: 3
+  hench/unit → hench/guard: 2
   hench/unit → hench/unit-2: 4
   hench/unit → hench/unit-agent: 5
   hench/unit → hench/unit-cli: 3
@@ -645,9 +639,9 @@ Cross-dependencies between sub-zones:
 This zone has 8 sub-zone(s):
 
 - **Hench/guard** (`hench/guard`): 10 files, cohesion 0.86, coupling 0.14
+- **Hench/hench** (`hench/hench`): 6 files, cohesion 1, coupling 0
 - **Hench/store** (`hench/store`): 2 files, cohesion 1, coupling 0
-- **Hench/tools** (`hench/tools`): 12 files, cohesion 0.76, coupling 0.24
-- **Hench/unit** (`hench/unit`): 120 files, cohesion 0.95, coupling 0.05
+- **Hench/unit** (`hench/unit`): 125 files, cohesion 0.97, coupling 0.03
   - Has 8 nested sub-zone(s)
 - **Hench/unit 2** (`hench/unit-2`): 3 files, cohesion 1, coupling 0
 - **Hench/unit Agent** (`hench/unit-agent`): 5 files, cohesion 0.44, coupling 0.56

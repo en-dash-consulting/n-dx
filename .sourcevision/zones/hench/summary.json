@@ -1,12 +1,11 @@
 {
   "id": "hench",
   "name": "Hench",
-  "description": "157 files, primarily TypeScript, JSON, Other",
+  "description": "156 files, primarily TypeScript, Other, JSON",
   "files": [
     "packages/hench/Hench-F.png",
     "packages/hench/Hench.png",
     "packages/hench/README.md",
-    "packages/hench/package-lock.json",
     "packages/hench/package.json",
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/review.ts",
@@ -43,7 +42,6 @@
     "packages/hench/src/guard/index.ts",
     "packages/hench/src/guard/paths.ts",
     "packages/hench/src/guard/policy.ts",
-    "packages/hench/src/prd/ops.ts",
     "packages/hench/src/prd/rex-gateway.ts",
     "packages/hench/src/process/concurrent-execution-metrics.ts",
     "packages/hench/src/process/exec-shell.ts",
@@ -129,6 +127,7 @@
     "packages/hench/tests/unit/guard/guard-integration.test.ts",
     "packages/hench/tests/unit/guard/paths.test.ts",
     "packages/hench/tests/unit/guard/policy.test.ts",
+    "packages/hench/tests/unit/prd/rex-gateway.test.ts",
     "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
     "packages/hench/tests/unit/process/exec.test.ts",
     "packages/hench/tests/unit/process/lifecycle.test.ts",
@@ -160,14 +159,13 @@
     "packages/hench/tests/unit/tools/test-runner.test.ts",
     "packages/hench/tsconfig.json",
     "packages/hench/vitest.config.ts",
-    "packages/web/tests/unit/viewer/graph-interaction.test.ts",
-    "packages/web/tests/unit/viewer/graph-zoom.test.ts"
+    "packages/web/tests/integration/build-output-contract.test.ts"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 159,
-  "lineCount": 38234,
+  "fileCount": 157,
+  "lineCount": 35684,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

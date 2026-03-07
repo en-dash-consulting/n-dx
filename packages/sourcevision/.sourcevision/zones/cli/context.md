@@ -133,6 +133,6 @@ Incoming (other zones → this zone):
 - Zone "cli" has files across 7 directories — consider consolidating under a dedicated directory
 - registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API.
 - Zone-level cohesion (0.71) and coupling (0.29) metrics are healthy in aggregate, but mask a within-zone file-level anti-pattern: registerMcpTools in src/cli/mcp.ts. Zone-aggregate metrics and file-level code quality are orthogonal — a zone can satisfy health thresholds while containing individual problematic functions.
-- [call graph] 362 internal calls, 5 outgoing, 88 incoming (cohesion: 0.99, coupling: 0.01)
+- [call graph] 362 internal calls, 5 outgoing, 89 incoming (cohesion: 0.99, coupling: 0.01)
 
 </insights>
