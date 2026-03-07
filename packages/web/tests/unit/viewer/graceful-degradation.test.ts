@@ -17,11 +17,11 @@ import {
   getCurrentTier,
   resetDegradation,
   type DegradableFeature,
-} from "../../../src/viewer/graceful-degradation.js";
+} from "../../../src/viewer/performance/graceful-degradation.js";
 import {
   startMemoryMonitor,
   resetMemoryMonitor,
-} from "../../../src/viewer/memory-monitor.js";
+} from "../../../src/viewer/performance/memory-monitor.js";
 
 describe("featuresForTier", () => {
   it("returns empty set for normal tier", () => {

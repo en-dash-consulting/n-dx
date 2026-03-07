@@ -8,8 +8,7 @@
  */
 
 import { h } from "preact";
-import type { MemoryLevel } from "../memory-monitor.js";
-import type { DegradableFeature } from "../graceful-degradation.js";
+import type { MemoryLevel, DegradableFeature } from "../performance/index.js";
 
 export interface DegradationBannerProps {
   /** Current degradation tier. */

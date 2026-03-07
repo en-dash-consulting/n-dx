@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { CrashRecoveryBanner } from "../../../src/viewer/components/crash-recovery-banner.js";
-import type { SavedNavigationState } from "../../../src/viewer/crash-detector.js";
+import type { SavedNavigationState } from "../../../src/viewer/performance/crash-detector.js";
 
 function makeState(overrides: Partial<SavedNavigationState> = {}): SavedNavigationState {
   return {

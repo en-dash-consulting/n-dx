@@ -521,6 +521,71 @@ describe("rex add --file (idea import)", () => {
     expect(combined).not.toContain("Missing description");
     expect(combined).not.toContain("Missing level");
   }, 10000);
+
+  it("positional .md file path auto-detected as file import", async () => {
+    run(["init", tmpDir]);
+
+    const mdFile = join(tmpDir, "requirements.md");
+    await writeFile(mdFile, `# Auth\n## Login\n- Validate credentials\n`);
+
+    // Pass .md file as positional argument (no --file flag)
+    const { stderr, stdout, timedOut } = runQuick([
+      "add",
+      mdFile,
+      tmpDir,
+    ]);
+
+    const combined = stderr + stdout;
+    // Should route to file processing, NOT treat as description text
+    expect(combined).not.toContain("Missing description");
+    expect(combined).not.toContain("Missing level");
+    expect(
+      combined.includes("Reading ideas file") ||
+      combined.includes("Processing") ||
+      combined.includes("Generated") ||
+      combined.includes("proposal") ||
+      combined.includes("claude CLI not found") ||
+      combined.includes("Failed") ||
+      timedOut,
+    ).toBe(true);
+  }, 10000);
+
+  it("positional .txt file path auto-detected as file import", async () => {
+    run(["init", tmpDir]);
+
+    const txtFile = join(tmpDir, "ideas.txt");
+    await writeFile(txtFile, `Requirements:\n- Build the thing\n- Ship it\n`);
+
+    const { stderr, stdout, timedOut } = runQuick([
+      "add",
+      txtFile,
+      tmpDir,
+    ]);
+
+    const combined = stderr + stdout;
+    expect(combined).not.toContain("Missing description");
+    expect(combined).not.toContain("Missing level");
+  }, 10000);
+
+  it("non-existent .md path treated as description, not file", async () => {
+    run(["init", tmpDir]);
+
+    // File does NOT exist — should be treated as description text
+    const { stderr, stdout, timedOut } = runQuick([
+      "add",
+      "fake-file.md",
+      tmpDir,
+    ]);
+
+    const combined = stderr + stdout;
+    // Should route to description mode since the file doesn't exist
+    expect(
+      combined.includes("Analyzing description") ||
+      combined.includes("LLM analysis failed") ||
+      combined.includes("claude CLI not found") ||
+      timedOut,
+    ).toBe(true);
+  }, 10000);
 });
 
 describe("rex add with piped stdin", () => {

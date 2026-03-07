@@ -36,7 +36,7 @@ import {
   type RenderTiming,
   type UpdateComparison,
   type PerformanceSummary,
-} from "../../../src/viewer/dom-performance-monitor.js";
+} from "../../../src/viewer/performance/dom-performance-monitor.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -11,21 +11,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createTickVisibilityGate,
   type TickVisibilityGate,
-} from "../../../src/viewer/tick-visibility-gate.js";
+} from "../../../src/viewer/polling/tick-visibility-gate.js";
 import {
   onTick,
   getTickTimerState,
   resetTickTimer,
-} from "../../../src/viewer/tick-timer.js";
+} from "../../../src/viewer/polling/tick-timer.js";
 import {
   resetBatchedTickDispatcher,
   registerTickUpdater,
   getBatchedTickDispatcherState,
-} from "../../../src/viewer/batched-tick-dispatcher.js";
+} from "../../../src/viewer/polling/batched-tick-dispatcher.js";
 import {
   startTabVisibilityMonitor,
   resetTabVisibility,
-} from "../../../src/viewer/tab-visibility.js";
+} from "../../../src/viewer/polling/tab-visibility.js";
 
 // ─── RAF mock ─────────────────────────────────────────────────────────────────
 

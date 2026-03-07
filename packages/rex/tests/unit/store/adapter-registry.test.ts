@@ -23,7 +23,7 @@ import {
   resolveStore,
   createStore,
 } from "../../../src/store/index.js";
-import type { PRDStore } from "../../../src/store/types.js";
+import type { PRDStore } from "../../../src/store/contracts.js";
 import { FileStore } from "../../../src/store/file-adapter.js";
 
 // ---------------------------------------------------------------------------

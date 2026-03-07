@@ -20,6 +20,10 @@ import { cascadeParentReset } from "../core/cascade-reset.js";
 import { validateMove, moveItem } from "../core/move.js";
 import { validateMerge, previewMerge, mergeItems } from "../core/merge.js";
 import { verify } from "../core/verify.js";
+import { detectReorganizations } from "../core/reorganize.js";
+import { applyProposals } from "../core/reorganize-executor.js";
+import { computeHealthScore } from "../core/health.js";
+import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -452,6 +456,143 @@ export async function handleVerifyCriteria(
       runTests: args.runTests ?? true,
     });
     return textResult(JSON.stringify(result, null, 2));
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+export async function handleReorganize(
+  store: PRDStore,
+  dir: string,
+  args: { accept?: string; includeCompleted?: boolean; mode?: string },
+): Promise<McpResult> {
+  try {
+    const doc = await store.loadDocument();
+    if (doc.items.length === 0) {
+      return textResult(JSON.stringify({ structural: { proposals: [], stats: {} }, llm: [] }, null, 2));
+    }
+
+    const plan = detectReorganizations(doc.items, {
+      includeCompleted: args.includeCompleted ?? false,
+    });
+
+    // LLM proposals (unless mode=fast)
+    let llmProposals: Array<{ id: string; action: string; reason: string }> = [];
+    if (args.mode !== "fast") {
+      try {
+        const { reasonForReshape } = await import("../analyze/reshape-reason.js");
+        const { setLLMConfig, setClaudeConfig } = await import("../analyze/reason.js");
+        const { loadLLMConfig, loadClaudeConfig } = await import("../store/project-config.js");
+        const { REX_DIR } = await import("./commands/constants.js");
+        const { join } = await import("node:path");
+
+        const rexDir = join(dir, REX_DIR);
+        const llmConfig = await loadLLMConfig(rexDir);
+        setLLMConfig(llmConfig);
+        const claudeConfig = await loadClaudeConfig(rexDir);
+        setClaudeConfig(claudeConfig);
+
+        const { proposals } = await reasonForReshape(doc.items, { dir });
+        llmProposals = proposals.map((p) => ({
+          id: p.id,
+          action: p.action.action,
+          reason: p.action.reason,
+        }));
+      } catch {
+        // LLM unavailable — continue with structural only
+      }
+    }
+
+    if (!args.accept) {
+      // Detection only
+      return textResult(JSON.stringify({
+        structural: {
+          proposals: plan.proposals.map((p) => ({
+            id: p.id,
+            type: p.type,
+            description: p.description,
+            risk: p.risk,
+            confidence: p.confidence,
+            items: p.items,
+          })),
+          stats: plan.stats,
+        },
+        llm: llmProposals,
+      }, null, 2));
+    }
+
+    // Apply proposals
+    let toApply = plan.proposals;
+    if (args.accept === "low-risk") {
+      toApply = plan.proposals.filter((p) => p.risk === "low");
+    } else if (args.accept !== "all") {
+      // Parse comma-separated IDs
+      const ids = new Set(args.accept.split(",").map((s) => parseInt(s.trim(), 10)));
+      toApply = plan.proposals.filter((p) => ids.has(p.id));
+    }
+
+    let applied = 0;
+    let failed = 0;
+
+    if (toApply.length > 0) {
+      const result = applyProposals(doc.items, toApply);
+      applied = result.applied;
+      failed = result.failed;
+    }
+
+    if (applied > 0) {
+      await store.saveDocument(doc);
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "reorganize_applied",
+        detail: `Applied ${applied} reorganization proposals via MCP`,
+      });
+    }
+
+    return textResult(JSON.stringify({ applied, failed, llm: llmProposals }, null, 2));
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+export async function handleHealth(store: PRDStore): Promise<McpResult> {
+  try {
+    const doc = await store.loadDocument();
+    const health = computeHealthScore(doc.items);
+    return textResult(JSON.stringify(health, null, 2));
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+export async function handleFacets(
+  store: PRDStore,
+  args: { itemId?: string },
+): Promise<McpResult> {
+  try {
+    const config = await store.loadConfig();
+    const facetConfig = config.facets ?? {};
+    const doc = await store.loadDocument();
+
+    if (args.itemId) {
+      // Suggest facets for a specific item
+      const entry = findItem(doc.items, args.itemId);
+      if (!entry) {
+        return textResult(`Item "${args.itemId}" not found.`, true);
+      }
+      const parent = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
+      const currentFacets = getItemFacets(entry.item);
+      const suggestions = Object.keys(facetConfig).length > 0
+        ? suggestFacets(entry.item, facetConfig, parent)
+        : [];
+      return textResult(JSON.stringify({ itemId: args.itemId, currentFacets, suggestions }, null, 2));
+    }
+
+    // List configured facets + distribution
+    const distribution = Object.keys(facetConfig).length > 0
+      ? computeFacetDistribution(doc.items, facetConfig)
+      : {};
+    return textResult(JSON.stringify({ facets: facetConfig, distribution }, null, 2));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
   }

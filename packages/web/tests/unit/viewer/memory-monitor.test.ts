@@ -23,7 +23,7 @@ import {
   type MemoryThresholds,
   type MemoryLevel,
   type MemorySnapshot,
-} from "../../../src/viewer/memory-monitor.js";
+} from "../../../src/viewer/performance/memory-monitor.js";
 
 const DEFAULT_THRESHOLDS: MemoryThresholds = {
   elevated: 0.50,

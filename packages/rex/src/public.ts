@@ -49,7 +49,7 @@
 // ---- Store ------------------------------------------------------------------
 
 export { resolveStore } from "./store/index.js";
-export type { PRDStore } from "./store/types.js";
+export type { PRDStore } from "./store/contracts.js";
 
 // ---- Integration schema system ----------------------------------------------
 
@@ -82,6 +82,7 @@ export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
 export type {
   PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
+  FacetDefinition, LoEConfig,
 } from "./schema/v1.js";
 export {
   PRIORITY_ORDER,
@@ -92,6 +93,7 @@ export {
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
   CHILD_LEVEL,
+  LOE_DEFAULTS,
   isPriority,
   isItemLevel,
   isItemStatus,
@@ -99,6 +101,29 @@ export {
   isValidationType,
   DEFAULT_CONFIG,
 } from "./schema/v1.js";
+
+// ---- Schema: level helpers --------------------------------------------------
+
+export type { LevelDisplay } from "./schema/levels.js";
+export {
+  isRootLevel,
+  isWorkItem,
+  isContainerLevel,
+  isLeafLevel,
+  isValidLevel,
+  getLevelLabel,
+  getLevelPlural,
+  getLevelEmoji,
+  getLevelDisplayMap,
+  getChildLevel,
+  getParentLevels,
+  getAllLevels,
+  getWorkItemLevels,
+  getContainerLevels,
+  formatLevelSummary,
+  setLevelDisplay,
+  resetLevelDisplay,
+} from "./schema/levels.js";
 
 // ---- Core: tree utilities ---------------------------------------------------
 
@@ -186,6 +211,46 @@ export {
 } from "./core/prune.js";
 export type { PruneResult } from "./core/prune.js";
 
+// ---- Core: reorganize -------------------------------------------------------
+
+export {
+  detectReorganizations,
+  formatReorganizationPlan,
+} from "./core/reorganize.js";
+export type {
+  ProposalType, RiskLevel,
+  ReorganizationProposal, ReorganizationPlan,
+  ProposalDetail, MergeDetail, MoveDetail, SplitDetail,
+  DeleteDetail, PruneDetail, CollapseDetail,
+  DetectorOptions,
+} from "./core/reorganize.js";
+
+export {
+  applyProposals,
+  formatApplyResult,
+} from "./core/reorganize-executor.js";
+export type { ApplyResult, ProposalResult } from "./core/reorganize-executor.js";
+
+// ---- Core: reshape ----------------------------------------------------------
+
+export { applyReshape } from "./core/reshape.js";
+export type { ReshapeProposal, ReshapeAction, ReshapeResult } from "./core/reshape.js";
+
+// ---- Analyze: reshape-reason ------------------------------------------------
+
+export { reasonForReshape, formatReshapeProposal } from "./analyze/reshape-reason.js";
+export type { ReshapeReasonOptions, ReshapeReasonResult } from "./analyze/reshape-reason.js";
+
+// ---- Core: health -----------------------------------------------------------
+
+export {
+  computeHealthScore,
+  formatHealthScore,
+} from "./core/health.js";
+export type {
+  StructureHealthScore, HealthDimensions, HealthOptions,
+} from "./core/health.js";
+
 // ---- Core: analytics --------------------------------------------------------
 
 export {
@@ -211,6 +276,82 @@ export type {
   EnrichedRecommendation, RecommendationMeta, CreationResult,
   SkippedRecommendation, ReparentedRecommendation,
 } from "./recommend/create-from-recommendations.js";
+
+// ---- Core: facets -----------------------------------------------------------
+
+export {
+  isFacetTag,
+  parseFacetTag,
+  getFacetValue,
+  setFacetValue,
+  removeFacet,
+  getItemFacets,
+  getItemsByFacet,
+  groupByFacet,
+  suggestFacets,
+  computeFacetDistribution,
+} from "./core/facets.js";
+export type { FacetConfig, FacetSuggestion } from "./core/facets.js";
+
+// ---- Core: scope creep detection --------------------------------------------
+
+export {
+  detectScopeCreep,
+  setInitialChildCount,
+} from "./core/scope-creep.js";
+export type { ScopeCreepResult } from "./core/scope-creep.js";
+
+// ---- Core: code coverage cross-reference ------------------------------------
+
+export { crossReferenceChanges } from "./core/code-coverage.js";
+export type {
+  AffectedTask, UncoveredChange, CrossReferenceResult,
+} from "./core/code-coverage.js";
+
+// ---- Analyze: LoE decomposition ---------------------------------------------
+
+export type { DecomposedTask, DecompositionResult } from "./analyze/decompose.js";
+export { applyDecompositionPass, buildDecompositionPrompt } from "./analyze/decompose.js";
+
+// ---- Analyze: consolidation guard -------------------------------------------
+
+export type { ConsolidationGuardResult } from "./analyze/consolidation-guard.js";
+export { countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard } from "./analyze/consolidation-guard.js";
+
+// ---- Analyze: structured extraction -----------------------------------------
+
+export {
+  extractFromMarkdown,
+  extractFromText,
+  extractFromFile,
+  classifyHeadingLevels,
+  isAmbiguousStructure,
+  maybeDisambiguate,
+} from "./analyze/extract.js";
+export type { ExtractionOptions, ExtractionResult } from "./analyze/extract.js";
+
+// ---- Analyze: file validation -----------------------------------------------
+
+export {
+  validateFileInput,
+  validateMarkdownContent,
+  validateTextContent,
+  validateJsonContent,
+  validateYamlContent,
+  detectMagicBytes,
+  FileValidationError,
+  SUPPORTED_EXTENSIONS,
+  MAX_FILE_SIZE_BYTES,
+  LARGE_FILE_WARNING_BYTES,
+} from "./analyze/file-validation.js";
+export type {
+  FileValidationResult,
+  MarkdownValidationResult,
+  TextValidationResult,
+  JsonValidationResult,
+  YamlValidationResult,
+  FileValidationErrorCode,
+} from "./analyze/file-validation.js";
 
 // ---- MCP server factory -----------------------------------------------------
 

@@ -18,7 +18,7 @@ import {
   resetDefaultRegistry,
 } from "../../../src/store/adapter-registry.js";
 import { FileStore } from "../../../src/store/file-adapter.js";
-import type { PRDStore } from "../../../src/store/types.js";
+import type { PRDStore } from "../../../src/store/contracts.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

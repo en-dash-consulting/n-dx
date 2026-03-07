@@ -1,0 +1,26 @@
+{
+  "id": "task-usage-tracking",
+  "name": "Task Usage Tracking",
+  "description": "Server-side services for recording and cleaning up per-task token/usage metrics incrementally over time.",
+  "files": [
+    "packages/web/src/server/incremental-task-usage.ts",
+    "packages/web/src/server/usage-cleanup-scheduler.ts",
+    "packages/web/tests/unit/server/incremental-task-usage.test.ts",
+    "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/incremental-task-usage.ts",
+    "packages/web/src/server/usage-cleanup-scheduler.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 4,
+  "lineCount": 1581,
+  "riskMetrics": {
+    "cohesion": 0.5,
+    "coupling": 0.5,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

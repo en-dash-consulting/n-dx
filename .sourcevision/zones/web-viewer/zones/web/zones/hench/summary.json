@@ -1,0 +1,16 @@
+{
+  "id": "web-viewer/web/hench",
+  "name": "Web Viewer/web/hench",
+  "description": "4 files, primarily CSS",
+  "files": [
+    "packages/web/src/viewer/styles/graph.css",
+    "packages/web/src/viewer/styles/hench-config.css",
+    "packages/web/src/viewer/styles/hench-runs.css",
+    "packages/web/src/viewer/styles/hench-templates.css"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 4,
+  "lineCount": 3028
+}

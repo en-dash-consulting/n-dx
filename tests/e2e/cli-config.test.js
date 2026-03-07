@@ -882,9 +882,9 @@ describe("n-dx config", () => {
     });
 
     it("gets claude.model after setting it", () => {
-      run(["claude.model", "claude-sonnet-4-20250514", tmpDir]);
+      run(["claude.model", "claude-sonnet-4-6", tmpDir]);
       const output = run(["claude.model", tmpDir]);
-      expect(output.trim()).toBe("claude-sonnet-4-20250514");
+      expect(output.trim()).toBe("claude-sonnet-4-6");
     });
 
     it("shows model in --json output", async () => {
@@ -916,7 +916,7 @@ describe("n-dx config", () => {
 
     it("shows model examples", () => {
       const output = run(["--help"]);
-      expect(output).toContain("claude-sonnet-4-20250514");
+      expect(output).toContain("claude-sonnet-4-6");
       expect(output).toContain("claude-opus-4-20250514");
     });
 

@@ -51,6 +51,8 @@ const ALLOWED = new Set([
   // Web server routes — spawn CLI subprocesses for domain tool execution
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",
+  // Claude Code integration — runs `claude mcp add` via execSync
+  "claude-integration.js",
 ]);
 
 /** Directories to skip entirely. */

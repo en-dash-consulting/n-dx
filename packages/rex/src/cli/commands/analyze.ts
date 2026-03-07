@@ -9,7 +9,7 @@ import { info, warn, result } from "../output.js";
 import {
   preflightBudgetCheck,
   formatBudgetWarnings,
-} from "../../core/token-usage.js";
+} from "./token-format.js";
 import {
   scanTests,
   scanDocs,
@@ -28,11 +28,15 @@ import {
   setClaudeConfig,
   getAuthMode,
   getLLMVendor,
+  applyDecompositionPass,
+  applyConsolidationGuard,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
-import type { PRDItem, PRDDocument, AnalyzeTokenUsage } from "../../schema/index.js";
+import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../schema/index.js";
+import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "./chunked-review.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 
 const PENDING_FILE = "pending-proposals.json";
 const UNKNOWN_PROVIDER_METADATA = "unknown";
@@ -100,7 +104,7 @@ async function hasRexDir(dir: string): Promise<boolean> {
   }
 }
 
-function formatProposals(proposals: Proposal[]): string {
+function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string {
   const lines: string[] = [];
   for (const p of proposals) {
     lines.push(`[epic] ${p.epic.title} (from: ${p.epic.source})`);
@@ -108,7 +112,23 @@ function formatProposals(proposals: Proposal[]): string {
       lines.push(`  [feature] ${f.title} (from: ${f.source})`);
       for (const t of f.tasks) {
         const pri = t.priority ? ` [${t.priority}]` : "";
-        lines.push(`    [task] ${t.title}${pri} (from: ${t.sourceFile})`);
+        if (t.decomposition) {
+          const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
+          const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
+          lines.push(`    [task] ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
+          for (const child of t.decomposition.children) {
+            const childPri = child.priority ? ` [${child.priority}]` : "";
+            const childLoe = formatTaskLoE(child, thresholdWeeks);
+            lines.push(`      ↳ ${child.title}${childPri}${childLoe}`);
+            const childRationale = formatTaskLoERationale(child, "         ");
+            if (childRationale) lines.push(childRationale);
+          }
+        } else {
+          const loe = formatTaskLoE(t, thresholdWeeks);
+          lines.push(`    [task] ${t.title}${pri}${loe} (from: ${t.sourceFile})`);
+          const rationale = formatTaskLoERationale(t, "      ");
+          if (rationale) lines.push(rationale);
+        }
       }
     }
   }
@@ -193,6 +213,10 @@ async function acceptProposals(
           acceptanceCriteria: t.acceptanceCriteria,
           priority: t.priority as PRDItem["priority"],
           tags: t.tags,
+          // LoE fields — optional, present when the LLM included estimates
+          ...(t.loe !== undefined && { loe: t.loe }),
+          ...(t.loeRationale !== undefined && { loeRationale: t.loeRationale }),
+          ...(t.loeConfidence !== undefined && { loeConfidence: t.loeConfidence }),
         };
         await store.addItem(taskItem, featureId);
         addedCount++;
@@ -391,13 +415,121 @@ export async function cmdAnalyze(
     }
   }
 
+  // Load LoE config for consolidation guard and decomposition
+  let loeConfig: LoEConfig | undefined;
+  if (!noLlm && await hasRexDir(dir)) {
+    try {
+      const rexDir = join(dir, REX_DIR);
+      const store = await resolveStore(rexDir);
+      const config = await store.loadConfig();
+      loeConfig = config.loe;
+    } catch {
+      // Config unreadable — use defaults
+    }
+  }
+
+  // Post-processing consolidation guard: reduce over-granular LLM output
+  if (!noLlm) {
+    const guardResult = await applyConsolidationGuard(
+      proposals,
+      loeConfig,
+      model,
+    );
+
+    if (guardResult.triggered) {
+      proposals = guardResult.proposals;
+      // Accumulate consolidation token usage
+      tokenUsage.calls += guardResult.tokenUsage.calls;
+      tokenUsage.inputTokens += guardResult.tokenUsage.inputTokens;
+      tokenUsage.outputTokens += guardResult.tokenUsage.outputTokens;
+      if (guardResult.tokenUsage.cacheCreationInputTokens) {
+        tokenUsage.cacheCreationInputTokens =
+          (tokenUsage.cacheCreationInputTokens ?? 0) +
+          guardResult.tokenUsage.cacheCreationInputTokens;
+      }
+      if (guardResult.tokenUsage.cacheReadInputTokens) {
+        tokenUsage.cacheReadInputTokens =
+          (tokenUsage.cacheReadInputTokens ?? 0) +
+          guardResult.tokenUsage.cacheReadInputTokens;
+      }
+
+      if (guardResult.reduced) {
+        info(
+          `Consolidation guard: reduced from ${guardResult.originalTaskCount} to ${guardResult.finalTaskCount} tasks (ceiling: ${guardResult.ceiling}).`,
+        );
+      } else if (guardResult.warning) {
+        warn(guardResult.warning);
+      }
+    }
+  }
+
+  // LoE decomposition pass: break down oversized tasks automatically
+  if (!noLlm) {
+    const decompositionResult = await applyDecompositionPass(
+      proposals,
+      loeConfig,
+      model,
+    );
+
+    if (decompositionResult.decomposed.length > 0) {
+      proposals = decompositionResult.proposals;
+      // Accumulate decomposition token usage
+      tokenUsage.calls += decompositionResult.tokenUsage.calls;
+      tokenUsage.inputTokens += decompositionResult.tokenUsage.inputTokens;
+      tokenUsage.outputTokens += decompositionResult.tokenUsage.outputTokens;
+      if (decompositionResult.tokenUsage.cacheCreationInputTokens) {
+        tokenUsage.cacheCreationInputTokens =
+          (tokenUsage.cacheCreationInputTokens ?? 0) +
+          decompositionResult.tokenUsage.cacheCreationInputTokens;
+      }
+      if (decompositionResult.tokenUsage.cacheReadInputTokens) {
+        tokenUsage.cacheReadInputTokens =
+          (tokenUsage.cacheReadInputTokens ?? 0) +
+          decompositionResult.tokenUsage.cacheReadInputTokens;
+      }
+
+      info(
+        `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} (LoE exceeded threshold).`,
+      );
+    }
+  }
+
+  // Resolve decomposition threshold for LoE flagging in display
+  const thresholdWeeks = loeConfig?.taskThresholdWeeks ?? LOE_DEFAULTS.taskThresholdWeeks;
+
   // Show diff view when existing PRD items are present, otherwise plain list
   if (existing.length > 0) {
     info(formatDiff(proposals, existing));
   } else {
-    info(formatProposals(proposals));
+    info(formatProposals(proposals, thresholdWeeks));
   }
   info("");
+
+  // Decomposition review: let user choose how to handle decomposed tasks
+  const { countDecomposedTasks } = await import("./decomposition-review.js");
+  if (countDecomposedTasks(proposals) > 0) {
+    const {
+      autoResolveDecompositions,
+      runDecompositionReview,
+      formatDecompositionSummary,
+    } = await import("./decomposition-review.js");
+
+    let decompositionResult;
+    if (accept || !process.stdin.isTTY) {
+      // Non-interactive: default to accepting decomposed versions
+      decompositionResult = await autoResolveDecompositions(proposals);
+    } else {
+      // Interactive: prompt user for each decomposed task
+      decompositionResult = await runDecompositionReview(proposals);
+    }
+
+    proposals = decompositionResult.proposals;
+    const summaryLine = formatDecompositionSummary(decompositionResult.summary);
+    if (summaryLine) {
+      info(summaryLine);
+      info("");
+    }
+  }
 
   // Display token usage summary
   const usageLine = formatTokenUsage(tokenUsage);
@@ -427,7 +559,7 @@ export async function cmdAnalyze(
     await savePending(dir, proposals);
   }
 
-  await handleAcceptance(dir, proposals, { accept, chunkSize, model });
+  await handleAcceptance(dir, proposals, { accept, chunkSize, model, thresholdWeeks });
 }
 
 // ── Extracted phases ──────────────────────────────────────────────────
@@ -545,9 +677,9 @@ async function runScannerMode(
 async function handleAcceptance(
   dir: string,
   proposals: Proposal[],
-  opts: { accept: boolean; chunkSize?: number; model?: string },
+  opts: { accept: boolean; chunkSize?: number; model?: string; thresholdWeeks?: number },
 ): Promise<void> {
-  const { accept, chunkSize, model } = opts;
+  const { accept, chunkSize, model, thresholdWeeks } = opts;
 
   if (accept) {
     // Non-interactive: accept immediately with auto-accept batch record
@@ -576,7 +708,7 @@ async function handleAcceptance(
         formatted: formatAssessment(r.assessments),
       };
     };
-    const { accepted, remaining, batchRecord } = await runChunkedReview(proposals, chunkSize, granularityHandler, assessmentHandler);
+    const { accepted, remaining, batchRecord } = await runChunkedReview(proposals, chunkSize, granularityHandler, assessmentHandler, undefined, thresholdWeeks);
 
     if (accepted.length > 0) {
       await acceptProposals(dir, accepted, batchRecord);

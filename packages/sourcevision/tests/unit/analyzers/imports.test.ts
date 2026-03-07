@@ -624,3 +624,118 @@ describe("analyzeImports (incremental)", () => {
     expect(incremental.external).toEqual(full.external);
   });
 });
+
+// ── tsconfig path alias resolution ──────────────────────────────────────────
+
+describe("tsconfig path alias resolution", () => {
+  let tmpDir: string;
+
+  afterEach(async () => {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("resolves ~ path aliases via tsconfig.json paths", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-alias-"));
+    await mkdir(join(tmpDir, "app/components"), { recursive: true });
+    await mkdir(join(tmpDir, "app/routes"), { recursive: true });
+
+    // tsconfig with ~/* -> ./app/*
+    await writeFile(
+      join(tmpDir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          paths: { "~/*": ["./app/*"] },
+        },
+      }),
+    );
+
+    await writeFile(
+      join(tmpDir, "app/components/Button.tsx"),
+      `export const Button = () => null;\n`,
+    );
+    await writeFile(
+      join(tmpDir, "app/routes/index.tsx"),
+      `import { Button } from "~/components/Button";\nexport default function() { return Button(); }\n`,
+    );
+
+    const inventory = await analyzeInventory(tmpDir);
+    const imports = await analyzeImports(tmpDir, inventory);
+
+    // The ~ import should resolve to an internal edge, not external
+    expect(imports.edges).toHaveLength(1);
+    expect(imports.edges[0].from).toBe("app/routes/index.tsx");
+    expect(imports.edges[0].to).toBe("app/components/Button.tsx");
+    expect(imports.external.every((e) => e.package !== "~")).toBe(true);
+  });
+
+  it("handles tsconfig.json with comments (JSONC format)", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-jsonc-"));
+    await mkdir(join(tmpDir, "app/utils"), { recursive: true });
+    await mkdir(join(tmpDir, "app/routes"), { recursive: true });
+
+    // tsconfig with comments — JSON.parse would fail on this
+    await writeFile(
+      join(tmpDir, "tsconfig.json"),
+      `{
+  "compilerOptions": {
+    "paths": {
+      "~/*": ["./app/*"]
+    },
+    // This is a comment that breaks JSON.parse
+    "noEmit": true
+  }
+}`,
+    );
+
+    await writeFile(
+      join(tmpDir, "app/utils/helper.ts"),
+      `export function helper() { return 42; }\n`,
+    );
+    await writeFile(
+      join(tmpDir, "app/routes/page.tsx"),
+      `import { helper } from "~/utils/helper";\nexport default function() { return helper(); }\n`,
+    );
+
+    const inventory = await analyzeInventory(tmpDir);
+    const imports = await analyzeImports(tmpDir, inventory);
+
+    // Even with comments in tsconfig, the ~ alias should resolve
+    expect(imports.edges).toHaveLength(1);
+    expect(imports.edges[0].from).toBe("app/routes/page.tsx");
+    expect(imports.edges[0].to).toBe("app/utils/helper.ts");
+    expect(imports.external.every((e) => e.package !== "~")).toBe(true);
+  });
+
+  it("handles tsconfig.json with trailing commas", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-trailing-"));
+    await mkdir(join(tmpDir, "app/lib"), { recursive: true });
+    await mkdir(join(tmpDir, "app/src"), { recursive: true });
+
+    // tsconfig with trailing commas
+    await writeFile(
+      join(tmpDir, "tsconfig.json"),
+      `{
+  "compilerOptions": {
+    "paths": {
+      "~/*": ["./app/*"],
+    },
+  },
+}`,
+    );
+
+    await writeFile(
+      join(tmpDir, "app/lib/math.ts"),
+      `export const add = (a: number, b: number) => a + b;\n`,
+    );
+    await writeFile(
+      join(tmpDir, "app/src/main.ts"),
+      `import { add } from "~/lib/math";\nconsole.log(add(1, 2));\n`,
+    );
+
+    const inventory = await analyzeInventory(tmpDir);
+    const imports = await analyzeImports(tmpDir, inventory);
+
+    expect(imports.edges).toHaveLength(1);
+    expect(imports.edges[0].to).toBe("app/lib/math.ts");
+  });
+});

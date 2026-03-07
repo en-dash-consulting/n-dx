@@ -27,7 +27,7 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
     ClaudeClientError: actual.ClaudeClientError,
     setClaudeConfig: vi.fn(),
     getAuthMode: vi.fn(),
-    DEFAULT_MODEL: "claude-sonnet-4-20250514",
+    DEFAULT_MODEL: "claude-sonnet-4-6",
   };
 });
 

@@ -1,0 +1,35 @@
+{
+  "id": "project-documentation",
+  "name": "Project Documentation",
+  "description": "Architecture decision records, design analyses, and long-form reference documentation for the n-dx system and its memory/PRD subsystems.",
+  "files": [
+    "docs/2026-03-03-refresh-orchestration-memory-analysis.md",
+    "docs/level-refactor-and-steward-plan.md",
+    "docs/level-system-reference.md",
+    "docs/memory-architecture.md",
+    "docs/memory-improvements.md",
+    "docs/memory-os-behavior.md",
+    "docs/memory-risks-and-flaws.md",
+    "docs/prd-steward-vision.md",
+    "docs/process-lifecycle-audit.md",
+    "docs/resource-allocation-catalog.md",
+    "docs/rex-smart-add-duplicate-detection.md",
+    "docs/signal-handling-audit.md",
+    "docs/viewer-architecture.md",
+    "docs/viewer-audit.md",
+    "docs/web-zone-architecture.md",
+    "docs/zone-naming-conventions.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 16,
+  "lineCount": 4317,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -2,9 +2,8 @@ import { h, Fragment } from "preact";
 import { useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Finding } from "../../schema/v1.js";
-import { FindingsList } from "../components/data-display/findings-list.js";
-import { BarChart } from "../components/data-display/mini-charts.js";
-import { ENRICHMENT_THRESHOLDS } from "../components/constants.js";
+import { FindingsList, BarChart } from "../visualization/index.js";
+import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface ArchitectureProps {

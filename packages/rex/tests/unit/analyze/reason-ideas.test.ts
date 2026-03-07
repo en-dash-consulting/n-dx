@@ -204,4 +204,245 @@ describe("reasonFromIdeasFile", () => {
       reasonFromIdeasFile([join(tmpDir, "nope.txt")], []),
     ).rejects.toThrow();
   });
+
+  describe("markdown local extraction (no LLM)", () => {
+    it("parses well-structured markdown files locally without LLM", async () => {
+      const fp = join(tmpDir, "requirements.md");
+      await writeFile(
+        fp,
+        `# User Authentication
+## Login Flow
+- Implement email/password login
+- Add OAuth2 support
+
+## Password Reset
+- Build reset request form
+- Send reset email
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.proposals.length).toBeGreaterThan(0);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const epic = result.proposals[0].epic;
+      expect(epic.title).toBe("User Authentication");
+    });
+
+    it("extracts headers as epic/feature titles", async () => {
+      const fp = join(tmpDir, "spec.md");
+      await writeFile(
+        fp,
+        `# Dashboard
+## Analytics Panel
+- Display charts
+- Filter by date
+
+## User Settings
+- Edit profile
+- Change password
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const epicTitles = result.proposals.map((p) => p.epic.title);
+      expect(epicTitles).toContain("Dashboard");
+
+      const featureTitles = result.proposals.flatMap((p) =>
+        p.features.map((f) => f.title),
+      );
+      expect(featureTitles).toContain("Analytics Panel");
+      expect(featureTitles).toContain("User Settings");
+    });
+
+    it("extracts bullets as tasks", async () => {
+      const fp = join(tmpDir, "tasks.md");
+      await writeFile(
+        fp,
+        `# Project
+## Feature A
+- Implement login form
+- Add form validation
+- Handle error states
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const taskTitles = result.proposals.flatMap((p) =>
+        p.features.flatMap((f) => f.tasks.map((t) => t.title)),
+      );
+      expect(taskTitles).toEqual([
+        "Implement login form",
+        "Add form validation",
+        "Handle error states",
+      ]);
+    });
+
+    it("extracts numbered list items as tasks", async () => {
+      const fp = join(tmpDir, "numbered.md");
+      await writeFile(
+        fp,
+        `# Project
+## Feature
+1. Set up database schema
+2. Create API endpoints
+3. Write integration tests
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const taskTitles = result.proposals.flatMap((p) =>
+        p.features.flatMap((f) => f.tasks.map((t) => t.title)),
+      );
+      expect(taskTitles).toEqual([
+        "Set up database schema",
+        "Create API endpoints",
+        "Write integration tests",
+      ]);
+    });
+
+    it("extracts bullets under task headings as acceptance criteria", async () => {
+      const fp = join(tmpDir, "ac.md");
+      await writeFile(
+        fp,
+        `# Epic
+## Feature
+### Implement rate limiting
+- Returns 429 when limit exceeded
+- Configurable per-route limits
+- Supports IP-based limiting
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const task = result.proposals[0].features[0].tasks[0];
+      expect(task.title).toBe("Implement rate limiting");
+      expect(task.acceptanceCriteria).toEqual([
+        "Returns 429 when limit exceeded",
+        "Configurable per-route limits",
+        "Supports IP-based limiting",
+      ]);
+    });
+
+    it("deduplicates against existing PRD items", async () => {
+      const fp = join(tmpDir, "dedup.md");
+      await writeFile(
+        fp,
+        `# Project
+## Feature A
+- Implement login
+- Add caching
+`,
+      );
+
+      const existing = [
+        {
+          id: "1",
+          title: "Implement login",
+          level: "task" as const,
+          status: "completed" as const,
+        },
+      ];
+
+      const result = await reasonFromIdeasFile([fp], existing);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const taskTitles = result.proposals.flatMap((p) =>
+        p.features.flatMap((f) => f.tasks.map((t) => t.title)),
+      );
+      expect(taskTitles).toEqual(["Add caching"]);
+    });
+
+    it("sets source to file-import on extracted items", async () => {
+      const fp = join(tmpDir, "source.md");
+      await writeFile(
+        fp,
+        `# Epic
+## Feature
+- Task
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      expect(result.proposals[0].epic.source).toBe("file-import");
+      expect(result.proposals[0].features[0].source).toBe("file-import");
+      expect(result.proposals[0].features[0].tasks[0].source).toBe(
+        "file-import",
+      );
+    });
+
+    it("handles multiple markdown files with local extraction", async () => {
+      const fp1 = join(tmpDir, "auth.md");
+      const fp2 = join(tmpDir, "billing.md");
+      await writeFile(
+        fp1,
+        `# Authentication
+## Login
+- Build login form
+`,
+      );
+      await writeFile(
+        fp2,
+        `# Billing
+## Payments
+- Integrate Stripe
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp1, fp2], []);
+      expect(result.tokenUsage.calls).toBe(0);
+
+      const epicTitles = result.proposals.map((p) => p.epic.title);
+      expect(epicTitles).toContain("Authentication");
+      expect(epicTitles).toContain("Billing");
+    });
+
+    it("handles JSON files with structured parsing (no LLM)", async () => {
+      const fp = join(tmpDir, "items.json");
+      await writeFile(
+        fp,
+        JSON.stringify([
+          {
+            epic: { title: "Auth" },
+            features: [
+              {
+                title: "Login",
+                tasks: [{ title: "Build form" }],
+              },
+            ],
+          },
+        ]),
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+      expect(result.proposals.length).toBeGreaterThan(0);
+    });
+
+    it("handles YAML files with structured parsing (no LLM)", async () => {
+      const fp = join(tmpDir, "items.yaml");
+      await writeFile(
+        fp,
+        `title: Authentication
+description: User auth system
+title: Dashboard
+description: Main dashboard
+`,
+      );
+
+      const result = await reasonFromIdeasFile([fp], []);
+      expect(result.tokenUsage.calls).toBe(0);
+      expect(result.proposals.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -1,0 +1,16 @@
+{
+  "id": "web-viewer/web/viewer-4",
+  "name": "Web Viewer/web/viewer 4",
+  "description": "4 files, primarily CSS",
+  "files": [
+    "packages/web/src/viewer/styles/detail.css",
+    "packages/web/src/viewer/styles/faq.css",
+    "packages/web/src/viewer/styles/feature-toggles.css",
+    "packages/web/src/viewer/styles/forms.css"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 4,
+  "lineCount": 796
+}

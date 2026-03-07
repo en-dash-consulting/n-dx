@@ -102,3 +102,66 @@
   color: var(--text);
   font-weight: var(--weight-medium);
 }
+
+/* ── Zone drill-down breadcrumb ── */
+
+.zone-breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+.zone-breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.zone-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  font-size: var(--font-base);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.zone-breadcrumb-sep {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  margin: 0 var(--space-1);
+}
+
+.zone-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 2px var(--space-1);
+  margin: 0;
+  cursor: pointer;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-normal), background var(--transition-normal);
+  font-family: inherit;
+}
+
+.zone-breadcrumb-link:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.zone-breadcrumb-current {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}

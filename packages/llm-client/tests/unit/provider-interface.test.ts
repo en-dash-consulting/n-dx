@@ -15,7 +15,7 @@ function makeInfo(overrides: Partial<ProviderInfo> = {}): ProviderInfo {
   return {
     vendor: "claude",
     mode: "api",
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     capabilities: [],
     ...overrides,
   };

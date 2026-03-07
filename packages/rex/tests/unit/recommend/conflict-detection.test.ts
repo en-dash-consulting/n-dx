@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem } from "../../../src/schema/index.js";
-import type { EnrichedRecommendation } from "../../../src/recommend/create-from-recommendations.js";
+import type { EnrichedRecommendation } from "../../../src/recommend/types.js";
 import {
   detectRecommendationConflicts,
   formatConflict,
@@ -166,9 +166,9 @@ describe("detectRecommendationConflicts", () => {
     expect(report.conflicts[0].matchedItem.status).toBe("in_progress");
   });
 
-  // ── Matched item metadata ─────────────────────────────────────────
+  // ── Completed items are excluded ──────────────────────────────────
 
-  it("includes matched item metadata in conflict report", () => {
+  it("skips completed items — new recommendations represent new work", () => {
     const recs = [makeRecommendation({ title: "Address auth issues" })];
     const items = [
       makeItem({
@@ -181,12 +181,26 @@ describe("detectRecommendationConflicts", () => {
 
     const report = detectRecommendationConflicts(recs, items);
 
-    expect(report.conflicts[0].matchedItem).toEqual({
-      id: "completed-1",
-      title: "Address auth issues",
-      level: "task",
-      status: "completed",
-    });
+    expect(report.hasConflicts).toBe(false);
+    expect(report.conflicts).toHaveLength(0);
+    expect(report.safeIndices).toEqual([0]);
+  });
+
+  it("conflicts with pending items but not completed ones with same title", () => {
+    const recs = [
+      makeRecommendation({ title: "Address auth issues" }),
+      makeRecommendation({ title: "Fix perf problems" }),
+    ];
+    const items = [
+      makeItem({ id: "e1", title: "Address auth issues", status: "pending" }),
+      makeItem({ id: "e2", title: "Fix perf problems", status: "completed" }),
+    ];
+
+    const report = detectRecommendationConflicts(recs, items);
+
+    expect(report.conflicts).toHaveLength(1);
+    expect(report.conflicts[0].matchedItem.id).toBe("e1");
+    expect(report.safeIndices).toContain(1); // perf is safe (matched item completed)
   });
 
   // ── Content overlap detection ─────────────────────────────────────

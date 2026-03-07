@@ -142,6 +142,20 @@
 .coupling-indicator.mid { color: var(--text-dim); }
 .coupling-indicator.low { color: transparent; }
 
+.zone-map-node-subzones {
+  margin-top: 4px;
+}
+
+.subzone-badge {
+  display: inline-block;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
 .zone-map-node-io {
   display: flex;
   justify-content: space-between;

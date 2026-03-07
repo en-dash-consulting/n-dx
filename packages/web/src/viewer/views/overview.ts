@@ -2,11 +2,17 @@ import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Zone, Finding } from "../../schema/v1.js";
-import { BarChart } from "../components/data-display/mini-charts.js";
-import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
-import { HealthGauge, PatternBadge, MetricCard } from "../components/data-display/health-gauge.js";
-import { ZoneMap, ZoneDetail } from "../components/data-display/zone-map.js";
-import { getZoneColorByIndex, basename } from "../utils.js";
+import {
+  BarChart,
+  CollapsibleSection,
+  HealthGauge,
+  PatternBadge,
+  MetricCard,
+  ZoneMap,
+  ZoneDetail,
+  getZoneColorByIndex,
+} from "../visualization/index.js";
+import { basename } from "../utils.js";
 import { BrandedHeader } from "../components/logos.js";
 
 interface OverviewProps {

@@ -10,7 +10,7 @@
   --panel-w: 320px;
 
   /* ── Typography scale (modular, 1.25 ratio) ── */
-  --font-xs: 10px;
+  --font-xs: 11px;
   --font-sm: 11px;
   --font-base: 13px;
   --font-md: 14px;
@@ -36,11 +36,14 @@
   --tracking-wide: 0.02em;
   --tracking-wider: 0.08em;
 
-  /* ── Spacing scale (4px grid) ── */
+  /* ── Spacing scale (4px grid + half-steps) ── */
   --space-0: 0px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
+  --space-2-5: 10px;
   --space-3: 12px;
+  --space-3-5: 14px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;

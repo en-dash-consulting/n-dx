@@ -4,6 +4,7 @@ import type { Manifest, Zones } from "../../schema/v1.js";
 import type { ViewId } from "../types.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
+import { GlobalFAQ } from "./faq.js";
 import {
   useProjectStatus,
   SvFreshnessIndicator,
@@ -12,7 +13,7 @@ import {
 } from "./status-indicators.js";
 import { ConfigFooter } from "./config-footer.js";
 import { useProjectMetadata } from "../hooks/use-project-metadata.js";
-import { SOURCEVISION_TABS } from "../sourcevision-tabs.js";
+import { SOURCEVISION_TABS } from "../views/sourcevision-tabs.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -86,17 +87,8 @@ function sectionForView(view: ViewId): string {
   return SECTIONS[0].label;
 }
 
-/** Read persisted expanded section, falling back to the section owning the active view */
+/** Expand the section that owns the active view so the highlighted item is always visible on load */
 function getInitialExpanded(view: ViewId): string {
-  // Token Usage now lives at top-level, so initial render must always surface
-  // its own section even when a different section was previously persisted.
-  if (view === "token-usage") return sectionForView(view);
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && SECTIONS.some((s) => s.label === stored)) return stored;
-  } catch {
-    // localStorage may be unavailable
-  }
   return sectionForView(view);
 }
 
@@ -416,6 +408,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarThemeToggle, null),
+            h(GlobalFAQ, null),
             h("button", {
               class: "sidebar-control-btn sidebar-collapse-btn",
               onClick: onToggleSidebar,

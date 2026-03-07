@@ -1,0 +1,28 @@
+{
+  "id": "web-viewer/polling",
+  "name": "Web Viewer/polling",
+  "description": "10 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts",
+    "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+    "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+    "packages/web/tests/unit/viewer/polling-state.test.ts",
+    "packages/web/tests/unit/viewer/tick-timer.test.ts",
+    "packages/web/tests/unit/viewer/use-polling-suspension.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts"
+  ],
+  "cohesion": 0.53,
+  "coupling": 0.47,
+  "fileCount": 10,
+  "lineCount": 3293
+}

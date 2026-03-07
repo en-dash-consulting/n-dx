@@ -13,7 +13,7 @@ import {
   suspendTickTimer,
   resumeTickTimer,
   type TickListener,
-} from "../../../src/viewer/tick-timer.js";
+} from "../../../src/viewer/polling/tick-timer.js";
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 

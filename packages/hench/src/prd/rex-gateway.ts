@@ -56,5 +56,8 @@ export {
   formatRequirementsValidation,
 } from "rex";
 
+// ---- Level helpers ----------------------------------------------------------
+export { isRootLevel, isWorkItem } from "rex";
+
 // ---- Finding acknowledgment -------------------------------------------------
 export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "rex";

@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   onTick,
   resetTickTimer,
-} from "../../../src/viewer/tick-timer.js";
+} from "../../../src/viewer/polling/tick-timer.js";
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 

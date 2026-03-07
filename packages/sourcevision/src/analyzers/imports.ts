@@ -303,7 +303,17 @@ export function extractPackageName(specifier: string): string {
 async function readTsconfigPaths(targetDir: string): Promise<Record<string, string[]> | null> {
   try {
     const raw = await readFile(join(targetDir, "tsconfig.json"), "utf-8");
-    const config = JSON.parse(raw);
+    // tsconfig.json allows comments (JSONC format) but JSON.parse does not.
+    // Strip single-line comments (//) and multi-line comments (/* ... */)
+    // before parsing. Handles comments inside strings correctly by matching
+    // quoted strings first and only stripping unquoted comment patterns.
+    const stripped = raw.replace(
+      /("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+      (match, quoted) => quoted ?? "",
+    );
+    // Also strip trailing commas before } or ] (common in tsconfig)
+    const cleaned = stripped.replace(/,\s*([}\]])/g, "$1");
+    const config = JSON.parse(cleaned);
     const paths = config?.compilerOptions?.paths;
     if (paths && typeof paths === "object") {
       return paths as Record<string, string[]>;

@@ -1,0 +1,37 @@
+{
+  "id": "e2e",
+  "name": "E2e",
+  "description": "16 files, primarily TypeScript, JSON, Other",
+  "files": [
+    "src/schema/validate.ts",
+    "tests/e2e/cli-adapter.test.ts",
+    "tests/e2e/cli-analyze.test.ts",
+    "tests/e2e/cli-import.test.ts",
+    "tests/e2e/cli-init.test.ts",
+    "tests/e2e/cli-prune.test.ts",
+    "tests/e2e/cli-quiet.test.ts",
+    "tests/e2e/cli-recommend.test.ts",
+    "tests/e2e/cli-smart-add.test.ts",
+    "tests/e2e/cli-sync.test.ts",
+    "tests/e2e/cli-workflow.test.ts",
+    "tests/e2e/fixtures/sample-prd/.rex/config.json",
+    "tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl",
+    "tests/e2e/fixtures/sample-prd/.rex/prd.json",
+    "tests/e2e/fixtures/sample-prd/.rex/workflow.md",
+    "tests/unit/schema/validate.test.ts"
+  ],
+  "entryPoints": [
+    "src/schema/validate.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 16,
+  "lineCount": 3603,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

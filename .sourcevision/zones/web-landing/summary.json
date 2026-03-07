@@ -1,0 +1,22 @@
+{
+  "id": "web-landing",
+  "name": "Web Landing Page",
+  "description": "Self-contained static landing page (HTML + CSS + TypeScript entrypoint) served before the main dashboard application loads.",
+  "files": [
+    "packages/web/src/landing/index.html",
+    "packages/web/src/landing/landing.css",
+    "packages/web/src/landing/landing.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 1941,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

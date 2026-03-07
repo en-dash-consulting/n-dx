@@ -225,45 +225,8 @@
   white-space: nowrap;
 }
 
-.search-result-status {
-  font-size: var(--font-xs);
-  font-weight: var(--weight-medium);
-  padding: 1px 8px;
-  border-radius: 99px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  flex-shrink: 0;
-}
-
-.search-result-status--pending {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
-}
-
-.search-result-status--in_progress {
-  color: var(--accent);
-  background: var(--accent-subtle);
-}
-
-.search-result-status--completed {
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-
-.search-result-status--blocked {
-  color: var(--red);
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.search-result-status--failing {
-  color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
-}
-
-.search-result-status--deferred {
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
-}
+/* Status badges in search results use the shared .status-badge component
+   from badges.css — no local overrides needed. */
 
 .search-result-breadcrumb {
   font-size: var(--font-sm);

@@ -1295,7 +1295,7 @@ describe("createItemsFromRecommendations", () => {
           source: "sourcevision",
         },
       ]),
-    ).rejects.toThrow(/subtask.*requires a parent/);
+    ).rejects.toThrow(/[Ss]ubtask.*requires a parent/);
   });
 
   it("reports multiple placement errors when several items fail", async () => {
@@ -1534,8 +1534,8 @@ describe("createItemsFromRecommendations", () => {
 
   // ── Conflict detection: skip + reparent completed items ────────────
 
-  describe("completed-item reparenting", () => {
-    it("reparents feature as task under completed feature", async () => {
+  describe("completed items do not block recommendations", () => {
+    it("creates recommendation at original level when only completed items match", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "completed-feature",
@@ -1560,28 +1560,18 @@ describe("createItemsFromRecommendations", () => {
         { conflictStrategy: "skip" },
       );
 
-      // Should be created (reparented), not skipped
+      // No conflict — completed items are excluded from conflict detection
       expect(result.created).toHaveLength(1);
-      expect(result.created[0].level).toBe("task");
-      expect(result.created[0].parentId).toBe("completed-feature");
+      expect(result.created[0].level).toBe("feature");
       expect(result.skipped).toBeUndefined();
+      expect(result.reparented).toBeUndefined();
 
-      // Reparented metadata
-      expect(result.reparented).toHaveLength(1);
-      expect(result.reparented![0].originalLevel).toBe("feature");
-      expect(result.reparented![0].newLevel).toBe("task");
-      expect(result.reparented![0].parentId).toBe("completed-feature");
-      expect(result.reparented![0].parentTitle).toBe("Address auth issues (3 findings)");
-
-      // Verify PRD structure
+      // Both items exist in PRD
       const doc = await readPrd(tmpDir);
-      expect(doc.items).toHaveLength(1);
-      expect(doc.items[0].children).toHaveLength(1);
-      expect(doc.items[0].children![0].level).toBe("task");
-      expect(doc.items[0].children![0].title).toBe("Address auth issues (6 findings)");
+      expect(doc.items).toHaveLength(2);
     });
 
-    it("reparents task as subtask under completed task", async () => {
+    it("creates task when completed task has same title", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "completed-task",
@@ -1607,14 +1597,11 @@ describe("createItemsFromRecommendations", () => {
       );
 
       expect(result.created).toHaveLength(1);
-      expect(result.created[0].level).toBe("subtask");
-      expect(result.created[0].parentId).toBe("completed-task");
-      expect(result.reparented).toHaveLength(1);
-      expect(result.reparented![0].originalLevel).toBe("task");
-      expect(result.reparented![0].newLevel).toBe("subtask");
+      expect(result.created[0].level).toBe("task");
+      expect(result.skipped).toBeUndefined();
     });
 
-    it("reparents epic as feature under completed epic", async () => {
+    it("creates epic when completed epic has same title", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "completed-epic",
@@ -1640,12 +1627,11 @@ describe("createItemsFromRecommendations", () => {
       );
 
       expect(result.created).toHaveLength(1);
-      expect(result.created[0].level).toBe("feature");
-      expect(result.created[0].parentId).toBe("completed-epic");
-      expect(result.reparented).toHaveLength(1);
+      expect(result.created[0].level).toBe("epic");
+      expect(result.skipped).toBeUndefined();
     });
 
-    it("falls back to skip for subtask conflicts (no child level)", async () => {
+    it("creates subtask when completed subtask has same title", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "parent-task",
@@ -1670,7 +1656,7 @@ describe("createItemsFromRecommendations", () => {
           {
             title: "Check logs",
             level: "subtask",
-            description: "Same subtask",
+            description: "Same subtask, new findings",
             priority: "low",
             source: "sourcevision",
             parentId: "parent-task",
@@ -1679,17 +1665,16 @@ describe("createItemsFromRecommendations", () => {
         { conflictStrategy: "skip" },
       );
 
-      // Should be skipped, not reparented (subtask has no child level)
-      expect(result.created).toHaveLength(0);
-      expect(result.skipped).toHaveLength(1);
-      expect(result.reparented).toBeUndefined();
+      // Should be created — completed subtask doesn't block
+      expect(result.created).toHaveLength(1);
+      expect(result.skipped).toBeUndefined();
     });
 
-    it("still skips active-item conflicts alongside reparented ones", async () => {
+    it("skips active-item conflicts but allows completed-item matches", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "active-feature",
-          title: "Address perf issues (2 findings)",
+          title: "Fix database migration errors",
           status: "in_progress",
           level: "feature",
         },
@@ -1706,7 +1691,7 @@ describe("createItemsFromRecommendations", () => {
         store,
         [
           {
-            title: "Address perf issues (4 findings)",
+            title: "Fix database migration errors",
             level: "feature",
             description: "Conflicts with active",
             priority: "high",
@@ -1715,7 +1700,7 @@ describe("createItemsFromRecommendations", () => {
           {
             title: "Address auth issues (6 findings)",
             level: "feature",
-            description: "Conflicts with completed",
+            description: "Completed item — no conflict",
             priority: "high",
             source: "sourcevision",
           },
@@ -1730,17 +1715,14 @@ describe("createItemsFromRecommendations", () => {
         { conflictStrategy: "skip" },
       );
 
-      // 1 reparented (auth→completed) + 1 safe (brand new) = 2 created
+      // 2 created (auth + brand new), 1 skipped (db migration→active)
       expect(result.created).toHaveLength(2);
-      // 1 skipped (perf→active)
       expect(result.skipped).toHaveLength(1);
-      expect(result.skipped![0].title).toBe("Address perf issues (4 findings)");
-      // 1 reparented
-      expect(result.reparented).toHaveLength(1);
-      expect(result.reparented![0].title).toBe("Address auth issues (6 findings)");
+      expect(result.skipped![0].title).toBe("Fix database migration errors");
+      expect(result.reparented).toBeUndefined();
     });
 
-    it("maintains valid PRD state when completed items are reparented", async () => {
+    it("creates items alongside completed items in nested PRD", async () => {
       await writeFixtureProject(tmpDir, [
         {
           id: "epic-1",
@@ -1780,21 +1762,14 @@ describe("createItemsFromRecommendations", () => {
         { conflictStrategy: "skip" },
       );
 
-      // Both created: auth reparented + perf as new root feature
+      // Both created as root features (no conflict with completed item)
       expect(result.created).toHaveLength(2);
-      expect(result.reparented).toHaveLength(1);
       expect(result.skipped).toBeUndefined();
+      expect(result.reparented).toBeUndefined();
 
       const doc = await readPrd(tmpDir);
-      // Original epic + new root feature
-      expect(doc.items).toHaveLength(2);
-      expect(doc.items[0].id).toBe("epic-1");
-      // The completed feature now has a child task
-      expect(doc.items[0].children).toHaveLength(1);
-      expect(doc.items[0].children![0].id).toBe("feature-1");
-      expect(doc.items[0].children![0].children).toHaveLength(1);
-      expect(doc.items[0].children![0].children![0].level).toBe("task");
-      expect(doc.items[1].title).toBe("New perf feature");
+      // Original epic + 2 new root features
+      expect(doc.items).toHaveLength(3);
     });
   });
 

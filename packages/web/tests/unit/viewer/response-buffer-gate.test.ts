@@ -10,11 +10,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createResponseBufferGate,
-} from "../../../src/viewer/response-buffer-gate.js";
+} from "../../../src/viewer/performance/response-buffer-gate.js";
 import {
   startTabVisibilityMonitor,
   resetTabVisibility,
-} from "../../../src/viewer/tab-visibility.js";
+} from "../../../src/viewer/polling/tab-visibility.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -257,7 +257,7 @@ async function testApiConnection(apiKey, endpoint, model) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "claude-sonnet-4-20250514",
+        model: model || "claude-sonnet-4-6",
         max_tokens: 1,
         messages: [{ role: "user", content: "hi" }],
       }),
@@ -537,6 +537,14 @@ Rex budget settings (token/cost usage limits):
   rex.budget.warnAt        number    Warning threshold percentage (default: 80)
   rex.budget.abort         boolean   Abort operations when budget exceeded (default: false)
 
+Rex LoE settings (level-of-effort estimation and decomposition):
+  rex.loe.taskThresholdWeeks     number    Max task size in engineer-weeks before
+                                           automatic decomposition (default: 2)
+  rex.loe.maxDecompositionDepth  number    Max recursion depth for decomposition
+                                           (default: 2)
+  rex.loe.proposalCeiling        number    Max proposal tasks per input description
+                                           before triggering consolidation (default: 10)
+
 Hench settings (.hench/config.json):
   hench.provider           string    API provider: "cli" or "api" (default: "cli")
   hench.model              string    Claude model name (default: "sonnet")
@@ -575,8 +583,8 @@ Claude settings (.n-dx.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-4-20250514, claude-opus-4-20250514
-                                    Default: claude-sonnet-4-20250514
+                                    Examples: claude-sonnet-4-6, claude-opus-4-20250514
+                                    Default: claude-sonnet-4-6
 
 LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"
@@ -589,6 +597,19 @@ LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
   llm.codex.api_key        string    Codex API key (optional)
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
+
+Feature toggles (.n-dx.json — managed via web UI or ndx config):
+  features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
+  features.rex.autoComplete         boolean   Auto-complete parents when children done (default: true)
+  features.rex.budgetEnforcement    boolean   Enforce token/cost budgets (default: false)
+  features.rex.notionSync           boolean   Enable Notion two-way sync (default: false)
+  features.sourcevision.callGraph   boolean   Enable call graph extraction (default: false)
+  features.sourcevision.enrichment  boolean   AI enrichment passes (default: true)
+  features.sourcevision.componentCatalog
+                                    boolean   React component catalog (default: true)
+  features.hench.autoRetry          boolean   Auto-retry on failure (default: true)
+  features.hench.guardRails         boolean   Security guard rails (default: true)
+  features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
@@ -646,6 +667,8 @@ Examples:
                                                Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
+  n-dx config features.rex.showTokenBudget true
+                                               Enable token budget display on tasks
   n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON

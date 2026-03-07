@@ -91,7 +91,7 @@ describe("MemoryThrottle", () => {
 
   describe("status()", () => {
     it("reports allow when memory usage is below delay threshold", () => {
-      const throttle = new MemoryThrottle({ delayThreshold: 80 }, mockReader(50));
+      const throttle = new MemoryThrottle({ enabled: true, delayThreshold: 80 }, mockReader(50));
       const status = throttle.status();
 
       expect(status.enabled).toBe(true);
@@ -106,7 +106,7 @@ describe("MemoryThrottle", () => {
 
     it("reports delay when memory usage is between thresholds", () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(85),
       );
       const status = throttle.status();
@@ -117,7 +117,7 @@ describe("MemoryThrottle", () => {
 
     it("reports reject when memory usage exceeds reject threshold", () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(97),
       );
       const status = throttle.status();
@@ -139,7 +139,7 @@ describe("MemoryThrottle", () => {
 
     it("reports at exact delay threshold boundary", () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(80),
       );
       expect(throttle.status().decision).toBe("delay");
@@ -147,7 +147,7 @@ describe("MemoryThrottle", () => {
 
     it("reports at exact reject threshold boundary", () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(95),
       );
       expect(throttle.status().decision).toBe("reject");
@@ -161,7 +161,7 @@ describe("MemoryThrottle", () => {
   describe("gate() — allow", () => {
     it("resolves immediately when memory is below threshold", async () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(50),
       );
       const onThrottle = vi.fn();
@@ -185,7 +185,7 @@ describe("MemoryThrottle", () => {
 
     it("works without a callback", async () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(50),
       );
       // Should not throw
@@ -200,7 +200,7 @@ describe("MemoryThrottle", () => {
   describe("gate() — reject", () => {
     it("throws MemoryThrottleRejectError when above reject threshold", async () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(97),
       );
       const onThrottle = vi.fn();
@@ -216,7 +216,7 @@ describe("MemoryThrottle", () => {
 
     it("reject error contains memory metadata", async () => {
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95 },
         mockReader(97, 16),
       );
 
@@ -245,7 +245,7 @@ describe("MemoryThrottle", () => {
       // First read: 85% (delay), second read: 70% (allow)
       const reader = sequentialReader([85, 70]);
       const throttle = new MemoryThrottle(
-        { delayThreshold: 80, rejectThreshold: 95, baseDelayMs: 10, maxDelayMs: 50 },
+        { enabled: true, delayThreshold: 80, rejectThreshold: 95, baseDelayMs: 10, maxDelayMs: 50 },
         reader,
       );
       const onThrottle = vi.fn();
@@ -274,6 +274,7 @@ describe("MemoryThrottle", () => {
       const reader = sequentialReader([85, 87, 89, 70]);
       const throttle = new MemoryThrottle(
         {
+          enabled: true,
           delayThreshold: 80,
           rejectThreshold: 95,
           baseDelayMs: 10,
@@ -298,6 +299,7 @@ describe("MemoryThrottle", () => {
       const reader = sequentialReader([85, 85, 85, 85, 85, 85, 70]);
       const throttle = new MemoryThrottle(
         {
+          enabled: true,
           delayThreshold: 80,
           rejectThreshold: 95,
           baseDelayMs: 10,
@@ -326,6 +328,7 @@ describe("MemoryThrottle", () => {
       const reader = mockReader(85); // Always 85%
       const throttle = new MemoryThrottle(
         {
+          enabled: true,
           delayThreshold: 80,
           rejectThreshold: 95,
           baseDelayMs: 1,
@@ -349,6 +352,7 @@ describe("MemoryThrottle", () => {
       const reader = sequentialReader([85, 97]);
       const throttle = new MemoryThrottle(
         {
+          enabled: true,
           delayThreshold: 80,
           rejectThreshold: 95,
           baseDelayMs: 1,
@@ -407,7 +411,7 @@ describe("MemoryThrottleRejectError", () => {
 
 describe("DEFAULT_MEMORY_THROTTLE_CONFIG", () => {
   it("has sensible defaults", () => {
-    expect(DEFAULT_MEMORY_THROTTLE_CONFIG.enabled).toBe(true);
+    expect(DEFAULT_MEMORY_THROTTLE_CONFIG.enabled).toBe(false);
     expect(DEFAULT_MEMORY_THROTTLE_CONFIG.delayThreshold).toBe(80);
     expect(DEFAULT_MEMORY_THROTTLE_CONFIG.rejectThreshold).toBe(95);
     expect(DEFAULT_MEMORY_THROTTLE_CONFIG.baseDelayMs).toBeGreaterThan(0);

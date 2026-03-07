@@ -12,7 +12,7 @@ import {
   onPollingStateChange,
   getPollingState,
   type PollingStateSnapshot,
-} from "../polling-state.js";
+} from "../polling/polling-state.js";
 
 export interface UsePollingSuspensionResult {
   /** Whether polling is currently globally suspended. */

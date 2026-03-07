@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import type { ViewId } from "../types.js";
-import type { CrashDetectionResult, SavedNavigationState } from "../crash-detector.js";
+import type { CrashDetectionResult, SavedNavigationState } from "../performance/index.js";
 import {
   detectCrash,
   saveNavigationState,
@@ -16,7 +16,7 @@ import {
   markRecoveryShown,
   wasRecoveryShown,
   resetCrashDetector,
-} from "../crash-detector.js";
+} from "../performance/crash-detector.js";
 
 export interface UseCrashRecoveryOptions {
   /** Current active view. */

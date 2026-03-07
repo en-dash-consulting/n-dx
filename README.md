@@ -61,7 +61,7 @@ ndx config llm.vendor claude .
 
 # Option A: API mode (recommended — best token accounting and reliability)
 ndx config llm.claude.api_key sk-ant-... .   # or: export ANTHROPIC_API_KEY=sk-ant-...
-# Optionally pin a model (default: claude-sonnet-4-20250514)
+# Optionally pin a model (default: claude-sonnet-4-6)
 ndx config llm.claude.model claude-opus-4-20250514 .
 
 # Option B: CLI mode (no API key required)

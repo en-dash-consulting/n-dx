@@ -1,0 +1,26 @@
+{
+  "id": "e2e",
+  "name": "E2e",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "src/schema/validate.ts",
+    "tests/e2e/cli-analyze.test.ts",
+    "tests/e2e/cli-serve.test.ts",
+    "tests/integration/pipeline.test.ts",
+    "tests/unit/schema/validate.test.ts"
+  ],
+  "entryPoints": [
+    "src/schema/validate.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 1723,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

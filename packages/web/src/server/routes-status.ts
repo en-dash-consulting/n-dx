@@ -12,7 +12,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
-import { DATA_FILES } from "../schema/data-files.js";
+import { DATA_FILES } from "../shared/data-files.js";
 import { computeStats, collectCompletedIds, findNextTask } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 

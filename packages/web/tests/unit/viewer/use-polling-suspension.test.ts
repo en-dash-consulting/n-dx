@@ -15,7 +15,7 @@ import {
   resumeAllSources,
   resetPollingState,
   type PollingSourceCallbacks,
-} from "../../../src/viewer/polling-state.js";
+} from "../../../src/viewer/polling/polling-state.js";
 import { usePollingSuspension } from "../../../src/viewer/hooks/use-polling-suspension.js";
 
 // Helper to create a minimal polling source

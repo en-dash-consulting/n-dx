@@ -17,10 +17,11 @@ import {
   setClaudeConfig,
   getAuthMode,
   getLLMVendor,
+  applyConsolidationGuard,
 } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
-import { CHILD_LEVEL, PRIORITY_ORDER } from "../../schema/index.js";
-import type { PRDItem, ItemLevel, DuplicateOverrideMarker } from "../../schema/index.js";
+import { CHILD_LEVEL, PRIORITY_ORDER, LOE_DEFAULTS } from "../../schema/index.js";
+import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import {
   matchProposalNodesToPRD,
@@ -29,6 +30,7 @@ import {
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
 import type { LLMVendor } from "@n-dx/llm-client";
+import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
 
@@ -95,6 +97,7 @@ export function countProposalItems(
 export function formatProposalTree(
   proposals: Proposal[],
   parentLevel?: ItemLevel,
+  thresholdWeeks?: number,
 ): string {
   const numbered = proposals.length > 1;
   const lines: string[] = [];
@@ -106,14 +109,20 @@ export function formatProposalTree(
       // Default: full epic → feature → task tree
       const prefix = numbered ? `${i + 1}. ` : "  ";
       if (!parentLevel) {
-        lines.push(`${prefix}📦 ${p.epic.title}`);
+        const epicLabel = p.epic.existingId
+          ? `${prefix}📦 Under existing: "${p.epic.title}" (${p.epic.existingId.slice(0, 8)}...)`
+          : `${prefix}📦 ${p.epic.title}`;
+        lines.push(epicLabel);
       }
 
       for (let fi = 0; fi < p.features.length; fi++) {
         const f = p.features[fi];
         const isLastFeature = fi === p.features.length - 1;
         const branch = isLastFeature ? "└─" : "├─";
-        lines.push(`    ${branch} 📋 ${f.title}`);
+        const featureLabel = f.existingId
+          ? `    ${branch} 📋 Under existing: "${f.title}" (${f.existingId.slice(0, 8)}...)`
+          : `    ${branch} 📋 ${f.title}`;
+        lines.push(featureLabel);
         if (f.description) {
           const cont = isLastFeature ? "  " : "│ ";
           lines.push(`    ${cont}   ${f.description}`);
@@ -124,7 +133,10 @@ export function formatProposalTree(
           const cont = isLastFeature ? "  " : "│ ";
           const taskBranch = isLastTask ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`    ${cont}   ${taskBranch} ○ ${t.title}${pri}`);
+          const loe = formatTaskLoE(t, thresholdWeeks);
+          lines.push(`    ${cont}   ${taskBranch} ○ ${t.title}${pri}${loe}`);
+          const rationale = formatTaskLoERationale(t, `    ${cont}   ${isLastTask ? "  " : "│ "}   `);
+          if (rationale) lines.push(rationale);
           if (t.acceptanceCriteria?.length) {
             const taskCont = isLastTask ? "  " : "│ ";
             for (const ac of t.acceptanceCriteria) {
@@ -141,7 +153,10 @@ export function formatProposalTree(
           const isLast = ti === f.tasks.length - 1;
           const branch = isLast ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`    ${branch} ○ ${t.title}${pri}`);
+          const loe = formatTaskLoE(t, thresholdWeeks);
+          lines.push(`    ${branch} ○ ${t.title}${pri}${loe}`);
+          const rationale = formatTaskLoERationale(t, `    ${isLast ? "  " : "│ "}   `);
+          if (rationale) lines.push(rationale);
           if (t.description) {
             const cont = isLast ? "  " : "│ ";
             lines.push(`    ${cont}   ${t.description}`);
@@ -162,7 +177,10 @@ export function formatProposalTree(
           const isLast = ti === f.tasks.length - 1;
           const branch = isLast ? "└─" : "├─";
           const pri = t.priority ? ` [${t.priority}]` : "";
-          lines.push(`    ${branch} ○ ${t.title}${pri}`);
+          const loe = formatTaskLoE(t, thresholdWeeks);
+          lines.push(`    ${branch} ○ ${t.title}${pri}${loe}`);
+          const rationale = formatTaskLoERationale(t, `    ${isLast ? "  " : "│ "}   `);
+          if (rationale) lines.push(rationale);
           if (t.description) {
             const cont = isLast ? "  " : "│ ";
             lines.push(`    ${cont}   ${t.description}`);
@@ -284,6 +302,35 @@ export function parseDuplicatePromptInput(input: string): DuplicatePromptDecisio
 
 function hasDuplicateMatches(matches: ProposalDuplicateMatch[]): boolean {
   return matches.some((match) => match.duplicate);
+}
+
+/**
+ * Filter out duplicate matches for proposal nodes that have `existingId` set.
+ * These nodes were intentionally placed by the LLM under existing items,
+ * so programmatic duplicate detection is redundant and would be confusing.
+ */
+function filterPlacedDuplicateMatches(
+  matches: ProposalDuplicateMatch[],
+  proposals: Proposal[],
+): ProposalDuplicateMatch[] {
+  return matches.filter((match) => {
+    const parsed = parseNodeKey(match.node.key);
+    if (!parsed) return true;
+    const proposal = proposals[parsed.proposalIndex];
+    if (!proposal) return true;
+
+    // Skip epics with existingId
+    if (parsed.suffix === "epic" && proposal.epic.existingId) return false;
+
+    // Skip features with existingId
+    const featureMatch = /^feature:(\d+)$/.exec(parsed.suffix);
+    if (featureMatch) {
+      const fIdx = parseInt(featureMatch[1], 10);
+      if (proposal.features[fIdx]?.existingId) return false;
+    }
+
+    return true;
+  });
 }
 
 function parseNodeKey(key: string): { proposalIndex: number; suffix: string } | null {
@@ -715,6 +762,21 @@ export function formatQualityWarnings(issues: QualityIssue[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Validate that a merge target exists and has the expected level.
+ * Returns the merge target ID if valid, or undefined to fall back to creation.
+ */
+async function validateMergeTarget(
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  mergeTargetId: string | undefined,
+  expectedLevel: ItemLevel,
+): Promise<string | undefined> {
+  if (!mergeTargetId) return undefined;
+  const item = await store.getItem(mergeTargetId);
+  if (!item || item.level !== expectedLevel) return undefined;
+  return mergeTargetId;
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -736,15 +798,37 @@ async function acceptProposals(
   const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
+  // Track newly created container IDs so we can clean up empty ones after merges
+  const newContainerIds: string[] = [];
 
   for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
     const p = proposals[pIdx];
     if (!parentId) {
-      // No parent — create a new top-level epic with features and tasks beneath
-      const epicMergeTarget = mergeTargetsByNodeKey?.[`p${pIdx}:epic`];
-      const epicId = epicMergeTarget ?? randomUUID();
+      // No parent — create a new top-level epic (or reuse existing via existingId)
+      const epicMergeTarget = await validateMergeTarget(
+        store, mergeTargetsByNodeKey?.[`p${pIdx}:epic`], "epic",
+      );
+      let epicId = epicMergeTarget ?? randomUUID();
       const epicMarker = overrideMarkersByNodeKey?.[`p${pIdx}:epic`];
-      if (!epicMergeTarget) {
+
+      // Check for existingId — LLM-directed placement under existing epic
+      const epicExistingRef = p.epic.existingId;
+      let epicReused = false;
+      if (epicExistingRef && !epicMergeTarget) {
+        const doc = await store.loadDocument();
+        const existing = findItem(doc.items, epicExistingRef);
+        if (existing) {
+          epicId = epicExistingRef;
+          epicReused = true;
+          // Update title if the LLM expanded the scope
+          if (p.epic.title && p.epic.title !== existing.item.title) {
+            await store.updateItem(epicExistingRef, { title: p.epic.title });
+          }
+        }
+        // If not found, fall through to create a new epic (LLM hallucinated the ID)
+      }
+
+      if (!epicMergeTarget && !epicReused) {
         await store.addItem({
           id: epicId,
           title: p.epic.title,
@@ -754,15 +838,34 @@ async function acceptProposals(
           ...(epicMarker ? { overrideMarker: epicMarker } : {}),
         });
         addedCount++;
+        newContainerIds.push(epicId);
       }
 
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
         const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
-        const featureId = featureMergeTarget ?? randomUUID();
+        const featureMergeTarget = await validateMergeTarget(
+          store, mergeTargetsByNodeKey?.[featureKey], "feature",
+        );
+        let featureId = featureMergeTarget ?? randomUUID();
         const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
-        if (!featureMergeTarget) {
+
+        // Check for existingId — LLM-directed placement under existing feature
+        const featureExistingRef = f.existingId;
+        let featureReused = false;
+        if (featureExistingRef && !featureMergeTarget) {
+          const doc = await store.loadDocument();
+          const existing = findItem(doc.items, featureExistingRef);
+          if (existing) {
+            featureId = featureExistingRef;
+            featureReused = true;
+            if (f.title && f.title !== existing.item.title) {
+              await store.updateItem(featureExistingRef, { title: f.title });
+            }
+          }
+        }
+
+        if (!featureMergeTarget && !featureReused) {
           await store.addItem(
             {
               id: featureId,
@@ -776,12 +879,16 @@ async function acceptProposals(
             epicId,
           );
           addedCount++;
+          newContainerIds.push(featureId);
         }
 
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -806,7 +913,9 @@ async function acceptProposals(
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
         const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
+        const featureMergeTarget = await validateMergeTarget(
+          store, mergeTargetsByNodeKey?.[featureKey], "feature",
+        );
         const featureId = featureMergeTarget ?? randomUUID();
         const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
         if (!featureMergeTarget) {
@@ -823,12 +932,16 @@ async function acceptProposals(
             parentId,
           );
           addedCount++;
+          newContainerIds.push(featureId);
         }
 
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -856,7 +969,10 @@ async function acceptProposals(
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -883,7 +999,10 @@ async function acceptProposals(
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "subtask",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -902,6 +1021,35 @@ async function acceptProposals(
           );
           addedCount++;
         }
+      }
+    }
+  }
+
+  // Clean up empty containers created during this operation.
+  // When all children of a proposed epic/feature were merged with existing items,
+  // the parent container was still created but has no children — remove it.
+  // Process bottom-up (features before epics) so epic cleanup sees the final state.
+  if (newContainerIds.length > 0) {
+    // Partition into features (remove first) and epics (remove second)
+    const featureIds: string[] = [];
+    const epicIds: string[] = [];
+    {
+      const doc = await store.loadDocument();
+      for (const id of newContainerIds) {
+        const entry = findItem(doc.items, id);
+        if (!entry) continue;
+        if (entry.item.level === "feature") featureIds.push(id);
+        else epicIds.push(id);
+      }
+    }
+    // Remove childless features first, then childless epics
+    for (const containerId of [...featureIds, ...epicIds]) {
+      const doc = await store.loadDocument();
+      const entry = findItem(doc.items, containerId);
+      if (!entry) continue;
+      if ((entry.item.children ?? []).length === 0) {
+        await store.removeItem(containerId);
+        addedCount--;
       }
     }
   }
@@ -1057,14 +1205,17 @@ async function generateSmartAddProposals(params: {
     const spinner = !isJson ? startSpinner(`${label}...`) : null;
 
     try {
-      spinner?.update(`Processing ideas with LLM (${effectiveModel})...`);
+      spinner?.update(`Processing ideas files...`);
       const reasonResult = await reasonFromIdeasFile(resolved, existing, {
         model,
         dir,
         parentId,
       });
       const proposals = reasonResult.proposals;
-      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
+      const method = reasonResult.tokenUsage.calls > 0
+        ? `via LLM (${effectiveModel})`
+        : "from file structure";
+      spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s) ${method}.` : undefined);
       return proposals;
     } catch (err) {
       spinner?.stop();
@@ -1101,7 +1252,7 @@ function emitNoSmartAddProposals(isJson: boolean): void {
   if (isJson) {
     result(JSON.stringify({ proposals: [], added: 0 }, null, 2));
   } else {
-    result("LLM returned no proposals for the given description.");
+    result("No proposals could be generated from the given input.");
   }
 }
 
@@ -1111,8 +1262,9 @@ function renderSmartAddProposals(params: {
   parentLevel?: ItemLevel;
   qualityIssues: QualityIssue[];
   isJson: boolean;
+  thresholdWeeks?: number;
 }): void {
-  const { proposals, parentId, parentLevel, qualityIssues, isJson } = params;
+  const { proposals, parentId, parentLevel, qualityIssues, isJson, thresholdWeeks } = params;
   if (isJson) return;
 
   const summary = formatProposalSummary(proposals, parentLevel);
@@ -1121,7 +1273,7 @@ function renderSmartAddProposals(params: {
   } else {
     info(`\nProposed structure (${summary}):`);
   }
-  info(formatProposalTree(proposals, parentLevel));
+  info(formatProposalTree(proposals, parentLevel, thresholdWeeks));
 
   if (qualityIssues.length > 0) {
     warn("");
@@ -1149,8 +1301,9 @@ async function runInteractiveSmartAddApproval(params: {
   parentId?: string;
   parentLevel?: ItemLevel;
   model?: string;
+  thresholdWeeks?: number;
 }): Promise<void> {
-  const { dir, existing, parentId, parentLevel, model } = params;
+  const { dir, existing, parentId, parentLevel, model, thresholdWeeks } = params;
   const { adjustGranularity } = await import("../../analyze/index.js");
   const resolvedModel = model ?? DEFAULT_MODEL;
   let currentProposals = params.proposals;
@@ -1199,10 +1352,13 @@ async function runInteractiveSmartAddApproval(params: {
 
           const updatedSummary = formatProposalSummary(currentProposals, parentLevel);
           info(`\nUpdated structure (${updatedSummary}):`);
-          info(formatProposalTree(currentProposals, parentLevel));
+          info(formatProposalTree(currentProposals, parentLevel, thresholdWeeks));
           info("");
 
-          currentDuplicateMatches = matchProposalNodesToPRD(currentProposals, existing);
+          currentDuplicateMatches = filterPlacedDuplicateMatches(
+            matchProposalNodesToPRD(currentProposals, existing),
+            currentProposals,
+          );
           await maybeCacheSmartAddProposals(dir, currentProposals, parentId);
         } else {
           adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
@@ -1343,6 +1499,7 @@ async function finalizeSmartAdd(params: {
   isJson: boolean;
   parentLevel?: ItemLevel;
   model?: string;
+  thresholdWeeks?: number;
 }): Promise<void> {
   const {
     dir,
@@ -1355,6 +1512,7 @@ async function finalizeSmartAdd(params: {
     isJson,
     parentLevel,
     model,
+    thresholdWeeks,
   } = params;
 
   await maybeCacheSmartAddProposals(dir, proposals, parentId);
@@ -1397,6 +1555,7 @@ async function finalizeSmartAdd(params: {
       parentId,
       parentLevel,
       model,
+      thresholdWeeks,
     });
     return;
   }
@@ -1441,8 +1600,46 @@ export async function cmdSmartAdd(
     return;
   }
 
-  const duplicateMatches = matchProposalNodesToPRD(proposals, existing);
-  const proposalsWithReasons = attachDuplicateReasonsToProposals(proposals, duplicateMatches);
+  // Load LoE config for consolidation guard and LoE display
+  let loeConfig: LoEConfig | undefined;
+  try {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+    const config = await store.loadConfig();
+    loeConfig = config.loe;
+  } catch {
+    // Config unreadable — use defaults
+  }
+  const thresholdWeeks = loeConfig?.taskThresholdWeeks ?? LOE_DEFAULTS.taskThresholdWeeks;
+
+  // Post-processing consolidation guard: reduce over-granular LLM output
+  let consolidatedProposals = proposals;
+  {
+    const guardResult = await applyConsolidationGuard(
+      consolidatedProposals,
+      loeConfig,
+      model,
+    );
+
+    if (guardResult.triggered) {
+      consolidatedProposals = guardResult.proposals;
+      if (!input.isJson) {
+        if (guardResult.reduced) {
+          info(
+            `Consolidation guard: reduced from ${guardResult.originalTaskCount} to ${guardResult.finalTaskCount} tasks (ceiling: ${guardResult.ceiling}).`,
+          );
+        } else if (guardResult.warning) {
+          warn(guardResult.warning);
+        }
+      }
+    }
+  }
+
+  const duplicateMatches = filterPlacedDuplicateMatches(
+    matchProposalNodesToPRD(consolidatedProposals, existing),
+    consolidatedProposals,
+  );
+  const proposalsWithReasons = attachDuplicateReasonsToProposals(consolidatedProposals, duplicateMatches);
   const qualityIssues = validateProposalQuality(proposalsWithReasons);
   if (input.isJson && !input.accept) {
     result(JSON.stringify({ proposals: proposalsWithReasons, qualityIssues }, null, 2));
@@ -1455,6 +1652,7 @@ export async function cmdSmartAdd(
     parentLevel,
     qualityIssues,
     isJson: input.isJson,
+    thresholdWeeks,
   });
 
   await finalizeSmartAdd({
@@ -1468,5 +1666,6 @@ export async function cmdSmartAdd(
     isJson: input.isJson,
     parentLevel,
     model,
+    thresholdWeeks,
   });
 }

@@ -7,18 +7,14 @@
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
-import type { MemoryLevel } from "../memory-monitor.js";
-import type {
-  DegradableFeature,
-  DegradationState,
-} from "../graceful-degradation.js";
+import type { MemoryLevel, DegradableFeature, DegradationState } from "../performance/index.js";
 import {
   startDegradation,
   stopDegradation,
   onDegradationChange,
   getDegradationState,
   isFeatureDisabled,
-} from "../graceful-degradation.js";
+} from "../performance/graceful-degradation.js";
 
 export interface UseGracefulDegradationResult {
   /** Current degradation tier (mirrors memory level). */

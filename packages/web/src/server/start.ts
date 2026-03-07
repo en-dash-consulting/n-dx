@@ -14,7 +14,8 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
-import { startUsageCleanupScheduler } from "./usage-cleanup-scheduler.js";
+import { startUsageCleanupScheduler, type CollectAllIdsFn } from "./usage-cleanup-scheduler.js";
+import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute } from "./routes-mcp.js";
@@ -27,7 +28,7 @@ import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { createWebSocketManager } from "./websocket.js";
 import { WsHealthTracker } from "./ws-health-tracker.js";
-import { ALL_DATA_FILES } from "../schema/data-files.js";
+import { ALL_DATA_FILES } from "../shared/data-files.js";
 import { findAvailablePort } from "./port.js";
 
 /**
@@ -622,6 +623,8 @@ export async function startServer(
       ctx,
       () => getAggregator(watcherHandles.henchRunsDir),
       ws.broadcast,
+      undefined, // use config interval
+      collectAllIds as CollectAllIdsFn,
     );
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }

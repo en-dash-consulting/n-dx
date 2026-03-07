@@ -11,7 +11,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { MetricCard } from "../components/data-display/health-gauge.js";
+import { MetricCard } from "../visualization/index.js";
 import { BrandedHeader } from "../components/logos.js";
 import { usePolling } from "../hooks/use-polling.js";
 import { RexTaskLink } from "../components/rex-task-link.js";

@@ -7,14 +7,15 @@
  * Steps:
  *   1. sourcevision analyze --fast  (codebase analysis, no AI enrichment)
  *   2. sourcevision validate        (schema checks on analysis output)
- *   3. rex validate --format=json   (PRD health checks)
- *   4. rex status --format=json     (completion stats)
+ *   3. zone health check            (cohesion/coupling threshold assertions)
+ *   4. rex validate --format=json   (PRD health checks)
+ *   5. rex status --format=json     (completion stats)
  *
  * Exits 0 if all steps pass, 1 otherwise.
  */
 
 import { spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -120,7 +121,32 @@ export async function runCI(dir, flags, { run, tools }) {
     if (!isJSON) printIndented(svValidate.stdout || svValidate.stderr, info);
   }
 
-  // ── Step 3: rex validate ────────────────────────────────────────────────
+  // ── Step 3: zone health check ───────────────────────────────────────────
+  info("── zone health ──");
+  const zoneHealth = checkZoneHealth(dir);
+  if (!zoneHealth.ok) allOk = false;
+
+  steps.push({
+    name: "zone-health",
+    ok: zoneHealth.ok,
+    detail: zoneHealth.ok
+      ? `${zoneHealth.checked} zones checked, all within thresholds`
+      : `${zoneHealth.violations.length} zone(s) exceed health thresholds`,
+    ...(zoneHealth.violations.length > 0 ? { violations: zoneHealth.violations } : {}),
+  });
+
+  if (zoneHealth.ok) {
+    info(`  ✓ zone health (${zoneHealth.checked} zones checked)`);
+  } else {
+    info(`  ✗ zone health`);
+    if (!isJSON) {
+      for (const v of zoneHealth.violations) {
+        info(`    ✗ ${v.id}: cohesion=${v.cohesion.toFixed(2)}, coupling=${v.coupling.toFixed(2)}`);
+      }
+    }
+  }
+
+  // ── Step 4: rex validate ────────────────────────────────────────────────
   info("── rex validate ──");
   const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir]);
 
@@ -169,7 +195,7 @@ export async function runCI(dir, flags, { run, tools }) {
     }
   }
 
-  // ── Step 4: rex status ──────────────────────────────────────────────────
+  // ── Step 5: rex status ──────────────────────────────────────────────────
   info("── rex status ──");
   const rexStatus = await runCapture(tools.rex, ["status", "--format=json", dir]);
   const statusOk = rexStatus.code === 0;
@@ -266,4 +292,77 @@ function printIndented(str, logFn) {
   for (const line of str.trim().split("\n").slice(0, 10)) {
     logFn(`    ${line}`);
   }
+}
+
+// ── Zone health thresholds ──────────────────────────────────────────────────
+
+/** Cohesion below this threshold triggers a warning. */
+const MIN_COHESION = 0.5;
+/** Coupling above this threshold triggers a warning. */
+const MAX_COUPLING = 0.25;
+
+/** Roles exempt from zone health checks (no semantic signal). */
+const EXEMPT_ROLES = new Set(["asset", "config", "other"]);
+
+/**
+ * Check zone health by reading zones.json and asserting cohesion/coupling
+ * thresholds. Returns violations for non-asset zones that exceed thresholds.
+ */
+function checkZoneHealth(dir) {
+  const zonesPath = join(dir, ".sourcevision", "zones.json");
+  if (!existsSync(zonesPath)) {
+    return { ok: true, checked: 0, violations: [] };
+  }
+
+  let zonesData;
+  try {
+    zonesData = JSON.parse(readFileSync(zonesPath, "utf-8"));
+  } catch {
+    return { ok: true, checked: 0, violations: [] };
+  }
+
+  const zones = zonesData.zones ?? [];
+  const violations = [];
+  let checked = 0;
+
+  function walkZones(zoneList) {
+    for (const zone of zoneList) {
+      // Skip zones with fewer than 3 files (metrics are unreliable)
+      if (!zone.files || zone.files.length < 3) continue;
+
+      // Skip asset/config-only zones
+      if (zone.files.every((f) => {
+        const ext = f.split(".").pop()?.toLowerCase();
+        return EXEMPT_ROLES.has(ext) || f.endsWith(".json") || f.endsWith(".md") || f.endsWith(".png") || f.endsWith(".svg");
+      })) continue;
+
+      checked++;
+
+      if (
+        (zone.cohesion != null && zone.cohesion < MIN_COHESION) ||
+        (zone.coupling != null && zone.coupling > MAX_COUPLING)
+      ) {
+        violations.push({
+          id: zone.id,
+          name: zone.name,
+          cohesion: zone.cohesion ?? 0,
+          coupling: zone.coupling ?? 0,
+          fileCount: zone.files.length,
+        });
+      }
+
+      // Check subzones recursively
+      if (zone.subZones) {
+        walkZones(zone.subZones);
+      }
+    }
+  }
+
+  walkZones(zones);
+
+  return {
+    ok: violations.length === 0,
+    checked,
+    violations,
+  };
 }

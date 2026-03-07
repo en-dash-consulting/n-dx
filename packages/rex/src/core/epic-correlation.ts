@@ -13,6 +13,7 @@
  */
 
 import type { PRDItem } from "../schema/index.js";
+import { isRootLevel } from "../schema/index.js";
 import type { EpiclessFeature } from "./structural.js";
 import { similarity } from "../analyze/dedupe.js";
 import { extractKeywords } from "./keywords.js";
@@ -233,7 +234,7 @@ export function correlateEpiclessFeatures(
 
   // Collect available epics (non-deleted root-level epics)
   const availableEpics = items.filter(
-    (item) => item.level === "epic" && item.status !== "deleted",
+    (item) => isRootLevel(item.level) && item.status !== "deleted",
   );
 
   const results: CorrelationResult[] = [];

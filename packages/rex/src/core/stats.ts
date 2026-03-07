@@ -1,4 +1,5 @@
 import type { PRDItem } from "../schema/index.js";
+import { isWorkItem } from "../schema/index.js";
 import { walkTree } from "./tree.js";
 
 export interface TreeStats {
@@ -24,8 +25,8 @@ export function computeStats(items: PRDItem[]): TreeStats {
     deleted: 0,
   };
   for (const { item } of walkTree(items)) {
-    // Only count tasks and subtasks (not epics/features) for accurate work metrics
-    if (item.level !== "task" && item.level !== "subtask") continue;
+    // Only count work items (not containers) for accurate work metrics
+    if (!isWorkItem(item.level)) continue;
 
     // Deleted items are tracked separately and excluded from total
     if (item.status === "deleted") {

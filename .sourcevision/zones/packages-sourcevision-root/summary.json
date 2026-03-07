@@ -1,0 +1,29 @@
+{
+  "id": "packages-sourcevision:root",
+  "name": "Root",
+  "description": "10 files, primarily Markdown, Other, JSON",
+  "files": [
+    "packages/sourcevision/ARCHITECTURE.md",
+    "packages/sourcevision/README.md",
+    "packages/sourcevision/SourceVision-F.png",
+    "packages/sourcevision/SourceVision.png",
+    "packages/sourcevision/WORKSPACE_DESIGN.md",
+    "packages/sourcevision/package-lock.json",
+    "packages/sourcevision/package.json",
+    "packages/sourcevision/tsconfig.json",
+    "packages/sourcevision/tsconfig.tsbuildinfo",
+    "packages/sourcevision/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 10,
+  "lineCount": 3809,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

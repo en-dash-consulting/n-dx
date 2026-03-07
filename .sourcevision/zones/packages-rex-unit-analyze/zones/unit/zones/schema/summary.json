@@ -1,0 +1,19 @@
+{
+  "id": "unit-analyze/unit/schema",
+  "name": "Unit Analyze/unit/schema",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "src/schema/index.ts",
+    "src/schema/levels.ts",
+    "src/schema/v1.ts"
+  ],
+  "entryPoints": [
+    "src/schema/index.ts",
+    "src/schema/levels.ts",
+    "src/schema/v1.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 3,
+  "lineCount": 0
+}

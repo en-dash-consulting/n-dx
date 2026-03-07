@@ -8,6 +8,7 @@ import {
   formatTimestamp,
   renderTree,
   filterCompleted,
+  filterDeleted,
   formatStats,
 } from "../../../../src/cli/commands/status.js";
 import { CLIError } from "../../../../src/cli/errors.js";
@@ -312,6 +313,101 @@ describe("cmdStatus", () => {
 
       expect(out).toContain("Force-created duplicate");
       expect(out).toContain("[override: exact_title]");
+    });
+  });
+
+  describe("deleted items hidden by default", () => {
+    const PRD_WITH_DELETED: PRDDocument = {
+      schema: "rex/v1",
+      title: "Test Project",
+      items: [
+        {
+          id: "e1",
+          title: "Auth System",
+          level: "epic",
+          status: "in_progress",
+          children: [
+            {
+              id: "t1",
+              title: "Active Task",
+              level: "task",
+              status: "pending",
+            },
+            {
+              id: "t2",
+              title: "Removed Task",
+              level: "task",
+              status: "deleted",
+            },
+          ],
+        },
+        {
+          id: "e2",
+          title: "Deleted Epic",
+          level: "epic",
+          status: "deleted",
+          children: [
+            {
+              id: "t3",
+              title: "Orphaned Task",
+              level: "task",
+              status: "pending",
+            },
+          ],
+        },
+      ],
+    };
+
+    it("hides deleted items from tree output by default", async () => {
+      writePRD(tmp, PRD_WITH_DELETED);
+      await cmdStatus(tmp, { format: "tree" });
+      const out = output();
+
+      expect(out).toContain("Active Task");
+      expect(out).not.toContain("Removed Task");
+      expect(out).not.toContain("Deleted Epic");
+      expect(out).not.toContain("Orphaned Task");
+    });
+
+    it("shows deleted items with --all flag", async () => {
+      writePRD(tmp, PRD_WITH_DELETED);
+      await cmdStatus(tmp, { format: "tree", all: "true" });
+      const out = output();
+
+      expect(out).toContain("Active Task");
+      expect(out).toContain("Removed Task");
+      expect(out).toContain("Deleted Epic");
+      expect(out).toContain("Orphaned Task");
+    });
+
+    it("hides deleted items from JSON output by default", async () => {
+      writePRD(tmp, PRD_WITH_DELETED);
+      await cmdStatus(tmp, { format: "json", tokens: "false" });
+      const parsed = JSON.parse(output());
+
+      // Should only have the Auth System epic with Active Task
+      expect(parsed.items).toHaveLength(1);
+      expect(parsed.items[0].title).toBe("Auth System");
+      expect(parsed.items[0].children).toHaveLength(1);
+      expect(parsed.items[0].children[0].title).toBe("Active Task");
+    });
+
+    it("includes deleted items in JSON output with --all flag", async () => {
+      writePRD(tmp, PRD_WITH_DELETED);
+      await cmdStatus(tmp, { format: "json", all: "true", tokens: "false" });
+      const parsed = JSON.parse(output());
+
+      expect(parsed.items).toHaveLength(2);
+      expect(parsed.items[1].title).toBe("Deleted Epic");
+    });
+
+    it("shows hint about hidden items when deleted items exist", async () => {
+      writePRD(tmp, PRD_WITH_DELETED);
+      await cmdStatus(tmp, { format: "tree" });
+      const out = output();
+
+      expect(out).toContain("hiding completed/deleted items");
+      expect(out).toContain("--all");
     });
   });
 
@@ -1164,11 +1260,85 @@ describe("filterCompleted", () => {
   });
 });
 
+describe("filterDeleted", () => {
+  it("removes deleted leaf items", () => {
+    const items: PRDItem[] = [
+      { id: "t1", title: "Deleted", level: "task", status: "deleted" },
+      { id: "t2", title: "Pending", level: "task", status: "pending" },
+    ];
+    const filtered = filterDeleted(items);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].title).toBe("Pending");
+  });
+
+  it("removes deleted subtrees entirely", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Deleted Epic",
+        level: "epic",
+        status: "deleted",
+        children: [
+          { id: "t1", title: "Child Task", level: "task", status: "pending" },
+        ],
+      },
+    ];
+    const filtered = filterDeleted(items);
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("keeps non-deleted parents but filters deleted children", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Active Epic",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "t1", title: "Deleted Task", level: "task", status: "deleted" },
+          { id: "t2", title: "Active Task", level: "task", status: "pending" },
+        ],
+      },
+    ];
+    const filtered = filterDeleted(items);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].title).toBe("Active Epic");
+    expect(filtered[0].children).toHaveLength(1);
+    expect(filtered[0].children![0].title).toBe("Active Task");
+  });
+
+  it("does not mutate the original items", () => {
+    const items: PRDItem[] = [
+      {
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        status: "in_progress",
+        children: [
+          { id: "t1", title: "Deleted", level: "task", status: "deleted" },
+          { id: "t2", title: "Active", level: "task", status: "pending" },
+        ],
+      },
+    ];
+    filterDeleted(items);
+    expect(items[0].children).toHaveLength(2);
+  });
+
+  it("returns all items when nothing is deleted", () => {
+    const items: PRDItem[] = [
+      { id: "t1", title: "A", level: "task", status: "pending" },
+      { id: "t2", title: "B", level: "task", status: "in_progress" },
+    ];
+    const filtered = filterDeleted(items);
+    expect(filtered).toHaveLength(2);
+  });
+});
+
 describe("formatStats with hidingCompleted option", () => {
   it("appends hint when hidingCompleted is true", () => {
     const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0, deleted: 0 };
     const line = formatStats(stats, { hidingCompleted: true });
-    expect(line).toContain("showing active items, use --all for full tree");
+    expect(line).toContain("hiding completed/deleted items, use --all for full tree");
   });
 
   it("does not append hint when hidingCompleted is false", () => {

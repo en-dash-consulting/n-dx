@@ -11,8 +11,8 @@ import {
   createMessageThrottle,
   type MessageThrottle,
   type ThrottledHandlerConfig,
-} from "../../../src/viewer/message-throttle.js";
-import type { ParsedWSMessage } from "../../../src/viewer/message-coalescer.js";
+} from "../../../src/viewer/messaging/message-throttle.js";
+import type { ParsedWSMessage } from "../../../src/viewer/messaging/message-coalescer.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

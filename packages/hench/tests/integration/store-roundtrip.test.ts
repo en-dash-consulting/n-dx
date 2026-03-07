@@ -74,7 +74,7 @@ describe("runs store roundtrip", () => {
       turns: 1,
       tokenUsage: { input: 100, output: 50 },
       toolCalls: [],
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       ...overrides,
     };
   }

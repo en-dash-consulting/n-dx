@@ -107,9 +107,9 @@ describe("createApiClient — LLMProvider interface", () => {
 
   it("sets info.model when model is configured", () => {
     const client = createApiClient({
-      claudeConfig: { api_key: "sk-ant-test", model: "claude-sonnet-4-20250514" },
+      claudeConfig: { api_key: "sk-ant-test", model: "claude-sonnet-4-6" },
     });
-    expect(client.info.model).toBe("claude-sonnet-4-20250514");
+    expect(client.info.model).toBe("claude-sonnet-4-6");
   });
 
   it("exposes validateAuth as a function", () => {

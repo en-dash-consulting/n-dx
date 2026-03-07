@@ -16,7 +16,7 @@
 }
 
 .token-header h2 {
-  font-size: 24px;
+  font-size: var(--font-3xl);
   margin: 0;
 }
 
@@ -31,7 +31,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
 }
 
@@ -39,7 +39,7 @@
   flex: none;
   width: auto;
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: var(--font-base);
 }
 
 .btn {
@@ -48,7 +48,7 @@
   color: var(--bg);
   border: none;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--font-base);
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -58,7 +58,7 @@
 
 .btn-small {
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--font-sm);
 }
 
 /* Metrics row (extends overview-metrics) */
@@ -71,7 +71,7 @@
   padding: 12px 20px;
   border-radius: 8px;
   margin-bottom: 20px;
-  font-size: 13px;
+  font-size: var(--font-base);
   line-height: 1.5;
 }
 
@@ -104,8 +104,8 @@
 }
 
 .token-section h3 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
   margin-bottom: 16px;
 }
 
@@ -123,12 +123,12 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
-  font-size: 12px;
+  font-size: var(--font-base);
 }
 
 .token-source-item code {
   font-family: monospace;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text);
   word-break: break-word;
 }
@@ -152,14 +152,14 @@
 }
 
 .budget-label {
-  font-size: 12px;
+  font-size: var(--font-base);
   font-weight: 500;
   color: var(--text-dim);
 }
 
 .budget-pct {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
 }
 
 .budget-ok { color: var(--green); }
@@ -195,7 +195,7 @@
 
 .budget-detail {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
 }
 
@@ -214,7 +214,7 @@
   background: transparent;
   color: var(--text-dim);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--font-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
@@ -242,7 +242,7 @@
 }
 
 .chart-axis-label {
-  font-size: 10px;
+  font-size: var(--font-sm);
   fill: var(--text-dim);
 }
 
@@ -258,7 +258,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
 }
 
@@ -282,13 +282,13 @@
 }
 
 .donut-total {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--font-xl);
+  font-weight: var(--weight-bold);
   fill: var(--text);
 }
 
 .donut-label {
-  font-size: 10px;
+  font-size: var(--font-sm);
   fill: var(--text-dim);
 }
 
@@ -304,7 +304,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--font-base);
 }
 
 .pkg-name {
@@ -314,12 +314,12 @@
 
 .pkg-tokens {
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text);
 }
 
 .pkg-pct {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   min-width: 30px;
   text-align: right;
@@ -335,7 +335,7 @@
 .token-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--font-base);
 }
 
 .token-table th {
@@ -344,7 +344,7 @@
   border-bottom: 2px solid var(--border);
   color: var(--text-dim);
   font-weight: 500;
-  font-size: 11px;
+  font-size: var(--font-sm);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -353,7 +353,7 @@
 .token-table td.num {
   text-align: right;
   font-family: monospace;
-  font-size: 12px;
+  font-size: var(--font-base);
 }
 
 .token-table td {
@@ -370,8 +370,8 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
   color: var(--bg);
   letter-spacing: 0.02em;
 }
@@ -395,23 +395,23 @@
 .cost-item.cost-total {
   border-top: 2px solid var(--border);
   background: var(--bg-hover);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .cost-label {
-  font-size: 13px;
+  font-size: var(--font-base);
   min-width: 120px;
 }
 
 .cost-value {
   font-family: monospace;
-  font-size: 14px;
+  font-size: var(--font-md);
   color: var(--green);
   min-width: 80px;
 }
 
 .cost-detail {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   flex: 1;
 }
@@ -421,7 +421,7 @@
   padding: 32px;
   text-align: center;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: var(--font-base);
   font-style: italic;
 }
 
@@ -440,7 +440,7 @@
 
 .token-error p {
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: var(--font-base);
   margin-bottom: 16px;
 }
 
@@ -453,7 +453,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 0 0 0 8px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
 }
 
@@ -477,7 +477,7 @@
   }
 
   .token-table {
-    font-size: 11px;
+    font-size: var(--font-sm);
   }
 
   .token-table th,

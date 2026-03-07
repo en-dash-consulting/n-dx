@@ -1,0 +1,28 @@
+{
+  "id": "analyzers-3",
+  "name": "Analyzers 3",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "src/analyzers/louvain.ts",
+    "src/analyzers/zone-hash.ts",
+    "src/analyzers/zones.ts",
+    "tests/unit/analyzers/zone-detection.test.ts",
+    "tests/unit/analyzers/zone-size-policy.test.ts",
+    "tests/unit/analyzers/zone-subdivision.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyzers/zone-hash.ts",
+    "src/analyzers/zones.ts"
+  ],
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 6,
+  "lineCount": 5740,
+  "riskMetrics": {
+    "cohesion": 0.31,
+    "coupling": 0.69,
+    "riskScore": 0.69,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

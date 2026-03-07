@@ -18,6 +18,8 @@ import {
 } from "./physics.js";
 import { basename, truncateFilename } from "../utils.js";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 // ── Public types ─────────────────────────────────────────────────────────────
 
 export interface GraphNode {
@@ -135,150 +137,36 @@ export class GraphRenderer {
     this.zoneInfos = zoneInfos;
     this.onZoneSelect = onZoneSelect;
 
-    // Clear existing SVG content
+    // Clear existing SVG content and set up root structure
     svg.innerHTML = "";
-
-    const ns = "http://www.w3.org/2000/svg";
-
     this.updateViewBox();
-
-    // Create defs for arrow marker
-    const defs = document.createElementNS(ns, "defs");
-    const marker = document.createElementNS(ns, "marker");
-    marker.setAttribute("id", "arrowhead");
-    marker.setAttribute("viewBox", "0 0 10 7");
-    marker.setAttribute("refX", "10");
-    marker.setAttribute("refY", "3.5");
-    marker.setAttribute("markerWidth", "6");
-    marker.setAttribute("markerHeight", "5");
-    marker.setAttribute("orient", "auto");
-    const polygon = document.createElementNS(ns, "polygon");
-    polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
-    polygon.setAttribute("fill", "var(--border)");
-    marker.appendChild(polygon);
-    defs.appendChild(marker);
-    svg.appendChild(defs);
-
-    this.g = document.createElementNS(ns, "g");
+    this.createSvgDefs(svg);
+    this.g = document.createElementNS(SVG_NS, "g");
     svg.appendChild(this.g);
 
-    // Build zone → node index map
-    for (let i = 0; i < nodes.length; i++) {
-      const z = nodes[i].zone;
-      if (!z) continue;
-      let indices = this.zoneNodeIndices.get(z);
-      if (!indices) { indices = []; this.zoneNodeIndices.set(z, indices); }
-      indices.push(i);
-    }
-
-    // Create zone hull group (rendered behind links/nodes)
-    this.zoneHullGroup = document.createElementNS(ns, "g");
-    this.zoneHullGroup.setAttribute("class", "zone-hulls");
-    this.g.appendChild(this.zoneHullGroup);
-
-    // Zone label layer — created here but appended after nodeLayer below
-    this.zoneLabelLayer = document.createElementNS(ns, "g");
+    // Build zone → node index map and zone hull/label layers
+    this.buildZoneNodeMap();
+    this.zoneHullGroup = this.createSvgLayer("zone-hulls");
+    this.zoneLabelLayer = document.createElementNS(SVG_NS, "g");
     this.zoneLabelLayer.setAttribute("class", "zone-label-layer");
+    this.createZoneHulls();
 
-    this.createZoneHulls(ns);
-
-    // Node map for link resolution
+    // Resolve link references and build adjacency map
     const nodeMap = new Map<string, GraphNode>();
     for (const n of nodes) nodeMap.set(n.id, n);
-
-    // Zone-clustered initial positions
     initZoneClusteredPositions(nodes, width, height);
+    this.resolvedLinks = this.resolveGraphLinks(links, nodeMap);
+    this.nodeEdgeMap = this.buildAdjacencyMap();
 
-    // Resolve links to node references
-    this.resolvedLinks = links.map((l) => ({
-      ...l,
-      source: nodeMap.get(typeof l.source === "string" ? l.source : l.source.id)!,
-      target: nodeMap.get(typeof l.target === "string" ? l.target : l.target.id)!,
-    })).filter((l) => l.source && l.target);
+    // Create SVG elements for links and nodes
+    this.createLinkElements();
+    const nodeLayer = this.createSvgLayer("graph-node-layer");
+    this.createNodeElements(nodeLayer);
+    this.labelRects = this.allocateLabelRects();
 
-    // Build adjacency map for hover highlighting
-    this.nodeEdgeMap = new Map();
-    for (let i = 0; i < this.resolvedLinks.length; i++) {
-      const l = this.resolvedLinks[i];
-      const sId = l.source.id;
-      const tId = l.target.id;
-      if (!this.nodeEdgeMap.has(sId)) this.nodeEdgeMap.set(sId, new Set());
-      if (!this.nodeEdgeMap.has(tId)) this.nodeEdgeMap.set(tId, new Set());
-      this.nodeEdgeMap.get(sId)!.add(i);
-      this.nodeEdgeMap.get(tId)!.add(i);
-    }
-
-    // Draw links
-    for (const l of this.resolvedLinks) {
-      const line = document.createElementNS(ns, "line");
-      line.setAttribute("class", `graph-link${l.crossZone ? " cross-zone" : ""}`);
-      line.setAttribute("marker-end", "url(#arrowhead)");
-      this.g.appendChild(line);
-      this.linkElements.push(line);
-    }
-
-    // Draw nodes — separate group above links/hulls for guaranteed z-order
-    const nodeLayer = document.createElementNS(ns, "g");
-    nodeLayer.setAttribute("class", "graph-node-layer");
-    this.g.appendChild(nodeLayer);
-
-    for (const n of nodes) {
-      const group = document.createElementNS(ns, "g");
-      group.setAttribute("class", "graph-node");
-
-      const radius = Math.min(3 + Math.sqrt(n.importCount) * 2, 16);
-      this.nodeRadii.push(radius);
-
-      // Invisible hit target — larger than the visible circle for easy clicking
-      const hitTarget = document.createElementNS(ns, "circle");
-      hitTarget.setAttribute("r", String(Math.max(radius + 4, 10)));
-      hitTarget.setAttribute("fill", "transparent");
-      hitTarget.setAttribute("class", "graph-node-hit");
-      group.appendChild(hitTarget);
-
-      const circle = document.createElementNS(ns, "circle");
-      circle.setAttribute("r", String(radius));
-      circle.setAttribute("fill", n.zoneColor || "#555");
-      group.appendChild(circle);
-
-      // Always create labels — LOD + overlap detection controls visibility
-      const fullName = basename(n.id);
-      const label = document.createElementNS(ns, "text");
-      label.setAttribute("class", "graph-label");
-      label.setAttribute("dy", String(-radius - 3));
-      label.setAttribute("text-anchor", "middle");
-      label.setAttribute("data-full", fullName);
-      label.textContent = truncateFilename(fullName);
-      group.appendChild(label);
-
-      nodeLayer.appendChild(group);
-      this.nodeGroups.push(group);
-    }
-
-    // Pre-allocate label rects array (reused each frame)
-    this.labelRects = new Array(nodes.length);
-    for (let i = 0; i < nodes.length; i++) {
-      this.labelRects[i] = { x: 0, y: 0, w: 0, h: 0 };
-    }
-
-    // Create shared tooltip (hidden by default)
-    this.tooltip = document.createElementNS(ns, "g");
-    this.tooltip.setAttribute("class", "graph-tooltip");
-    this.tooltip.style.display = "none";
-    this.tooltip.style.pointerEvents = "none";
-    const tooltipBg = document.createElementNS(ns, "rect");
-    tooltipBg.setAttribute("class", "graph-tooltip-bg");
-    tooltipBg.setAttribute("rx", "3");
-    tooltipBg.setAttribute("ry", "3");
-    this.tooltip.appendChild(tooltipBg);
-    const tooltipText = document.createElementNS(ns, "text");
-    tooltipText.setAttribute("class", "graph-tooltip-text");
-    tooltipText.setAttribute("dy", "0.35em");
-    this.tooltip.appendChild(tooltipText);
-    // Zone label layer sits above nodes for readability
+    // Tooltip and top layers
+    this.tooltip = this.createTooltipElement();
     this.g.appendChild(this.zoneLabelLayer);
-
-    // Tooltip must be added last so it renders on top of all nodes and zone labels
     this.g.appendChild(this.tooltip);
 
     // Initialize physics simulation
@@ -315,7 +203,7 @@ export class GraphRenderer {
     const idx = this.nodes.findIndex((n) => n.id === id);
     if (idx < 0) return;
 
-    const ns = "http://www.w3.org/2000/svg";
+    const ns = SVG_NS;
     const ring = document.createElementNS(ns, "circle");
     ring.setAttribute("class", "graph-search-ring");
     ring.setAttribute("r", String(this.nodeRadii[idx] + 4));
@@ -462,6 +350,148 @@ export class GraphRenderer {
     this.labelRects.length = 0;
   }
 
+  // ── Private: Constructor helpers ──────────────────────────────────────────
+
+  /** Create SVG <defs> with the arrowhead marker. */
+  private createSvgDefs(svg: SVGSVGElement): void {
+    const ns = SVG_NS;
+    const defs = document.createElementNS(ns, "defs");
+    const marker = document.createElementNS(ns, "marker");
+    marker.setAttribute("id", "arrowhead");
+    marker.setAttribute("viewBox", "0 0 10 7");
+    marker.setAttribute("refX", "10");
+    marker.setAttribute("refY", "3.5");
+    marker.setAttribute("markerWidth", "6");
+    marker.setAttribute("markerHeight", "5");
+    marker.setAttribute("orient", "auto");
+    const polygon = document.createElementNS(ns, "polygon");
+    polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
+    polygon.setAttribute("fill", "var(--border)");
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+  }
+
+  /** Build the zone → node-index map used for hull rendering and collapse. */
+  private buildZoneNodeMap(): void {
+    for (let i = 0; i < this.nodes.length; i++) {
+      const z = this.nodes[i].zone;
+      if (!z) continue;
+      let indices = this.zoneNodeIndices.get(z);
+      if (!indices) { indices = []; this.zoneNodeIndices.set(z, indices); }
+      indices.push(i);
+    }
+  }
+
+  /** Create an SVG <g> layer, append it to the root group, and return it. */
+  private createSvgLayer(className: string): SVGGElement {
+    const layer = document.createElementNS(SVG_NS, "g");
+    layer.setAttribute("class", className);
+    this.g.appendChild(layer);
+    return layer;
+  }
+
+  /** Resolve string-based link endpoints to GraphNode references. */
+  private resolveGraphLinks(
+    links: GraphLink[],
+    nodeMap: Map<string, GraphNode>,
+  ): { source: GraphNode; target: GraphNode; crossZone: boolean }[] {
+    return links.map((l) => ({
+      ...l,
+      source: nodeMap.get(typeof l.source === "string" ? l.source : l.source.id)!,
+      target: nodeMap.get(typeof l.target === "string" ? l.target : l.target.id)!,
+    })).filter((l) => l.source && l.target);
+  }
+
+  /** Build a node-id → edge-index adjacency map for hover/select highlighting. */
+  private buildAdjacencyMap(): Map<string, Set<number>> {
+    const map = new Map<string, Set<number>>();
+    for (let i = 0; i < this.resolvedLinks.length; i++) {
+      const l = this.resolvedLinks[i];
+      const sId = l.source.id;
+      const tId = l.target.id;
+      if (!map.has(sId)) map.set(sId, new Set());
+      if (!map.has(tId)) map.set(tId, new Set());
+      map.get(sId)!.add(i);
+      map.get(tId)!.add(i);
+    }
+    return map;
+  }
+
+  /** Create SVG line elements for all resolved links. */
+  private createLinkElements(): void {
+    for (const l of this.resolvedLinks) {
+      const line = document.createElementNS(SVG_NS, "line");
+      line.setAttribute("class", `graph-link${l.crossZone ? " cross-zone" : ""}`);
+      line.setAttribute("marker-end", "url(#arrowhead)");
+      this.g.appendChild(line);
+      this.linkElements.push(line);
+    }
+  }
+
+  /** Create SVG groups for all nodes (hit target, circle, label). */
+  private createNodeElements(nodeLayer: SVGGElement): void {
+    for (const n of this.nodes) {
+      const group = document.createElementNS(SVG_NS, "g");
+      group.setAttribute("class", "graph-node");
+
+      const radius = Math.min(3 + Math.sqrt(n.importCount) * 2, 16);
+      this.nodeRadii.push(radius);
+
+      // Invisible hit target — larger than the visible circle for easy clicking
+      const hitTarget = document.createElementNS(SVG_NS, "circle");
+      hitTarget.setAttribute("r", String(Math.max(radius + 4, 10)));
+      hitTarget.setAttribute("fill", "transparent");
+      hitTarget.setAttribute("class", "graph-node-hit");
+      group.appendChild(hitTarget);
+
+      const circle = document.createElementNS(SVG_NS, "circle");
+      circle.setAttribute("r", String(radius));
+      circle.setAttribute("fill", n.zoneColor || "#555");
+      group.appendChild(circle);
+
+      // Always create labels — LOD + overlap detection controls visibility
+      const fullName = basename(n.id);
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("class", "graph-label");
+      label.setAttribute("dy", String(-radius - 3));
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("data-full", fullName);
+      label.textContent = truncateFilename(fullName);
+      group.appendChild(label);
+
+      nodeLayer.appendChild(group);
+      this.nodeGroups.push(group);
+    }
+  }
+
+  /** Pre-allocate label rect objects reused each frame to avoid GC pressure. */
+  private allocateLabelRects(): LabelRect[] {
+    const rects = new Array<LabelRect>(this.nodes.length);
+    for (let i = 0; i < this.nodes.length; i++) {
+      rects[i] = { x: 0, y: 0, w: 0, h: 0 };
+    }
+    return rects;
+  }
+
+  /** Create the shared tooltip SVG group (hidden by default). */
+  private createTooltipElement(): SVGGElement {
+    const tooltip = document.createElementNS(SVG_NS, "g");
+    tooltip.setAttribute("class", "graph-tooltip");
+    tooltip.style.display = "none";
+    tooltip.style.pointerEvents = "none";
+    const tooltipBg = document.createElementNS(SVG_NS, "rect");
+    tooltipBg.setAttribute("class", "graph-tooltip-bg");
+    tooltipBg.setAttribute("rx", "3");
+    tooltipBg.setAttribute("ry", "3");
+    tooltip.appendChild(tooltipBg);
+    const tooltipText = document.createElementNS(SVG_NS, "text");
+    tooltipText.setAttribute("class", "graph-tooltip-text");
+    tooltipText.setAttribute("dy", "0.35em");
+    tooltip.appendChild(tooltipText);
+    return tooltip;
+  }
+
   // ── Private: Selection highlighting ───────────────────────────────────────
 
   private applySelectionHighlight(nodeId: string): void {
@@ -498,7 +528,8 @@ export class GraphRenderer {
   // ── Private: Zone hull management ─────────────────────────────────────────
 
   /** Create SVG elements for each zone hull (background + label). */
-  private createZoneHulls(ns: string): void {
+  private createZoneHulls(): void {
+    const ns = SVG_NS;
     const signal = this.ac.signal;
 
     for (const zi of this.zoneInfos) {
@@ -684,7 +715,7 @@ export class GraphRenderer {
     if (hullGroup) {
       hullGroup.classList.add("collapsed");
       // Position a summary badge at the centroid
-      const ns = "http://www.w3.org/2000/svg";
+      const ns = SVG_NS;
       let badge = hullGroup.querySelector(".zone-collapse-badge") as SVGGElement | null;
       if (!badge) {
         badge = document.createElementNS(ns, "g");

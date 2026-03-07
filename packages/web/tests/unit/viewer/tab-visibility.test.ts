@@ -22,7 +22,7 @@ import {
   getTransitionHistory,
   type TabVisibilitySnapshot,
   type TabVisibilityState,
-} from "../../../src/viewer/tab-visibility.js";
+} from "../../../src/viewer/polling/tab-visibility.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

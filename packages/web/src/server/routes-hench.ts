@@ -293,202 +293,219 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
   };
 }
 
-/** Handle Hench API requests. Returns true if the request was handled. */
-export function handleHenchRoute(
-  req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-  broadcast?: WebSocketBroadcaster,
-): boolean | Promise<boolean> {
-  const url = req.url || "/";
-  const method = req.method || "GET";
+// ── Sub-routers ─────────────────────────────────────────────────────────────
+// Each sub-router handles a resource group under /api/hench/.
+// Returns false if the path doesn't belong to its group.
 
-  if (!url.startsWith(HENCH_PREFIX)) return false;
+/** Parsed request context shared across sub-routers. */
+interface RouteContext {
+  path: string;
+  fullPath: string;
+  qIdx: number;
+  method: string;
+  req: IncomingMessage;
+  res: ServerResponse;
+  ctx: ServerContext;
+  runsDir: string;
+  broadcast?: WebSocketBroadcaster;
+}
 
-  const fullPath = url.slice(HENCH_PREFIX.length);
-  const qIdx = fullPath.indexOf("?");
-  const path = qIdx === -1 ? fullPath : fullPath.slice(0, qIdx);
-
-  const runsDir = join(ctx.projectDir, ".hench", "runs");
-
+/** Routes: task-usage, audit */
+function routeUsage(rc: RouteContext): boolean | Promise<boolean> | null {
   // GET /api/hench/task-usage — incremental per-task token usage aggregation
-  // After refreshing run data, prune entries for tasks that no longer
-  // exist in the PRD so the UI never shows stale usage data.
-  if (path === "task-usage" && method === "GET") {
-    const aggregator = getAggregator(runsDir);
+  if (rc.path === "task-usage" && rc.method === "GET") {
+    const aggregator = getAggregator(rc.runsDir);
     return aggregator.getTaskUsage().then((taskUsage) => {
-      const validIds = loadValidTaskIds(ctx);
+      const validIds = loadValidTaskIds(rc.ctx);
       if (validIds) {
         aggregator.pruneStaleEntries(validIds);
-        // Re-derive output after pruning (cheap — no I/O, just Map→Object)
         const pruned: Record<string, (typeof taskUsage)[string]> = {};
         for (const [id, acc] of Object.entries(taskUsage)) {
           if (validIds.has(id)) pruned[id] = acc;
         }
-        jsonResponse(res, 200, { taskUsage: pruned });
+        jsonResponse(rc.res, 200, { taskUsage: pruned });
       } else {
-        // No PRD available — return all data (graceful degradation)
-        jsonResponse(res, 200, { taskUsage });
+        jsonResponse(rc.res, 200, { taskUsage });
       }
       return true as const;
     });
   }
 
-  // GET /api/hench/audit — task execution audit info (PIDs, resource usage, logs)
-  if (path === "audit" && method === "GET") {
-    return handleAudit(res, runsDir);
+  // GET /api/hench/audit — task execution audit info
+  if (rc.path === "audit" && rc.method === "GET") {
+    return handleAudit(rc.res, rc.runsDir);
   }
 
-  // GET /api/hench/metrics/snapshots — time-series execution metrics snapshots
-  if (path === "metrics/snapshots" && method === "GET") {
-    return handleMetricsSnapshots(res);
-  }
+  return null;
+}
 
-  // GET /api/hench/metrics — concurrent execution metrics and resource utilization
-  if (path === "metrics" && method === "GET") {
-    return handleMetrics(res);
+/** Routes: metrics, metrics/snapshots */
+function routeMetrics(rc: RouteContext): boolean | null {
+  if (rc.path === "metrics/snapshots" && rc.method === "GET") {
+    return handleMetricsSnapshots(rc.res);
   }
-
-  // GET /api/hench/memory — system memory, per-process memory, and resource health
-  if (path === "memory" && method === "GET") {
-    return handleMemory(res);
+  if (rc.path === "metrics" && rc.method === "GET") {
+    return handleMetrics(rc.res);
   }
+  return null;
+}
 
-  // GET /api/hench/memory/history/:taskId — memory history for a specific task
-  const memoryHistoryMatch = path.match(/^memory\/history\/([^/?]+)$/);
-  if (memoryHistoryMatch && method === "GET") {
-    return handleMemoryHistoryByTask(memoryHistoryMatch[1]!, res);
+/** Routes: memory, memory/history, memory/history/:taskId, memory/leaks */
+function routeMemory(rc: RouteContext): boolean | null {
+  if (!rc.path.startsWith("memory")) return null;
+
+  if (rc.path === "memory" && rc.method === "GET") {
+    return handleMemory(rc.res);
   }
-
-  // GET /api/hench/memory/history — per-process memory history (all tracked processes)
-  if (path === "memory/history" && method === "GET") {
-    return handleMemoryHistory(res);
+  const historyMatch = rc.path.match(/^memory\/history\/([^/?]+)$/);
+  if (historyMatch && rc.method === "GET") {
+    return handleMemoryHistoryByTask(historyMatch[1]!, rc.res);
   }
-
-  // GET /api/hench/memory/leaks — leak detection summary for all active processes
-  if (path === "memory/leaks" && method === "GET") {
-    return handleMemoryLeaks(res);
+  if (rc.path === "memory/history" && rc.method === "GET") {
+    return handleMemoryHistory(rc.res);
   }
-
-  // GET /api/hench/concurrency — concurrent execution count, limits, and queue status
-  if (path === "concurrency" && method === "GET") {
-    return handleConcurrency(res, ctx);
+  if (rc.path === "memory/leaks" && rc.method === "GET") {
+    return handleMemoryLeaks(rc.res);
   }
+  return null;
+}
 
-  // GET /api/hench/throttle — current throttle state
-  if (path === "throttle" && method === "GET") {
-    return handleThrottleGet(res, ctx);
+/** Routes: throttle (GET/PUT), throttle/pause, throttle/resume, throttle/emergency-stop */
+function routeThrottle(rc: RouteContext): boolean | Promise<boolean> | null {
+  if (!rc.path.startsWith("throttle")) return null;
+
+  if (rc.path === "throttle" && rc.method === "GET") {
+    return handleThrottleGet(rc.res, rc.ctx);
   }
-
-  // PUT /api/hench/throttle — adjust concurrency limit override
-  if (path === "throttle" && method === "PUT") {
-    return handleThrottleUpdate(req, res, ctx, broadcast);
+  if (rc.path === "throttle" && rc.method === "PUT") {
+    return handleThrottleUpdate(rc.req, rc.res, rc.ctx, rc.broadcast);
   }
-
-  // POST /api/hench/throttle/pause — pause new executions
-  if (path === "throttle/pause" && method === "POST") {
-    return handleThrottlePause(res, broadcast, ctx);
+  if (rc.path === "throttle/pause" && rc.method === "POST") {
+    return handleThrottlePause(rc.res, rc.broadcast, rc.ctx);
   }
-
-  // POST /api/hench/throttle/resume — resume new executions
-  if (path === "throttle/resume" && method === "POST") {
-    return handleThrottleResume(res, broadcast, ctx);
+  if (rc.path === "throttle/resume" && rc.method === "POST") {
+    return handleThrottleResume(rc.res, rc.broadcast, rc.ctx);
   }
-
-  // POST /api/hench/throttle/emergency-stop — terminate all running executions
-  if (path === "throttle/emergency-stop" && method === "POST") {
-    return handleEmergencyStop(req, res, broadcast, ctx);
+  if (rc.path === "throttle/emergency-stop" && rc.method === "POST") {
+    return handleEmergencyStop(rc.req, rc.res, rc.broadcast, rc.ctx);
   }
+  return null;
+}
 
-  // POST /api/hench/execute/:taskId/terminate — terminate a running task
-  const terminateMatch = path.match(/^execute\/([^/?]+)\/terminate$/);
-  if (terminateMatch && method === "POST") {
-    return handleTerminate(terminateMatch[1], res, runsDir, broadcast);
+/** Routes: execute (POST), execute/status, execute/status/:taskId, execute/:taskId/terminate */
+function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
+  if (!rc.path.startsWith("execute")) return null;
+
+  const terminateMatch = rc.path.match(/^execute\/([^/?]+)\/terminate$/);
+  if (terminateMatch && rc.method === "POST") {
+    return handleTerminate(terminateMatch[1], rc.res, rc.runsDir, rc.broadcast);
   }
-
-  // GET /api/hench/runs/health — staleness health check for running runs
-  if (path === "runs/health" && method === "GET") {
-    return handleRunsHealth(res, runsDir);
+  if (rc.path === "execute" && rc.method === "POST") {
+    return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
   }
+  if (rc.path === "execute/status" && rc.method === "GET") {
+    return handleExecuteStatus(rc.res);
+  }
+  const statusMatch = rc.path.match(/^execute\/status\/([^/?]+)$/);
+  if (statusMatch && rc.method === "GET") {
+    return handleExecuteStatusForTask(statusMatch[1], rc.res);
+  }
+  return null;
+}
 
-  // POST /api/hench/runs/:id/mark-stuck — mark a running run as failed
-  const markStuckMatch = path.match(/^runs\/([^/?]+)\/mark-stuck$/);
-  if (markStuckMatch && method === "POST") {
-    return handleMarkStuck(markStuckMatch[1], res, runsDir);
+/** Routes: runs, runs/:id, runs/health, runs/:id/mark-stuck */
+function routeRuns(rc: RouteContext): boolean | null {
+  if (!rc.path.startsWith("runs")) return null;
+
+  if (rc.path === "runs/health" && rc.method === "GET") {
+    return handleRunsHealth(rc.res, rc.runsDir);
+  }
+  const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
+  if (markStuckMatch && rc.method === "POST") {
+    return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir);
   }
 
   // GET /api/hench/runs — list runs with summary (?limit=N&offset=N)
-  if (path === "runs" && method === "GET") {
+  if (rc.path === "runs" && rc.method === "GET") {
     let files: string[];
     try {
-      files = readdirSync(runsDir);
+      files = readdirSync(rc.runsDir);
     } catch {
-      jsonResponse(res, 200, { runs: [], total: 0 });
+      jsonResponse(rc.res, 200, { runs: [], total: 0 });
       return true;
     }
 
     const jsonFiles = files.filter((f) => f.endsWith(".json"));
     const total = jsonFiles.length;
 
-    // Parse limit and offset from query string
     let limit = 0;
     let offset = 0;
-    if (qIdx !== -1) {
-      const params = new URLSearchParams(fullPath.slice(qIdx));
+    let filterTaskId: string | null = null;
+    if (rc.qIdx !== -1) {
+      const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
       const limitStr = params.get("limit");
       const offsetStr = params.get("offset");
+      const taskIdStr = params.get("taskId");
       if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
       if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
+      if (taskIdStr) filterTaskId = taskIdStr;
     }
 
-    // Sort filenames descending (run IDs are timestamp-based, so filename
-    // sort approximates chronological order) to avoid loading every file
-    // when only a page is requested.
     jsonFiles.sort((a, b) => b.localeCompare(a));
 
-    // When paginated, only load the slice of files we need
-    const filesToLoad = (limit > 0 || offset > 0)
+    const filesToLoad = (!filterTaskId && (limit > 0 || offset > 0))
       ? jsonFiles.slice(offset, limit > 0 ? offset + limit : undefined)
       : jsonFiles;
 
     const summaries: RunSummary[] = [];
     for (const file of filesToLoad) {
       const id = file.replace(/\.json$/, "");
-      const run = loadRunFile(runsDir, id);
+      const run = loadRunFile(rc.runsDir, id);
       if (run && run.id && run.startedAt) {
+        // When filtering by taskId, skip non-matching runs before building summary
+        if (filterTaskId && run.taskId !== filterTaskId) continue;
         summaries.push(toRunSummary(run));
       }
     }
 
-    // Final sort by startedAt descending for accurate ordering
     summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
-    jsonResponse(res, 200, { runs: summaries, total });
+    // Apply limit/offset after taskId filtering (when both are present)
+    const paginatedSummaries = filterTaskId && (limit > 0 || offset > 0)
+      ? summaries.slice(offset, limit > 0 ? offset + limit : undefined)
+      : summaries;
+
+    jsonResponse(rc.res, 200, { runs: paginatedSummaries, total: filterTaskId ? summaries.length : total });
     return true;
   }
 
   // GET /api/hench/runs/:id — full run detail
-  const runsMatch = path.match(/^runs\/([^/?]+)$/);
-  if (runsMatch && method === "GET") {
+  const runsMatch = rc.path.match(/^runs\/([^/?]+)$/);
+  if (runsMatch && rc.method === "GET") {
     const runId = runsMatch[1];
-    const run = loadRunFile(runsDir, runId);
+    const run = loadRunFile(rc.runsDir, runId);
     if (!run) {
-      errorResponse(res, 404, `Run "${runId}" not found`);
+      errorResponse(rc.res, 404, `Run "${runId}" not found`);
       return true;
     }
-    jsonResponse(res, 200, run);
+    jsonResponse(rc.res, 200, run);
     return true;
   }
 
-  // GET /api/hench/config — current config with metadata
-  if (path === "config" && method === "GET") {
-    const config = loadHenchConfig(ctx.projectDir);
+  return null;
+}
+
+/** Routes: config (GET/PUT) */
+function routeConfig(rc: RouteContext): boolean | Promise<boolean> | null {
+  if (!rc.path.startsWith("config")) return null;
+
+  if (rc.path === "config" && rc.method === "GET") {
+    const config = loadHenchConfig(rc.ctx.projectDir);
     if (!config) {
-      errorResponse(res, 404, "Hench configuration not found. Run 'hench init' first.");
+      errorResponse(rc.res, 404, "Hench configuration not found. Run 'hench init' first.");
       return true;
     }
 
-    // Build fields response with current values, defaults, and impact descriptions
     const fields = CONFIG_FIELD_META.map((field) => {
       const value = getNestedValue(config, field.path);
       const defaultValue = DEFAULT_CONFIG[field.path];
@@ -502,60 +519,85 @@ export function handleHenchRoute(
       };
     });
 
-    jsonResponse(res, 200, { config, fields });
+    jsonResponse(rc.res, 200, { config, fields });
     return true;
   }
 
-  // PUT /api/hench/config — update config
-  if (path === "config" && method === "PUT") {
-    return handleConfigUpdate(req, res, ctx);
+  if (rc.path === "config" && rc.method === "PUT") {
+    return handleConfigUpdate(rc.req, rc.res, rc.ctx);
   }
+  return null;
+}
 
-  // GET /api/hench/templates — list all templates
-  if (path === "templates" && method === "GET") {
-    return handleTemplateList(res, ctx);
+/** Routes: templates (GET/POST), templates/:id (GET/DELETE), templates/:id/apply */
+function routeTemplates(rc: RouteContext): boolean | Promise<boolean> | null {
+  if (!rc.path.startsWith("templates")) return null;
+
+  if (rc.path === "templates" && rc.method === "GET") {
+    return handleTemplateList(rc.res, rc.ctx);
   }
-
-  // POST /api/hench/templates — create/update a user template
-  if (path === "templates" && method === "POST") {
-    return handleTemplateCreate(req, res, ctx);
+  if (rc.path === "templates" && rc.method === "POST") {
+    return handleTemplateCreate(rc.req, rc.res, rc.ctx);
   }
-
-  // GET /api/hench/templates/:id — get single template
-  const templateShowMatch = path.match(/^templates\/([a-z][a-z0-9-]+)$/);
-  if (templateShowMatch && method === "GET") {
-    return handleTemplateGet(templateShowMatch[1], res, ctx);
+  const applyMatch = rc.path.match(/^templates\/([a-z][a-z0-9-]+)\/apply$/);
+  if (applyMatch && rc.method === "POST") {
+    return handleTemplateApply(applyMatch[1], rc.res, rc.ctx);
   }
-
-  // POST /api/hench/templates/:id/apply — apply template to config
-  const templateApplyMatch = path.match(/^templates\/([a-z][a-z0-9-]+)\/apply$/);
-  if (templateApplyMatch && method === "POST") {
-    return handleTemplateApply(templateApplyMatch[1], res, ctx);
+  const idMatch = rc.path.match(/^templates\/([a-z][a-z0-9-]+)$/);
+  if (idMatch && rc.method === "GET") {
+    return handleTemplateGet(idMatch[1], rc.res, rc.ctx);
   }
-
-  // DELETE /api/hench/templates/:id — delete user template
-  const templateDeleteMatch = path.match(/^templates\/([a-z][a-z0-9-]+)$/);
-  if (templateDeleteMatch && method === "DELETE") {
-    return handleTemplateDelete(templateDeleteMatch[1], res, ctx);
+  if (idMatch && rc.method === "DELETE") {
+    return handleTemplateDelete(idMatch[1], rc.res, rc.ctx);
   }
+  return null;
+}
 
-  // POST /api/hench/execute — trigger task execution
-  if (path === "execute" && method === "POST") {
-    return handleExecute(req, res, ctx, broadcast);
+/** Handle Hench API requests. Returns true if the request was handled. */
+export function handleHenchRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): boolean | Promise<boolean> {
+  const url = req.url || "/";
+  if (!url.startsWith(HENCH_PREFIX)) return false;
+
+  const fullPath = url.slice(HENCH_PREFIX.length);
+  const qIdx = fullPath.indexOf("?");
+  const path = qIdx === -1 ? fullPath : fullPath.slice(0, qIdx);
+
+  const rc: RouteContext = {
+    path,
+    fullPath,
+    qIdx,
+    method: req.method || "GET",
+    req,
+    res,
+    ctx,
+    runsDir: join(ctx.projectDir, ".hench", "runs"),
+    broadcast,
+  };
+
+  // Dispatch to sub-routers — first non-null result wins.
+  return routeUsage(rc)
+    ?? routeMetrics(rc)
+    ?? routeMemory(rc)
+    ?? routeThrottle(rc)
+    ?? routeExecute(rc)
+    ?? routeRuns(rc)
+    ?? routeConfig(rc)
+    ?? routeTemplates(rc)
+    ?? routeConcurrency(rc)
+    ?? false;
+}
+
+/** Routes: concurrency */
+function routeConcurrency(rc: RouteContext): boolean | null {
+  if (rc.path === "concurrency" && rc.method === "GET") {
+    return handleConcurrency(rc.res, rc.ctx);
   }
-
-  // GET /api/hench/execute/status — get all active execution statuses
-  if (path === "execute/status" && method === "GET") {
-    return handleExecuteStatus(res);
-  }
-
-  // GET /api/hench/execute/status/:taskId — get specific task execution status
-  const execStatusMatch = path.match(/^execute\/status\/([^/?]+)$/);
-  if (execStatusMatch && method === "GET") {
-    return handleExecuteStatusForTask(execStatusMatch[1], res);
-  }
-
-  return false;
+  return null;
 }
 
 /** Handle PUT /api/hench/config — validate and apply config changes. */

@@ -19,7 +19,7 @@
 import { similarity } from "../analyze/dedupe.js";
 import { walkTree } from "../core/tree.js";
 import type { PRDItem, ItemLevel, ItemStatus } from "../schema/index.js";
-import type { EnrichedRecommendation } from "./create-from-recommendations.js";
+import type { EnrichedRecommendation } from "./types.js";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -195,12 +195,17 @@ export function detectRecommendationConflicts(
   const conflicts: RecommendationConflict[] = [];
   const conflictingSet = new Set<number>();
 
-  // 1. Check each recommendation against existing PRD items
+  // 1. Check each recommendation against existing PRD items.
+  //    Skip completed items — they represent finished work, and new
+  //    recommendations with similar titles represent new findings that
+  //    need separate attention (e.g. "Address observation issues (4 findings)"
+  //    is genuinely new work even if "(1 findings)" was already completed).
   for (let i = 0; i < recommendations.length; i++) {
     const rec = recommendations[i];
     let best: ScoredCandidate | null = null;
 
     for (const { item } of walkTree(existingItems)) {
+      if (item.status === "completed") continue;
       const candidate = scoreRecommendationAgainstItem(rec, item);
       if (!candidate) continue;
       if (!best || candidate.score > best.score) {

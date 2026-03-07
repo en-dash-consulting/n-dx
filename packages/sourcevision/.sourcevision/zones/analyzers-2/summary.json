@@ -1,0 +1,36 @@
+{
+  "id": "analyzers-2",
+  "name": "Analyzers 2",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "src/analyzers/callgraph.ts",
+    "src/analyzers/components.ts",
+    "src/analyzers/imports.ts",
+    "src/analyzers/index.ts",
+    "src/analyzers/inventory.ts",
+    "src/analyzers/route-detection.ts",
+    "src/util/paths.ts",
+    "tests/unit/analyzers/callgraph.test.ts",
+    "tests/unit/analyzers/components.test.ts",
+    "tests/unit/analyzers/imports.test.ts",
+    "tests/unit/analyzers/inventory.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyzers/callgraph.ts",
+    "src/analyzers/components.ts",
+    "src/analyzers/imports.ts",
+    "src/analyzers/inventory.ts",
+    "src/util/paths.ts"
+  ],
+  "cohesion": 0.48,
+  "coupling": 0.52,
+  "fileCount": 11,
+  "lineCount": 5963,
+  "riskMetrics": {
+    "cohesion": 0.48,
+    "coupling": 0.52,
+    "riskScore": 0.52,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -16,7 +16,7 @@ const PROJECT_CONFIG_FILE = ".n-dx.json";
  * The Claude CLI resolves these internally, but the API requires full IDs.
  */
 const MODEL_ALIASES: Record<string, string> = {
-  sonnet: "claude-sonnet-4-20250514",
+  sonnet: "claude-sonnet-4-6",
   opus: "claude-opus-4-20250514",
   haiku: "claude-haiku-4-20250414",
 };

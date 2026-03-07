@@ -22,6 +22,9 @@
       "vitest"
     ],
     "commandTimeout": 30000,
-    "maxFileSize": 1048576
+    "maxFileSize": 1048576,
+    "memoryThrottle": {
+      "enabled": false
+    }
   }
 }

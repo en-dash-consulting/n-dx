@@ -84,12 +84,13 @@ export async function runChunkedReview(
   onGranularityAdjust?: GranularityHandler,
   onAssess?: AssessmentHandler,
   onModify?: ModificationHandler,
+  thresholdWeeks?: number,
 ): Promise<{ accepted: Proposal[]; remaining: Proposal[]; batchRecord: BatchAcceptanceRecord }> {
   // For single proposal or small batches, use simple y/n
   if (proposals.length <= 1) {
     const answer = await promptLine("Accept this proposal? (y/n) ");
     const isYes = ["y", "yes"].includes(answer.toLowerCase());
-    const state = createReviewState(proposals, 1);
+    const state = createReviewState(proposals, 1, thresholdWeeks);
     if (isYes) {
       state.accepted.add(0);
     }
@@ -100,7 +101,7 @@ export async function runChunkedReview(
     return { accepted: [], remaining: proposals, batchRecord: record };
   }
 
-  let state = createReviewState(proposals, chunkSize);
+  let state = createReviewState(proposals, chunkSize, thresholdWeeks);
 
   // Main review loop
   while (true) {
@@ -182,7 +183,7 @@ export async function runChunkedReview(
           const modified = await onModify(state.proposals, modificationRequest);
           if (modified.length > 0) {
             // Replace all proposals with the modified set
-            state = createReviewState(modified, state.chunkSize);
+            state = createReviewState(modified, state.chunkSize, state.thresholdWeeks);
             info(`Proposals updated (${modified.length} proposal${modified.length === 1 ? "" : "s"}).`);
           } else {
             info("Modification returned no proposals. Original proposals unchanged.");

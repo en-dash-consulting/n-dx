@@ -1,0 +1,28 @@
+{
+  "id": "packages-sourcevision:analyzers-3",
+  "name": "Analyzers 3",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/louvain.ts",
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zones.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-size-policy.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zones.ts"
+  ],
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 6,
+  "lineCount": 5740,
+  "riskMetrics": {
+    "cohesion": 0.31,
+    "coupling": 0.69,
+    "riskScore": 0.69,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

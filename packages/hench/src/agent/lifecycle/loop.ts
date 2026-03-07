@@ -18,6 +18,7 @@ import { resolveModel } from "@n-dx/llm-client";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import {
   prepareBrief,
   executeDryRun,
@@ -178,6 +179,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const heartbeat = startHeartbeat(henchDir, run);
 
   // API-specific: turn-based execution loop
+  let consecutiveEmptyTurns = 0;
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       run.turns = turn + 1;
@@ -244,6 +246,18 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
             break;
           }
         }
+        break;
+      }
+
+      // Spin detection: abort if too many consecutive turns without tool calls
+      const hasToolUse = assistantContent.some((b) => b.type === "tool_use");
+      consecutiveEmptyTurns = updateEmptyTurnCount(consecutiveEmptyTurns, hasToolUse);
+
+      if (consecutiveEmptyTurns >= DEFAULT_SPIN_THRESHOLD) {
+        run.status = "failed";
+        run.error = `Agent spin detected: ${consecutiveEmptyTurns} consecutive turns without tool calls.`;
+        stream("Warning", run.error);
+        await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
         break;
       }
 

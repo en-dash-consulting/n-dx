@@ -9,6 +9,7 @@ export type {
   ProposalEpic,
   ProposalFeature,
   ProposalTask,
+  TaskDecomposition,
   DuplicateReasonType,
   DuplicateReasonReference,
   DuplicateReasonMetadata,
@@ -32,6 +33,7 @@ export {
   CHUNK_CHAR_LIMIT,
   CHUNK_ITEM_LIMIT,
   FEW_SHOT_EXAMPLE,
+  CONSOLIDATION_INSTRUCTION,
   spawnClaude,
   reasonFromFile,
   reasonFromFiles,
@@ -78,3 +80,15 @@ export { buildModifyPrompt, modifyProposals } from "./modify-reason.js";
 
 export type { ValidationResult, ClassificationResult } from "./validate-modification.js";
 export { validateModificationRequest, classifyModificationRequest } from "./validate-modification.js";
+
+export type { DecomposedTask, DecompositionResult } from "./decompose.js";
+export { buildDecompositionPrompt, parseDecompositionResponse, decomposeTask, applyDecompositionPass } from "./decompose.js";
+
+export type { ExtractionOptions, ExtractionResult } from "./extract.js";
+export { extractFromMarkdown, extractFromText, extractFromFile, extractPriorityTag, classifyHeadingLevels } from "./extract.js";
+
+export type { FileValidationResult, MarkdownValidationResult, TextValidationResult, JsonValidationResult, YamlValidationResult, FileValidationErrorCode } from "./file-validation.js";
+export { validateFileInput, validateMarkdownContent, validateTextContent, validateJsonContent, validateYamlContent, detectMagicBytes, FileValidationError, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES, LARGE_FILE_WARNING_BYTES } from "./file-validation.js";
+
+export type { ConsolidationGuardResult } from "./consolidation-guard.js";
+export { countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard } from "./consolidation-guard.js";

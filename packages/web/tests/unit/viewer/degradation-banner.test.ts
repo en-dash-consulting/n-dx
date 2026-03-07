@@ -9,8 +9,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { DegradationBanner } from "../../../src/viewer/components/degradation-banner.js";
-import type { DegradableFeature } from "../../../src/viewer/graceful-degradation.js";
-import type { MemoryLevel } from "../../../src/viewer/memory-monitor.js";
+import type { DegradableFeature } from "../../../src/viewer/performance/graceful-degradation.js";
+import type { MemoryLevel } from "../../../src/viewer/performance/memory-monitor.js";
 
 function makeProps(overrides: Partial<Parameters<typeof DegradationBanner>[0]> = {}) {
   return {

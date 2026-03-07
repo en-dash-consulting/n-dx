@@ -159,6 +159,11 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
+          "path": "/api/hench/concurrency"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
           "path": "/api/hench/config"
         },
         {
@@ -170,6 +175,36 @@
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
           "path": "/api/hench/execute/status/:taskId"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/memory"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/memory/history"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/memory/history/:taskId"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/memory/leaks"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/metrics"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/metrics/snapshots"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -189,12 +224,22 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
+          "path": "/api/hench/task-usage"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
           "path": "/api/hench/templates"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
           "path": "/api/hench/templates/:id"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/throttle"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -223,8 +268,28 @@
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
+          "path": "/api/hench/throttle/emergency-stop"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
+          "path": "/api/hench/throttle/pause"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
+          "path": "/api/hench/throttle/resume"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
           "method": "PUT",
           "path": "/api/hench/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "PUT",
+          "path": "/api/hench/throttle"
         }
       ]
     },
@@ -462,6 +527,18 @@
       ]
     },
     {
+      "file": "packages/web/src/server/routes-search.ts",
+      "prefix": "/api/search",
+      "handler": "handleSearchRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-search.ts",
+          "method": "GET",
+          "path": "/api/search?q=<query>&limit=N"
+        }
+      ]
+    },
+    {
       "file": "packages/web/src/server/routes-sourcevision.ts",
       "prefix": "/api/sv/",
       "handler": "handleSourcevisionRoute",
@@ -601,7 +678,7 @@
     "totalComponents": 5,
     "totalRouteModules": 0,
     "totalUsageEdges": 0,
-    "totalServerRoutes": 92,
+    "totalServerRoutes": 106,
     "routeConventions": {},
     "mostUsedComponents": [],
     "layoutDepth": 0

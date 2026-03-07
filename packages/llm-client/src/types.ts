@@ -62,7 +62,7 @@ export interface ClaudeClientOptions {
 export interface CompletionRequest {
   /** The prompt text to send. */
   prompt: string;
-  /** Model to use (e.g., "claude-sonnet-4-20250514"). */
+  /** Model to use (e.g., "claude-sonnet-4-6"). */
   model: string;
   /** Output format: "json" for a single JSON envelope, "stream-json" for streaming events. */
   outputFormat?: "json" | "stream-json";

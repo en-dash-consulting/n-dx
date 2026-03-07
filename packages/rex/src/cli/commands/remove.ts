@@ -2,19 +2,25 @@ import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
 import { removeEpic } from "../../core/remove-epic.js";
 import { removeTask } from "../../core/remove-task.js";
+import {
+  preCheckFeatureDeletion,
+  removeFeature,
+} from "../../core/remove-feature.js";
 import { findItem } from "../../core/tree.js";
 import { countSubtree } from "../../core/prune.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { info, result } from "../output.js";
+import { info, warn, result } from "../output.js";
 import type { ItemStatus } from "../../schema/index.js";
+import { isRootLevel, getLevelLabel } from "../../schema/index.js";
 
 /**
  * Supported levels for the remove command.
- * Only epics and tasks have dedicated removal logic.
+ * Epics, features, and tasks have dedicated removal logic.
+ * Features include integrity pre-checks (external dependents, sync state).
  */
-const REMOVABLE_LEVELS = new Set(["epic", "task"]);
+const REMOVABLE_LEVELS = new Set(["epic", "feature", "task"]);
 
 /**
  * Ask a single yes/no question in a TTY. Returns true for "y"/"yes".
@@ -35,10 +41,15 @@ async function confirmPrompt(question: string): Promise<boolean> {
 }
 
 /**
- * `rex remove <level> <id> [dir]` — remove an epic or task from the PRD.
+ * `rex remove <level> <id> [dir]` — remove an epic, feature, or task from the PRD.
  *
  * When `level` is omitted, the item's level is auto-detected from the tree.
  * Shows a confirmation prompt unless `--yes` / `-y` is passed.
+ *
+ * Feature removal includes integrity pre-checks:
+ * - Validates no external items depend on the feature's subtree via `blockedBy`
+ * - Checks for synced items (remoteId) that could cause remote data corruption
+ * - Shows warnings and requires explicit confirmation when risks are detected
  */
 export async function cmdRemove(
   dir: string,
@@ -66,13 +77,13 @@ export async function cmdRemove(
     if (!REMOVABLE_LEVELS.has(level)) {
       throw new CLIError(
         `Cannot remove a ${level} directly.`,
-        "Use 'rex remove epic <id>' or 'rex remove task <id>'.",
+        "Use 'rex remove epic <id>', 'rex remove feature <id>', or 'rex remove task <id>'.",
       );
     }
     if (item.level !== level) {
       const article = level === "epic" ? "an" : "a";
       throw new CLIError(
-        `Item "${id}" is a ${item.level}, not ${article} ${level}.`,
+        `Item "${id}" is a ${getLevelLabel(item.level)}, not ${article} ${getLevelLabel(level)}.`,
         `Use 'rex remove ${item.level} ${id}' instead.`,
       );
     }
@@ -80,8 +91,8 @@ export async function cmdRemove(
     // Auto-detect: validate the item is a removable level
     if (!REMOVABLE_LEVELS.has(item.level)) {
       throw new CLIError(
-        `Cannot remove a ${item.level} directly.`,
-        "Only epics and tasks can be removed. Use 'rex remove epic <id>' or 'rex remove task <id>'.",
+        `Cannot remove a ${getLevelLabel(item.level)} directly.`,
+        "Only epics, features, and tasks can be removed. Use 'rex remove <epic|feature|task> <id>'.",
       );
     }
   }
@@ -107,7 +118,7 @@ export async function cmdRemove(
   }
 
   // Execute the removal
-  if (item.level === "epic") {
+  if (isRootLevel(item.level)) {
     const epicResult = removeEpic(doc.items, id);
     if (!epicResult.ok) {
       throw new CLIError(epicResult.error!, "Check the ID with 'rex status' and try again.");
@@ -130,6 +141,61 @@ export async function cmdRemove(
       }, null, 2));
     } else {
       result(epicResult.detail);
+    }
+  } else if (item.level === "feature") {
+    // Feature removal with integrity pre-checks
+    const preCheck = preCheckFeatureDeletion(doc.items, id);
+
+    // Show integrity warnings in interactive mode
+    if (needsConfirmation && !preCheck.safe) {
+      warn("\n⚠ Integrity warnings:");
+      for (const w of preCheck.warnings) {
+        warn(`  • ${w}`);
+      }
+      info("");
+
+      const confirmed = await confirmPrompt(
+        `Proceed with deletion despite warnings? (y/n) `,
+      );
+      if (!confirmed) {
+        result("Remove cancelled.");
+        return;
+      }
+      info("");
+    }
+
+    const featureResult = removeFeature(doc.items, id);
+    if (!featureResult.ok) {
+      throw new CLIError(featureResult.error!, "Check the ID with 'rex status' and try again.");
+    }
+
+    await store.saveDocument(doc);
+
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "feature_removed",
+      itemId: id,
+      detail: featureResult.detail,
+    });
+
+    if (flags.format === "json") {
+      result(JSON.stringify({
+        removed: { id, title: item.title, level: item.level },
+        deletedIds: featureResult.deletedIds,
+        deletedCount: featureResult.deletedIds.length,
+        cleanedRefs: featureResult.cleanedRefs,
+        integrityCheck: {
+          safe: preCheck.safe,
+          externalDependents: preCheck.externalDependents,
+          syncedItems: preCheck.syncedItems,
+          warnings: preCheck.warnings,
+        },
+      }, null, 2));
+    } else {
+      result(featureResult.detail);
+      if (featureResult.cleanedRefs > 0) {
+        info(`  Cleaned ${featureResult.cleanedRefs} blockedBy reference${featureResult.cleanedRefs === 1 ? "" : "s"}`);
+      }
     }
   } else {
     // task

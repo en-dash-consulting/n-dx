@@ -1,4 +1,4 @@
-export type { PRDStore, StoreCapabilities } from "./types.js";
+export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir } from "./file-adapter.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
@@ -49,7 +49,7 @@ import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
 import { getDefaultRegistry } from "./adapter-registry.js";
-import type { PRDStore } from "./types.js";
+import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
 
 /**

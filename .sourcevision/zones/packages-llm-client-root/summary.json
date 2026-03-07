@@ -1,0 +1,23 @@
+{
+  "id": "packages-llm-client:root",
+  "name": "Root",
+  "description": "4 files, primarily JSON, TypeScript",
+  "files": [
+    "packages/llm-client/package-lock.json",
+    "packages/llm-client/package.json",
+    "packages/llm-client/tsconfig.json",
+    "packages/llm-client/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 1970,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

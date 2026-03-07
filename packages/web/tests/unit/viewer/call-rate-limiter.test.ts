@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createCallRateLimiter,
   type CallRateLimiter,
-} from "../../../src/viewer/call-rate-limiter.js";
+} from "../../../src/viewer/messaging/call-rate-limiter.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,18 @@
+{
+  "id": "web-viewer/web-viewer/crash",
+  "name": "Web Viewer/web Viewer/crash",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 727
+}

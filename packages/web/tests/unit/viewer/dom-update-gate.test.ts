@@ -12,12 +12,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createDomUpdateGate,
   type DomUpdateGate,
-} from "../../../src/viewer/dom-update-gate.js";
-import { createUpdateBatcher } from "../../../src/viewer/update-batcher.js";
+} from "../../../src/viewer/performance/dom-update-gate.js";
+import { createUpdateBatcher } from "../../../src/viewer/performance/update-batcher.js";
 import {
   startTabVisibilityMonitor,
   resetTabVisibility,
-} from "../../../src/viewer/tab-visibility.js";
+} from "../../../src/viewer/polling/tab-visibility.js";
 
 // ─── RAF mock ─────────────────────────────────────────────────────────────────
 

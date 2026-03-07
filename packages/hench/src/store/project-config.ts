@@ -79,19 +79,22 @@ export function resolveVendorCliPath(llmConfig: LLMConfig): string {
  * Falls back to process.env unchanged when no config-supplied key is present.
  */
 export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
+  // Strip CLAUDECODE so spawned claude processes don't think they're nested
+  // inside an interactive Claude Code session (breaks background/server usage).
+  const { CLAUDECODE: _, ...baseEnv } = process.env;
   const vendor = resolveLLMVendor(llmConfig);
   if (vendor === "codex") {
     const apiKey = llmConfig.codex?.api_key;
     if (apiKey) {
-      return { ...process.env, OPENAI_API_KEY: apiKey };
+      return { ...baseEnv, OPENAI_API_KEY: apiKey };
     }
   } else {
     const apiKey = llmConfig.claude?.api_key;
     if (apiKey) {
-      return { ...process.env, ANTHROPIC_API_KEY: apiKey };
+      return { ...baseEnv, ANTHROPIC_API_KEY: apiKey };
     }
   }
-  return process.env;
+  return baseEnv;
 }
 
 /**

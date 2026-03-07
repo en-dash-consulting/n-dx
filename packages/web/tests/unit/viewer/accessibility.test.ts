@@ -374,11 +374,12 @@ describe("PRDTree accessibility", () => {
     expect(document.activeElement).toBe(items[0]);
   });
 
-  it("children container has role=group", () => {
+  it("tree container has role=tree", () => {
     root = renderToDiv(h(PRDTree, { document: sampleDoc }));
-    const groups = root.querySelectorAll('[role="group"]');
-    // At least one group (the filter group and tree children)
-    expect(groups.length).toBeGreaterThan(0);
+    const tree = root.querySelector('[role="tree"]');
+    // StatusFilter (which had role=group) is now rendered by PRDView,
+    // not by PRDTree. Verify the tree container is still present.
+    expect(tree).not.toBeNull();
   });
 
   it("chevrons are aria-hidden", () => {

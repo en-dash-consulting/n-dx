@@ -30,7 +30,7 @@ import {
   extractSyncMeta,
 } from "../core/sync.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
-import type { PRDStore, StoreCapabilities } from "./types.js";
+import type { PRDStore, StoreCapabilities } from "./contracts.js";
 import type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

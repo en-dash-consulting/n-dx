@@ -11,6 +11,7 @@ import { join, relative, dirname } from "node:path";
 import type {
   Manifest,
   Inventory,
+  Imports,
   Zones,
   Zone,
   ZoneCrossing,
@@ -36,6 +37,8 @@ export interface SubAnalysis {
   zones?: Zones;
   /** Loaded inventory (if available). */
   inventory?: Inventory;
+  /** Loaded imports (if available). */
+  imports?: Imports;
 }
 
 // ── Detection ────────────────────────────────────────────────────────────────
@@ -159,6 +162,16 @@ function loadSubAnalysis(rootDir: string, subDir: string): SubAnalysis | null {
       result.inventory = JSON.parse(readFileSync(inventoryPath, "utf-8"));
     } catch {
       // Inventory unavailable
+    }
+  }
+
+  // Load imports if available
+  const importsPath = join(svDir, DATA_FILES.imports);
+  if (existsSync(importsPath)) {
+    try {
+      result.imports = JSON.parse(readFileSync(importsPath, "utf-8"));
+    } catch {
+      // Imports unavailable
     }
   }
 

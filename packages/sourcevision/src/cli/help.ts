@@ -56,6 +56,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
       { flag: "--fast", description: "Skip AI zone-name enrichment (algorithmic names only)" },
       { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
+      { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
       { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
       { flag: "--quiet, -q", description: "Suppress informational output" },
     ],
@@ -185,6 +186,30 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: [],
   },
+  workspace: {
+    tool: "sourcevision",
+    command: "workspace",
+    summary: "aggregate multiple analyzed repos into a unified view",
+    usage: "sourcevision workspace [options] [dir]",
+    description:
+      "Aggregates pre-analyzed repositories into a unified .sourcevision/ output.\n" +
+      "Each member repo must already have .sourcevision/ from a prior analysis run.\n" +
+      "Members are configured in .n-dx.json or auto-detected from nested\n" +
+      ".sourcevision/ directories.",
+    options: [
+      { flag: "--add <dir>", description: "Add a directory as a workspace member (persists to .n-dx.json)" },
+      { flag: "--remove <dir>", description: "Remove a workspace member" },
+      { flag: "--status", description: "List members with analysis freshness, zone counts, file counts" },
+      { flag: "--quiet, -q", description: "Suppress informational output" },
+    ],
+    examples: [
+      { command: "sourcevision workspace --add packages/api --add packages/web .", description: "Add workspace members" },
+      { command: "sourcevision workspace .", description: "Run workspace aggregation" },
+      { command: "sourcevision workspace --status .", description: "Check member status" },
+      { command: "sv workspace .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze", "validate"],
+  },
 };
 
 /** Related commands for each sourcevision command (shown as "See also"). */
@@ -198,6 +223,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   "pr-markdown": ["serve", "git-credential-helper"],
   "git-credential-helper": ["pr-markdown"],
   mcp: [],
+  workspace: ["analyze", "validate"],
 };
 
 /**

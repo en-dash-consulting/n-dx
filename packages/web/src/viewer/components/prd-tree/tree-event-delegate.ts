@@ -1,21 +1,25 @@
 /**
  * Event delegation hook for the PRD tree container.
  *
- * Replaces per-node click, contextmenu, and keydown listeners with a single
- * set of delegated handlers on the `[role="tree"]` container. Each event
+ * Replaces per-node click and keydown listeners with a single set of
+ * delegated handlers on the `[role="tree"]` container. Each event
  * bubbles up and is routed to the correct callback by inspecting the target
  * and its closest `[data-node-id]` ancestor.
  *
- * Net effect: from O(N * handlers-per-node) down to O(1) for click,
- * contextmenu, and keydown — a dramatic reduction in total listener count
- * for large trees.
+ * Click delegation routes to the correct handler based on the target's
+ * CSS class: `.prd-inline-add-btn` → add, `.prd-node-action-edit` → edit
+ * (select), `.prd-node-action-status` → status picker,
+ * `.prd-node-action-delete` → delete, `.prd-chevron` → toggle.
+ *
+ * Row clicks with keyboard modifiers drive multi-select: Ctrl/Cmd+click
+ * toggles individual items, Shift+click extends a range selection, and
+ * plain click selects a single item (deselecting all others).
+ *
+ * Net effect: from O(N * handlers-per-node) down to O(1) for click and
+ * keydown — a dramatic reduction in total listener count for large trees.
  *
  * Individual NodeRow components only need `data-node-id` and
  * `data-has-children` attributes; no event handler props.
- *
- * Checkbox `onChange` is intentionally NOT delegated — Preact's controlled
- * input model requires `onChange` on the element itself to stay in sync.
- * The delegated click handler detects checkbox clicks and returns early.
  *
  * @see ./prd-tree.ts — PRDTree component that consumes this hook
  */
@@ -25,26 +29,38 @@ import type { PRDItemData } from "./types.js";
 
 // ── Public interface ────────────────────────────────────────────────
 
+/** Keyboard modifier state at the time of a click or keydown event. */
+export interface SelectionModifiers {
+  ctrlKey: boolean;
+  shiftKey: boolean;
+}
+
 export interface TreeDelegationCallbacks {
   /** Look up an item by ID (should be O(1) — backed by a Map). */
   getItem: (id: string) => PRDItemData | null;
   /** Toggle expand/collapse for a node. */
   onToggle: (id: string) => void;
-  /** Select an item for detail view. */
+  /** Select an item for detail view (edit button). */
   onSelectItem?: (item: PRDItemData) => void;
+  /**
+   * Multi-select callback for bulk operations.
+   * Replaces the previous checkbox-based toggle. The caller receives the
+   * clicked item plus modifier state so it can implement ctrl-toggle,
+   * shift-range, and plain-click-single-select semantics.
+   */
+  onBulkSelect?: (item: PRDItemData, modifiers: SelectionModifiers) => void;
   /** Open / toggle inline add form for a node. */
   onInlineAdd?: (item: PRDItemData) => void;
   /** Remove / delete an item. */
   onRemoveItem?: (item: PRDItemData) => void;
-  /** Show context menu at viewport position for an item. */
-  onContextMenu?: (item: PRDItemData, x: number, y: number) => void;
+  /** Open inline status picker, passing the anchor button's bounding rect. */
+  onStatusClick?: (item: PRDItemData, anchorRect: { left: number; top: number; bottom: number }) => void;
   /** Set of currently expanded node IDs (for keyboard arrow logic). */
   expanded: Set<string>;
 }
 
 export interface TreeDelegationHandlers {
   onClick: (e: MouseEvent) => void;
-  onContextMenu: (e: MouseEvent) => void;
   onKeyDown: (e: KeyboardEvent) => void;
 }
 
@@ -88,22 +104,30 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
 
     const hasChildren = node.el.hasAttribute("data-has-children");
 
-    // Checkbox — handled by its own onChange; bail out to avoid double-toggle.
-    if (
-      target.classList.contains("prd-bulk-checkbox") ||
-      target.closest(".prd-bulk-checkbox-wrapper")
-    ) {
-      return;
-    }
-
     // Inline add button
     if (target.closest(".prd-inline-add-btn")) {
       if (c.onInlineAdd) c.onInlineAdd(item);
       return;
     }
 
-    // Inline delete button
-    if (target.closest(".prd-inline-delete-btn")) {
+    // Edit action button — select item for detail panel
+    if (target.closest(".prd-node-action-edit")) {
+      if (c.onSelectItem) c.onSelectItem(item);
+      return;
+    }
+
+    // Status action button — open inline status picker
+    if (target.closest(".prd-node-action-status")) {
+      if (c.onStatusClick) {
+        const btn = target.closest(".prd-node-action-status") as HTMLElement;
+        const rect = btn.getBoundingClientRect();
+        c.onStatusClick(item, { left: rect.left, top: rect.top, bottom: rect.bottom });
+      }
+      return;
+    }
+
+    // Delete action button
+    if (target.closest(".prd-node-action-delete")) {
       if (c.onRemoveItem) c.onRemoveItem(item);
       return;
     }
@@ -114,29 +138,19 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       return;
     }
 
-    // Default: select the item, or toggle if no onSelect provided.
-    if (c.onSelectItem) {
+    // Default: multi-select with modifier support, falling back to
+    // detail-panel selection or expand/collapse toggle.
+    if (c.onBulkSelect) {
+      const modifiers: SelectionModifiers = {
+        ctrlKey: e.ctrlKey || e.metaKey,
+        shiftKey: e.shiftKey,
+      };
+      c.onBulkSelect(item, modifiers);
+    } else if (c.onSelectItem) {
       c.onSelectItem(item);
     } else if (hasChildren) {
       c.onToggle(node.id);
     }
-  }, []);
-
-  // ── Context-menu delegation ───────────────────────────────────────
-  const onContextMenu = useCallback((e: MouseEvent) => {
-    const node = findNodeRow(e.target);
-    if (!node) return;
-
-    const c = cbRef.current;
-    const item = c.getItem(node.id);
-    if (!item) return;
-
-    // Only show when there are actions available (delete).
-    if (!c.onRemoveItem || !c.onContextMenu) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    c.onContextMenu(item, e.clientX, e.clientY);
   }, []);
 
   // ── Keydown delegation ────────────────────────────────────────────
@@ -151,10 +165,13 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
     const hasChildren = node.el.hasAttribute("data-has-children");
     const isExpanded = c.expanded.has(node.id);
 
-    // Enter / Space → select or toggle
+    // Enter / Space → toggle selection (like ctrl+click) or select item
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (c.onSelectItem) {
+      if (c.onBulkSelect) {
+        // Space/Enter toggles selection like ctrl+click
+        c.onBulkSelect(item, { ctrlKey: true, shiftKey: false });
+      } else if (c.onSelectItem) {
         c.onSelectItem(item);
       } else if (hasChildren) {
         c.onToggle(node.id);
@@ -173,7 +190,8 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       c.onToggle(node.id);
     }
 
-    // Arrow up/down → navigate between visible tree items
+    // Arrow up/down → navigate between visible tree items.
+    // Shift+Arrow extends range selection to the newly focused item.
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       // e.currentTarget is the tree container where the handler is attached.
@@ -184,9 +202,19 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       const next = e.key === "ArrowDown" ? idx + 1 : idx - 1;
       if (next >= 0 && next < items.length) {
         items[next].focus();
+        // Shift+Arrow → extend range selection to the next item
+        if (e.shiftKey && c.onBulkSelect) {
+          const nextId = items[next].getAttribute("data-node-id");
+          if (nextId) {
+            const nextItem = c.getItem(nextId);
+            if (nextItem) {
+              c.onBulkSelect(nextItem, { ctrlKey: false, shiftKey: true });
+            }
+          }
+        }
       }
     }
   }, []);
 
-  return { onClick, onContextMenu, onKeyDown };
+  return { onClick, onKeyDown };
 }

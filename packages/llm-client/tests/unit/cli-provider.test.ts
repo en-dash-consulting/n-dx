@@ -29,14 +29,14 @@ describe("createCliClient", () => {
     await expect(
       client.complete({
         prompt: "test",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
       }),
     ).rejects.toThrow(ClaudeClientError);
 
     try {
       await client.complete({
         prompt: "test",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
       });
     } catch (err) {
       expect(err).toBeInstanceOf(ClaudeClientError);
@@ -56,7 +56,7 @@ describe("createCliClient", () => {
     try {
       await client.complete({
         prompt: "test",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
       });
     } catch {
       // Expected
@@ -98,9 +98,9 @@ describe("createCliClient — LLMProvider interface", () => {
 
   it("sets info.model when model is configured", () => {
     const client = createCliClient({
-      claudeConfig: { model: "claude-sonnet-4-20250514" },
+      claudeConfig: { model: "claude-sonnet-4-6" },
     });
-    expect(client.info.model).toBe("claude-sonnet-4-20250514");
+    expect(client.info.model).toBe("claude-sonnet-4-6");
   });
 
   it("does not expose validateAuth (CLI auth cannot be probed)", () => {

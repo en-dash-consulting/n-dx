@@ -1,48 +1,43 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-25T16:29:11.964Z",
+  "analyzedAt": "2026-03-06T22:09:41.995Z",
   "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2",
   "gitBranch": "feature/integrate-codex",
   "targetPath": "/Users/ryankeith/work-internal/n-dx",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:28:02.275Z",
-      "completedAt": "2026-02-25T16:28:02.317Z"
+      "startedAt": "2026-03-06T21:54:44.637Z",
+      "completedAt": "2026-03-06T21:54:44.754Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:28:02.318Z",
-      "completedAt": "2026-02-25T16:28:02.798Z"
+      "startedAt": "2026-03-06T21:54:44.754Z",
+      "completedAt": "2026-03-06T21:54:45.287Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:28:02.799Z",
-      "completedAt": "2026-02-25T16:28:13.122Z"
+      "startedAt": "2026-03-06T21:54:45.287Z",
+      "completedAt": "2026-03-06T22:00:53.892Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:28:13.122Z",
-      "completedAt": "2026-02-25T16:29:09.967Z"
+      "startedAt": "2026-03-06T22:00:53.892Z",
+      "completedAt": "2026-03-06T22:09:39.814Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:29:09.968Z",
-      "completedAt": "2026-02-25T16:29:10.052Z"
+      "startedAt": "2026-03-06T22:09:39.815Z",
+      "completedAt": "2026-03-06T22:09:39.938Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-02-25T16:29:10.052Z",
-      "completedAt": "2026-02-25T16:29:11.964Z"
+      "startedAt": "2026-03-06T22:09:39.938Z",
+      "completedAt": "2026-03-06T22:09:41.995Z"
     }
   },
   "children": [
-    {
-      "id": ".claude-worktrees-angry-chatelet",
-      "prefix": ".claude/worktrees/angry-chatelet",
-      "manifestPath": ".claude/worktrees/angry-chatelet/.sourcevision/manifest.json"
-    },
     {
       "id": "packages-llm-client",
       "prefix": "packages/llm-client",
@@ -61,10 +56,10 @@
   ],
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 3,
+    "calls": 16,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",
-    "model": "claude-sonnet-4-20250514"
+    "model": "claude-sonnet-4-6"
   }
 }

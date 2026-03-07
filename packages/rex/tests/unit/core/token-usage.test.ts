@@ -7,7 +7,6 @@ import {
   extractHenchTokenUsage,
   extractSvTokenUsage,
   aggregateTokenUsage,
-  formatAggregateTokenUsage,
   estimateCost,
   extractRexTokenEvents,
   extractHenchTokenEvents,
@@ -17,8 +16,11 @@ import {
   groupByTimePeriod,
   periodKey,
   checkBudget,
-  formatBudgetWarnings,
 } from "../../../src/core/token-usage.js";
+import {
+  formatAggregateTokenUsage,
+  formatBudgetWarnings,
+} from "../../../src/cli/commands/token-format.js";
 import type { LogEntry } from "../../../src/schema/index.js";
 import type { AggregateTokenUsage, TokenEvent, BudgetConfig } from "../../../src/core/token-usage.js";
 
@@ -831,7 +833,7 @@ describe("extractRexTokenEvents", () => {
           inputTokens: 3000,
           outputTokens: 500,
           vendor: "claude",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
         }),
       },
     ];
@@ -845,7 +847,7 @@ describe("extractRexTokenEvents", () => {
     expect(events[0].outputTokens).toBe(500);
     expect(events[0].calls).toBe(2);
     expect(events[0].vendor).toBe("claude");
-    expect(events[0].model).toBe("claude-sonnet-4-20250514");
+    expect(events[0].model).toBe("claude-sonnet-4-6");
   });
 
   it("maps smart_add_token_usage events to smart-add command", () => {
@@ -986,7 +988,7 @@ describe("extractHenchTokenEvents", () => {
       model: "fallback-model",
       tokenUsage: { input: 7000, output: 2200 },
       turnTokenUsage: [
-        { turn: 1, input: 3000, output: 1000, vendor: "claude", model: "claude-sonnet-4-20250514" },
+        { turn: 1, input: 3000, output: 1000, vendor: "claude", model: "claude-sonnet-4-6" },
         { turn: 1, input: 4000, output: 1200, vendor: "codex" },
       ],
     });
@@ -996,7 +998,7 @@ describe("extractHenchTokenEvents", () => {
     expect(events).toHaveLength(2);
     expect(events[0].inputTokens).toBe(3000);
     expect(events[0].vendor).toBe("claude");
-    expect(events[0].model).toBe("claude-sonnet-4-20250514");
+    expect(events[0].model).toBe("claude-sonnet-4-6");
     expect(events[1].inputTokens).toBe(4000);
     expect(events[1].vendor).toBe("codex");
     expect(events[1].model).toBe("fallback-model");

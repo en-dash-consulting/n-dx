@@ -162,6 +162,11 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
               }, zone.coupling > 0.3 ? "\u26A0" : "")
             )
           ),
+          zone.subZones && zone.subZones.length > 0
+            ? h("div", { class: "zone-map-node-subzones" },
+                h("span", { class: "subzone-badge" }, `${zone.subZones.length} sub-zones`),
+              )
+            : null,
           metrics && (metrics.incoming > 0 || metrics.outgoing > 0)
             ? h("div", { class: "zone-map-node-io" },
                 h("span", { class: "io-in", title: "Incoming deps" },

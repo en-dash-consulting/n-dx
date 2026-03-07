@@ -118,6 +118,10 @@ export function useFileEdges(
       const fromZone = zoneById.get(edge.from);
       const toZone = zoneById.get(edge.to);
 
+      // Skip edges for zones expanded with subzones — handled by useSubZoneEdges
+      if (fromExpanded && fromZone?.subZones?.length) continue;
+      if (toExpanded && toZone?.subZones?.length) continue;
+
       // Both zones expanded: try file-to-file edges, fall back to file-to-zone
       if (fromExpanded && toExpanded) {
         if (!fromZone || !toZone) continue;

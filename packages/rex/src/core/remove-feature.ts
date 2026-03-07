@@ -1,4 +1,5 @@
 import type { PRDItem } from "../schema/index.js";
+import { getLevelLabel } from "../schema/index.js";
 import { findItem, walkTree } from "./tree.js";
 import { deleteItem, cleanBlockedByRefs } from "./delete.js";
 import { extractSyncMeta } from "./sync.js";
@@ -115,7 +116,7 @@ export function preCheckFeatureDeletion(
       externalDependents: [],
       syncedItems: [],
       safe: false,
-      warnings: [`Item "${featureId}" is a ${entry.item.level}, not a feature.`],
+      warnings: [`Item "${featureId}" is a ${getLevelLabel(entry.item.level)}, not a ${getLevelLabel("feature")}.`],
     };
   }
 
@@ -251,8 +252,8 @@ export function removeFeature(
     return {
       ok: false,
       deletedIds: [],
-      detail: `Item "${featureId}" is a ${entry.item.level}, not a feature.`,
-      error: `Item "${entry.item.title}" (${featureId}) is not a feature — it is a ${entry.item.level}.`,
+      detail: `Item "${featureId}" is a ${getLevelLabel(entry.item.level)}, not a ${getLevelLabel("feature")}.`,
+      error: `Item "${entry.item.title}" (${featureId}) is not a ${getLevelLabel("feature")} — it is a ${getLevelLabel(entry.item.level)}.`,
       cleanedRefs: 0,
     };
   }

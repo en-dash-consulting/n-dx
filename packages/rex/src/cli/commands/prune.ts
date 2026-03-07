@@ -10,6 +10,7 @@ import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import type { PRDItem } from "../../schema/index.js";
+import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 
 const ARCHIVE_FILE = "archive.json";
 
@@ -91,15 +92,7 @@ function formatPrunePreview(prunable: PRDItem[]): {
  * Format a level summary like "2 epics, 3 tasks".
  */
 function formatLevelSummary(byLevel: Record<string, number>): string {
-  const order = ["epic", "feature", "task", "subtask"];
-  const parts: string[] = [];
-  for (const level of order) {
-    const count = byLevel[level];
-    if (count) {
-      parts.push(`${count} ${level}${count === 1 ? "" : "s"}`);
-    }
-  }
-  return parts.join(", ");
+  return formatLevels(byLevel);
 }
 
 export async function cmdPrune(
@@ -616,11 +609,5 @@ function summarize(item: PRDItem): { id: string; title: string; level: string } 
 }
 
 function icon(level: string): string {
-  switch (level) {
-    case "epic": return "📦";
-    case "feature": return "✨";
-    case "task": return "📋";
-    case "subtask": return "🔹";
-    default: return "•";
-  }
+  return getLevelEmoji(level);
 }

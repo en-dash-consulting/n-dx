@@ -87,6 +87,7 @@ const QUICK_STATUSES = [
 
 function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -105,6 +106,13 @@ function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: Co
     };
   }, [onClose]);
 
+  // Auto-close after showing feedback
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(onClose, feedback.type === "error" ? 2000 : 800);
+    return () => clearTimeout(timer);
+  }, [feedback, onClose]);
+
   // Clamp position so menu doesn't overflow viewport
   const style: Record<string, string> = {
     position: "fixed",
@@ -121,31 +129,49 @@ function TaskContextMenu({ task, x, y, onClose, navigateTo, onStatusChange }: Co
   const handleStatusClick = async (newStatus: string) => {
     if (onStatusChange) {
       onStatusChange(task.id, newStatus);
+      onClose();
     } else {
       // Direct API call as fallback
       try {
-        await fetch(`/api/rex/items/${task.id}`, {
+        const res = await fetch(`/api/rex/items/${task.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: newStatus }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setFeedback({ message: `Status → ${newStatus.replace("_", " ")}`, type: "success" });
       } catch {
-        // silently fail — user can retry from detail view
+        setFeedback({ message: "Failed to update status", type: "error" });
       }
     }
-    onClose();
   };
 
   const handleCopyId = () => {
-    navigator.clipboard.writeText(task.id).catch(() => {});
-    onClose();
+    navigator.clipboard.writeText(task.id).then(
+      () => setFeedback({ message: "Copied task ID", type: "success" }),
+      () => setFeedback({ message: "Copy failed", type: "error" }),
+    );
   };
 
   const handleCopyLink = () => {
     const url = buildShareableUrl(`/prd/${task.id}`);
-    navigator.clipboard.writeText(url).catch(() => {});
-    onClose();
+    navigator.clipboard.writeText(url).then(
+      () => setFeedback({ message: "Copied link", type: "success" }),
+      () => setFeedback({ message: "Copy failed", type: "error" }),
+    );
   };
+
+  // Show feedback overlay when an action completes
+  if (feedback) {
+    return h("div", { ref, class: "rex-context-menu", style, role: "status", "aria-live": "polite" },
+      h("div", {
+        class: `rex-context-menu-feedback${feedback.type === "error" ? " rex-context-menu-feedback-error" : ""}`,
+      },
+        h("span", { class: "rex-context-menu-feedback-icon" }, feedback.type === "error" ? "✕" : "✓"),
+        h("span", null, feedback.message),
+      ),
+    );
+  }
 
   return h("div", { ref, class: "rex-context-menu", style, role: "menu" },
     // Header

@@ -65,6 +65,7 @@ import {
   formatMainHelp,
   formatOrchestratorCommandHelp,
 } from "./help.js";
+import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
@@ -435,7 +436,8 @@ async function handleInit(rest) {
     process.exit(1);
   }
 
-  const initArgs = stripInitProviderFlag(rest);
+  const noClaude = rest.includes("--no-claude");
+  const initArgs = stripInitProviderFlag(rest).filter((a) => a !== "--no-claude");
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
 
@@ -453,6 +455,19 @@ async function handleInit(rest) {
   await runOrDie(tools.rex, ["init", ...flags, dir]);
   await runOrDie(tools.hench, ["init", ...flags, dir]);
   await runConfig(["llm.vendor", selectedProvider, dir]);
+
+  // Claude Code integration (settings, skills, MCP servers)
+  if (!noClaude) {
+    try {
+      const result = setupClaudeIntegration(dir);
+      printClaudeSetupSummary(result);
+    } catch (err) {
+      // Non-fatal — init succeeded even if Claude integration fails
+      console.log("");
+      console.log(`Claude Code integration: skipped (${err instanceof Error ? err.message : String(err)})`);
+    }
+  }
+
   process.exit(0);
 }
 
@@ -726,7 +741,6 @@ async function handleConfig(rest) {
     console.error(formatError(err));
     process.exit(1);
   }
-  process.exit(0);
 }
 
 function handleHelp(rest) {

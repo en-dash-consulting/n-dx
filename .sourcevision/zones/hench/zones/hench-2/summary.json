@@ -1,0 +1,15 @@
+{
+  "id": "hench/hench-2",
+  "name": "Hench/hench 2",
+  "description": "3 files, primarily JSON, TypeScript",
+  "files": [
+    "packages/hench/package.json",
+    "packages/hench/tsconfig.json",
+    "packages/hench/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.8,
+  "coupling": 0.2,
+  "fileCount": 3,
+  "lineCount": 70
+}

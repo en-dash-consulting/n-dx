@@ -17,7 +17,7 @@ import { toCanonicalJSON } from "../core/canonical.js";
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
-import type { PRDStore } from "./types.js";
+import type { PRDStore } from "./contracts.js";
 
 // ---------------------------------------------------------------------------
 // Types

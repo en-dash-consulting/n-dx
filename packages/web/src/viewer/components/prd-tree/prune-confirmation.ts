@@ -18,6 +18,7 @@
 import { h } from "preact";
 import { useState, useCallback } from "preact/hooks";
 import type { ItemLevel } from "./types.js";
+import { getLevelLabel, getLevelPlural } from "./levels.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────
@@ -78,14 +79,9 @@ interface PruneCriteria {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
-};
-
-const LEVEL_ICONS: Record<string, string> = {
+// Level labels provided by getLevelLabel() from ./levels.ts
+// Level icons specific to prune UI (geometric shapes for compact display)
+const PRUNE_ICONS: Record<string, string> = {
   epic: "\u25A0",     // ■
   feature: "\u25C6",   // ◆
   task: "\u25CF",      // ●
@@ -488,7 +484,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
                 key: level,
                 class: `prune-confirmation-level-chip prd-level-${level}`,
               },
-                `${count} ${LEVEL_LABELS[level as ItemLevel] ?? level}${count !== 1 ? "s" : ""}`,
+                `${count} ${count !== 1 ? getLevelPlural(level).toLowerCase() : getLevelLabel(level).toLowerCase()}`,
               ),
             ),
           )
@@ -528,11 +524,11 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
                   class: "prune-confirmation-item",
                 },
                   h("span", { class: `prune-confirmation-item-icon prd-level-${item.level}` },
-                    LEVEL_ICONS[item.level] ?? "\u2022",
+                    PRUNE_ICONS[item.level] ?? "\u2022",
                   ),
                   h("span", { class: "prune-confirmation-item-title" }, item.title),
                   h("span", { class: `prd-level-badge prd-level-${item.level}` },
-                    LEVEL_LABELS[item.level as ItemLevel] ?? item.level,
+                    getLevelLabel(item.level),
                   ),
                   item.totalCount > 1
                     ? h("span", { class: "prune-confirmation-item-count" },

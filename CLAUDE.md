@@ -93,6 +93,7 @@ ndx usage [dir]           # token usage analytics (--format=json, --group=day|we
 ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx web [dir]             # alias for start (legacy name)
+ndx dev [dir]             # start web dev server with live reload
 ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
 ndx config [key] [value]  # view/edit settings (--json, --help)
 ```

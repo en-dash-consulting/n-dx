@@ -211,6 +211,9 @@ function buildItemContent(item: PRDItem): string {
 }
 
 function scoreNodeAgainstItem(node: ProposalNode, item: PRDItem): CandidateScore | null {
+  // Only match items at the same level (epic↔epic, feature↔feature, task↔task)
+  if (node.kind !== item.level) return null;
+
   const nodeTitle = normalize(node.title);
   const itemTitle = normalize(item.title);
 

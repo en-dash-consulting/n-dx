@@ -8,7 +8,7 @@
  * @module core/cascade-reset
  */
 
-import type { PRDStore } from "../store/types.js";
+import type { PRDStore } from "../store/contracts.js";
 import type { PRDItem, ItemStatus } from "../schema/index.js";
 import { findParentResets } from "./parent-reset.js";
 

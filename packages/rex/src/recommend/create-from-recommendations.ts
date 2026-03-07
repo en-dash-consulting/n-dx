@@ -14,9 +14,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { PRDStore } from "../store/types.js";
-import type { PRDItem, ItemLevel, Priority } from "../schema/index.js";
-import { LEVEL_HIERARCHY, CHILD_LEVEL } from "../schema/index.js";
+import type { PRDStore } from "../store/contracts.js";
+import type { PRDItem, ItemLevel } from "../schema/index.js";
+import { LEVEL_HIERARCHY, CHILD_LEVEL, isLeafLevel, getLevelLabel } from "../schema/index.js";
 import { findItem, insertChild } from "../core/tree.js";
 import { validateDAG } from "../core/dag.js";
 import {
@@ -24,57 +24,19 @@ import {
 } from "./conflict-detection.js";
 import type { ConflictReport } from "./conflict-detection.js";
 
+// Re-export shared types for backwards compatibility — downstream
+// consumers that imported from this module continue to work.
+export type {
+  EnrichedRecommendation,
+  RecommendationMeta,
+  ConflictStrategy,
+} from "./types.js";
+import type {
+  EnrichedRecommendation,
+  ConflictStrategy,
+} from "./types.js";
+
 // ── Types ────────────────────────────────────────────────────────────
-
-/**
- * Metadata carried forward from the recommendation's source findings.
- * Persisted on created PRDItems for traceability.
- */
-export interface RecommendationMeta {
-  /** Content hashes of the source findings that produced this recommendation. */
-  findingHashes?: string[];
-  /** Category of the grouped findings (e.g. "auth", "perf", "security"). */
-  category?: string;
-  /** Distribution of finding severities in this recommendation group. */
-  severityDistribution?: Record<string, number>;
-  /** Total number of findings that contributed to this recommendation. */
-  findingCount?: number;
-}
-
-/**
- * Enriched recommendation carrying all metadata needed for PRD item creation.
- *
- * This is the input type for {@link createItemsFromRecommendations}.
- * Callers build these from whatever recommendation source they have
- * (sourcevision findings, manual input, etc.).
- */
-export interface EnrichedRecommendation {
-  /** Title for the PRD item. */
-  title: string;
-  /** PRD hierarchy level (epic, feature, task, subtask). */
-  level: ItemLevel;
-  /** Description text for the PRD item. */
-  description: string;
-  /** Priority derived from finding severities. */
-  priority: Priority;
-  /** Source identifier (e.g. "sourcevision"). */
-  source: string;
-  /** Parent PRD item ID. When omitted, item is added at root level. */
-  parentId?: string;
-  /** Tags to apply to the created item. */
-  tags?: string[];
-  /** Recommendation metadata for traceability. */
-  meta?: RecommendationMeta;
-}
-
-/**
- * How to handle conflicting recommendations during creation.
- *
- * - `"skip"` — silently skip conflicting items; create only non-conflicting ones.
- * - `"force"` — ignore conflicts; create all items regardless.
- * - `"error"` — throw if any conflicts are detected (default for backwards compat).
- */
-export type ConflictStrategy = "skip" | "force" | "error";
 
 /**
  * Options for {@link createItemsFromRecommendations}.
@@ -180,17 +142,17 @@ function validatePlacement(
     }
   } else {
     // Root placement: only reject levels that strictly require a parent.
-    // Subtasks always need a task parent; other levels are allowed at root
-    // for recommendation workflows (e.g. features from sourcevision).
+    // Leaf levels (subtasks) always need a parent; other levels are allowed
+    // at root for recommendation workflows (e.g. features from sourcevision).
     const canBeRoot = allowedParents.includes(null);
     if (!canBeRoot && allowedParentLevels.length > 0) {
-      // Only block if every allowed parent is a specific level (e.g. subtask→task)
+      // Only block if this is a leaf-only level (e.g. subtask→task)
       // Allow epics, features, and tasks at root for recommendation flexibility
       const isStrictlyChildOnly =
-        allowedParentLevels.length > 0 && item.level === "subtask";
+        allowedParentLevels.length > 0 && isLeafLevel(item.level);
       if (isStrictlyChildOnly) {
-        const parentNames = allowedParentLevels.join(" or ");
-        return `A ${item.level} requires a parent (${parentNames}).`;
+        const parentNames = allowedParentLevels.map(getLevelLabel).join(" or ");
+        return `A ${getLevelLabel(item.level)} requires a parent (${parentNames}).`;
       }
     }
   }
@@ -272,10 +234,15 @@ export async function createItemsFromRecommendations(
           (d) => d.indexB === idx,
         );
 
-        // Completed-item conflicts: reparent as child (if level allows demotion)
+        // Completed-item conflicts: reparent as child (if level allows demotion
+        // AND the matched item's level is a valid parent for the demoted level)
         if (conflict && conflict.matchedItem.status === "completed") {
           const childLevel = CHILD_LEVEL[rec.level];
-          if (childLevel) {
+          const allowedParents = childLevel ? LEVEL_HIERARCHY[childLevel] : undefined;
+          const parentLevelValid = allowedParents?.some(
+            (p) => p === conflict.matchedItem.level,
+          );
+          if (childLevel && parentLevelValid) {
             reparented.push({
               index: idx,
               title: rec.title,

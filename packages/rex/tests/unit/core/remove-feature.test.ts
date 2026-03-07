@@ -213,8 +213,8 @@ describe("preCheckFeatureDeletion", () => {
 
     expect(result.safe).toBe(false);
     expect(result.subtreeCount).toBe(0);
-    expect(result.warnings[0]).toContain("epic");
-    expect(result.warnings[0]).toContain("not a feature");
+    expect(result.warnings[0]).toContain("Epic");
+    expect(result.warnings[0]).toContain("not a Feature");
   });
 
   it("counts subtree correctly for feature with no children", () => {
@@ -386,8 +386,8 @@ describe("removeFeature", () => {
 
     expect(result.ok).toBe(false);
     expect(result.deletedIds).toHaveLength(0);
-    expect(result.error).toContain("not a feature");
-    expect(result.error).toContain("epic");
+    expect(result.error).toContain("not a Feature");
+    expect(result.error).toContain("Epic");
     expect(result.cleanedRefs).toBe(0);
   });
 
