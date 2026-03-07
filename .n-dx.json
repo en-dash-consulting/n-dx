@@ -7,7 +7,8 @@
       "overrides": {
         "packages/web/build.js": "entrypoint",
         "packages/web/dev.js": "entrypoint",
-        "packages/web/src/viewer/route-state.ts": "store"
+        "packages/web/src/viewer/route-state.ts": "store",
+        "packages/web/src/landing/landing.ts": "entrypoint"
       }
     },
     "zones": {
@@ -30,8 +31,8 @@
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-dashboard",
         "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-dashboard",
         "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-dashboard",
-        "tests/check-gateway-test.mjs": "monorepo-root",
-        "tests/check-gateway-regex.mjs": "monorepo-root",
+        "scripts/check-gateway-test.mjs": "monorepo-orchestration",
+        "scripts/check-gateway-regex.mjs": "monorepo-orchestration",
         "tests/e2e/cli-contract.test.mjs": "monorepo-root",
         "packages/web/src/viewer/components/prd-tree/analyze-panel.ts": "web-dashboard",
         "packages/web/src/viewer/views/analysis.ts": "web-dashboard",
@@ -61,6 +62,10 @@
       {
         "zone": "packages-rex:unit",
         "reason": "Large cross-cutting zone spanning analyze/ and recommend/ subsystems (19 files). High coupling reflects shared dependencies on store, types, and LLM client. The analyze and recommend features are functionally related (recommendations feed into analysis proposals). Splitting would not improve cohesion — the Louvain algorithm correctly identified these as a community."
+      },
+      {
+        "zone": "web-unit",
+        "reason": "Test-dominated zone (3 test/helper files for 2 source files). All 5 files relate to crash detection and recovery — a tightly cohesive feature. High coupling (0.71) is inherent: the 3 cross-zone imports target web-viewer types and the performance barrel, which are fundamental dependencies for any viewer subsystem. The files are already pinned to web-dashboard; the zone boundary is an artifact of Louvain partitioning on a small, import-sparse cluster."
       },
       {
         "zone": "global",
