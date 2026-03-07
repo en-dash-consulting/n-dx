@@ -250,9 +250,33 @@ The PRD document (`prd.json`) wraps items in:
 .rex/
   config.json           Project configuration
   prd.json              PRD tree
-  execution-log.jsonl   Append-only structured log
+  execution-log.jsonl   Append-only structured log (current)
+  execution-log.1.jsonl Rotated backup (older entries)
   workflow.md           Agent workflow instructions
 ```
+
+### Execution log rotation
+
+The execution log (`execution-log.jsonl`) uses automatic size-based rotation to prevent unbounded growth.
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Max file size | 1 MB (1,048,576 bytes) | Checked before each append |
+| Max file count | 2 | Current log + one backup |
+| Rotation trigger | Pre-append size check | If current log >= 1 MB, rotate before writing |
+| Max entry detail | 2,000 characters | Longer `detail` fields are truncated with `...` |
+
+**How rotation works:**
+
+1. Before each `appendLog` call, the current log file size is checked.
+2. If it exceeds 1 MB, `execution-log.jsonl` is renamed to `execution-log.1.jsonl` (overwriting any previous backup).
+3. The new entry is then written to a fresh `execution-log.jsonl`.
+
+**Which file is authoritative?**
+
+`execution-log.jsonl` is always the current, authoritative log. It contains the most recent entries and is the only file read by `readLog()` and the `rex://log` MCP resource. `execution-log.1.jsonl` is a backup of older entries kept for manual inspection only — it is not read by any rex API.
+
+These values are hardcoded in `FileStore` (`src/store/file-adapter.ts`), not configurable via `config.json`.
 
 ## Default workflow
 
