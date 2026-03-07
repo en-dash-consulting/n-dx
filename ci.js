@@ -5,6 +5,7 @@
  * a comprehensive report. Designed for CI environments.
  *
  * Steps:
+ *   0. community files check        (CODE_OF_CONDUCT.md exists and is non-empty)
  *   1. sourcevision analyze --fast  (codebase analysis, no AI enrichment)
  *   2. sourcevision validate        (schema checks on analysis output)
  *   3. zone health check            (cohesion/coupling threshold assertions)
@@ -81,6 +82,33 @@ export async function runCI(dir, flags, { run, tools }) {
 
   function info(...args) {
     if (!isQuiet && !isJSON) console.log(...args);
+  }
+
+  // ── Step 0: community files check ─────────────────────────────────────
+  // Verify that required community files (CODE_OF_CONDUCT.md) exist and are
+  // non-empty. Prevents accidental deletion of governance documents.
+  info("── community files ──");
+  const communityResult = checkCommunityFiles(dir);
+  if (!communityResult.ok) allOk = false;
+
+  steps.push({
+    name: "community-files",
+    ok: communityResult.ok,
+    detail: communityResult.ok
+      ? `${communityResult.checked} community file(s) present`
+      : `${communityResult.missing.length} required community file(s) missing or empty`,
+    ...(communityResult.missing.length > 0 ? { missing: communityResult.missing } : {}),
+  });
+
+  if (communityResult.ok) {
+    info(`  ✓ community files (${communityResult.checked} checked)`);
+  } else {
+    info(`  ✗ community files`);
+    if (!isJSON) {
+      for (const m of communityResult.missing) {
+        info(`    ✗ ${m}`);
+      }
+    }
   }
 
   // ── Step 1: sourcevision analyze ────────────────────────────────────────
@@ -344,6 +372,44 @@ function printIndented(str, logFn) {
   for (const line of str.trim().split("\n").slice(0, 10)) {
     logFn(`    ${line}`);
   }
+}
+
+// ── Community files check ────────────────────────────────────────────────────
+
+/** Required community/governance files that must exist and be non-empty. */
+const REQUIRED_COMMUNITY_FILES = ["CODE_OF_CONDUCT.md"];
+
+/**
+ * Verify that required community files exist and are non-empty.
+ * Prevents accidental deletion of governance documents.
+ *
+ * @param {string} dir  Project root directory
+ * @returns {{ ok: boolean, checked: number, missing: string[] }}
+ */
+function checkCommunityFiles(dir) {
+  const missing = [];
+
+  for (const file of REQUIRED_COMMUNITY_FILES) {
+    const filePath = join(dir, file);
+    if (!existsSync(filePath)) {
+      missing.push(`${file} is missing`);
+      continue;
+    }
+    try {
+      const stat = statSync(filePath);
+      if (stat.size === 0) {
+        missing.push(`${file} is empty`);
+      }
+    } catch {
+      missing.push(`${file} is unreadable`);
+    }
+  }
+
+  return {
+    ok: missing.length === 0,
+    checked: REQUIRED_COMMUNITY_FILES.length,
+    missing,
+  };
 }
 
 // ── Zone health thresholds ──────────────────────────────────────────────────
