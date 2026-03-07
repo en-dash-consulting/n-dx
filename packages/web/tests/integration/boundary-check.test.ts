@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const WEB_SRC = join(import.meta.dirname!, "..", "..", "..", "src");
+const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
 
 /** Recursively collect all .ts files under a directory. */
 function collectTsFiles(dir: string): string[] {

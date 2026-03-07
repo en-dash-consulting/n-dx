@@ -18522,6 +18522,321 @@
           ]
         }
       ]
+    },
+    {
+      "id": "931eabce-d252-4b60-9023-da5c8c0371a8",
+      "title": "Address observation issues (8 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Bidirectional coupling: \"task-usage-tracking\" ↔ \"web-dashboard\" (1+3 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-build-infrastructure\" ↔ \"web-dashboard\" (4+2 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 22 files — high-impact module, changes may have wide ripple effects\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone\n- Cohesion of 0.25 and coupling of 0.75 indicate significant structural fragmentation — likely caused by test files importing broadly from the rest of the web package.\n- Only 2 of 6 files are production source; the test-to-source ratio inflates coupling scores and suggests the zone boundary is defined by test co-location rather than domain cohesion.\n- The cleanup scheduler imports back into web-viewer (per cross-zone import graph), creating a dependency inversion — the scheduler should depend on an interface, not the viewer zone.\n- Bidirectional imports between web and web-viewer (web→web-viewer: 4, web-viewer→web: 2) create a soft cycle risk; extracting shared primitives into a dedicated shared zone would eliminate this.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "86237ba90ad7",
+          "01e8f53cc770",
+          "3a82920140f7",
+          "f6eac0dd056f",
+          "86ec9000ac3e",
+          "54e1a5f6b858",
+          "a87aa693d8a4",
+          "b17d0ed875cc"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 8
+        },
+        "findingCount": 8
+      }
+    },
+    {
+      "id": "dd043475-16b3-4419-8aec-52cb76f992c7",
+      "title": "Address suggestion issues (17 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Run intra-package call-graph analysis on hench to detect any emerging circular call patterns between its internal subdirectories (agent/, prd/, tools/) before they compound — the rex circular call pattern (239+100 calls) was only found via call-graph analysis, not zone metrics, and hench's 2838 internal calls make it the most likely next site for a hidden cycle.\n- Add a dependency-cruiser or similar import-boundary rule to CI that enforces the gateway pattern: any cross-package import that does not pass through the designated gateway module should fail the build. This converts a trust-based convention into a machine-enforced constraint.\n- All micro-zones (< 5 production files) in the web package lack facade index modules, meaning their zone boundaries exist only in the zone detection metadata and are invisible to the TypeScript compiler — mandate an 'index.ts' barrel for every zone with 2+ production files to make zone membership compiler-visible and reduce the risk of zone boundaries eroding silently.\n- Establish a documented testing convention for the utility+hook pattern: every hook wrapper (use-*.ts) should have a corresponding hook test file alongside the utility test — currently dom-performance-monitoring applies the production pattern but not the test pattern, and without a written convention future hooks will follow the same incomplete template.\n- Introduce a project-wide lint rule enforcing that files in 'src/server/' cannot import from 'src/viewer/' — the two known violations (task-usage-tracking, websocket boundary-check) both evade detection because the no-upward-import convention is undocumented and unenforced; a lint rule would surface new violations at PR time rather than zone-enrichment time.\n- Reconcile the two analysis passes (call-graph and cross-zone import table) that report contradictory coupling values for the dom zone — add a CI step that asserts zone IDs are consistent across both passes and flags any zone that appears in one pass but not the other, before this class of metric disagreement spreads to other zones.\n- 5 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:unit-core, packages-rex:unit-cli, websocket-infrastructure, packages-sourcevision:analyzers-3, packages-rex:unit — mandatory refactoring recommended before further development\n- Split the web-build-infrastructure zone into two groups: (1) build tooling (build.js, dev.js, package.json, images, markdown) and (2) reusable UI components (elapsed-time.ts, task-audit.ts) — these two groups have different change drivers, different consumers, and different lifecycle concerns that should not share a zone boundary.\n- Add use-dom-performance-monitor.test.ts to cover the hook's lifecycle: verify the monitor is started on mount, stopped on unmount, and that ref changes trigger re-subscription — the utility has test coverage but the hook wrapper that most consumers interact with does not.\n- Document the execution log rotation policy (max file size, max file count, rotation trigger) in .rex/config.json or a companion README to prevent unbounded log accumulation and clarify when execution-log.1.jsonl vs execution-log.jsonl is the authoritative current log.\n- Neither source file in this zone exports through a shared index — introduce a thin 'index.ts' barrel that re-exports the public surfaces of both services, giving the zone an explicit boundary and preventing consumers from coupling to internal file paths.\n- websocket-infrastructure breaches both cohesion (<0.5) and coupling (>0.5) thresholds simultaneously — this double breach qualifies it as the highest-priority structural risk in the web package; dissolve the zone by absorbing websocket.ts and ws-health-tracker.ts into web-dashboard and relocating boundary-check.test.ts to the integration test suite.\n- Zone \"WebSocket Infrastructure\" (websocket-infrastructure) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention\n- Zone \"Unit Core\" (packages-rex:unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention\n- Zone \"Unit Cli\" (packages-rex:unit-cli) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention\n- Zone \"Analyzers 3\" (packages-sourcevision:analyzers-3) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development\n- Zone \"Unit\" (packages-rex:unit) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "58269e61c2c7",
+          "7b97cd013cf4",
+          "12398526c48c",
+          "d17af6e7d20c",
+          "d66483b62c7f",
+          "643a8d124a0a",
+          "789d87bda596",
+          "b7f5ee66f875",
+          "602a0a79dc47",
+          "d6363b569119",
+          "76965087c616",
+          "3b4373bd0c5a",
+          "c57ccfdb2b03",
+          "9b0769dfa7c6",
+          "43c713eeecc4",
+          "f842d47bf869",
+          "2f5a2317583e"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 14,
+          "critical": 3
+        },
+        "findingCount": 17
+      }
+    },
+    {
+      "id": "bb55952e-1fb1-41bf-9875-d6daf3a5b288",
+      "title": "Address pattern issues (4 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- E2E suite has zero source-level coupling but a hidden build-time dependency on all packages; CI must enforce a build step before e2e execution. This should be documented or enforced via a pre-test script to prevent silent false-negatives when a package fails to compile.\n- The runtime-state zone is a shared mutable sink readable by both rex and hench packages without creating import-graph coupling — this is an intentional design but concurrent write safety is implicit; documenting the write-access protocol would prevent future race conditions.\n- Absence of an index/facade module means task-usage-tracking has no encapsulated public surface; consumers couple directly to internal service files, weakening the zone boundary.\n- Build scripts (build.js, dev.js) in this zone operate at the package boundary but are grouped with UI components (elapsed-time.ts, task-audit.ts) — splitting into a pure build-config group and a reusable-components group would clarify which files are tooling versus production API surface.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "122af3d5b4b0",
+          "a325d637b951",
+          "b36f6c3bb1fd",
+          "78adf986399c"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 4
+        },
+        "findingCount": 4
+      }
+    },
+    {
+      "id": "b2140cd8-dd60-4fed-ba39-74c0eb3f5d59",
+      "title": "Address relationship issues (5 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Hench is the only execution-layer package importing from a domain package (rex via gateway); if rex's public API changes, hench's gateway is the single choke-point — this is good design, but the gateway has no explicit version-lock or compatibility test to catch breaking changes early.\n- Cross-zone import direction 'dom → web-viewer' conflicts with documented leaf-node status; verify whether dom-performance-monitoring imports anything from web-viewer or whether the arrow direction in the import table denotes 'exports to'. If dom does import from web-viewer, this is a circular dependency that must be resolved.\n- Orchestration layer's zero-coupling guarantee is enforced structurally but not contractually — CLI argument interfaces between cli.js and domain package CLIs are untyped; adding schema validation or contract tests would make the spawn boundary explicit.\n- viewer-static-assets has zero import-graph coupling but carries hidden deployment coupling to web-dashboard via build manifest filenames; this contract is not enforced by TypeScript and breaks silently if build output names change.\n- boundary-check.test.ts appears to test zone-boundary contracts rather than websocket internals; relocating it to an integration test zone would remove the external coupling that degrades this zone's cohesion score.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-06T23:54:01.595Z",
+      "children": [
+        {
+          "id": "675369d2-f980-4c9e-a896-88c2dc2027f2",
+          "title": "Verify dom→web-viewer cross-zone import direction is not circular",
+          "status": "completed",
+          "level": "task",
+          "description": "Finding #2: Cross-zone import direction 'dom → web-viewer' conflicts with documented leaf-node status. Verify the import direction and document/resolve.",
+          "priority": "high",
+          "startedAt": "2026-03-06T23:55:10.311Z",
+          "completedAt": "2026-03-06T23:55:39.712Z"
+        },
+        {
+          "id": "7b3f14af-c93a-4689-93e9-e91e7eec5cf6",
+          "title": "Add CLI spawn boundary contract tests",
+          "status": "completed",
+          "level": "task",
+          "description": "Finding #3: Orchestration layer's zero-coupling guarantee is enforced structurally but not contractually. Add contract tests that verify each domain CLI accepts the expected arguments and returns expected exit codes.",
+          "priority": "high",
+          "startedAt": "2026-03-06T23:55:43.819Z",
+          "completedAt": "2026-03-06T23:57:21.666Z"
+        },
+        {
+          "id": "86edb3ef-0410-4a4a-8397-39912054d8bb",
+          "title": "Add viewer build output contract assertion",
+          "status": "completed",
+          "level": "task",
+          "description": "Finding #4: viewer-static-assets has hidden deployment coupling to web-dashboard via build manifest filenames. Add a contract test that verifies expected build outputs exist after build.",
+          "priority": "high",
+          "startedAt": "2026-03-06T23:57:22.814Z",
+          "completedAt": "2026-03-06T23:58:18.872Z"
+        },
+        {
+          "id": "25667b78-01aa-401e-837f-c66c404646d2",
+          "title": "Relocate boundary-check.test.ts to integration tests",
+          "status": "completed",
+          "level": "task",
+          "description": "Finding #5: boundary-check.test.ts tests zone-boundary contracts rather than websocket internals. Relocate to integration test directory to improve zone cohesion.",
+          "priority": "medium",
+          "startedAt": "2026-03-06T23:58:19.881Z",
+          "completedAt": "2026-03-06T23:58:53.465Z"
+        }
+      ],
+      "recommendationMeta": {
+        "findingHashes": [
+          "f6dff706ce23",
+          "a2490005d081",
+          "37f69cf164f3",
+          "e29f77099f48",
+          "19911d86c497"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 4,
+          "critical": 1
+        },
+        "findingCount": 5
+      },
+      "completedAt": "2026-03-06T23:58:53.657Z"
+    },
+    {
+      "id": "b5dae0e0-cd90-4c48-8119-fd43bc3e5a84",
+      "title": "Address anti-pattern issues (13 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- rex-gateway.ts in hench re-exports 8 functions from rex with no version-lock or compatibility smoke test; breaking changes to rex's public API will only surface at runtime inside an agent loop, making them expensive to diagnose — add a gateway compatibility test\n- Call graph reports coupling=0 while cross-zone import table records 1 outgoing import to web-viewer — metric disagreement between analysis passes produces unreliable zone health scores and must be resolved before coupling data can be trusted for this zone.\n- MCP HTTP transport (the recommended integration path) has no E2E test coverage; the suite tests CLI process boundaries but not the HTTP session lifecycle, leaving the primary MCP surface unvalidated at the process boundary level.\n- No shared E2E fixture or helper module detected across 14 test files; duplicated process-spawn and environment setup logic increases maintenance burden and risks inconsistent test environments between files — extract common setup into a shared e2e-helpers module.\n- architecture-policy.test.js encodes zone IDs and tier boundaries statically; zone renames or structural changes will not automatically invalidate the policy assertions, creating a category of silent false-passes — tie policy checks to the live zone graph output rather than hardcoded identifiers.\n- CLI argument interfaces between orchestration scripts and domain package CLIs are untyped; any CLI signature change in rex, hench, or sourcevision is a silent breaking change with no compile-time or schema-level safety net — add contract tests or a shared CLI-args schema to make this boundary explicit\n- usage-cleanup-scheduler.ts depends on web-viewer (the UI application layer) from within a background service zone — scheduler lifecycle should be driven by an interface or event emitter, not a direct import of the viewer module, to prevent initialization-order coupling in tests and production startup\n- No shared design-token layer exists between viewer-static-assets and web-landing despite both being presentation zones in the same package; brand drift between landing page and viewer is undetectable at build time\n- elapsed-time.ts and task-audit.ts are reusable UI components but are grouped with build scripts and package assets in the web-build-infrastructure zone — they should be moved to the web-viewer zone or a dedicated components zone to collocate them with their consumers and avoid accidental coupling to build tooling\n- Absence of a dedicated test-support or shared-fixtures zone forces web-viewer tests to import from the low-cohesion web-unit zone (6 imports); introducing a scoped test-support module would break this dependency and allow web-unit to be dissolved or tightened\n- 2 production files (websocket.ts, ws-health-tracker.ts) do not justify an independent zone boundary; absorbing them into web-dashboard would eliminate the structural noise introduced by the test-inflated coupling metric\n- God function: cmdAnalyze in packages/rex/src/cli/commands/analyze.ts calls 44 unique functions — consider decomposing into smaller, focused functions\n- God function: runConfig in config.js calls 36 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-06T23:37:31.000Z",
+      "completedAt": "2026-03-06T23:53:59.147Z",
+      "children": [
+        {
+          "id": "e578c79d-60e8-453f-be22-5f422774c88d",
+          "title": "Add gateway compatibility test for hench rex-gateway",
+          "status": "completed",
+          "level": "task",
+          "description": "rex-gateway.ts in hench re-exports 8+ functions from rex with no version-lock or compatibility smoke test. Add a test that verifies all re-exported functions exist and are callable, so rex API changes are caught at test time rather than at runtime inside agent loops.",
+          "acceptanceCriteria": [
+            "Gateway compatibility test exists in hench test suite",
+            "Test verifies all re-exported functions are defined and callable",
+            "Test fails if any re-exported function is removed from rex public API"
+          ],
+          "priority": "high",
+          "startedAt": "2026-03-06T23:38:55.596Z",
+          "completedAt": "2026-03-06T23:39:26.519Z"
+        },
+        {
+          "id": "3519e7a3-883a-4e0c-82f3-6decde6046cf",
+          "title": "Extract shared E2E test helpers module",
+          "status": "completed",
+          "level": "task",
+          "description": "No shared E2E fixture or helper module across 14 test files. Extract common process-spawn, environment setup, and cleanup logic into a shared e2e-helpers module to reduce duplication and ensure consistent test environments.",
+          "acceptanceCriteria": [
+            "Shared e2e-helpers module exists in tests/e2e/",
+            "Common spawn/setup patterns extracted from existing tests",
+            "At least 3 existing test files updated to use shared helpers"
+          ],
+          "priority": "high",
+          "startedAt": "2026-03-06T23:40:00.211Z",
+          "completedAt": "2026-03-06T23:45:07.852Z"
+        },
+        {
+          "id": "49cd3604-e0eb-4fe3-88ac-ea0e020c0a0f",
+          "title": "Decompose cmdAnalyze god function",
+          "status": "completed",
+          "level": "task",
+          "description": "cmdAnalyze in packages/rex/src/cli/commands/analyze.ts calls 44 unique functions. Decompose into smaller, focused phases (config resolution, scanning, proposal processing, acceptance).",
+          "acceptanceCriteria": [
+            "cmdAnalyze broken into named sub-functions",
+            "Each extracted function has a clear single responsibility",
+            "Existing tests continue to pass"
+          ],
+          "priority": "high",
+          "startedAt": "2026-03-06T23:45:11.821Z",
+          "completedAt": "2026-03-06T23:47:50.077Z"
+        },
+        {
+          "id": "67ed05f2-ab56-42c5-bb1e-7148faf3cd99",
+          "title": "Decompose runConfig god function",
+          "status": "completed",
+          "level": "task",
+          "description": "runConfig in config.js calls 36 unique functions. Decompose into smaller, focused functions for each config section handler.",
+          "acceptanceCriteria": [
+            "runConfig broken into named sub-functions",
+            "Each section handler is its own function",
+            "Existing tests continue to pass"
+          ],
+          "priority": "high",
+          "startedAt": "2026-03-06T23:47:53.997Z",
+          "completedAt": "2026-03-06T23:50:56.760Z"
+        },
+        {
+          "id": "650803e7-c8c3-42c4-9363-9d1423d9a7a7",
+          "title": "Fix usage-cleanup-scheduler web-viewer coupling",
+          "status": "pending",
+          "level": "task",
+          "description": "usage-cleanup-scheduler.ts depends on web-viewer zone. Scheduler lifecycle should use interface/event emitter, not direct import of viewer module, to prevent initialization-order coupling.",
+          "acceptanceCriteria": [
+            "No direct imports from web-viewer zone in scheduler",
+            "Scheduler uses injected interfaces or events",
+            "Tests pass without viewer initialization"
+          ],
+          "priority": "medium"
+        },
+        {
+          "id": "61de5525-b96d-44b0-8628-60dfe743a8f2",
+          "title": "Move elapsed-time.ts and task-audit.ts to viewer zone",
+          "status": "pending",
+          "level": "task",
+          "description": "elapsed-time.ts and task-audit.ts are UI components grouped with build scripts in web-build-infrastructure zone. Move to viewer zone where their consumers live.",
+          "acceptanceCriteria": [
+            "UI components colocated with viewer consumers",
+            "All imports updated",
+            "Build and tests pass"
+          ],
+          "priority": "medium"
+        },
+        {
+          "id": "05d92652-08b9-4610-9f27-48623d61c7a0",
+          "title": "Add CLI argument contract tests",
+          "status": "pending",
+          "level": "task",
+          "description": "CLI argument interfaces between orchestration scripts and domain package CLIs are untyped. Add contract tests that verify CLI help output matches expected argument signatures, catching silent breaking changes.",
+          "acceptanceCriteria": [
+            "Contract test validates rex, hench, sourcevision CLI signatures",
+            "Test breaks when CLI args change without updating contract",
+            "Covers at least the top-level commands"
+          ],
+          "priority": "medium"
+        },
+        {
+          "id": "7ebfc2ad-2694-4288-8f31-bc8e874ee49d",
+          "title": "Absorb websocket zone into web-dashboard",
+          "status": "pending",
+          "level": "task",
+          "description": "websocket.ts and ws-health-tracker.ts don't justify an independent zone. Absorb into web-dashboard to eliminate structural noise from test-inflated coupling metric.",
+          "acceptanceCriteria": [
+            "websocket files are part of web-dashboard zone",
+            "No standalone websocket zone in analysis output",
+            "Build and tests pass"
+          ],
+          "priority": "low"
+        },
+        {
+          "id": "26a806b2-1b3a-4487-aea9-b791962ad924",
+          "title": "Tie architecture policy test to live zone graph",
+          "status": "completed",
+          "level": "task",
+          "description": "architecture-policy.test.js encodes file paths statically. Zone renames or structural changes won't invalidate assertions. Add validation that the ALLOWED files still exist, preventing silent false-passes from stale entries.",
+          "acceptanceCriteria": [
+            "Policy test validates ALLOWED entries still exist on disk",
+            "Stale ALLOWED entries cause test failure",
+            "Test documents why each exception exists"
+          ],
+          "priority": "medium",
+          "startedAt": "2026-03-06T23:39:30.206Z",
+          "completedAt": "2026-03-06T23:39:56.608Z"
+        }
+      ],
+      "recommendationMeta": {
+        "findingHashes": [
+          "ba7c8ef3290f",
+          "b3960a17b2f4",
+          "c35efdca4a79",
+          "63fed6c8a33e",
+          "2a9dc4791a9a",
+          "e7b66ede1438",
+          "9813480cb94c",
+          "07bd88843135",
+          "ff9d7f9a04c7",
+          "f2e65e134e1c",
+          "991032cd7eeb",
+          "68ae7881c0cd",
+          "f53f9b0ec7df"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 12,
+          "critical": 1
+        },
+        "findingCount": 13
+      }
     }
   ]
 }
