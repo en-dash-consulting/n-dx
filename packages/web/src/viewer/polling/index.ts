@@ -13,3 +13,16 @@ export {
 export {
   registerTickUpdater,
 } from "./batched-tick-dispatcher.js";
+
+// ── Polling state — cross-zone API ───────────────────────────────────────────
+
+export {
+  registerPollingSource,
+  onPollingStateChange,
+  getPollingState,
+  resetPollingState,
+  type PollingSourceCallbacks,
+  type PollingSourceConfig,
+  type PollingStateSnapshot,
+  type PollingStateChangeHandler,
+} from "./polling-state.js";

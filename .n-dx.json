@@ -1,0 +1,50 @@
+{
+  "llm": {
+    "vendor": "claude"
+  },
+  "sourcevision": {
+    "archetypes": {
+      "overrides": {
+        "packages/web/build.js": "entrypoint",
+        "packages/web/dev.js": "entrypoint"
+      }
+    },
+    "zones": {
+      "pins": {
+        "packages/web/src/viewer/components/elapsed-time.ts": "web-dashboard",
+        "packages/web/src/viewer/views/task-audit.ts": "web-dashboard",
+        "packages/web/src/server/websocket.ts": "web-dashboard",
+        "packages/web/tests/unit/server/websocket.test.ts": "web-dashboard",
+        "packages/web/tests/unit/server/ws-health-tracker.test.ts": "web-dashboard",
+        "packages/web/tests/integration/ws-health-integration.test.ts": "web-dashboard",
+        "packages/web/tests/integration/boundary-check.test.ts": "web-dashboard",
+        "packages/web/src/viewer/performance/crash-detector.ts": "web-dashboard",
+        "packages/web/src/viewer/performance/crash-detector-test-support.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/crash-detector.test.ts": "web-dashboard",
+        "packages/web/src/viewer/route-state.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-tick.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/route-state.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-dashboard"
+      }
+    },
+    "riskJustifications": [
+      {
+        "zone": "packages-rex:unit-core",
+        "reason": "Test-dominated zone (5 test files for 2 source files). High coupling is inherent: test files import store, types, and fixtures from across rex. The CLI command + core next-task logic are cohesive; the apparent low cohesion is an artifact of test files having many external imports. No refactoring would reduce coupling without splitting tests from source."
+      },
+      {
+        "zone": "packages-rex:unit-cli",
+        "reason": "Test-dominated zone (2 test files for 2 source files). The fix CLI command and core fix logic form a natural pair. High coupling is driven by test imports of store, validation, and type modules. Structurally sound — the zone boundary correctly groups the feature's implementation and tests."
+      },
+      {
+        "zone": "packages-sourcevision:analyzers-3",
+        "reason": "Core zone analysis engine (Louvain algorithm, zone detection, zone hashing) with 3 test files. High coupling is expected: these files import inventory types, import graph types, and shared utilities that are fundamental to the analysis pipeline. The files are tightly cohesive in purpose — splitting them would create artificial boundaries in the zone detection pipeline."
+      },
+      {
+        "zone": "packages-rex:unit",
+        "reason": "Large cross-cutting zone spanning analyze/ and recommend/ subsystems (19 files). High coupling reflects shared dependencies on store, types, and LLM client. The analyze and recommend features are functionally related (recommendations feed into analysis proposals). Splitting would not improve cohesion — the Louvain algorithm correctly identified these as a community."
+      }
+    ]
+  }
+}
