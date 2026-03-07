@@ -85,6 +85,13 @@ export interface ZonePipelineOptions {
   depth?: number;
   /** Test files excluded from cohesion/coupling metric computation. */
   testFiles?: Set<string>;
+  /**
+   * Manual zone overrides: file path → target zone ID.
+   * Files listed here are moved to the specified zone after Louvain detection
+   * and proximity assignment, overriding the algorithmic placement.
+   * Stored in `.n-dx.json` under `sourcevision.zones.pins`.
+   */
+  zonePins?: Record<string, string>;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -449,6 +456,56 @@ export function assignByProximity(
   });
 
   return { zones: expandedZones, remaining };
+}
+
+// ── Zone pinning ─────────────────────────────────────────────────────────────
+
+/**
+ * Apply manual zone pins by moving files from their detected zone to the
+ * pinned target zone. Files whose target zone doesn't exist are skipped.
+ * This runs after Louvain detection and proximity assignment.
+ */
+export function applyZonePins(
+  zones: Zone[],
+  pins: Record<string, string>,
+): Zone[] {
+  // Build file → source zone index
+  const fileToZoneIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    for (const f of zones[i].files) {
+      fileToZoneIdx.set(f, i);
+    }
+  }
+
+  // Build zone ID → index
+  const zoneIdToIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    zoneIdToIdx.set(zones[i].id, i);
+  }
+
+  // Collect moves: [file, sourceIdx, targetIdx]
+  const moves: [string, number, number][] = [];
+  for (const [file, targetZoneId] of Object.entries(pins)) {
+    const sourceIdx = fileToZoneIdx.get(file);
+    const targetIdx = zoneIdToIdx.get(targetZoneId);
+    if (sourceIdx === undefined || targetIdx === undefined) continue;
+    if (sourceIdx === targetIdx) continue; // already in target zone
+    moves.push([file, sourceIdx, targetIdx]);
+  }
+
+  if (moves.length === 0) return zones;
+
+  // Apply moves immutably
+  const result = zones.map((z) => ({ ...z, files: [...z.files] }));
+  for (const [file, sourceIdx, targetIdx] of moves) {
+    const srcFiles = result[sourceIdx].files;
+    const idx = srcFiles.indexOf(file);
+    if (idx !== -1) srcFiles.splice(idx, 1);
+    result[targetIdx].files.push(file);
+  }
+
+  // Remove zones that became empty
+  return result.filter((z) => z.files.length > 0);
 }
 
 // ── Recursive subdivision ────────────────────────────────────────────────────
@@ -1577,6 +1634,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     parentId,
     depth = 0,
     testFiles = new Set<string>(),
+    zonePins,
   } = options;
 
   // ── Build undirected graph ──
@@ -1644,10 +1702,15 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     zones, initialUnzoned, maxPct < 100 ? maxZoneSize : undefined,
   );
 
-  // ── Build crossings ──
-  const crossings = buildCrossings(expandedZones, imports, []);
+  // ── Apply zone pins ──
+  const pinnedZones = zonePins && Object.keys(zonePins).length > 0
+    ? applyZonePins(expandedZones, zonePins)
+    : expandedZones;
 
-  return { zones: expandedZones, crossings, unzoned, filenameBasedZoneIds };
+  // ── Build crossings ──
+  const crossings = buildCrossings(pinnedZones, imports, []);
+
+  return { zones: pinnedZones, crossings, unzoned, filenameBasedZoneIds };
 }
 
 // ── Main entry point ────────────────────────────────────────────────────────
@@ -1673,6 +1736,11 @@ export async function analyzeZones(
      * Set to `100` to disable the zone size cap.
      */
     maxZonePercent?: number;
+    /**
+     * Manual zone overrides: file path → target zone ID.
+     * Passed through to the zone pipeline to override Louvain placement.
+     */
+    zonePins?: Record<string, string>;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -1708,6 +1776,7 @@ export async function analyzeZones(
     scopeFiles,
     maxZonePercent: options?.maxZonePercent,
     testFiles,
+    zonePins: options?.zonePins,
   });
   const { zones: expandedZones, unzoned, filenameBasedZoneIds } = pipeline;
 

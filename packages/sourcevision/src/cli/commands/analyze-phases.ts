@@ -260,8 +260,14 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       info(`  Detected changes, resetting from Pass ${fromPass} to Pass ${toPass}`);
     };
 
+    // Load zone pins from .n-dx.json
+    const svZoneOverrides = await loadProjectOverrides(ctx.svDir, "sourcevision");
+    const zonesConfig = (svZoneOverrides as Record<string, unknown>).zones as Record<string, unknown> | undefined;
+    const zonePins = (zonesConfig?.pins ?? {}) as Record<string, string>;
+
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+      zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
@@ -280,6 +286,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         info(`\n[phase 4] Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+          zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {

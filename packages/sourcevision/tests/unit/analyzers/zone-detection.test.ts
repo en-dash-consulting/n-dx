@@ -15,6 +15,7 @@ import {
   deriveZoneIdFromFilenames,
   analyzeZones,
   assignByProximity,
+  applyZonePins,
   SUBDIVISION_THRESHOLD,
 } from "../../../src/analyzers/zones.js";
 import type { Zone, ImportEdge } from "../../../src/schema/index.js";
@@ -1014,6 +1015,51 @@ describe("assignByProximity", () => {
 
     expect(expanded[0].files).toHaveLength(6); // all assigned
     expect(remaining).toHaveLength(0);
+  });
+});
+
+// ── applyZonePins ────────────────────────────────────────────────────────────
+
+describe("applyZonePins", () => {
+  const baseZones: Zone[] = [
+    { id: "build", name: "Build", description: "", files: ["build.js", "src/a.ts", "src/b.ts"], cohesion: 0, coupling: 0 },
+    { id: "viewer", name: "Viewer", description: "", files: ["src/viewer/main.ts", "src/viewer/app.ts"], cohesion: 0, coupling: 0 },
+  ];
+
+  it("moves pinned files from source zone to target zone", () => {
+    const result = applyZonePins(baseZones, { "src/a.ts": "viewer" });
+    const build = result.find((z) => z.id === "build")!;
+    const viewer = result.find((z) => z.id === "viewer")!;
+
+    expect(build.files).not.toContain("src/a.ts");
+    expect(viewer.files).toContain("src/a.ts");
+  });
+
+  it("skips pins for files not in any zone", () => {
+    const result = applyZonePins(baseZones, { "missing.ts": "viewer" });
+    expect(result).toHaveLength(2);
+    expect(result.find((z) => z.id === "build")!.files).toHaveLength(3);
+  });
+
+  it("skips pins targeting a nonexistent zone", () => {
+    const result = applyZonePins(baseZones, { "src/a.ts": "nonexistent" });
+    expect(result.find((z) => z.id === "build")!.files).toContain("src/a.ts");
+  });
+
+  it("removes zones that become empty after pinning", () => {
+    const zones: Zone[] = [
+      { id: "tiny", name: "Tiny", description: "", files: ["only.ts"], cohesion: 0, coupling: 0 },
+      { id: "big", name: "Big", description: "", files: ["a.ts"], cohesion: 0, coupling: 0 },
+    ];
+    const result = applyZonePins(zones, { "only.ts": "big" });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("big");
+    expect(result[0].files).toContain("only.ts");
+  });
+
+  it("is a no-op when file is already in target zone", () => {
+    const result = applyZonePins(baseZones, { "src/viewer/main.ts": "viewer" });
+    expect(result.find((z) => z.id === "viewer")!.files).toHaveLength(2);
   });
 });
 

@@ -18683,6 +18683,7 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-07T00:50:08.593Z",
+      "completedAt": "2026-03-07T00:56:25.870Z",
       "recommendationMeta": {
         "findingHashes": [
           "122af3d5b4b0",
@@ -18695,8 +18696,7 @@
           "warning": 4
         },
         "findingCount": 4
-      },
-      "completedAt": "2026-03-07T00:56:25.870Z"
+      }
     },
     {
       "id": "b2140cd8-dd60-4fed-ba39-74c0eb3f5d59",
@@ -18840,7 +18840,7 @@
         {
           "id": "650803e7-c8c3-42c4-9363-9d1423d9a7a7",
           "title": "Fix usage-cleanup-scheduler web-viewer coupling",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "usage-cleanup-scheduler.ts depends on web-viewer zone. Scheduler lifecycle should use interface/event emitter, not direct import of viewer module, to prevent initialization-order coupling.",
           "acceptanceCriteria": [
@@ -18848,12 +18848,14 @@
             "Scheduler uses injected interfaces or events",
             "Tests pass without viewer initialization"
           ],
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-03-07T01:01:06.932Z",
+          "completedAt": "2026-03-07T01:02:43.236Z"
         },
         {
           "id": "61de5525-b96d-44b0-8628-60dfe743a8f2",
           "title": "Move elapsed-time.ts and task-audit.ts to viewer zone",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "elapsed-time.ts and task-audit.ts are UI components grouped with build scripts in web-build-infrastructure zone. Move to viewer zone where their consumers live.",
           "acceptanceCriteria": [
@@ -18861,12 +18863,14 @@
             "All imports updated",
             "Build and tests pass"
           ],
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-03-07T01:02:55.108Z",
+          "completedAt": "2026-03-07T01:09:15.068Z"
         },
         {
           "id": "05d92652-08b9-4610-9f27-48623d61c7a0",
           "title": "Add CLI argument contract tests",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "CLI argument interfaces between orchestration scripts and domain package CLIs are untyped. Add contract tests that verify CLI help output matches expected argument signatures, catching silent breaking changes.",
           "acceptanceCriteria": [
@@ -18874,7 +18878,9 @@
             "Test breaks when CLI args change without updating contract",
             "Covers at least the top-level commands"
           ],
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-03-07T00:57:21.527Z",
+          "completedAt": "2026-03-07T01:00:32.261Z"
         },
         {
           "id": "7ebfc2ad-2694-4288-8f31-bc8e874ee49d",
