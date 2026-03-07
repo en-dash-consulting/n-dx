@@ -62,3 +62,34 @@ export {
   type CrashDetectionResult,
   type SavedNavigationState,
 } from "./crash-detector.js";
+
+// ── DOM performance monitor ──────────────────────────────────────────────────
+
+export {
+  countDOMNodes,
+  readHeapUsage,
+  formatDuration,
+  formatNodeCount,
+  formatDelta,
+  recordRender,
+  recordUpdate,
+  measureOperation,
+  takeDOMSnapshot,
+  computeSummary,
+  onDOMSnapshot,
+  setObservedContainer,
+  startDOMPerformanceMonitor,
+  stopDOMPerformanceMonitor,
+  getLatestDOMSnapshot,
+  getDOMSnapshotHistory,
+  getRenderTimings,
+  getUpdateComparisons,
+  getObservedContainer,
+  resetDOMPerformanceMonitor,
+  type DOMNodeSnapshot,
+  type RenderTiming,
+  type UpdateComparison,
+  type PerformanceSummary,
+  type DOMPerformanceConfig,
+  type DOMSnapshotHandler,
+} from "./dom-performance-monitor.js";
