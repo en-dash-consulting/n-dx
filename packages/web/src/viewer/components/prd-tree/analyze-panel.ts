@@ -6,7 +6,7 @@
  */
 
 import { h, Fragment } from "preact";
-import { useState, useCallback } from "preact/hooks";
+import { useState, useCallback, useEffect } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 
@@ -70,8 +70,8 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
     }
   }, []);
 
-  // Load pending on first idle render
-  useState(() => { loadPending(); });
+  // Load pending on first render
+  useEffect(() => { loadPending(); }, []);
 
   const handleAnalyze = useCallback(async () => {
     setState("running");

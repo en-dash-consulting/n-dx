@@ -293,24 +293,5 @@ export function resetCrashDetector(): void {
   }
 }
 
-// ─── Test helpers ────────────────────────────────────────────────────────────
-
-/** @internal Exported for testing only. */
-export const _testHelpers = {
-  HEARTBEAT_KEY,
-  NAV_STATE_KEY,
-  CRASH_HISTORY_KEY,
-  RECOVERY_SHOWN_KEY,
-  CRASH_LOOP_WINDOW_MS,
-  CRASH_LOOP_THRESHOLD,
-  MAX_CRASH_HISTORY,
-  storageAvailable,
-  getJSON,
-  setJSON,
-  getCrashHistory,
-  addCrashRecord,
-  getRecentCrashCount,
-  setHeartbeat,
-  clearHeartbeat,
-  heartbeatPresent,
-};
+// Test-only constants and helpers are in crash-detector-test-support.ts
+// to keep the production API surface clean.

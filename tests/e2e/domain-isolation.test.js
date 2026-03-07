@@ -28,7 +28,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -90,6 +90,68 @@ function hasRuntimeImportFrom(content, pkg) {
   }
   return false;
 }
+
+describe("hasRuntimeImportFrom self-tests", () => {
+  it("detects runtime import from a package", () => {
+    expect(hasRuntimeImportFrom('import { foo } from "rex"', "rex")).toBe(true);
+    expect(hasRuntimeImportFrom('export { bar } from "rex"', "rex")).toBe(true);
+    expect(hasRuntimeImportFrom('import foo from "sourcevision"', "sourcevision")).toBe(true);
+  });
+
+  it("excludes type-only imports", () => {
+    expect(hasRuntimeImportFrom('import type { Foo } from "rex"', "rex")).toBe(false);
+    expect(hasRuntimeImportFrom('export type { Bar } from "rex"', "rex")).toBe(false);
+  });
+
+  it("excludes comments", () => {
+    expect(hasRuntimeImportFrom('// import { foo } from "rex"', "rex")).toBe(false);
+    expect(hasRuntimeImportFrom('* import { foo } from "rex"', "rex")).toBe(false);
+  });
+
+  it("does not match unrelated packages", () => {
+    expect(hasRuntimeImportFrom('import { foo } from "rex"', "sourcevision")).toBe(false);
+  });
+});
+
+describe("gateway-rules.json validation", () => {
+  it("all gateway files referenced in gateway-rules.json exist on disk", () => {
+    const stale = [];
+    for (const rule of GATEWAY_RULES) {
+      for (const gw of rule.gatewayFiles) {
+        if (!existsSync(join(ROOT, gw))) {
+          stale.push(gw);
+        }
+      }
+    }
+    if (stale.length > 0) {
+      expect.fail(
+        [
+          "gateway-rules.json references gateway files that do not exist on disk.",
+          "Update gateway-rules.json after renames/moves:",
+          "",
+          ...stale.map((s) => `  - ${s}`),
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("all consumer directories referenced in gateway-rules.json exist on disk", () => {
+    const missing = [];
+    for (const rule of GATEWAY_RULES) {
+      if (!existsSync(join(ROOT, rule.packageDir))) {
+        missing.push(rule.packageDir);
+      }
+    }
+    if (missing.length > 0) {
+      expect.fail(
+        [
+          "gateway-rules.json references consumer directories that do not exist:",
+          ...missing.map((m) => `  - ${m}`),
+        ].join("\n"),
+      );
+    }
+  });
+});
 
 describe("architecture policy: domain layer isolation", () => {
   it("rex must not import from sourcevision, hench, or @n-dx/web", () => {
@@ -164,94 +226,63 @@ describe("architecture policy: domain layer isolation", () => {
   });
 });
 
+/**
+ * Gateway rules loaded from the shared gateway-rules.json.
+ *
+ * This is the single source of truth for gateway file paths and allowed
+ * import patterns, shared with ci.js to prevent silent divergence.
+ */
+const _gatewayConfig = JSON.parse(readFileSync(join(ROOT, "gateway-rules.json"), "utf-8"));
+
+const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
+  packageDir: g.consumer,
+  externalPkg: g.externalPackage,
+  gatewayFiles: new Set(g.gatewayFiles),
+}));
+
 describe("architecture policy: gateway enforcement", () => {
   /**
-   * Hench gateway: packages/hench/src/prd/rex-gateway.ts
+   * Dynamically generated tests from gateway-rules.json.
    *
-   * All runtime imports from "rex" in hench source files must go through
-   * this single gateway. `import type` is allowed anywhere (zero runtime coupling).
-   * The legacy re-export at prd/ops.ts is also allowed (backward compatibility).
+   * Each gateway rule generates a test asserting that runtime imports from
+   * the external package only occur in the designated gateway file(s).
+   * `import type` is allowed anywhere (zero runtime coupling).
    */
-  it("hench runtime imports from rex must go through the gateway (prd/rex-gateway.ts)", () => {
-    const GATEWAY = "packages/hench/src/prd/rex-gateway.ts";
-    const LEGACY_GATEWAY = "packages/hench/src/prd/ops.ts";
-    const henchSrc = walk(join(ROOT, "packages/hench/src"));
-    const violations = [];
+  for (const rule of GATEWAY_RULES) {
+    it(`${rule.packageDir} runtime imports from "${rule.externalPkg}" must go through gateway`, () => {
+      const pkgSrc = walk(join(ROOT, rule.packageDir));
+      const violations = [];
 
-    for (const file of henchSrc) {
-      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      for (const file of pkgSrc) {
+        const rel = relative(ROOT, file).replace(/\\/g, "/");
 
-      // The gateway itself and its legacy re-export are allowed
-      if (rel === GATEWAY || rel === LEGACY_GATEWAY) continue;
+        // The gateway itself is allowed
+        if (rule.gatewayFiles.has(rel)) continue;
 
-      const content = readFileSync(file, "utf-8");
-      if (hasRuntimeImportFrom(content, "rex")) {
-        violations.push(rel);
-      }
-    }
-
-    if (violations.length > 0) {
-      expect.fail(
-        [
-          "Runtime imports from 'rex' found outside the hench gateway.",
-          `All runtime imports must go through: ${GATEWAY}`,
-          "`import type` is fine anywhere (erased at compile time).",
-          "",
-          "Violations:",
-          ...violations.map((v) => `  - ${v}`),
-          "",
-          "To fix: import from '../prd/rex-gateway.js' (the gateway) instead of 'rex' directly.",
-          `If a new rex export is needed, add it to ${GATEWAY} first.`,
-        ].join("\n"),
-      );
-    }
-  });
-
-  /**
-   * Web gateway: packages/web/src/server/domain-gateway.ts
-   *
-   * All runtime imports from "rex" and "sourcevision" in web source files
-   * must go through this single gateway. `import type` is allowed anywhere.
-   * The legacy re-export at mcp-deps.ts is also allowed (backward compatibility).
-   */
-  it("web runtime imports from domain packages must go through the gateway (server/domain-gateway.ts)", () => {
-    const GATEWAY = "packages/web/src/server/domain-gateway.ts";
-    const REX_GATEWAY = "packages/web/src/server/rex-gateway.ts";
-    const LEGACY_GATEWAY = "packages/web/src/server/mcp-deps.ts";
-    const domainPkgs = ["rex", "sourcevision"];
-    const webSrc = walk(join(ROOT, "packages/web/src"));
-    const violations = [];
-
-    for (const file of webSrc) {
-      const rel = relative(ROOT, file).replace(/\\/g, "/");
-
-      // The gateways themselves and legacy re-export are allowed
-      if (rel === GATEWAY || rel === REX_GATEWAY || rel === LEGACY_GATEWAY) continue;
-
-      const content = readFileSync(file, "utf-8");
-      for (const pkg of domainPkgs) {
-        if (hasRuntimeImportFrom(content, pkg)) {
-          violations.push(`${rel} has runtime import from "${pkg}"`);
+        const content = readFileSync(file, "utf-8");
+        if (hasRuntimeImportFrom(content, rule.externalPkg)) {
+          violations.push(rel);
         }
       }
-    }
 
-    if (violations.length > 0) {
-      expect.fail(
-        [
-          "Runtime imports from domain packages found outside the web gateway.",
-          `All runtime imports must go through: ${GATEWAY}`,
-          "`import type` is fine anywhere (erased at compile time).",
-          "",
-          "Violations:",
-          ...violations.map((v) => `  - ${v}`),
-          "",
-          "To fix: import from './domain-gateway.js' (the gateway) instead of the domain package directly.",
-          `If a new export is needed, add it to ${GATEWAY} first.`,
-        ].join("\n"),
-      );
-    }
-  });
+      if (violations.length > 0) {
+        const gw = [...rule.gatewayFiles][0];
+        expect.fail(
+          [
+            `Runtime imports from '${rule.externalPkg}' found outside the gateway.`,
+            `All runtime imports must go through: ${gw}`,
+            "`import type` is fine anywhere (erased at compile time).",
+            "",
+            "Violations:",
+            ...violations.map((v) => `  - ${v}`),
+            "",
+            `To fix: import from the gateway instead of '${rule.externalPkg}' directly.`,
+            `If a new export is needed, add it to ${gw} first.`,
+          ].join("\n"),
+        );
+      }
+    });
+  }
 
   /**
    * Hench must not import from sourcevision at runtime.

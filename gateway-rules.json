@@ -1,0 +1,27 @@
+{
+  "description": "Authoritative source of gateway file paths and allowed import patterns. Consumed by ci.js and domain-isolation.test.js to enforce the gateway pattern consistently.",
+  "gateways": [
+    {
+      "consumer": "packages/hench/src",
+      "externalPackage": "rex",
+      "gatewayFiles": ["packages/hench/src/prd/rex-gateway.ts"]
+    },
+    {
+      "consumer": "packages/web/src",
+      "externalPackage": "rex",
+      "gatewayFiles": ["packages/web/src/server/rex-gateway.ts"]
+    },
+    {
+      "consumer": "packages/web/src",
+      "externalPackage": "sourcevision",
+      "gatewayFiles": ["packages/web/src/server/domain-gateway.ts"]
+    }
+  ],
+  "boundaries": [
+    {
+      "sourceDir": "packages/web/src/server",
+      "forbiddenImportPattern": "from\\s+[\"']\\.\\.\/viewer\/",
+      "message": "server/ must not import from viewer/ (use gateway or shared types)"
+    }
+  ]
+}

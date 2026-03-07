@@ -508,48 +508,25 @@ function checkZoneIdConsistency(dir) {
 // ── Gateway import boundary ─────────────────────────────────────────────────
 
 /**
- * Gateway import boundary rules.
+ * Gateway import boundary rules — loaded from gateway-rules.json.
  *
- * Each entry defines: which package directory to scan, which external package
- * names require gateway routing, and which file(s) are the designated gateways.
- *
- * Additionally, the `boundaryRules` array enforces intra-package import
- * direction (e.g. server cannot import from viewer).
+ * The JSON file is the single source of truth shared by ci.js and
+ * domain-isolation.test.js, eliminating silent divergence between
+ * enforcement mechanisms.
  */
-const GATEWAY_RULES = [
-  {
-    // hench → rex: only rex-gateway.ts may have runtime imports
-    packageDir: "packages/hench/src",
-    externalPkg: "rex",
-    gatewayFiles: new Set(["packages/hench/src/prd/rex-gateway.ts"]),
-  },
-  {
-    // web → rex: only rex-gateway.ts may have runtime imports
-    packageDir: "packages/web/src",
-    externalPkg: "rex",
-    gatewayFiles: new Set(["packages/web/src/server/rex-gateway.ts"]),
-  },
-  {
-    // web → sourcevision: only domain-gateway.ts may have runtime imports
-    packageDir: "packages/web/src",
-    externalPkg: "sourcevision",
-    gatewayFiles: new Set(["packages/web/src/server/domain-gateway.ts"]),
-  },
-];
+const _gatewayConfig = JSON.parse(readFileSync(join(__dir, "gateway-rules.json"), "utf-8"));
 
-/**
- * Intra-package import direction rules.
- *
- * Prevents server-side code from importing browser-side modules.
- */
-const BOUNDARY_RULES = [
-  {
-    // server/ must not import from viewer/
-    sourceDir: "packages/web/src/server",
-    forbiddenPattern: /from\s+["']\.\.\/viewer\//,
-    message: "server/ must not import from viewer/ (use gateway or shared types)",
-  },
-];
+const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
+  packageDir: g.consumer,
+  externalPkg: g.externalPackage,
+  gatewayFiles: new Set(g.gatewayFiles),
+}));
+
+const BOUNDARY_RULES = _gatewayConfig.boundaries.map((b) => ({
+  sourceDir: b.sourceDir,
+  forbiddenPattern: new RegExp(b.forbiddenImportPattern),
+  message: b.message,
+}));
 
 /**
  * Regex to detect runtime (non-type) imports from a specific package.

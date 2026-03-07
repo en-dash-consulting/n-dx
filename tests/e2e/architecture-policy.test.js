@@ -76,6 +76,92 @@ function walk(dir, files = []) {
   return files;
 }
 
+/**
+ * Intra-package layer-direction rules.
+ *
+ * Domain-layer files (src/core/, src/analyze/, src/schema/, etc.) must not
+ * import from CLI-layer files (src/cli/). This prevents tight coupling
+ * between business logic and CLI presentation concerns.
+ *
+ * Known violations are listed in KNOWN_VIOLATIONS and tracked for
+ * resolution — the test ensures no NEW violations are introduced.
+ */
+const INTRA_PACKAGE_RULES = [
+  {
+    name: "rex",
+    packageDir: "packages/rex/src",
+    domainDirs: ["core", "analyze", "schema", "store"],
+    cliDir: "cli",
+  },
+  {
+    name: "sourcevision",
+    packageDir: "packages/sourcevision/src",
+    domainDirs: ["analyzers", "schema", "util"],
+    cliDir: "cli",
+  },
+  {
+    name: "hench",
+    packageDir: "packages/hench/src",
+    domainDirs: ["agent", "prd", "tools", "process"],
+    cliDir: "cli",
+  },
+];
+
+/**
+ * Known pre-existing violations that are tracked for future resolution.
+ * These are grandfathered in to avoid blocking other work, but new
+ * violations of the same pattern will fail the test.
+ */
+const KNOWN_VIOLATIONS = new Set([
+  // rex domain → cli imports (tracked for resolution)
+  "packages/rex/src/analyze/guided.ts",
+  "packages/rex/src/core/move.ts",
+  // sourcevision domain → cli imports (tracked for resolution)
+  "packages/sourcevision/src/analyzers/classify.ts",
+  "packages/sourcevision/src/analyzers/enrich-batch.ts",
+  "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+]);
+
+describe("architecture policy: intra-package layering", () => {
+  for (const rule of INTRA_PACKAGE_RULES) {
+    it(`${rule.name}: domain files must not import from cli/ (except known violations)`, () => {
+      const violations = [];
+
+      for (const domainDir of rule.domainDirs) {
+        const fullDir = join(ROOT, rule.packageDir, domainDir);
+        if (!existsSync(fullDir)) continue;
+
+        const files = walk(fullDir);
+        for (const file of files) {
+          const rel = relative(ROOT, file).replace(/\\/g, "/");
+          const content = readFileSync(file, "utf-8");
+
+          // Check for imports from the cli/ directory (relative paths)
+          const cliImportPattern = /from\s+["']\.\.\/cli\//;
+          if (cliImportPattern.test(content) && !KNOWN_VIOLATIONS.has(rel)) {
+            violations.push(rel);
+          }
+        }
+      }
+
+      if (violations.length > 0) {
+        expect.fail(
+          [
+            `Domain-layer files in ${rule.name} import from cli/ subdirectories.`,
+            "Domain logic should not depend on CLI presentation concerns.",
+            "",
+            "Violations:",
+            ...violations.map((v) => `  - ${v}`),
+            "",
+            "To fix: move the shared utility out of cli/ into core/ or a shared module,",
+            "or restructure the import to avoid the dependency.",
+          ].join("\n"),
+        );
+      }
+    });
+  }
+});
+
 describe("architecture policy: process execution", () => {
   it("ALLOWED list contains no stale entries (all files exist on disk)", () => {
     const stale = [];

@@ -20,6 +20,7 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run && pnpm -r run test",
     "validate": "pnpm -r run validate",
+    "verify": "vitest run tests/e2e && node ci.js .",
     "pr-check": "node pr-check.js"
   },
   "devDependencies": {
