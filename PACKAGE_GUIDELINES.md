@@ -69,6 +69,17 @@ When a package imports from another package at runtime, those imports are concen
 3. **Type imports excluded** — `import type` is erased at compile time and creates zero runtime coupling. Type imports stay at the call-site.
 4. **Deliberate friction** — adding a new cross-package import requires editing the gateway, not sprinkling `import … from "rex"` in a leaf file.
 5. **Cross-reference** — each gateway's JSDoc links to its sibling gateways with `@see`.
+6. **CI-enforced** — `ndx ci` runs a gateway import boundary check that fails the build if any cross-package runtime import bypasses the designated gateway. See the `checkGatewayImports` function in `ci.js`.
+
+### Import boundary rules (CI-enforced)
+
+In addition to the gateway pattern, CI enforces intra-package import direction:
+
+| Rule | Scope | Rationale |
+|---|---|---|
+| `server/` cannot import `viewer/` | `packages/web/src/server/` | Server runs in Node.js; viewer code is browser-only |
+
+These rules are defined in `ci.js` (`GATEWAY_RULES` and `BOUNDARY_RULES` arrays) and checked on every CI run. Violations fail the build.
 
 ### Gateway JSDoc template
 

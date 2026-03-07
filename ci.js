@@ -8,6 +8,7 @@
  *   1. sourcevision analyze --fast  (codebase analysis, no AI enrichment)
  *   2. sourcevision validate        (schema checks on analysis output)
  *   3. zone health check            (cohesion/coupling threshold assertions)
+ *   3b. gateway import boundary     (cross-package imports must use gateways)
  *   4. rex validate --format=json   (PRD health checks)
  *   5. rex status --format=json     (completion stats)
  *
@@ -15,8 +16,8 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
-import { dirname, join, resolve } from "path";
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -142,6 +143,31 @@ export async function runCI(dir, flags, { run, tools }) {
     if (!isJSON) {
       for (const v of zoneHealth.violations) {
         info(`    ✗ ${v.id}: cohesion=${v.cohesion.toFixed(2)}, coupling=${v.coupling.toFixed(2)}`);
+      }
+    }
+  }
+
+  // ── Step 3b: gateway import boundary ────────────────────────────────────
+  info("── gateway imports ──");
+  const gatewayResult = checkGatewayImports(dir);
+  if (!gatewayResult.ok) allOk = false;
+
+  steps.push({
+    name: "gateway-imports",
+    ok: gatewayResult.ok,
+    detail: gatewayResult.ok
+      ? `${gatewayResult.checked} files checked, all cross-package imports use gateways`
+      : `${gatewayResult.violations.length} file(s) bypass gateway pattern`,
+    ...(gatewayResult.violations.length > 0 ? { violations: gatewayResult.violations } : {}),
+  });
+
+  if (gatewayResult.ok) {
+    info(`  ✓ gateway imports (${gatewayResult.checked} files checked)`);
+  } else {
+    info(`  ✗ gateway imports`);
+    if (!isJSON) {
+      for (const v of gatewayResult.violations) {
+        info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
       }
     }
   }
@@ -359,6 +385,202 @@ function checkZoneHealth(dir) {
   }
 
   walkZones(zones);
+
+  return {
+    ok: violations.length === 0,
+    checked,
+    violations,
+  };
+}
+
+// ── Gateway import boundary ─────────────────────────────────────────────────
+
+/**
+ * Gateway import boundary rules.
+ *
+ * Each entry defines: which package directory to scan, which external package
+ * names require gateway routing, and which file(s) are the designated gateways.
+ *
+ * Additionally, the `boundaryRules` array enforces intra-package import
+ * direction (e.g. server cannot import from viewer).
+ */
+const GATEWAY_RULES = [
+  {
+    // hench → rex: only rex-gateway.ts may have runtime imports
+    packageDir: "packages/hench/src",
+    externalPkg: "rex",
+    gatewayFiles: new Set(["packages/hench/src/prd/rex-gateway.ts"]),
+  },
+  {
+    // web → rex: only rex-gateway.ts may have runtime imports
+    packageDir: "packages/web/src",
+    externalPkg: "rex",
+    gatewayFiles: new Set(["packages/web/src/server/rex-gateway.ts"]),
+  },
+  {
+    // web → sourcevision: only domain-gateway.ts may have runtime imports
+    packageDir: "packages/web/src",
+    externalPkg: "sourcevision",
+    gatewayFiles: new Set(["packages/web/src/server/domain-gateway.ts"]),
+  },
+];
+
+/**
+ * Intra-package import direction rules.
+ *
+ * Prevents server-side code from importing browser-side modules.
+ */
+const BOUNDARY_RULES = [
+  {
+    // server/ must not import from viewer/
+    sourceDir: "packages/web/src/server",
+    forbiddenPattern: /from\s+["']\.\.\/viewer\//,
+    message: "server/ must not import from viewer/ (use gateway or shared types)",
+  },
+];
+
+/**
+ * Regex to detect runtime (non-type) imports from a specific package.
+ *
+ * Matches:
+ *   import { foo } from "pkg"
+ *   export { foo } from "pkg"
+ *   import foo from "pkg"
+ *
+ * Does NOT match:
+ *   import type { Foo } from "pkg"
+ *   export type { Foo } from "pkg"
+ *
+ * @param {string} pkg  Package name (e.g. "rex", "sourcevision")
+ * @returns {RegExp}
+ */
+function runtimeImportRegex(pkg) {
+  // Matches import/export that is NOT followed by "type" before the from clause.
+  // Uses negative lookahead to exclude type-only imports.
+  return new RegExp(
+    `(?:^|\\n)\\s*(?:import|export)\\s+(?!type\\s).*?from\\s+["']${pkg}["']`,
+  );
+}
+
+/**
+ * Recursively collect all .ts files under a directory.
+ * Skips node_modules and dist directories.
+ *
+ * @param {string} dir  Directory to scan
+ * @returns {string[]}  Array of relative file paths (from project root)
+ */
+function collectTsFiles(dir) {
+  const results = [];
+
+  function walk(d) {
+    let entries;
+    try {
+      entries = readdirSync(d);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry === "node_modules" || entry === "dist") continue;
+      const full = join(d, entry);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        walk(full);
+      } else if (entry.endsWith(".ts") && !entry.endsWith(".d.ts")) {
+        results.push(full);
+      }
+    }
+  }
+
+  walk(dir);
+  return results;
+}
+
+/**
+ * Check that all cross-package runtime imports pass through designated
+ * gateway modules, and that intra-package import boundaries are respected.
+ *
+ * @param {string} dir  Project root directory
+ * @returns {{ ok: boolean, checked: number, violations: Array<{ file: string, line: number, message: string }> }}
+ */
+function checkGatewayImports(dir) {
+  const violations = [];
+  let checked = 0;
+
+  // ── Cross-package gateway checks ────────────────────────────────────────
+  for (const rule of GATEWAY_RULES) {
+    const pkgDir = join(dir, rule.packageDir);
+    if (!existsSync(pkgDir)) continue;
+
+    const regex = runtimeImportRegex(rule.externalPkg);
+    const files = collectTsFiles(pkgDir);
+
+    for (const filePath of files) {
+      checked++;
+      const relPath = relative(dir, filePath);
+
+      // Skip if this file IS a designated gateway
+      if (rule.gatewayFiles.has(relPath)) continue;
+
+      let content;
+      try {
+        content = readFileSync(filePath, "utf-8");
+      } catch {
+        continue;
+      }
+
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Quick pre-filter: skip lines that don't mention the package
+        if (!line.includes(`"${rule.externalPkg}"`) && !line.includes(`'${rule.externalPkg}'`)) continue;
+
+        // Check for runtime (non-type) import/export
+        if (regex.test(line)) {
+          violations.push({
+            file: relPath,
+            line: i + 1,
+            message: `runtime import from "${rule.externalPkg}" must go through gateway (${[...rule.gatewayFiles][0]})`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Intra-package boundary checks ──────────────────────────────────────
+  for (const rule of BOUNDARY_RULES) {
+    const srcDir = join(dir, rule.sourceDir);
+    if (!existsSync(srcDir)) continue;
+
+    const files = collectTsFiles(srcDir);
+
+    for (const filePath of files) {
+      checked++;
+      const relPath = relative(dir, filePath);
+
+      let content;
+      try {
+        content = readFileSync(filePath, "utf-8");
+      } catch {
+        continue;
+      }
+
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (rule.forbiddenPattern.test(lines[i])) {
+          violations.push({
+            file: relPath,
+            line: i + 1,
+            message: rule.message,
+          });
+        }
+      }
+    }
+  }
 
   return {
     ok: violations.length === 0,
