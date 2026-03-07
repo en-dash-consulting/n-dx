@@ -19319,6 +19319,7 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-07T17:52:10.984Z",
+      "completedAt": "2026-03-07T17:57:47.084Z",
       "recommendationMeta": {
         "findingHashes": [
           "c174b7aeec75"
@@ -19328,8 +19329,7 @@
           "warning": 1
         },
         "findingCount": 1
-      },
-      "completedAt": "2026-03-07T17:57:47.084Z"
+      }
     },
     {
       "id": "b3d58129-c66a-4a58-84ce-f4906b06b700",
