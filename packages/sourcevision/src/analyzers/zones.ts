@@ -618,6 +618,9 @@ export { computeGlobalContentHash } from "./zone-hash.js";
  * These insights translate raw cohesion/coupling numbers into architectural
  * guidance:
  *
+ * - **Isolated files**: multiple files with no import edges — cohesion is
+ *   unmeasurable (reported as 0). Not inherently bad, but the grouping is
+ *   based on proximity rather than structural evidence.
  * - **High cohesion** (≥0.8): files are tightly interconnected — good sign.
  *   Perfect cohesion (1.0) means the zone is fully self-contained.
  * - **Low cohesion** (<0.4): files are loosely related — consider splitting.
@@ -629,9 +632,10 @@ export { computeGlobalContentHash } from "./zone-hash.js";
  * - **Hub files**: files imported across 3+ zones are cross-cutting dependencies.
  * - **Bidirectional coupling**: zone pairs that import from each other.
  *
- * When all zones achieve perfect cohesion, it validates that the Louvain
- * community detection successfully identified the codebase's natural
- * architectural boundaries.
+ * When all connected zones achieve perfect cohesion, it validates that the
+ * Louvain community detection successfully identified the codebase's natural
+ * architectural boundaries. Isolated-file zones (cohesion 0) are excluded
+ * from this assessment — their grouping is proximity-based, not structural.
  */
 export function generateStructuralInsights(
   zones: Zone[],
@@ -657,7 +661,11 @@ export function generateStructuralInsights(
       ? Math.round((zone.files.length / totalFiles) * 100)
       : 0;
 
-    if (zone.cohesion >= 0.8) {
+    if (zone.cohesion === 0 && zone.coupling === 0 && zone.files.length > 1) {
+      insights.push(
+        `Isolated files — no import edges between ${zone.files.length} files, cohesion is unmeasurable (reported as 0)`
+      );
+    } else if (zone.cohesion >= 0.8) {
       insights.push(
         `High cohesion (${zone.cohesion}) — files are tightly interconnected`
       );
@@ -1043,11 +1051,16 @@ function computeZoneMetrics(
   if (productionNodeCount <= 1) {
     return { cohesion: 1, coupling: 0 };
   }
+  // Multiple production files but zero edges: files are completely isolated
+  // from each other. Cohesion is 0 (no evidence of relatedness), not 1.
+  // Returning 1 here would be a metric artifact — perfect cohesion should
+  // require actual internal edges, not merely the absence of external ones.
+  if (totalEdgesFromZone === 0) {
+    return { cohesion: 0, coupling: 0 };
+  }
   return {
-    cohesion: totalEdgesFromZone > 0
-      ? Math.round((internalEdgeCount / totalEdgesFromZone) * 100) / 100 : 1,
-    coupling: totalEdgesFromZone > 0
-      ? Math.round(((totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone) * 100) / 100 : 0,
+    cohesion: Math.round((internalEdgeCount / totalEdgesFromZone) * 100) / 100,
+    coupling: Math.round(((totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone) * 100) / 100,
   };
 }
 
@@ -1075,6 +1088,11 @@ function computeEntryPoints(
  * Convert Louvain community assignments into Zone objects with metrics.
  * Computes entry points, cohesion/coupling, and recursive subdivision.
  *
+ * Cohesion/coupling are computed from `metricsGraph` (import edges only),
+ * not from the clustering `graph` which includes proximity edges. This
+ * prevents isolated files grouped by directory proximity from receiving
+ * artificially perfect cohesion scores.
+ *
  * When `parentId` is provided (subdivision), zone IDs are derived relative
  * to the parent and prefixed with `parentId/`. The `depth` parameter is
  * threaded to `subdivideZone` for recursion limiting.
@@ -1082,6 +1100,7 @@ function computeEntryPoints(
 function buildZonesFromCommunities(
   community: Map<string, string>,
   graph: Map<string, Map<string, number>>,
+  metricsGraph: Map<string, Map<string, number>>,
   imports: Imports,
   inventory: Inventory,
   testFiles: Set<string>,
@@ -1130,7 +1149,7 @@ function buildZonesFromCommunities(
             existing.description = describeZone(existing.files, inventory);
             const mergedSet = new Set(existing.files);
             existing.entryPoints = computeEntryPoints(mergedSet, imports);
-            const metrics = computeZoneMetrics(existing.files, graph, testFiles);
+            const metrics = computeZoneMetrics(existing.files, metricsGraph, testFiles);
             existing.cohesion = metrics.cohesion;
             existing.coupling = metrics.coupling;
             // Re-subdivide with merged files
@@ -1157,7 +1176,7 @@ function buildZonesFromCommunities(
 
     const memberSet = new Set(members);
     const entryPoints = computeEntryPoints(memberSet, imports);
-    const { cohesion, coupling } = computeZoneMetrics(members, graph, testFiles);
+    const { cohesion, coupling } = computeZoneMetrics(members, metricsGraph, testFiles);
 
     const zone: Zone = {
       id,
@@ -1640,6 +1659,15 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // ── Build undirected graph ──
   const graph = buildUndirectedGraph(edges);
 
+  // Snapshot the import-only graph for metrics computation. Proximity edges
+  // exist to help Louvain cluster disconnected files but they are NOT
+  // evidence of architectural cohesion — inflating cohesion for zones
+  // whose files share a directory but never import each other.
+  const importOnlyGraph: Map<string, Map<string, number>> = new Map();
+  for (const [node, neighbors] of graph) {
+    importOnlyGraph.set(node, new Map(neighbors));
+  }
+
   // ── Add directory proximity edges ──
   // Only for files not already in the import graph, and only those sharing
   // a directory with at least one other non-import file. Files with imports
@@ -1688,7 +1716,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
-    community, graph, imports, inventory, testFiles, parentId, depth,
+    community, graph, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
     maxPct < 100 ? maxZoneSize : undefined,
   );
 

@@ -219,6 +219,23 @@ describe("analyzeZones", () => {
     expect(result.zones[0].coupling).toBe(0);
   });
 
+  it("gives cohesion=0 to multi-file zones with no import edges", async () => {
+    // Two files in the same directory but no imports between them
+    const inventory = makeInventory([
+      makeFileEntry("scripts/check-a.mjs"),
+      makeFileEntry("scripts/check-b.mjs"),
+    ]);
+    const imports = makeImports([]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    // All files should land in one zone (proximity-based)
+    expect(result.zones).toHaveLength(1);
+    // No edges → cohesion should be 0, not the old default of 1
+    expect(result.zones[0].cohesion).toBe(0);
+    expect(result.zones[0].coupling).toBe(0);
+  });
+
   it("populates crossings for cross-zone edges", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/a/x.ts"),

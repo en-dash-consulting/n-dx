@@ -13,12 +13,16 @@
  * Louvain detects this automatically, producing zones that match intuitive
  * architectural groupings without any configuration.
  *
- * ## Achieving perfect cohesion
+ * ## Cohesion scoring
  *
  * When the algorithm finds zones with cohesion 1.0 and coupling 0.0, it means
  * all import edges for that zone's files stay within the zone — a sign of
  * excellent encapsulation. This typically happens with well-structured packages
  * that expose clean public interfaces.
+ *
+ * Zones where multiple files have **no** import edges at all receive cohesion
+ * 0.0 — the absence of edges means cohesion is unmeasurable, not perfect.
+ * Single-file zones are the exception: cohesion is trivially 1.0.
  *
  * ## Pipeline
  *

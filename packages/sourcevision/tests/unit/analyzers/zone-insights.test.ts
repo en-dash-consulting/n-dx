@@ -23,6 +23,25 @@ import {
 // ── generateStructuralInsights ──────────────────────────────────────────────
 
 describe("generateStructuralInsights", () => {
+  it("generates isolated-files insight for multi-file zones with no edges", () => {
+    const zones: Zone[] = [
+      { id: "landing", name: "Landing", description: "", files: ["scripts/a.mjs", "scripts/b.mjs"], entryPoints: [], cohesion: 0, coupling: 0 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("Isolated files"))).toBe(true);
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("2 files"))).toBe(true);
+    // Should NOT generate "High cohesion" for isolated files
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("High cohesion"))).toBe(false);
+  });
+
+  it("does not generate isolated-files insight for single-file zones", () => {
+    const zones: Zone[] = [
+      { id: "single", name: "Single", description: "", files: ["src/only.ts"], entryPoints: [], cohesion: 1, coupling: 0 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("single")!.some((i) => i.includes("Isolated files"))).toBe(false);
+  });
+
   it("generates high-cohesion insight", () => {
     const zones: Zone[] = [
       { id: "core", name: "Core", description: "", files: ["a.ts", "b.ts", "c.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 },
