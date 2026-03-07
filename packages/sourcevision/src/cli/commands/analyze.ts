@@ -14,6 +14,7 @@ import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
 import { loadLLMConfig } from "@n-dx/llm-client";
+import type { RiskJustificationEntry } from "../../schema/v1.js";
 import { detectSubAnalyses } from "../../analyzers/workspace.js";
 import {
   setLLMConfig,
@@ -279,9 +280,14 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
       ? JSON.parse(readFileSync(classificationsPath, "utf-8"))
       : null;
 
+    // Load risk justifications from .n-dx.json (synchronous — we're in a sync function)
+    const riskJustifications = loadRiskJustifications(ctx.svDir);
+
     // Compute architectural risk scoring and attach metrics to zones
     if (zonesData.zones.length > 0) {
-      const riskResult = assessAllZoneRisks(zonesData);
+      const riskResult = assessAllZoneRisks(zonesData, {
+        justifications: riskJustifications,
+      });
 
       // Attach risk metrics to each zone object
       for (const zone of zonesData.zones) {
@@ -326,4 +332,24 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
   } catch {
     // Non-critical — don't fail the analysis
   }
+}
+
+/**
+ * Load risk justifications from .n-dx.json (synchronous).
+ * Returns the array from `sourcevision.riskJustifications` or undefined.
+ */
+function loadRiskJustifications(svDir: string): RiskJustificationEntry[] | undefined {
+  try {
+    const projectDir = resolve(svDir, "..");
+    const configPath = join(projectDir, ".n-dx.json");
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const justifications = data?.sourcevision?.riskJustifications;
+    if (Array.isArray(justifications) && justifications.length > 0) {
+      return justifications as RiskJustificationEntry[];
+    }
+  } catch {
+    // Invalid config — no justifications
+  }
+  return undefined;
 }

@@ -202,6 +202,23 @@ export interface ZoneRiskMetrics {
   riskLevel: RiskLevel;
   /** Whether the zone fails the governance threshold (cohesion < 0.4 AND coupling > 0.6). */
   failsThreshold: boolean;
+  /**
+   * Human-provided justification for why the current risk level is acceptable.
+   * When present, the zone is still reported but findings are downgraded to
+   * informational rather than actionable warnings.
+   */
+  riskJustification?: string;
+}
+
+/**
+ * Configuration entry for a zone risk justification.
+ * Stored in .n-dx.json under `sourcevision.riskJustifications`.
+ */
+export interface RiskJustificationEntry {
+  /** Zone ID (e.g., "packages-rex:unit-core"). */
+  zone: string;
+  /** Human-readable explanation of why the risk level is acceptable. */
+  reason: string;
 }
 
 /** Token usage tracked per zone during per-zone enrichment */

@@ -12,11 +12,15 @@
  * - Risk levels: healthy → at-risk → critical → catastrophic
  * - Catastrophic: cohesion < 0.3 AND coupling > 0.7
  *
+ * Supports risk justifications: zones with a documented justification in
+ * .n-dx.json are still assessed but their findings are downgraded to
+ * informational severity and annotated with the justification text.
+ *
  * All findings are deterministic — no AI invocation required.
  */
 
 import type { Zone, Zones, Finding } from "../schema/index.js";
-import type { ZoneRiskMetrics } from "../schema/v1.js";
+import type { ZoneRiskMetrics, RiskJustificationEntry } from "../schema/v1.js";
 
 export type { ZoneRiskMetrics };
 
@@ -89,7 +93,7 @@ export function classifyRiskLevel(
 /**
  * Compute full risk metrics for a single zone.
  */
-export function assessZoneRisk(zone: Zone): ZoneRiskMetrics {
+export function assessZoneRisk(zone: Zone, justification?: string): ZoneRiskMetrics {
   const riskScore = computeRiskScore(zone.cohesion, zone.coupling);
   const riskLevel = classifyRiskLevel(zone.cohesion, zone.coupling);
   const failsThreshold =
@@ -102,6 +106,7 @@ export function assessZoneRisk(zone: Zone): ZoneRiskMetrics {
     riskScore,
     riskLevel,
     failsThreshold,
+    ...(justification ? { riskJustification: justification } : {}),
   };
 }
 
@@ -114,23 +119,48 @@ export interface RiskAssessmentResult {
   findings: Finding[];
 }
 
+/** Options for batch risk assessment. */
+export interface RiskAssessmentOptions {
+  /**
+   * Risk justifications from .n-dx.json config.
+   * Justified zones are still assessed but their findings are downgraded
+   * to informational severity.
+   */
+  justifications?: RiskJustificationEntry[];
+}
+
 /**
  * Assess architectural risk for all zones and emit findings.
  *
  * Findings are deterministic (pass 0) — they use only structural zone metrics,
  * no AI invocation.
+ *
+ * When justifications are provided, justified zones have their findings
+ * downgraded to "info" severity and annotated with the justification text.
  */
-export function assessAllZoneRisks(zones: Zones): RiskAssessmentResult {
+export function assessAllZoneRisks(
+  zones: Zones,
+  opts?: RiskAssessmentOptions,
+): RiskAssessmentResult {
   const metrics: Record<string, ZoneRiskMetrics> = {};
   const findings: Finding[] = [];
 
+  // Build justification lookup
+  const justificationMap = new Map<string, string>();
+  if (opts?.justifications) {
+    for (const j of opts.justifications) {
+      justificationMap.set(j.zone, j.reason);
+    }
+  }
+
   // Compute metrics for all zones
-  const assessed: Array<{ zone: Zone; risk: ZoneRiskMetrics }> = [];
+  const assessed: Array<{ zone: Zone; risk: ZoneRiskMetrics; justified: boolean }> = [];
   for (const zone of zones.zones) {
-    const risk = assessZoneRisk(zone);
+    const justification = justificationMap.get(zone.id);
+    const risk = assessZoneRisk(zone, justification);
     metrics[zone.id] = risk;
     if (risk.riskLevel !== "healthy") {
-      assessed.push({ zone, risk });
+      assessed.push({ zone, risk, justified: !!justification });
     }
   }
 
@@ -138,18 +168,28 @@ export function assessAllZoneRisks(zones: Zones): RiskAssessmentResult {
   assessed.sort((a, b) => b.risk.riskScore - a.risk.riskScore);
 
   // Emit per-zone findings
-  for (const { zone, risk } of assessed) {
-    findings.push({
-      type: "suggestion",
-      pass: 0,
-      scope: zone.id,
-      text: formatZoneFinding(zone, risk),
-      severity: riskLevelToSeverity(risk.riskLevel),
-    });
+  for (const { zone, risk, justified } of assessed) {
+    if (justified) {
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zone.id,
+        text: formatJustifiedFinding(zone, risk),
+        severity: "info",
+      });
+    } else {
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zone.id,
+        text: formatZoneFinding(zone, risk),
+        severity: riskLevelToSeverity(risk.riskLevel),
+      });
+    }
   }
 
-  // Emit global summary if multiple zones fail the governance threshold
-  const failingZones = assessed.filter(({ risk }) => risk.failsThreshold);
+  // Emit global summary if multiple unjustified zones fail the governance threshold
+  const failingZones = assessed.filter(({ risk, justified }) => risk.failsThreshold && !justified);
   if (failingZones.length >= 2) {
     findings.push({
       type: "suggestion",
@@ -183,6 +223,14 @@ function formatZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
     `Zone "${zone.name}" (${zone.id}) has ${level} risk ` +
     `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
     `coupling: ${risk.coupling.toFixed(2)}) — ${action}`
+  );
+}
+
+function formatJustifiedFinding(zone: Zone, risk: ZoneRiskMetrics): string {
+  return (
+    `Zone "${zone.name}" (${zone.id}) has ${risk.riskLevel} risk ` +
+    `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
+    `coupling: ${risk.coupling.toFixed(2)}) — justified: ${risk.riskJustification}`
   );
 }
 

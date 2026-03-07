@@ -26,8 +26,7 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
-import { createWebSocketManager } from "./websocket.js";
-import { WsHealthTracker } from "./ws-health-tracker.js";
+import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
 import { ALL_DATA_FILES } from "../shared/data-files.js";
 import { findAvailablePort } from "./port.js";
 
