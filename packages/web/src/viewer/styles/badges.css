@@ -1,0 +1,110 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Centralized Badge & Chip Components
+   ─────────────────────────────────────────────────────────────────
+   Single source of truth for:
+   • Status badges (read-only inline indicators)
+   • Status color palette (shared by interactive chips/buttons too)
+   • Tag chips (uniform across tree and detail panel)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Status Badge (read-only) ──────────────────────────────────────
+   Used in: search results, dashboard "next task", epic summaries,
+   execution panel status, and anywhere a non-interactive status
+   indicator is needed.
+   ──────────────────────────────────────────────────────────────── */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: var(--leading-normal);
+}
+
+/* ── Status colors ─────────────────────────────────────────────── */
+
+.status-badge--completed {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+
+.status-badge--in_progress {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.status-badge--pending {
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text-dim) 12%, transparent);
+}
+
+.status-badge--failing {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.status-badge--blocked {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.status-badge--deferred {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.status-badge--deleted {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  opacity: 0.7;
+}
+
+/* Execution panel status aliases — same visual treatment,
+   mapped to the canonical PRD status palette */
+.status-badge--running {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  animation: status-badge-pulse 2s ease-in-out infinite;
+}
+
+.status-badge--paused {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.status-badge--failed {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+@keyframes status-badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── Tag Chip ──────────────────────────────────────────────────────
+   Unified tag appearance shared by tree nodes, task detail,
+   dashboard cards, and any other tag display.
+   ──────────────────────────────────────────────────────────────── */
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 1px var(--space-1-5);
+  border-radius: 3px;
+}
+
+.tag-chip-list {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}

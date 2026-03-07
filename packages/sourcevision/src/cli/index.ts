@@ -24,6 +24,7 @@ import { cmdValidate } from "./commands/validate.js";
 import { cmdExportPdf } from "./commands/export-pdf.js";
 import { cmdGitCredentialHelper } from "./commands/git-credential-helper.js";
 import { cmdPrMarkdown } from "./commands/pr-markdown.js";
+import { cmdWorkspace } from "./commands/workspace.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet } from "./output.js";
 import { formatTypoSuggestion } from "@n-dx/llm-client";
@@ -48,7 +49,7 @@ for (const a of args.slice(1)) {
     quiet = true;
   } else if (a === "--help" || a === "-h") {
     help = true;
-  } else if (a.startsWith("--phase=") || a.startsWith("--only=") || a === "--fast" || a === "--full") {
+  } else if (a.startsWith("--phase=") || a.startsWith("--only=") || a === "--fast" || a === "--full" || a === "--deep") {
     passthrough.push(a);
   }
 }
@@ -112,6 +113,9 @@ try {
     case "git-credential-helper":
       cmdGitCredentialHelper();
       break;
+    case "workspace":
+      cmdWorkspace(targetArg || ".", args.slice(1));
+      break;
     case "mcp":
       await cmdMcp(targetArg || ".");
       break;
@@ -121,7 +125,7 @@ try {
       usage();
       break;
     default: {
-      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "pr-markdown", "git-credential-helper", "mcp"];
+      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
       const typoHint = formatTypoSuggestion(command, SV_COMMANDS, "sourcevision ");
       throw new CLIError(
         `Unknown command: ${command}`,

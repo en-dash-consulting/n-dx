@@ -31,6 +31,8 @@ export function usage(): void {
           { name: "recommend [dir]", description: "Get SourceVision recommendations" },
           { name: "analyze [dir]", description: "Build PRD from project analysis" },
           { name: "import [dir]", description: "Alias for analyze (file import shorthand)" },
+          { name: "reorganize [dir]", description: "Detect and fix structural issues in the PRD" },
+          { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
           { name: "sync [dir]", description: "Sync local PRD with remote adapter" },
           { name: "adapter <sub> [name]", description: "Manage store adapters (list|add|remove|show)" },
           { name: "mcp [dir]", description: "Start MCP server" },

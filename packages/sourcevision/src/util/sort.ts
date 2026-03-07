@@ -55,6 +55,8 @@ export function sortZones(zones: Zone[]): Zone[] {
       files: [...z.files].sort(cmp),
       entryPoints: [...z.entryPoints].sort(cmp),
       // insights: order is meaningful (structural first, then by pass) — don't sort
+      ...(z.subZones ? { subZones: sortZones(z.subZones) } : {}),
+      ...(z.subCrossings ? { subCrossings: sortCrossings(z.subCrossings) } : {}),
     }))
     .sort((a, b) => cmp(a.id, b.id));
 }

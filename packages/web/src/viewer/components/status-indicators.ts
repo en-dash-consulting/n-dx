@@ -1,193 +1,28 @@
 /**
  * Sidebar status indicators — compact health badges for each product section.
  *
- * Fetches `/api/status` with polling and renders:
- * - SourceVision: analysis freshness indicator
- * - Rex: PRD completion percentage + pending task indicator
- * - Hench: run count badge
- *
- * Designed to slot into each sidebar section's item list, below nav items.
+ * Pure presentation components that render status data as sidebar badges.
+ * The infrastructure coupling (polling, WebSocket, messaging) lives in the
+ * `use-project-status` hook, following the consistent hook abstraction
+ * pattern used across all infrastructure services.
  */
 
 import { h } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { usePolling } from "../hooks/use-polling.js";
-import { createMessageCoalescer } from "../message-coalescer.js";
-import { createMessageThrottle } from "../message-throttle.js";
-import { isFeatureDisabled, onDegradationChange } from "../graceful-degradation.js";
 import type { ViewId } from "../types.js";
 
-// ---------------------------------------------------------------------------
-// Types (mirror server-side ProjectStatus shape)
-// ---------------------------------------------------------------------------
+// Re-export hook and types from the canonical hooks location.
+// This preserves backward-compatibility for any consumer that imported
+// from this module before the extraction.
+export { useProjectStatus } from "../hooks/use-project-status.js";
+export type {
+  ProjectStatus,
+  SourceVisionStatus,
+  RexStatus,
+  HenchStatus,
+} from "../hooks/use-project-status.js";
 
-type AnalysisFreshness = "fresh" | "stale" | "unavailable";
-
-interface SourceVisionStatus {
-  freshness: AnalysisFreshness;
-  analyzedAt: string | null;
-  minutesAgo: number | null;
-  modulesComplete: number;
-  modulesTotal: number;
-}
-
-interface TreeStats {
-  total: number;
-  completed: number;
-  inProgress: number;
-  pending: number;
-  deferred: number;
-  blocked: number;
-}
-
-interface RexStatus {
-  exists: boolean;
-  percentComplete: number;
-  stats: TreeStats | null;
-  hasInProgress: boolean;
-  hasPending: boolean;
-  nextTaskTitle: string | null;
-}
-
-interface HenchStatus {
-  configured: boolean;
-  totalRuns: number;
-  activeRuns: number;
-  staleRuns: number;
-}
-
-interface ProjectStatus {
-  sv: SourceVisionStatus;
-  rex: RexStatus;
-  hench: HenchStatus;
-}
-
-// ---------------------------------------------------------------------------
-// Status fetcher with dedup + polling
-// ---------------------------------------------------------------------------
-
-const POLL_INTERVAL_MS = 10_000;
-
-let cachedStatus: ProjectStatus | null = null;
-let fetchPromise: Promise<ProjectStatus | null> | null = null;
-
-async function fetchStatus(): Promise<ProjectStatus | null> {
-  if (fetchPromise) return fetchPromise;
-  fetchPromise = (async () => {
-    try {
-      const res = await fetch("/api/status");
-      if (!res.ok) return null;
-      const data: ProjectStatus = await res.json();
-      cachedStatus = data;
-      return data;
-    } catch {
-      return null;
-    } finally {
-      fetchPromise = null;
-    }
-  })();
-  return fetchPromise;
-}
-
-/** Hook that returns project status, polling at a regular interval.
- *  Also listens for WebSocket events (hench:run-changed, rex:prd-changed)
- *  to refresh immediately when runs or PRD data change on disk.
- *
- *  Polling is automatically suspended when memory pressure disables the
- *  `autoRefresh` feature (elevated tier and above). The last-known status
- *  is preserved and displayed without updates until pressure subsides. */
-function useProjectStatus(): ProjectStatus | null {
-  const [status, setStatus] = useState<ProjectStatus | null>(cachedStatus);
-  const mountedRef = useRef(true);
-
-  // Track memory-pressure state reactively so usePolling's `enabled`
-  // parameter updates when the degradation tier changes.
-  const [autoRefreshDisabled, setAutoRefreshDisabled] = useState(
-    () => isFeatureDisabled("autoRefresh")
-  );
-
-  useEffect(() => {
-    const unsubscribe = onDegradationChange((state) => {
-      setAutoRefreshDisabled(state.disabledFeatures.has("autoRefresh"));
-    });
-    return unsubscribe;
-  }, []);
-
-  const refresh = useCallback(async () => {
-    const data = await fetchStatus();
-    if (mountedRef.current) setStatus(data);
-  }, []);
-
-  // Initial fetch + WebSocket for instant updates
-  useEffect(() => {
-    mountedRef.current = true;
-
-    refresh();
-
-    // Connect to WebSocket for instant status updates when runs/PRD change.
-    // Two-layer pipeline: per-type throttle → coalescer → single refresh.
-    //
-    // The throttle debounces high-frequency message types (rex:prd-changed,
-    // hench:task-execution-progress) independently before they reach the
-    // coalescer. Other types pass through immediately.
-    let ws: WebSocket | null = null;
-
-    const coalescer = createMessageCoalescer({
-      onFlush: (batch) => {
-        if (!mountedRef.current) return;
-        const needsRefresh =
-          batch.types.has("hench:run-changed") ||
-          batch.types.has("hench:task-execution-progress") ||
-          batch.types.has("rex:prd-changed");
-        if (needsRefresh) {
-          refresh();
-        }
-      },
-    });
-
-    const throttle = createMessageThrottle({
-      onMessage: (msg) => coalescer.push(msg),
-      defaultDelayMs: 250,
-      delays: {
-        "rex:prd-changed": 300,
-        "hench:task-execution-progress": 200,
-      },
-      throttledTypes: ["rex:prd-changed", "hench:task-execution-progress"],
-      maxPendingPerType: 20,
-    });
-
-    try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const msg = JSON.parse(event.data);
-          throttle.push(msg);
-        } catch {
-          // ignore malformed messages
-        }
-      };
-    } catch {
-      // WebSocket not available — polling still works as fallback
-    }
-
-    return () => {
-      mountedRef.current = false;
-      throttle.dispose();
-      coalescer.dispose();
-      if (ws) {
-        try { ws.close(); } catch { /* ignore */ }
-      }
-    };
-  }, [refresh]);
-
-  // Visibility-aware polling via polling manager.
-  // Disabled during memory pressure (autoRefresh feature disabled).
-  usePolling("status-indicators", refresh, POLL_INTERVAL_MS, !autoRefreshDisabled);
-
-  return status;
-}
+// Import types for use in component props
+import type { SourceVisionStatus, RexStatus, HenchStatus } from "../hooks/use-project-status.js";
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -382,10 +217,3 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
     ),
   );
 }
-
-// ---------------------------------------------------------------------------
-// Composite hook export
-// ---------------------------------------------------------------------------
-
-export { useProjectStatus };
-export type { ProjectStatus, SourceVisionStatus, RexStatus, HenchStatus };

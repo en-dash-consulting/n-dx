@@ -1,0 +1,20 @@
+{
+  "id": "hench/unit/agent-3",
+  "name": "Hench/unit/agent 3",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/store/config.ts",
+    "packages/hench/tests/integration/store-roundtrip.test.ts",
+    "packages/hench/tests/unit/agent/atomic-transition.test.ts",
+    "packages/hench/tests/unit/agent/loop.test.ts",
+    "packages/hench/tests/unit/agent/task-failure.test.ts",
+    "packages/hench/tests/unit/store/project-config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/store/config.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 6,
+  "lineCount": 999
+}

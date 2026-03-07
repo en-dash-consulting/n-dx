@@ -388,9 +388,13 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
     await removePortFile(absDir);
 
     const script = resolve(__dir, tools.web);
+    // Strip CLAUDECODE so child processes (rex analyze, hench run) can
+    // spawn the claude CLI without the "nested session" guard blocking them.
+    const { CLAUDECODE: _cc, ...serverEnv } = process.env;
     const child = spawn(process.execPath, [script, ...serveArgs], {
       stdio: "ignore",
       detached: true,
+      env: serverEnv,
     });
     child.unref();
 

@@ -32,8 +32,6 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { collectAllIds } from "./rex-gateway.js";
-import type { PRDDocument } from "./rex-gateway.js";
 import type { IncrementalTaskUsageAggregator, TaskUsageAccumulator } from "./incremental-task-usage.js";
 
 // ---------------------------------------------------------------------------
@@ -149,17 +147,33 @@ export function loadCleanupConfig(projectDir: string): CleanupConfig {
   }
 }
 
+/** Minimal PRD shape for cleanup — avoids importing full rex types. */
+interface PRDShape {
+  items?: unknown[];
+}
+
+/**
+ * Callback that extracts valid task IDs from a flat array of PRD items.
+ * Injected by the caller to avoid a direct import of rex-gateway, which
+ * would create a bidirectional dependency cycle between the web-server
+ * and web-viewer zones.
+ */
+export type CollectAllIdsFn = (items: unknown[]) => Set<string>;
+
 /**
  * Load valid task IDs from the PRD file.
  *
  * Returns null if the PRD cannot be read, allowing callers to degrade
  * gracefully (skip cleanup rather than removing everything).
  */
-function loadValidTaskIds(rexDir: string): Set<string> | null {
+function loadValidTaskIds(
+  rexDir: string,
+  collectAllIds: CollectAllIdsFn,
+): Set<string> | null {
   const prdPath = join(rexDir, "prd.json");
   if (!existsSync(prdPath)) return null;
   try {
-    const doc = JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
+    const doc = JSON.parse(readFileSync(prdPath, "utf-8")) as PRDShape;
     if (!Array.isArray(doc.items)) return null;
     return collectAllIds(doc.items);
   } catch {
@@ -184,20 +198,22 @@ function loadValidTaskIds(rexDir: string): Set<string> | null {
  *
  * @param options.aggregator The incremental task usage aggregator to clean
  * @param options.rexDir Path to the `.rex/` directory containing `prd.json`
+ * @param options.collectAllIds Injected function to extract IDs from PRD items
  * @param options.logPath Optional path for the JSONL audit log
  * @param options.broadcast Optional WebSocket broadcast function
  */
 export async function runCleanupCycle(options: {
   aggregator: IncrementalTaskUsageAggregator;
   rexDir: string;
+  collectAllIds?: CollectAllIdsFn;
   logPath?: string;
   broadcast?: (data: unknown) => void;
 }): Promise<CleanupResult> {
-  const { aggregator, rexDir, logPath, broadcast } = options;
+  const { aggregator, rexDir, collectAllIds: collectIds, logPath, broadcast } = options;
 
   // Ensure aggregator is populated before checking for orphans
   const taskUsage = await aggregator.getTaskUsage();
-  const validIds = loadValidTaskIds(rexDir);
+  const validIds = collectIds ? loadValidTaskIds(rexDir, collectIds) : null;
 
   const result: CleanupResult = {
     timestamp: new Date().toISOString(),
@@ -270,6 +286,7 @@ export function startUsageCleanupScheduler(
   getAggregator: () => IncrementalTaskUsageAggregator,
   broadcast?: (data: unknown) => void,
   overrideIntervalMs?: number,
+  collectAllIds?: CollectAllIdsFn,
 ): ReturnType<typeof setInterval> {
   const logPath = join(ctx.projectDir, ".hench", "usage-cleanup.jsonl");
 
@@ -282,6 +299,7 @@ export function startUsageCleanupScheduler(
       const result = await runCleanupCycle({
         aggregator,
         rexDir: ctx.rexDir,
+        collectAllIds,
         logPath,
         broadcast,
       });

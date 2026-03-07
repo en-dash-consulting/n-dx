@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web/unit/server-3",
+  "name": "Web Viewer/web/unit/server 3",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/server/pr-markdown-refresh-diagnostics.ts",
+    "packages/web/src/server/routes-sourcevision.ts",
+    "packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts",
+    "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+    "packages/web/tests/unit/server/scope.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/routes-sourcevision.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 5,
+  "lineCount": 1941
+}

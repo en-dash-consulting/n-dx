@@ -4,7 +4,7 @@ import {
   type SyncDirection,
   type SyncReport,
 } from "../../../src/core/sync-engine.js";
-import type { PRDStore, StoreCapabilities } from "../../../src/store/types.js";
+import type { PRDStore, StoreCapabilities } from "../../../src/store/contracts.js";
 import type {
   PRDDocument,
   PRDItem,

@@ -43,18 +43,23 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex status [options] [dir]",
     description:
       "Displays the full PRD hierarchy with status icons, progress bars, and\n" +
-      "optional token usage summary. Completed subtrees are hidden by default.",
+      "optional token usage summary. Completed subtrees and deleted items are\n" +
+      "hidden by default.",
     options: [
-      { flag: "--all", description: "Show all items including completed ones" },
+      { flag: "--all", description: "Show all items including completed and deleted ones" },
       { flag: "--coverage", description: "Show test coverage per task" },
       { flag: "--tokens=false", description: "Hide token usage summary (shown by default)" },
       { flag: "--since=<ISO>", description: "Filter token usage after this timestamp" },
       { flag: "--until=<ISO>", description: "Filter token usage before this timestamp" },
       { flag: "--format=tree|json", description: "Output format (default: tree)" },
+      { flag: "--group-by=<facet>", description: "Group items by facet value instead of hierarchy" },
+      { flag: "--stale", description: "Show only stale items (in_progress > 48h)" },
     ],
     examples: [
       { command: "rex status", description: "Show PRD tree (hides completed)" },
-      { command: "rex status --all", description: "Show everything including completed items" },
+      { command: "rex status --all", description: "Show everything including completed and deleted items" },
+      { command: "rex status --group-by=component", description: "Group items by component facet" },
+      { command: "rex status --stale", description: "Show stale in-progress items" },
       { command: "rex status --format=json .", description: "Machine-readable JSON output" },
     ],
     related: ["next", "usage"],
@@ -481,6 +486,56 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["sync"],
   },
+  reorganize: {
+    tool: "rex",
+    command: "reorganize",
+    summary: "detect and fix structural issues in the PRD",
+    usage: "rex reorganize [options] [dir]",
+    description:
+      "Analyzes the PRD tree using both programmatic detectors and LLM reasoning.\n" +
+      "Programmatic: orphaned features, near-duplicates, oversized/undersized containers.\n" +
+      "LLM: semantic merge, update, reparent, split, and obsolete proposals.\n" +
+      "Use --fast to skip LLM analysis for quick structural checks only.",
+    options: [
+      { flag: "--accept", description: "Apply all low-risk structural proposals" },
+      { flag: "--accept=<ids>", description: "Apply specific structural proposals by ID (comma-separated)" },
+      { flag: "--accept=all", description: "Apply structural (low-risk) + all LLM proposals" },
+      { flag: "--accept-llm", description: "Apply all LLM proposals" },
+      { flag: "--accept-llm=<ids>", description: "Apply specific LLM proposals by display index" },
+      { flag: "--fast", description: "Programmatic analysis only (no LLM call)" },
+      { flag: "--model=<model>", description: "LLM model to use for analysis" },
+      { flag: "--include-completed", description: "Include completed items in similarity analysis" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex reorganize", description: "Detect issues and show all proposals" },
+      { command: "rex reorganize --fast", description: "Structural analysis only (no LLM)" },
+      { command: "rex reorganize --accept", description: "Apply low-risk structural proposals" },
+      { command: "rex reorganize --accept-llm", description: "Apply all LLM proposals" },
+      { command: "rex reorganize --accept=all", description: "Apply structural + LLM proposals" },
+      { command: "rex reorganize --accept-llm=1,3", description: "Apply LLM proposals 1 and 3" },
+    ],
+    related: ["health", "prune", "reshape"],
+  },
+  health: {
+    tool: "rex",
+    command: "health",
+    summary: "show structure health score",
+    usage: "rex health [options] [dir]",
+    description:
+      "Computes a multi-dimensional health score (0–100) for the PRD structure.\n" +
+      "Evaluates depth (items at correct nesting), balance (even distribution),\n" +
+      "granularity (task quality), completeness (metadata coverage), and\n" +
+      "staleness (stale in-progress items). Includes up to 3 improvement suggestions.",
+    options: [
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex health", description: "Show health score with dimension breakdown" },
+      { command: "rex health --format=json .", description: "JSON output for CI dashboards" },
+    ],
+    related: ["reorganize", "report", "validate"],
+  },
   mcp: {
     tool: "rex",
     command: "mcp",
@@ -522,6 +577,8 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   analyze: ["add", "recommend"],
   import: ["add", "recommend"],
   adapter: ["sync"],
+  reorganize: ["health", "prune", "reshape"],
+  health: ["reorganize", "report", "validate"],
   mcp: [],
 };
 

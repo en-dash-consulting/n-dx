@@ -1,0 +1,39 @@
+{
+  "id": "web-viewer/web-viewer/web/viewer-views",
+  "name": "Web Viewer/web Viewer/web/viewer Views",
+  "description": "15 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/config-footer.ts",
+    "packages/web/src/viewer/components/logos.ts",
+    "packages/web/src/viewer/components/notion-schema-wizard.ts",
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/components/theme-toggle.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts",
+    "packages/web/src/viewer/views/feature-toggles.ts",
+    "packages/web/src/viewer/views/hench-config.ts",
+    "packages/web/src/viewer/views/hench-templates.ts",
+    "packages/web/src/viewer/views/integration-config.ts",
+    "packages/web/src/viewer/views/notion-config.ts",
+    "packages/web/src/viewer/views/validation.ts",
+    "packages/web/src/viewer/views/workflow-optimization.ts",
+    "packages/web/tests/unit/viewer/hench-config.test.ts",
+    "packages/web/tests/unit/viewer/sidebar.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/logos.ts",
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/components/theme-toggle.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts",
+    "packages/web/src/viewer/views/feature-toggles.ts",
+    "packages/web/src/viewer/views/hench-config.ts",
+    "packages/web/src/viewer/views/hench-templates.ts",
+    "packages/web/src/viewer/views/integration-config.ts",
+    "packages/web/src/viewer/views/notion-config.ts",
+    "packages/web/src/viewer/views/validation.ts",
+    "packages/web/src/viewer/views/workflow-optimization.ts"
+  ],
+  "cohesion": 0.52,
+  "coupling": 0.48,
+  "fileCount": 15,
+  "lineCount": 6548
+}

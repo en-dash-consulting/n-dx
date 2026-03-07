@@ -30,8 +30,11 @@ import {
   appendFile,
   mkdir,
 } from "node:fs/promises";
-import { gunzipSync } from "node:zlib";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
 import { dirname } from "node:path";
+
+const gunzipAsync = promisify(gunzip);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -171,7 +174,7 @@ export async function loadRetentionConfig(
 async function readRunFile(filePath: string): Promise<unknown> {
   const raw = await readFile(filePath);
   if (filePath.endsWith(".gz")) {
-    const decompressed = gunzipSync(raw);
+    const decompressed = await gunzipAsync(raw);
     return JSON.parse(decompressed.toString("utf-8"));
   }
   return JSON.parse(raw.toString("utf-8"));

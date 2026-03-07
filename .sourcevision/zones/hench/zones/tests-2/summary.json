@@ -1,31 +1,19 @@
 {
   "id": "hench/tests-2",
   "name": "Tests 2",
-  "description": "14 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/completion.ts",
-    "packages/hench/src/prd/ops.ts",
-    "packages/hench/src/prd/rex-gateway.ts",
-    "packages/hench/src/process/exec-shell.ts",
-    "packages/hench/src/process/exec.ts",
-    "packages/hench/src/process/index.ts",
-    "packages/hench/src/tools/exec-shell.ts",
-    "packages/hench/src/tools/rex.ts",
     "packages/hench/src/validation/completion.ts",
     "packages/hench/src/validation/index.ts",
     "packages/hench/tests/unit/agent/completion.test.ts",
-    "packages/hench/tests/unit/process/exec.test.ts",
-    "packages/hench/tests/unit/tools/completion-validation.test.ts",
-    "packages/hench/tests/unit/tools/rex.test.ts"
+    "packages/hench/tests/unit/tools/completion-validation.test.ts"
   ],
   "entryPoints": [
-    "packages/hench/src/process/index.ts",
-    "packages/hench/src/validation/completion.ts",
-    "packages/hench/src/tools/rex.ts",
-    "packages/hench/src/prd/rex-gateway.ts"
+    "packages/hench/src/validation/completion.ts"
   ],
-  "cohesion": 0.74,
-  "coupling": 0.26,
-  "fileCount": 14,
-  "lineCount": 1716
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 5,
+  "lineCount": 923
 }

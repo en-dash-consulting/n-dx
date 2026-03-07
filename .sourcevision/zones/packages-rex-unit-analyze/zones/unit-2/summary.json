@@ -1,0 +1,17 @@
+{
+  "id": "unit-analyze/unit-2",
+  "name": "Unit Analyze/unit 2",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "src/analyze/guided.ts",
+    "tests/unit/analyze/guided.test.ts",
+    "tests/unit/cli/commands/analyze-guided.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyze/guided.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 0
+}

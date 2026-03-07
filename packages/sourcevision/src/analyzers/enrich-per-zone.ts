@@ -63,6 +63,7 @@ async function enrichSingleZone(
   passConfig: PassConfig,
   previousZone?: Zone,
   fileArchetypes?: Map<string, string | null>,
+  hints?: string,
 ): Promise<SingleZoneResult> {
   const ATTEMPT_CONFIGS = computePerZoneAttemptConfigs(zone.files.length, passNumber);
   const isFirstPass = passNumber === 1;
@@ -116,7 +117,7 @@ ${passConfig.focus}
 Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)
 Files: ${filesSample.map((f) => { const a = fileArchetypes?.get(f); return a ? `"${f}" [${a}]` : `"${f}"`; }).join(", ")}${entryLine}
 ${otherContext}
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Boundary crossings:
 ${crossingLines || "  (none)"}
 
@@ -140,7 +141,7 @@ Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zo
 Files: ${filesSample.map((f: string) => { const a = fileArchetypes?.get(f); return a ? `"${f}" [${a}]` : `"${f}"`; }).join(", ")}
 Known insights: ${prevInsights.slice(0, maxInsights).length > 0 ? prevInsights.slice(0, maxInsights).map((i) => `"${i}"`).join("; ") : "(none)"}
 ${otherContext}
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Boundary crossings:
 ${crossingLines || "  (none)"}
 
@@ -250,6 +251,7 @@ export async function enrichZonesPerZone(
   imports: Imports,
   previousZones?: Zones,
   fileArchetypes?: Map<string, string | null>,
+  hints?: string,
 ): Promise<PerZoneEnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
@@ -329,7 +331,7 @@ export async function enrichZonesPerZone(
           const prevZone = previousZones?.zones.find(
             (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
           );
-          return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes);
+          return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes, hints);
         })
       );
     } finally {

@@ -1,4 +1,5 @@
 import type { PRDItem } from "../schema/index.js";
+import { getLevelLabel } from "../schema/index.js";
 import { findItem } from "./tree.js";
 import { deleteItem, cleanBlockedByRefs } from "./delete.js";
 
@@ -53,8 +54,8 @@ export function removeEpic(items: PRDItem[], epicId: string): RemoveEpicResult {
     return {
       ok: false,
       deletedIds: [],
-      detail: `Item "${epicId}" is a ${entry.item.level}, not an epic.`,
-      error: `Item "${entry.item.title}" (${epicId}) is not an epic — it is a ${entry.item.level}.`,
+      detail: `Item "${epicId}" is a ${getLevelLabel(entry.item.level)}, not an ${getLevelLabel("epic")}.`,
+      error: `Item "${entry.item.title}" (${epicId}) is not an ${getLevelLabel("epic")} — it is a ${getLevelLabel(entry.item.level)}.`,
     };
   }
 

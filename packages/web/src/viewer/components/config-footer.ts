@@ -67,7 +67,7 @@ function formatModel(model: string | null): string {
   // Shorten full model IDs for display
   if (model.startsWith("claude-")) {
     const parts = model.split("-");
-    // "claude-sonnet-4-20250514" -> "sonnet 4"
+    // "claude-sonnet-4-6" -> "sonnet 4"
     if (parts.length >= 3) {
       return `${parts[1]} ${parts[2]}`;
     }

@@ -17,11 +17,11 @@ import {
   onQueueChange,
   resetRefreshThrottle,
   type RefreshQueueState,
-} from "../../../src/viewer/refresh-throttle.js";
+} from "../../../src/viewer/performance/refresh-throttle.js";
 import {
   startMemoryMonitor,
   resetMemoryMonitor,
-} from "../../../src/viewer/memory-monitor.js";
+} from "../../../src/viewer/performance/memory-monitor.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

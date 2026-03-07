@@ -4,12 +4,12 @@
 .rex-task-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
   color: var(--text);
   background: transparent;
   transition: background 0.15s, color 0.15s;
@@ -35,15 +35,15 @@
 
 /* Compact variant */
 .rex-task-link-compact {
-  padding: 2px 6px;
-  font-size: 12px;
-  gap: 4px;
+  padding: 2px var(--space-1-5);
+  font-size: var(--font-base);
+  gap: var(--space-1);
 }
 
 /* Status icon */
 .rex-task-link-status {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--font-sm);
   width: 14px;
   text-align: center;
 }
@@ -59,7 +59,7 @@
 /* Arrow indicator */
 .rex-task-link-arrow {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   opacity: 0;
   transform: translateX(-4px);
@@ -80,7 +80,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   min-width: 180px;
   max-width: 280px;
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   overflow: hidden;
   animation: rex-context-in 0.12s ease;
 }
@@ -97,12 +97,12 @@
 }
 
 .rex-context-menu-header {
-  padding: 8px 12px 4px;
+  padding: var(--space-2) var(--space-3) var(--space-1);
 }
 
 .rex-context-menu-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
   color: var(--text);
   display: block;
   overflow: hidden;
@@ -113,13 +113,13 @@
 .rex-context-menu-divider {
   height: 1px;
   background: var(--border);
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .rex-context-menu-section-label {
-  padding: 4px 12px 2px;
-  font-size: 10px;
-  font-weight: 600;
+  padding: var(--space-1) var(--space-3) 2px;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-dim);
@@ -128,13 +128,13 @@
 .rex-context-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 6px 12px;
+  padding: var(--space-1-5) var(--space-3);
   border: none;
   background: none;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-base);
   cursor: pointer;
   text-align: left;
   transition: background 0.1s;
@@ -145,8 +145,41 @@
 }
 
 .rex-context-menu-status-icon {
-  font-size: 10px;
+  font-size: var(--font-sm);
   width: 14px;
   text-align: center;
   flex-shrink: 0;
+}
+
+/* ── Context Menu Feedback ─────────────────────────────────────── */
+
+.rex-context-menu-feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 14px;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  color: var(--green, #22c55e);
+  animation: rex-context-feedback-in 0.15s ease;
+}
+
+.rex-context-menu-feedback-error {
+  color: var(--red, #ef4444);
+}
+
+.rex-context-menu-feedback-icon {
+  font-size: var(--font-md);
+  flex-shrink: 0;
+}
+
+@keyframes rex-context-feedback-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

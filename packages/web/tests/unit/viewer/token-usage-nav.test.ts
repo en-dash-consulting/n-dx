@@ -4,6 +4,7 @@ import { h, render } from "preact";
 import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 import { parsePathnameRoute } from "../../../src/viewer/route-state.js";
+import { TOKEN_USAGE_VIEW_ID } from "../../../src/viewer/usage/constants.js";
 
 function createStorageStub(): Storage {
   const store = new Map<string, string>();
@@ -70,8 +71,8 @@ describe("token usage sidebar navigation", () => {
 
   it("highlights Token Usage for direct /token-usage loads", () => {
     localStorage.setItem("sidebar-expanded-section", "SETTINGS");
-    const parsed = parsePathnameRoute("/token-usage", new Set<ViewId>(["token-usage", "feature-toggles"]));
-    expect(parsed).toEqual({ view: "token-usage", subId: null });
+    const parsed = parsePathnameRoute(`/${TOKEN_USAGE_VIEW_ID}`, new Set<ViewId>([TOKEN_USAGE_VIEW_ID, "feature-toggles"]));
+    expect(parsed).toEqual({ view: TOKEN_USAGE_VIEW_ID, subId: null });
 
     const root = renderSidebar(parsed!.view);
 
@@ -89,7 +90,7 @@ describe("token usage sidebar navigation", () => {
     const root = renderSidebar("feature-toggles");
     render(
       h(Sidebar, {
-        view: "token-usage",
+        view: TOKEN_USAGE_VIEW_ID,
         onNavigate: vi.fn(),
         manifest: null,
         zones: null,
@@ -107,8 +108,8 @@ describe("token usage sidebar navigation", () => {
 
   it("highlights Token Usage for legacy deep-link routes after normalization", () => {
     localStorage.setItem("sidebar-expanded-section", "SETTINGS");
-    const parsed = parsePathnameRoute("/rex-dashboard/token-usage", new Set<ViewId>(["token-usage", "feature-toggles"]));
-    expect(parsed).toEqual({ view: "token-usage", subId: null });
+    const parsed = parsePathnameRoute(`/rex-dashboard/${TOKEN_USAGE_VIEW_ID}`, new Set<ViewId>([TOKEN_USAGE_VIEW_ID, "feature-toggles"]));
+    expect(parsed).toEqual({ view: TOKEN_USAGE_VIEW_ID, subId: null });
 
     const root = renderSidebar(parsed!.view);
     const tokenUsageItem = findNavItem(root, "Token Usage");

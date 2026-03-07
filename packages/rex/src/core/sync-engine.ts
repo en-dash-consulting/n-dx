@@ -13,7 +13,7 @@
  * then writes the merged result back to both stores.
  */
 
-import type { PRDStore } from "../store/types.js";
+import type { PRDStore } from "../store/contracts.js";
 import type { PRDItem, PRDDocument } from "../schema/index.js";
 import { walkTree } from "./tree.js";
 import {

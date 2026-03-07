@@ -17,8 +17,8 @@
 }
 
 .val-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-bold);
   margin: 0;
 }
 
@@ -37,7 +37,7 @@
   background: transparent;
   border: none;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--font-base);
   padding: 6px 14px;
   border-radius: 4px;
   cursor: pointer;
@@ -53,7 +53,7 @@
 .val-tab.active {
   background: var(--accent);
   color: var(--bg);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 /* ── Validation Panel ────────────────────────────────────────────────── */
@@ -80,8 +80,8 @@
   border: none;
   padding: 8px 20px;
   border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
   cursor: pointer;
   transition: opacity 0.15s;
   white-space: nowrap;
@@ -98,7 +98,7 @@
 
 .val-actions-hint {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--font-base);
   margin: 0;
 }
 
@@ -108,7 +108,7 @@
   color: var(--red);
   padding: 10px 14px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--font-base);
   margin-bottom: 16px;
 }
 
@@ -116,7 +116,7 @@
   text-align: center;
   padding: 40px 20px;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 /* ── Validation Summary ──────────────────────────────────────────────── */
@@ -134,8 +134,8 @@
 }
 
 .val-summary-badge {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
   padding: 4px 12px;
   border-radius: 4px;
   white-space: nowrap;
@@ -155,12 +155,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: 13px;
+  font-size: var(--font-base);
   color: var(--text-dim);
 }
 
 .val-stat-num {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   margin-right: 3px;
 }
 
@@ -221,7 +221,7 @@
 }
 
 .val-check-icon {
-  font-size: 14px;
+  font-size: var(--font-md);
   flex-shrink: 0;
 }
 
@@ -238,14 +238,14 @@
 }
 
 .val-check-name {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
   color: var(--text);
   flex: 1;
 }
 
 .val-check-count {
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   background: var(--bg-hover);
   padding: 2px 8px;
@@ -253,7 +253,7 @@
 }
 
 .val-check-chevron {
-  font-size: 10px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   transition: transform 0.15s;
 }
@@ -270,7 +270,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px 8px 38px;
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
   transition: background 0.15s;
 }
@@ -291,7 +291,7 @@
 
 .val-error-item-title {
   color: var(--accent);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -300,7 +300,7 @@
 
 .val-error-item-id {
   font-family: monospace;
-  font-size: 10px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   opacity: 0.7;
 }
@@ -330,13 +330,13 @@
 }
 
 .dep-stat-num {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--font-2xl);
+  font-weight: var(--weight-bold);
   color: var(--text);
 }
 
 .dep-stat-label {
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
 }
 
@@ -349,7 +349,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--font-base);
   padding: 4px 12px;
   border-radius: 4px;
   cursor: pointer;
@@ -454,13 +454,13 @@
 
 .dep-node-label {
   fill: var(--text);
-  font-size: 10px;
+  font-size: var(--font-sm);
   pointer-events: none;
 }
 
 .dep-node-status-icon {
   fill: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--font-base);
   pointer-events: none;
 }
 
@@ -492,21 +492,21 @@
 }
 
 .dep-detail-title {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  font-size: var(--font-md);
   color: var(--text);
 }
 
 .dep-detail-id {
   font-family: monospace;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   opacity: 0.7;
   margin-bottom: 8px;
 }
 
 .dep-detail-deps {
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
   margin-bottom: 8px;
   display: flex;
@@ -516,13 +516,13 @@
 }
 
 .dep-detail-label {
-  font-weight: 500;
+  font-weight: var(--weight-medium);
 }
 
 .dep-detail-dep-link {
   color: var(--accent);
   cursor: pointer;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   padding: 2px 6px;
   background: rgba(0, 229, 185, 0.08);
   border-radius: 3px;
@@ -537,7 +537,7 @@
   background: transparent;
   border: 1px solid var(--border);
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--font-base);
   padding: 4px 12px;
   border-radius: 4px;
   cursor: pointer;
@@ -560,7 +560,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   margin-bottom: 20px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
 }
 
@@ -606,13 +606,13 @@
 }
 
 .dep-empty-icon {
-  font-size: 32px;
+  font-size: var(--font-3xl);
   color: var(--green);
   margin-bottom: 12px;
 }
 
 .dep-empty-hint {
-  font-size: 12px;
+  font-size: var(--font-base);
   opacity: 0.7;
 }
 
@@ -632,14 +632,14 @@
 }
 
 .dep-section-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
   color: var(--text);
   margin: 0 0 4px;
 }
 
 .dep-section-desc {
-  font-size: 12px;
+  font-size: var(--font-base);
   color: var(--text-dim);
   margin: 0 0 12px;
 }
@@ -682,14 +682,14 @@
   height: 28px;
   background: rgba(213, 46, 102, 0.15);
   color: var(--red);
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: var(--weight-bold);
+  font-size: var(--font-base);
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .dep-blocker-title {
-  font-size: 13px;
+  font-size: var(--font-base);
   color: var(--text);
   flex: 1;
   min-width: 0;
@@ -700,7 +700,7 @@
 
 .dep-blocker-id {
   font-family: monospace;
-  font-size: 10px;
+  font-size: var(--font-sm);
   color: var(--text-dim);
   opacity: 0.7;
 }
@@ -728,8 +728,8 @@
 
 .dep-chain-length {
   display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
   color: var(--text-dim);
   background: var(--bg-hover);
   padding: 2px 8px;
@@ -746,12 +746,12 @@
 
 .dep-chain-arrow {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--font-sm);
   opacity: 0.6;
 }
 
 .dep-chain-node {
-  font-size: 11px;
+  font-size: var(--font-sm);
   padding: 2px 8px;
   border-radius: 3px;
   cursor: pointer;

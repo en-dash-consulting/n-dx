@@ -11,6 +11,7 @@ import { checkTokenBudget } from "./token-budget.js";
 import { mapCodexUsageToTokenUsage, parseTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, stream, info } from "../../types/output.js";
+import { isSpinningRun } from "../analysis/spin.js";
 import {
   loadLLMConfig,
   type LLMVendor,
@@ -409,6 +410,18 @@ export function processStreamLine(
             if (block.type === "text" && block.text) {
               stream("Agent", block.text);
               result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
+            } else if (block.type === "tool_use") {
+              const b = block as { name?: string; input?: Record<string, unknown> };
+              const toolName = b.name || "unknown";
+              const toolInput = b.input || {};
+              stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+              result.toolCalls.push({
+                turn: turnCounter.value,
+                tool: toolName,
+                input: toolInput,
+                output: "",
+                durationMs: 0,
+              });
             }
           }
         }
@@ -447,6 +460,18 @@ export function processStreamLine(
           if (block.type === "text" && block.text) {
             stream("Agent", block.text);
             result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
+          } else if (block.type === "tool_use") {
+            const b = block as { name?: string; input?: Record<string, unknown> };
+            const toolName = b.name || "unknown";
+            const toolInput = b.input || {};
+            stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+            result.toolCalls.push({
+              turn: turnCounter.value,
+              tool: toolName,
+              input: toolInput,
+              output: "",
+              durationMs: 0,
+            });
           }
         }
       }
@@ -856,6 +881,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       accumulatedToolCalls = accumulatedToolCalls.concat(result.toolCalls);
       accumulatedTurnTokenUsage = accumulatedTurnTokenUsage.concat(result.turnTokenUsage);
       accumulatedTokenUsage = addTokenUsage(accumulatedTokenUsage, result.tokenUsage);
+
+      // Post-run spin detection: many turns with zero tool calls
+      if (isSpinningRun(result.turns, result.toolCalls.length) && !result.error) {
+        run.turns = accumulatedTurns;
+        run.toolCalls = accumulatedToolCalls;
+        run.tokenUsage = accumulatedTokenUsage;
+        run.turnTokenUsage = accumulatedTurnTokenUsage;
+        run.status = "failed";
+        run.error = `Agent spin detected: ${result.turns} turns with 0 tool calls.`;
+        run.retryAttempts = attempt > 0 ? attempt : undefined;
+        info(`\n${run.error}`);
+        await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
+        break;
+      }
 
       if (!result.error) {
         // Validate completion: require meaningful changes

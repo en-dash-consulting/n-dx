@@ -67,7 +67,7 @@
     {
       "file": "src/cli-provider.ts",
       "name": "parseJsonOutput",
-      "line": 156,
+      "line": 161,
       "column": 0,
       "qualifiedName": "parseJsonOutput",
       "isExported": false
@@ -75,7 +75,7 @@
     {
       "file": "src/cli-provider.ts",
       "name": "parseStreamOutput",
-      "line": 171,
+      "line": 176,
       "column": 0,
       "qualifiedName": "parseStreamOutput",
       "isExported": false
@@ -83,7 +83,7 @@
     {
       "file": "src/cli-provider.ts",
       "name": "createCliClient",
-      "line": 202,
+      "line": 207,
       "column": 0,
       "qualifiedName": "createCliClient",
       "isExported": true
@@ -274,8 +274,16 @@
     },
     {
       "file": "src/exec.ts",
+      "name": "killWithFallback",
+      "line": 447,
+      "column": 0,
+      "qualifiedName": "killWithFallback",
+      "isExported": true
+    },
+    {
+      "file": "src/exec.ts",
       "name": "constructor",
-      "line": 434,
+      "line": 498,
       "column": 2,
       "qualifiedName": "ProcessLimitError.constructor",
       "isExported": true
@@ -283,7 +291,7 @@
     {
       "file": "src/exec.ts",
       "name": "constructor",
-      "line": 465,
+      "line": 529,
       "column": 2,
       "qualifiedName": "ProcessPool.constructor",
       "isExported": true
@@ -291,7 +299,7 @@
     {
       "file": "src/exec.ts",
       "name": "limit",
-      "line": 471,
+      "line": 535,
       "column": 2,
       "qualifiedName": "ProcessPool.limit",
       "isExported": true
@@ -299,7 +307,7 @@
     {
       "file": "src/exec.ts",
       "name": "active",
-      "line": 476,
+      "line": 540,
       "column": 2,
       "qualifiedName": "ProcessPool.active",
       "isExported": true
@@ -307,7 +315,7 @@
     {
       "file": "src/exec.ts",
       "name": "spawn",
-      "line": 486,
+      "line": 550,
       "column": 2,
       "qualifiedName": "ProcessPool.spawn",
       "isExported": true
@@ -315,7 +323,7 @@
     {
       "file": "src/exec.ts",
       "name": "spawnManaged",
-      "line": 506,
+      "line": 570,
       "column": 2,
       "qualifiedName": "ProcessPool.spawnManaged",
       "isExported": true
@@ -467,7 +475,7 @@
     {
       "file": "src/llm-client.ts",
       "name": "resolveVendor",
-      "line": 14,
+      "line": 34,
       "column": 0,
       "qualifiedName": "resolveVendor",
       "isExported": false
@@ -475,7 +483,7 @@
     {
       "file": "src/llm-client.ts",
       "name": "detectLLMAuthMode",
-      "line": 24,
+      "line": 44,
       "column": 0,
       "qualifiedName": "detectLLMAuthMode",
       "isExported": true
@@ -483,7 +491,7 @@
     {
       "file": "src/llm-client.ts",
       "name": "createLLMClient",
-      "line": 41,
+      "line": 61,
       "column": 0,
       "qualifiedName": "createLLMClient",
       "isExported": true
@@ -1143,7 +1151,7 @@
       "calleeFile": "src/cli-provider.ts",
       "callee": "spawnOnce",
       "type": "direct",
-      "line": 227,
+      "line": 232,
       "column": 23
     },
     {
@@ -1152,7 +1160,7 @@
       "calleeFile": null,
       "callee": "Math.min",
       "type": "method",
-      "line": 238,
+      "line": 243,
       "column": 26
     },
     {
@@ -1161,7 +1169,7 @@
       "calleeFile": null,
       "callee": "setTimeout",
       "type": "direct",
-      "line": 239,
+      "line": 244,
       "column": 37
     },
     {
@@ -1170,7 +1178,7 @@
       "calleeFile": "src/config.ts",
       "callee": "resolveCliPath",
       "type": "direct",
-      "line": 203,
+      "line": 208,
       "column": 20
     },
     {
@@ -1197,7 +1205,7 @@
       "calleeFile": null,
       "callee": "JSON.parse",
       "type": "method",
-      "line": 158,
+      "line": 163,
       "column": 21
     },
     {
@@ -1206,7 +1214,7 @@
       "calleeFile": "src/token-usage.ts",
       "callee": "parseCliTokenUsage",
       "type": "direct",
-      "line": 160,
+      "line": 165,
       "column": 23
     },
     {
@@ -1215,7 +1223,7 @@
       "calleeFile": null,
       "callee": "stdout.split",
       "type": "method",
-      "line": 175,
+      "line": 180,
       "column": 21
     },
     {
@@ -1224,7 +1232,7 @@
       "calleeFile": null,
       "callee": "line.trim",
       "type": "method",
-      "line": 176,
+      "line": 181,
       "column": 9
     },
     {
@@ -1233,7 +1241,7 @@
       "calleeFile": null,
       "callee": "JSON.parse",
       "type": "method",
-      "line": 178,
+      "line": 183,
       "column": 18
     },
     {
@@ -1242,7 +1250,7 @@
       "calleeFile": "src/token-usage.ts",
       "callee": "parseStreamTokenUsage",
       "type": "direct",
-      "line": 181,
+      "line": 186,
       "column": 21
     },
     {
@@ -1251,7 +1259,7 @@
       "calleeFile": null,
       "callee": "spawn",
       "type": "direct",
-      "line": 111,
+      "line": 115,
       "column": 17
     },
     {
@@ -1260,7 +1268,7 @@
       "calleeFile": null,
       "callee": "proc.stdout.on",
       "type": "property-chain",
-      "line": 118,
+      "line": 123,
       "column": 4
     },
     {
@@ -1269,7 +1277,7 @@
       "calleeFile": null,
       "callee": "chunk.toString",
       "type": "method",
-      "line": 119,
+      "line": 124,
       "column": 16
     },
     {
@@ -1278,7 +1286,7 @@
       "calleeFile": null,
       "callee": "proc.stderr.on",
       "type": "property-chain",
-      "line": 121,
+      "line": 126,
       "column": 4
     },
     {
@@ -1287,7 +1295,7 @@
       "calleeFile": null,
       "callee": "chunk.toString",
       "type": "method",
-      "line": 122,
+      "line": 127,
       "column": 16
     },
     {
@@ -1296,7 +1304,7 @@
       "calleeFile": null,
       "callee": "proc.on",
       "type": "method",
-      "line": 125,
+      "line": 130,
       "column": 4
     },
     {
@@ -1305,7 +1313,7 @@
       "calleeFile": null,
       "callee": "reject",
       "type": "direct",
-      "line": 130,
+      "line": 135,
       "column": 8
     },
     {
@@ -1314,7 +1322,7 @@
       "calleeFile": null,
       "callee": "reject",
       "type": "direct",
-      "line": 132,
+      "line": 137,
       "column": 8
     },
     {
@@ -1323,7 +1331,7 @@
       "calleeFile": "src/cli-provider.ts",
       "callee": "isTransientError",
       "type": "direct",
-      "line": 132,
+      "line": 137,
       "column": 61
     },
     {
@@ -1332,7 +1340,7 @@
       "calleeFile": null,
       "callee": "proc.on",
       "type": "method",
-      "line": 136,
+      "line": 141,
       "column": 4
     },
     {
@@ -1341,7 +1349,7 @@
       "calleeFile": null,
       "callee": "resolve",
       "type": "direct",
-      "line": 139,
+      "line": 144,
       "column": 10
     },
     {
@@ -1350,7 +1358,7 @@
       "calleeFile": "src/cli-provider.ts",
       "callee": "parseJsonOutput",
       "type": "direct",
-      "line": 139,
+      "line": 144,
       "column": 18
     },
     {
@@ -1359,7 +1367,7 @@
       "calleeFile": null,
       "callee": "resolve",
       "type": "direct",
-      "line": 141,
+      "line": 146,
       "column": 10
     },
     {
@@ -1368,7 +1376,7 @@
       "calleeFile": "src/cli-provider.ts",
       "callee": "parseStreamOutput",
       "type": "direct",
-      "line": 141,
+      "line": 146,
       "column": 18
     },
     {
@@ -1377,7 +1385,7 @@
       "calleeFile": null,
       "callee": "stderr.trim",
       "type": "method",
-      "line": 146,
+      "line": 151,
       "column": 21
     },
     {
@@ -1386,7 +1394,7 @@
       "calleeFile": "src/cli-provider.ts",
       "callee": "classifyStderr",
       "type": "direct",
-      "line": 147,
+      "line": 152,
       "column": 25
     },
     {
@@ -1395,7 +1403,7 @@
       "calleeFile": null,
       "callee": "reject",
       "type": "direct",
-      "line": 148,
+      "line": 153,
       "column": 6
     },
     {
@@ -2034,7 +2042,7 @@
       "calleeFile": null,
       "callee": "finally",
       "type": "method",
-      "line": 495,
+      "line": 559,
       "column": 11
     },
     {
@@ -2043,7 +2051,7 @@
       "calleeFile": "src/exec.ts",
       "callee": "spawnTool",
       "type": "direct",
-      "line": 495,
+      "line": 559,
       "column": 11
     },
     {
@@ -2052,7 +2060,7 @@
       "calleeFile": "src/exec.ts",
       "callee": "spawnManaged",
       "type": "direct",
-      "line": 515,
+      "line": 579,
       "column": 19
     },
     {
@@ -2061,7 +2069,7 @@
       "calleeFile": null,
       "callee": "handle.done.then",
       "type": "property-chain",
-      "line": 518,
+      "line": 582,
       "column": 4
     },
     {
@@ -2243,6 +2251,87 @@
       "type": "method",
       "line": 414,
       "column": 15
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "handle.kill",
+      "type": "method",
+      "line": 456,
+      "column": 4
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "Promise.race",
+      "type": "method",
+      "line": 462,
+      "column": 8
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "handle.done.then",
+      "type": "property-chain",
+      "line": 463,
+      "column": 4
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "setTimeout",
+      "type": "direct",
+      "line": 465,
+      "column": 6
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "resolve",
+      "type": "direct",
+      "line": 467,
+      "column": 8
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "handle.kill",
+      "type": "method",
+      "line": 475,
+      "column": 6
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "Promise.race",
+      "type": "method",
+      "line": 480,
+      "column": 10
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "handle.done.then",
+      "type": "property-chain",
+      "line": 481,
+      "column": 6
+    },
+    {
+      "callerFile": "src/exec.ts",
+      "caller": "killWithFallback",
+      "calleeFile": null,
+      "callee": "setTimeout",
+      "type": "direct",
+      "line": 483,
+      "column": 8
     },
     {
       "callerFile": "src/exec.ts",
@@ -3501,7 +3590,7 @@
       "calleeFile": "src/llm-client.ts",
       "callee": "resolveVendor",
       "type": "direct",
-      "line": 42,
+      "line": 62,
       "column": 17
     },
     {
@@ -3510,7 +3599,7 @@
       "calleeFile": "src/codex-cli-provider.ts",
       "callee": "createCodexCliClient",
       "type": "direct",
-      "line": 45,
+      "line": 65,
       "column": 11
     },
     {
@@ -3519,7 +3608,7 @@
       "calleeFile": "src/create-client.ts",
       "callee": "createClient",
       "type": "direct",
-      "line": 51,
+      "line": 71,
       "column": 9
     },
     {
@@ -3528,7 +3617,7 @@
       "calleeFile": "src/llm-client.ts",
       "callee": "resolveVendor",
       "type": "direct",
-      "line": 25,
+      "line": 45,
       "column": 17
     },
     {
@@ -3537,7 +3626,7 @@
       "calleeFile": "src/create-client.ts",
       "callee": "detectAuthMode",
       "type": "direct",
-      "line": 29,
+      "line": 49,
       "column": 9
     },
     {
@@ -12070,6 +12159,483 @@
       "callee": "child2.emit",
       "type": "method",
       "line": 611,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 616,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 617,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useFakeTimers",
+      "type": "method",
+      "line": 618,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "tests/unit/exec.test.ts",
+      "callee": "createMockChild",
+      "type": "direct",
+      "line": 619,
+      "column": 18
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockReturnValue",
+      "type": "method",
+      "line": 622,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.fn",
+      "type": "method",
+      "line": 622,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockSpawn.mockReturnValue",
+      "type": "method",
+      "line": 623,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "spawnManaged",
+      "type": "direct",
+      "line": 625,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "killWithFallback",
+      "type": "direct",
+      "line": 626,
+      "column": 28
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 629,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledWith",
+      "type": "method",
+      "line": 629,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "child.emit",
+      "type": "method",
+      "line": 632,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 637,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledTimes",
+      "type": "method",
+      "line": 637,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useRealTimers",
+      "type": "method",
+      "line": 639,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 642,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useFakeTimers",
+      "type": "method",
+      "line": 643,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "tests/unit/exec.test.ts",
+      "callee": "createMockChild",
+      "type": "direct",
+      "line": 644,
+      "column": 18
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockReturnValue",
+      "type": "method",
+      "line": 647,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.fn",
+      "type": "method",
+      "line": 647,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockSpawn.mockReturnValue",
+      "type": "method",
+      "line": 648,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "spawnManaged",
+      "type": "direct",
+      "line": 650,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "killWithFallback",
+      "type": "direct",
+      "line": 651,
+      "column": 28
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 653,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledWith",
+      "type": "method",
+      "line": 653,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.advanceTimersByTimeAsync",
+      "type": "method",
+      "line": 656,
+      "column": 10
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 659,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledWith",
+      "type": "method",
+      "line": 659,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "child.emit",
+      "type": "method",
+      "line": 662,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useRealTimers",
+      "type": "method",
+      "line": 665,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 668,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "tests/unit/exec.test.ts",
+      "callee": "createMockChild",
+      "type": "direct",
+      "line": 669,
+      "column": 18
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.fn",
+      "type": "method",
+      "line": 672,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockSpawn.mockReturnValue",
+      "type": "method",
+      "line": 674,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "spawnManaged",
+      "type": "direct",
+      "line": 676,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "killWithFallback",
+      "type": "direct",
+      "line": 678,
+      "column": 10
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 680,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "not.toHaveBeenCalled",
+      "type": "method",
+      "line": 680,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 683,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useFakeTimers",
+      "type": "method",
+      "line": 684,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "tests/unit/exec.test.ts",
+      "callee": "createMockChild",
+      "type": "direct",
+      "line": 685,
+      "column": 18
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockReturnValue",
+      "type": "method",
+      "line": 688,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.fn",
+      "type": "method",
+      "line": 688,
+      "column": 17
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "mockSpawn.mockReturnValue",
+      "type": "method",
+      "line": 689,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "spawnManaged",
+      "type": "direct",
+      "line": 691,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/exec.ts",
+      "callee": "killWithFallback",
+      "type": "direct",
+      "line": 692,
+      "column": 28
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "child.emit",
+      "type": "method",
+      "line": 695,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.advanceTimersByTimeAsync",
+      "type": "method",
+      "line": 696,
+      "column": 10
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 701,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledTimes",
+      "type": "method",
+      "line": 701,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 702,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toHaveBeenCalledWith",
+      "type": "method",
+      "line": 702,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/exec.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "vi.useRealTimers",
+      "type": "method",
+      "line": 704,
       "column": 4
     },
     {
@@ -20893,6 +21459,2031 @@
       "column": 38
     },
     {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 160,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 161,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 162,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 162,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 165,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 166,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 166,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 169,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 170,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 170,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 173,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 174,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 174,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 177,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 178,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 178,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 181,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 182,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 182,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 185,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 186,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 186,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 189,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 190,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 190,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 193,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 194,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 194,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 197,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 198,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 198,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 201,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 202,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 202,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 205,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 206,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 206,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 209,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 210,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 210,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 213,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 214,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 214,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 217,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 218,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 218,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 221,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 222,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 222,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 225,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 226,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 226,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 229,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 230,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 230,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 233,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 234,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 234,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 240,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 241,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 242,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 242,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 245,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 246,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 246,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 249,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 250,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 250,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 253,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 254,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 254,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 257,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 258,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 258,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 261,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 262,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 262,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 265,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 266,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 266,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 269,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 270,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 270,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 273,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 274,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 274,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 277,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 278,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 278,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 284,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 285,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 286,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 286,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 288,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBeInstanceOf",
+      "type": "method",
+      "line": 288,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 289,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBeInstanceOf",
+      "type": "method",
+      "line": 289,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 290,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 290,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 291,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 291,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 294,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 295,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 295,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 297,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBeInstanceOf",
+      "type": "method",
+      "line": 297,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 298,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBeInstanceOf",
+      "type": "method",
+      "line": 298,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 299,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 299,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 305,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 306,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 307,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 307,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 310,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 311,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 311,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 314,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 315,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBeInstanceOf",
+      "type": "method",
+      "line": 315,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 318,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 319,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 319,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 322,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 323,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 323,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 329,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 330,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 331,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 331,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 332,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "not.toBeNull",
+      "type": "method",
+      "line": 332,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 335,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 336,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 336,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 339,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 340,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 340,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 343,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 344,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 344,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 347,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 348,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 348,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 351,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 352,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 352,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 355,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 356,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 356,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 359,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 360,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 360,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 363,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 364,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 364,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 367,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 368,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 368,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 371,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 372,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 372,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 375,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 376,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 376,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 382,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 383,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 384,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 384,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 387,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 388,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 388,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 391,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 392,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 392,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 395,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 396,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 396,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 399,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 400,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 400,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 403,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 404,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 404,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 407,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 408,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 408,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 411,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 412,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 412,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 415,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 416,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 416,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 419,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 420,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 420,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 423,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 424,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 424,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 427,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 428,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 428,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 431,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 432,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 432,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "describe",
+      "type": "direct",
+      "line": 441,
+      "column": 0
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 442,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 449,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 449,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 456,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 456,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 459,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/public.ts",
+      "callee": "createLLMClient",
+      "type": "direct",
+      "line": 466,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 467,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 467,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 470,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": "src/public.ts",
+      "callee": "createLLMClient",
+      "type": "direct",
+      "line": 472,
+      "column": 19
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 475,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 475,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 478,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 483,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 483,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "it",
+      "type": "direct",
+      "line": 486,
+      "column": 2
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "expect",
+      "type": "direct",
+      "line": 491,
+      "column": 4
+    },
+    {
+      "callerFile": "tests/unit/public-api.test.ts",
+      "caller": "<module>",
+      "calleeFile": null,
+      "callee": "toBe",
+      "type": "method",
+      "line": 491,
+      "column": 4
+    },
+    {
       "callerFile": "tests/unit/suggest.test.ts",
       "caller": "<module>",
       "calleeFile": null,
@@ -23225,29 +25816,29 @@
     }
   ],
   "summary": {
-    "totalFunctions": 107,
-    "totalCalls": 2485,
-    "filesWithCalls": 35,
+    "totalFunctions": 108,
+    "totalCalls": 2772,
+    "filesWithCalls": 36,
     "mostCalled": [
       {
         "qualifiedName": "describe",
         "file": "<external>",
-        "callerCount": 18
+        "callerCount": 19
       },
       {
         "qualifiedName": "expect",
         "file": "<external>",
-        "callerCount": 18
+        "callerCount": 19
       },
       {
         "qualifiedName": "it",
         "file": "<external>",
-        "callerCount": 18
+        "callerCount": 19
       },
       {
         "qualifiedName": "toBe",
         "file": "<external>",
-        "callerCount": 17
+        "callerCount": 18
       },
       {
         "qualifiedName": "beforeEach",
@@ -23265,6 +25856,16 @@
         "callerCount": 9
       },
       {
+        "qualifiedName": "resolve",
+        "file": "<external>",
+        "callerCount": 8
+      },
+      {
+        "qualifiedName": "setTimeout",
+        "file": "<external>",
+        "callerCount": 8
+      },
+      {
         "qualifiedName": "toEqual",
         "file": "<external>",
         "callerCount": 8
@@ -23275,19 +25876,9 @@
         "callerCount": 7
       },
       {
-        "qualifiedName": "resolve",
-        "file": "<external>",
-        "callerCount": 7
-      },
-      {
-        "qualifiedName": "setTimeout",
-        "file": "<external>",
-        "callerCount": 7
-      },
-      {
         "qualifiedName": "toBeInstanceOf",
         "file": "<external>",
-        "callerCount": 6
+        "callerCount": 7
       },
       {
         "qualifiedName": "toContain",
@@ -23334,7 +25925,7 @@
       {
         "qualifiedName": "<module>",
         "file": "tests/unit/exec.test.ts",
-        "calleeCount": 44
+        "calleeCount": 47
       },
       {
         "qualifiedName": "<module>",

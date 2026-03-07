@@ -13,6 +13,7 @@ import { h, Fragment } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
+import { isContainerLevel, isRootLevel, getLevelLabel } from "./levels.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -41,10 +42,7 @@ interface ScopeOption {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-/** Debounce delay in ms before triggering LLM preview. */
-const DEBOUNCE_MS = 500;
-
-/** Minimum input length before triggering preview. */
+/** Minimum input length before allowing submission. */
 const MIN_INPUT_LENGTH = 10;
 
 /** Example prompts to guide user input. */
@@ -74,7 +72,6 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
 
   // Track the latest request to ignore stale responses
   const requestIdRef = useRef(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Abort controller for cancelling in-flight requests
   const abortRef = useRef<AbortController | null>(null);
@@ -95,9 +92,9 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
         const options: ScopeOption[] = [];
         function walk(items: Array<{ id: string; title: string; level: string; children?: unknown[] }>, depth: number) {
           for (const item of items) {
-            if (item.level === "epic" || item.level === "feature") {
+            if (isContainerLevel(item.level)) {
               options.push({ id: item.id, title: item.title, level: item.level, depth });
-              if (item.level === "epic" && Array.isArray(item.children)) {
+              if (isRootLevel(item.level) && Array.isArray(item.children)) {
                 walk(item.children as typeof items, depth + 1);
               }
             }
@@ -179,39 +176,20 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
 
   const handleInput = useCallback((text: string) => {
     setInput(text);
+  }, []);
 
-    // Clear any pending debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
+  /** Explicit submit — only way to trigger proposal generation. */
+  const handleSubmit = useCallback(() => {
+    const text = input.trim();
+    if (text.length < MIN_INPUT_LENGTH) return;
 
-    // Reset if input is too short
-    if (text.trim().length < MIN_INPUT_LENGTH) {
-      // Abort any in-flight request
-      if (abortRef.current) {
-        abortRef.current.abort();
-        abortRef.current = null;
-      }
-      setState("idle");
-      setProposals([]);
-      setConfidence(0);
-      setQualityIssues([]);
-      setError(null);
-      return;
-    }
-
-    // Debounce the preview request
     const reqId = ++requestIdRef.current;
-    debounceRef.current = setTimeout(() => {
-      triggerPreview(text, reqId, selectedScope || undefined);
-    }, DEBOUNCE_MS);
-  }, [triggerPreview, selectedScope]);
+    triggerPreview(text, reqId, selectedScope || undefined);
+  }, [input, triggerPreview, selectedScope]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
       if (abortRef.current) abortRef.current.abort();
     };
   }, []);
@@ -317,7 +295,7 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
     h("div", { class: "smart-add-header" },
       h("h3", { class: "smart-add-title" }, "Smart Add"),
       h("p", { class: "smart-add-subtitle" },
-        "Describe what you want to build. Proposals generate as you type.",
+        "Describe what you want to build, then click Generate.",
       ),
     ),
 
@@ -329,25 +307,14 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
             class: "smart-add-scope-select",
             value: selectedScope,
             onChange: (e: Event) => {
-              const val = (e.target as HTMLSelectElement).value;
-              setSelectedScope(val);
-              // Re-trigger preview if there's existing input
-              if (input.trim().length >= MIN_INPUT_LENGTH) {
-                if (debounceRef.current) {
-                  clearTimeout(debounceRef.current);
-                }
-                const reqId = ++requestIdRef.current;
-                debounceRef.current = setTimeout(() => {
-                  triggerPreview(input, reqId, val || undefined);
-                }, DEBOUNCE_MS);
-              }
+              setSelectedScope((e.target as HTMLSelectElement).value);
             },
             "aria-label": "Scope proposals under an existing epic or feature",
           },
             h("option", { value: "" }, "Entire project (new epics)"),
             scopeOptions.map((opt) =>
               h("option", { key: opt.id, value: opt.id },
-                `${"  ".repeat(opt.depth)}${opt.level === "epic" ? "Epic" : "Feature"}: ${opt.title}`,
+                `${"  ".repeat(opt.depth)}${getLevelLabel(opt.level)}: ${opt.title}`,
               ),
             ),
           ),
@@ -409,6 +376,14 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
             )
           : null,
       ),
+      // Generate button — sole trigger for proposal generation
+      h("button", {
+        class: "smart-add-btn smart-add-btn-generate",
+        type: "button",
+        disabled: trimmedLength < MIN_INPUT_LENGTH || state === "loading",
+        onClick: handleSubmit,
+        "aria-label": "Generate proposals",
+      }, state === "loading" ? "Generating..." : "Generate"),
     ),
 
     // Loading state with progress

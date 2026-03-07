@@ -84,7 +84,8 @@ export function buildUndirectedGraph(edges: ImportEdge[]): UndirectedGraph {
  */
 export function louvainPhase1(
   graph: UndirectedGraph,
-  maxPasses = 100
+  maxPasses = 100,
+  resolution = 1.0
 ): Map<string, string> {
   // Each node starts in its own community (ID = node name)
   const community = new Map<string, string>();
@@ -158,11 +159,12 @@ export function louvainPhase1(
 
         const candidateDegreeSum = communityDegreeSum.get(candidateCommunity)!;
 
-        // ΔQ = [weight_to_candidate/m - nodeDegree * candidateDegreeSum / (2m²)]
-        //     - [weight_to_own/m - nodeDegree * ownCommunityDegreeWithout / (2m²)]
+        // ΔQ = [weight_to_candidate/m - γ * nodeDegree * candidateDegreeSum / (2m²)]
+        //     - [weight_to_own/m - γ * nodeDegree * ownCommunityDegreeWithout / (2m²)]
+        // resolution γ > 1 penalises large communities → smaller zones.
         const deltaQ =
           (weightToCandidate - weightToOwnCommunity) / m2 -
-          (nodeDegree * (candidateDegreeSum - ownCommunityDegreeWithout)) /
+          resolution * (nodeDegree * (candidateDegreeSum - ownCommunityDegreeWithout)) /
             (m2 * m2) * 2;
 
         if (
@@ -308,7 +310,7 @@ export function mergeBidirectionalCoupling(
 
   // Compute internal edge count per community and cross-edge counts per pair
   const internalEdges = new Map<string, number>();
-  const crossEdges = new Map<string, number>(); // "commA\0commB" → count (A < B)
+  const crossEdges = new Map<string, number>(); // "commA\x01commB" → count (A < B)
 
   for (const [node, neighbors] of graph) {
     const nodeComm = result.get(node)!;
@@ -319,8 +321,8 @@ export function mergeBidirectionalCoupling(
       } else {
         const key =
           nodeComm < neighborComm
-            ? `${nodeComm}\0${neighborComm}`
-            : `${neighborComm}\0${nodeComm}`;
+            ? `${nodeComm}\x01${neighborComm}`
+            : `${neighborComm}\x01${nodeComm}`;
         crossEdges.set(key, (crossEdges.get(key) ?? 0) + 1);
       }
     }
@@ -339,7 +341,7 @@ export function mergeBidirectionalCoupling(
   const mergeCandidates: Array<{ commA: string; commB: string; ratio: number }> = [];
 
   for (const [pair, cross] of crossEdges) {
-    const [commA, commB] = pair.split("\0");
+    const [commA, commB] = pair.split("\x01");
     const intA = internalEdges.get(commA) ?? 0;
     const intB = internalEdges.get(commB) ?? 0;
     const minInternal = Math.min(intA, intB);
@@ -389,15 +391,121 @@ export function mergeBidirectionalCoupling(
   return result;
 }
 
+// ── Merge satellite communities ──────────────────────────────────────────────
+
+/**
+ * Absorb small communities that are more coupled to their neighbors than
+ * internally cohesive. These "satellites" are too small and too dependent
+ * to justify a separate zone.
+ *
+ * For each community with ≤ `maxSize` files, compute:
+ *   externalEdges / totalEdges (= coupling ratio)
+ *
+ * If this ratio exceeds `couplingThreshold`, the community is absorbed into
+ * its most-connected neighbor. Iterates until no more merges occur.
+ */
+export function mergeSatelliteCommunities(
+  community: Map<string, string>,
+  graph: UndirectedGraph,
+  maxSize = 8,
+  couplingThreshold = 0.3
+): Map<string, string> {
+  const result = new Map(community);
+
+  for (let round = 0; round < 10; round++) {
+    // Gather community → members
+    const members = new Map<string, string[]>();
+    for (const [node, comm] of result) {
+      let list = members.get(comm);
+      if (!list) { list = []; members.set(comm, list); }
+      list.push(node);
+    }
+
+    let merged = false;
+
+    // Process small communities in sorted order for determinism
+    const smallComms = [...members.entries()]
+      .filter(([, m]) => m.length <= maxSize)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    for (const [comm, commMembers] of smallComms) {
+      // Skip if already merged in this round
+      if (!members.has(comm)) continue;
+
+      // Count internal vs external edges and track neighbor communities
+      let internalEdgeCount = 0;
+      let externalEdgeCount = 0;
+      const neighborCommWeights = new Map<string, number>();
+
+      for (const node of commMembers) {
+        const neighbors = graph.get(node);
+        if (!neighbors) continue;
+        for (const [neighbor, weight] of neighbors) {
+          const neighborComm = result.get(neighbor)!;
+          if (neighborComm === comm) {
+            internalEdgeCount += weight;
+          } else {
+            externalEdgeCount += weight;
+            neighborCommWeights.set(
+              neighborComm,
+              (neighborCommWeights.get(neighborComm) ?? 0) + weight
+            );
+          }
+        }
+      }
+
+      // Undirected: each edge counted twice
+      internalEdgeCount /= 2;
+      const totalEdges = internalEdgeCount + externalEdgeCount;
+      if (totalEdges === 0) continue;
+
+      const couplingRatio = externalEdgeCount / totalEdges;
+      if (couplingRatio < couplingThreshold) continue;
+
+      // Find the most-connected neighbor community
+      let bestNeighbor = "";
+      let bestWeight = 0;
+      for (const [neighborComm, weight] of neighborCommWeights) {
+        if (weight > bestWeight || (weight === bestWeight && neighborComm < bestNeighbor)) {
+          bestNeighbor = neighborComm;
+          bestWeight = weight;
+        }
+      }
+
+      if (!bestNeighbor) continue;
+
+      // Absorb into the best neighbor
+      for (const node of commMembers) {
+        result.set(node, bestNeighbor);
+      }
+
+      // Update members tracking
+      const targetMembers = members.get(bestNeighbor) ?? [];
+      targetMembers.push(...commMembers);
+      members.set(bestNeighbor, targetMembers);
+      members.delete(comm);
+      merged = true;
+    }
+
+    if (!merged) break;
+  }
+
+  return result;
+}
+
 // ── Split large communities ──────────────────────────────────────────────────
 
 /**
  * Split communities that exceed `maxSize` files by running Louvain
- * internally on their subgraph. If subdivision produces only one
- * community (the zone is truly monolithic), the zone is left intact.
+ * internally on their subgraph with increasing resolution (γ).
  *
- * Deterministic: processes communities in sorted order, applies
- * deterministic Louvain subdivision.
+ * Standard Louvain (γ=1) has a resolution limit that prevents it from
+ * finding sub-communities inside dense, uniformly-connected subgraphs —
+ * exactly what happens when routes → components → utils form one big
+ * cluster. Increasing γ penalises large communities, forcing splits.
+ *
+ * Iterates until no oversized communities remain or no further splits
+ * are possible. Deterministic: processes communities in sorted order.
  */
 export function splitLargeCommunities(
   community: Map<string, string>,
@@ -406,65 +514,154 @@ export function splitLargeCommunities(
 ): Map<string, string> {
   const result = new Map(community);
 
-  // Gather community → members
-  const members = new Map<string, string[]>();
-  for (const [node, comm] of result) {
-    let list = members.get(comm);
-    if (!list) {
-      list = [];
-      members.set(comm, list);
+  // Track communities that resisted splitting so we don't retry them
+  const unsplittable = new Set<string>();
+
+  for (let round = 0; round < 10; round++) {
+    // Gather community → members
+    const members = new Map<string, string[]>();
+    for (const [node, comm] of result) {
+      let list = members.get(comm);
+      if (!list) { list = []; members.set(comm, list); }
+      list.push(node);
     }
-    list.push(node);
-  }
 
-  // Process oversized communities in sorted order for determinism
-  const oversized = [...members.entries()]
-    .filter(([, m]) => m.length > maxSize)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    // Find oversized communities we haven't already failed to split
+    const oversized = [...members.entries()]
+      .filter(([comm, m]) => m.length > maxSize && !unsplittable.has(comm))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
-  for (const [comm, commMembers] of oversized) {
-    // Build subgraph containing only nodes in this community
-    const memberSet = new Set(commMembers);
-    const subGraph: UndirectedGraph = new Map();
+    if (oversized.length === 0) break;
 
-    for (const node of commMembers) {
-      const neighbors = graph.get(node);
-      if (!neighbors) continue;
+    let splitAny = false;
 
-      const subNeighbors = new Map<string, number>();
-      for (const [neighbor, weight] of neighbors) {
-        if (memberSet.has(neighbor)) {
-          subNeighbors.set(neighbor, weight);
+    for (const [comm, commMembers] of oversized) {
+      // Build subgraph containing only nodes in this community
+      const memberSet = new Set(commMembers);
+      const subGraph: UndirectedGraph = new Map();
+
+      for (const node of commMembers) {
+        const neighbors = graph.get(node);
+        if (!neighbors) continue;
+
+        const subNeighbors = new Map<string, number>();
+        for (const [neighbor, weight] of neighbors) {
+          if (memberSet.has(neighbor)) {
+            subNeighbors.set(neighbor, weight);
+          }
+        }
+        if (subNeighbors.size > 0) {
+          subGraph.set(node, subNeighbors);
         }
       }
-      if (subNeighbors.size > 0) {
-        subGraph.set(node, subNeighbors);
+
+      // Ensure all member nodes exist in the subgraph (even if isolated)
+      for (const node of commMembers) {
+        if (!subGraph.has(node)) {
+          subGraph.set(node, new Map());
+        }
       }
-    }
 
-    // Ensure all member nodes exist in the subgraph (even if isolated)
-    for (const node of commMembers) {
-      if (!subGraph.has(node)) {
-        subGraph.set(node, new Map());
+      // Try increasing resolution until the community splits
+      let subCommunity: Map<string, string> | null = null;
+      for (const γ of [1, 2, 4, 8]) {
+        let attempt = louvainPhase1(subGraph, 100, γ);
+        attempt = mergeSmallCommunities(attempt, subGraph);
+        const subComms = new Set(attempt.values());
+        if (subComms.size > 1) {
+          subCommunity = attempt;
+          break;
+        }
       }
+
+      if (!subCommunity) {
+        // Fallback: split by directory structure
+        subCommunity = splitByDirectory(commMembers, maxSize);
+        if (!subCommunity || new Set(subCommunity.values()).size <= 1) {
+          unsplittable.add(comm);
+          continue;
+        }
+      }
+
+      // Apply sub-community assignments: use "parentComm\0subComm" as new ID
+      for (const [node, subComm] of subCommunity) {
+        result.set(node, `${comm}\0${subComm}`);
+      }
+      splitAny = true;
     }
 
-    // Run Louvain on the subgraph
-    let subCommunity = louvainPhase1(subGraph);
-    subCommunity = mergeSmallCommunities(subCommunity, subGraph);
-
-    // Check if subdivision was meaningful (>1 community)
-    const subComms = new Set(subCommunity.values());
-    if (subComms.size <= 1) continue;
-
-    // Apply sub-community assignments: use "parentComm\0subComm" as new ID
-    // to avoid collisions with existing community IDs
-    for (const [node, subComm] of subCommunity) {
-      result.set(node, `${comm}\0${subComm}`);
-    }
+    if (!splitAny) break;
   }
 
   return result;
+}
+
+// ── Directory proximity edges ────────────────────────────────────────────────
+
+/**
+ * Add chain-topology edges between files sharing a parent directory.
+ *
+ * Groups files by immediate parent directory, sorts each group, then adds
+ * edges between sorted adjacent pairs. This brings import-isolated files
+ * (configs, scripts, etc.) into the Louvain graph and gives the algorithm
+ * directory-structure awareness — critical for convention-based frameworks
+ * where directory layout defines architecture.
+ *
+ * Chain topology produces O(n) edges per directory (vs O(n²) for clique),
+ * providing enough signal without overwhelming import-based edge weights.
+ *
+ * @param weight - Edge weight for proximity edges (default 0.2).
+ *   Low enough to not override import edges (weight ≥1) but high enough
+ *   to influence clustering of otherwise-disconnected files.
+ */
+export function addDirectoryProximityEdges(
+  graph: UndirectedGraph,
+  files: string[],
+  weight = 0.2
+): void {
+  // Group files by immediate parent directory
+  const dirGroups = new Map<string, string[]>();
+  for (const file of files) {
+    const lastSlash = file.lastIndexOf("/");
+    const dir = lastSlash === -1 ? "." : file.slice(0, lastSlash);
+    let group = dirGroups.get(dir);
+    if (!group) {
+      group = [];
+      dirGroups.set(dir, group);
+    }
+    group.push(file);
+  }
+
+  function ensureNode(n: string): Map<string, number> {
+    let neighbors = graph.get(n);
+    if (!neighbors) {
+      neighbors = new Map();
+      graph.set(n, neighbors);
+    }
+    return neighbors;
+  }
+
+  for (const [, group] of dirGroups) {
+    if (group.length < 2) {
+      // Single-file directories: still ensure the node exists in graph
+      if (group.length === 1) ensureNode(group[0]);
+      continue;
+    }
+
+    group.sort();
+
+    for (let i = 0; i < group.length - 1; i++) {
+      const a = group[i];
+      const b = group[i + 1];
+      const na = ensureNode(a);
+      const nb = ensureNode(b);
+      // Only add if no edge exists yet (don't inflate existing import edges)
+      if (!na.has(b)) {
+        na.set(b, weight);
+        nb.set(a, weight);
+      }
+    }
+  }
 }
 
 // ── Cap zone count ──────────────────────────────────────────────────────────
@@ -499,8 +696,8 @@ export function capZoneCount(
         if (nodeComm === neighborComm) continue;
         const key =
           nodeComm < neighborComm
-            ? `${nodeComm}\0${neighborComm}`
-            : `${neighborComm}\0${nodeComm}`;
+            ? `${nodeComm}\x01${neighborComm}`
+            : `${neighborComm}\x01${nodeComm}`;
         communityPairWeight.set(
           key,
           (communityPairWeight.get(key) ?? 0) + weight
@@ -531,7 +728,7 @@ export function capZoneCount(
       }
     }
 
-    const [commA, commB] = bestPair.split("\0");
+    const [commA, commB] = bestPair.split("\x01");
     // Merge smaller into larger (tie-break lexicographic)
     const sizeA = members.get(commA)?.length ?? 0;
     const sizeB = members.get(commB)?.length ?? 0;
@@ -546,4 +743,62 @@ export function capZoneCount(
   }
 
   return result;
+}
+
+// ── Directory-based fallback splitting ───────────────────────────────────────
+
+/**
+ * Split files into communities based on directory structure.
+ * Used as a fallback when Louvain cannot split an oversized community
+ * (e.g., fully-connected import graph with no internal structure).
+ *
+ * Groups files by their directory prefix (depth 2, falling back to depth 3
+ * if all files share the same depth-2 prefix). Returns null if files cannot
+ * be meaningfully split by directory.
+ */
+export function splitByDirectory(
+  files: string[],
+  _maxSize: number,
+): Map<string, string> | null {
+  // Group files by depth-2 directory prefix (e.g., "app/components", "app/lib")
+  let dirGroups = groupByPrefix(files, 2);
+
+  // If everything is in one group, try deeper
+  if (dirGroups.size <= 1) {
+    dirGroups = groupByPrefix(files, 3);
+  }
+
+  if (dirGroups.size <= 1) return null;
+
+  // Reject splits where most groups are singletons — not a meaningful
+  // directory-based split (e.g., root-level files with no directory structure)
+  const meaningfulGroups = [...dirGroups.values()].filter((g) => g.length >= 2);
+  if (meaningfulGroups.length < 2) return null;
+
+  // Assign each directory group a community ID
+  const result = new Map<string, string>();
+  let communityIdx = 0;
+  for (const [, group] of [...dirGroups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const commId = `dir-${communityIdx++}`;
+    for (const file of group) {
+      result.set(file, commId);
+    }
+  }
+  return result;
+}
+
+function groupByPrefix(files: string[], depth: number): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  for (const file of files) {
+    const parts = file.split("/");
+    // Use directory segments only (exclude filename)
+    const dirParts = parts.slice(0, -1);
+    const key = dirParts.length >= depth
+      ? dirParts.slice(0, depth).join("/")
+      : dirParts.join("/") || parts[0];
+    let list = groups.get(key);
+    if (!list) { list = []; groups.set(key, list); }
+    list.push(file);
+  }
+  return groups;
 }

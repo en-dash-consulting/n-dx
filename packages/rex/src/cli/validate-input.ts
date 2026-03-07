@@ -6,7 +6,7 @@
  */
 
 import { CLIError } from "./errors.js";
-import { LEVEL_HIERARCHY, VALID_LEVELS, isItemLevel } from "../schema/index.js";
+import { LEVEL_HIERARCHY, VALID_LEVELS, isItemLevel, getLevelLabel } from "../schema/index.js";
 import type { ItemLevel } from "../schema/index.js";
 
 /**
@@ -35,7 +35,7 @@ export function requireParent(level: ItemLevel, parentId: string | undefined): v
       .filter((p): p is ItemLevel => p !== null)
       .join(" or ");
     throw new CLIError(
-      `A ${level} requires a parent (${parentNames}).`,
+      `A ${getLevelLabel(level)} requires a parent (${parentNames}).`,
       "Run 'rex status' to find a suitable parent ID, then use --parent=<id>.",
     );
   }

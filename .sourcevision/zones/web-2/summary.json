@@ -1,0 +1,21 @@
+{
+  "id": "web-2",
+  "name": "Web 2",
+  "description": "2 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/node-culler.ts",
+    "packages/web/tests/unit/viewer/node-culler.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 522,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

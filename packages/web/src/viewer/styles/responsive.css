@@ -129,6 +129,20 @@
     display: none;
   }
 
+  /* Promote global FAQ to a viewport-fixed FAB when sidebar footer is hidden */
+  .global-faq-btn {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 500;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
   .page-context-bar {
     padding: 0 0 6px;
   }

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, relative } from "node:path";
 import { SV_DIR } from "../../constants.js";
 import { CLIError } from "../errors.js";
 import { DATA_FILES, SUPPLEMENTARY_FILES } from "../../schema/data-files.js";
@@ -7,10 +7,14 @@ import { readManifest, writeManifest } from "../../analyzers/manifest.js";
 import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
 import { generateContext } from "../../analyzers/context.js";
 import { emitZoneOutputs } from "../../analyzers/zone-output.js";
+import { assessAllZoneRisks } from "../../analyzers/risk-scoring.js";
+import { deduplicateFindings, enforceSeverityRules } from "../../analyzers/enrich-parsing.js";
+import { toCanonicalJSON } from "../../util/sort.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
 import { loadLLMConfig } from "@n-dx/llm-client";
+import { detectSubAnalyses } from "../../analyzers/workspace.js";
 import {
   setLLMConfig,
   getAuthMode,
@@ -120,6 +124,23 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
   };
+
+  // ── Deep mode: re-analyze sub-packages first ──────────────────────
+  if (extraArgs.includes("--deep")) {
+    const subAnalyses = detectSubAnalyses(absDir);
+    if (subAnalyses.length > 0) {
+      info(`[deep] Found ${subAnalyses.length} sub-package${subAnalyses.length > 1 ? "s" : ""}: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
+      // Pass through flags except --deep (avoid infinite recursion)
+      const childArgs = extraArgs.filter((a) => a !== "--deep");
+      for (const sub of subAnalyses) {
+        const subDir = join(absDir, sub.prefix);
+        info(`\n[deep] Analyzing ${sub.prefix}...`);
+        await cmdAnalyze(subDir, childArgs);
+        info("");
+      }
+      info(`[deep] Sub-package analysis complete, proceeding with root.\n`);
+    }
+  }
 
   info(`Analyzing: ${absDir}`);
   info("");
@@ -257,6 +278,35 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
     const classData = existsSync(classificationsPath)
       ? JSON.parse(readFileSync(classificationsPath, "utf-8"))
       : null;
+
+    // Compute architectural risk scoring and attach metrics to zones
+    if (zonesData.zones.length > 0) {
+      const riskResult = assessAllZoneRisks(zonesData);
+
+      // Attach risk metrics to each zone object
+      for (const zone of zonesData.zones) {
+        const metrics = riskResult.metrics[zone.id];
+        if (metrics) {
+          zone.riskMetrics = metrics;
+        }
+      }
+
+      // Merge risk findings with existing findings (replace previous risk findings)
+      if (riskResult.findings.length > 0) {
+        const existingFindings = (zonesData.findings ?? []).filter(
+          (f: { pass: number; text: string }) =>
+            !(f.pass === 0 && (
+              f.text.includes("risk (score:") ||
+              f.text.includes("exceed architectural risk thresholds")
+            )),
+        );
+        zonesData.findings = enforceSeverityRules(
+          deduplicateFindings([...existingFindings, ...riskResult.findings]),
+        );
+      }
+
+      writeFileSync(join(ctx.svDir, DATA_FILES.zones), toCanonicalJSON(zonesData));
+    }
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[0]), llmsTxt);

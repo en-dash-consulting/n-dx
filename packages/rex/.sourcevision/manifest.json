@@ -1,28 +1,46 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-03T05:05:24.223Z",
+  "analyzedAt": "2026-03-06T21:52:06.522Z",
   "targetPath": "/Users/nick/development/endash/n-dx/rex",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-03T04:48:31.322Z",
-      "completedAt": "2026-02-03T04:48:31.331Z"
+      "startedAt": "2026-03-06T21:50:23.221Z",
+      "completedAt": "2026-03-06T21:50:23.248Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-03T04:48:31.331Z",
-      "completedAt": "2026-02-03T04:48:31.381Z"
+      "startedAt": "2026-03-06T21:50:23.249Z",
+      "completedAt": "2026-03-06T21:50:23.440Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-03T04:48:31.381Z",
-      "completedAt": "2026-02-03T05:05:24.214Z"
+      "startedAt": "2026-03-06T21:51:02.341Z",
+      "completedAt": "2026-03-06T21:52:05.960Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-03T05:05:24.215Z",
-      "completedAt": "2026-02-03T05:05:24.223Z"
+      "startedAt": "2026-03-06T21:52:05.960Z",
+      "completedAt": "2026-03-06T21:52:05.986Z"
+    },
+    "classifications": {
+      "status": "complete",
+      "startedAt": "2026-03-06T21:50:23.440Z",
+      "completedAt": "2026-03-06T21:51:02.341Z"
+    },
+    "callgraph": {
+      "status": "complete",
+      "startedAt": "2026-03-06T21:52:05.986Z",
+      "completedAt": "2026-03-06T21:52:06.522Z"
     }
+  },
+  "zoneOutputs": true,
+  "tokenUsage": {
+    "calls": 2,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "vendor": "claude",
+    "model": "claude-sonnet-4-6"
   }
 }

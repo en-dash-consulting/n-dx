@@ -1,0 +1,16 @@
+{
+  "id": "web-viewer/web/viewer-5",
+  "name": "Web Viewer/web/viewer 5",
+  "description": "4 files, primarily CSS",
+  "files": [
+    "packages/web/src/viewer/styles/index.css",
+    "packages/web/src/viewer/styles/integration-config.css",
+    "packages/web/src/viewer/styles/layout.css",
+    "packages/web/src/viewer/styles/memory-warning.css"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.86,
+  "coupling": 0.14,
+  "fileCount": 4,
+  "lineCount": 1150
+}

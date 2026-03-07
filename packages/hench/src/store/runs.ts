@@ -1,9 +1,12 @@
 import { join } from "node:path";
 import { readFile, writeFile, readdir, access } from "node:fs/promises";
-import { gunzipSync } from "node:zlib";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
 import { validateRunRecord } from "../schema/index.js";
 import { toCanonicalJSON } from "./json.js";
 import type { RunRecord } from "../schema/index.js";
+
+const gunzipAsync = promisify(gunzip);
 
 /**
  * Read a run file that may be either plain JSON or gzip-compressed.
@@ -14,7 +17,7 @@ import type { RunRecord } from "../schema/index.js";
 async function readRunJSON(filePath: string): Promise<unknown> {
   const raw = await readFile(filePath);
   if (filePath.endsWith(".gz")) {
-    const decompressed = gunzipSync(raw);
+    const decompressed = await gunzipAsync(raw);
     return JSON.parse(decompressed.toString("utf-8"));
   }
   return JSON.parse(raw.toString("utf-8"));

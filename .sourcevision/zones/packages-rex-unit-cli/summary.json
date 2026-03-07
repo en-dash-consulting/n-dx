@@ -1,0 +1,25 @@
+{
+  "id": "packages-rex:unit-cli",
+  "name": "Unit Cli",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/fix.ts",
+    "packages/rex/src/core/fix.ts",
+    "packages/rex/tests/unit/cli/commands/fix.test.ts",
+    "packages/rex/tests/unit/core/fix.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/fix.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 4,
+  "lineCount": 1230,
+  "riskMetrics": {
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

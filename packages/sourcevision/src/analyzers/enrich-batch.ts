@@ -56,11 +56,12 @@ export async function runMetaEvaluation(
   crossings: ZoneCrossing[],
   passNumber: number,
   passConfig: PassConfig,
+  hints?: string,
 ): Promise<MetaEvalResult | null> {
   const metaSpinner = startSpinner(
     `  [enrich] Meta-evaluation pass (reviewing ${existingFindings.length} existing findings)...`,
   );
-  const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings);
+  const metaPrompt = buildMetaPrompt(zones, existingFindings, crossings, hints);
   const metaTokenUsage = emptyAnalyzeTokenUsage();
 
   let metaText: string;
@@ -152,6 +153,7 @@ export async function enrichBatch(
   totalBatches: number,
   enrichedNames?: Map<string, string>,
   fileArchetypes?: Map<string, string | null>,
+  hints?: string,
 ): Promise<BatchResult | null | { authError: true }> {
   const isFirstPass = passNumber === 1;
   const batchFiles = batchZones.reduce((sum, z) => sum + z.files.length, 0);
@@ -194,8 +196,8 @@ export async function enrichBatch(
       .join("\n");
 
     const prompt = isFirstPass
-      ? buildFirstPassPrompt(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes)
-      : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes);
+      ? buildFirstPassPrompt(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints)
+      : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
     const spinner = startSpinner(
@@ -333,6 +335,7 @@ function buildFirstPassPrompt(
   globalPromptNote: string,
   passConfig: PassConfig,
   fileArchetypes?: Map<string, string | null>,
+  hints?: string,
 ): string {
   if (config.maxFiles > 0) {
     const zoneList = batchZones
@@ -355,7 +358,7 @@ ${passConfig.focus}
 Zones:
 ${zoneList}
 ${otherContext}
-${priorNames}
+${priorNames}${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Cross-zone imports:
 ${crossingLines || "  (none)"}
 ${globalPromptNote}
@@ -390,7 +393,7 @@ Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfi
 Zones:
 ${zoneList}
 ${otherContext}
-${priorNames}
+${priorNames}${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Return ONLY JSON:
 {"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":[]}],"insights":[]}
 
@@ -407,6 +410,7 @@ function buildLaterPassPrompt(
   previousZones: Zones | undefined,
   globalPromptNote: string,
   fileArchetypes?: Map<string, string | null>,
+  hints?: string,
 ): string {
   const prevZones = previousZones?.zones ?? [];
   const prevGlobal = previousZones?.insights ?? [];
@@ -432,7 +436,7 @@ function buildLaterPassPrompt(
 Zones:
 ${zoneContext}
 ${otherContext}
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Cross-zone imports:
 ${crossingLines || "  (none)"}
 
@@ -467,7 +471,7 @@ Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(",
 Zones:
 ${zoneContext}
 ${otherContext}
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Return ONLY JSON:
 {"zones":[{"id":"zone-id","newInsights":[],"findings":[]}],"insights":[],"findings":[]}`;
 }

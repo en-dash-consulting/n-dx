@@ -3,10 +3,12 @@
   "usageEdges": [],
   "routeModules": [],
   "routeTree": [],
+  "serverRoutes": [],
   "summary": {
     "totalComponents": 0,
     "totalRouteModules": 0,
     "totalUsageEdges": 0,
+    "totalServerRoutes": 0,
     "routeConventions": {},
     "mostUsedComponents": [],
     "layoutDepth": 0

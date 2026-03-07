@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 /**
- * Integration tests for progressive tree loading in PRDTree.
+ * Integration tests for virtual scroll rendering in PRDTree.
  *
- * Verifies that the PRDTree component correctly limits rendering for large
- * datasets, shows the "Load More" indicator, and supports on-demand chunk
- * loading. Also confirms that small trees render without any progressive
- * loading UI.
+ * Verifies that the PRDTree component correctly renders all items when the
+ * scroll container has no measured height (jsdom / initial render) and that
+ * the virtual scroll infrastructure (spacer elements, container classes)
+ * is present and functional.
+ *
+ * Note: In jsdom, element dimensions are always 0, so virtual scrolling
+ * falls back to rendering all items. The pure function tests in
+ * virtual-scroll.test.ts cover the viewport-based slicing logic.
  *
  * IMPORTANT: This file avoids vi.stubGlobal(), vi.useFakeTimers(), and any
  * global mocking to prevent test isolation leaks to parallel test files.
@@ -15,7 +19,6 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
 import type { PRDDocumentData, PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
-import { PROGRESSIVE_THRESHOLD } from "../../../src/viewer/components/prd-tree/progressive-loader.js";
 
 // ─── jsdom polyfills ────────────────────────────────────────────────────────
 
@@ -71,37 +74,21 @@ function countNodeRows(root: HTMLElement): number {
   return root.querySelectorAll(".prd-node-row").length;
 }
 
-/**
- * Wait for pending requestAnimationFrame callbacks and Preact batches.
- * Uses a real rAF + setTimeout round-trip (no fake timers) so we
- * don't pollute the global timer state for parallel test files.
- */
-function waitForFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      // One more tick to let Preact flush the state update
-      setTimeout(resolve, 0);
-    });
-  });
-}
-
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("PRDTree progressive loading integration", () => {
-  describe("small trees (no progressive loading)", () => {
-    it("renders all nodes when tree is under threshold", () => {
+describe("PRDTree virtual scroll integration", () => {
+  describe("small trees (renders all items)", () => {
+    it("renders all nodes for a small tree", () => {
       const doc = generateLargeDoc(10);
-      // 1 epic + 1 feature + 10 tasks = 12, under threshold of 50
+      // 1 epic + 1 feature + 10 tasks = 12
       const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
 
-      // No load more indicator
-      expect(root.querySelector(".prd-load-more")).toBeNull();
       // All tasks visible
       expect(root.textContent).toContain("Task 0");
       expect(root.textContent).toContain("Task 9");
     });
 
-    it("does not show load more for a tiny tree", () => {
+    it("does not show load more UI (replaced by virtual scroll)", () => {
       const doc: PRDDocumentData = {
         schema: "rex/v1",
         title: "Small",
@@ -114,123 +101,97 @@ describe("PRDTree progressive loading integration", () => {
     });
   });
 
-  describe("large trees (progressive loading active)", () => {
-    it("limits rendered nodes to chunkSize", () => {
+  describe("virtual scroll container", () => {
+    it("renders tree with virtual scroll container class", () => {
+      const doc = generateLargeDoc(10);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
+      const tree = root.querySelector(".prd-tree-virtual");
+      expect(tree).not.toBeNull();
+    });
+
+    it("has tree role on the virtual scroll container", () => {
+      const doc = generateLargeDoc(10);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
+      const tree = root.querySelector(".prd-tree-virtual");
+      expect(tree!.getAttribute("role")).toBe("tree");
+    });
+
+    it("has accessible label on the virtual scroll container", () => {
+      const doc = generateLargeDoc(10);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
+      const tree = root.querySelector(".prd-tree-virtual");
+      expect(tree!.getAttribute("aria-label")).toBe("PRD hierarchy");
+    });
+  });
+
+  describe("large trees (fallback rendering without measured container)", () => {
+    it("renders all nodes when container has no measured height (jsdom)", () => {
+      // In jsdom, clientHeight is 0, so virtual scrolling renders all items
+      const doc = generateLargeDoc(100);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
       // 1 epic + 1 feature + 100 tasks = 102 visible nodes
-      const doc = generateLargeDoc(100);
-      const chunkSize = 20;
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize }),
-      );
-
-      // Should render fewer nodes than total
       const nodeCount = countNodeRows(root);
-      expect(nodeCount).toBeLessThanOrEqual(chunkSize);
-      expect(nodeCount).toBeGreaterThan(0);
+      expect(nodeCount).toBe(102);
     });
 
-    it("shows load more indicator for large trees", () => {
-      const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
+    it("renders 500+ item tree completely in fallback mode", () => {
+      const doc = generateLargeDoc(500);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
 
-      const loadMore = root.querySelector(".prd-load-more");
-      expect(loadMore).not.toBeNull();
-      expect(loadMore!.textContent).toContain("of");
-      expect(loadMore!.textContent).toContain("nodes");
+      const nodeCount = countNodeRows(root);
+      // 1 epic + 1 feature + 500 tasks = 502
+      expect(nodeCount).toBe(502);
     });
 
-    it("displays correct counts in load more indicator", () => {
-      // 1 epic + 1 feature + 100 tasks = 102 total visible nodes
+    it("does not show load more UI for large trees (virtual scroll replaces it)", () => {
       const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
 
-      const info = root.querySelector(".prd-load-more-info");
-      expect(info).not.toBeNull();
-      expect(info!.textContent).toContain("Showing 20 of 102 nodes");
-    });
-
-    it("has load more and load all buttons", () => {
-      const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
-
-      const primary = root.querySelector(".prd-load-more-btn-primary");
-      const secondary = root.querySelector(".prd-load-more-btn-secondary");
-      expect(primary).not.toBeNull();
-      expect(secondary).not.toBeNull();
-      expect(primary!.textContent).toContain("Load 20 more");
-      expect(secondary!.textContent).toContain("Load all");
-    });
-
-    it("loads more nodes when load more button is clicked", async () => {
-      const doc = generateLargeDoc(100);
-      const chunkSize = 20;
-      const root = document.createElement("div");
-
-      act(() => {
-        render(h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize }), root);
-      });
-
-      const initialCount = countNodeRows(root);
-
-      // Click "Load More" — the hook uses rAF internally
-      const loadMoreBtn = root.querySelector(".prd-load-more-btn-primary") as HTMLButtonElement;
-      act(() => {
-        loadMoreBtn.click();
-      });
-
-      // Wait for the rAF callback and Preact re-render
-      await act(async () => {
-        await waitForFrame();
-      });
-
-      const newCount = countNodeRows(root);
-      expect(newCount).toBeGreaterThan(initialCount);
-    });
-
-    it("loads all remaining nodes when load all button is clicked", async () => {
-      const doc = generateLargeDoc(100);
-      const root = document.createElement("div");
-
-      act(() => {
-        render(h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }), root);
-      });
-
-      // Click "Load All"
-      const loadAllBtn = root.querySelector(".prd-load-more-btn-secondary") as HTMLButtonElement;
-      act(() => {
-        loadAllBtn.click();
-      });
-
-      await act(async () => {
-        await waitForFrame();
-      });
-
-      // Load more indicator should be gone — all nodes are rendered
       expect(root.querySelector(".prd-load-more")).toBeNull();
     });
+  });
 
-    it("uses configurable chunkSize prop", () => {
-      const doc = generateLargeDoc(200);
+  describe("expansion and collapse", () => {
+    it("respects defaultExpandDepth for rendering", () => {
+      const doc = generateLargeDoc(10);
 
-      // Small chunk size
-      const root10 = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 10 }),
-      );
-      const count10 = countNodeRows(root10);
+      // Depth 0 = only epics visible
+      const root0 = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 0 }));
+      expect(root0.textContent).toContain("Big Epic");
+      expect(root0.textContent).not.toContain("Big Feature");
 
-      // Larger chunk size
-      const root30 = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 30 }),
-      );
-      const count30 = countNodeRows(root30);
+      // Depth 3 = epics + features + tasks visible
+      const root3 = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+      expect(root3.textContent).toContain("Big Feature");
+      expect(root3.textContent).toContain("Task 0");
+    });
 
-      expect(count30).toBeGreaterThan(count10);
+    it("renders node rows as flat list (no nested prd-children)", () => {
+      const doc = generateLargeDoc(5);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
+      // With virtual scrolling, node rows are flat siblings — no nested
+      // .prd-children wrappers (those were part of the recursive renderer)
+      const tree = root.querySelector(".prd-tree-virtual");
+      const nodeRows = tree!.querySelectorAll(".prd-node-row");
+      expect(nodeRows.length).toBe(7); // 1 epic + 1 feature + 5 tasks
+    });
+
+    it("renders correct depth-based indentation", () => {
+      const doc = generateLargeDoc(2);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
+
+      const nodeRows = root.querySelectorAll(".prd-node-row");
+      // Epic at depth 0: padding-left = 0*24 + 8 = 8px
+      expect(nodeRows[0].getAttribute("style")).toContain("padding-left: 8px");
+      // Feature at depth 1: padding-left = 1*24 + 8 = 32px
+      expect(nodeRows[1].getAttribute("style")).toContain("padding-left: 32px");
+      // Task at depth 2: padding-left = 2*24 + 8 = 56px
+      expect(nodeRows[2].getAttribute("style")).toContain("padding-left: 56px");
     });
   });
 
@@ -238,7 +199,7 @@ describe("PRDTree progressive loading integration", () => {
     it("summary bar always shows stats for full tree (not sliced)", () => {
       const doc = generateLargeDoc(100);
       const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
+        h(PRDTree, { document: doc, defaultExpandDepth: 3 }),
       );
 
       // Summary bar should reflect the full tree, not just the visible slice
@@ -248,63 +209,37 @@ describe("PRDTree progressive loading integration", () => {
     });
   });
 
-  describe("progressive threshold", () => {
-    it("does not show load more when visible count equals threshold", () => {
-      // Create a tree with exactly PROGRESSIVE_THRESHOLD visible nodes
-      // threshold = 50, so 48 tasks + 1 feature + 1 epic = 50
-      const doc = generateLargeDoc(PROGRESSIVE_THRESHOLD - 2);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: PROGRESSIVE_THRESHOLD }),
-      );
+  describe("accessibility", () => {
+    it("node rows have proper ARIA attributes", () => {
+      const doc = generateLargeDoc(3);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
 
-      expect(root.querySelector(".prd-load-more")).toBeNull();
+      const nodeRows = root.querySelectorAll("[role='treeitem']");
+      expect(nodeRows.length).toBeGreaterThan(0);
+
+      // Expandable nodes have aria-expanded
+      const epic = root.querySelector("[data-node-id='epic-1']");
+      expect(epic!.getAttribute("aria-expanded")).toBe("true");
     });
 
-    it("shows load more when visible count exceeds threshold", () => {
-      // 50 tasks + 1 feature + 1 epic = 52 > threshold of 50
-      const doc = generateLargeDoc(PROGRESSIVE_THRESHOLD);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: PROGRESSIVE_THRESHOLD }),
-      );
+    it("virtual spacers are hidden from screen readers", () => {
+      const doc = generateLargeDoc(100);
+      const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3 }));
 
-      expect(root.querySelector(".prd-load-more")).not.toBeNull();
+      const spacers = root.querySelectorAll(".prd-virtual-spacer");
+      for (const spacer of spacers) {
+        expect(spacer.getAttribute("aria-hidden")).toBe("true");
+      }
     });
   });
 
-  describe("accessibility", () => {
-    it("load more region has role=status for screen readers", () => {
-      const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
-
-      const loadMore = root.querySelector(".prd-load-more");
-      expect(loadMore!.getAttribute("role")).toBe("status");
-    });
-
-    it("load more region has aria-live for live announcements", () => {
-      const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
-
-      const loadMore = root.querySelector(".prd-load-more");
-      expect(loadMore!.getAttribute("aria-live")).toBe("polite");
-    });
-
-    it("progress bar has correct ARIA attributes", () => {
-      const doc = generateLargeDoc(100);
-      const root = renderToDiv(
-        h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 20 }),
-      );
-
-      // Query within the load more indicator (not the summary bar progress)
-      const loadMore = root.querySelector(".prd-load-more");
-      expect(loadMore).not.toBeNull();
-      const progressBar = loadMore!.querySelector("[role='progressbar']");
-      expect(progressBar).not.toBeNull();
-      expect(progressBar!.getAttribute("aria-valuenow")).toBe("20");
-      expect(progressBar!.getAttribute("aria-valuemax")).toBe("102");
+  describe("backward compatibility", () => {
+    it("accepts chunkSize prop without errors (deprecated, ignored)", () => {
+      const doc = generateLargeDoc(10);
+      // chunkSize is accepted but has no effect with virtual scrolling
+      expect(() => {
+        renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 3, chunkSize: 5 }));
+      }).not.toThrow();
     });
   });
 });

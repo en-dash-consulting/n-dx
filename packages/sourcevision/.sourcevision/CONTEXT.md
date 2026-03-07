@@ -7,22 +7,43 @@
 
 Project: sourcevision
 Git: main @ 63d150a
-Files: 97, Lines: 23247
-Languages: TypeScript(86) JSON(6) Other(3) Markdown(2)
-Zones: 2, Described: 2
-Import edges: 221, External packages: 6
+Files: 141, Lines: 45524
+Languages: TypeScript(128) JSON(7) Markdown(3) Other(3)
+Zones: 9, Described: 9
+Import edges: 349, External packages: 7
 
 </architecture>
 
 <zones>
 
-[cli] Cli (12 files, coh=0.74 coup=0.26)
-  12 files, primarily TypeScript
-  files: src/cli/commands/constants.ts, src/cli/commands/export-pdf.ts, src/cli/commands/init.ts, src/cli/commands/reset.ts, src/cli/commands/validate.ts, src/cli/errors.ts, src/cli/index.ts, src/cli/output.ts, src/cli/serve.ts, tests/unit/cli/errors.test.ts +2
-[tests] Tests (68 files, coh=0.94 coup=0.06)
-  66 files, primarily TypeScript
-  files: src/analyzers/callgraph-findings.ts, src/analyzers/callgraph.ts, src/analyzers/claude-client.ts, src/analyzers/components.ts, src/analyzers/context.ts, src/analyzers/enrich-batch.ts, src/analyzers/enrich-config.ts, src/analyzers/enrich-parsing.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts +58
-[unzoned] 17 files: .claude/settings.json, .claude/settings.local.json, ARCHITECTURE.md, README.md, SourceVision-F.png ...
+[.claude] .claude (2 files, coh=1.00 coup=0.00)
+  2 files, primarily JSON
+  files: .claude/settings.json, .claude/settings.local.json
+[analyzers] Analyzers (39 files, coh=0.67 coup=0.33)
+  39 files, primarily TypeScript
+  files: src/analyzers/archetypes.ts [types], src/analyzers/callgraph-findings.ts [service], src/analyzers/classify.ts [service], src/analyzers/claude-client.ts [service], src/analyzers/completion-reader.ts [service], src/analyzers/context.ts [service], src/analyzers/enrich-batch.ts [service], src/analyzers/enrich-config.ts [config], src/analyzers/enrich-parsing.ts [utility], src/analyzers/enrich-per-zone.ts [service] +29
+[analyzers-2] Analyzers 2 (11 files, coh=0.48 coup=0.52)
+  11 files, primarily TypeScript
+  files: src/analyzers/callgraph.ts [service], src/analyzers/components.ts [service], src/analyzers/imports.ts [service], src/analyzers/index.ts [entrypoint], src/analyzers/inventory.ts [service], src/analyzers/route-detection.ts [route-handler], src/util/paths.ts [utility], tests/unit/analyzers/callgraph.test.ts, tests/unit/analyzers/components.test.ts, tests/unit/analyzers/imports.test.ts +1
+[analyzers-3] Analyzers 3 (6 files, coh=0.31 coup=0.69)
+  6 files, primarily TypeScript
+  files: src/analyzers/louvain.ts [utility], src/analyzers/zone-hash.ts [utility], src/analyzers/zones.ts [service], tests/unit/analyzers/zone-detection.test.ts, tests/unit/analyzers/zone-size-policy.test.ts, tests/unit/analyzers/zone-subdivision.test.ts
+[cli] Cli (26 files, coh=0.67 coup=0.33)
+  26 files, primarily TypeScript
+  files: src/analyzers/branch-work-collector.ts [service], src/analyzers/manifest.ts [service], src/cli/commands/constants.ts [types], src/cli/commands/export-pdf.ts [cli-command], src/cli/commands/git-credential-helper.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/commands/pr-markdown.ts [cli-command], src/cli/commands/prd-epic-resolver.ts [cli-command], src/cli/commands/reset.ts [cli-command], src/cli/commands/validate.ts [cli-command] +16
+[e2e] E2e (5 files, coh=1.00 coup=0.00)
+  4 files, primarily TypeScript
+  files: src/schema/validate.ts [schema], tests/e2e/cli-analyze.test.ts, tests/e2e/cli-serve.test.ts, tests/integration/pipeline.test.ts, tests/unit/schema/validate.test.ts
+[fixtures] Fixtures (11 files, coh=1.00 coup=0.00)
+  10 files, primarily TypeScript
+  files: tests/fixtures/remix-app/app/routes/_auth.login.tsx, tests/fixtures/remix-app/app/routes/_auth.tsx, tests/fixtures/remix-app/app/routes/_index.tsx, tests/fixtures/remix-app/app/routes/users.$id.tsx, tests/fixtures/small-ts-project/src/config.ts, tests/fixtures/small-ts-project/src/index.ts, tests/fixtures/small-ts-project/src/models/user.ts, tests/fixtures/small-ts-project/src/services/email-service.ts, tests/fixtures/small-ts-project/src/services/user-service.ts, tests/fixtures/small-ts-project/src/utils/format.ts +1
+[root] Root (10 files, coh=1.00 coup=0.00)
+  10 files, primarily Markdown, Other, JSON
+  files: ARCHITECTURE.md, README.md, SourceVision-F.png, SourceVision.png, WORKSPACE_DESIGN.md, package-lock.json, package.json, tsconfig.json, tsconfig.tsbuildinfo, vitest.config.ts
+[unit] Unit (28 files, coh=0.43 coup=0.57)
+  28 files, primarily TypeScript
+  files: src/analyzers/branch-work-classifier.ts [utility], src/analyzers/branch-work-filter.ts [utility], src/analyzers/branch-work-store.ts [service], src/analyzers/risk-scoring.ts [utility], src/analyzers/workspace-aggregate.ts [service], src/cli/commands/workspace.ts [cli-command], src/cli/mcp.ts [service], src/generators/pr-markdown-template.ts [service], src/public.ts [entrypoint], src/schema/data-files.ts [schema] +18
+[unzoned] 3 files: tests/fixtures/remix-app/app/root.tsx, tests/fixtures/remix-app/tsconfig.json, tests/fixtures/small-ts-project/tsconfig.json
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -31,53 +52,67 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 <imports>
 
 Most imported:
-  src/cli/commands/constants.ts ← src/analyzers/manifest.ts, src/analyzers/workspace.ts, src/cli/commands/analyze.ts, src/cli/commands/export-pdf.ts, src/cli/commands/init.ts +5
-  src/util/sort.ts ← src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts, src/analyzers/inventory.ts, src/analyzers/zone-output.ts +4
-  src/schema/data-files.ts ← src/analyzers/workspace.ts, src/cli/commands/analyze.ts, src/cli/commands/export-pdf.ts, src/cli/commands/validate.ts, src/cli/mcp.ts +3
-  src/analyzers/claude-client.ts ← src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts, src/cli/commands/analyze.ts +3
-  src/analyzers/enrich-parsing.ts ← src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts +3
-  src/analyzers/inventory.ts ← src/analyzers/index.ts, src/cli/commands/analyze.ts, src/cli/commands/analyze.ts, tests/integration/pipeline.test.ts, tests/unit/analyzers/callgraph.test.ts +6
-  src/cli/output.ts ← src/cli/commands/analyze.ts, src/cli/commands/export-pdf.ts, src/cli/commands/init.ts, src/cli/commands/reset.ts, src/cli/commands/validate.ts +2
-  src/analyzers/imports.ts ← src/analyzers/index.ts, src/cli/commands/analyze.ts, tests/integration/pipeline.test.ts, tests/unit/analyzers/callgraph.test.ts, tests/unit/analyzers/components.test.ts +1
-  src/analyzers/token-usage.ts ← src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/index.ts, src/cli/commands/analyze.ts +1
-  src/analyzers/zones.ts ← src/analyzers/index.ts, src/analyzers/index.ts, src/cli/commands/analyze.ts, tests/integration/pipeline.test.ts, tests/unit/analyzers/zone-detection.test.ts +2
+  src/cli/output.ts ← src/analyzers/classify.ts, src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/cli/commands/analyze-phases.ts, src/cli/commands/analyze.ts +9
+  src/util/sort.ts ← src/analyzers/callgraph.ts, src/analyzers/classify.ts, src/analyzers/components.ts, src/analyzers/imports.ts, src/analyzers/inventory.ts +7
+  src/analyzers/claude-client.ts ← src/analyzers/classify.ts, src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts +7
+  src/cli/errors.ts ← src/cli/commands/analyze.ts, src/cli/commands/export-pdf.ts, src/cli/commands/git-credential-helper.ts, src/cli/commands/pr-markdown.ts, src/cli/commands/validate.ts +6
+  src/schema/data-files.ts ← src/analyzers/workspace-aggregate.ts, src/analyzers/workspace.ts, src/cli/commands/analyze-phases.ts, src/cli/commands/analyze.ts, src/cli/commands/export-pdf.ts +5
+  src/analyzers/enrich-parsing.ts ← src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts, src/analyzers/enrich.ts +5
+  src/util/paths.ts ← src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts, src/analyzers/inventory.ts, src/analyzers/route-detection.ts +4
+  src/analyzers/zones.ts ← src/analyzers/index.ts, src/analyzers/index.ts, src/cli/commands/analyze-phases.ts, tests/integration/pipeline.test.ts, tests/unit/analyzers/enrich-content-skip.test.ts +4
+  src/analyzers/inventory.ts ← src/analyzers/index.ts, src/cli/commands/analyze-phases.ts, src/cli/commands/analyze-phases.ts, tests/integration/pipeline.test.ts, tests/unit/analyzers/callgraph.test.ts +6
+  src/analyzers/token-usage.ts ← src/analyzers/classify.ts, src/analyzers/enrich-batch.ts, src/analyzers/enrich-per-zone.ts, src/analyzers/enrich.ts, src/analyzers/index.ts +2
 
 </imports>
 
-<routes>
-
-Route modules: 4
-Components: 5
-Usage edges: 0
-
-/ (tests/fixtures/remix-app/app/routes/_index.tsx)
-/login (tests/fixtures/remix-app/app/routes/_auth.login.tsx)
-/users/:id (tests/fixtures/remix-app/app/routes/users.$id.tsx)
-
-Conventions: action(2) default(4) loader(2) meta(1)
-
-</routes>
-
 <findings>
 
-[warning] Bidirectional coupling: "cli" ↔ "tests" (8+7 crossings) — consider extracting shared interface
-[warning] enrich.ts at 925 lines combines AI orchestration, prompt construction, and result processing—this god module concentrates complexity and maintenance risk [analysis-engine]
-[warning] Contains validate.ts which is used in production by both CLI and viewer, indicating misclassification due to test-heavy import patterns [test-suite]
-[critical] God function: analyzeComponents in src/analyzers/components.ts calls 59 unique functions — consider decomposing into smaller, focused functions
-[critical] God function: createSourcevisionMcpServer in src/cli/mcp.ts calls 36 unique functions — consider decomposing into smaller, focused functions
-[critical] Tightly coupled modules: src/cli/commands/analyze.ts and src/cli/output.ts — 32 cross-file calls (unidirectional). Consider extracting shared interface or merging
+[warning] 16 entry points — wide API surface, consider consolidating exports [analyzers]
+[warning] Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [analyzers-2]
+[warning] High coupling (0.52) — 15 imports target "analyzers" [analyzers-2]
+[warning] Generic zone name "Analyzers 3" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [analyzers-3]
+[warning] High coupling (0.69) — 10 imports target "analyzers" [analyzers-3]
+[warning] Low cohesion (0.31) — files are loosely related, consider splitting this zone [analyzers-3]
+[warning] Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extracting shared interface
+[warning] High coupling (0.57) — 27 imports target "analyzers" [unit]
+[warning] registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API. [cli]
+[warning] God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — consider decomposing into smaller, focused functions
+[warning] Zone "Analyzers 3" (analyzers-3) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development [analyzers-3]
 
 </findings>
 
 <next-steps>
 
-[high] God function: analyzeComponents in src/analyzers/components… (+2 related)
-  category: fix
-[medium] Bidirectional coupling: "cli" ↔ "tests" (8+7 crossings) — consider extracting s…
+[high] Zone "Analyzers 3" (analyzers-3) has critical risk (score: 0.69, cohesion: 0.31…
+  files: src/analyzers/louvain.ts, src/analyzers/zone-hash.ts, src/analyzers/zones.ts
   category: refactor
-[medium] enrich.ts at 925 lines combines AI orchestration, prompt construction, and resu…
+[high] Generic zone name "Analyzers 3" — enrichment did not assign a meaningful name r…
+  files: src/analyzers/louvain.ts, src/analyzers/zone-hash.ts, src/analyzers/zones.ts
   category: refactor
-[medium] Contains validate.ts which is used in production by both CLI and viewer, indica…
+[high] High coupling (0.69) — 10 imports target "analyzers"
+  files: src/analyzers/louvain.ts, src/analyzers/zone-hash.ts, src/analyzers/zones.ts
+  category: refactor
+[high] Low cohesion (0.31) — files are loosely related, consider splitting this zone
+  files: src/analyzers/louvain.ts, src/analyzers/zone-hash.ts, src/analyzers/zones.ts
+  category: refactor
+[medium] High coupling (0.57) — 27 imports target "analyzers"
+  files: src/analyzers/branch-work-classifier.ts, src/analyzers/branch-work-filter.ts, src/analyzers/branch-work-store.ts
+  category: refactor
+[medium] Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name r…
+  files: src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts
+  category: refactor
+[medium] High coupling (0.52) — 15 imports target "analyzers"
+  files: src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts
+  category: refactor
+[medium] God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — co…
+  category: refactor
+[medium] registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed int…
+  files: src/analyzers/branch-work-collector.ts, src/analyzers/manifest.ts, src/cli/commands/constants.ts
+  category: refactor
+[medium] 16 entry points — wide API surface, consider consolidating exports
+  files: src/analyzers/archetypes.ts, src/analyzers/callgraph-findings.ts, src/analyzers/classify.ts
+  category: refactor
+[medium] Bidirectional coupling: "analyzers" ↔ "unit" (6+27 crossings) — consider extrac…
   category: refactor
 
 </next-steps>

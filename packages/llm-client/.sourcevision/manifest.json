@@ -1,48 +1,48 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-02-24T06:49:19.756Z",
+  "analyzedAt": "2026-03-06T21:50:23.181Z",
   "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad",
   "gitBranch": "feature/integrate-codex",
   "targetPath": "/Users/ryankeith/work-internal/bravo/packages/llm-client",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.383Z",
-      "completedAt": "2026-02-24T06:49:19.390Z"
+      "startedAt": "2026-03-06T21:47:08.112Z",
+      "completedAt": "2026-03-06T21:47:08.119Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.391Z",
-      "completedAt": "2026-02-24T06:49:19.397Z"
+      "startedAt": "2026-03-06T21:47:08.120Z",
+      "completedAt": "2026-03-06T21:47:08.183Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.397Z",
-      "completedAt": "2026-02-24T06:49:19.568Z"
+      "startedAt": "2026-03-06T21:47:08.183Z",
+      "completedAt": "2026-03-06T21:47:58.308Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.568Z",
-      "completedAt": "2026-02-24T06:49:19.747Z"
+      "startedAt": "2026-03-06T21:47:58.309Z",
+      "completedAt": "2026-03-06T21:50:23.087Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.747Z",
-      "completedAt": "2026-02-24T06:49:19.748Z"
+      "startedAt": "2026-03-06T21:50:23.088Z",
+      "completedAt": "2026-03-06T21:50:23.094Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-02-24T06:49:19.748Z",
-      "completedAt": "2026-02-24T06:49:19.756Z"
+      "startedAt": "2026-03-06T21:50:23.094Z",
+      "completedAt": "2026-03-06T21:50:23.181Z"
     }
   },
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 3,
+    "calls": 2,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",
-    "model": "claude-sonnet-4-20250514"
+    "model": "claude-sonnet-4-6"
   }
 }

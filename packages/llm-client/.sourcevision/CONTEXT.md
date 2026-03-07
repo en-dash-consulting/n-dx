@@ -7,28 +7,27 @@
 
 Project: llm-client
 Git: feature/integrate-codex @ 3acc839
-Files: 46, Lines: 9293
-Languages: TypeScript(41) JSON(3) Other(2)
+Files: 45, Lines: 9980
+Languages: TypeScript(42) JSON(3)
 Zones: 4, Described: 4
-Import edges: 111, External packages: 2
+Import edges: 114, External packages: 2
 
 </architecture>
 
 <zones>
 
-[src] Src (4 files, coh=0.29 coup=0.71)
-  4 files, primarily TypeScript
-  files: src/api-provider.ts, src/config.ts [config], tests/unit/api-provider.test.ts, tests/unit/config.test.ts
-[src-2] Src 2 (16 files, coh=0.63 coup=0.38)
-  16 files, primarily TypeScript
-  files: src/auth.ts, src/exec.ts, src/help-format.ts, src/json.ts, src/output.ts [utility], src/project-config.ts, src/project-dirs.ts, src/public.ts [entrypoint], src/suggest.ts, tests/unit/auth.test.ts +6
-[src-3] Src 3 (17 files, coh=0.65 coup=0.35)
-  17 files, primarily TypeScript
-  files: src/cli-provider.ts, src/codex-cli-provider.ts, src/create-client.ts, src/llm-client.ts, src/provider-interface.ts, src/provider-registry.ts, src/provider-session.ts, src/token-usage.ts, src/types.ts [types], tests/unit/cli-provider.test.ts +7
-[src-4] Src 4 (3 files, coh=0.20 coup=0.80)
-  3 files, primarily TypeScript
-  files: src/llm-config.ts, src/llm-types.ts, tests/unit/llm-config.test.ts
-[unzoned] 6 files: package-lock.json, package.json, tests/e2e/.gitkeep, tests/integration/.gitkeep, tsconfig.json ...
+[root] Root (4 files, coh=1.00 coup=0.00)
+  4 files, primarily JSON, TypeScript
+  files: package-lock.json, package.json, tsconfig.json, vitest.config.ts
+[src] Src (13 files, coh=0.77 coup=0.23)
+  13 files, primarily TypeScript
+  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [service], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [store], src/provider-session.ts [store] +3
+[src-2] Src 2 (19 files, coh=0.56 coup=0.44)
+  19 files, primarily TypeScript
+  files: src/auth.ts [service], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [utility], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
+[unit] Unit (9 files, coh=1.00 coup=0.00)
+  9 files, primarily TypeScript
+  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -39,7 +38,7 @@ Detailed zone context: .sourcevision/zones/{id}/context.md
 Most imported:
   src/types.ts ← src/api-provider.ts, src/api-provider.ts, src/auth.ts, src/auth.ts, src/cli-provider.ts +22
   src/config.ts ← src/api-provider.ts, src/auth.ts, src/cli-provider.ts, src/create-client.ts, src/public.ts +1
-  src/create-client.ts ← src/llm-client.ts, src/llm-types.ts, src/provider-registry.ts, src/public.ts, src/public.ts +1
+  src/create-client.ts ← src/llm-client.ts, src/llm-client.ts, src/provider-registry.ts, src/public.ts, src/public.ts +1
   src/provider-registry.ts ← src/provider-session.ts, src/public.ts, src/public.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-registry.test.ts +2
   src/token-usage.ts ← src/api-provider.ts, src/cli-provider.ts, src/public.ts, tests/unit/token-usage.test.ts
   src/api-provider.ts ← src/create-client.ts, src/create-client.ts, src/public.ts, src/public.ts, tests/unit/api-provider.test.ts
@@ -52,33 +51,58 @@ Most imported:
 
 <findings>
 
-[warning] Bidirectional coupling: "src" ↔ "src-3" (7+4 crossings) — consider extracting shared interface
-[warning] High coupling (0.71) — 7 imports target "src-3" [src]
-[warning] Low cohesion (0.29) — files are loosely related, consider splitting this zone [src]
-[warning] 9 entry points — wide API surface, consider consolidating exports [src-3]
-[warning] Contains 37% of project files (17/46) — may be too broad, consider splitting [src-3]
-[warning] High coupling (0.8) — 4 imports target "src-3" [src-4]
+[warning] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting shared interface
+[warning] 12 entry points — wide API surface, consider consolidating exports [src]
+[warning] Contains 42% of project files (19/45) — may be too broad, consider splitting [src-2]
+[warning] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [src-2]
+[warning] The bidirectional dependency between src and src-2 (25 down, 3 up) is the primary architectural risk — eliminating the 3 upward imports would make the layering clean and unidirectional.
+[warning] The asymmetry between test coverage (core only) and source coupling (core ↔ utilities) means the package's test suite validates the intended architecture but not the actual architecture — a dedicated utility test zone would close this gap.
+[critical] The three source zones form a layered architecture (utilities → core ← tests) that is one refactor away from being a clean strict DAG — only 3 import edges need to be redirected or extracted into a shared types module to achieve full unidirectionality.
+[critical] No zone imports from package-root at runtime — configuration is consumed by external tooling only. This clean boundary means config changes cannot introduce runtime regressions in source zones.
+[critical] A shared base types zone is missing: both llm-provider-core and llm-cli-utilities need the same fundamental types (provider config shapes, token structs, project dir records), causing core to import upward into utilities to get them. Introducing a zero-dependency types-only zone that both source zones import downward from would eliminate the cycle with no behavioral change.
+[warning] HTTP and subprocess provider strategies (api-provider vs cli-provider/codex-cli-provider) are co-located in the same zone with no sub-boundary — a consumer cannot depend on just the HTTP strategy without also pulling in subprocess execution code, and adding a new transport requires editing files adjacent to unrelated transports.
+[warning] The 3 reverse imports (llm-provider-core → llm-cli-utilities) combined with zero utility test coverage and implicit session↔auth coupling form a compounding risk cluster: a single change to auth.ts or a utility config shape can silently break provider construction with no test signal at any layer. Treat these three issues as a single fix unit: extract shared types, add a utility test zone, and add a session-auth integration test simultaneously.
+[warning] Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export. [src]
+[critical] Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists, so llm-provider-core imports upward into llm-cli-utilities to access shared config and token shapes. This single missing layer is the origin of all three compounding risks in finding 11. It should be tracked as one work unit, not five separate issues.
+[warning] The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves.
+[warning] The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope.
+... +6 more
 
 </findings>
 
 <next-steps>
 
-[high] High coupling (0.8) — 4 imports target "src-3"
-  files: src/llm-config.ts, src/llm-types.ts, tests/unit/llm-config.test.ts
+[high] The three source zones form a layered architecture (utiliti… (+5 related)
+  category: fix
+[medium] Add a short ZONE.md at the src-2 zone root documenting: (1) the domain name cho…
+  files: src/auth.ts, src/config.ts, src/exec.ts
   category: refactor
-[high] High coupling (0.71) — 7 imports target "src-3"
-  files: src/api-provider.ts, src/config.ts, tests/unit/api-provider.test.ts
+[medium] Manually assign a domain-specific name to this zone (e.g. 'llm-cli-utilities') …
+  files: src/auth.ts, src/config.ts, src/exec.ts
   category: refactor
-[high] Low cohesion (0.29) — files are loosely related, consider splitting this zone
-  files: src/api-provider.ts, src/config.ts, tests/unit/api-provider.test.ts
+[medium] Contains 42% of project files (19/45) — may be too broad, consider splitting
+  files: src/auth.ts, src/config.ts, src/exec.ts
   category: refactor
-[medium] 9 entry points — wide API surface, consider consolidating exports
-  files: src/cli-provider.ts, src/codex-cli-provider.ts, src/create-client.ts
+[medium] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…
+  files: src/auth.ts, src/config.ts, src/exec.ts
   category: refactor
-[medium] Contains 37% of project files (17/46) — may be too broad, consider splitting
-  files: src/cli-provider.ts, src/codex-cli-provider.ts, src/create-client.ts
+[medium] 12 entry points — wide API surface, consider consolidating exports
+  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
   category: refactor
-[medium] Bidirectional coupling: "src" ↔ "src-3" (7+4 crossings) — consider extracting s…
+[medium] Findings src/0 (12 entry points, automated heuristic) and global/2 (single publ…
+  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
+  category: refactor
+[medium] The asymmetry between test coverage (core only) and source … (+2 related)
+  category: extract
+[medium] HTTP and subprocess provider strategies (api-provider vs cl… (+1 related)
+  category: refactor
+[medium] The 3 reverse imports (llm-provider-core → llm-cli-utilities) combined with zer…
+  category: refactor
+[medium] The concrete prerequisite step for finding 17 is: inspect the import lines in a…
+  category: refactor
+[medium] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting …
+  category: refactor
+[medium] The bidirectional dependency between src and src-2 (25 down, 3 up) is the prima…
   category: refactor
 
 </next-steps>

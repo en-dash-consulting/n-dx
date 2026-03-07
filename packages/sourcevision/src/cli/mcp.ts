@@ -151,7 +151,7 @@ function setArchetypeOverride(absDir: string, path: string, archetype: string): 
 }
 
 function registerMcpTools(server: McpServer, context: McpContext): void {
-  server.tool("get_overview", "Get project summary statistics", {}, () => {
+  server.tool("get_overview", "Get project summary statistics. Good starting point when the user asks about the project or its architecture.", {}, () => {
     const data = context.freshData();
     if (!data.manifest || !data.inventory) {
       return { content: [{ type: "text", text: "No analysis data available. Run 'sourcevision analyze' first." }] };
@@ -178,7 +178,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_zone",
-    "Get details for a specific zone",
+    "Get details for a specific zone. Use to understand architectural context before making changes to files in a zone.",
     { id: z.string().describe("Zone ID") },
     ({ id }) => {
       const data = context.freshData();
@@ -208,7 +208,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_file_info",
-    "Get inventory entry, zone, and imports for a file",
+    "Get inventory entry, zone, and imports for a file. Use before modifying a file to understand its role and dependencies.",
     { path: z.string().describe("File path (relative to project root)") },
     ({ path }) => {
       const data = context.freshData();
@@ -243,7 +243,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_imports",
-    "Get import graph edges, optionally filtered to a specific file",
+    "Get import graph edges, optionally filtered to a specific file. Use to trace dependencies and understand coupling between modules.",
     { file: z.string().optional().describe("Filter to imports from/to this file") },
     ({ file }) => {
       const data = context.freshData();
@@ -269,7 +269,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
     }
   );
 
-  server.tool("get_route_tree", "Get the route structure", {}, () => {
+  server.tool("get_route_tree", "Get the route structure (pages, API routes, layouts). Use when working on routing or navigation.", {}, () => {
     const data = context.freshData();
     if (!data.components) {
       return { content: [{ type: "text", text: "No components data available." }] };
@@ -290,7 +290,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "search_files",
-    "Search the file inventory",
+    "Search the file inventory by path, role, or language. Use to find files related to a feature or module.",
     {
       query: z.string().describe("Search string to match against file paths"),
       role: z.string().optional().describe("Filter by role: source, test, config, docs, etc."),
@@ -329,7 +329,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_findings",
-    "Get analysis findings, optionally filtered",
+    "Get analysis findings (anti-patterns, suggestions, observations). Check before modifying code in an area to see known issues.",
     {
       type: z.string().optional().describe("Filter by type: observation, pattern, relationship, anti-pattern, suggestion"),
       severity: z.string().optional().describe("Filter by severity: info, warning, critical"),
@@ -356,7 +356,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_classifications",
-    "Get file archetype classifications",
+    "Get file archetype classifications (e.g., utility, entrypoint, route-handler). Use to understand file roles across the codebase.",
     {
       archetype: z.string().optional().describe("Filter by archetype ID (e.g., utility, entrypoint, route-handler)"),
       path: z.string().optional().describe("Filter by file path substring"),
@@ -392,7 +392,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "set_file_archetype",
-    "Override the archetype classification for a file (persists to .n-dx.json)",
+    "Override the archetype classification for a file (persists to .n-dx.json). Use when the automatic classification is wrong.",
     {
       path: z.string().describe("File path (relative to project root)"),
       archetype: z.string().describe("Archetype ID to assign (e.g., utility, route-handler, entrypoint)"),
@@ -428,7 +428,7 @@ function registerMcpTools(server: McpServer, context: McpContext): void {
 
   server.tool(
     "get_next_steps",
-    "Get prioritized list of what to work on next",
+    "Get prioritized list of what to work on next based on analysis findings. Use when planning work or looking for improvement opportunities.",
     {
       priority: z.string().optional().describe("Filter by priority: high, medium, low"),
       limit: z.number().optional().describe("Max results (default 10)"),

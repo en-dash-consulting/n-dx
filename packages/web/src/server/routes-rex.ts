@@ -87,6 +87,13 @@ import {
   computeEpicStats,
   computePriorityDistribution,
   computeRequirementsSummary,
+  isRootLevel,
+  isWorkItem,
+  computeHealthScore,
+  detectReorganizations,
+  applyProposals,
+  applyReshape,
+  type ReshapeProposal,
 } from "./rex-gateway.js";
 
 const REX_PREFIX = "/api/rex/";
@@ -487,6 +494,149 @@ function routeExecution(
   return false;
 }
 
+/** Health and reorganize routes. */
+function routeHealthReorganize(
+  path: string, method: string,
+  req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): boolean | Promise<boolean> {
+  // GET /api/rex/health — structure health score
+  if (path === "health" && method === "GET") {
+    const doc = loadPRD(ctx);
+    if (!doc) {
+      errorResponse(res, 404, "No PRD data found");
+      return true;
+    }
+    const health = computeHealthScore(doc.items);
+    jsonResponse(res, 200, health);
+    return true;
+  }
+
+  // GET /api/rex/reorganize — detect reorganization proposals
+  // Query params: mode=fast|full (default: full)
+  if (path === "reorganize" && method === "GET") {
+    return (async () => {
+      const doc = loadPRD(ctx);
+      if (!doc) {
+        errorResponse(res, 404, "No PRD data found");
+        return true;
+      }
+      if (doc.items.length === 0) {
+        jsonResponse(res, 200, { structural: { proposals: [], stats: {} }, llm: [] });
+        return true;
+      }
+
+      const urlObj = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+      const mode = urlObj.searchParams.get("mode") ?? "full";
+
+      const plan = detectReorganizations(doc.items);
+      const structural = {
+        proposals: plan.proposals.map((p) => ({
+          id: p.id,
+          type: p.type,
+          description: p.description,
+          risk: p.risk,
+          confidence: p.confidence,
+          items: p.items,
+        })),
+        stats: plan.stats,
+      };
+
+      let llm: Array<{ id: string; action: string; reason: string }> = [];
+      if (mode !== "fast") {
+        try {
+          const { reasonForReshape } = await import("./rex-gateway.js");
+          const { proposals } = await reasonForReshape(doc.items, { dir: ctx.projectDir });
+          llm = proposals.map((p: ReshapeProposal) => ({
+            id: p.id,
+            action: p.action.action,
+            reason: p.action.reason,
+          }));
+        } catch {
+          // LLM unavailable — return structural only
+        }
+      }
+
+      jsonResponse(res, 200, { structural, llm });
+      return true;
+    })();
+  }
+
+  // POST /api/rex/reorganize/apply — apply selected proposals
+  // Body: { proposalIds?: number[], llmProposalIds?: string[] }
+  if (path === "reorganize/apply" && method === "POST") {
+    return (async () => {
+      const doc = loadPRD(ctx);
+      if (!doc) {
+        errorResponse(res, 404, "No PRD data found");
+        return true;
+      }
+
+      const body = await readBody(req);
+      let proposalIds: number[];
+      let llmProposalIds: string[];
+      try {
+        const parsed = JSON.parse(body);
+        proposalIds = parsed.proposalIds ?? [];
+        llmProposalIds = parsed.llmProposalIds ?? [];
+      } catch {
+        errorResponse(res, 400, "Invalid JSON body");
+        return true;
+      }
+
+      let structuralApplied = 0;
+      let structuralFailed = 0;
+
+      // Apply structural proposals
+      if (proposalIds.length > 0 || (llmProposalIds.length === 0 && proposalIds.length === 0)) {
+        const plan = detectReorganizations(doc.items);
+        const toApply = proposalIds.length > 0
+          ? plan.proposals.filter((p) => proposalIds.includes(p.id))
+          : plan.proposals.filter((p) => p.risk === "low");
+
+        if (toApply.length > 0) {
+          const result = applyProposals(doc.items, toApply);
+          structuralApplied = result.applied;
+          structuralFailed = result.failed;
+        }
+      }
+
+      // Apply LLM proposals
+      let llmApplied = 0;
+      let llmFailed = 0;
+      if (llmProposalIds.length > 0) {
+        try {
+          const { reasonForReshape } = await import("./rex-gateway.js");
+          const { proposals } = await reasonForReshape(doc.items, { dir: ctx.projectDir });
+          const toApply = proposals.filter((p: ReshapeProposal) => llmProposalIds.includes(p.id));
+          if (toApply.length > 0) {
+            const reshapeResult = applyReshape(doc.items, toApply);
+            llmApplied = reshapeResult.applied.length;
+            llmFailed = reshapeResult.errors.length;
+          }
+        } catch {
+          // LLM unavailable
+        }
+      }
+
+      const totalApplied = structuralApplied + llmApplied;
+      if (totalApplied > 0) {
+        savePRD(ctx, doc);
+        if (broadcast) broadcast({ type: "rex:prd-changed", source: "reorganize" });
+      }
+      jsonResponse(res, 200, {
+        applied: totalApplied,
+        failed: structuralFailed + llmFailed,
+        structuralApplied,
+        llmApplied,
+      });
+      return true;
+    })();
+  }
+
+  return false;
+}
+
 /**
  * Handle Rex API requests. Returns true if the request was handled.
  *
@@ -497,6 +647,7 @@ function routeExecution(
  * - Prune (preview, execute)
  * - Proposals (analyze, proposals, smart-add, batch-import)
  * - Execution (epic-by-epic, status, pause, resume)
+ * - Health & reorganize (health score, proposals, apply)
  */
 export function handleRexRoute(
   req: IncomingMessage,
@@ -531,6 +682,9 @@ export function handleRexRoute(
 
   const execResult = routeExecution(path, method, req, res, ctx, broadcast);
   if (execResult !== false) return execResult;
+
+  const healthResult = routeHealthReorganize(path, method, req, res, ctx, broadcast);
+  if (healthResult !== false) return healthResult;
 
   return false;
 }
@@ -1085,7 +1239,7 @@ function computeEpicImpact(
     let removedCount = 0;
 
     function countBefore(node: PRDItem): void {
-      if (node.level === "task" || node.level === "subtask") {
+      if (isWorkItem(node.level)) {
         if (node.status !== "deleted") {
           beforeTotal++;
           if (node.status === "completed") beforeCompleted++;
@@ -1100,7 +1254,7 @@ function computeEpicImpact(
       if (prunableIds.has(node.id)) {
         // Count all tasks/subtasks in this subtree as removed
         function countAll(n: PRDItem): void {
-          if (n.level === "task" || n.level === "subtask") {
+          if (isWorkItem(n.level)) {
             if (n.status !== "deleted") removedCount++;
           }
           if (Array.isArray(n.children)) {
@@ -1124,7 +1278,7 @@ function computeEpicImpact(
     function countRemovedCompleted(node: PRDItem): void {
       if (prunableIds.has(node.id)) {
         function countComp(n: PRDItem): void {
-          if ((n.level === "task" || n.level === "subtask") && n.status === "completed") {
+          if (isWorkItem(n.level) && n.status === "completed") {
             removedCompleted++;
           }
           if (Array.isArray(n.children)) {
@@ -1778,10 +1932,12 @@ async function handleSmartAddPreview(
       return true;
     }
 
-    // Use rex CLI smart-add with --format=json (no --accept = preview mode)
-    const args = ["smart-add", "--format=json"];
+    // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
+    // Pass description via --description flag (not positional) to prevent any
+    // stale UI text from being concatenated into the argument list.
+    const description = String(input.text).trim();
+    const args = ["add", "--format=json", "--description", description];
     if (input.parentId) args.push("--parent", input.parentId);
-    args.push(input.text.trim());
     args.push(ctx.projectDir);
 
     const rexBin = join(ctx.projectDir, "node_modules", ".bin", "rex");
@@ -1925,8 +2081,8 @@ async function handleBatchImport(
         itemSources.push(item.source ?? fileName);
       }
 
-      // Build rex CLI args: smart-add --format=json --file=<f1> --file=<f2> ...
-      const args = ["smart-add", "--format=json"];
+      // Build rex CLI args: add --format=json --file=<f1> --file=<f2> ...
+      const args = ["add", "--format=json"];
       if (input.parentId) args.push("--parent", input.parentId);
       if (input.accept) args.push("--accept");
       for (const fp of filePaths) {
@@ -2222,7 +2378,7 @@ async function handleStartEpicByEpic(
     };
 
     // Build the list of epics to execute
-    const allEpics = doc.items.filter((item) => item.level === "epic");
+    const allEpics = doc.items.filter((item) => isRootLevel(item.level));
 
     let epicsToRun: PRDItem[];
     if (input.epicIds && input.epicIds.length > 0) {

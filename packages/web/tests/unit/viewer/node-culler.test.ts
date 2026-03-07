@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { NodeCuller } from "../../../src/viewer/components/prd-tree/node-culler.js";
-import type { VisibilityCallback } from "../../../src/viewer/components/prd-tree/node-culler.js";
+import { NodeCuller } from "../../../src/shared/node-culler.js";
+import type { VisibilityCallback } from "../../../src/shared/node-culler.js";
 
 // ─── IntersectionObserver mock ───────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 import type { PRDDocument } from "../../schema/index.js";
+import { isRootLevel } from "../../schema/index.js";
 import type { EpiclessFeature } from "../../core/structural.js";
 import {
   correlateEpiclessFeatures,
@@ -59,7 +60,7 @@ export async function resolveEpiclessFeatures(
 
   // Collect available epics for correlation
   const availableEpics = doc.items.filter(
-    (item) => item.level === "epic" && item.status !== "deleted",
+    (item) => isRootLevel(item.level) && item.status !== "deleted",
   );
 
   // Run correlation analysis for all epicless features

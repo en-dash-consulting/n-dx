@@ -6,8 +6,8 @@ export {
   updateManifestModule,
   updateManifestError,
 } from "./manifest.js";
-export { analyzeZones } from "./zones.js";
-export type { AnalyzeZonesResult } from "./zones.js";
+export { analyzeZones, runZonePipeline } from "./zones.js";
+export type { AnalyzeZonesResult, ZonePipelineOptions, ZonePipelineResult } from "./zones.js";
 export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
 export {
   analyzeComponents,

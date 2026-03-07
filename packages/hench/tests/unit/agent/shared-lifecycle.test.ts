@@ -125,7 +125,7 @@ describe("shared lifecycle", () => {
         systemPrompt: "test prompt",
         taskId: "task-1",
         taskTitle: "Test task",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
       });
 
       expect(run.status).toBe("completed");
@@ -152,7 +152,7 @@ describe("shared lifecycle", () => {
         systemPrompt: "test prompt",
         taskId: "task-1",
         taskTitle: "Test task",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         extraInfo: [
           { heading: "Provider", content: "cli (claude binary)" },
         ],
@@ -211,14 +211,14 @@ describe("shared lifecycle", () => {
       const { run, memoryCtx } = await initRunRecord({
         taskId: "task-1",
         taskTitle: "Test task",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         henchDir,
       });
 
       expect(run.status).toBe("running");
       expect(run.taskId).toBe("task-1");
       expect(run.taskTitle).toBe("Test task");
-      expect(run.model).toBe("claude-sonnet-4-20250514");
+      expect(run.model).toBe("claude-sonnet-4-6");
       expect(run.turns).toBe(0);
       expect(run.tokenUsage).toEqual({ input: 0, output: 0 });
       expect(run.toolCalls).toEqual([]);
@@ -284,7 +284,7 @@ describe("shared lifecycle", () => {
         turns: 5,
         tokenUsage: { input: 80000, output: 20000 },
         toolCalls: [],
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
       };
 
       await handleBudgetExceeded(store, "task-1", run, 100000, 50000);

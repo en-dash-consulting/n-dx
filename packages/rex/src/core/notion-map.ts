@@ -20,7 +20,7 @@ import type {
   PRDDocument,
   Priority,
 } from "../schema/index.js";
-import { SCHEMA_VERSION } from "../schema/index.js";
+import { SCHEMA_VERSION, isRootLevel } from "../schema/index.js";
 import { walkTree } from "./tree.js";
 
 // ---------------------------------------------------------------------------
@@ -599,8 +599,8 @@ export function resolveParentPage(
   idMap: Map<string, string>,
   parentId?: string,
 ): NotionParent {
-  // Epics are always top-level in the database
-  if (item.level === "epic") {
+  // Root-level items are always top-level in the database
+  if (isRootLevel(item.level)) {
     return { database_id: databaseId };
   }
 
@@ -643,7 +643,7 @@ export function mapDocumentToNotion(
     // creation), so we use database_id for epics and record parentItemId for
     // the caller to resolve after page creation.
     const parent: NotionParent =
-      item.level === "epic" || !parentId
+      isRootLevel(item.level) || !parentId
         ? { database_id: databaseId }
         : { database_id: databaseId }; // caller will remap after creation
 

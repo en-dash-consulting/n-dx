@@ -12,7 +12,7 @@ import {
   type MessageCoalescer,
   type CoalescedBatch,
   type ParsedWSMessage,
-} from "../../../src/viewer/message-coalescer.js";
+} from "../../../src/viewer/messaging/message-coalescer.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

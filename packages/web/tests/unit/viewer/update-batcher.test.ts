@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createUpdateBatcher,
   type UpdateBatcher,
-} from "../../../src/viewer/update-batcher.js";
+} from "../../../src/viewer/performance/update-batcher.js";
 
 // ─── RAF mock ─────────────────────────────────────────────────────────────────
 

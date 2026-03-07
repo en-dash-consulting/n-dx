@@ -29,9 +29,24 @@ export interface ZoneData {
   cohesion: number;
   coupling: number;
   files: FileInfo[];
+  totalFiles: number;
   totalFunctions: number;
   internalCalls: number;
   crossZoneCalls: number;
+  /** Nested sub-zones when recursive analysis is available. */
+  subZones?: ZoneData[];
+  /** Cross-zone edges between sub-zones at this level. */
+  subCrossings?: FlowEdge[];
+  /** Whether this zone has sub-zone data available for drill-down. */
+  hasDrillDown?: boolean;
+}
+
+/** Breadcrumb entry for tracking the drill-down navigation path. */
+export interface ZoneBreadcrumb {
+  /** Zone ID at this level, or null for the root (all zones) level. */
+  zoneId: string | null;
+  /** Human-readable label for the breadcrumb. */
+  label: string;
 }
 
 export interface BoxRect {
@@ -60,3 +75,6 @@ export type FileConnectionMap = Map<string, FileZoneLink[]>;
 
 /** Maps (sourceFile → targetFile → weight) for file-to-file edges. */
 export type FileToFileMap = Map<string, Map<string, number>>;
+
+/** Parent zone ID → set of expanded subzone IDs within that zone. */
+export type ExpandedSubZones = Map<string, Set<string>>;

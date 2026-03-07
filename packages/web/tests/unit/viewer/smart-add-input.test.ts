@@ -28,6 +28,14 @@ async function flush() {
   await new Promise<void>((r) => queueMicrotask(r));
 }
 
+/** Type text into the textarea, flush, then click the Generate button. */
+async function typeAndGenerate(root: HTMLElement, text: string) {
+  const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+  typeInTextarea(textarea, text);
+  await flush();
+  root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!.click();
+}
+
 // Sample proposal data matching the RawProposal interface
 const sampleProposals = [
   {
@@ -86,11 +94,12 @@ describe("SmartAddInput", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the smart add panel with header and textarea", () => {
+  it("renders the smart add panel with header, textarea, and generate button", () => {
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
     expect(root.textContent).toContain("Smart Add");
     expect(root.textContent).toContain("Describe what you want to build");
     expect(root.querySelector(".smart-add-textarea")).toBeTruthy();
+    expect(root.querySelector(".smart-add-btn-generate")).toBeTruthy();
   });
 
   it("shows hint when input is too short", async () => {
@@ -103,34 +112,54 @@ describe("SmartAddInput", () => {
     expect(root.textContent).toContain("more to generate proposals");
   });
 
-  it("does not trigger API call for input shorter than minimum length", () => {
-    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
-
-    typeInTextarea(textarea, "short");
-
-    // Advance past debounce
-    vi.advanceTimersByTime(600);
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("triggers debounced API call for sufficient input", async () => {
-    fetchSpy.mockResolvedValue(mockSuccessResponse());
-
+  it("does not trigger API call on typing alone", () => {
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
     const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
     typeInTextarea(textarea, "Add user authentication with OAuth2");
 
-    // Should not have called fetch yet (still debouncing)
+    // Advance well past any hypothetical debounce
+    vi.advanceTimersByTime(2000);
+
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
-    // Advance past debounce (500ms)
-    vi.advanceTimersByTime(600);
+  it("disables generate button when input is too short", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+    const btn = root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!;
 
-    // Now fetch should be called
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(btn.disabled).toBe(true);
+
+    typeInTextarea(textarea, "short");
+    await flush();
+
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("triggers API call only when Generate button is clicked", async () => {
+    fetchSpy.mockResolvedValue(mockSuccessResponse());
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+    const btn = root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!;
+
+    typeInTextarea(textarea, "Add user authentication with OAuth2");
+    await flush();
+
+    // Typing alone should not trigger preview fetch (scope load may have fired)
+    const previewCalls = fetchSpy.mock.calls.filter(
+      (c: unknown[]) => c[0] === "/api/rex/smart-add-preview",
+    );
+    expect(previewCalls).toHaveLength(0);
+
+    // Click the Generate button
+    btn.click();
+
+    const previewCallsAfter = fetchSpy.mock.calls.filter(
+      (c: unknown[]) => c[0] === "/api/rex/smart-add-preview",
+    );
+    expect(previewCallsAfter).toHaveLength(1);
     expect(fetchSpy).toHaveBeenCalledWith(
       "/api/rex/smart-add-preview",
       expect.objectContaining({
@@ -140,41 +169,43 @@ describe("SmartAddInput", () => {
     );
 
     // Verify the request body
-    const call = fetchSpy.mock.calls[0];
+    const call = previewCallsAfter[0];
     const body = JSON.parse(call[1].body);
     expect(body.text).toBe("Add user authentication with OAuth2");
   });
 
-  it("debounces rapid input changes", () => {
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        proposals: [],
-        confidence: 0,
-        qualityIssues: [],
-      }),
-    });
-
+  it("does not trigger API call on Enter key in textarea", async () => {
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
     const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    // Type multiple changes rapidly
+    typeInTextarea(textarea, "Add user authentication with OAuth2");
+    await flush();
+
+    textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    vi.advanceTimersByTime(2000);
+
+    const previewCalls = fetchSpy.mock.calls.filter(
+      (c: unknown[]) => c[0] === "/api/rex/smart-add-preview",
+    );
+    expect(previewCalls).toHaveLength(0);
+  });
+
+  it("allows typing, pausing, editing, and resuming without API calls", async () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+
+    // Type, pause, edit, resume
     typeInTextarea(textarea, "Add user auth");
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(1000);
 
     typeInTextarea(textarea, "Add user authentication");
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(2000);
 
     typeInTextarea(textarea, "Add user authentication with OAuth2");
+    vi.advanceTimersByTime(5000);
 
-    // Only the last input should be pending, not yet fired
+    // No API calls at any point during typing
     expect(fetchSpy).not.toHaveBeenCalled();
-
-    // Advance past debounce for the last input
-    vi.advanceTimersByTime(600);
-
-    // Should only have made one fetch call (the last input)
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("shows loading state while generating", async () => {
@@ -188,9 +219,10 @@ describe("SmartAddInput", () => {
     const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
     typeInTextarea(textarea, "Add user authentication with OAuth2");
+    await flush();
 
-    // Advance past debounce to trigger the fetch
-    vi.advanceTimersByTime(600);
+    // Click Generate
+    root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!.click();
 
     // Allow setState to be called (triggerPreview sets state synchronously before await)
     await flush();
@@ -210,14 +242,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    // Advance past debounce
-    vi.advanceTimersByTime(600);
-
-    // Wait for the fetch promise to resolve and Preact to update
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -232,11 +258,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -249,11 +272,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -267,11 +287,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -286,11 +303,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -303,11 +317,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -324,11 +335,8 @@ describe("SmartAddInput", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -349,11 +357,8 @@ describe("SmartAddInput", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -361,27 +366,24 @@ describe("SmartAddInput", () => {
     expect(root.textContent).toContain("1 quality warning");
   });
 
-  it("resets state when input is cleared", async () => {
+  it("proposals persist when input text is later edited", async () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    // First, generate proposals
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-    vi.advanceTimersByTime(600);
+    // Generate proposals
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
     expect(root.textContent).toContain("User Authentication");
 
-    // Now clear the input
-    typeInTextarea(textarea, "");
+    // Edit the input — proposals should remain (no auto-clear)
+    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
+    typeInTextarea(textarea, "Add user authentication with OAuth2 and SSO");
     await flush();
 
-    // Proposals should be cleared — no preview section
-    expect(root.querySelector(".smart-add-preview")).toBeFalsy();
-    expect(root.querySelector(".smart-add-confidence")).toBeFalsy();
+    expect(root.textContent).toContain("User Authentication");
   });
 
   it("shows empty state when no proposals generated", async () => {
@@ -395,11 +397,8 @@ describe("SmartAddInput", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Something that produces no results");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Something that produces no results");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -411,11 +410,8 @@ describe("SmartAddInput", () => {
     fetchSpy.mockResolvedValue(mockSuccessResponse());
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -557,11 +553,8 @@ describe("Confidence indicator", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -581,11 +574,8 @@ describe("Confidence indicator", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 
@@ -604,11 +594,8 @@ describe("Confidence indicator", () => {
     });
 
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
-    const textarea = root.querySelector<HTMLTextAreaElement>(".smart-add-textarea")!;
 
-    typeInTextarea(textarea, "Add user authentication with OAuth2");
-
-    vi.advanceTimersByTime(600);
+    await typeAndGenerate(root, "Add user authentication with OAuth2");
     await vi.runAllTimersAsync();
     await flush();
 

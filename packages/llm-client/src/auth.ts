@@ -68,7 +68,7 @@ export async function validateApiKey(
 
   try {
     await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1,
       messages: [{ role: "user", content: "hi" }],
     });

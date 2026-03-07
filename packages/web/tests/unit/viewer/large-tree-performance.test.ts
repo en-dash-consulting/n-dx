@@ -660,8 +660,9 @@ describe("DOM rendering performance", () => {
   /**
    * Render a tree and measure DOM metrics.
    *
-   * Progressive loading limits the initial render to ~50 nodes,
-   * so DOM node count should be bounded regardless of tree size.
+   * In jsdom (containerHeight=0), virtual scrolling renders all visible
+   * items. Visible items are bounded by defaultExpandDepth (1), not by
+   * the total tree size.
    */
   function renderAndMeasure(tree: PRDItemData[]): {
     domNodeCount: number;
@@ -709,35 +710,39 @@ describe("DOM rendering performance", () => {
         expect(renderTimeMs).toBeLessThan(budget);
       });
 
-      it("progressive loading bounds initial DOM node count", () => {
+      it("virtual scroll limits visible items by expand depth", () => {
         const tree = generateRealisticTree(size);
 
         const { treeItemCount } = renderAndMeasure(tree);
 
-        // Progressive loading should limit initial render.
-        // With defaultExpandDepth=1, only top-level epics + their first
-        // level of children are expanded. The progressive loader caps at
-        // PROGRESSIVE_THRESHOLD visible nodes initially.
-        // Allow generous upper bound since container nodes are always shown.
-        const maxExpectedTreeItems = size <= 500 ? 200 : 300;
+        // With defaultExpandDepth=1, only epics + their direct features are
+        // visible in the flattened tree. Tasks and subtasks are hidden behind
+        // collapsed feature nodes.
+        // In jsdom (containerHeight=0), virtual scrolling renders all visible
+        // nodes. Visible count is bounded by expansion depth, not tree size.
+        // Allow generous upper bound since the tree generates ~5 epics × ~3
+        // features per 500 nodes, scaling proportionally.
+        // Visible items ≈ epics + features (roughly size / 7), well under total.
+        const maxExpectedTreeItems = Math.ceil(size / 4);
         expect(treeItemCount).toBeLessThan(maxExpectedTreeItems);
       });
 
-      it("DOM node count grows sub-linearly with tree size", () => {
-        // This test validates that rendering 4× more items doesn't create
-        // 4× more DOM nodes, thanks to progressive loading and lazy children.
-        const smallTree = generateRealisticTree(Math.floor(size / 4));
-        const largeTree = generateRealisticTree(size);
+      it("DOM per visible item is bounded (no CulledNode/LazyChildren wrappers)", () => {
+        // Virtual scrolling renders flat NodeRow elements without the
+        // recursive CulledNode and LazyChildren wrapper divs, keeping
+        // the DOM nodes per item bounded to a small constant.
+        const tree = generateRealisticTree(size);
+        const { domNodeCount, treeItemCount } = renderAndMeasure(tree);
 
-        const smallMetrics = renderAndMeasure(smallTree);
-        const largeMetrics = renderAndMeasure(largeTree);
-
-        // DOM nodes should not grow proportionally (sub-linear growth)
-        // Large tree should have less than 3× the DOM nodes of small tree
-        // (if it were linear, it would be 4×)
-        expect(largeMetrics.domNodeCount).toBeLessThan(
-          smallMetrics.domNodeCount * 3 + 100,
-        );
+        if (treeItemCount > 0) {
+          // Overhead includes header, toolbar, filters, summary bar, spacers.
+          // Subtract fixed overhead (~200 nodes) and check per-item cost.
+          const overheadEstimate = 200;
+          const perItemNodes = (domNodeCount - overheadEstimate) / treeItemCount;
+          // Each NodeRow produces ~15-25 DOM nodes (spans, divs, text nodes).
+          // Without CulledNode/LazyChildren wrappers, this should be < 30.
+          expect(perItemNodes).toBeLessThan(30);
+        }
       });
     });
   }

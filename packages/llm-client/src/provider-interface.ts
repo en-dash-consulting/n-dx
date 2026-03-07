@@ -110,7 +110,7 @@ export interface ProviderInfo {
   readonly mode: ProviderAuthMode;
 
   /**
-   * Active model identifier (e.g. `"claude-sonnet-4-20250514"`).
+   * Active model identifier (e.g. `"claude-sonnet-4-6"`).
    * Absent when the provider delegates model selection to the CLI.
    */
   readonly model?: string;

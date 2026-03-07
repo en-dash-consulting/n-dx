@@ -20,7 +20,7 @@ import {
   _testHelpers,
   type CrashDetectionResult,
   type SavedNavigationState,
-} from "../../../src/viewer/crash-detector.js";
+} from "../../../src/viewer/performance/crash-detector.js";
 
 const {
   HEARTBEAT_KEY,

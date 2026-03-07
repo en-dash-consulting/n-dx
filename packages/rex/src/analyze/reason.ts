@@ -1,176 +1,53 @@
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
-import type { PRDItem, TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
+import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
+import { isContainerLevel } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import { walkTree } from "../core/tree.js";
-import type {
-  ClaudeConfig,
-  ClaudeClient,
-  AuthMode,
-  LLMConfig,
-  LLMVendor,
-} from "@n-dx/llm-client";
+// Re-export shared utilities for backward compatibility — existing consumers
+// that import from "./reason.js" continue to work without changes.
+export {
+  DEFAULT_MODEL,
+  DEFAULT_CODEX_MODEL,
+  MAX_RETRIES,
+  parseTokenUsage,
+  emptyAnalyzeTokenUsage,
+  accumulateTokenUsage,
+  detectFileFormat,
+  extractJson,
+  repairTruncatedJson,
+  PRD_SCHEMA,
+  TASK_QUALITY_RULES,
+  OUTPUT_INSTRUCTION,
+} from "./analyze-shared.js";
+export type { ClaudeResult, FileFormat } from "./analyze-shared.js";
+
+// Re-export LLM bridge functions for backward compatibility — consumers
+// that import config/client management from "./reason.js" continue to work.
+export {
+  setLLMConfig,
+  setClaudeConfig,
+  setClaudeClient,
+  getAuthMode,
+  getLLMVendor,
+  spawnClaude,
+} from "./llm-bridge.js";
+
 import {
-  createLLMClient,
-  detectLLMAuthMode,
-} from "@n-dx/llm-client";
-
-export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
-
-/** Maximum number of LLM retry attempts for transient/parse failures. */
-export const MAX_RETRIES = 2;
-
-/**
- * Module-level Claude configuration. Set once at CLI entry points via
- * `setClaudeConfig()` so that all internal `spawnClaude()` calls inherit
- * the resolved CLI path without threading config through every function.
- */
-let _llmConfig: LLMConfig | undefined;
-
-/**
- * Module-level Claude client instance. Created lazily from the config
- * when the first LLM call is made, or set explicitly at CLI entry points.
- */
-let _llmClient: ClaudeClient | undefined;
-
-function resolveVendor(): LLMVendor {
-  return _llmConfig?.vendor ?? "claude";
-}
-
-function resolveModel(model?: string): string {
-  if (model) return model;
-  const vendor = resolveVendor();
-  if (vendor === "codex") {
-    return _llmConfig?.codex?.model ?? DEFAULT_CODEX_MODEL;
-  }
-  return _llmConfig?.claude?.model ?? DEFAULT_MODEL;
-}
-
-export function setLLMConfig(config: LLMConfig): void {
-  _llmConfig = config;
-  _llmClient = undefined;
-}
-
-/**
- * Set the module-level Claude configuration (CLI path, API key, etc.).
- * Call this at CLI entry points before any LLM operations.
- * Also resets the cached client so the next call creates a fresh one
- * using the new configuration.
- */
-export function setClaudeConfig(config: ClaudeConfig): void {
-  _llmConfig = {
-    ...(_llmConfig ?? {}),
-    claude: config,
-    vendor: _llmConfig?.vendor ?? "claude",
-  };
-  _llmClient = undefined;
-}
-
-/**
- * Set the module-level Claude client explicitly. This is useful when a
- * client has already been created at the CLI entry point.
- */
-export function setClaudeClient(client: ClaudeClient): void {
-  _llmClient = client;
-}
-
-/**
- * Get the current authentication mode being used for LLM calls.
- * Returns "api" when using direct API key authentication, "cli" when
- * using the Claude Code CLI binary. Returns undefined if no config
- * has been set yet.
- */
-export function getAuthMode(): AuthMode | undefined {
-  if (_llmClient) return _llmClient.mode;
-  if (_llmConfig) {
-    return detectLLMAuthMode({
-      vendor: resolveVendor(),
-      llmConfig: _llmConfig,
-    });
-  }
-  return undefined;
-}
-
-export function getLLMVendor(): LLMVendor | undefined {
-  if (_llmClient || _llmConfig) return resolveVendor();
-  return undefined;
-}
-
-/**
- * Get or lazily create the module-level Claude client.
- * Falls back to CLI mode when no configuration is available.
- */
-function getClient(): ClaudeClient {
-  if (_llmClient) return _llmClient;
-  const llmConfig = _llmConfig ?? {};
-  _llmClient = createLLMClient({
-    vendor: resolveVendor(),
-    llmConfig,
-  });
-  return _llmClient;
-}
-
-// ── Token usage helpers ──
-
-/** Result from a Claude CLI call, including text and optional token usage. */
-export interface ClaudeResult {
-  text: string;
-  tokenUsage?: TokenUsage;
-}
-
-/** Parse token usage from a claude CLI JSON envelope. */
-export function parseTokenUsage(envelope: Record<string, unknown>): TokenUsage | undefined {
-  // Claude CLI --output-format json includes usage fields at the top level
-  const input = envelope.input_tokens ?? envelope.total_input_tokens;
-  const output = envelope.output_tokens ?? envelope.total_output_tokens;
-
-  if (typeof input !== "number" && typeof output !== "number") {
-    return undefined;
-  }
-
-  const usage: TokenUsage = {
-    input: typeof input === "number" ? input : 0,
-    output: typeof output === "number" ? output : 0,
-  };
-
-  const cacheCreation = envelope.cache_creation_input_tokens;
-  const cacheRead = envelope.cache_read_input_tokens;
-  if (typeof cacheCreation === "number" && cacheCreation > 0) {
-    usage.cacheCreationInput = cacheCreation;
-  }
-  if (typeof cacheRead === "number" && cacheRead > 0) {
-    usage.cacheReadInput = cacheRead;
-  }
-
-  return usage;
-}
-
-/** Create an empty AnalyzeTokenUsage accumulator. */
-export function emptyAnalyzeTokenUsage(): AnalyzeTokenUsage {
-  return { calls: 0, inputTokens: 0, outputTokens: 0 };
-}
-
-/** Accumulate a single call's token usage into the aggregate. */
-export function accumulateTokenUsage(
-  aggregate: AnalyzeTokenUsage,
-  usage?: TokenUsage,
-): void {
-  aggregate.calls++;
-  if (!usage) return;
-  aggregate.inputTokens += usage.input;
-  aggregate.outputTokens += usage.output;
-  if (usage.cacheCreationInput) {
-    aggregate.cacheCreationInputTokens =
-      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
-  }
-  if (usage.cacheReadInput) {
-    aggregate.cacheReadInputTokens =
-      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
-  }
-}
+  DEFAULT_MODEL,
+  emptyAnalyzeTokenUsage,
+  accumulateTokenUsage,
+  extractJson,
+  repairTruncatedJson,
+  detectFileFormat,
+  PRD_SCHEMA,
+  TASK_QUALITY_RULES,
+  OUTPUT_INSTRUCTION,
+} from "./analyze-shared.js";
+import type { ClaudeResult, FileFormat } from "./analyze-shared.js";
+import { spawnClaude } from "./llm-bridge.js";
 
 // ── Zod schemas for LLM response validation ──
 
@@ -180,16 +57,23 @@ const ProposalTaskSchema = z.object({
   acceptanceCriteria: z.array(z.string()).optional(),
   priority: z.enum(["critical", "high", "medium", "low"]).optional(),
   tags: z.array(z.string()).optional(),
+  loe: z.number().positive().optional(),
+  loeRationale: z.string().optional(),
+  loeConfidence: z.enum(["low", "medium", "high"]).optional(),
 });
 
 const ProposalFeatureSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
+  existingId: z.string().optional(),
   tasks: z.array(ProposalTaskSchema),
 });
 
 const ProposalSchema = z.object({
-  epic: z.object({ title: z.string() }),
+  epic: z.object({
+    title: z.string(),
+    existingId: z.string().optional(),
+  }),
   features: z.array(ProposalFeatureSchema),
 });
 
@@ -197,11 +81,16 @@ const ProposalArraySchema = z.array(ProposalSchema);
 
 // ── Helpers ──
 
-function summarizeExisting(items: PRDItem[]): string {
+function summarizeExisting(
+  items: PRDItem[],
+  options?: { withIds?: boolean },
+): string {
   const lines: string[] = [];
   for (const { item, parents } of walkTree(items)) {
     const indent = "  ".repeat(parents.length);
-    lines.push(`${indent}- [${item.level}] ${item.title} (${item.status})`);
+    const showId = options?.withIds && isContainerLevel(item.level);
+    const idPart = showId ? ` (id: ${item.id})` : "";
+    lines.push(`${indent}- [${item.level}] ${item.title} (${item.status})${idPart}`);
   }
   return lines.length > 0 ? lines.join("\n") : "(empty PRD)";
 }
@@ -251,252 +140,6 @@ export async function readProjectContext(dir: string): Promise<string> {
   return sections.join("\n\n");
 }
 
-/**
- * Walk a JSON structure starting at `open` (`[` or `{`), tracking nesting
- * and string state, and return the index of the matching close character.
- * Returns -1 if the structure is never closed (truncated).
- */
-function findMatchingClose(text: string, startIndex: number): number {
-  const open = text[startIndex];
-  const close = open === "[" ? "]" : "}";
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = startIndex; i < text.length; i++) {
-    const ch = text[i];
-    if (escaped) { escaped = false; continue; }
-    if (ch === "\\") { escaped = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === open) depth++;
-    else if (ch === close) {
-      depth--;
-      if (depth === 0) return i;
-    }
-  }
-
-  return -1;
-}
-
-/**
- * Extract JSON text from an LLM response, handling markdown fences,
- * leading prose, and trailing text after the JSON array or object.
- */
-export function extractJson(raw: string): string {
-  let text = raw.trim();
-
-  // Try markdown code fences first
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  if (fenceMatch) {
-    return fenceMatch[1].trim();
-  }
-
-  // Find the start of a top-level JSON array. When text already starts with
-  // `[`, the search begins at index 0. Otherwise, look for `[` at the
-  // beginning of a line (to avoid matching arrays embedded in object values).
-  let arrayStart = -1;
-  if (text.startsWith("[")) {
-    arrayStart = 0;
-  } else {
-    const match = text.match(/(?:^|\n)\s*(\[)/);
-    if (match) {
-      arrayStart = text.indexOf(match[1], match.index!);
-    }
-  }
-
-  if (arrayStart >= 0) {
-    text = text.slice(arrayStart);
-    const closeIdx = findMatchingClose(text, 0);
-    if (closeIdx >= 0) {
-      return text.slice(0, closeIdx + 1);
-    }
-    // Unclosed array — return the sliced text for downstream repair
-    return text;
-  }
-
-  // Handle JSON objects: find the first `{` (at start or on its own line)
-  // and match its closing `}`, stripping leading and trailing prose.
-  let objStart = -1;
-  if (text.startsWith("{")) {
-    objStart = 0;
-  } else {
-    const match = text.match(/(?:^|\n)\s*(\{)/);
-    if (match) {
-      objStart = text.indexOf(match[1], match.index!);
-    }
-  }
-
-  if (objStart >= 0) {
-    text = text.slice(objStart);
-    const closeIdx = findMatchingClose(text, 0);
-    if (closeIdx >= 0) {
-      return text.slice(0, closeIdx + 1);
-    }
-    // Unclosed object — return sliced text for downstream repair
-    return text;
-  }
-
-  return text;
-}
-
-/**
- * Attempt to repair truncated JSON by closing any open structures.
- * Handles trailing commas, truncated strings, mid-key/mid-value
- * truncation, and unclosed brackets/braces.
- * Returns repaired JSON string or null if not repairable.
- */
-/**
- * Strip incomplete escape sequences from the end of a truncated JSON string.
- * Handles:
- *  - trailing lone backslash (`"path\` → `"path`)
- *  - partial unicode escapes (`"emoji \u00` → `"emoji `)
- */
-function stripTrailingEscape(s: string): string {
-  // Strip partial \uXXXX (1-4 hex digits after \u)
-  const partialUnicode = s.match(/\\u[\da-fA-F]{0,3}$/);
-  if (partialUnicode) return s.slice(0, partialUnicode.index);
-
-  // Strip lone trailing backslash (incomplete escape)
-  if (s.endsWith("\\")) {
-    // But not an escaped backslash (\\) — count consecutive trailing backslashes
-    let count = 0;
-    for (let i = s.length - 1; i >= 0 && s[i] === "\\"; i--) count++;
-    // Odd number means the last backslash is a lone escape starter
-    if (count % 2 === 1) return s.slice(0, -1);
-  }
-
-  return s;
-}
-
-export function repairTruncatedJson(text: string): string | null {
-  // Only attempt repair on text that starts as a JSON array or object
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;
-
-  // Try parsing as-is first
-  try {
-    JSON.parse(trimmed);
-    return trimmed;
-  } catch {
-    // Continue with repair
-  }
-
-  // Track open brackets, braces, and string state
-  let inString = false;
-  let escaped = false;
-  const stack: string[] = [];
-
-  for (const ch of trimmed) {
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (ch === "[" || ch === "{") {
-      stack.push(ch);
-    } else if (ch === "]" || ch === "}") {
-      stack.pop();
-    }
-  }
-
-  if (stack.length === 0) return null;
-
-  // Close any unclosed string, stripping incomplete escape sequences first
-  let repaired = trimmed;
-  if (inString) repaired = stripTrailingEscape(repaired) + '"';
-
-  // Close structures in reverse order
-  while (stack.length > 0) {
-    const open = stack.pop()!;
-    repaired += open === "[" ? "]" : "}";
-  }
-
-  // Validate the repaired JSON actually parses
-  try {
-    JSON.parse(repaired);
-    return repaired;
-  } catch {
-    // The naive close didn't work (trailing commas, partial values, etc.)
-    // Try progressively stripping trailing junk before closing
-  }
-
-  // Strategy: progressively strip trailing incomplete tokens from the
-  // truncation point. Each pattern removes one layer of junk:
-  //   - trailing commas/whitespace
-  //   - dangling colons (key with no value)
-  //   - partial key-value pairs (e.g. `,"feat` or `,"key":"val`)
-  //   - orphaned keys without values
-  //   - bare partial literals after a colon (e.g. `:"nul`, `:"fals`, `:"tr`)
-  const stripPatterns = [
-    // Trailing comma, colon, or whitespace
-    /[,:\s]+$/,
-    // Dangling key with optional colon: `,"key":` or `,"key"` or `,"ke`
-    /,\s*"[^"]*"?\s*:?\s*$/,
-    // Dangling value token (partial string, number, bool, null)
-    /,\s*(?:"[^"]*"?|[\d.]+|true|false|null)\s*$/,
-    // Orphan key without comma prefix: `"key":` at end of object
-    /"\w*"?\s*:?\s*$/,
-    // Bare partial literal after colon (handles truncated true/false/null)
-    /:\s*(?:t(?:r(?:ue?)?)?|f(?:a(?:l(?:se?)?)?)?|n(?:u(?:ll?)?)?|[\d.]+)\s*$/,
-  ];
-
-  let content = trimmed;
-  if (inString) content = stripTrailingEscape(content) + '"';
-
-  for (let attempts = 0; attempts < 20; attempts++) {
-    // Recompute the structure stack for the current content
-    let innerString = false;
-    let innerEscaped = false;
-    const innerStack: string[] = [];
-
-    for (const ch of content) {
-      if (innerEscaped) { innerEscaped = false; continue; }
-      if (ch === "\\") { innerEscaped = true; continue; }
-      if (ch === '"') { innerString = !innerString; continue; }
-      if (innerString) continue;
-      if (ch === "[" || ch === "{") innerStack.push(ch);
-      else if (ch === "]" || ch === "}") innerStack.pop();
-    }
-
-    let candidate = content;
-    if (innerString) candidate = stripTrailingEscape(candidate) + '"';
-
-    const closingStack = [...innerStack];
-    while (closingStack.length > 0) {
-      const open = closingStack.pop()!;
-      candidate += open === "[" ? "]" : "}";
-    }
-
-    try {
-      JSON.parse(candidate);
-      return candidate;
-    } catch {
-      // Try each strip pattern until one makes progress
-      let stripped = false;
-      for (const pattern of stripPatterns) {
-        const result = content.replace(pattern, "");
-        if (result.length < content.length) {
-          content = result;
-          stripped = true;
-          break;
-        }
-      }
-      if (!stripped) break;
-    }
-  }
-
-  return null;
-}
 
 export function parseProposalResponse(raw: string): Proposal[] {
   const text = extractJson(raw);
@@ -555,11 +198,12 @@ function normalizeProposals(
   validated: z.infer<typeof ProposalArraySchema>,
 ): Proposal[] {
   return validated.map((p) => ({
-    epic: { title: p.epic.title, source: "llm" },
+    epic: { title: p.epic.title, source: "llm", existingId: p.epic.existingId },
     features: p.features.map((f) => ({
       title: f.title,
       source: "llm",
       description: f.description,
+      existingId: f.existingId,
       tasks: f.tasks.map((t) => ({
         title: t.title,
         source: "llm",
@@ -568,6 +212,9 @@ function normalizeProposals(
         acceptanceCriteria: t.acceptanceCriteria,
         priority: t.priority,
         tags: t.tags,
+        loe: t.loe,
+        loeRationale: t.loeRationale,
+        loeConfidence: t.loeConfidence,
       })),
     })),
   }));
@@ -643,57 +290,6 @@ export function validateProposalQuality(proposals: Proposal[]): QualityIssue[] {
   }
 
   return issues;
-}
-
-// ── LLM interaction ──
-
-/**
- * Send a prompt to Claude using the unified client abstraction.
- *
- * Uses the module-level `ClaudeClient` which supports both direct API
- * and CLI modes transparently. The client is configured via
- * `setClaudeConfig()` at CLI entry points. Retries are handled by the
- * underlying client provider.
- *
- * @param prompt  The prompt to send to Claude
- * @param model   The model to use (e.g., "claude-sonnet-4-20250514")
- * @param claudeConfig  Optional config override (creates a one-off client)
- */
-export async function spawnClaude(prompt: string, model: string, claudeConfig?: ClaudeConfig): Promise<ClaudeResult> {
-  // When an explicit config is passed, create a one-off client for it
-  // instead of using the module-level client.
-  const client = claudeConfig
-    ? createLLMClient({
-      vendor: resolveVendor(),
-      llmConfig: {
-        ...(_llmConfig ?? {}),
-        claude: claudeConfig,
-      },
-    })
-    : getClient();
-
-  const result = await client.complete({ prompt, model: resolveModel(model) });
-  return {
-    text: result.text,
-    tokenUsage: result.tokenUsage,
-  };
-}
-
-// ── Format detection ──
-
-export type FileFormat = "markdown" | "json" | "yaml";
-
-const FORMAT_MAP: Record<string, FileFormat> = {
-  ".md": "markdown",
-  ".txt": "markdown",
-  ".json": "json",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-};
-
-export function detectFileFormat(filePath: string): FileFormat {
-  const ext = extname(filePath).toLowerCase();
-  return FORMAT_MAP[ext] ?? "markdown";
 }
 
 // ── Structured file parsing (JSON/YAML without LLM) ──
@@ -779,7 +375,7 @@ export function parseStructuredFile(
   format: FileFormat,
   existingItems: PRDItem[],
 ): Proposal[] | null {
-  if (format === "markdown") return null;
+  if (format === "markdown" || format === "text") return null;
 
   // For JSON, first try to parse as the full Proposal schema
   if (format === "json") {
@@ -873,6 +469,8 @@ export function parseStructuredFile(
 const FORMAT_HINTS: Record<FileFormat, string> = {
   markdown:
     "The document is in Markdown format. Pay attention to headings, bullet points, and structured sections.",
+  text:
+    "The document is in plain text format. Look for section headers (ALL CAPS, underlined, numbered), bullet points, and requirement keywords (must, should, shall).",
   json:
     "The document is in JSON format. Extract meaningful requirements from the structured data, including nested objects and arrays.",
   yaml:
@@ -881,32 +479,8 @@ const FORMAT_HINTS: Record<FileFormat, string> = {
 
 // ── Shared prompt fragments ──
 
-/**
- * The JSON schema definition shared across all PRD prompts.
- * Centralised here to ensure consistency and reduce prompt token count
- * (one source of truth instead of repeating the shape in every prompt).
- */
-export const PRD_SCHEMA = `Each element must be an object with:
-- "epic": { "title": string }
-- "features": array of { "title": string, "description"?: string, "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[] } }`;
-
-/**
- * Shared task-quality guidelines that every PRD prompt should include.
- * Extracted so that improvements to task quality expectations propagate
- * everywhere at once.
- */
-export const TASK_QUALITY_RULES = `Task quality:
-- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
-- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
-- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
-- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
-- Assign priority based on: blocking dependencies → user-facing impact → technical debt.`;
-
-/**
- * Common anti-patterns to avoid in LLM responses. Included in prompts to
- * steer the model away from frequently observed failure modes.
- */
+// ANTI_PATTERNS is defined here (not in analyze-shared) because it is only
+// used by reason.ts prompts, not by extract.ts or file-validation.ts.
 export const ANTI_PATTERNS = `Avoid these common mistakes:
 - Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
 - Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
@@ -915,9 +489,43 @@ export const ANTI_PATTERNS = `Avoid these common mistakes:
 - Do NOT wrap your response in markdown fences — return raw JSON only.`;
 
 /**
- * Strict output format instruction shared by all PRD prompts.
+ * Auto-placement instruction block. Included in prompts when no explicit
+ * parentId is specified, telling the LLM it can reference existing PRD
+ * items by ID to place new items under them.
  */
-export const OUTPUT_INSTRUCTION = `Respond with ONLY a valid JSON array. No explanation, no markdown fences, no commentary — just the JSON.`;
+export const AUTO_PLACEMENT_INSTRUCTION = `
+## Placement
+The existing PRD includes item IDs for epics and features. When new items
+naturally belong under an existing epic or feature, set "existingId" on the
+epic/feature object to reference it by ID. Only create new epics/features
+when the items genuinely represent new work areas not covered by the existing tree.
+
+If an existing parent's title needs to expand to accommodate the new scope,
+use "existingId" to reference it AND set the title to the updated version.`;
+
+/**
+ * Consolidation instruction block. Guides the LLM toward producing fewer,
+ * larger work packages rather than many micro-tasks. Included in prompts
+ * that process broad input (scan results, natural-language descriptions)
+ * to produce sprint-sized proposals.
+ */
+export const CONSOLIDATION_INSTRUCTION = `
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.`;
 
 // ── Few-shot example for LLM prompts ──
 
@@ -936,14 +544,43 @@ export const FEW_SHOT_EXAMPLE = `Example output (for reference — do NOT includ
         "tasks": [
           {
             "title": "Implement OAuth2 callback handler",
-            "description": "Handle the authorization code exchange and token storage after provider redirects back to our app",
+            "description": "Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.",
             "acceptanceCriteria": [
-              "Handles Google OAuth2 flow end-to-end",
-              "Stores refresh token securely",
-              "Returns meaningful error on provider rejection"
+              "Handles Google and GitHub OAuth2 flows end-to-end",
+              "Stores refresh token securely in encrypted session storage",
+              "Returns meaningful error on provider rejection",
+              "Provider adapter interface documented with at least one example"
             ],
             "priority": "high",
-            "tags": ["auth", "backend"]
+            "tags": ["auth", "backend"],
+            "loe": 2,
+            "loeRationale": "Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.",
+            "loeConfidence": "high"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "epic": { "title": "API Infrastructure", "existingId": "abc-123" },
+    "features": [
+      {
+        "title": "Rate Limiting",
+        "description": "Protect API endpoints from abuse with configurable rate limits",
+        "tasks": [
+          {
+            "title": "Implement token bucket rate limiter middleware",
+            "description": "Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates",
+            "acceptanceCriteria": [
+              "Returns 429 with Retry-After header when limit exceeded",
+              "Configurable per-route limits via middleware options",
+              "Supports both IP-based and API-key-based limiting"
+            ],
+            "priority": "high",
+            "tags": ["api", "security"],
+            "loe": 1.5,
+            "loeRationale": "Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.",
+            "loeConfidence": "medium"
           }
         ]
       }
@@ -1118,10 +755,19 @@ export async function reasonFromFile(
   const tokenUsage = emptyAnalyzeTokenUsage();
 
   // For JSON/YAML, try direct structured parsing first
-  if (format !== "markdown") {
+  if (format !== "markdown" && format !== "text") {
     const structured = parseStructuredFile(content, format, existingItems);
     if (structured !== null) {
       return { proposals: structured, tokenUsage };
+    }
+  }
+
+  // For text files, try local extraction before LLM
+  if (format === "text") {
+    const { extractFromText } = await import("./extract.js");
+    const extraction = extractFromText(content, { existingItems });
+    if (extraction.proposals.length > 0) {
+      return { proposals: extraction.proposals, tokenUsage };
     }
   }
 
@@ -1299,6 +945,7 @@ export async function reasonFromScanResults(
 ${PRD_SCHEMA}
 
 ${FEW_SHOT_EXAMPLE}
+${CONSOLIDATION_INSTRUCTION}
 
 Structuring guidelines:
 - Near-duplicate items have already been merged. Focus on semantic grouping and structure.
@@ -1349,7 +996,8 @@ export async function buildAddPrompt(
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const existingSummary = summarizeExisting(existingItems);
+  const hasParent = !!options?.parentId;
+  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
 
   const contextBlock = projectContext
@@ -1357,19 +1005,22 @@ export async function buildAddPrompt(
     : "";
 
   let parentConstraint = "";
-  if (options?.parentId) {
+  let placementBlock = "";
+  if (hasParent) {
     // Find the parent in the tree and describe it
-    const parentEntry = findItemInTree(existingItems, options.parentId);
+    const parentEntry = findItemInTree(existingItems, options!.parentId!);
     if (parentEntry) {
       parentConstraint = `
 IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options.parentId}
+  ID: ${options!.parentId}
   Level: ${parentEntry.level}
   Title: ${parentEntry.title}
 
 Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
 Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
     }
+  } else if (existingItems.length > 0) {
+    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
   }
 
   return `You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.
@@ -1377,6 +1028,7 @@ Do NOT create a new epic — instead use the parent's title as the epic title in
 ${PRD_SCHEMA}
 
 ${FEW_SHOT_EXAMPLE}
+${CONSOLIDATION_INSTRUCTION}
 
 Structuring guidelines:
 - Break the description into a logical hierarchy of epics, features, and tasks.
@@ -1391,7 +1043,7 @@ Deduplication:
 - Use the project context to understand terminology and architecture.
 
 ${ANTI_PATTERNS}
-${parentConstraint}
+${parentConstraint}${placementBlock}
 ${contextBlock}
 Existing PRD:
 ${existingSummary}
@@ -1449,7 +1101,8 @@ export async function buildMultiAddPrompt(
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const existingSummary = summarizeExisting(existingItems);
+  const hasParent = !!options?.parentId;
+  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
 
   const contextBlock = projectContext
@@ -1457,18 +1110,21 @@ export async function buildMultiAddPrompt(
     : "";
 
   let parentConstraint = "";
-  if (options?.parentId) {
-    const parentEntry = findItemInTree(existingItems, options.parentId);
+  let placementBlock = "";
+  if (hasParent) {
+    const parentEntry = findItemInTree(existingItems, options!.parentId!);
     if (parentEntry) {
       parentConstraint = `
 IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options.parentId}
+  ID: ${options!.parentId}
   Level: ${parentEntry.level}
   Title: ${parentEntry.title}
 
 Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
 Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
     }
+  } else if (existingItems.length > 0) {
+    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
   }
 
   const numbered = descriptions
@@ -1480,6 +1136,7 @@ Do NOT create a new epic — instead use the parent's title as the epic title in
 ${PRD_SCHEMA}
 
 ${FEW_SHOT_EXAMPLE}
+${CONSOLIDATION_INSTRUCTION}
 
 Structuring guidelines:
 - Treat each description as a distinct piece of work.
@@ -1494,7 +1151,7 @@ Deduplication:
 - Use the project context to understand terminology and architecture.
 
 ${ANTI_PATTERNS}
-${parentConstraint}
+${parentConstraint}${placementBlock}
 ${contextBlock}
 Existing PRD:
 ${existingSummary}
@@ -1826,7 +1483,8 @@ export async function buildIdeasPrompt(
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const existingSummary = summarizeExisting(existingItems);
+  const hasParent = !!options?.parentId;
+  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
 
   const contextBlock = projectContext
@@ -1834,18 +1492,21 @@ export async function buildIdeasPrompt(
     : "";
 
   let parentConstraint = "";
-  if (options?.parentId) {
-    const parentEntry = findItemInTree(existingItems, options.parentId);
+  let placementBlock = "";
+  if (hasParent) {
+    const parentEntry = findItemInTree(existingItems, options!.parentId!);
     if (parentEntry) {
       parentConstraint = `
 IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options.parentId}
+  ID: ${options!.parentId}
   Level: ${parentEntry.level}
   Title: ${parentEntry.title}
 
 Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
 Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
     }
+  } else if (existingItems.length > 0) {
+    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
   }
 
   return `You are a product requirements analyst reading raw brainstorming notes. These are NOT formal specs — they are rough ideas, bullet points, half-formed thoughts, and informal shorthand. Distill every idea into a well-structured PRD as a JSON array.
@@ -1853,6 +1514,7 @@ Do NOT create a new epic — instead use the parent's title as the epic title in
 ${PRD_SCHEMA}
 
 ${FEW_SHOT_EXAMPLE}
+${CONSOLIDATION_INSTRUCTION}
 
 Interpreting rough notes:
 - Capture EVERY idea, no matter how brief or fragmentary. A single word like "caching" is still an idea worth structuring.
@@ -1870,7 +1532,7 @@ Deduplication:
 - Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.
 
 ${ANTI_PATTERNS}
-${parentConstraint}
+${parentConstraint}${placementBlock}
 ${contextBlock}
 Existing PRD:
 ${existingSummary}
@@ -1882,9 +1544,15 @@ ${OUTPUT_INSTRUCTION}`;
 }
 
 /**
- * Read one or more freeform idea files and structure them into proposals via
- * LLM. Unlike `reasonFromFile` / `reasonFromFiles` (used by `analyze --file`
- * for formal spec import), this function uses a prompt specifically tuned for
+ * Read one or more freeform idea files and structure them into proposals.
+ *
+ * For well-structured files (markdown with headings, JSON matching the Proposal
+ * schema, YAML with title/name fields), extraction is performed locally without
+ * an LLM call. Files that cannot be meaningfully extracted fall back to the LLM
+ * ideas pipeline.
+ *
+ * Unlike `reasonFromFile` / `reasonFromFiles` (used by `analyze --file` for
+ * formal spec import), the LLM fallback uses a prompt specifically tuned for
  * rough brainstorming notes.
  */
 export async function reasonFromIdeasFile(
@@ -1898,28 +1566,71 @@ export async function reasonFromIdeasFile(
 
   const dir = options?.dir ?? process.cwd();
 
-  // Read and concatenate all idea files
-  const sections: string[] = [];
+  // Phase 1: Try local extraction for each file.
+  // Collect proposals from files that can be parsed without LLM, and
+  // accumulate content from files that need LLM fallback.
+  const localProposals: Proposal[] = [];
+  const llmSections: string[] = [];
+
   for (const fp of filePaths) {
     const content = await readFile(fp, "utf-8");
     if (content.trim().length === 0) continue;
+
+    const format = detectFileFormat(fp);
+
+    // Try structured parsing for JSON/YAML files (no LLM needed)
+    if (format === "json" || format === "yaml") {
+      const structured = parseStructuredFile(content, format, existingItems);
+      if (structured !== null && structured.length > 0) {
+        localProposals.push(...structured);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // Try local markdown extraction (no LLM needed)
+    if (format === "markdown") {
+      const { extractFromMarkdown } = await import("./extract.js");
+      const extraction = extractFromMarkdown(content, { existingItems, sourceFile: fp });
+      if (extraction.proposals.length > 0) {
+        localProposals.push(...extraction.proposals);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // Try local plain text extraction (no LLM needed)
+    if (format === "text") {
+      const { extractFromText } = await import("./extract.js");
+      const extraction = extractFromText(content, { existingItems, sourceFile: fp });
+      if (extraction.proposals.length > 0) {
+        localProposals.push(...extraction.proposals);
+        continue;
+      }
+      // Fall through to LLM processing
+    }
+
+    // File could not be locally extracted — queue for LLM
     if (filePaths.length > 1) {
-      sections.push(`--- ${fp} ---\n${content.trim()}`);
+      llmSections.push(`--- ${fp} ---\n${content.trim()}`);
     } else {
-      sections.push(content.trim());
+      llmSections.push(content.trim());
     }
   }
 
-  if (sections.length === 0) return { proposals: [], tokenUsage };
+  // Phase 2: Fall back to LLM for files that couldn't be locally parsed.
+  if (llmSections.length > 0) {
+    const combined = llmSections.join("\n\n");
+    const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
+      parentId: options?.parentId,
+    });
 
-  const combined = sections.join("\n\n");
-  const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
-    parentId: options?.parentId,
-  });
+    const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+    accumulateTokenUsage(tokenUsage, result.tokenUsage);
+    localProposals.push(...parseProposalResponse(result.text));
+  }
 
-  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
-  accumulateTokenUsage(tokenUsage, result.tokenUsage);
-  return { proposals: parseProposalResponse(result.text), tokenUsage };
+  return { proposals: localProposals, tokenUsage };
 }
 
 // ── Batch import ──

@@ -61,13 +61,13 @@ describe("loadClaudeConfig", () => {
         claude: {
           cli_path: 42,
           api_key: true,
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
         },
       }),
     );
 
     const config = await loadClaudeConfig(tmpDir);
-    expect(config).toEqual({ model: "claude-sonnet-4-20250514" });
+    expect(config).toEqual({ model: "claude-sonnet-4-6" });
     expect(config.cli_path).toBeUndefined();
     expect(config.api_key).toBeUndefined();
   });

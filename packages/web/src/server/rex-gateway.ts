@@ -36,6 +36,10 @@ export {
   isItemLevel,
   isRequirementCategory,
   isValidationType,
+  isRootLevel,
+  isWorkItem,
+  isContainerLevel,
+  getLevelLabel,
 } from "rex";
 
 // ---- Rex tree utilities -----------------------------------------------------
@@ -70,3 +74,16 @@ export {
   computeRequirementsSummary,
 } from "rex";
 export type { EpicStats, PriorityDistribution, RequirementsSummary } from "rex";
+
+// ---- Rex health -------------------------------------------------------------
+export { computeHealthScore, formatHealthScore } from "rex";
+export type { StructureHealthScore, HealthDimensions, HealthOptions } from "rex";
+
+// ---- Rex reorganize ---------------------------------------------------------
+export { detectReorganizations, applyProposals, formatApplyResult } from "rex";
+export type { ReorganizationProposal, ReorganizationPlan, ApplyResult } from "rex";
+
+// ---- Rex reshape (LLM-powered restructuring) --------------------------------
+export { applyReshape, reasonForReshape, formatReshapeProposal } from "rex";
+export type { ReshapeProposal, ReshapeAction, ReshapeResult } from "rex";
+export type { ReshapeReasonOptions, ReshapeReasonResult } from "rex";

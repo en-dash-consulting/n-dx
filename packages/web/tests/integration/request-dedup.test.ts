@@ -17,10 +17,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRequestDedup } from "../../src/viewer/request-dedup.js";
-import { createCallRateLimiter } from "../../src/viewer/call-rate-limiter.js";
-import { createMessageCoalescer } from "../../src/viewer/message-coalescer.js";
-import { createMessageThrottle } from "../../src/viewer/message-throttle.js";
+import { createRequestDedup } from "../../src/shared/request-dedup.js";
+import { createCallRateLimiter } from "../../src/viewer/messaging/call-rate-limiter.js";
+import { createMessageCoalescer } from "../../src/viewer/messaging/message-coalescer.js";
+import { createMessageThrottle } from "../../src/viewer/messaging/message-throttle.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

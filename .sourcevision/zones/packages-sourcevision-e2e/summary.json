@@ -1,0 +1,26 @@
+{
+  "id": "packages-sourcevision:e2e",
+  "name": "E2e",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/schema/validate.ts",
+    "packages/sourcevision/tests/e2e/cli-analyze.test.ts",
+    "packages/sourcevision/tests/e2e/cli-serve.test.ts",
+    "packages/sourcevision/tests/integration/pipeline.test.ts",
+    "packages/sourcevision/tests/unit/schema/validate.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/schema/validate.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 1723,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

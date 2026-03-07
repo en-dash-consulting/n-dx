@@ -1,0 +1,23 @@
+{
+  "id": "root",
+  "name": "Root",
+  "description": "4 files, primarily JSON, TypeScript",
+  "files": [
+    "package-lock.json",
+    "package.json",
+    "tsconfig.json",
+    "vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 1970,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

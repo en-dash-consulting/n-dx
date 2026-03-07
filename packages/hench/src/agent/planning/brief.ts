@@ -5,6 +5,7 @@ import {
   findItem,
   walkTree,
   collectRequirements,
+  isWorkItem,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry } from "rex";
 import type {
@@ -42,7 +43,7 @@ export function collectEpicTaskIds(items: PRDItem[], epicId: string): Set<string
       item.id === epicId ||
       parents.some((p) => p.id === epicId);
 
-    if (isInEpic && (item.level === "task" || item.level === "subtask")) {
+    if (isInEpic && isWorkItem(item.level)) {
       ids.add(item.id);
     }
   }

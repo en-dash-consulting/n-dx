@@ -11,14 +11,14 @@ import type {
   TabVisibilityState,
   TabVisibilitySnapshot,
   VisibilityAPICapabilities,
-} from "../tab-visibility.js";
+} from "../polling/tab-visibility.js";
 import {
   startTabVisibilityMonitor,
   stopTabVisibilityMonitor,
   onVisibilityChange,
   getTabVisibilitySnapshot,
   getVisibilityCapabilities,
-} from "../tab-visibility.js";
+} from "../polling/tab-visibility.js";
 
 export interface UseTabVisibilityResult {
   /** Current tab visibility state ("visible" or "hidden"). */

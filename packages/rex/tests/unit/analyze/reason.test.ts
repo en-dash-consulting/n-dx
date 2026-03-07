@@ -198,8 +198,8 @@ describe("detectFileFormat", () => {
     expect(detectFileFormat("features.md")).toBe("markdown");
   });
 
-  it("detects markdown from .txt extension", () => {
-    expect(detectFileFormat("notes.txt")).toBe("markdown");
+  it("detects text from .txt extension", () => {
+    expect(detectFileFormat("notes.txt")).toBe("text");
   });
 
   it("detects JSON from .json extension", () => {

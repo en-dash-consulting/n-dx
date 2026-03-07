@@ -1,0 +1,21 @@
+{
+  "id": "packages-sourcevision:.claude",
+  "name": ".claude",
+  "description": "2 files, primarily JSON",
+  "files": [
+    "packages/sourcevision/.claude/settings.json",
+    "packages/sourcevision/.claude/settings.local.json"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 0,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -5,6 +5,8 @@
  * Supports:
  * - File uploads (drag & drop or file picker): text, markdown, JSON
  * - Manual text entries with per-entry format selection
+ * - Expandable file preview with metadata (lines, words, size)
+ * - Stage-based progress indicator during processing
  * - Consolidated proposal preview with confidence scoring
  * - Hands off to ProposalEditor for review before acceptance
  */
@@ -22,7 +24,7 @@ export interface BatchImportPanelProps {
 }
 
 /** An individual item queued for batch processing. */
-interface BatchItem {
+export interface BatchItem {
   id: string;
   content: string;
   format: "text" | "markdown" | "json";
@@ -30,6 +32,21 @@ interface BatchItem {
 }
 
 type BatchState = "idle" | "processing" | "done" | "error";
+
+/** Stages of the processing pipeline, shown in the progress indicator. */
+type ProcessingStage = "uploading" | "analyzing" | "generating";
+
+const STAGE_LABELS: Record<ProcessingStage, string> = {
+  uploading: "Sending files to server...",
+  analyzing: "Analyzing content...",
+  generating: "Generating proposals...",
+};
+
+const STAGE_PROGRESS: Record<ProcessingStage, number> = {
+  uploading: 25,
+  analyzing: 60,
+  generating: 90,
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -39,6 +56,25 @@ function inferFormat(fileName: string): "text" | "markdown" | "json" {
   if (lower.endsWith(".json")) return "json";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "markdown";
   return "text";
+}
+
+/** Format byte size to human-readable string. */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Count lines in a string. */
+function countLines(text: string): number {
+  if (!text) return 0;
+  return text.split("\n").length;
+}
+
+/** Count words in a string. */
+function countWords(text: string): number {
+  if (!text.trim()) return 0;
+  return text.trim().split(/\s+/).length;
 }
 
 let nextId = 0;
@@ -57,6 +93,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
   const [editing, setEditing] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>("uploading");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,9 +182,11 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
     if (validItems.length === 0) return;
 
     setState("processing");
+    setProcessingStage("uploading");
     setError(null);
 
     try {
+      setProcessingStage("uploading");
       const res = await fetch("/api/rex/batch-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,11 +199,14 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
         }),
       });
 
+      setProcessingStage("analyzing");
+
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: "Import failed" }));
         throw new Error(errBody.error || `HTTP ${res.status}`);
       }
 
+      setProcessingStage("generating");
       const data = await res.json();
       setProposals(data.proposals ?? []);
       setConfidence(data.confidence ?? 0);
@@ -430,14 +472,40 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
         )
       : null,
 
-    // Processing state
+    // Processing state — stage-based progress
     state === "processing"
-      ? h("div", { class: "smart-add-loading", role: "status", "aria-live": "polite" },
-          h("div", { class: "smart-add-loading-bar" },
-            h("div", { class: "smart-add-loading-bar-fill" }),
+      ? h("div", { class: "batch-import-progress", role: "status", "aria-live": "polite" },
+          h("div", { class: "batch-import-progress-bar" },
+            h("div", {
+              class: "batch-import-progress-fill",
+              style: { width: `${STAGE_PROGRESS[processingStage]}%` },
+              role: "progressbar",
+              "aria-valuenow": STAGE_PROGRESS[processingStage],
+              "aria-valuemin": 0,
+              "aria-valuemax": 100,
+            }),
           ),
-          h("span", { class: "smart-add-loading-text" },
-            `Processing ${validCount} item${validCount !== 1 ? "s" : ""} through smart add pipeline...`,
+          h("div", { class: "batch-import-progress-info" },
+            h("span", { class: "batch-import-progress-text" },
+              STAGE_LABELS[processingStage],
+            ),
+            h("span", { class: "batch-import-progress-detail" },
+              `${validCount} file${validCount !== 1 ? "s" : ""}`,
+            ),
+          ),
+          h("div", { class: "batch-import-progress-stages" },
+            (["uploading", "analyzing", "generating"] as ProcessingStage[]).map((stage) => {
+              const isCurrent = stage === processingStage;
+              const isDone = STAGE_PROGRESS[stage] < STAGE_PROGRESS[processingStage];
+              return h("span", {
+                key: stage,
+                class: `batch-import-stage${isCurrent ? " batch-import-stage-active" : ""}${isDone ? " batch-import-stage-done" : ""}`,
+              },
+                isDone ? "\u2713 " : isCurrent ? "\u25CF " : "\u25CB ",
+                stage === "uploading" ? "Upload" :
+                stage === "analyzing" ? "Analyze" : "Generate",
+              );
+            }),
           ),
         )
       : null,
@@ -467,14 +535,19 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
 
 // ── Batch Item Row ──────────────────────────────────────────────────
 
-interface BatchItemRowProps {
+export interface BatchItemRowProps {
   item: BatchItem;
   onUpdate: (id: string, updates: Partial<BatchItem>) => void;
   onRemove: (id: string) => void;
 }
 
-function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
+export function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
   const isTextEntry = item.source === "Text entry";
+  const [expanded, setExpanded] = useState(false);
+
+  const lines = countLines(item.content);
+  const words = countWords(item.content);
+  const size = new Blob([item.content]).size;
 
   return h(
     "div",
@@ -487,8 +560,12 @@ function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
       ),
       h("span", { class: "batch-import-item-source" }, item.source),
       !isTextEntry
-        ? h("span", { class: "batch-import-item-size" },
-            `${item.content.length} chars`,
+        ? h("span", { class: "batch-import-item-meta" },
+            h("span", { class: "batch-import-item-size" }, formatSize(size)),
+            h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),
+            h("span", null, `${lines} line${lines !== 1 ? "s" : ""}`),
+            h("span", { class: "batch-import-item-meta-sep" }, "\u00B7"),
+            h("span", null, `${words} word${words !== 1 ? "s" : ""}`),
           )
         : null,
       h("select", {
@@ -503,6 +580,17 @@ function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
         h("option", { value: "markdown" }, "Markdown"),
         h("option", { value: "json" }, "JSON"),
       ),
+      // Expand/collapse toggle for file content
+      !isTextEntry
+        ? h("button", {
+            class: `batch-import-expand-btn${expanded ? " batch-import-expand-btn-active" : ""}`,
+            onClick: () => setExpanded((p) => !p),
+            type: "button",
+            title: expanded ? "Collapse preview" : "Expand preview",
+            "aria-label": expanded ? "Collapse preview" : "Expand preview",
+            "aria-expanded": expanded ? "true" : "false",
+          }, expanded ? "\u25B2" : "\u25BC")
+        : null,
       h("button", {
         class: "batch-import-remove-btn",
         onClick: () => onRemove(item.id),
@@ -523,10 +611,16 @@ function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
           }),
           rows: 3,
         })
-      : // Preview for file content
-        h("div", { class: "batch-import-item-preview" },
-          item.content.slice(0, 200),
-          item.content.length > 200 ? "..." : "",
+      : // Preview for file content — collapsed or expanded
+        h("div", {
+          class: `batch-import-item-preview${expanded ? " batch-import-item-preview-expanded" : ""}`,
+        },
+          expanded
+            ? item.content
+            : h(Fragment, null,
+                item.content.slice(0, 300),
+                item.content.length > 300 ? "\u2026" : "",
+              ),
         ),
   );
 }

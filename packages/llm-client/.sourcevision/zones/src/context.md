@@ -5,49 +5,113 @@
 <zone>
 
 Zone: Src (`src`)
-Files: 4, Cohesion: 0.29, Coupling: 0.71
-Description: 4 files, primarily TypeScript
-Entry points: src/api-provider.ts, src/config.ts
-Lines: 552
+Files: 13, Cohesion: 0.77, Coupling: 0.23
+Risk: healthy (score: 0.23)
+Description: 13 files, primarily TypeScript
+Entry points: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts, src/create-client.ts, src/llm-client.ts, src/llm-config.ts, src/llm-types.ts, src/provider-interface.ts, src/provider-registry.ts, src/provider-session.ts, src/token-usage.ts, src/types.ts
+Lines: 1925
 
 </zone>
 
 <files>
 
 src/api-provider.ts (TypeScript, 187 lines, source)
-src/config.ts (TypeScript, 94 lines, source)
-tests/unit/api-provider.test.ts (TypeScript, 124 lines, test)
-tests/unit/config.test.ts (TypeScript, 147 lines, test)
+src/cli-provider.ts (TypeScript, 252 lines, source)
+src/codex-cli-provider.ts (TypeScript, 245 lines, source)
+src/create-client.ts (TypeScript, 90 lines, source)
+src/llm-client.ts (TypeScript, 75 lines, source)
+src/llm-config.ts (TypeScript, 78 lines, source)
+src/llm-types.ts (TypeScript, 48 lines, source)
+src/provider-interface.ts (TypeScript, 223 lines, source)
+src/provider-registry.ts (TypeScript, 213 lines, source)
+src/provider-session.ts (TypeScript, 192 lines, source)
+src/token-usage.ts (TypeScript, 131 lines, source)
+src/types.ts (TypeScript, 136 lines, source)
+tests/unit/llm-config.test.ts (TypeScript, 55 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  src/api-provider.ts → src/config.ts {resolveApiKey, resolveModel}
-  tests/unit/api-provider.test.ts → src/api-provider.ts {createApiClient}
-  tests/unit/config.test.ts → src/config.ts {loadClaudeConfig, resolveApiKey, resolveCliPath}
+  src/api-provider.ts → src/provider-interface.ts {LLMProvider, ProviderInfo}
+  src/api-provider.ts → src/token-usage.ts {parseApiTokenUsage}
+  src/api-provider.ts → src/types.ts {ClaudeClientError}
+  src/api-provider.ts → src/types.ts {ClaudeClient, ClaudeClientOptions, CompletionRequest, CompletionResult}
+  src/cli-provider.ts → src/provider-interface.ts {LLMProvider, ProviderInfo}
+  src/cli-provider.ts → src/token-usage.ts {parseCliTokenUsage, parseStreamTokenUsage}
+  src/cli-provider.ts → src/types.ts {ClaudeClientError}
+  src/cli-provider.ts → src/types.ts {ClaudeClient, ClaudeClientOptions, CompletionRequest, CompletionResult, TokenUsage}
+  src/codex-cli-provider.ts → src/llm-types.ts {CodexConfig}
+  src/codex-cli-provider.ts → src/types.ts {ClaudeClientError}
+  src/codex-cli-provider.ts → src/types.ts {ClaudeClient, CompletionRequest, CompletionResult}
+  src/create-client.ts → src/api-provider.ts {createApiClient}
+  src/create-client.ts → src/api-provider.ts {ApiProviderOptions}
+  src/create-client.ts → src/cli-provider.ts {createCliClient}
+  src/create-client.ts → src/cli-provider.ts {CliProviderOptions}
+  src/create-client.ts → src/provider-interface.ts {LLMProvider}
+  src/create-client.ts → src/types.ts {ClaudeClientError}
+  src/create-client.ts → src/types.ts {AuthMode, ClaudeClient, ClaudeClientOptions}
+  src/llm-client.ts → src/codex-cli-provider.ts {createCodexCliClient}
+  src/llm-client.ts → src/create-client.ts {createClient, detectAuthMode}
+  src/llm-client.ts → src/create-client.ts {CreateClientOptions}
+  src/llm-client.ts → src/llm-types.ts {LLMVendor, LLMConfig}
+  src/llm-client.ts → src/types.ts {AuthMode, ClaudeClient, ClaudeConfig}
+  src/llm-config.ts → src/llm-types.ts {LLMConfig, LLMVendor, CodexConfig}
+  src/llm-config.ts → src/types.ts {ClaudeConfig}
+  src/llm-types.ts → src/provider-interface.ts {LLMVendor}
+  src/llm-types.ts → src/types.ts {ClaudeClient, ClaudeConfig}
+  src/provider-interface.ts → src/types.ts {CompletionRequest, CompletionResult, TokenUsage}
+  src/provider-registry.ts → src/codex-cli-provider.ts {createCodexCliClient}
+  src/provider-registry.ts → src/create-client.ts {createClient}
+  src/provider-registry.ts → src/llm-types.ts {LLMConfig}
+  src/provider-registry.ts → src/provider-interface.ts {LLMProvider, ProviderInfo}
+  src/provider-session.ts → src/llm-types.ts {LLMConfig}
+  src/provider-session.ts → src/provider-interface.ts {LLMProvider}
+  src/provider-session.ts → src/provider-registry.ts {ProviderRegistry, createDefaultRegistry}
+  src/token-usage.ts → src/types.ts {TokenUsage}
+  tests/unit/llm-config.test.ts → src/llm-config.ts {loadLLMConfig}
 
 Outgoing (this zone → other zones):
-  → src-3: src/api-provider.ts → src/provider-interface.ts; src/api-provider.ts → src/token-usage.ts; src/api-provider.ts → src/types.ts; src/api-provider.ts → src/types.ts; src/config.ts → src/types.ts; tests/unit/api-provider.test.ts → src/provider-interface.ts; tests/unit/api-provider.test.ts → src/types.ts
+  → src-2: src/api-provider.ts → src/config.ts; src/cli-provider.ts → src/config.ts; src/create-client.ts → src/config.ts
 
 Incoming (other zones → this zone):
-  ← src-2: src/auth.ts → src/config.ts; src/public.ts → src/api-provider.ts; src/public.ts → src/api-provider.ts; src/public.ts → src/config.ts
-  ← src-3: src/cli-provider.ts → src/config.ts; src/create-client.ts → src/api-provider.ts; src/create-client.ts → src/api-provider.ts; src/create-client.ts → src/config.ts
+  ← src-2: src/auth.ts → src/types.ts; src/auth.ts → src/types.ts; src/config.ts → src/types.ts; src/public.ts → src/api-provider.ts; src/public.ts → src/api-provider.ts; src/public.ts → src/cli-provider.ts; src/public.ts → src/cli-provider.ts; src/public.ts → src/codex-cli-provider.ts; src/public.ts → src/codex-cli-provider.ts; src/public.ts → src/create-client.ts; src/public.ts → src/create-client.ts; src/public.ts → src/llm-client.ts; src/public.ts → src/llm-client.ts; src/public.ts → src/llm-config.ts; src/public.ts → src/llm-types.ts; src/public.ts → src/provider-interface.ts; src/public.ts → src/provider-registry.ts; src/public.ts → src/provider-registry.ts; src/public.ts → src/provider-session.ts; src/public.ts → src/token-usage.ts; src/public.ts → src/types.ts; src/public.ts → src/types.ts; tests/unit/auth.test.ts → src/types.ts
+  ← unit: tests/unit/api-provider.test.ts → src/api-provider.ts; tests/unit/api-provider.test.ts → src/provider-interface.ts; tests/unit/api-provider.test.ts → src/types.ts; tests/unit/cli-provider.test.ts → src/cli-provider.ts; tests/unit/cli-provider.test.ts → src/provider-interface.ts; tests/unit/cli-provider.test.ts → src/types.ts; tests/unit/create-client.test.ts → src/create-client.ts; tests/unit/create-client.test.ts → src/types.ts; tests/unit/create-client.test.ts → src/types.ts; tests/unit/llm-client.test.ts → src/llm-client.ts; tests/unit/provider-interface.test.ts → src/provider-interface.ts; tests/unit/provider-interface.test.ts → src/types.ts; tests/unit/provider-registry.test.ts → src/llm-types.ts; tests/unit/provider-registry.test.ts → src/provider-interface.ts; tests/unit/provider-registry.test.ts → src/provider-registry.ts; tests/unit/provider-registry.test.ts → src/provider-registry.ts; tests/unit/provider-registry.test.ts → src/types.ts; tests/unit/provider-session.test.ts → src/llm-types.ts; tests/unit/provider-session.test.ts → src/provider-interface.ts; tests/unit/provider-session.test.ts → src/provider-registry.ts; tests/unit/provider-session.test.ts → src/provider-registry.ts; tests/unit/provider-session.test.ts → src/provider-session.ts; tests/unit/provider-session.test.ts → src/types.ts; tests/unit/token-usage.test.ts → src/token-usage.ts; tests/unit/types.test.ts → src/types.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] High coupling (0.71) — 7 imports target "src-3"
-[observation] [warning] Low cohesion (0.29) — files are loosely related, consider splitting this zone
+[observation] [warning] 12 entry points — wide API surface, consider consolidating exports
+[observation] [warning] Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export.
 
 </findings>
 
 <insights>
 
-- Low cohesion (0.29) — files are loosely related, consider splitting this zone
-- High coupling (0.71) — 7 imports target "src-3"
-- [call graph] 30 internal calls, 1 outgoing, 7 incoming (cohesion: 0.97, coupling: 0.03)
+- 12 entry points — wide API surface, consider consolidating exports
+- The provider-interface + provider-registry pattern establishes a solid open/closed extension point — new vendors can be added without modifying core client logic.
+- Token usage tracking is correctly co-located with the provider layer rather than in utilities, keeping billing concerns close to the transport boundary.
+- The bidirectional import with src-2 (3 imports src→src-2) is worth watching — ideally this foundational layer should have zero upward dependencies into the utility layer.
+- The 3 imports from this zone into src-2 (utilities) creates a mild coupling inversion — the foundation layer should not depend on the utility layer above it.
+- Cohesion of 0.6 is acceptable for a multi-provider abstraction; the provider registry and session files bind otherwise loosely related provider implementations together.
+- The 3 outgoing imports into llm-cli-utilities mean the foundational provider layer has a runtime dependency on the utility layer above it — any change to the utility API can break the provider core without a test catching it, since the test zone covers core but not utilities.
+- The 88 incoming calls from the test zone combined with 0 outgoing test calls to utilities creates a protection asymmetry: the core is well-tested but the utilities it depends on are not, so the 3 upward imports are doubly risky.
+- llm-provider-core imports 3 symbols from llm-cli-utilities while llm-provider-tests provides no coverage for those utility symbols — the 3 upward dependency edges are untested by the existing test suite.
+- The 4 outgoing external calls (to node built-ins or npm packages) combined with 88 incoming from tests suggests the core is correctly thin on external deps — the 3 utility imports stand out as the only inward-leaning coupling.
+- The 3 upward imports into llm-cli-utilities almost certainly originate from create-client.ts or a provider constructor needing runtime config (project dirs, auth tokens) — the dependency is driven by initialization concerns leaking into the transport layer rather than being injected at construction time.
+- The 12-entry-point surface amplifies the impact of the bidirectional coupling: every upward import from utilities has 12 possible re-export paths it could travel through, making it harder to trace which public symbols carry the layering violation.
+- 12 exported entry points on a foundation layer that is imported by 23 edges from utilities and 25 from tests creates an oversized public contract — changes to any of the 12 exports can ripple into both consumer zones simultaneously. Reduce to 1–2 entry points aligned with the src/public.ts convention used across the monorepo.
+- create-client.ts and the provider constructors importing runtime config or auth from llm-cli-utilities indicates initialization concern leakage — providers should receive config values via constructor injection rather than pulling them from a higher-level utility layer, eliminating the 3 reverse imports structurally.
+- codex-cli-provider.ts encodes a vendor name in a file that sits alongside transport-named peers (api-provider, cli-provider) — the naming convention mixes vendor identity with transport strategy at the file level, making it unclear whether future vendors should be named by vendor (openai-cli-provider) or by transport (http-provider).
+- llm-types.ts is generically named in a zone scoped to provider concerns — if this file contains package-wide shared types (token structs, config shapes) rather than provider-only types, its placement in provider-core is the structural root cause of the 3 reverse imports: core holds types that utilities need, so utilities import core to get them rather than importing a neutral types zone.
+- provider-session.ts implies stateful session management at the transport layer, but auth credentials live in auth.ts in llm-cli-utilities with no visible contract between the two — session construction likely requires auth context, making the session↔auth coupling implicit and untraceable across zone boundaries.
+- Rename codex-cli-provider.ts to follow the transport-first naming pattern used by api-provider and cli-provider — e.g. codex-provider.ts or openai-cli-provider.ts depending on whether the file abstraction is vendor or transport. Mixing both in the filename breaks the zone's naming convention and will compound as more vendors are added.
+- Audit llm-types.ts to determine whether it holds provider-scoped or package-wide types. If it contains types shared with llm-cli-utilities (project dir shapes, token structs, provider config interfaces), move those types to a new zero-dependency types module — this is likely the direct cause of the 3 reverse imports and fixing the placement fixes the cycle structurally.
+- The 12 entry-point warning (src/0) is a heuristic threshold crossing but has no corroborating LLM finding. With a public.ts convention confirmed in global finding 2, the wide surface may be intentional delegation. Do not treat this as critical without additional evidence.
+- The 12 entry points from automated heuristic analysis (src/0) and the 'single public entry point' claim from LLM pass 1 (global/2) are in direct tension. Both cannot be simultaneously true at the intra-package zone level — either the src zone has one file imported from outside (supporting global/2) or twelve (supporting src/0). This discrepancy has not been reconciled in any subsequent pass.
+- Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export.
+- [call graph] 55 internal calls, 4 outgoing, 88 incoming (cohesion: 0.93, coupling: 0.07)
 
 </insights>

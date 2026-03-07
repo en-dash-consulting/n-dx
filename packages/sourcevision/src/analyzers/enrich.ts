@@ -42,6 +42,7 @@ import {
   ZONES_PER_BATCH,
   getPassConfig,
 } from "./enrich-config.js";
+import { computeGlobalContentHash } from "./zone-hash.js";
 import { extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import {
@@ -69,6 +70,8 @@ export async function enrichZonesWithAI(
   imports: Imports,
   previousZones?: Zones,
   fileArchetypes?: Map<string, string | null>,
+  currentContentHashes?: Record<string, string>,
+  hints?: string,
 ): Promise<EnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
@@ -85,10 +88,37 @@ export async function enrichZonesWithAI(
     pass: previousZones?.enrichmentPass ?? 0,
   };
 
+  // 0. Content-hash skip: if nothing changed since last enrichment, skip entirely
+  if (currentContentHashes && previousZones?.zoneContentHashes && prevEnrichPass > 0) {
+    const prevGlobalHash = computeGlobalContentHash(previousZones.zoneContentHashes);
+    const curGlobalHash = computeGlobalContentHash(currentContentHashes);
+    if (prevGlobalHash === curGlobalHash && passNumber <= prevEnrichPass) {
+      console.log(`  [enrich] Content unchanged — skipping enrichment (pass ${prevEnrichPass} preserved)`);
+      // Preserve previous names/descriptions on current zones
+      const prevZones = previousZones.zones;
+      const preserved: Zone[] = zones.map((zone) => {
+        const prev = prevZones.find(
+          (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
+        );
+        if (prev) {
+          return { ...zone, id: prev.id, name: prev.name, description: prev.description };
+        }
+        return zone;
+      });
+      return {
+        zones: preserved,
+        newZoneInsights: new Map(),
+        newGlobalInsights: [],
+        newFindings: [],
+        pass: prevEnrichPass,
+      };
+    }
+  }
+
   // 1. Meta-evaluation path (pass 5+) — single prompt, no batching
   if (isMetaPass && existingFindings.length > 0) {
     const metaResult = await runMetaEvaluation(
-      zones, existingFindings, crossings, passNumber, passConfig
+      zones, existingFindings, crossings, passNumber, passConfig, hints,
     );
     if (!metaResult) return empty;
 
@@ -103,7 +133,42 @@ export async function enrichZonesWithAI(
     };
   }
 
-  // 2. Build cross-zone summary (shared across all batches)
+  // 2. Per-zone content filtering: identify changed vs unchanged zones
+  //    Only applies when we have previous data and per-zone content hashes.
+  //    Unchanged zones preserve previous enrichment; only changed zones go to LLM.
+  let zonesToEnrich = zones;
+  let unchangedZones: Zone[] = [];
+
+  if (currentContentHashes && previousZones?.zoneContentHashes && passNumber <= prevEnrichPass) {
+    const changed: Zone[] = [];
+    const unchanged: Zone[] = [];
+    for (const zone of zones) {
+      if (currentContentHashes[zone.id] !== previousZones.zoneContentHashes[zone.id]) {
+        changed.push(zone);
+      } else {
+        const prev = previousZones.zones.find(
+          (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
+        );
+        if (prev) {
+          unchanged.push({
+            ...zone,
+            id: prev.id,
+            name: prev.name,
+            description: prev.description,
+          });
+        } else {
+          changed.push(zone);
+        }
+      }
+    }
+    if (changed.length < zones.length) {
+      console.log(`  [enrich] ${changed.length}/${zones.length} zones changed — skipping ${unchanged.length} unchanged`);
+      zonesToEnrich = changed;
+      unchangedZones = unchanged;
+    }
+  }
+
+  // 3. Build cross-zone summary (shared across all batches — includes ALL zones for context)
   const crossingSummary = new Map<string, number>();
   for (const c of crossings) {
     const key = `${c.fromZone} \u2192 ${c.toZone}`;
@@ -112,17 +177,17 @@ export async function enrichZonesWithAI(
   const sortedCrossingsArr: [string, number][] = [...crossingSummary.entries()]
     .sort((a, b) => b[1] - a[1]);
 
-  // 3. Split zones into batches
+  // 4. Split changed zones into batches
   const batches: Zone[][] = [];
-  for (let i = 0; i < zones.length; i += ZONES_PER_BATCH) {
-    batches.push(zones.slice(i, i + ZONES_PER_BATCH));
+  for (let i = 0; i < zonesToEnrich.length; i += ZONES_PER_BATCH) {
+    batches.push(zonesToEnrich.slice(i, i + ZONES_PER_BATCH));
   }
 
   if (batches.length > 1) {
-    console.log(`  [enrich] Processing ${zones.length} zones in ${batches.length} batches of up to ${ZONES_PER_BATCH}`);
+    console.log(`  [enrich] Processing ${zonesToEnrich.length} zones in ${batches.length} batches of up to ${ZONES_PER_BATCH}`);
   }
 
-  // 4. Process batches sequentially, feeding enriched names forward
+  // 5. Process batches sequentially, feeding enriched names forward
   const allBatchResults: BatchResult[] = [];
   const enrichedNames = new Map<string, string>();
   let authFailed = false;
@@ -134,7 +199,7 @@ export async function enrichZonesWithAI(
       const result = await enrichBatch(
         batches[bi], zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
-        enrichedNames, fileArchetypes,
+        enrichedNames, fileArchetypes, hints,
       );
       if (result && "authError" in result) {
         authFailed = true;
@@ -155,19 +220,34 @@ export async function enrichZonesWithAI(
     }
   }
 
-  if ((authFailed && allBatchResults.length === 0) || allBatchResults.length === 0) {
-    if (!authFailed) console.warn("  [enrich] All batches failed — using algorithmic names");
+  if (allBatchResults.length === 0) {
+    if (authFailed) {
+      // auth error already logged upstream
+    } else if (batches.length === 0 && unchangedZones.length > 0) {
+      // All zones preserved from previous enrichment — return them
+      return { ...empty, zones: unchangedZones, pass: prevEnrichPass };
+    } else if (batches.length > 0) {
+      console.warn("  [enrich] All batches failed — using algorithmic names");
+    }
     return empty;
   }
 
-  // 5. Aggregate and apply results
+  // 6. Aggregate and apply results, merging unchanged zones back in
   const agg = aggregateBatchResults(allBatchResults);
 
   if (isFirstPass) {
-    return applyFirstPassResults(zones, agg, passConfig);
+    const result = applyFirstPassResults(zonesToEnrich, agg, passConfig);
+    if (unchangedZones.length > 0) {
+      result.zones = [...result.zones, ...unchangedZones];
+    }
+    return result;
   }
 
-  return applyLaterPassResults(zones, agg, passNumber, passConfig, previousZones);
+  const result = applyLaterPassResults(zonesToEnrich, agg, passNumber, passConfig, previousZones);
+  if (unchangedZones.length > 0) {
+    result.zones = [...result.zones, ...unchangedZones];
+  }
+  return result;
 }
 
 // ── Result application (private) ─────────────────────────────────────────────

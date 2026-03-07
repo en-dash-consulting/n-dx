@@ -1,4 +1,5 @@
 import type { PRDItem, ItemStatus } from "../schema/index.js";
+import { getLevelLabel } from "../schema/index.js";
 import { findItem } from "./tree.js";
 import { deleteItem, cleanBlockedByRefs } from "./delete.js";
 
@@ -98,8 +99,8 @@ export function removeTask(items: PRDItem[], taskId: string): RemoveTaskResult {
     return {
       ok: false,
       deletedIds: [],
-      detail: `Item "${taskId}" is a ${entry.item.level}, not a task.`,
-      error: `Item "${entry.item.title}" (${taskId}) is not a task — it is a ${entry.item.level}.`,
+      detail: `Item "${taskId}" is a ${getLevelLabel(entry.item.level)}, not a ${getLevelLabel("task")}.`,
+      error: `Item "${entry.item.title}" (${taskId}) is not a ${getLevelLabel("task")} — it is a ${getLevelLabel(entry.item.level)}.`,
       parentAutoCompletions: [],
     };
   }

@@ -1,0 +1,24 @@
+{
+  "id": "web-viewer/web-3/web",
+  "name": "Web Viewer/web 3/web",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/guide.ts",
+    "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+    "packages/web/src/viewer/components/prd-tree/tree-search.ts",
+    "packages/web/src/viewer/hooks/use-facet-state.ts",
+    "packages/web/tests/unit/viewer/accessibility.test.ts",
+    "packages/web/tests/unit/viewer/status-filter.test.ts",
+    "packages/web/tests/unit/viewer/tree-search.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/guide.ts",
+    "packages/web/src/viewer/components/prd-tree/status-filter.ts",
+    "packages/web/src/viewer/components/prd-tree/tree-search.ts",
+    "packages/web/src/viewer/hooks/use-facet-state.ts"
+  ],
+  "cohesion": 0.17,
+  "coupling": 0.83,
+  "fileCount": 7,
+  "lineCount": 1814
+}

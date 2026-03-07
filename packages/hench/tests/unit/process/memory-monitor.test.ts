@@ -21,6 +21,7 @@ function mockOverrides(
     totalGB?: number;
     platform?: NodeJS.Platform;
     linuxAvailablePercent?: number;
+    darwinAvailablePercent?: number;
   },
 ): MemoryMonitorOverrides {
   const totalGB = opts?.totalGB ?? 16;
@@ -35,6 +36,12 @@ function mockOverrides(
     readLinuxAvailable: async () => {
       if (plat === "linux" && opts?.linuxAvailablePercent !== undefined) {
         return total * (1 - opts.linuxAvailablePercent / 100);
+      }
+      return undefined;
+    },
+    readDarwinAvailable: async () => {
+      if (plat === "darwin" && opts?.darwinAvailablePercent !== undefined) {
+        return total * (1 - opts.darwinAvailablePercent / 100);
       }
       return undefined;
     },
@@ -148,6 +155,65 @@ describe("SystemMemoryMonitor", () => {
       });
       const snap = await monitor.snapshot();
       expect(snap.usagePercent).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // snapshot() — macOS with vm_stat
+  // -------------------------------------------------------------------------
+
+  describe("snapshot() — macOS vm_stat", () => {
+    it("uses vm_stat available memory for more accurate readings", async () => {
+      // os.freemem() says 85% used (only 15% "free" pages)
+      // But vm_stat shows 50% used when counting inactive + purgeable pages
+      const monitor = new SystemMemoryMonitor(
+        undefined,
+        mockOverrides(85, {
+          platform: "darwin",
+          darwinAvailablePercent: 50,
+        }),
+      );
+      const snap = await monitor.snapshot();
+
+      expect(snap.platform).toBe("darwin");
+      // Usage should be based on vm_stat available (50%), not os.freemem (85%)
+      expect(snap.usagePercent).toBeCloseTo(50, 0);
+      // Available should be higher than free
+      expect(snap.availableBytes).toBeGreaterThan(snap.freeBytes);
+    });
+
+    it("falls back to os.freemem() when vm_stat is unavailable", async () => {
+      const monitor = new SystemMemoryMonitor(undefined, {
+        platform: "darwin",
+        freemem: () => 4 * GB,
+        totalmem: () => 16 * GB,
+        readLinuxAvailable: async () => undefined,
+        readDarwinAvailable: async () => undefined,
+      });
+      const snap = await monitor.snapshot();
+
+      expect(snap.availableBytes).toBe(snap.freeBytes);
+      expect(snap.usagePercent).toBeCloseTo(75, 0);
+    });
+
+    it("prevents false throttle triggers with realistic macOS memory", async () => {
+      // Realistic scenario: Mac with 32GB RAM
+      // os.freemem() reports 97% used (only 1GB "free" pages)
+      // vm_stat shows 60% used (12.8GB of inactive+purgeable pages reclaimable)
+      const monitor = new SystemMemoryMonitor(
+        { spawnThreshold: 90 },
+        mockOverrides(97, {
+          platform: "darwin",
+          totalGB: 32,
+          darwinAvailablePercent: 60,
+        }),
+      );
+      const check = await monitor.checkBeforeSpawn();
+
+      // Without vm_stat: 97% > 90% threshold → would block (false positive)
+      // With vm_stat: 60% < 90% threshold → correctly allows
+      expect(check.allowed).toBe(true);
+      expect(check.usagePercent).toBeCloseTo(60, 0);
     });
   });
 

@@ -1,0 +1,17 @@
+{
+  "id": "hench/unit-2",
+  "name": "Hench/unit 2",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/token-usage.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+    "packages/hench/tests/unit/agent/token-usage.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/token-usage.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 657
+}

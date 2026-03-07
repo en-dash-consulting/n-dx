@@ -1,0 +1,19 @@
+{
+  "id": "hench/unit/completion",
+  "name": "Hench/unit/completion",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/validation/completion.ts",
+    "packages/hench/src/validation/index.ts",
+    "packages/hench/tests/unit/agent/completion.test.ts",
+    "packages/hench/tests/unit/tools/completion-validation.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/validation/completion.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 5,
+  "lineCount": 923
+}

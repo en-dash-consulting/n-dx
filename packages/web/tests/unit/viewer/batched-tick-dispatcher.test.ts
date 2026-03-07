@@ -12,8 +12,8 @@ import {
   getBatchedTickDispatcherState,
   flushBatchedTicks,
   resetBatchedTickDispatcher,
-} from "../../../src/viewer/batched-tick-dispatcher.js";
-import { resetTickTimer } from "../../../src/viewer/tick-timer.js";
+} from "../../../src/viewer/polling/batched-tick-dispatcher.js";
+import { resetTickTimer } from "../../../src/viewer/polling/tick-timer.js";
 
 // ─── RAF mock ────────────────────────────────────────────────────────────────
 

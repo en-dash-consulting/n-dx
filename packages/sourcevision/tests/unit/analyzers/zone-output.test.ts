@@ -5,6 +5,7 @@ import {
   generateZoneContext,
   buildZoneSummary,
   emitZoneOutputs,
+  pruneStaleZoneFolders,
 } from "../../../src/analyzers/zone-output.js";
 import type {
   Inventory,
@@ -219,6 +220,66 @@ describe("generateZoneContext", () => {
     // No imports for this zone
     expect(result).not.toContain("<imports>");
   });
+
+  it("shows sub-crossings section with counts grouped by zone pair", () => {
+    const subA = makeZone("parent/sub-a", ["src/parent/a1.ts", "src/parent/a2.ts"]);
+    const subB = makeZone("parent/sub-b", ["src/parent/b1.ts", "src/parent/b2.ts"]);
+    const zone = makeZone("parent", ["src/parent/a1.ts", "src/parent/a2.ts", "src/parent/b1.ts", "src/parent/b2.ts"], {
+      subZones: [subA, subB],
+      subCrossings: [
+        { from: "src/parent/a1.ts", to: "src/parent/b1.ts", fromZone: "parent/sub-a", toZone: "parent/sub-b" },
+        { from: "src/parent/a2.ts", to: "src/parent/b2.ts", fromZone: "parent/sub-a", toZone: "parent/sub-b" },
+        { from: "src/parent/b1.ts", to: "src/parent/a1.ts", fromZone: "parent/sub-b", toZone: "parent/sub-a" },
+      ],
+    });
+    const inventory = makeInventory([
+      makeFileEntry("src/parent/a1.ts"),
+      makeFileEntry("src/parent/a2.ts"),
+      makeFileEntry("src/parent/b1.ts"),
+      makeFileEntry("src/parent/b2.ts"),
+    ]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).toContain("<sub-crossings>");
+    expect(result).toContain("</sub-crossings>");
+    expect(result).toContain("parent/sub-a → parent/sub-b: 2");
+    expect(result).toContain("parent/sub-b → parent/sub-a: 1");
+  });
+
+  it("omits sub-crossings section when no sub-crossings exist", () => {
+    const subA = makeZone("parent/sub-a", ["src/parent/a1.ts"]);
+    const subB = makeZone("parent/sub-b", ["src/parent/b1.ts"]);
+    const zone = makeZone("parent", ["src/parent/a1.ts", "src/parent/b1.ts"], {
+      subZones: [subA, subB],
+    });
+    const inventory = makeInventory([
+      makeFileEntry("src/parent/a1.ts"),
+      makeFileEntry("src/parent/b1.ts"),
+    ]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).not.toContain("<sub-crossings>");
+  });
+
+  it("omits sub-crossings section when subCrossings is empty array", () => {
+    const zone = makeZone("parent", ["src/parent/a1.ts"], {
+      subZones: [makeZone("parent/child", ["src/parent/a1.ts"])],
+      subCrossings: [],
+    });
+    const inventory = makeInventory([makeFileEntry("src/parent/a1.ts")]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    const result = generateZoneContext(zone, inventory, imports, zones);
+
+    expect(result).not.toContain("<sub-crossings>");
+  });
 });
 
 // ── buildZoneSummary ────────────────────────────────────────────────────────
@@ -374,5 +435,84 @@ describe("emitZoneOutputs", () => {
     expect(context).toContain("**Parent/child**"); // Name derived from ID
     expect(context).toContain("`parent/child`");
     expect(context).toContain("cohesion 0.9");
+  });
+
+  it("prunes stale zone folders from previous runs", () => {
+    const zonesDir = join(tmpDir, "zones");
+
+    // Simulate previous run: create stale folders
+    mkdirSync(join(zonesDir, "old-zone"), { recursive: true });
+    writeFileSync(join(zonesDir, "old-zone", "context.md"), "stale");
+    mkdirSync(join(zonesDir, "another-stale"), { recursive: true });
+    writeFileSync(join(zonesDir, "another-stale", "summary.json"), "{}");
+
+    // Current run has only "core" zone
+    const zone = makeZone("core", ["src/a.ts"]);
+    const inventory = makeInventory([makeFileEntry("src/a.ts")]);
+    const imports = makeImports([]);
+    const zones = makeZones([zone]);
+
+    emitZoneOutputs(tmpDir, inventory, imports, zones);
+
+    // Active zone should exist
+    expect(existsSync(join(zonesDir, "core", "context.md"))).toBe(true);
+    // Stale folders should be removed
+    expect(existsSync(join(zonesDir, "old-zone"))).toBe(false);
+    expect(existsSync(join(zonesDir, "another-stale"))).toBe(false);
+  });
+
+  it("preserves zone folders that match current zones", () => {
+    const zonesDir = join(tmpDir, "zones");
+
+    // Pre-create folders for both current zones
+    mkdirSync(join(zonesDir, "core"), { recursive: true });
+    writeFileSync(join(zonesDir, "core", "context.md"), "old content");
+    mkdirSync(join(zonesDir, "auth"), { recursive: true });
+    writeFileSync(join(zonesDir, "auth", "context.md"), "old content");
+
+    const core = makeZone("core", ["src/a.ts"]);
+    const auth = makeZone("auth", ["src/b.ts"]);
+    const inventory = makeInventory([
+      makeFileEntry("src/a.ts"),
+      makeFileEntry("src/b.ts"),
+    ]);
+    const imports = makeImports([]);
+    const zones = makeZones([core, auth]);
+
+    emitZoneOutputs(tmpDir, inventory, imports, zones);
+
+    expect(existsSync(join(zonesDir, "core", "context.md"))).toBe(true);
+    expect(existsSync(join(zonesDir, "auth", "context.md"))).toBe(true);
+  });
+});
+
+// ── pruneStaleZoneFolders ────────────────────────────────────────────────────
+
+describe("pruneStaleZoneFolders", () => {
+  const tmpDir2 = join(process.cwd(), "tests/.tmp-prune-test");
+
+  beforeEach(() => {
+    mkdirSync(tmpDir2, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("does nothing when zones directory does not exist", () => {
+    const zones = makeZones([makeZone("core", ["a.ts"])]);
+    // Should not throw
+    pruneStaleZoneFolders(join(tmpDir2, "nonexistent"), zones);
+  });
+
+  it("ignores non-directory entries", () => {
+    // Create a file (not a directory) in the zones dir
+    writeFileSync(join(tmpDir2, "not-a-dir.txt"), "hello");
+
+    const zones = makeZones([makeZone("core", ["a.ts"])]);
+    pruneStaleZoneFolders(tmpDir2, zones);
+
+    // File should not be deleted (we only remove directories)
+    expect(existsSync(join(tmpDir2, "not-a-dir.txt"))).toBe(true);
   });
 });

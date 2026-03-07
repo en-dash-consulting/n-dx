@@ -4,18 +4,21 @@ import { computeStats } from "../../core/stats.js";
 import { verify } from "../../core/verify.js";
 import {
   aggregateTokenUsage,
-  formatAggregateTokenUsage,
   checkBudget,
-  formatBudgetWarnings,
 } from "../../core/token-usage.js";
+import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
 import { isFullyCompleted } from "../../core/prune.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, warn, result, isQuiet } from "../output.js";
-import type { PRDItem } from "../../schema/index.js";
+import type { PRDItem, ItemStatus } from "../../schema/index.js";
+import { isRootLevel } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
+import { validateStructure } from "../../core/structural.js";
+import { groupByFacet, getFacetValue } from "../../core/facets.js";
+import { walkTree } from "../../core/tree.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
 
@@ -178,6 +181,28 @@ export function filterCompleted(items: PRDItem[]): PRDItem[] {
   return result;
 }
 
+/**
+ * Filter out deleted items from the tree for display.
+ *
+ * Any item with status 'deleted' is removed along with its entire subtree.
+ * Non-deleted items that have deleted children will have those children
+ * recursively filtered out.
+ *
+ * Returns a new array — does not mutate the input.
+ */
+export function filterDeleted(items: PRDItem[]): PRDItem[] {
+  const result: PRDItem[] = [];
+  for (const item of items) {
+    if (item.status === "deleted") continue;
+    if (item.children && item.children.length > 0) {
+      result.push({ ...item, children: filterDeleted(item.children) });
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 /** Render a PRD tree to lines with status icons and indentation. */
 export function renderTree(
   items: PRDItem[],
@@ -198,7 +223,7 @@ export function renderTree(
       const stats = computeStats(item.children);
       const count = `[${stats.completed}/${stats.total}]`;
 
-      if (item.level === "epic") {
+      if (isRootLevel(item.level)) {
         const ratio = stats.total > 0 ? stats.completed / stats.total : 0;
         const pct = Math.round(ratio * 100);
         const bar = renderProgressBar(ratio);
@@ -234,7 +259,7 @@ export function formatStats(
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
   const suffix =
     options?.hidingCompleted
-      ? " (showing active items, use --all for full tree)"
+      ? " (hiding completed/deleted items, use --all for full tree)"
       : "";
   return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})${suffix}`;
 }
@@ -257,6 +282,56 @@ function formatCoverageSummary(verifyResult: VerifyResult): string {
   return `${coveredCriteria}/${totalCriteria} criteria covered across ${totalTasks} task(s)`;
 }
 
+/** Render items grouped by a facet key. */
+function renderGroupedByFacet(items: PRDItem[], facetKey: string): string[] {
+  const groups = groupByFacet(items, facetKey);
+  const lines: string[] = [];
+
+  // Items without the facet
+  const ungrouped: PRDItem[] = [];
+  for (const { item } of walkTree(items)) {
+    if (!getFacetValue(item, facetKey)) {
+      ungrouped.push(item);
+    }
+  }
+
+  for (const [value, groupItems] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const stats = computeStats(groupItems);
+    lines.push(`${facetKey}:${value} (${stats.completed}/${stats.total} complete)`);
+    for (const item of groupItems) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      const priority = item.priority ? ` [${item.priority}]` : "";
+      lines.push(`  ${icon} ${item.title}${priority}`);
+    }
+    lines.push("");
+  }
+
+  if (ungrouped.length > 0) {
+    lines.push(`(untagged) (${ungrouped.length} items)`);
+    for (const item of ungrouped) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      lines.push(`  ${icon} ${item.title}`);
+    }
+  }
+
+  return lines;
+}
+
+/** Find stale items (in_progress > 48h). */
+function findStaleItems(items: PRDItem[], now: Date = new Date()): PRDItem[] {
+  const stale: PRDItem[] = [];
+  const threshold = 48 * 60 * 60 * 1000; // 48h in ms
+  for (const { item } of walkTree(items)) {
+    if (item.status === "in_progress" && item.startedAt) {
+      const started = new Date(item.startedAt).getTime();
+      if (!isNaN(started) && now.getTime() - started > threshold) {
+        stale.push(item);
+      }
+    }
+  }
+  return stale;
+}
+
 export async function cmdStatus(
   dir: string,
   flags: Record<string, string>,
@@ -265,6 +340,8 @@ export async function cmdStatus(
   const showCoverage = flags.coverage === "true";
   const showTokens = flags.tokens !== "false";
   const showAll = flags.all === "true";
+  const groupBy = flags["group-by"];
+  const showStaleOnly = flags.stale === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -293,8 +370,9 @@ export async function cmdStatus(
   if (flags.until) tokenFilter.until = flags.until;
 
   if (format === "json") {
-    const output: Record<string, unknown> = { ...doc };
-    output.overrideMarkers = summarizeOverrideMarkers(doc.items);
+    const jsonItems = showAll ? doc.items : filterDeleted(doc.items);
+    const output: Record<string, unknown> = { ...doc, items: jsonItems };
+    output.overrideMarkers = summarizeOverrideMarkers(jsonItems);
     if (verifyResult) {
       output.coverage = {
         tasks: verifyResult.tasks,
@@ -319,6 +397,23 @@ export async function cmdStatus(
     return;
   }
 
+  // --stale: show only stale items
+  if (showStaleOnly) {
+    const staleItems = findStaleItems(doc.items);
+    if (staleItems.length === 0) {
+      result("No stale items (in_progress > 48h).");
+      return;
+    }
+    result(`Stale items (in_progress > 48h): ${staleItems.length}`);
+    result("");
+    for (const item of staleItems) {
+      const icon = STATUS_ICONS[item.status] ?? "?";
+      const ts = item.startedAt ? ` (started ${formatTimestamp(item.startedAt)})` : "";
+      result(`  ${icon} ${item.title}${ts}`);
+    }
+    return;
+  }
+
   // Default and --format=tree both render the tree view
   result(`PRD: ${doc.title}`);
   result("");
@@ -328,9 +423,17 @@ export async function cmdStatus(
     return;
   }
 
-  const displayItems = showAll ? doc.items : filterCompleted(doc.items);
+  // --group-by: render grouped by facet instead of hierarchy
+  if (groupBy) {
+    for (const line of renderGroupedByFacet(doc.items, groupBy)) {
+      result(line);
+    }
+    return;
+  }
+
+  const displayItems = showAll ? doc.items : filterDeleted(filterCompleted(doc.items));
   const stats = computeStats(doc.items);
-  const hidingCompleted = !showAll && stats.completed > 0;
+  const hidingCompleted = !showAll && (stats.completed > 0 || stats.deleted > 0);
 
   const coverageMap = verifyResult ? buildCoverageMap(verifyResult) : undefined;
   for (const line of renderTree(displayItems, 0, coverageMap)) {
@@ -376,6 +479,40 @@ export async function cmdStatus(
       }
     } catch {
       // Config unavailable — skip budget check
+    }
+  }
+
+  // Auto-completion hints: parents whose children are ALL completed/deferred
+  const autoCompletable: Array<{ id: string; title: string }> = [];
+  const TERMINAL: Set<ItemStatus> = new Set(["completed", "deferred"]);
+  for (const { item } of walkTree(doc.items)) {
+    if (
+      item.children && item.children.length > 0 &&
+      (item.status === "pending" || item.status === "in_progress") &&
+      item.children.every((c) => TERMINAL.has(c.status))
+    ) {
+      autoCompletable.push({ id: item.id, title: item.title });
+    }
+  }
+  if (autoCompletable.length > 0) {
+    info("");
+    info("Auto-completable:");
+    for (const ac of autoCompletable) {
+      info(`  ● ${ac.title} — all children done, can be marked completed`);
+    }
+  }
+
+  // Stale item warnings
+  const staleItems = findStaleItems(doc.items);
+  if (staleItems.length > 0) {
+    warn("");
+    warn(`Stale items (in_progress > 48h): ${staleItems.length}`);
+    for (const item of staleItems.slice(0, 5)) {
+      const ts = item.startedAt ? ` (started ${formatTimestamp(item.startedAt)})` : "";
+      warn(`  ⚠ ${item.title}${ts}`);
+    }
+    if (staleItems.length > 5) {
+      warn(`  ... and ${staleItems.length - 5} more (use --stale to see all)`);
     }
   }
 }

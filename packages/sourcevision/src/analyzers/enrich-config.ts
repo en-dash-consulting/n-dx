@@ -37,9 +37,11 @@ export const PASS_CONFIGS: PassConfig[] = [
   { focus: "", expectedTypes: ["observation"] }, // pass 0 = algorithmic only
   {
     focus: `For each zone, provide:
-1. A meaningful, descriptive name (not generic like "utilities" or "misc" — reflect the zone's actual domain role)
+1. A meaningful, descriptive name (not generic like "utilities" or "misc", and never keep numeric suffixes like "Src 2" or "Lib 3" — reflect the zone's actual domain role)
 2. A one-sentence description of the zone's architectural purpose
 3. 2-3 actionable observations about its role and quality
+
+Zone naming convention: the '-tests' suffix is reserved for zones that contain ONLY test files. If a zone contains any production source files alongside test files, name it after its production purpose (e.g. 'prd-tree-lifecycle', not 'prd-tree-lifecycle-tests'). This prevents tooling from misclassifying production code as test-only.
 
 Severity guide: most observations are "info". Flag zones with low cohesion (<0.4) or high coupling (>0.6) as "warning". Positive observations about good architecture or clean design are always "info" — never "warning" or "critical".`,
     expectedTypes: ["observation"],
@@ -151,6 +153,7 @@ export function buildMetaPrompt(
   zones: Zone[],
   findings: Finding[],
   crossings: ZoneCrossing[],
+  hints?: string,
 ): string {
   // Group findings by zone
   const findingsByZone = new Map<string, Finding[]>();
@@ -186,7 +189,7 @@ Global Findings:
 ${globalStr || "  (none)"}
 
 Cross-zone crossings: ${crossings.length} total across ${new Set(crossings.map(c => c.fromZone + "\u2192" + c.toZone)).size} zone pairs.
-
+${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 IMPORTANT CONSTRAINTS:
 - Findings annotated "pass 0: automated heuristic" come from deterministic code analysis (call-graph edge counting, zone metric thresholds). Do NOT escalate their severity unless corroborated by MULTIPLE independent findings pointing to the same root cause. A single heuristic finding alone is never sufficient evidence for "critical" severity.
 - Do NOT generate specific file decomposition suggestions (e.g. "split X into Y and Z", "extract module from X") unless the underlying metric exceeds 2x its detection threshold. Vague heuristic signals do not justify concrete refactoring prescriptions.

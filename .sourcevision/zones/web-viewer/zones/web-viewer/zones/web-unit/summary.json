@@ -1,0 +1,17 @@
+{
+  "id": "web-viewer/web-viewer/web-unit",
+  "name": "Web Viewer/web Viewer/web Unit",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/graph/physics.ts",
+    "packages/web/tests/unit/viewer/graph-destroy.test.ts",
+    "packages/web/tests/unit/viewer/graph-layout.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/graph/physics.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 888
+}

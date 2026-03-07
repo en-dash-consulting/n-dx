@@ -100,6 +100,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     defaultValue: true,
   },
   {
+    key: "rex.showTokenBudget",
+    label: "Show Token Budget",
+    description: "Display token budget information on Rex task line items and in the detail side panel. When disabled, only non-zero token usage badges are shown.",
+    impact: "Adds budget percentage and remaining capacity indicators to task views. No performance impact.",
+    package: "rex",
+    stability: "stable",
+    defaultValue: false,
+  },
+  {
     key: "rex.budgetEnforcement",
     label: "Budget Enforcement",
     description: "Enforce token and cost budgets during rex analyze operations. When exceeded, operations are blocked or warned.",

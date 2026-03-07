@@ -1,0 +1,17 @@
+{
+  "id": "hench/unit-cli",
+  "name": "Hench/unit Cli",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/schema/validate.ts",
+    "packages/hench/tests/unit/cli/commands/run-loop.test.ts",
+    "packages/hench/tests/unit/schema/validate.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/schema/validate.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 1027
+}

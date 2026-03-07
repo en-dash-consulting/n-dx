@@ -1,0 +1,52 @@
+{
+  "id": "store",
+  "name": "Store",
+  "description": "23 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/sync.ts",
+    "src/core/canonical.ts",
+    "src/store/adapter-registry.ts",
+    "src/store/contracts.ts",
+    "src/store/file-adapter.ts",
+    "src/store/index.ts",
+    "src/store/integration-schema.ts",
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts",
+    "src/store/notion-adapter.ts",
+    "src/store/notion-client.ts",
+    "tests/integration/project-config.test.ts",
+    "tests/integration/store-roundtrip.test.ts",
+    "tests/unit/cli/commands/sync.test.ts",
+    "tests/unit/core/canonical.test.ts",
+    "tests/unit/store/adapter-registry.test.ts",
+    "tests/unit/store/file-adapter.test.ts",
+    "tests/unit/store/integration-schema.test.ts",
+    "tests/unit/store/notion-adapter.test.ts",
+    "tests/unit/store/notion-client.test.ts",
+    "tests/unit/store/resolve-store.test.ts",
+    "tests/unit/store/store-contract.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/sync.ts",
+    "src/core/canonical.ts",
+    "src/store/adapter-registry.ts",
+    "src/store/contracts.ts",
+    "src/store/index.ts",
+    "src/store/integration-schema.ts",
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 23,
+  "lineCount": 6376,
+  "riskMetrics": {
+    "cohesion": 0.5,
+    "coupling": 0.5,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,38 +1,32 @@
 import { z, ZodError } from "zod";
+import {
+  VALID_STATUSES,
+  VALID_LEVELS,
+  VALID_PRIORITIES,
+  VALID_REQUIREMENT_CATEGORIES,
+  VALID_VALIDATION_TYPES,
+} from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
   | { ok: false; errors: ZodError };
 
-const ItemStatusSchema = z.enum([
-  "pending",
-  "in_progress",
-  "completed",
-  "failing",
-  "deferred",
-  "blocked",
-  "deleted",
-]);
+/** Helper: convert a Set<string> to a z.enum()-compatible tuple. */
+function setToEnumValues<T extends string>(s: Set<T>): [T, ...T[]] {
+  const arr = [...s];
+  return arr as [T, ...T[]];
+}
 
-const ItemLevelSchema = z.enum(["epic", "feature", "task", "subtask"]);
+const ItemStatusSchema = z.enum(setToEnumValues(VALID_STATUSES));
 
-const PrioritySchema = z.enum(["critical", "high", "medium", "low"]);
+const ItemLevelSchema = z.enum(setToEnumValues(VALID_LEVELS));
+
+const PrioritySchema = z.enum(setToEnumValues(VALID_PRIORITIES));
 const ProposalNodeKindSchema = z.enum(["epic", "feature", "task"]);
 
-const RequirementCategorySchema = z.enum([
-  "technical",
-  "performance",
-  "security",
-  "accessibility",
-  "compatibility",
-  "quality",
-]);
+const RequirementCategorySchema = z.enum(setToEnumValues(VALID_REQUIREMENT_CATEGORIES));
 
-const RequirementValidationTypeSchema = z.enum([
-  "automated",
-  "manual",
-  "metric",
-]);
+const RequirementValidationTypeSchema = z.enum(setToEnumValues(VALID_VALIDATION_TYPES));
 
 export const RequirementSchema = z
   .object({
@@ -96,6 +90,14 @@ const BudgetThresholdsSchema = z
   })
   .strict();
 
+const LoEConfigSchema = z
+  .object({
+    taskThresholdWeeks: z.number().positive("taskThresholdWeeks must be a positive number").optional(),
+    maxDecompositionDepth: z.number().int().positive("maxDecompositionDepth must be a positive integer").optional(),
+    proposalCeiling: z.number().int().positive("proposalCeiling must be a positive integer").optional(),
+  })
+  .strict();
+
 export const RexConfigSchema = z
   .object({
     schema: z.string(),
@@ -106,6 +108,7 @@ export const RexConfigSchema = z
     sourcevision: z.string().optional(),
     model: z.string().optional(),
     budget: BudgetThresholdsSchema.optional(),
+    loe: LoEConfigSchema.optional(),
     future: z.record(z.unknown()).optional(),
   })
   .passthrough();

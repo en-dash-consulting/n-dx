@@ -16,6 +16,7 @@ import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
+import { getLevelEmoji } from "./prd-tree/levels.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -88,13 +89,7 @@ const STATUS_LABELS: Record<string, string> = {
   deleted: "Deleted",
 };
 
-/** Level emoji prefixes */
-const LEVEL_ICONS: Record<string, string> = {
-  epic: "\u{1F3F0}",
-  feature: "\u{2B50}",
-  task: "\u{2611}\uFE0F",
-  subtask: "\u{1F539}",
-};
+// Level emoji prefixes provided by getLevelEmoji() from prd-tree/levels.ts
 
 /**
  * Highlight matching terms within text, returning an array of VNodes.
@@ -550,9 +545,9 @@ function renderResult(
     ? getContextSnippet(result.description, queryTerms)
     : null;
 
-  const statusClass = `search-result-status search-result-status--${result.status}`;
+  const statusClass = `status-badge status-badge--${result.status}`;
   const statusLabel = STATUS_LABELS[result.status] ?? result.status;
-  const levelIcon = LEVEL_ICONS[result.level] ?? "";
+  const levelIcon = getLevelEmoji(result.level);
 
   return h("div", {
     id: `search-result-${index}`,

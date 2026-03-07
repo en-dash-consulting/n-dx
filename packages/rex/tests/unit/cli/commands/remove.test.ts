@@ -122,7 +122,7 @@ describe("cmdRemove", () => {
       ).rejects.toThrow(CLIError);
       await expect(
         cmdRemove(tmp, "t1", "epic", { yes: "true" }),
-      ).rejects.toThrow(/not an epic/);
+      ).rejects.toThrow(/not an Epic/);
     });
   });
 
@@ -194,7 +194,164 @@ describe("cmdRemove", () => {
       ).rejects.toThrow(CLIError);
       await expect(
         cmdRemove(tmp, "e1", "task", { yes: "true" }),
-      ).rejects.toThrow(/not a task/);
+      ).rejects.toThrow(/not a Task/);
+    });
+  });
+
+  // ── Feature removal ──────────────────────────────────────────────────
+
+  describe("feature removal", () => {
+    function treeWithEpiclessFeature() {
+      return [
+        {
+          id: "e1", title: "Epic One", level: "epic", status: "pending",
+          children: [
+            {
+              id: "f1", title: "Feature 1", level: "feature", status: "pending",
+              children: [
+                { id: "t1", title: "Task 1", level: "task", status: "pending" },
+              ],
+            },
+          ],
+        },
+        {
+          id: "f-orphan", title: "Epicless Feature", level: "feature", status: "pending",
+          children: [
+            { id: "t-orphan", title: "Orphan Task", level: "task", status: "pending" },
+            { id: "t-orphan2", title: "Orphan Task 2", level: "task", status: "completed" },
+          ],
+        },
+      ];
+    }
+
+    it("removes feature and all descendants with --yes", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+
+      await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
+
+      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      expect(prd.items.length).toBe(1);
+      expect(prd.items[0].id).toBe("e1");
+    });
+
+    it("cleans up blockedBy references to deleted feature items", async () => {
+      const items = [
+        {
+          id: "f-orphan", title: "Epicless Feature", level: "feature", status: "pending",
+          children: [
+            { id: "t-orphan", title: "Orphan Task", level: "task", status: "pending" },
+          ],
+        },
+        {
+          id: "e1", title: "Epic One", level: "epic", status: "pending",
+          children: [
+            {
+              id: "t-dep", title: "Dependent Task", level: "task", status: "blocked",
+              blockedBy: ["t-orphan"],
+            },
+          ],
+        },
+      ];
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+
+      await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
+
+      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const tDep = prd.items[0].children[0];
+      expect(tDep.id).toBe("t-dep");
+      expect(tDep.blockedBy ?? []).toEqual([]);
+    });
+
+    it("logs feature_removed event", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+
+      await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
+
+      const logContent = readFileSync(join(tmp, ".rex", "execution-log.jsonl"), "utf-8");
+      const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
+      const removeEntry = entries.find((e: { event: string }) => e.event === "feature_removed");
+      expect(removeEntry).toBeDefined();
+      expect(removeEntry.itemId).toBe("f-orphan");
+      expect(removeEntry.detail).toContain("Epicless Feature");
+    });
+
+    it("outputs JSON with pre-check data when --format=json", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+
+      try {
+        await cmdRemove(tmp, "f-orphan", "feature", { format: "json", yes: "true" });
+      } finally {
+        console.log = origLog;
+      }
+
+      const output = JSON.parse(logs.join(""));
+      expect(output.removed.id).toBe("f-orphan");
+      expect(output.removed.level).toBe("feature");
+      expect(output.deletedIds).toContain("f-orphan");
+      expect(output.deletedIds).toContain("t-orphan");
+      expect(output.deletedIds).toContain("t-orphan2");
+      expect(output.deletedCount).toBe(3);
+      expect(output.cleanedRefs).toBe(0);
+      expect(output.integrityCheck).toBeDefined();
+      expect(output.integrityCheck.safe).toBe(true);
+    });
+
+    it("includes integrity warnings in JSON output for unsafe deletions", async () => {
+      const items = [
+        {
+          id: "f-orphan", title: "Epicless Feature", level: "feature", status: "pending",
+          remoteId: "notion-123",
+          children: [
+            { id: "t-orphan", title: "Orphan Task", level: "task", status: "pending" },
+          ],
+        },
+        {
+          id: "t-ext", title: "External Task", level: "task", status: "blocked",
+          blockedBy: ["t-orphan"],
+        },
+      ];
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+
+      try {
+        await cmdRemove(tmp, "f-orphan", "feature", { format: "json", yes: "true" });
+      } finally {
+        console.log = origLog;
+      }
+
+      const output = JSON.parse(logs.join(""));
+      expect(output.integrityCheck.safe).toBe(false);
+      expect(output.integrityCheck.externalDependents.length).toBe(1);
+      expect(output.integrityCheck.syncedItems.length).toBe(1);
+      expect(output.integrityCheck.warnings.length).toBeGreaterThan(0);
+    });
+
+    it("throws CLIError when item is not a feature", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+
+      await expect(
+        cmdRemove(tmp, "e1", "feature", { yes: "true" }),
+      ).rejects.toThrow(CLIError);
+      await expect(
+        cmdRemove(tmp, "e1", "feature", { yes: "true" }),
+      ).rejects.toThrow(/not a Feature/);
+    });
+
+    it("auto-detects feature level when level is omitted", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+
+      await cmdRemove(tmp, "f-orphan", undefined, { yes: "true" });
+
+      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      expect(prd.items.length).toBe(1);
+      expect(prd.items[0].id).toBe("e1");
     });
   });
 
@@ -222,17 +379,6 @@ describe("cmdRemove", () => {
       expect(f1.children[0].id).toBe("t2");
     });
 
-    it("throws CLIError for non-removable level (feature)", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
-
-      await expect(
-        cmdRemove(tmp, "f1", undefined, { yes: "true" }),
-      ).rejects.toThrow(CLIError);
-      await expect(
-        cmdRemove(tmp, "f1", undefined, { yes: "true" }),
-      ).rejects.toThrow(/Cannot remove a feature/);
-    });
-
     it("throws CLIError for non-removable level (subtask)", async () => {
       writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
 
@@ -241,7 +387,7 @@ describe("cmdRemove", () => {
       ).rejects.toThrow(CLIError);
       await expect(
         cmdRemove(tmp, "s1", undefined, { yes: "true" }),
-      ).rejects.toThrow(/Cannot remove a subtask/);
+      ).rejects.toThrow(/Cannot remove a Subtask/);
     });
   });
 
@@ -257,17 +403,6 @@ describe("cmdRemove", () => {
       await expect(
         cmdRemove(tmp, "nonexistent", "epic", { yes: "true" }),
       ).rejects.toThrow(/not found/);
-    });
-
-    it("throws CLIError for invalid removable level", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
-
-      await expect(
-        cmdRemove(tmp, "f1", "feature", { yes: "true" }),
-      ).rejects.toThrow(CLIError);
-      await expect(
-        cmdRemove(tmp, "f1", "feature", { yes: "true" }),
-      ).rejects.toThrow(/Cannot remove a feature/);
     });
 
     it("throws CLIError when specified level doesn't match item", async () => {

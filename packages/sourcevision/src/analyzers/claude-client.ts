@@ -19,7 +19,7 @@ import type { TokenUsage } from "../schema/index.js";
 
 export { ClaudeClientError } from "@n-dx/llm-client";
 
-export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 // ── Module-level state ────────────────────────────────────────────────────────

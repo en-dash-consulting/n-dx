@@ -170,6 +170,8 @@ export interface Zone {
   depth?: number;
   /** Sub-zones from recursive subdivision of large zones. */
   subZones?: Zone[];
+  /** Cross-zone import edges within this zone's sub-zones. */
+  subCrossings?: ZoneCrossing[];
 }
 
 /** Token usage tracked per zone during per-zone enrichment */

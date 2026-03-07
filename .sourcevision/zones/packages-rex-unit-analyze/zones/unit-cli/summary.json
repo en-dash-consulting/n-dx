@@ -1,0 +1,26 @@
+{
+  "id": "unit-analyze/unit-cli",
+  "name": "Unit Analyze/unit Cli",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/validate-interactive.ts",
+    "src/cli/commands/validate.ts",
+    "src/core/epic-correlation.ts",
+    "src/core/structural.ts",
+    "tests/integration/smart-add-orphaned-parent.test.ts",
+    "tests/unit/cli/commands/validate-epicless.test.ts",
+    "tests/unit/cli/commands/validate-interactive.test.ts",
+    "tests/unit/cli/commands/validate.test.ts",
+    "tests/unit/core/epic-correlation.test.ts",
+    "tests/unit/core/epicless.test.ts",
+    "tests/unit/core/structural.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/validate.ts",
+    "src/core/structural.ts"
+  ],
+  "cohesion": 0.63,
+  "coupling": 0.38,
+  "fileCount": 11,
+  "lineCount": 0
+}

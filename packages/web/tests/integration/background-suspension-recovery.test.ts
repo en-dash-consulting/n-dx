@@ -28,7 +28,7 @@ import {
   getRegisteredPollers,
   getPollerCount,
   resetPollingManager,
-} from "../../src/viewer/polling-manager.js";
+} from "../../src/viewer/polling/polling-manager.js";
 import {
   startTabVisibilityMonitor,
   getTabVisibility,
@@ -36,11 +36,11 @@ import {
   onVisibilityChange,
   getTransitionHistory,
   resetTabVisibility,
-} from "../../src/viewer/tab-visibility.js";
+} from "../../src/viewer/polling/tab-visibility.js";
 import {
   startMemoryMonitor,
   resetMemoryMonitor,
-} from "../../src/viewer/memory-monitor.js";
+} from "../../src/viewer/performance/memory-monitor.js";
 import {
   startDegradation,
   isFeatureDisabled,
@@ -48,7 +48,7 @@ import {
   getDegradationState,
   getCurrentTier,
   resetDegradation,
-} from "../../src/viewer/graceful-degradation.js";
+} from "../../src/viewer/performance/graceful-degradation.js";
 
 // ─── Constants (mirror real component keys & intervals) ────────────────────
 

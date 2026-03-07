@@ -3,12 +3,14 @@
   "taskId": "22f4144a-0ec1-4c19-8ce4-fa3a8fa294dc",
   "taskTitle": "Add JSON and YAML import support",
   "startedAt": "2026-02-04T05:11:48.258Z",
-  "status": "running",
+  "status": "failed",
   "turns": 0,
   "tokenUsage": {
     "input": 0,
     "output": 0
   },
   "toolCalls": [],
-  "model": "sonnet"
+  "model": "sonnet",
+  "error": "Terminated via audit interface",
+  "finishedAt": "2026-02-27T18:13:57.519Z"
 }

@@ -27,7 +27,7 @@ import {
   startPolling,
   stopPolling,
 } from "../loader.js";
-import { isFeatureDisabled, onDegradationChange } from "../graceful-degradation.js";
+import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 
 export interface AppDataState {
   data: LoadedData;

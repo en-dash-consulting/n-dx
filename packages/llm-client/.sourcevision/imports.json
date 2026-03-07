@@ -244,11 +244,19 @@
     },
     {
       "from": "src/llm-client.ts",
+      "to": "src/create-client.ts",
+      "type": "type",
+      "symbols": [
+        "CreateClientOptions"
+      ]
+    },
+    {
+      "from": "src/llm-client.ts",
       "to": "src/llm-types.ts",
       "type": "type",
       "symbols": [
-        "CreateLLMClientOptions",
-        "LLMVendor"
+        "LLMVendor",
+        "LLMConfig"
       ]
     },
     {
@@ -257,7 +265,8 @@
       "type": "type",
       "symbols": [
         "AuthMode",
-        "ClaudeClient"
+        "ClaudeClient",
+        "ClaudeConfig"
       ]
     },
     {
@@ -276,14 +285,6 @@
       "type": "type",
       "symbols": [
         "ClaudeConfig"
-      ]
-    },
-    {
-      "from": "src/llm-types.ts",
-      "to": "src/create-client.ts",
-      "type": "type",
-      "symbols": [
-        "CreateClientOptions"
       ]
     },
     {
@@ -480,6 +481,7 @@
         "isExecutableOnPath",
         "spawnTool",
         "spawnManaged",
+        "killWithFallback",
         "ProcessPool",
         "ProcessLimitError"
       ]
@@ -547,6 +549,14 @@
     },
     {
       "from": "src/public.ts",
+      "to": "src/llm-client.ts",
+      "type": "type",
+      "symbols": [
+        "CreateLLMClientOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
       "to": "src/llm-config.ts",
       "type": "reexport",
       "symbols": [
@@ -561,7 +571,6 @@
         "LLMVendor",
         "CodexConfig",
         "LLMConfig",
-        "CreateLLMClientOptions",
         "LLMClient"
       ]
     },
@@ -806,6 +815,7 @@
         "getCurrentHead",
         "spawnTool",
         "spawnManaged",
+        "killWithFallback",
         "ProcessPool",
         "ProcessLimitError"
       ]
@@ -1000,6 +1010,117 @@
       ]
     },
     {
+      "from": "tests/unit/public-api.test.ts",
+      "to": "src/public.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError",
+        "CLIError",
+        "ProviderRegistry",
+        "createDefaultRegistry",
+        "defaultRegistry",
+        "ProviderSession",
+        "createProviderSession",
+        "loadLLMConfig",
+        "createLLMClient",
+        "detectLLMAuthMode",
+        "loadClaudeConfig",
+        "resolveApiKey",
+        "resolveCliPath",
+        "resolveModel",
+        "parseApiTokenUsage",
+        "parseCliTokenUsage",
+        "parseStreamTokenUsage",
+        "createApiClient",
+        "createCliClient",
+        "createCodexCliClient",
+        "createClient",
+        "detectAuthMode",
+        "detectCliAvailability",
+        "validateApiKey",
+        "detectAvailableAuth",
+        "diagnoseAuth",
+        "exec",
+        "execStdout",
+        "execShellCmd",
+        "getCurrentHead",
+        "getCurrentBranch",
+        "isExecutableOnPath",
+        "spawnTool",
+        "spawnManaged",
+        "ProcessPool",
+        "ProcessLimitError",
+        "PROJECT_DIRS",
+        "toCanonicalJSON",
+        "deepMerge",
+        "loadProjectOverrides",
+        "mergeWithOverrides",
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result",
+        "editDistance",
+        "suggestCommands",
+        "formatTypoSuggestion",
+        "isColorEnabled",
+        "resetColorCache",
+        "bold",
+        "dim",
+        "cyan",
+        "yellow",
+        "cmd",
+        "flag",
+        "sectionHeader",
+        "requiredParam",
+        "optionalParam",
+        "formatHelp",
+        "formatUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/public-api.test.ts",
+      "to": "src/public.ts",
+      "type": "type",
+      "symbols": [
+        "ProviderAuthMode",
+        "ProviderCapability",
+        "ProviderInfo",
+        "StreamChunk",
+        "LLMProvider",
+        "LLMVendor",
+        "CodexConfig",
+        "LLMConfig",
+        "LLMClient",
+        "TokenUsage",
+        "ClaudeConfig",
+        "AuthMode",
+        "ClaudeClientOptions",
+        "CompletionRequest",
+        "CompletionResult",
+        "ErrorReason",
+        "ClaudeClient",
+        "CreateLLMClientOptions",
+        "ApiProviderOptions",
+        "CliProviderOptions",
+        "CodexCliProviderOptions",
+        "CreateClientOptions",
+        "AuthDetectionResult",
+        "AuthDiagnostics",
+        "ExecResult",
+        "ExecOptions",
+        "SpawnToolOptions",
+        "SpawnToolResult",
+        "ManagedChild",
+        "ProjectDir",
+        "HelpOption",
+        "HelpExample",
+        "HelpDefinition",
+        "UsageSection",
+        "UsageDefinition",
+        "ProviderFactory"
+      ]
+    },
+    {
       "from": "tests/unit/suggest.test.ts",
       "to": "src/suggest.ts",
       "type": "static",
@@ -1059,6 +1180,7 @@
         "tests/unit/provider-interface.test.ts",
         "tests/unit/provider-registry.test.ts",
         "tests/unit/provider-session.test.ts",
+        "tests/unit/public-api.test.ts",
         "tests/unit/suggest.test.ts",
         "tests/unit/token-usage.test.ts",
         "tests/unit/types.test.ts",
@@ -1076,7 +1198,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 111,
+    "totalEdges": 114,
     "totalExternal": 2,
     "circularCount": 0,
     "circulars": [],
@@ -1156,8 +1278,12 @@
       {
         "path": "src/project-dirs.ts",
         "count": 1
+      },
+      {
+        "path": "src/public.ts",
+        "count": 1
       }
     ],
-    "avgImportsPerFile": 3.47
+    "avgImportsPerFile": 3.45
   }
 }

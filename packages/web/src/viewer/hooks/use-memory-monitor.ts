@@ -11,7 +11,7 @@ import type {
   MemorySnapshot,
   MemoryLevel,
   MemoryThresholds,
-} from "../memory-monitor.js";
+} from "../performance/memory-monitor.js";
 import {
   startMemoryMonitor,
   stopMemoryMonitor,
@@ -19,7 +19,7 @@ import {
   getLatestSnapshot,
   getSnapshotHistory,
   resetMemoryMonitor,
-} from "../memory-monitor.js";
+} from "../performance/memory-monitor.js";
 
 export interface UseMemoryMonitorOptions {
   /** Polling interval in milliseconds (default: 5000). */

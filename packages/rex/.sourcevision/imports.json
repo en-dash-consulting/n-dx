@@ -1,14 +1,491 @@
 {
   "edges": [
     {
+      "from": "src/analyze/analyze-shared.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/consolidation-guard.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/analyze/consolidation-guard.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude",
+        "DEFAULT_MODEL",
+        "parseProposalResponse",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "FEW_SHOT_EXAMPLE",
+        "OUTPUT_INSTRUCTION",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES"
+      ]
+    },
+    {
+      "from": "src/analyze/consolidation-guard.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LOE_DEFAULTS"
+      ]
+    },
+    {
+      "from": "src/analyze/consolidation-guard.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "LoEConfig",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/decompose.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask",
+        "ProposalFeature"
+      ]
+    },
+    {
+      "from": "src/analyze/decompose.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude",
+        "DEFAULT_MODEL",
+        "extractJson",
+        "repairTruncatedJson",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES",
+        "OUTPUT_INSTRUCTION"
+      ]
+    },
+    {
+      "from": "src/analyze/decompose.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "ReasonResult",
+        "ClaudeResult"
+      ]
+    },
+    {
+      "from": "src/analyze/decompose.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LOE_DEFAULTS"
+      ]
+    },
+    {
+      "from": "src/analyze/decompose.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "LoEConfig",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/dedupe.ts",
+      "to": "src/analyze/scanners.ts",
+      "type": "type",
+      "symbols": [
+        "ScanResult"
+      ]
+    },
+    {
+      "from": "src/analyze/dedupe.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER"
+      ]
+    },
+    {
+      "from": "src/analyze/diff.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/analyze/diff.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/analyze/diff.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "static",
+      "symbols": [
+        "detectFileFormat",
+        "DEFAULT_MODEL",
+        "extractJson",
+        "repairTruncatedJson",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES",
+        "OUTPUT_INSTRUCTION"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "type",
+      "symbols": [
+        "FileFormat"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "static",
+      "symbols": [
+        "validateFileInput",
+        "validateMarkdownContent",
+        "validateTextContent",
+        "validateJsonContent",
+        "validateYamlContent",
+        "FileValidationError"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/analyze/llm-bridge.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "src/analyze/extract.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/file-validation.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "type",
+      "symbols": [
+        "FileFormat"
+      ]
+    },
+    {
+      "from": "src/analyze/guided.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/analyze/guided.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude",
+        "readProjectContext",
+        "parseProposalResponse",
+        "FEW_SHOT_EXAMPLE",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES",
+        "OUTPUT_INSTRUCTION",
+        "DEFAULT_MODEL",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/guided.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "ReasonResult"
+      ]
+    },
+    {
+      "from": "src/analyze/guided.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/consolidation-guard.ts",
+      "type": "reexport",
+      "symbols": [
+        "countProposalTasks",
+        "buildConsolidationGuardPrompt",
+        "applyConsolidationGuard"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/consolidation-guard.ts",
+      "type": "type",
+      "symbols": [
+        "ConsolidationGuardResult"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/decompose.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildDecompositionPrompt",
+        "parseDecompositionResponse",
+        "decomposeTask",
+        "applyDecompositionPass"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/decompose.ts",
+      "type": "type",
+      "symbols": [
+        "DecomposedTask",
+        "DecompositionResult"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "reexport",
+      "symbols": [
+        "similarity",
+        "deduplicateScanResults"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/diff.ts",
+      "type": "reexport",
+      "symbols": [
+        "formatDiff"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "reexport",
+      "symbols": [
+        "extractFromMarkdown",
+        "extractFromText",
+        "extractFromFile",
+        "extractPriorityTag",
+        "classifyHeadingLevels"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "type",
+      "symbols": [
+        "ExtractionOptions",
+        "ExtractionResult"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateFileInput",
+        "validateMarkdownContent",
+        "validateTextContent",
+        "validateJsonContent",
+        "validateYamlContent",
+        "detectMagicBytes",
+        "FileValidationError",
+        "SUPPORTED_EXTENSIONS",
+        "MAX_FILE_SIZE_BYTES",
+        "LARGE_FILE_WARNING_BYTES"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "type",
+      "symbols": [
+        "FileValidationResult",
+        "MarkdownValidationResult",
+        "TextValidationResult",
+        "JsonValidationResult",
+        "YamlValidationResult",
+        "FileValidationErrorCode"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "reexport",
+      "symbols": [
+        "runGuidedSpec",
+        "clarify",
+        "generateSpecFromContext"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "type",
+      "symbols": [
+        "GuidedContext",
+        "ClarifyResponse"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/modify-reason.ts",
+      "type": "reexport",
+      "symbols": [
+        "buildModifyPrompt",
+        "modifyProposals"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/modify-reason.ts",
+      "type": "type",
+      "symbols": [
+        "ModifyProposalOptions",
+        "ModifyProposalResult"
+      ]
+    },
+    {
       "from": "src/analyze/index.ts",
       "to": "src/analyze/propose.ts",
       "type": "reexport",
       "symbols": [
+        "buildProposals"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
         "Proposal",
+        "ProposalEpic",
         "ProposalFeature",
         "ProposalTask",
-        "buildProposals"
+        "TaskDecomposition",
+        "DuplicateReasonType",
+        "DuplicateReasonReference",
+        "DuplicateReasonMetadata"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "reexport",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "DEFAULT_CODEX_MODEL",
+        "MAX_RETRIES",
+        "setLLMConfig",
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode",
+        "getLLMVendor",
+        "CHUNK_CHAR_LIMIT",
+        "CHUNK_ITEM_LIMIT",
+        "FEW_SHOT_EXAMPLE",
+        "CONSOLIDATION_INSTRUCTION",
+        "spawnClaude",
+        "reasonFromFile",
+        "reasonFromFiles",
+        "reasonFromScanResults",
+        "reasonFromDescription",
+        "reasonFromDescriptions",
+        "reasonFromIdeasFile",
+        "buildIdeasPrompt",
+        "readProjectContext",
+        "parseProposalResponse",
+        "parseTokenUsage",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "extractJson",
+        "repairTruncatedJson",
+        "validateProposalQuality",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt",
+        "adjustGranularity",
+        "buildAssessmentPrompt",
+        "parseAssessmentResponse",
+        "formatAssessment",
+        "assessGranularity",
+        "detectFileFormat",
+        "parseStructuredFile",
+        "mergeProposals",
+        "reasonFromBatch",
+        "chunkScanResults",
+        "summarizeScanResults",
+        "estimateItemSize",
+        "groupScanResults"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "FileFormat",
+        "AddPromptOptions",
+        "QualityIssue",
+        "ClaudeResult",
+        "ReasonResult",
+        "GranularityAssessment",
+        "GranularityAssessmentResult",
+        "BatchImportItem",
+        "BatchImportResult"
       ]
     },
     {
@@ -16,8 +493,36 @@
       "to": "src/analyze/reconcile.ts",
       "type": "reexport",
       "symbols": [
-        "ReconcileStats",
         "reconcile"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/reconcile.ts",
+      "type": "type",
+      "symbols": [
+        "ReconcileStats",
+        "UpdateCandidate",
+        "ReconcileOptions"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "reexport",
+      "symbols": [
+        "reasonForReshape",
+        "parseReshapeResponse",
+        "formatReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeReasonOptions",
+        "ReshapeReasonResult"
       ]
     },
     {
@@ -25,11 +530,115 @@
       "to": "src/analyze/scanners.ts",
       "type": "reexport",
       "symbols": [
-        "ScanResult",
-        "ScanOptions",
         "scanTests",
         "scanDocs",
-        "scanSourceVision"
+        "scanSourceVision",
+        "scanPackageJson"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/scanners.ts",
+      "type": "type",
+      "symbols": [
+        "ScanResult",
+        "ScanOptions"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/validate-modification.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateModificationRequest",
+        "classifyModificationRequest"
+      ]
+    },
+    {
+      "from": "src/analyze/index.ts",
+      "to": "src/analyze/validate-modification.ts",
+      "type": "type",
+      "symbols": [
+        "ValidationResult",
+        "ClassificationResult"
+      ]
+    },
+    {
+      "from": "src/analyze/llm-bridge.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "static",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "DEFAULT_CODEX_MODEL"
+      ]
+    },
+    {
+      "from": "src/analyze/llm-bridge.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeResult"
+      ]
+    },
+    {
+      "from": "src/analyze/modify-reason.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/analyze/modify-reason.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude",
+        "parseProposalResponse",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "readProjectContext",
+        "validateProposalQuality",
+        "PRD_SCHEMA",
+        "FEW_SHOT_EXAMPLE",
+        "TASK_QUALITY_RULES",
+        "ANTI_PATTERNS",
+        "OUTPUT_INSTRUCTION",
+        "DEFAULT_MODEL",
+        "MAX_RETRIES"
+      ]
+    },
+    {
+      "from": "src/analyze/modify-reason.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "ReasonResult"
+      ]
+    },
+    {
+      "from": "src/analyze/modify-reason.ts",
+      "to": "src/analyze/validate-modification.ts",
+      "type": "static",
+      "symbols": [
+        "validateModificationRequest"
+      ]
+    },
+    {
+      "from": "src/analyze/modify-reason.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/propose.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "deduplicateScanResults"
       ]
     },
     {
@@ -38,6 +647,148 @@
       "type": "type",
       "symbols": [
         "ScanResult"
+      ]
+    },
+    {
+      "from": "src/analyze/propose.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER"
+      ]
+    },
+    {
+      "from": "src/analyze/propose.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "Priority",
+        "ItemLevel",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "reexport",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "DEFAULT_CODEX_MODEL",
+        "MAX_RETRIES",
+        "parseTokenUsage",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "detectFileFormat",
+        "extractJson",
+        "repairTruncatedJson",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES",
+        "OUTPUT_INSTRUCTION"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "static",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "extractJson",
+        "repairTruncatedJson",
+        "detectFileFormat",
+        "PRD_SCHEMA",
+        "TASK_QUALITY_RULES",
+        "OUTPUT_INSTRUCTION"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/analyze-shared.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeResult",
+        "FileFormat"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "dynamic",
+      "symbols": [
+        "extractFromText",
+        "extractFromMarkdown"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/llm-bridge.ts",
+      "type": "reexport",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode",
+        "getLLMVendor",
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/llm-bridge.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/analyze/scanners.ts",
+      "type": "type",
+      "symbols": [
+        "ScanResult"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isContainerLevel"
+      ]
+    },
+    {
+      "from": "src/analyze/reason.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/reconcile.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
       ]
     },
     {
@@ -65,6 +816,64 @@
       ]
     },
     {
+      "from": "src/analyze/reshape-reason.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude",
+        "extractJson",
+        "repairTruncatedJson",
+        "readProjectContext",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage",
+        "DEFAULT_MODEL"
+      ]
+    },
+    {
+      "from": "src/analyze/reshape-reason.ts",
+      "to": "src/core/reshape.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal",
+        "ReshapeAction"
+      ]
+    },
+    {
+      "from": "src/analyze/reshape-reason.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/analyze/reshape-reason.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/analyze/scanners.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "static",
+      "symbols": [
+        "computeFindingHash",
+        "loadAcknowledged",
+        "isAcknowledged"
+      ]
+    },
+    {
+      "from": "src/analyze/scanners.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "type",
+      "symbols": [
+        "AcknowledgedStore"
+      ]
+    },
+    {
       "from": "src/analyze/scanners.ts",
       "to": "src/schema/index.ts",
       "type": "type",
@@ -73,11 +882,94 @@
       ]
     },
     {
+      "from": "src/analyze/validate-modification.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/adapter.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/adapter.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/adapter.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/adapter.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "static",
+      "symbols": [
+        "getDefaultRegistry",
+        "isRedactedField"
+      ]
+    },
+    {
+      "from": "src/cli/commands/adapter.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
+        "AdapterConfig"
+      ]
+    },
+    {
       "from": "src/cli/commands/add.ts",
       "to": "src/cli/commands/constants.ts",
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/add.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/add.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/add.ts",
+      "to": "src/core/cascade-reset.ts",
+      "type": "static",
+      "symbols": [
+        "cascadeParentReset"
+      ]
+    },
+    {
+      "from": "src/cli/commands/add.ts",
+      "to": "src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
       ]
     },
     {
@@ -93,7 +985,9 @@
       "to": "src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "LEVEL_HIERARCHY"
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL",
+        "isItemLevel"
       ]
     },
     {
@@ -112,7 +1006,25 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "dynamic",
+      "symbols": [
+        "runGuidedSpec"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyze/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "adjustGranularity",
+        "assessGranularity",
+        "formatAssessment"
       ]
     },
     {
@@ -123,8 +1035,22 @@
         "scanTests",
         "scanDocs",
         "scanSourceVision",
+        "scanPackageJson",
         "reconcile",
-        "buildProposals"
+        "buildProposals",
+        "deduplicateScanResults",
+        "reasonFromFiles",
+        "reasonFromScanResults",
+        "emptyAnalyzeTokenUsage",
+        "formatDiff",
+        "DEFAULT_MODEL",
+        "DEFAULT_CODEX_MODEL",
+        "setLLMConfig",
+        "setClaudeConfig",
+        "getAuthMode",
+        "getLLMVendor",
+        "applyDecompositionPass",
+        "applyConsolidationGuard"
       ]
     },
     {
@@ -138,10 +1064,93 @@
     },
     {
       "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/commands/chunked-review.ts",
+      "type": "dynamic",
+      "symbols": [
+        "formatBatchSummary",
+        "createReviewState",
+        "buildBatchRecord",
+        "runChunkedReview"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/commands/chunked-review.ts",
+      "type": "type",
+      "symbols": [
+        "BatchAcceptanceRecord"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
       "to": "src/cli/commands/constants.ts",
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/commands/decomposition-review.ts",
+      "type": "dynamic",
+      "symbols": [
+        "countDecomposedTasks",
+        "autoResolveDecompositions",
+        "runDecompositionReview",
+        "formatDecompositionSummary"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/commands/format-loe.ts",
+      "type": "static",
+      "symbols": [
+        "formatTaskLoE",
+        "formatTaskLoERationale"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "preflightBudgetCheck",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "BudgetExceededError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/cli/validate-input.ts",
+      "type": "static",
+      "symbols": [
+        "parseIntSafe"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LOE_DEFAULTS"
       ]
     },
     {
@@ -150,7 +1159,9 @@
       "type": "type",
       "symbols": [
         "PRDItem",
-        "PRDDocument"
+        "PRDDocument",
+        "AnalyzeTokenUsage",
+        "LoEConfig"
       ]
     },
     {
@@ -158,7 +1169,218 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "loadLLMConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review-state.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review-state.ts",
+      "to": "src/analyze/validate-modification.ts",
+      "type": "static",
+      "symbols": [
+        "classifyModificationRequest"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review-state.ts",
+      "to": "src/cli/commands/format-loe.ts",
+      "type": "static",
+      "symbols": [
+        "formatTaskLoE",
+        "formatTaskLoERationale"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "reexport",
+      "symbols": [
+        "GranularityAdjustmentRecord",
+        "ChunkReviewState",
+        "ChunkAction",
+        "GranularityRequest",
+        "BatchAcceptanceRecord",
+        "GranularityHandler",
+        "AssessmentHandler",
+        "ModificationHandler",
+        "ProposalAssessment",
+        "createReviewState",
+        "getCurrentChunk",
+        "formatPaginationHeader",
+        "formatChunk",
+        "formatActionMenu",
+        "buildPrompt",
+        "parseChunkInput",
+        "applyAction",
+        "replaceProposals",
+        "getAcceptedProposals",
+        "getRemainingProposals",
+        "buildBatchRecord",
+        "formatBatchSummary"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "static",
+      "symbols": [
+        "createReviewState",
+        "formatPaginationHeader",
+        "formatChunk",
+        "formatActionMenu",
+        "buildPrompt",
+        "parseChunkInput",
+        "applyAction",
+        "replaceProposals",
+        "getAcceptedProposals",
+        "getRemainingProposals",
+        "buildBatchRecord",
+        "formatBatchSummary"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "type",
+      "symbols": [
+        "GranularityHandler",
+        "AssessmentHandler",
+        "ModificationHandler",
+        "BatchAcceptanceRecord"
+      ]
+    },
+    {
+      "from": "src/cli/commands/chunked-review.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info"
+      ]
+    },
+    {
+      "from": "src/cli/commands/decomposition-review.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask",
+        "ProposalFeature"
+      ]
+    },
+    {
+      "from": "src/cli/commands/decomposition-review.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info"
+      ]
+    },
+    {
+      "from": "src/cli/commands/fix.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/fix.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/fix.ts",
+      "to": "src/core/fix.ts",
+      "type": "static",
+      "symbols": [
+        "detectIssues",
+        "applyFixes"
+      ]
+    },
+    {
+      "from": "src/cli/commands/fix.ts",
+      "to": "src/core/fix.ts",
+      "type": "type",
+      "symbols": [
+        "FixAction",
+        "FixKind"
+      ]
+    },
+    {
+      "from": "src/cli/commands/fix.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/format-loe.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "src/cli/commands/health.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/health.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/health.ts",
+      "to": "src/core/health.ts",
+      "type": "static",
+      "symbols": [
+        "computeHealthScore",
+        "formatHealthScore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/health.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
       ]
     },
     {
@@ -167,6 +1389,14 @@
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/init.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info"
       ]
     },
     {
@@ -211,11 +1441,62 @@
       ]
     },
     {
+      "from": "src/cli/commands/move.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/move.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/move.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/move.ts",
+      "to": "src/core/move.ts",
+      "type": "static",
+      "symbols": [
+        "validateMove",
+        "moveItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/move.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
       "from": "src/cli/commands/next.ts",
       "to": "src/cli/commands/constants.ts",
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/next.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
       ]
     },
     {
@@ -224,7 +1505,8 @@
       "type": "static",
       "symbols": [
         "findNextTask",
-        "collectCompletedIds"
+        "collectCompletedIds",
+        "explainSelection"
       ]
     },
     {
@@ -232,7 +1514,138 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "reasonForReshape",
+        "formatReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/cli/commands/analyze.ts",
+      "type": "static",
+      "symbols": [
+        "formatTokenUsage"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "findPrunableItems",
+        "pruneItems",
+        "countSubtree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/core/reshape.ts",
+      "type": "static",
+      "symbols": [
+        "applyReshape"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/core/reshape.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "getLevelEmoji",
+        "formatLevels"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/prune.ts",
+      "to": "src/store/project-config.ts",
+      "type": "dynamic",
+      "symbols": [
+        "loadLLMConfig",
+        "loadClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "static",
+      "symbols": [
+        "computeFindingHash",
+        "loadAcknowledged",
+        "saveAcknowledged",
+        "acknowledgeFinding",
+        "isAcknowledged"
       ]
     },
     {
@@ -245,10 +1658,45 @@
     },
     {
       "from": "src/cli/commands/recommend.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
+      "to": "src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "formatConflict",
+        "formatIntraBatchDuplicate"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
+      "to": "src/recommend/create-from-recommendations.ts",
+      "type": "static",
+      "symbols": [
+        "createItemsFromRecommendations"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
+      "to": "src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "ConflictStrategy"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
-        "PRDItem",
         "ItemLevel"
       ]
     },
@@ -257,7 +1705,571 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "countSubtree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/remove-epic.ts",
+      "type": "static",
+      "symbols": [
+        "removeEpic"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/remove-feature.ts",
+      "type": "static",
+      "symbols": [
+        "preCheckFeatureDeletion",
+        "removeFeature"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/remove-task.ts",
+      "type": "static",
+      "symbols": [
+        "removeTask"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/timestamps.ts",
+      "type": "static",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel",
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/cli/commands/remove.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "reasonForReshape",
+        "formatReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result",
+        "startSpinner"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/core/reorganize-executor.ts",
+      "type": "static",
+      "symbols": [
+        "applyProposals",
+        "formatApplyResult"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "static",
+      "symbols": [
+        "detectReorganizations",
+        "formatReorganizationPlan"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "type",
+      "symbols": [
+        "ReorganizationProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/core/reshape.ts",
+      "type": "static",
+      "symbols": [
+        "applyReshape"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/core/reshape.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reorganize.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "loadLLMConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/core/stats.ts",
+      "type": "type",
+      "symbols": [
+        "TreeStats"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/cli/commands/report.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument",
+        "validateConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "static",
+      "symbols": [
+        "reasonForReshape",
+        "formatReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/cli/commands/analyze.ts",
+      "type": "static",
+      "symbols": [
+        "formatTokenUsage"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/core/reshape.ts",
+      "type": "static",
+      "symbols": [
+        "applyReshape"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/core/reshape.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/reshape.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadLLMConfig",
+        "loadClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add-duplicates.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add-duplicates.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "DuplicateReasonMetadata",
+        "DuplicateReasonType"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add-duplicates.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add-duplicates.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "ItemStatus",
+        "DuplicateOverrideMarker"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/analyze/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "adjustGranularity"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/analyze/index.ts",
+      "type": "static",
+      "symbols": [
+        "reasonFromDescriptions",
+        "reasonFromIdeasFile",
+        "validateProposalQuality",
+        "DEFAULT_MODEL",
+        "setLLMConfig",
+        "setClaudeConfig",
+        "getAuthMode",
+        "getLLMVendor",
+        "applyConsolidationGuard"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "QualityIssue"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/commands/format-loe.ts",
+      "type": "static",
+      "symbols": [
+        "formatTaskLoE",
+        "formatTaskLoERationale"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/commands/smart-add-duplicates.ts",
+      "type": "static",
+      "symbols": [
+        "matchProposalNodesToPRD",
+        "attachDuplicateReasonsToProposals",
+        "buildDuplicateOverrideMarkerIndex"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/commands/smart-add-duplicates.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalDuplicateMatch"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result",
+        "startSpinner"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/core/cascade-reset.ts",
+      "type": "static",
+      "symbols": [
+        "cascadeParentReset"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "CHILD_LEVEL",
+        "PRIORITY_ORDER",
+        "LOE_DEFAULTS"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "DuplicateOverrideMarker",
+        "LoEConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/smart-add.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "loadLLMConfig"
       ]
     },
     {
@@ -270,7 +2282,53 @@
     },
     {
       "from": "src/cli/commands/status.ts",
-      "to": "src/core/tree.ts",
+      "to": "src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "BudgetExceededError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result",
+        "isQuiet"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/facets.ts",
+      "type": "static",
+      "symbols": [
+        "groupByFacet",
+        "getFacetValue"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "isFullyCompleted"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/stats.ts",
       "type": "static",
       "symbols": [
         "computeStats"
@@ -278,7 +2336,7 @@
     },
     {
       "from": "src/cli/commands/status.ts",
-      "to": "src/core/tree.ts",
+      "to": "src/core/stats.ts",
       "type": "type",
       "symbols": [
         "TreeStats"
@@ -286,10 +2344,68 @@
     },
     {
       "from": "src/cli/commands/status.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsageFilter"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/verify.ts",
+      "type": "static",
+      "symbols": [
+        "verify"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/core/verify.ts",
+      "type": "type",
+      "symbols": [
+        "VerifyResult"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "src/cli/commands/status.ts",
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
-        "PRDItem"
+        "PRDItem",
+        "ItemStatus"
       ]
     },
     {
@@ -297,7 +2413,77 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/sync.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/sync.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/sync.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/sync.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore",
+        "resolveRemoteStore",
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "src/cli/commands/sync.ts",
+      "to": "src/store/index.ts",
+      "type": "type",
+      "symbols": [
+        "SyncDirection",
+        "SyncReport"
+      ]
+    },
+    {
+      "from": "src/cli/commands/token-format.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "src/cli/commands/token-format.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage",
+        "BudgetCheckResult"
+      ]
+    },
+    {
+      "from": "src/cli/commands/token-format.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
       ]
     },
     {
@@ -306,6 +2492,84 @@
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "requireRexDir"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/delete.ts",
+      "type": "static",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/parent-completion.ts",
+      "type": "static",
+      "symbols": [
+        "findAutoCompletions"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/timestamps.ts",
+      "type": "static",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/transitions.ts",
+      "type": "static",
+      "symbols": [
+        "validateTransition"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/update.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "isItemStatus",
+        "isPriority"
       ]
     },
     {
@@ -323,7 +2587,144 @@
       "to": "src/store/index.ts",
       "type": "static",
       "symbols": [
-        "createStore"
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "BudgetExceededError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "estimateCost",
+        "collectTokenEvents",
+        "groupByCommand",
+        "groupByTimePeriod",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage",
+        "TokenUsageFilter",
+        "CommandTokenUsage",
+        "TimePeriod",
+        "PeriodBucket"
+      ]
+    },
+    {
+      "from": "src/cli/commands/usage.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/core/epic-correlation.ts",
+      "type": "static",
+      "symbols": [
+        "correlateEpiclessFeatures",
+        "formatScore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/core/epic-correlation.ts",
+      "type": "type",
+      "symbols": [
+        "CorrelationResult"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/core/remove-feature.ts",
+      "type": "static",
+      "symbols": [
+        "preCheckFeatureDeletion",
+        "removeFeature"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/core/structural.ts",
+      "type": "type",
+      "symbols": [
+        "EpiclessFeature"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "insertChild",
+        "removeFromTree"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate-interactive.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
       ]
     },
     {
@@ -332,6 +2733,32 @@
       "type": "static",
       "symbols": [
         "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/cli/commands/validate-interactive.ts",
+      "type": "static",
+      "symbols": [
+        "resolveEpiclessFeatures",
+        "applyEpiclessResolutions"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/cli/commands/validate-interactive.ts",
+      "type": "type",
+      "symbols": [
+        "PromptFn"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
       ]
     },
     {
@@ -344,12 +2771,19 @@
     },
     {
       "from": "src/cli/commands/validate.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure",
+        "findEpiclessFeatures"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
       "to": "src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "SCHEMA_VERSION",
-        "validateDocument",
-        "validateConfig"
+        "SCHEMA_VERSION"
       ]
     },
     {
@@ -361,11 +2795,93 @@
       ]
     },
     {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument",
+        "validateConfig"
+      ]
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/core/tree.ts",
+      "type": "dynamic",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/core/verify.ts",
+      "type": "static",
+      "symbols": [
+        "verify"
+      ]
+    },
+    {
+      "from": "src/cli/commands/verify.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/cli/errors.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/adapter.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdAdapter"
+      ]
+    },
+    {
       "from": "src/cli/index.ts",
       "to": "src/cli/commands/add.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdAdd"
       ]
     },
     {
@@ -373,7 +2889,7 @@
       "to": "src/cli/commands/analyze.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdAnalyze"
       ]
     },
     {
@@ -386,10 +2902,34 @@
     },
     {
       "from": "src/cli/index.ts",
+      "to": "src/cli/commands/fix.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdFix"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/health.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdHealth"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
       "to": "src/cli/commands/init.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdInit"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/move.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdMove"
       ]
     },
     {
@@ -397,7 +2937,15 @@
       "to": "src/cli/commands/next.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdNext"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/prune.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdPrune"
       ]
     },
     {
@@ -405,7 +2953,47 @@
       "to": "src/cli/commands/recommend.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdRecommend"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/remove.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdRemove"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/reorganize.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdReorganize"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/report.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdReport"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/reshape.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdReshape"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdSmartAdd"
       ]
     },
     {
@@ -413,7 +3001,15 @@
       "to": "src/cli/commands/status.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdStatus"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/sync.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdSync"
       ]
     },
     {
@@ -421,7 +3017,15 @@
       "to": "src/cli/commands/update.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdUpdate"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/usage.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdUsage"
       ]
     },
     {
@@ -429,7 +3033,33 @@
       "to": "src/cli/commands/validate.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "cmdValidate"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/verify.ts",
+      "type": "dynamic",
+      "symbols": [
+        "cmdVerify"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "handleCLIError",
+        "requireRexDir"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/help.ts",
+      "type": "static",
+      "symbols": [
+        "showCommandHelp"
       ]
     },
     {
@@ -437,11 +3067,52 @@
       "to": "src/cli/mcp.ts",
       "type": "dynamic",
       "symbols": [
-        "*"
+        "startMcpServer"
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
+      "from": "src/cli/index.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "setQuiet"
+      ]
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isItemLevel"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "setLLMConfig",
+        "setClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "dynamic",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
       "to": "src/cli/commands/constants.ts",
       "type": "static",
       "symbols": [
@@ -449,34 +3120,151 @@
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/cascade-reset.ts",
+      "type": "static",
+      "symbols": [
+        "cascadeParentReset"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/delete.ts",
+      "type": "static",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/facets.ts",
+      "type": "static",
+      "symbols": [
+        "computeFacetDistribution",
+        "suggestFacets",
+        "getItemFacets"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/health.ts",
+      "type": "static",
+      "symbols": [
+        "computeHealthScore"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/merge.ts",
+      "type": "static",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/move.ts",
+      "type": "static",
+      "symbols": [
+        "validateMove",
+        "moveItem"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
       "to": "src/core/next-task.ts",
       "type": "static",
       "symbols": [
         "findNextTask",
-        "collectCompletedIds"
+        "collectCompletedIds",
+        "explainSelection"
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/parent-completion.ts",
+      "type": "static",
+      "symbols": [
+        "findAutoCompletions"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/reorganize-executor.ts",
+      "type": "static",
+      "symbols": [
+        "applyProposals"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "static",
+      "symbols": [
+        "detectReorganizations"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/timestamps.ts",
+      "type": "static",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/transitions.ts",
+      "type": "static",
+      "symbols": [
+        "validateTransition"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
       "to": "src/core/tree.ts",
       "type": "static",
       "symbols": [
-        "computeStats",
         "findItem"
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
-      "to": "src/schema/index.ts",
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/core/verify.ts",
       "type": "static",
       "symbols": [
-        "SCHEMA_VERSION",
-        "LEVEL_HIERARCHY"
+        "verify"
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "src/cli/mcp-tools.ts",
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -487,15 +3275,7 @@
       ]
     },
     {
-      "from": "src/cli/mcp.ts",
-      "to": "src/store/index.ts",
-      "type": "static",
-      "symbols": [
-        "createStore"
-      ]
-    },
-    {
-      "from": "src/cli/mcp.ts",
+      "from": "src/cli/mcp-tools.ts",
       "to": "src/store/index.ts",
       "type": "type",
       "symbols": [
@@ -503,12 +3283,181 @@
       ]
     },
     {
-      "from": "src/core/canonical.ts",
+      "from": "src/cli/mcp-tools.ts",
+      "to": "src/store/project-config.ts",
+      "type": "dynamic",
+      "symbols": [
+        "loadLLMConfig",
+        "loadClaudeConfig"
+      ]
+    },
+    {
+      "from": "src/cli/mcp.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR",
+        "TOOL_VERSION"
+      ]
+    },
+    {
+      "from": "src/cli/mcp.ts",
+      "to": "src/cli/mcp-tools.ts",
+      "type": "static",
+      "symbols": [
+        "handleGetPrdStatus",
+        "handleGetNextTask",
+        "handleUpdateTaskStatus",
+        "handleAddItem",
+        "handleMoveItem",
+        "handleMergeItems",
+        "handleGetItem",
+        "handleAppendLog",
+        "handleSyncWithRemote",
+        "handleGetRecommendations",
+        "handleVerifyCriteria",
+        "handleGetCapabilities",
+        "handleReorganize",
+        "handleHealth",
+        "handleFacets"
+      ]
+    },
+    {
+      "from": "src/cli/mcp.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "getAllLevels"
+      ]
+    },
+    {
+      "from": "src/cli/mcp.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore",
+        "resolveRemoteStore",
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "src/cli/validate-input.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/cli/validate-input.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "isItemLevel",
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/cli/validate-input.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/analytics.ts",
+      "to": "src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "src/core/analytics.ts",
+      "to": "src/core/stats.ts",
+      "type": "type",
+      "symbols": [
+        "TreeStats"
+      ]
+    },
+    {
+      "from": "src/core/analytics.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel",
+        "isWorkItem"
+      ]
+    },
+    {
+      "from": "src/core/analytics.ts",
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
-        "Priority"
+        "ItemStatus",
+        "Priority",
+        "Requirement"
+      ]
+    },
+    {
+      "from": "src/core/canonical.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER"
+      ]
+    },
+    {
+      "from": "src/core/canonical.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/cascade-reset.ts",
+      "to": "src/core/parent-reset.ts",
+      "type": "static",
+      "symbols": [
+        "findParentResets"
+      ]
+    },
+    {
+      "from": "src/core/cascade-reset.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/core/cascade-reset.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "src/core/code-coverage.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/code-coverage.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
       ]
     },
     {
@@ -529,6 +3478,217 @@
       ]
     },
     {
+      "from": "src/core/delete.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "removeFromTree",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/delete.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/epic-correlation.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
+      ]
+    },
+    {
+      "from": "src/core/epic-correlation.ts",
+      "to": "src/core/keywords.ts",
+      "type": "static",
+      "symbols": [
+        "extractKeywords"
+      ]
+    },
+    {
+      "from": "src/core/epic-correlation.ts",
+      "to": "src/core/structural.ts",
+      "type": "type",
+      "symbols": [
+        "EpiclessFeature"
+      ]
+    },
+    {
+      "from": "src/core/epic-correlation.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "src/core/epic-correlation.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/facets.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/facets.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "RexConfig"
+      ]
+    },
+    {
+      "from": "src/core/fix.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "src/core/fix.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/core/health.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "isFullyCompleted",
+        "countSubtree"
+      ]
+    },
+    {
+      "from": "src/core/health.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/health.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isContainerLevel",
+        "isWorkItem",
+        "isRootLevel",
+        "getLevelLabel",
+        "getLevelPlural"
+      ]
+    },
+    {
+      "from": "src/core/health.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/merge.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "removeFromTree",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/merge.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/move.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "src/core/move.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "removeFromTree",
+        "insertChild",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/move.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY"
+      ]
+    },
+    {
+      "from": "src/core/move.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/next-task.ts",
+      "to": "src/core/keywords.ts",
+      "type": "static",
+      "symbols": [
+        "extractKeywords",
+        "scoreMatch"
+      ]
+    },
+    {
+      "from": "src/core/next-task.ts",
+      "to": "src/core/requirements.ts",
+      "type": "static",
+      "symbols": [
+        "collectRequirements"
+      ]
+    },
+    {
+      "from": "src/core/next-task.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "findItem"
+      ]
+    },
+    {
       "from": "src/core/next-task.ts",
       "to": "src/core/tree.ts",
       "type": "type",
@@ -539,10 +3699,526 @@
     {
       "from": "src/core/next-task.ts",
       "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "PRIORITY_ORDER"
+      ]
+    },
+    {
+      "from": "src/core/next-task.ts",
+      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
+        "Priority",
+        "Requirement"
+      ]
+    },
+    {
+      "from": "src/core/notion-map.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/notion-map.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "src/core/notion-map.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel",
+        "ItemStatus",
+        "PRDItem",
+        "PRDDocument",
         "Priority"
+      ]
+    },
+    {
+      "from": "src/core/parent-completion.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/parent-completion.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/core/parent-reset.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/parent-reset.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/prune.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/prune.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/remove-epic.ts",
+      "to": "src/core/delete.ts",
+      "type": "static",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/core/remove-epic.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/remove-epic.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/core/remove-epic.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/remove-feature.ts",
+      "to": "src/core/delete.ts",
+      "type": "static",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/core/remove-feature.ts",
+      "to": "src/core/sync.ts",
+      "type": "static",
+      "symbols": [
+        "extractSyncMeta"
+      ]
+    },
+    {
+      "from": "src/core/remove-feature.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/remove-feature.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/core/remove-feature.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/remove-task.ts",
+      "to": "src/core/delete.ts",
+      "type": "static",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/core/remove-task.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/remove-task.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/core/remove-task.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/core/merge.ts",
+      "type": "static",
+      "symbols": [
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/core/move.ts",
+      "type": "static",
+      "symbols": [
+        "moveItem"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "pruneItems"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "type",
+      "symbols": [
+        "ReorganizationProposal",
+        "MergeDetail",
+        "MoveDetail",
+        "DeleteDetail",
+        "PruneDetail",
+        "CollapseDetail",
+        "SplitDetail"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "removeFromTree",
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/reorganize-executor.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/reorganize.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
+      ]
+    },
+    {
+      "from": "src/core/reorganize.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "findEpiclessFeatures"
+      ]
+    },
+    {
+      "from": "src/core/reorganize.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "findItem"
+      ]
+    },
+    {
+      "from": "src/core/reorganize.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isRootLevel",
+        "isContainerLevel",
+        "isWorkItem",
+        "getLevelLabel",
+        "getLevelPlural"
+      ]
+    },
+    {
+      "from": "src/core/reorganize.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/requirements.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/requirements.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "Requirement",
+        "RequirementCategory",
+        "RequirementValidationType"
+      ]
+    },
+    {
+      "from": "src/core/reshape.ts",
+      "to": "src/core/move.ts",
+      "type": "static",
+      "symbols": [
+        "moveItem"
+      ]
+    },
+    {
+      "from": "src/core/reshape.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "removeFromTree",
+        "updateInTree",
+        "insertChild"
+      ]
+    },
+    {
+      "from": "src/core/reshape.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/scope-creep.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/scope-creep.ts",
+      "to": "src/schema/levels.ts",
+      "type": "static",
+      "symbols": [
+        "isContainerLevel"
+      ]
+    },
+    {
+      "from": "src/core/scope-creep.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/stats.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/stats.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "isWorkItem"
+      ]
+    },
+    {
+      "from": "src/core/stats.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/structural.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "src/core/structural.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "isRootLevel",
+        "getContainerLevels"
+      ]
+    },
+    {
+      "from": "src/core/structural.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/sync-engine.ts",
+      "to": "src/core/sync.ts",
+      "type": "static",
+      "symbols": [
+        "detectChangedFields",
+        "isModifiedSinceSync",
+        "resolveConflicts",
+        "stampSynced",
+        "extractSyncMeta",
+        "conflictToLogEntry"
+      ]
+    },
+    {
+      "from": "src/core/sync-engine.ts",
+      "to": "src/core/sync.ts",
+      "type": "type",
+      "symbols": [
+        "ConflictRecord"
+      ]
+    },
+    {
+      "from": "src/core/sync-engine.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/sync-engine.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "src/core/sync-engine.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "src/core/sync.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/sync.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "LogEntry"
+      ]
+    },
+    {
+      "from": "src/core/timestamps.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus",
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "src/core/token-usage.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "LogEntry"
+      ]
+    },
+    {
+      "from": "src/core/transitions.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/core/tree.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY"
       ]
     },
     {
@@ -550,7 +4226,867 @@
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/core/verify.ts",
+      "to": "src/core/keywords.ts",
+      "type": "static",
+      "symbols": [
+        "extractKeywords",
+        "scoreMatch",
+        "STOP_WORDS"
+      ]
+    },
+    {
+      "from": "src/core/verify.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/core/verify.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
         "PRDItem"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeFindingHash",
+        "loadAcknowledged",
+        "saveAcknowledged",
+        "acknowledgeFinding",
+        "isAcknowledged"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "type",
+      "symbols": [
+        "AcknowledgedFinding",
+        "AcknowledgedStore"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/consolidation-guard.ts",
+      "type": "reexport",
+      "symbols": [
+        "countProposalTasks",
+        "buildConsolidationGuardPrompt",
+        "applyConsolidationGuard"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/consolidation-guard.ts",
+      "type": "type",
+      "symbols": [
+        "ConsolidationGuardResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/decompose.ts",
+      "type": "reexport",
+      "symbols": [
+        "applyDecompositionPass",
+        "buildDecompositionPrompt"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/decompose.ts",
+      "type": "type",
+      "symbols": [
+        "DecomposedTask",
+        "DecompositionResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "reexport",
+      "symbols": [
+        "extractFromMarkdown",
+        "extractFromText",
+        "extractFromFile",
+        "classifyHeadingLevels",
+        "isAmbiguousStructure",
+        "maybeDisambiguate"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "type",
+      "symbols": [
+        "ExtractionOptions",
+        "ExtractionResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateFileInput",
+        "validateMarkdownContent",
+        "validateTextContent",
+        "validateJsonContent",
+        "validateYamlContent",
+        "detectMagicBytes",
+        "FileValidationError",
+        "SUPPORTED_EXTENSIONS",
+        "MAX_FILE_SIZE_BYTES",
+        "LARGE_FILE_WARNING_BYTES"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "type",
+      "symbols": [
+        "FileValidationResult",
+        "MarkdownValidationResult",
+        "TextValidationResult",
+        "JsonValidationResult",
+        "YamlValidationResult",
+        "FileValidationErrorCode"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "reexport",
+      "symbols": [
+        "reasonForReshape",
+        "formatReshapeProposal"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/analyze/reshape-reason.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeReasonOptions",
+        "ReshapeReasonResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli/mcp.ts",
+      "type": "reexport",
+      "symbols": [
+        "createRexMcpServer"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/analytics.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeEpicStats",
+        "computePriorityDistribution",
+        "computeRequirementsSummary"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/analytics.ts",
+      "type": "type",
+      "symbols": [
+        "EpicStats",
+        "PriorityDistribution",
+        "RequirementsSummary"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/cascade-reset.ts",
+      "type": "reexport",
+      "symbols": [
+        "cascadeParentReset"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/code-coverage.ts",
+      "type": "reexport",
+      "symbols": [
+        "crossReferenceChanges"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/code-coverage.ts",
+      "type": "type",
+      "symbols": [
+        "AffectedTask",
+        "UncoveredChange",
+        "CrossReferenceResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/delete.ts",
+      "type": "reexport",
+      "symbols": [
+        "deleteItem",
+        "cleanBlockedByRefs"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/facets.ts",
+      "type": "reexport",
+      "symbols": [
+        "isFacetTag",
+        "parseFacetTag",
+        "getFacetValue",
+        "setFacetValue",
+        "removeFacet",
+        "getItemFacets",
+        "getItemsByFacet",
+        "groupByFacet",
+        "suggestFacets",
+        "computeFacetDistribution"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/facets.ts",
+      "type": "type",
+      "symbols": [
+        "FacetConfig",
+        "FacetSuggestion"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/health.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeHealthScore",
+        "formatHealthScore"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/health.ts",
+      "type": "type",
+      "symbols": [
+        "StructureHealthScore",
+        "HealthDimensions",
+        "HealthOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/keywords.ts",
+      "type": "reexport",
+      "symbols": [
+        "extractKeywords",
+        "scoreMatch"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/merge.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/merge.ts",
+      "type": "type",
+      "symbols": [
+        "MergeOptions",
+        "MergeValidation",
+        "MergePreview",
+        "MergeResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/next-task.ts",
+      "type": "reexport",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "extractTaskKeywords",
+        "matchTasksByKeywords",
+        "requirementsScore"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/next-task.ts",
+      "type": "type",
+      "symbols": [
+        "TaskMatch",
+        "PrioritizationOptions",
+        "RiskTolerance"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/parent-completion.ts",
+      "type": "reexport",
+      "symbols": [
+        "findAutoCompletions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/parent-reset.ts",
+      "type": "reexport",
+      "symbols": [
+        "findParentResets"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/prune.ts",
+      "type": "reexport",
+      "symbols": [
+        "countSubtree",
+        "isFullyCompleted",
+        "findPrunableItems",
+        "pruneItems"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/prune.ts",
+      "type": "type",
+      "symbols": [
+        "PruneResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-epic.ts",
+      "type": "reexport",
+      "symbols": [
+        "removeEpic"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-epic.ts",
+      "type": "type",
+      "symbols": [
+        "RemoveEpicResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-feature.ts",
+      "type": "reexport",
+      "symbols": [
+        "preCheckFeatureDeletion",
+        "removeFeature"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-feature.ts",
+      "type": "type",
+      "symbols": [
+        "DeletionPreCheck",
+        "RemoveFeatureResult",
+        "ExternalDependent",
+        "SyncedItem"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-task.ts",
+      "type": "reexport",
+      "symbols": [
+        "removeTask"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/remove-task.ts",
+      "type": "type",
+      "symbols": [
+        "RemoveTaskResult",
+        "ParentAutoCompletion"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reorganize-executor.ts",
+      "type": "reexport",
+      "symbols": [
+        "applyProposals",
+        "formatApplyResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reorganize-executor.ts",
+      "type": "type",
+      "symbols": [
+        "ApplyResult",
+        "ProposalResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "reexport",
+      "symbols": [
+        "detectReorganizations",
+        "formatReorganizationPlan"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalType",
+        "RiskLevel",
+        "ReorganizationProposal",
+        "ReorganizationPlan",
+        "ProposalDetail",
+        "MergeDetail",
+        "MoveDetail",
+        "SplitDetail",
+        "DeleteDetail",
+        "PruneDetail",
+        "CollapseDetail",
+        "DetectorOptions"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/requirements.ts",
+      "type": "reexport",
+      "symbols": [
+        "collectRequirements",
+        "collectRequirementsByCategory",
+        "collectRequirementsByValidationType",
+        "validateRequirements",
+        "validateAutomatedRequirements",
+        "formatRequirementsValidation",
+        "buildTraceabilityMatrix"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/requirements.ts",
+      "type": "type",
+      "symbols": [
+        "TracedRequirement",
+        "RequirementValidationResult",
+        "RequirementsValidationSummary",
+        "CommandExecutor"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reshape.ts",
+      "type": "reexport",
+      "symbols": [
+        "applyReshape"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/reshape.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal",
+        "ReshapeAction",
+        "ReshapeResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/scope-creep.ts",
+      "type": "reexport",
+      "symbols": [
+        "detectScopeCreep",
+        "setInitialChildCount"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/scope-creep.ts",
+      "type": "type",
+      "symbols": [
+        "ScopeCreepResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/stats.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/stats.ts",
+      "type": "type",
+      "symbols": [
+        "TreeStats"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/timestamps.ts",
+      "type": "reexport",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/tree.ts",
+      "type": "reexport",
+      "symbols": [
+        "findItem",
+        "walkTree",
+        "collectAllIds",
+        "insertChild",
+        "updateInTree",
+        "removeFromTree"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/core/tree.ts",
+      "type": "type",
+      "symbols": [
+        "TreeEntry"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/recommend/create-from-recommendations.ts",
+      "type": "reexport",
+      "symbols": [
+        "createItemsFromRecommendations"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/recommend/create-from-recommendations.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "CreationResult",
+        "SkippedRecommendation",
+        "ReparentedRecommendation"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/schema/levels.ts",
+      "type": "reexport",
+      "symbols": [
+        "isRootLevel",
+        "isWorkItem",
+        "isContainerLevel",
+        "isLeafLevel",
+        "isValidLevel",
+        "getLevelLabel",
+        "getLevelPlural",
+        "getLevelEmoji",
+        "getLevelDisplayMap",
+        "getChildLevel",
+        "getParentLevels",
+        "getAllLevels",
+        "getWorkItemLevels",
+        "getContainerLevels",
+        "formatLevelSummary",
+        "setLevelDisplay",
+        "resetLevelDisplay"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/schema/levels.ts",
+      "type": "type",
+      "symbols": [
+        "LevelDisplay"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/schema/v1.ts",
+      "type": "reexport",
+      "symbols": [
+        "PRIORITY_ORDER",
+        "LEVEL_HIERARCHY",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES",
+        "CHILD_LEVEL",
+        "LOE_DEFAULTS",
+        "isPriority",
+        "isItemLevel",
+        "isItemStatus",
+        "isRequirementCategory",
+        "isValidationType",
+        "DEFAULT_CONFIG"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument",
+        "ItemLevel",
+        "ItemStatus",
+        "Priority",
+        "RexConfig",
+        "RequirementCategory",
+        "RequirementValidationType",
+        "Requirement",
+        "FacetDefinition",
+        "LoEConfig"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "reexport",
+      "symbols": [
+        "validateField",
+        "validateConfig",
+        "registerIntegrationSchema",
+        "getIntegrationSchema",
+        "listIntegrationSchemas",
+        "toAdapterConfigSchema"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "type",
+      "symbols": [
+        "FieldInputType",
+        "FieldValidationRule",
+        "FieldSelectOption",
+        "IntegrationFieldSchema",
+        "IntegrationSchema",
+        "IntegrationFieldGroup",
+        "FieldValidationResult"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/integration-schemas/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "registerBuiltInSchemas",
+        "ensureSchemas"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/integration-schemas/jira.ts",
+      "type": "reexport",
+      "symbols": [
+        "jiraIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/store/integration-schemas/notion.ts",
+      "type": "reexport",
+      "symbols": [
+        "notionIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/recommend/conflict-detection.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity"
+      ]
+    },
+    {
+      "from": "src/recommend/conflict-detection.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/recommend/conflict-detection.ts",
+      "to": "src/recommend/types.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation"
+      ]
+    },
+    {
+      "from": "src/recommend/conflict-detection.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/core/dag.ts",
+      "type": "static",
+      "symbols": [
+        "validateDAG"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "insertChild"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "detectRecommendationConflicts"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/recommend/conflict-detection.ts",
+      "type": "type",
+      "symbols": [
+        "ConflictReport"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/recommend/types.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation",
+        "RecommendationMeta",
+        "ConflictStrategy"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL",
+        "isLeafLevel",
+        "getLevelLabel"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/recommend/create-from-recommendations.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "src/recommend/types.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel",
+        "Priority"
+      ]
+    },
+    {
+      "from": "src/schema/index.ts",
+      "to": "src/schema/levels.ts",
+      "type": "reexport",
+      "symbols": [
+        "isRootLevel",
+        "isWorkItem",
+        "isContainerLevel",
+        "isLeafLevel",
+        "isValidLevel",
+        "getLevelLabel",
+        "getLevelPlural",
+        "getLevelEmoji",
+        "getLevelDisplayMap",
+        "getChildLevel",
+        "getParentLevels",
+        "getAllLevels",
+        "getWorkItemLevels",
+        "getContainerLevels",
+        "formatLevelSummary",
+        "setLevelDisplay",
+        "resetLevelDisplay"
+      ]
+    },
+    {
+      "from": "src/schema/index.ts",
+      "to": "src/schema/levels.ts",
+      "type": "type",
+      "symbols": [
+        "LevelDisplay"
       ]
     },
     {
@@ -560,29 +5096,124 @@
       "symbols": [
         "SCHEMA_VERSION",
         "LEVEL_HIERARCHY",
-        "DEFAULT_CONFIG",
-        "ItemLevel",
-        "ItemStatus",
-        "Priority",
-        "PRDItem",
-        "PRDDocument",
-        "RexConfig",
-        "LogEntry"
+        "PRIORITY_ORDER",
+        "VALID_LEVELS",
+        "VALID_STATUSES",
+        "VALID_PRIORITIES",
+        "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES",
+        "CHILD_LEVEL",
+        "LOE_DEFAULTS",
+        "isPriority",
+        "isItemLevel",
+        "isItemStatus",
+        "isRequirementCategory",
+        "isValidationType",
+        "DEFAULT_CONFIG"
       ]
     },
     {
       "from": "src/schema/index.ts",
-      "to": "src/schema/validate.ts",
-      "type": "reexport",
+      "to": "src/schema/v1.ts",
+      "type": "type",
       "symbols": [
-        "PRDItemSchema",
-        "PRDDocumentSchema",
-        "RexConfigSchema",
-        "LogEntrySchema",
-        "validateDocument",
-        "validateConfig",
-        "validateLogEntry",
-        "ValidationResult"
+        "ItemLevel",
+        "ItemStatus",
+        "Priority",
+        "RequirementCategory",
+        "RequirementValidationType",
+        "Requirement",
+        "DuplicateOverrideMarker",
+        "MergedProposalRecord",
+        "PRDItem",
+        "PRDDocument",
+        "RexConfig",
+        "FacetDefinition",
+        "BudgetThresholds",
+        "LoEConfig",
+        "LogEntry",
+        "TokenUsage",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "src/schema/levels.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL"
+      ]
+    },
+    {
+      "from": "src/schema/levels.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel"
+      ]
+    },
+    {
+      "from": "src/schema/validate.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "VALID_STATUSES",
+        "VALID_LEVELS",
+        "VALID_PRIORITIES",
+        "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES"
+      ]
+    },
+    {
+      "from": "src/store/adapter-registry.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "src/store/adapter-registry.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "src/store/adapter-registry.ts",
+      "to": "src/store/file-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "FileStore"
+      ]
+    },
+    {
+      "from": "src/store/adapter-registry.ts",
+      "to": "src/store/notion-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "NotionStore"
+      ]
+    },
+    {
+      "from": "src/store/adapter-registry.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "static",
+      "symbols": [
+        "LiveNotionClient"
+      ]
+    },
+    {
+      "from": "src/store/contracts.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem",
+        "RexConfig",
+        "LogEntry"
       ]
     },
     {
@@ -607,16 +5238,6 @@
     {
       "from": "src/store/file-adapter.ts",
       "to": "src/schema/index.ts",
-      "type": "static",
-      "symbols": [
-        "validateDocument",
-        "validateConfig",
-        "validateLogEntry"
-      ]
-    },
-    {
-      "from": "src/store/file-adapter.ts",
-      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDDocument",
@@ -627,7 +5248,84 @@
     },
     {
       "from": "src/store/file-adapter.ts",
-      "to": "src/store/types.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument",
+        "validateConfig",
+        "validateLogEntry"
+      ]
+    },
+    {
+      "from": "src/store/file-adapter.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
+      ]
+    },
+    {
+      "from": "src/store/file-adapter.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadProjectOverrides",
+        "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/core/sync-engine.ts",
+      "type": "reexport",
+      "symbols": [
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/core/sync-engine.ts",
+      "type": "type",
+      "symbols": [
+        "SyncDirection",
+        "SyncReport",
+        "SyncOptions"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "reexport",
+      "symbols": [
+        "AdapterRegistry",
+        "getDefaultRegistry",
+        "resetDefaultRegistry",
+        "isRedactedField"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "static",
+      "symbols": [
+        "getDefaultRegistry"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
+        "AdapterDefinition",
+        "AdapterFactory",
+        "AdapterConfig",
+        "AdapterConfigField",
+        "AdapterInfo"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/contracts.ts",
       "type": "type",
       "symbols": [
         "PRDStore",
@@ -653,23 +5351,217 @@
     },
     {
       "from": "src/store/index.ts",
-      "to": "src/store/types.ts",
+      "to": "src/store/integration-schema.ts",
       "type": "reexport",
       "symbols": [
-        "PRDStore",
-        "StoreCapabilities"
+        "validateField",
+        "validateConfig",
+        "registerIntegrationSchema",
+        "getIntegrationSchema",
+        "listIntegrationSchemas",
+        "resetIntegrationSchemas",
+        "toAdapterConfigSchema"
       ]
     },
     {
       "from": "src/store/index.ts",
-      "to": "src/store/types.ts",
+      "to": "src/store/integration-schema.ts",
       "type": "type",
       "symbols": [
-        "PRDStore"
+        "FieldInputType",
+        "FieldValidationRule",
+        "FieldSelectOption",
+        "IntegrationFieldSchema",
+        "IntegrationSchema",
+        "IntegrationFieldGroup",
+        "FieldValidationResult"
       ]
     },
     {
-      "from": "src/store/types.ts",
+      "from": "src/store/index.ts",
+      "to": "src/store/integration-schemas/index.ts",
+      "type": "reexport",
+      "symbols": [
+        "registerBuiltInSchemas",
+        "ensureSchemas"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/integration-schemas/jira.ts",
+      "type": "reexport",
+      "symbols": [
+        "jiraIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/integration-schemas/notion.ts",
+      "type": "reexport",
+      "symbols": [
+        "notionIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/notion-adapter.ts",
+      "type": "reexport",
+      "symbols": [
+        "NotionStore",
+        "ensureNotionRexDir"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/notion-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "NotionStore"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "reexport",
+      "symbols": [
+        "LiveNotionClient"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "static",
+      "symbols": [
+        "LiveNotionClient"
+      ]
+    },
+    {
+      "from": "src/store/index.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "type",
+      "symbols": [
+        "NotionClient",
+        "NotionAdapterConfig"
+      ]
+    },
+    {
+      "from": "src/store/integration-schema.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
+        "AdapterConfigField"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/index.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "static",
+      "symbols": [
+        "registerIntegrationSchema",
+        "listIntegrationSchemas"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/index.ts",
+      "to": "src/store/integration-schemas/jira.ts",
+      "type": "reexport",
+      "symbols": [
+        "jiraIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/index.ts",
+      "to": "src/store/integration-schemas/jira.ts",
+      "type": "static",
+      "symbols": [
+        "jiraIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/index.ts",
+      "to": "src/store/integration-schemas/notion.ts",
+      "type": "reexport",
+      "symbols": [
+        "notionIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/index.ts",
+      "to": "src/store/integration-schemas/notion.ts",
+      "type": "static",
+      "symbols": [
+        "notionIntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/jira.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "type",
+      "symbols": [
+        "IntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/integration-schemas/notion.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "type",
+      "symbols": [
+        "IntegrationSchema"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/core/notion-map.ts",
+      "type": "static",
+      "symbols": [
+        "mapItemToNotion",
+        "mapNotionToItem",
+        "mapNotionToDocument",
+        "resolveParentPage",
+        "buildStatusGroupMap",
+        "validateDatabaseSchema"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/core/notion-map.ts",
+      "type": "type",
+      "symbols": [
+        "NotionStatusGroup"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/core/sync.ts",
+      "type": "static",
+      "symbols": [
+        "stampModified",
+        "stampSynced",
+        "extractSyncMeta"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem",
+        "insertChild",
+        "updateInTree",
+        "removeFromTree",
+        "walkTree"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
       "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -677,6 +5569,234 @@
         "PRDItem",
         "RexConfig",
         "LogEntry"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument",
+        "validateConfig",
+        "validateLogEntry"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "type",
+      "symbols": [
+        "NotionClient",
+        "NotionAdapterConfig"
+      ]
+    },
+    {
+      "from": "src/store/notion-adapter.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadProjectOverrides",
+        "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "tests/e2e/cli-init.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "DEFAULT_CONFIG"
+      ]
+    },
+    {
+      "from": "tests/e2e/cli-init.test.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "RexConfigSchema",
+        "PRDDocumentSchema"
+      ]
+    },
+    {
+      "from": "tests/integration/claude-config.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "setClaudeConfig",
+        "setClaudeClient",
+        "getAuthMode"
+      ]
+    },
+    {
+      "from": "tests/integration/claude-config.test.ts",
+      "to": "src/store/project-config.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfig",
+        "resolveCliPath",
+        "resolveApiKey"
+      ]
+    },
+    {
+      "from": "tests/integration/claude-config.test.ts",
+      "to": "src/store/project-config.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig"
+      ]
+    },
+    {
+      "from": "tests/integration/project-config.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/integration/project-config.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/integration/project-config.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "createStore",
+        "ensureRexDir"
+      ]
+    },
+    {
+      "from": "tests/integration/project-config.test.ts",
+      "to": "src/store/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/cli/commands/init.ts",
+      "type": "static",
+      "symbols": [
+        "cmdInit"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "cmdSmartAdd"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-duplicate-outcomes.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/cli/commands/init.ts",
+      "type": "static",
+      "symbols": [
+        "cmdInit"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "cmdSmartAdd"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/cli/commands/validate.ts",
+      "type": "static",
+      "symbols": [
+        "cmdValidate"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/integration/smart-add-orphaned-parent.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
       ]
     },
     {
@@ -722,6 +5842,284 @@
       ]
     },
     {
+      "from": "tests/unit/analyze/acknowledge.test.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "static",
+      "symbols": [
+        "computeFindingHash",
+        "loadAcknowledged",
+        "saveAcknowledged",
+        "acknowledgeFinding",
+        "isAcknowledged"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/consolidation-guard.test.ts",
+      "to": "src/analyze/consolidation-guard.ts",
+      "type": "static",
+      "symbols": [
+        "countProposalTasks",
+        "buildConsolidationGuardPrompt",
+        "applyConsolidationGuard"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/consolidation-guard.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/consolidation-guard.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/consolidation-guard.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "LoEConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/decompose.test.ts",
+      "to": "src/analyze/decompose.ts",
+      "type": "static",
+      "symbols": [
+        "buildDecompositionPrompt",
+        "parseDecompositionResponse",
+        "applyDecompositionPass"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/decompose.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalTask",
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/decompose.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/dedupe.test.ts",
+      "to": "src/analyze/dedupe.ts",
+      "type": "static",
+      "symbols": [
+        "similarity",
+        "deduplicateScanResults"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/dedupe.test.ts",
+      "to": "src/analyze/scanners.ts",
+      "type": "type",
+      "symbols": [
+        "ScanResult"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/diff.test.ts",
+      "to": "src/analyze/diff.ts",
+      "type": "static",
+      "symbols": [
+        "formatDiff"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/diff.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/diff.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-llm-mock.test.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "static",
+      "symbols": [
+        "maybeDisambiguate",
+        "extractFromText"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-llm-mock.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-llm.test.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "static",
+      "symbols": [
+        "isAmbiguousStructure",
+        "maybeDisambiguate",
+        "extractFromText",
+        "extractFromMarkdown"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-llm.test.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "type",
+      "symbols": [
+        "ExtractionResult"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-llm.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-text.test.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "static",
+      "symbols": [
+        "extractFromText",
+        "classifyHeadingLevels",
+        "isAllCapsHeader",
+        "isRequirementSentence",
+        "extractRequirementSentences",
+        "parseNumberedSection",
+        "extractPriorityTag"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract-text.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract.test.ts",
+      "to": "src/analyze/extract.ts",
+      "type": "static",
+      "symbols": [
+        "extractFromMarkdown",
+        "extractFromText",
+        "classifyHeadingLevels"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/extract.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/file-validation.test.ts",
+      "to": "src/analyze/file-validation.ts",
+      "type": "static",
+      "symbols": [
+        "validateFileInput",
+        "validateMarkdownContent",
+        "validateTextContent",
+        "validateJsonContent",
+        "validateYamlContent",
+        "detectMagicBytes",
+        "FileValidationError",
+        "SUPPORTED_EXTENSIONS",
+        "MAX_FILE_SIZE_BYTES",
+        "LARGE_FILE_WARNING_BYTES"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/guided.test.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "static",
+      "symbols": [
+        "clarify",
+        "generateSpecFromContext"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/guided.test.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "type",
+      "symbols": [
+        "GuidedContext"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/guided.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "spawnClaude"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/loe-proposal-schema.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/loe-proposal-schema.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "parseProposalResponse",
+        "buildAddPrompt",
+        "PRD_SCHEMA",
+        "FEW_SHOT_EXAMPLE",
+        "CONSOLIDATION_INSTRUCTION"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/modify-reason.test.ts",
+      "to": "src/analyze/modify-reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/modify-reason.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
       "from": "tests/unit/analyze/propose.test.ts",
       "to": "src/analyze/propose.ts",
       "type": "static",
@@ -735,6 +6133,126 @@
       "type": "type",
       "symbols": [
         "ScanResult"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-assessment.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-assessment.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildAssessmentPrompt",
+        "parseAssessmentResponse",
+        "formatAssessment"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-assessment.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "GranularityAssessment"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-batch.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-batch.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "type",
+      "symbols": [
+        "BatchImportItem",
+        "BatchImportResult"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-description.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "parseProposalResponse",
+        "buildAddPrompt"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-granularity.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-granularity.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-ideas.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildIdeasPrompt",
+        "reasonFromIdeasFile"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason-multi-description.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "buildMultiAddPrompt",
+        "reasonFromDescriptions"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/reason.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "DEFAULT_MODEL",
+        "MAX_RETRIES",
+        "FEW_SHOT_EXAMPLE",
+        "parseProposalResponse",
+        "extractJson",
+        "repairTruncatedJson",
+        "validateProposalQuality",
+        "detectFileFormat",
+        "parseStructuredFile",
+        "mergeProposals",
+        "reasonFromFiles",
+        "readProjectContext",
+        "chunkScanResults",
+        "summarizeScanResults",
+        "estimateItemSize",
+        "groupScanResults",
+        "CHUNK_CHAR_LIMIT",
+        "CHUNK_ITEM_LIMIT"
       ]
     },
     {
@@ -762,13 +6280,737 @@
       ]
     },
     {
+      "from": "tests/unit/analyze/scanners-acknowledge.test.ts",
+      "to": "src/analyze/acknowledge.ts",
+      "type": "static",
+      "symbols": [
+        "computeFindingHash",
+        "acknowledgeFinding",
+        "saveAcknowledged"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/scanners-acknowledge.test.ts",
+      "to": "src/analyze/scanners.ts",
+      "type": "static",
+      "symbols": [
+        "scanSourceVision"
+      ]
+    },
+    {
       "from": "tests/unit/analyze/scanners.test.ts",
       "to": "src/analyze/scanners.ts",
       "type": "static",
       "symbols": [
         "scanTests",
         "scanDocs",
-        "scanSourceVision"
+        "scanSourceVision",
+        "scanPackageJson"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/token-tracking.test.ts",
+      "to": "src/analyze/reason.ts",
+      "type": "static",
+      "symbols": [
+        "parseTokenUsage",
+        "emptyAnalyzeTokenUsage",
+        "accumulateTokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/token-tracking.test.ts",
+      "to": "src/cli/commands/analyze.ts",
+      "type": "static",
+      "symbols": [
+        "formatTokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/token-tracking.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsage",
+        "AnalyzeTokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/validate-modification.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/analyze/validate-modification.test.ts",
+      "to": "src/analyze/validate-modification.ts",
+      "type": "static",
+      "symbols": [
+        "validateModificationRequest",
+        "classifyModificationRequest"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/add.test.ts",
+      "to": "src/cli/commands/add.ts",
+      "type": "static",
+      "symbols": [
+        "cmdAdd"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/add.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/analyze-guided.test.ts",
+      "to": "src/analyze/guided.ts",
+      "type": "static",
+      "symbols": [
+        "runGuidedSpec"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/analyze-guided.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/analyze-guided.test.ts",
+      "to": "src/cli/commands/analyze.ts",
+      "type": "static",
+      "symbols": [
+        "cmdAnalyze"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "static",
+      "symbols": [
+        "createReviewState",
+        "getCurrentChunk",
+        "formatPaginationHeader",
+        "formatChunk",
+        "formatActionMenu",
+        "buildPrompt",
+        "parseChunkInput",
+        "applyAction",
+        "getAcceptedProposals",
+        "getRemainingProposals",
+        "replaceProposals",
+        "buildBatchRecord",
+        "formatBatchSummary"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/chunked-review.test.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "type",
+      "symbols": [
+        "ChunkReviewState",
+        "ChunkAction",
+        "BatchAcceptanceRecord",
+        "GranularityRequest",
+        "GranularityAdjustmentRecord",
+        "ProposalAssessment"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/decomposition-review.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask",
+        "TaskDecomposition"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/decomposition-review.test.ts",
+      "to": "src/cli/commands/decomposition-review.ts",
+      "type": "static",
+      "symbols": [
+        "formatDecomposedTask",
+        "formatProposalsWithDecomposition",
+        "countDecomposedTasks",
+        "applyDecompositionChoice",
+        "resolveDecompositions",
+        "autoResolveDecompositions",
+        "parseDecompositionInput",
+        "formatDecompositionSummary"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/fix.test.ts",
+      "to": "src/cli/commands/fix.ts",
+      "type": "static",
+      "symbols": [
+        "cmdFix"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/fix.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/format-loe.test.ts",
+      "to": "src/analyze/propose.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/format-loe.test.ts",
+      "to": "src/cli/commands/format-loe.ts",
+      "type": "static",
+      "symbols": [
+        "formatTaskLoE",
+        "formatTaskLoERationale"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/loe-display.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "ProposalTask"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/loe-display.test.ts",
+      "to": "src/cli/commands/chunked-review-state.ts",
+      "type": "static",
+      "symbols": [
+        "createReviewState",
+        "formatChunk"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/loe-display.test.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "formatProposalTree"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/move.test.ts",
+      "to": "src/cli/commands/move.ts",
+      "type": "static",
+      "symbols": [
+        "cmdMove"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/move.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/recommend.test.ts",
+      "to": "src/cli/commands/recommend.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/recommend.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/remove.test.ts",
+      "to": "src/cli/commands/remove.ts",
+      "type": "static",
+      "symbols": [
+        "cmdRemove"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/remove.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/report.test.ts",
+      "to": "src/cli/commands/report.ts",
+      "type": "static",
+      "symbols": [
+        "cmdReport"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/report.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-duplicates.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-duplicates.test.ts",
+      "to": "src/cli/commands/smart-add-duplicates.ts",
+      "type": "static",
+      "symbols": [
+        "buildDuplicateOverrideMarker",
+        "buildDuplicateOverrideMarkerIndex",
+        "buildDuplicateReasonMetadata",
+        "attachDuplicateReasonsToProposals",
+        "matchProposalNodeToPRD",
+        "matchProposalNodesToPRD"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-duplicates.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/cli/commands/constants.ts",
+      "type": "static",
+      "symbols": [
+        "REX_DIR"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/cli/commands/init.ts",
+      "type": "static",
+      "symbols": [
+        "cmdInit"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/cli/commands/smart-add-duplicates.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalDuplicateMatch"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "applyDuplicateProposalMerges"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add-merge.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add.test.ts",
+      "to": "src/analyze/index.ts",
+      "type": "type",
+      "symbols": [
+        "Proposal",
+        "QualityIssue"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add.test.ts",
+      "to": "src/cli/commands/smart-add-duplicates.ts",
+      "type": "type",
+      "symbols": [
+        "ProposalDuplicateMatch"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/smart-add.test.ts",
+      "to": "src/cli/commands/smart-add.ts",
+      "type": "static",
+      "symbols": [
+        "formatProposalTree",
+        "formatProposalSummary",
+        "countProposalItems",
+        "filterProposalsByIndex",
+        "parseApprovalInput",
+        "parseDuplicatePromptInput",
+        "parseGranularityInput",
+        "remapDuplicateMatchesForSelectedProposals",
+        "formatQualityWarnings",
+        "classifySmartAddError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/status.test.ts",
+      "to": "src/cli/commands/status.ts",
+      "type": "static",
+      "symbols": [
+        "cmdStatus",
+        "renderProgressBar",
+        "formatTimestamp",
+        "renderTree",
+        "filterCompleted",
+        "filterDeleted",
+        "formatStats"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/status.test.ts",
+      "to": "src/cli/commands/status.ts",
+      "type": "type",
+      "symbols": [
+        "CoverageMap"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/status.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/status.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/sync.test.ts",
+      "to": "src/cli/commands/sync.ts",
+      "type": "static",
+      "symbols": [
+        "cmdSync"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/sync.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/sync.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/sync.test.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "static",
+      "symbols": [
+        "getDefaultRegistry",
+        "resetDefaultRegistry"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/sync.test.ts",
+      "to": "src/store/file-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "FileStore"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/update.test.ts",
+      "to": "src/cli/commands/update.ts",
+      "type": "static",
+      "symbols": [
+        "cmdUpdate"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/update.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/update.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/usage.test.ts",
+      "to": "src/cli/commands/usage.ts",
+      "type": "static",
+      "symbols": [
+        "cmdUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/usage.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "RexConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-epicless.test.ts",
+      "to": "src/cli/commands/validate.ts",
+      "type": "static",
+      "symbols": [
+        "cmdValidate"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-epicless.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-interactive.test.ts",
+      "to": "src/cli/commands/validate-interactive.ts",
+      "type": "static",
+      "symbols": [
+        "resolveEpiclessFeatures",
+        "applyEpiclessResolutions"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-interactive.test.ts",
+      "to": "src/cli/commands/validate-interactive.ts",
+      "type": "type",
+      "symbols": [
+        "EpiclessResolution",
+        "PromptFn"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-interactive.test.ts",
+      "to": "src/core/structural.ts",
+      "type": "type",
+      "symbols": [
+        "EpiclessFeature"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate-interactive.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate.test.ts",
+      "to": "src/cli/commands/validate.ts",
+      "type": "static",
+      "symbols": [
+        "cmdValidate"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/validate.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/verify.test.ts",
+      "to": "src/cli/commands/verify.ts",
+      "type": "static",
+      "symbols": [
+        "cmdVerify"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/verify.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/verify.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/commands/verify.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "RexConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/errors.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError",
+        "BudgetExceededError",
+        "formatCLIError",
+        "handleCLIError",
+        "requireRexDir"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/help.test.ts",
+      "to": "src/cli/help.ts",
+      "type": "static",
+      "symbols": [
+        "showCommandHelp"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/cli/mcp.ts",
+      "type": "static",
+      "symbols": [
+        "createRexMcpServer",
+        "startMcpServer"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/public.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "ensureRexDir"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/output.test.ts",
+      "to": "src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "warn",
+        "result",
+        "startSpinner"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/validate-input.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/cli/validate-input.test.ts",
+      "to": "src/cli/validate-input.ts",
+      "type": "static",
+      "symbols": [
+        "parseIntSafe",
+        "validateLevel",
+        "requireParent",
+        "validateFormat",
+        "requireUpdates"
       ]
     },
     {
@@ -805,12 +7047,244 @@
       ]
     },
     {
+      "from": "tests/unit/core/epic-correlation.test.ts",
+      "to": "src/core/epic-correlation.ts",
+      "type": "static",
+      "symbols": [
+        "computeTagOverlap",
+        "computeCorrelationSignals",
+        "computeCombinedScore",
+        "rankEpicsForFeature",
+        "correlateEpiclessFeatures",
+        "formatScore"
+      ]
+    },
+    {
+      "from": "tests/unit/core/epic-correlation.test.ts",
+      "to": "src/core/structural.ts",
+      "type": "type",
+      "symbols": [
+        "EpiclessFeature"
+      ]
+    },
+    {
+      "from": "tests/unit/core/epic-correlation.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/epicless.test.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "findEpiclessFeatures"
+      ]
+    },
+    {
+      "from": "tests/unit/core/epicless.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/facets.test.ts",
+      "to": "src/core/facets.ts",
+      "type": "static",
+      "symbols": [
+        "isFacetTag",
+        "parseFacetTag",
+        "getFacetValue",
+        "setFacetValue",
+        "removeFacet",
+        "getItemFacets",
+        "getItemsByFacet",
+        "groupByFacet",
+        "suggestFacets",
+        "computeFacetDistribution"
+      ]
+    },
+    {
+      "from": "tests/unit/core/facets.test.ts",
+      "to": "src/core/facets.ts",
+      "type": "type",
+      "symbols": [
+        "FacetConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/core/facets.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/feature-filtered-task.test.ts",
+      "to": "src/core/next-task.ts",
+      "type": "static",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks"
+      ]
+    },
+    {
+      "from": "tests/unit/core/feature-filtered-task.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/fix.test.ts",
+      "to": "src/core/fix.ts",
+      "type": "static",
+      "symbols": [
+        "detectTimestampIssues",
+        "detectOrphanBlockedBy",
+        "detectParentChildMisalignment",
+        "detectIssues",
+        "applyFixes"
+      ]
+    },
+    {
+      "from": "tests/unit/core/fix.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/health.test.ts",
+      "to": "src/core/health.ts",
+      "type": "static",
+      "symbols": [
+        "computeHealthScore",
+        "formatHealthScore"
+      ]
+    },
+    {
+      "from": "tests/unit/core/health.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/keywords.test.ts",
+      "to": "src/core/keywords.ts",
+      "type": "static",
+      "symbols": [
+        "extractKeywords",
+        "scoreMatch",
+        "STOP_WORDS"
+      ]
+    },
+    {
+      "from": "tests/unit/core/merge.test.ts",
+      "to": "src/core/merge.ts",
+      "type": "static",
+      "symbols": [
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "tests/unit/core/merge.test.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "findItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/merge.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/move.test.ts",
+      "to": "src/cli/errors.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
+      ]
+    },
+    {
+      "from": "tests/unit/core/move.test.ts",
+      "to": "src/core/move.ts",
+      "type": "static",
+      "symbols": [
+        "validateMove",
+        "moveItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/move.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/next-task-matching.test.ts",
+      "to": "src/core/next-task.ts",
+      "type": "static",
+      "symbols": [
+        "extractTaskKeywords",
+        "matchTasksByKeywords"
+      ]
+    },
+    {
+      "from": "tests/unit/core/next-task-matching.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/next-task-scoring.test.ts",
+      "to": "src/core/next-task.ts",
+      "type": "static",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "siblingCompletionRatio",
+        "countDependents"
+      ]
+    },
+    {
+      "from": "tests/unit/core/next-task-scoring.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
       "from": "tests/unit/core/next-task.test.ts",
       "to": "src/core/next-task.ts",
       "type": "static",
       "symbols": [
         "findNextTask",
-        "collectCompletedIds"
+        "findActionableTasks",
+        "collectCompletedIds",
+        "explainSelection"
       ]
     },
     {
@@ -819,6 +7293,475 @@
       "type": "type",
       "symbols": [
         "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/notion-map.test.ts",
+      "to": "src/core/notion-map.ts",
+      "type": "static",
+      "symbols": [
+        "mapItemToNotion",
+        "mapNotionToItem",
+        "mapDocumentToNotion",
+        "mapNotionToDocument",
+        "resolveParentPage",
+        "resolveStatusFromNotion",
+        "validateDatabaseSchema",
+        "buildStatusGroupMap",
+        "NOTION_LEVEL_CONFIG",
+        "STATUS_OPTIONS",
+        "PRIORITY_OPTIONS",
+        "DATABASE_SCHEMA"
+      ]
+    },
+    {
+      "from": "tests/unit/core/notion-map.test.ts",
+      "to": "src/core/notion-map.ts",
+      "type": "type",
+      "symbols": [
+        "NotionStatusGroup"
+      ]
+    },
+    {
+      "from": "tests/unit/core/notion-map.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/core/parent-completion.test.ts",
+      "to": "src/core/parent-completion.ts",
+      "type": "static",
+      "symbols": [
+        "findAutoCompletions"
+      ]
+    },
+    {
+      "from": "tests/unit/core/parent-completion.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/parent-reset.test.ts",
+      "to": "src/core/parent-reset.ts",
+      "type": "static",
+      "symbols": [
+        "findParentResets"
+      ]
+    },
+    {
+      "from": "tests/unit/core/parent-reset.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/prune.test.ts",
+      "to": "src/core/prune.ts",
+      "type": "static",
+      "symbols": [
+        "isFullyCompleted",
+        "findPrunableItems",
+        "pruneItems",
+        "countSubtree"
+      ]
+    },
+    {
+      "from": "tests/unit/core/prune.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-epic.test.ts",
+      "to": "src/core/remove-epic.ts",
+      "type": "static",
+      "symbols": [
+        "removeEpic"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-epic.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-feature.test.ts",
+      "to": "src/core/remove-feature.ts",
+      "type": "static",
+      "symbols": [
+        "preCheckFeatureDeletion",
+        "removeFeature"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-feature.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-task.test.ts",
+      "to": "src/core/remove-task.ts",
+      "type": "static",
+      "symbols": [
+        "removeTask"
+      ]
+    },
+    {
+      "from": "tests/unit/core/remove-task.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize-executor.test.ts",
+      "to": "src/core/reorganize-executor.ts",
+      "type": "static",
+      "symbols": [
+        "applyProposals",
+        "formatApplyResult"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize-executor.test.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "type",
+      "symbols": [
+        "ReorganizationProposal"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize-executor.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize.test.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "static",
+      "symbols": [
+        "detectReorganizations",
+        "formatReorganizationPlan"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize.test.ts",
+      "to": "src/core/reorganize.ts",
+      "type": "type",
+      "symbols": [
+        "ReorganizationPlan",
+        "MergeDetail",
+        "MoveDetail",
+        "CollapseDetail"
+      ]
+    },
+    {
+      "from": "tests/unit/core/reorganize.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements-prioritization.test.ts",
+      "to": "src/core/next-task.ts",
+      "type": "static",
+      "symbols": [
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "requirementsScore"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements-prioritization.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "Requirement"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements.test.ts",
+      "to": "src/core/requirements.ts",
+      "type": "static",
+      "symbols": [
+        "collectRequirements",
+        "collectRequirementsByCategory",
+        "collectRequirementsByValidationType",
+        "validateRequirements",
+        "validateAutomatedRequirements",
+        "formatRequirementsValidation",
+        "buildTraceabilityMatrix"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements.test.ts",
+      "to": "src/core/requirements.ts",
+      "type": "type",
+      "symbols": [
+        "CommandExecutor"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements.test.ts",
+      "to": "src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "Requirement"
+      ]
+    },
+    {
+      "from": "tests/unit/core/requirements.test.ts",
+      "to": "src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/core/structural.test.ts",
+      "to": "src/core/structural.ts",
+      "type": "static",
+      "symbols": [
+        "validateStructure"
+      ]
+    },
+    {
+      "from": "tests/unit/core/structural.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync-engine.test.ts",
+      "to": "src/core/sync-engine.ts",
+      "type": "static",
+      "symbols": [
+        "SyncEngine"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync-engine.test.ts",
+      "to": "src/core/sync-engine.ts",
+      "type": "type",
+      "symbols": [
+        "SyncDirection",
+        "SyncReport"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync-engine.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync-engine.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem",
+        "RexConfig",
+        "LogEntry"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync-engine.test.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "StoreCapabilities"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync.test.ts",
+      "to": "src/core/sync.ts",
+      "type": "static",
+      "symbols": [
+        "detectChangedFields",
+        "isModifiedSinceSync",
+        "resolveConflicts",
+        "reconcile",
+        "conflictToLogEntry",
+        "stampModified",
+        "stampSynced",
+        "extractSyncMeta"
+      ]
+    },
+    {
+      "from": "tests/unit/core/sync.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/timestamps.test.ts",
+      "to": "src/core/timestamps.ts",
+      "type": "static",
+      "symbols": [
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage-regression.test.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "collectTokenEvents",
+        "groupByCommand",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage-regression.test.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage-regression.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "LogEntry"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage.test.ts",
+      "to": "src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage.test.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "extractRexTokenUsage",
+        "extractHenchTokenUsage",
+        "extractSvTokenUsage",
+        "aggregateTokenUsage",
+        "estimateCost",
+        "extractRexTokenEvents",
+        "extractHenchTokenEvents",
+        "extractSvTokenEvents",
+        "collectTokenEvents",
+        "groupByCommand",
+        "groupByTimePeriod",
+        "periodKey",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage.test.ts",
+      "to": "src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "AggregateTokenUsage",
+        "TokenEvent",
+        "BudgetConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/core/token-usage.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "LogEntry"
+      ]
+    },
+    {
+      "from": "tests/unit/core/transitions.test.ts",
+      "to": "src/core/transitions.ts",
+      "type": "static",
+      "symbols": [
+        "validateTransition",
+        "allowedTargets"
+      ]
+    },
+    {
+      "from": "tests/unit/core/transitions.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "tests/unit/core/tree-hardened.test.ts",
+      "to": "src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "tests/unit/core/tree-hardened.test.ts",
+      "to": "src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "findItem",
+        "insertChild",
+        "updateInTree",
+        "removeFromTree",
+        "getParentChain",
+        "collectAllIds"
+      ]
+    },
+    {
+      "from": "tests/unit/core/tree-hardened.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/core/tree.test.ts",
+      "to": "src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
       ]
     },
     {
@@ -831,7 +7774,6 @@
         "insertChild",
         "updateInTree",
         "removeFromTree",
-        "computeStats",
         "getParentChain",
         "collectAllIds"
       ]
@@ -845,13 +7787,147 @@
       ]
     },
     {
+      "from": "tests/unit/core/verify.test.ts",
+      "to": "src/core/verify.ts",
+      "type": "static",
+      "symbols": [
+        "extractKeywords",
+        "scoreMatch",
+        "mapCriteriaToTests",
+        "collectVerifiableTasks",
+        "findTestFiles",
+        "verify"
+      ]
+    },
+    {
+      "from": "tests/unit/core/verify.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/conflict-detection.test.ts",
+      "to": "src/recommend/conflict-detection.ts",
+      "type": "static",
+      "symbols": [
+        "detectRecommendationConflicts",
+        "formatConflict",
+        "formatIntraBatchDuplicate",
+        "CONFLICT_THRESHOLD"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/conflict-detection.test.ts",
+      "to": "src/recommend/types.ts",
+      "type": "type",
+      "symbols": [
+        "EnrichedRecommendation"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/conflict-detection.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "src/recommend/create-from-recommendations.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/recommend/create-from-recommendations.test.ts",
+      "to": "src/store/index.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
       "from": "tests/unit/schema/validate.test.ts",
       "to": "src/schema/validate.ts",
       "type": "static",
       "symbols": [
         "validateDocument",
         "validateConfig",
-        "validateLogEntry"
+        "validateLogEntry",
+        "formatValidationErrors"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "static",
+      "symbols": [
+        "AdapterRegistry",
+        "isRedactedField"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "type",
+      "symbols": [
+        "AdapterDefinition",
+        "AdapterConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/store/file-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "FileStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/adapter-registry.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveRemoteStore",
+        "resolveStore",
+        "createStore"
       ]
     },
     {
@@ -887,35 +7963,403 @@
         "FileStore",
         "ensureRexDir"
       ]
+    },
+    {
+      "from": "tests/unit/store/integration-schema.test.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "static",
+      "symbols": [
+        "validateField",
+        "validateConfig",
+        "registerIntegrationSchema",
+        "getIntegrationSchema",
+        "listIntegrationSchemas",
+        "resetIntegrationSchemas",
+        "toAdapterConfigSchema"
+      ]
+    },
+    {
+      "from": "tests/unit/store/integration-schema.test.ts",
+      "to": "src/store/integration-schema.ts",
+      "type": "type",
+      "symbols": [
+        "IntegrationSchema",
+        "IntegrationFieldSchema"
+      ]
+    },
+    {
+      "from": "tests/unit/store/integration-schema.test.ts",
+      "to": "src/store/integration-schemas/index.ts",
+      "type": "static",
+      "symbols": [
+        "registerBuiltInSchemas",
+        "ensureSchemas",
+        "resetRegistration"
+      ]
+    },
+    {
+      "from": "tests/unit/store/integration-schema.test.ts",
+      "to": "src/store/integration-schemas/jira.ts",
+      "type": "static",
+      "symbols": [
+        "jiraIntegrationSchema"
+      ]
+    },
+    {
+      "from": "tests/unit/store/integration-schema.test.ts",
+      "to": "src/store/integration-schemas/notion.ts",
+      "type": "static",
+      "symbols": [
+        "notionIntegrationSchema"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-adapter.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-adapter.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-adapter.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-adapter.test.ts",
+      "to": "src/store/notion-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "NotionStore",
+        "ensureNotionRexDir"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-adapter.test.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "type",
+      "symbols": [
+        "NotionClient",
+        "NotionAdapterConfig"
+      ]
+    },
+    {
+      "from": "tests/unit/store/notion-client.test.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "static",
+      "symbols": [
+        "LiveNotionClient"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/store/adapter-registry.ts",
+      "type": "static",
+      "symbols": [
+        "getDefaultRegistry",
+        "resetDefaultRegistry"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/store/file-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "FileStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/resolve-store.test.ts",
+      "to": "src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore",
+        "resolveRemoteStore",
+        "createStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/store/contracts.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/store/file-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "FileStore",
+        "ensureRexDir"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/store/notion-adapter.ts",
+      "type": "static",
+      "symbols": [
+        "NotionStore",
+        "ensureNotionRexDir"
+      ]
+    },
+    {
+      "from": "tests/unit/store/store-contract.test.ts",
+      "to": "src/store/notion-client.ts",
+      "type": "type",
+      "symbols": [
+        "NotionClient",
+        "NotionAdapterConfig"
+      ]
     }
   ],
   "external": [
     {
       "package": "@modelcontextprotocol/sdk",
       "importedBy": [
-        "src/cli/mcp.ts"
+        "src/cli/mcp.ts",
+        "tests/unit/cli/mcp.test.ts"
       ],
       "symbols": [
+        "Client",
+        "InMemoryTransport",
         "McpServer",
         "StdioServerTransport"
       ]
     },
     {
+      "package": "@n-dx/llm-client",
+      "importedBy": [
+        "src/analyze/llm-bridge.ts",
+        "src/analyze/scanners.ts",
+        "src/cli/commands/constants.ts",
+        "src/cli/commands/recommend.ts",
+        "src/cli/commands/smart-add.ts",
+        "src/cli/errors.ts",
+        "src/cli/help.ts",
+        "src/cli/index.ts",
+        "src/cli/output.ts",
+        "src/core/canonical.ts",
+        "src/core/token-usage.ts",
+        "src/core/verify.ts",
+        "src/store/project-config.ts"
+      ],
+      "symbols": [
+        "AuthMode",
+        "BaseCLIError",
+        "ClaudeClient",
+        "ClaudeConfig",
+        "ExecResult",
+        "HelpDefinition",
+        "LLMConfig",
+        "LLMVendor",
+        "PROJECT_DIRS",
+        "createLLMClient",
+        "detectLLMAuthMode",
+        "formatHelp",
+        "formatTypoSuggestion",
+        "formatUsage",
+        "foundationExec",
+        "info",
+        "isQuiet",
+        "loadClaudeConfigFromDir",
+        "loadLLMConfigFromDir",
+        "loadProjectOverrides",
+        "mergeWithOverrides",
+        "result",
+        "setQuiet",
+        "sharedResolveApiKey",
+        "sharedResolveCliPath",
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "package": "ora",
+      "importedBy": [
+        "src/cli/output.ts"
+      ],
+      "symbols": [
+        "default"
+      ]
+    },
+    {
       "package": "vitest",
       "importedBy": [
+        "tests/e2e/cli-adapter.test.ts",
         "tests/e2e/cli-analyze.test.ts",
+        "tests/e2e/cli-import.test.ts",
         "tests/e2e/cli-init.test.ts",
+        "tests/e2e/cli-prune.test.ts",
+        "tests/e2e/cli-quiet.test.ts",
+        "tests/e2e/cli-recommend.test.ts",
+        "tests/e2e/cli-smart-add.test.ts",
+        "tests/e2e/cli-sync.test.ts",
         "tests/e2e/cli-workflow.test.ts",
+        "tests/integration/claude-config.test.ts",
+        "tests/integration/project-config.test.ts",
+        "tests/integration/smart-add-duplicate-outcomes.test.ts",
+        "tests/integration/smart-add-orphaned-parent.test.ts",
         "tests/integration/store-roundtrip.test.ts",
+        "tests/unit/analyze/acknowledge.test.ts",
+        "tests/unit/analyze/consolidation-guard.test.ts",
+        "tests/unit/analyze/decompose.test.ts",
+        "tests/unit/analyze/dedupe.test.ts",
+        "tests/unit/analyze/diff.test.ts",
+        "tests/unit/analyze/extract-llm-mock.test.ts",
+        "tests/unit/analyze/extract-llm.test.ts",
+        "tests/unit/analyze/extract-text.test.ts",
+        "tests/unit/analyze/extract.test.ts",
+        "tests/unit/analyze/file-validation.test.ts",
+        "tests/unit/analyze/guided.test.ts",
+        "tests/unit/analyze/loe-proposal-schema.test.ts",
+        "tests/unit/analyze/modify-reason.test.ts",
         "tests/unit/analyze/propose.test.ts",
+        "tests/unit/analyze/reason-assessment.test.ts",
+        "tests/unit/analyze/reason-batch.test.ts",
+        "tests/unit/analyze/reason-description.test.ts",
+        "tests/unit/analyze/reason-granularity.test.ts",
+        "tests/unit/analyze/reason-ideas.test.ts",
+        "tests/unit/analyze/reason-multi-description.test.ts",
+        "tests/unit/analyze/reason.test.ts",
         "tests/unit/analyze/reconcile.test.ts",
+        "tests/unit/analyze/scanners-acknowledge.test.ts",
         "tests/unit/analyze/scanners.test.ts",
+        "tests/unit/analyze/token-tracking.test.ts",
+        "tests/unit/analyze/validate-modification.test.ts",
+        "tests/unit/cli/commands/add.test.ts",
+        "tests/unit/cli/commands/analyze-guided.test.ts",
+        "tests/unit/cli/commands/chunked-review.test.ts",
+        "tests/unit/cli/commands/decomposition-review.test.ts",
+        "tests/unit/cli/commands/fix.test.ts",
+        "tests/unit/cli/commands/format-loe.test.ts",
+        "tests/unit/cli/commands/loe-display.test.ts",
+        "tests/unit/cli/commands/move.test.ts",
+        "tests/unit/cli/commands/recommend.test.ts",
+        "tests/unit/cli/commands/remove.test.ts",
+        "tests/unit/cli/commands/report.test.ts",
+        "tests/unit/cli/commands/smart-add-duplicates.test.ts",
+        "tests/unit/cli/commands/smart-add-merge.test.ts",
+        "tests/unit/cli/commands/smart-add.test.ts",
+        "tests/unit/cli/commands/status.test.ts",
+        "tests/unit/cli/commands/sync.test.ts",
+        "tests/unit/cli/commands/update.test.ts",
+        "tests/unit/cli/commands/usage.test.ts",
+        "tests/unit/cli/commands/validate-epicless.test.ts",
+        "tests/unit/cli/commands/validate-interactive.test.ts",
+        "tests/unit/cli/commands/validate.test.ts",
+        "tests/unit/cli/commands/verify.test.ts",
+        "tests/unit/cli/errors.test.ts",
+        "tests/unit/cli/help.test.ts",
+        "tests/unit/cli/mcp.test.ts",
+        "tests/unit/cli/output.test.ts",
+        "tests/unit/cli/validate-input.test.ts",
         "tests/unit/core/canonical.test.ts",
         "tests/unit/core/dag.test.ts",
+        "tests/unit/core/epic-correlation.test.ts",
+        "tests/unit/core/epicless.test.ts",
+        "tests/unit/core/facets.test.ts",
+        "tests/unit/core/feature-filtered-task.test.ts",
+        "tests/unit/core/fix.test.ts",
+        "tests/unit/core/health.test.ts",
+        "tests/unit/core/keywords.test.ts",
+        "tests/unit/core/merge.test.ts",
+        "tests/unit/core/move.test.ts",
+        "tests/unit/core/next-task-matching.test.ts",
+        "tests/unit/core/next-task-scoring.test.ts",
         "tests/unit/core/next-task.test.ts",
+        "tests/unit/core/notion-map.test.ts",
+        "tests/unit/core/parent-completion.test.ts",
+        "tests/unit/core/parent-reset.test.ts",
+        "tests/unit/core/prune.test.ts",
+        "tests/unit/core/remove-epic.test.ts",
+        "tests/unit/core/remove-feature.test.ts",
+        "tests/unit/core/remove-task.test.ts",
+        "tests/unit/core/reorganize-executor.test.ts",
+        "tests/unit/core/reorganize.test.ts",
+        "tests/unit/core/requirements-prioritization.test.ts",
+        "tests/unit/core/requirements.test.ts",
+        "tests/unit/core/structural.test.ts",
+        "tests/unit/core/sync-engine.test.ts",
+        "tests/unit/core/sync.test.ts",
+        "tests/unit/core/timestamps.test.ts",
+        "tests/unit/core/token-usage-regression.test.ts",
+        "tests/unit/core/token-usage.test.ts",
+        "tests/unit/core/transitions.test.ts",
+        "tests/unit/core/tree-hardened.test.ts",
         "tests/unit/core/tree.test.ts",
+        "tests/unit/core/verify.test.ts",
+        "tests/unit/recommend/conflict-detection.test.ts",
+        "tests/unit/recommend/create-from-recommendations.test.ts",
         "tests/unit/schema/validate.test.ts",
+        "tests/unit/store/adapter-registry.test.ts",
         "tests/unit/store/file-adapter.test.ts",
+        "tests/unit/store/integration-schema.test.ts",
+        "tests/unit/store/notion-adapter.test.ts",
+        "tests/unit/store/notion-client.test.ts",
+        "tests/unit/store/resolve-store.test.ts",
+        "tests/unit/store/store-contract.test.ts",
         "vitest.config.ts"
       ],
       "symbols": [
@@ -924,12 +8368,18 @@
         "defineConfig",
         "describe",
         "expect",
-        "it"
+        "it",
+        "vi"
       ]
     },
     {
       "package": "zod",
       "importedBy": [
+        "src/analyze/decompose.ts",
+        "src/analyze/extract.ts",
+        "src/analyze/guided.ts",
+        "src/analyze/reason.ts",
+        "src/analyze/reshape-reason.ts",
         "src/cli/mcp.ts",
         "src/schema/validate.ts"
       ],
@@ -940,92 +8390,92 @@
     }
   ],
   "summary": {
-    "totalEdges": 101,
-    "totalExternal": 3,
+    "totalEdges": 887,
+    "totalExternal": 5,
     "circularCount": 0,
     "circulars": [],
     "mostImported": [
       {
+        "path": "src/core/tree.ts",
+        "count": 48
+      },
+      {
         "path": "src/schema/index.ts",
-        "count": 30
+        "count": 42
       },
       {
         "path": "src/store/index.ts",
-        "count": 11
+        "count": 31
       },
       {
         "path": "src/cli/commands/constants.ts",
-        "count": 10
+        "count": 29
       },
       {
-        "path": "src/core/tree.ts",
-        "count": 9
+        "path": "src/cli/output.ts",
+        "count": 27
       },
       {
-        "path": "src/analyze/scanners.ts",
-        "count": 6
+        "path": "src/cli/errors.ts",
+        "count": 26
+      },
+      {
+        "path": "src/analyze/reason.ts",
+        "count": 23
       },
       {
         "path": "src/core/canonical.ts",
-        "count": 5
+        "count": 16
+      },
+      {
+        "path": "src/store/project-config.ts",
+        "count": 9
+      },
+      {
+        "path": "src/analyze/dedupe.ts",
+        "count": 8
       },
       {
         "path": "src/core/next-task.ts",
-        "count": 3
+        "count": 8
       },
       {
         "path": "src/store/file-adapter.ts",
-        "count": 3
+        "count": 8
       },
       {
-        "path": "src/store/types.ts",
-        "count": 3
-      },
-      {
-        "path": "src/analyze/index.ts",
-        "count": 2
-      },
-      {
-        "path": "src/analyze/propose.ts",
-        "count": 2
-      },
-      {
-        "path": "src/analyze/reconcile.ts",
-        "count": 2
+        "path": "src/analyze/extract.ts",
+        "count": 7
       },
       {
         "path": "src/core/dag.ts",
-        "count": 2
+        "count": 7
+      },
+      {
+        "path": "src/core/prune.ts",
+        "count": 7
+      },
+      {
+        "path": "src/core/stats.ts",
+        "count": 7
+      },
+      {
+        "path": "src/core/structural.ts",
+        "count": 7
+      },
+      {
+        "path": "src/schema/v1.ts",
+        "count": 7
       },
       {
         "path": "src/schema/validate.ts",
-        "count": 2
+        "count": 7
       },
       {
-        "path": "src/cli/commands/add.ts",
-        "count": 1
-      },
-      {
-        "path": "src/cli/commands/init.ts",
-        "count": 1
-      },
-      {
-        "path": "src/cli/commands/next.ts",
-        "count": 1
-      },
-      {
-        "path": "src/cli/commands/status.ts",
-        "count": 1
-      },
-      {
-        "path": "src/cli/commands/update.ts",
-        "count": 1
-      },
-      {
-        "path": "src/workflow/default.ts",
-        "count": 1
+        "path": "src/analyze/reshape-reason.ts",
+        "count": 6
       }
     ],
-    "avgImportsPerFile": 3.16
+    "avgImportsPerFile": 4.35
   }
 }

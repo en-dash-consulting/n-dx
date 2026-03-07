@@ -99,6 +99,112 @@ describe("matchProposalNodeToPRD", () => {
     expect(result.matchedItem).toBeUndefined();
     expect(result.reason).toBe("none");
   });
+
+  it("rejects cross-level match: proposed epic with same title as existing task", () => {
+    const existing: PRDItem[] = [
+      {
+        id: "task-1",
+        title: "OAuth Integration",
+        level: "task",
+        status: "pending",
+      },
+    ];
+
+    const result = matchProposalNodeToPRD(
+      {
+        key: "p0:epic",
+        kind: "epic",
+        title: "OAuth Integration",
+      },
+      existing,
+    );
+
+    expect(result.duplicate).toBe(false);
+    expect(result.matchedItem).toBeUndefined();
+  });
+
+  it("rejects cross-level match: proposed feature with same title as existing epic", () => {
+    const existing: PRDItem[] = [
+      {
+        id: "epic-1",
+        title: "Security Hardening",
+        level: "epic",
+        status: "pending",
+      },
+    ];
+
+    const result = matchProposalNodeToPRD(
+      {
+        key: "p0:feature:0",
+        kind: "feature",
+        title: "Security Hardening",
+      },
+      existing,
+    );
+
+    expect(result.duplicate).toBe(false);
+    expect(result.matchedItem).toBeUndefined();
+  });
+
+  it("rejects cross-level match: proposed task with same title as existing feature", () => {
+    const existing: PRDItem[] = [
+      {
+        id: "feature-1",
+        title: "Implement OAuth callback handler",
+        level: "feature",
+        status: "pending",
+      },
+    ];
+
+    const result = matchProposalNodeToPRD(
+      {
+        key: "p0:task:0:0",
+        kind: "task",
+        title: "Implement OAuth callback handler",
+      },
+      existing,
+    );
+
+    expect(result.duplicate).toBe(false);
+    expect(result.matchedItem).toBeUndefined();
+  });
+
+  it("matches same-level items correctly after level filtering", () => {
+    const existing: PRDItem[] = [
+      {
+        id: "epic-1",
+        title: "OAuth Integration",
+        level: "epic",
+        status: "pending",
+        children: [
+          {
+            id: "task-1",
+            title: "OAuth Integration",
+            level: "task",
+            status: "pending",
+          },
+        ],
+      },
+    ];
+
+    // Epic proposal should match the epic, not the task
+    const epicResult = matchProposalNodeToPRD(
+      { key: "p0:epic", kind: "epic", title: "OAuth Integration" },
+      existing,
+    );
+    expect(epicResult.duplicate).toBe(true);
+    expect(epicResult.matchedItem?.id).toBe("epic-1");
+    expect(epicResult.matchedItem?.level).toBe("epic");
+
+    // Task proposal should match the task, not the epic
+    const taskResult = matchProposalNodeToPRD(
+      { key: "p0:task:0:0", kind: "task", title: "OAuth Integration" },
+      existing,
+    );
+    expect(taskResult.duplicate).toBe(true);
+    expect(taskResult.matchedItem?.id).toBe("task-1");
+    expect(taskResult.matchedItem?.level).toBe("task");
+  });
 });
 
 describe("matchProposalNodesToPRD", () => {

@@ -48,6 +48,12 @@
   stroke-width: 2;
 }
 
+.cg-zone-box.selected .cg-zone-rect {
+  stroke: var(--zone-color, var(--accent));
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--zone-color, var(--accent)) 40%, transparent));
+}
+
 .cg-zone-name {
   font-family: var(--font-mono, monospace);
   font-size: 13px;
@@ -75,26 +81,67 @@
 }
 
 .cg-detail-btn-bg {
-  fill: transparent;
-  stroke: var(--border);
-  stroke-width: 1;
-  transition: fill 0.1s ease, stroke 0.1s ease;
+  fill: var(--bg-hover, rgba(128, 128, 128, 0.1));
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
 .cg-zone-detail-btn:hover .cg-detail-btn-bg {
-  fill: var(--bg-hover);
-  stroke: var(--border-strong);
+  fill: var(--accent-bg, rgba(74, 158, 255, 0.15));
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 2;
 }
 
 .cg-detail-btn-text {
-  font-family: var(--font-mono, monospace);
-  font-size: 8px;
-  fill: var(--text-muted);
+  font-size: 14px;
+  fill: var(--accent, #4a9eff);
   pointer-events: none;
-  transition: fill 0.1s ease;
+  transition: fill 0.15s ease;
 }
 
 .cg-zone-detail-btn:hover .cg-detail-btn-text {
+  fill: var(--accent-strong, #2b7de9);
+}
+
+/* ── Drill-down button (on zones with sub-zones) ──────────────────── */
+
+.cg-zone-drill-btn {
+  cursor: pointer;
+}
+
+.cg-drill-btn-bg {
+  fill: var(--bg-hover);
+  stroke: var(--zone-color, var(--border-strong));
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+
+.cg-zone-drill-btn:hover .cg-drill-btn-bg {
+  fill: color-mix(in srgb, var(--zone-color, var(--accent)) 15%, var(--bg-hover));
+  stroke: var(--zone-color, var(--accent));
+  stroke-width: 2;
+}
+
+.cg-drill-btn-icon {
+  color: var(--zone-color, var(--text-dim));
+  transition: color 0.15s ease;
+}
+
+.cg-zone-drill-btn:hover .cg-drill-btn-icon {
+  color: var(--zone-color, var(--accent));
+}
+
+.cg-drill-btn-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  fill: var(--zone-color, var(--accent));
+  pointer-events: none;
+  transition: fill 0.15s ease;
+}
+
+.cg-zone-drill-btn:hover .cg-drill-btn-label {
   fill: var(--text);
 }
 
@@ -159,6 +206,27 @@
 .cg-file-row.cross-zone .cg-file-name {
   fill: var(--text);
   font-weight: 500;
+}
+
+/* ── Subzone rows inside expanded zones ───────────────────────────── */
+
+.cg-subzone-bg { fill: transparent; cursor: pointer; transition: fill 0.1s ease; }
+.cg-subzone-row:hover .cg-subzone-bg { fill: var(--bg-hover); }
+.cg-subzone-row.expanded .cg-subzone-bg {
+  fill: color-mix(in srgb, var(--zone-color, var(--accent)) 8%, transparent);
+}
+.cg-subzone-name {
+  font-family: var(--font-mono, monospace); font-size: 11px;
+  font-weight: 600; fill: var(--text); pointer-events: none;
+}
+.cg-subzone-stats { font-size: 9px; fill: var(--text-muted); pointer-events: none; }
+.cg-subzone-expand-icon { font-size: 9px; fill: var(--text-muted); pointer-events: none; }
+
+/* ── Internal subzone edges ──────────────────────────────────────── */
+
+.cg-subzone-edge {
+  stroke-linecap: round; pointer-events: none;
+  opacity: 0.4; stroke-dasharray: 4 3;
 }
 
 /* ── File-level edges (expanded zone → target zones) ─────────────── */

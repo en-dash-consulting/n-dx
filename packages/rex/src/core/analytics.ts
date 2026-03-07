@@ -9,6 +9,7 @@
  */
 
 import type { PRDItem, ItemStatus, Priority, Requirement } from "../schema/index.js";
+import { isRootLevel, isWorkItem } from "../schema/index.js";
 import { computeStats, type TreeStats } from "./stats.js";
 
 // ── Epic stats ──────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ export interface EpicStats {
 /** Compute per-epic stats. Each epic's descendants (tasks/subtasks) are counted. */
 export function computeEpicStats(items: PRDItem[]): EpicStats[] {
   return items
-    .filter((item) => item.level === "epic")
+    .filter((item) => isRootLevel(item.level))
     .map((epic) => {
       const stats = computeStats(epic.children ?? []);
       return {
@@ -57,7 +58,7 @@ export function computePriorityDistribution(items: PRDItem[]): PriorityDistribut
 
   function walk(list: PRDItem[]): void {
     for (const item of list) {
-      if (item.level === "task" || item.level === "subtask") {
+      if (isWorkItem(item.level)) {
         const p = item.priority ?? "";
         if (p === "critical") dist.critical++;
         else if (p === "high") dist.high++;

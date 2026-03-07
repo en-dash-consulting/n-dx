@@ -1,14 +1,14 @@
 /* Search/filter bar */
 .filter-bar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
   align-items: center;
 }
 
 .filter-input {
   flex: 1;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -24,7 +24,7 @@
 }
 
 .filter-select {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -47,7 +47,7 @@
 
 /* Toggle button inside filter bar */
 .filter-toggle-btn {
-  padding: 7px 14px;
+  padding: var(--space-2) var(--space-3-5);
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-dim);
@@ -86,11 +86,11 @@
 .drop-box {
   border: 2px dashed var(--accent);
   border-radius: 16px;
-  padding: 48px 64px;
+  padding: var(--space-12) 64px;
   text-align: center;
 }
 
-.drop-box h2 { color: var(--accent); margin-bottom: 8px; }
+.drop-box h2 { color: var(--accent); margin-bottom: var(--space-2); }
 .drop-box p { color: var(--text-dim); font-size: 14px; }
 
 /* Locked view */
@@ -106,22 +106,22 @@
 
 .locked-icon {
   font-size: 48px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   opacity: 0.4;
 }
 
 .locked-view h2 {
   font-size: 20px;
   color: var(--text);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
-.locked-view p { margin-bottom: 8px; font-size: 14px; }
+.locked-view p { margin-bottom: var(--space-2); font-size: 14px; }
 
 .locked-hint code {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
   font-size: 13px;
   color: var(--accent);

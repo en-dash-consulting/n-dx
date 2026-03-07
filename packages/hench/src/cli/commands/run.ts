@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "rex";
 import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
@@ -38,12 +38,12 @@ export interface ResolvedEpic {
 }
 
 /**
- * List all epics in the PRD (root-level items with level === "epic").
+ * List all epics in the PRD (root-level container items).
  */
 export function listEpics(items: PRDItem[]): ResolvedEpic[] {
   const epics: ResolvedEpic[] = [];
   for (const item of items) {
-    if (item.level === "epic") {
+    if (isRootLevel(item.level)) {
       epics.push({ id: item.id, title: item.title });
     }
   }
@@ -60,7 +60,7 @@ export function findEpicByIdOrTitle(
 ): ResolvedEpic | null {
   const searchLower = search.toLowerCase();
   for (const item of items) {
-    if (item.level === "epic") {
+    if (isRootLevel(item.level)) {
       if (item.id === search || item.title.toLowerCase() === searchLower) {
         return { id: item.id, title: item.title };
       }
@@ -136,7 +136,7 @@ export async function getEpicScopeInfo(
       item.id === resolvedEpicId ||
       parents.some((p) => p.id === resolvedEpicId);
 
-    if (isInEpic && (item.level === "task" || item.level === "subtask")) {
+    if (isInEpic && isWorkItem(item.level)) {
       // Deleted items are excluded from all counts
       if (item.status === "deleted") continue;
       totalTasks++;

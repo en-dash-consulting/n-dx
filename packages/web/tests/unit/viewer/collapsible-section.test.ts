@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { h, render } from "preact";
 import { CollapsibleSection } from "../../../src/viewer/components/data-display/collapsible-section.js";
 
@@ -9,6 +9,10 @@ describe("CollapsibleSection", () => {
     render(vnode, root);
     return root;
   }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
   it("renders title", () => {
     const root = renderToDiv(
@@ -83,5 +87,63 @@ describe("CollapsibleSection", () => {
     const toggle = root.querySelector("[aria-expanded]");
     expect(toggle).not.toBeNull();
     expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  describe("storageKey persistence", () => {
+    it("reads persisted open state from localStorage", () => {
+      localStorage.setItem("collapsible-section:test-key", "true");
+      const root = renderToDiv(
+        h(CollapsibleSection, { title: "Persisted", defaultOpen: false, storageKey: "test-key" },
+          h("div", null, "persisted content")
+        )
+      );
+      // Should be open despite defaultOpen=false because persisted state is true
+      expect(root.textContent).toContain("persisted content");
+    });
+
+    it("reads persisted closed state from localStorage", () => {
+      localStorage.setItem("collapsible-section:closed-key", "false");
+      const root = renderToDiv(
+        h(CollapsibleSection, { title: "Closed", defaultOpen: true, storageKey: "closed-key" },
+          h("div", null, "should be hidden")
+        )
+      );
+      // Should be closed despite defaultOpen=true because persisted state is false
+      expect(root.textContent).not.toContain("should be hidden");
+    });
+
+    it("falls back to defaultOpen when no persisted state exists", () => {
+      const root = renderToDiv(
+        h(CollapsibleSection, { title: "Fallback", defaultOpen: true, storageKey: "new-key" },
+          h("div", null, "fallback content")
+        )
+      );
+      expect(root.textContent).toContain("fallback content");
+    });
+
+    it("persists state to localStorage when toggled", () => {
+      const root = renderToDiv(
+        h(CollapsibleSection, { title: "Toggle", defaultOpen: true, storageKey: "toggle-key" },
+          h("div", null, "content")
+        )
+      );
+      // Click the header to collapse
+      const header = root.querySelector(".collapsible-header") as HTMLElement;
+      header.click();
+      expect(localStorage.getItem("collapsible-section:toggle-key")).toBe("false");
+    });
+
+    it("does not persist state when no storageKey is set", () => {
+      const root = renderToDiv(
+        h(CollapsibleSection, { title: "No Key", defaultOpen: true },
+          h("div", null, "content")
+        )
+      );
+      const header = root.querySelector(".collapsible-header") as HTMLElement;
+      header.click();
+      // No localStorage entries with the collapsible prefix
+      const keys = Object.keys(localStorage).filter(k => k.startsWith("collapsible-section:"));
+      expect(keys).toHaveLength(0);
+    });
   });
 });

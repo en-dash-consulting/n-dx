@@ -1,0 +1,29 @@
+{
+  "id": "unit-core",
+  "name": "Unit Core",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/next.ts",
+    "src/core/next-task.ts",
+    "tests/unit/core/feature-filtered-task.test.ts",
+    "tests/unit/core/next-task-matching.test.ts",
+    "tests/unit/core/next-task-scoring.test.ts",
+    "tests/unit/core/next-task.test.ts",
+    "tests/unit/core/requirements-prioritization.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/next.ts",
+    "src/core/next-task.ts"
+  ],
+  "cohesion": 0.17,
+  "coupling": 0.83,
+  "fileCount": 7,
+  "lineCount": 2456,
+  "riskMetrics": {
+    "cohesion": 0.17,
+    "coupling": 0.83,
+    "riskScore": 0.83,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

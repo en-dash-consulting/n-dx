@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { MemoryWarningBanner } from "../../../src/viewer/components/memory-warning.js";
-import type { MemorySnapshot, MemoryLevel } from "../../../src/viewer/memory-monitor.js";
+import type { MemorySnapshot, MemoryLevel } from "../../../src/viewer/performance/memory-monitor.js";
 
 function makeSnapshot(overrides: Partial<MemorySnapshot> = {}): MemorySnapshot {
   return {

@@ -156,6 +156,45 @@ tests/
 
 All test files use `*.test.ts` suffix. Tests are co-located with the code they test by directory structure (e.g., `tests/unit/core/tree.test.ts` tests `src/core/tree.ts`).
 
+## Zone Structure
+
+SourceVision zones are auto-detected by Louvain community detection. These conventions guide naming and structural expectations.
+
+### Naming convention
+
+All zones within a package share a consistent kebab-case prefix matching the package name:
+
+| Package | Zone prefix | Examples |
+|---|---|---|
+| rex | `packages-rex-` | `packages-rex-core`, `packages-rex-cli`, `packages-rex-store` |
+| sourcevision | `packages-sourcevision-` | `packages-sourcevision-analyzers`, `packages-sourcevision-cli` |
+| web | `web-` | `web-viewer`, `web-server` |
+| hench | `hench` | `hench` (single zone) |
+
+Zone IDs that don't follow this convention (e.g., `panel`, `dom`, `logo` for web package files) indicate the Louvain algorithm found a community whose dominant directory segment differs from the package name. This is acceptable when the community has strong internal cohesion (>0.8) but should be reviewed when cohesion is low.
+
+### Zone size budget
+
+| Range | Status |
+|---|---|
+| 3-30 files | Target range |
+| 31-50 files | Acceptable, monitor cohesion |
+| 50+ files | Flagged for review — likely too broad, consider subdivision |
+| <3 files | Satellite — auto-merged into most-connected neighbor by the pipeline |
+
+### Satellite zone policy
+
+Small zones (≤8 files) with coupling ratio >0.3 are automatically absorbed into their most-connected neighbor community during the Louvain post-processing step (`mergeSatelliteCommunities`). This prevents fragmentation of cohesive code into tiny, highly-coupled satellites.
+
+Satellite zones that survive the merge (because they have strong internal cohesion) should own both their source files and corresponding unit tests within the same zone boundary.
+
+### Test format
+
+| Scope | Format | Example |
+|---|---|---|
+| Monorepo-root e2e tests | Plain `.js` (no build step) | `tests/e2e/cli-smoke.js` |
+| Package-internal tests | `.ts` (compiled with package) | `packages/rex/tests/unit/core/tree.test.ts` |
+
 ## Dependency Hierarchy
 
 ```

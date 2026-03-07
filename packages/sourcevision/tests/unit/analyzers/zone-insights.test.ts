@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   analyzeZones,
   generateStructuralInsights,
+  runZonePipeline,
 } from "../../../src/analyzers/zones.js";
 import type {
   Zone,
@@ -76,6 +77,122 @@ describe("generateStructuralInsights", () => {
     expect(bigInsights.some((i) => i.includes("too broad, consider splitting"))).toBe(false);
     // Should mention the subdivision
     expect(bigInsights.some((i) => i.includes("subdivided into 2 sub-zones"))).toBe(true);
+  });
+
+  it("detects generic zone names with numeric suffixes", () => {
+    const zones: Zone[] = [
+      { id: "src-2", name: "Src 2", description: "", files: ["a.ts", "b.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "lib-3", name: "Lib 3", description: "", files: ["c.ts", "d.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "root-2", name: "Root 2", description: "", files: ["e.ts"], entryPoints: [], cohesion: 1, coupling: 0 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("src-2")!.some((i) => i.includes("Generic zone name"))).toBe(true);
+    expect(zoneInsights.get("lib-3")!.some((i) => i.includes("Generic zone name"))).toBe(true);
+    expect(zoneInsights.get("root-2")!.some((i) => i.includes("Generic zone name"))).toBe(true);
+  });
+
+  it("does not flag descriptive zone names as generic", () => {
+    const zones: Zone[] = [
+      { id: "auth", name: "Authentication", description: "", files: ["a.ts", "b.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "api-gateway", name: "Api Gateway", description: "", files: ["c.ts", "d.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("auth")!.some((i) => i.includes("Generic zone name"))).toBe(false);
+    expect(zoneInsights.get("api-gateway")!.some((i) => i.includes("Generic zone name"))).toBe(false);
+  });
+
+  // ── File-structure recommendations ──
+
+  it("recommends subdirectories when a flat directory spans 3+ zones", () => {
+    const zones: Zone[] = [
+      { id: "config", name: "Config", description: "", files: ["src/config.ts", "src/config-utils.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "llm", name: "Llm", description: "", files: ["src/llm-client.ts", "src/llm-types.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "provider", name: "Provider", description: "", files: ["src/provider-interface.ts", "src/provider-registry.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    const flatDirFinding = findings.find((f) => f.text.includes("src/") && f.text.includes("3 zones"));
+    expect(flatDirFinding).toBeDefined();
+    expect(flatDirFinding!.type).toBe("suggestion");
+    expect(flatDirFinding!.severity).toBe("info");
+    expect(flatDirFinding!.text).toContain("consider grouping into subdirectories");
+  });
+
+  it("does not recommend subdirectories for directory spanning fewer than 3 zones", () => {
+    const zones: Zone[] = [
+      { id: "config", name: "Config", description: "", files: ["src/config.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+      { id: "llm", name: "Llm", description: "", files: ["src/llm.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(findings.filter((f) => f.text.includes("consider grouping"))).toHaveLength(0);
+  });
+
+  it("recommends consolidation when zone has files across 5+ directories", () => {
+    const zones: Zone[] = [
+      {
+        id: "auth",
+        name: "Auth",
+        description: "",
+        files: [
+          "src/a/login.ts", "src/b/session.ts", "src/c/token.ts",
+          "src/d/refresh.ts", "src/e/guard.ts",
+        ],
+        entryPoints: [],
+        cohesion: 0.8,
+        coupling: 0.2,
+      },
+    ];
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    const scatteredFinding = findings.find((f) => f.text.includes("5 directories"));
+    expect(scatteredFinding).toBeDefined();
+    expect(scatteredFinding!.type).toBe("suggestion");
+    expect(scatteredFinding!.scope).toBe("auth");
+    expect(scatteredFinding!.text).toContain("consider consolidating");
+  });
+
+  it("does not recommend consolidation when zone spans fewer than 5 directories", () => {
+    const zones: Zone[] = [
+      {
+        id: "auth",
+        name: "Auth",
+        description: "",
+        files: ["src/a/login.ts", "src/b/session.ts", "src/c/token.ts", "src/d/guard.ts"],
+        entryPoints: [],
+        cohesion: 0.8,
+        coupling: 0.2,
+      },
+    ];
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(findings.filter((f) => f.text.includes("consider consolidating"))).toHaveLength(0);
+  });
+
+  it("recommends creating directory for filename-derived zone", () => {
+    const zones: Zone[] = [
+      { id: "provider", name: "Provider", description: "", files: ["src/provider-interface.ts", "src/provider-registry.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const filenameBasedZoneIds = new Set(["provider"]);
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10, undefined, filenameBasedZoneIds);
+    const filenameFinding = findings.find((f) => f.text.includes("identified from filename patterns"));
+    expect(filenameFinding).toBeDefined();
+    expect(filenameFinding!.type).toBe("suggestion");
+    expect(filenameFinding!.scope).toBe("provider");
+    expect(filenameFinding!.text).toContain("src/provider/");
+  });
+
+  it("does not generate filename recommendation without filenameBasedZoneIds", () => {
+    const zones: Zone[] = [
+      { id: "provider", name: "Provider", description: "", files: ["src/provider-interface.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const { findings } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(findings.filter((f) => f.text.includes("identified from filename patterns"))).toHaveLength(0);
+  });
+
+  it("catches unenriched name matching deriveZoneName with numeric suffix ID", () => {
+    // deriveZoneName("schema-2") → "Schema 2", which is the default algorithmic name
+    const zones: Zone[] = [
+      { id: "schema-2", name: "Schema 2", description: "", files: ["a.ts", "b.ts"], entryPoints: [], cohesion: 0.8, coupling: 0.2 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("schema-2")!.some((i) => i.includes("Generic zone name"))).toBe(true);
   });
 
   it("detects bidirectional coupling", () => {
@@ -574,5 +691,190 @@ describe("analyzeZones findings", () => {
     for (const insight of result.insights ?? []) {
       expect(result.findings!.some((f) => f.text === insight && f.scope === "global")).toBe(true);
     }
+  });
+});
+
+// ── Zone merging and maxZones scaling ────────────────────────────────────────
+
+describe("zone merging (no numbered suffixes)", () => {
+  it("merges communities with same zone ID instead of adding -2 suffix", async () => {
+    // Create two groups of files that will derive the same zone ID ("src")
+    // but are in separate communities because they have no cross-edges
+    const inventory = makeInventory([
+      makeFileEntry("src/a.ts"),
+      makeFileEntry("src/b.ts"),
+      makeFileEntry("src/c.ts"),
+      makeFileEntry("src/d.ts"),
+      makeFileEntry("src/e.ts"),
+      makeFileEntry("src/f.ts"),
+    ]);
+    // Two disconnected clusters — Louvain will put them in different communities
+    const imports = makeImports([
+      makeEdge("src/a.ts", "src/b.ts"),
+      makeEdge("src/b.ts", "src/c.ts"),
+      makeEdge("src/a.ts", "src/c.ts"),
+      makeEdge("src/d.ts", "src/e.ts"),
+      makeEdge("src/e.ts", "src/f.ts"),
+      makeEdge("src/d.ts", "src/f.ts"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100, // disable size cap so merge is unconstrained
+    });
+
+    // Should have no zone IDs with numeric suffixes
+    for (const zone of result.zones) {
+      expect(zone.id).not.toMatch(/-\d+$/);
+    }
+  });
+
+  it("preserves disambiguation when subdirectories differ", async () => {
+    // Two clusters under different subdirs — disambiguation should succeed
+    const inventory = makeInventory([
+      makeFileEntry("src/auth/login.ts"),
+      makeFileEntry("src/auth/logout.ts"),
+      makeFileEntry("src/auth/session.ts"),
+      makeFileEntry("src/api/routes.ts"),
+      makeFileEntry("src/api/handler.ts"),
+      makeFileEntry("src/api/middleware.ts"),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/auth/login.ts", "src/auth/logout.ts"),
+      makeEdge("src/auth/logout.ts", "src/auth/session.ts"),
+      makeEdge("src/auth/login.ts", "src/auth/session.ts"),
+      makeEdge("src/api/routes.ts", "src/api/handler.ts"),
+      makeEdge("src/api/handler.ts", "src/api/middleware.ts"),
+      makeEdge("src/api/routes.ts", "src/api/middleware.ts"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    // Should have distinct zone IDs (auth + api or similar), no numeric suffixes
+    for (const zone of result.zones) {
+      expect(zone.id).not.toMatch(/-\d+$/);
+    }
+    // Both clusters' files should be accounted for
+    const allFiles = result.zones.flatMap(z => z.files);
+    expect(allFiles).toContain("src/auth/login.ts");
+    expect(allFiles).toContain("src/api/routes.ts");
+  });
+
+  it("merged zone has correct metrics", async () => {
+    // Two clusters under same dir — will merge — verify metrics are recalculated
+    const inventory = makeInventory([
+      makeFileEntry("src/a.ts"),
+      makeFileEntry("src/b.ts"),
+      makeFileEntry("src/c.ts"),
+      makeFileEntry("src/d.ts"),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a.ts", "src/b.ts"),
+      makeEdge("src/c.ts", "src/d.ts"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, {
+      enrich: false,
+      maxZonePercent: 100, // disable size cap so merge is unconstrained
+    });
+
+    // Find the zone that contains all 4 files (should be merged)
+    const mergedZone = result.zones.find(z =>
+      z.files.includes("src/a.ts") && z.files.includes("src/d.ts")
+    );
+    if (mergedZone) {
+      // Cohesion should be calculated for the merged set
+      expect(mergedZone.cohesion).toBeGreaterThanOrEqual(0);
+      expect(mergedZone.cohesion).toBeLessThanOrEqual(1);
+      expect(mergedZone.coupling).toBeGreaterThanOrEqual(0);
+      expect(mergedZone.coupling).toBeLessThanOrEqual(1);
+      // No numbered suffix
+      expect(mergedZone.id).not.toMatch(/-\d+$/);
+    }
+  });
+});
+
+describe("maxZones scaling", () => {
+  it("scales maxZones down for small file sets", () => {
+    // 20 files → scaled maxZones = max(3, floor(20/15)) = 3
+    const files = Array.from({ length: 20 }, (_, i) => `src/f${i}.ts`);
+    const inventory = makeInventory(files.map(f => makeFileEntry(f)));
+
+    // Create a chain of edges so files are in the graph
+    const edges: ImportEdge[] = [];
+    for (let i = 0; i < files.length - 1; i++) {
+      edges.push(makeEdge(files[i], files[i + 1]));
+    }
+    const imports = makeImports(edges);
+
+    const result = runZonePipeline({
+      edges: imports.edges,
+      inventory,
+      imports,
+      scopeFiles: files,
+      maxZonePercent: 100, // disable size policy to test maxZones scaling in isolation
+    });
+
+    // With 20 files and scaled maxZones = max(3, floor(20/15)) = 3
+    expect(result.zones.length).toBeLessThanOrEqual(3);
+    expect(result.zones.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("allows more zones for larger file sets", () => {
+    // 150 files → scaled maxZones = max(3, floor(150/15)) = 10
+    const files = Array.from({ length: 150 }, (_, i) => {
+      const dir = `src/d${Math.floor(i / 10)}`;
+      return `${dir}/f${i}.ts`;
+    });
+    const inventory = makeInventory(files.map(f => makeFileEntry(f)));
+
+    // Create clusters of 10 files each with internal edges
+    const edges: ImportEdge[] = [];
+    for (let cluster = 0; cluster < 15; cluster++) {
+      const base = cluster * 10;
+      for (let i = base; i < base + 9; i++) {
+        edges.push(makeEdge(files[i], files[i + 1]));
+      }
+      // Close the loop within cluster
+      edges.push(makeEdge(files[base + 9], files[base]));
+    }
+    const imports = makeImports(edges);
+
+    const result = runZonePipeline({
+      edges: imports.edges,
+      inventory,
+      imports,
+      scopeFiles: files,
+    });
+
+    // Should have at most 10 zones (scaled from 150 files)
+    expect(result.zones.length).toBeLessThanOrEqual(10);
+  });
+
+  it("respects explicit maxZones when lower than scaled value", () => {
+    const files = Array.from({ length: 150 }, (_, i) => {
+      const dir = `src/d${Math.floor(i / 10)}`;
+      return `${dir}/f${i}.ts`;
+    });
+    const inventory = makeInventory(files.map(f => makeFileEntry(f)));
+    const edges: ImportEdge[] = [];
+    for (let cluster = 0; cluster < 15; cluster++) {
+      const base = cluster * 10;
+      for (let i = base; i < base + 9; i++) {
+        edges.push(makeEdge(files[i], files[i + 1]));
+      }
+      edges.push(makeEdge(files[base + 9], files[base]));
+    }
+    const imports = makeImports(edges);
+
+    const result = runZonePipeline({
+      edges: imports.edges,
+      inventory,
+      imports,
+      scopeFiles: files,
+      maxZones: 5, // explicit cap lower than scaled (10)
+    });
+
+    expect(result.zones.length).toBeLessThanOrEqual(5);
   });
 });

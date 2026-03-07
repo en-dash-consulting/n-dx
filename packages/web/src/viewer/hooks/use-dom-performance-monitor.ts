@@ -5,7 +5,7 @@
  * comparison data. Starts the monitor on mount, cleans up on unmount,
  * and triggers re-renders only when the snapshot changes.
  *
- * @see ../dom-performance-monitor.ts — standalone monitoring module
+ * @see ../performance/dom-performance-monitor.ts — standalone monitoring module
  */
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
@@ -16,7 +16,7 @@ import type {
   RenderTiming,
   UpdateComparison,
   PerformanceSummary,
-} from "../dom-performance-monitor.js";
+} from "../performance/dom-performance-monitor.js";
 import {
   startDOMPerformanceMonitor,
   stopDOMPerformanceMonitor,
@@ -32,7 +32,7 @@ import {
   resetDOMPerformanceMonitor,
   countDOMNodes,
   readHeapUsage,
-} from "../dom-performance-monitor.js";
+} from "../performance/dom-performance-monitor.js";
 
 export interface UseDOMPerformanceMonitorOptions {
   /** Polling interval in milliseconds (default: 2000). */

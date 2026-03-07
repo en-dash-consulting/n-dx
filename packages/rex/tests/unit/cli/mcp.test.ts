@@ -22,6 +22,9 @@ const EXPECTED_TOOLS = [
   "sync_with_remote",
   "get_recommendations",
   "verify_criteria",
+  "reorganize",
+  "health",
+  "facets",
   "get_capabilities",
 ];
 

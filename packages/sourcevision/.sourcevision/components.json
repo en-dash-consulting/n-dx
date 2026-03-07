@@ -14,9 +14,7 @@
       "kind": "function",
       "line": 5,
       "isDefaultExport": true,
-      "conventionExports": [
-        "action"
-      ]
+      "conventionExports": []
     },
     {
       "file": "tests/fixtures/remix-app/app/routes/_auth.tsx",
@@ -32,10 +30,7 @@
       "kind": "function",
       "line": 9,
       "isDefaultExport": true,
-      "conventionExports": [
-        "loader",
-        "meta"
-      ]
+      "conventionExports": []
     },
     {
       "file": "tests/fixtures/remix-app/app/routes/users.$id.tsx",
@@ -43,88 +38,20 @@
       "kind": "function",
       "line": 9,
       "isDefaultExport": true,
-      "conventionExports": [
-        "loader",
-        "action"
-      ]
+      "conventionExports": []
     }
   ],
   "usageEdges": [],
-  "routeModules": [
-    {
-      "file": "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
-      "routePattern": "/login",
-      "exports": [
-        "action",
-        "default"
-      ],
-      "parentLayout": "tests/fixtures/remix-app/app/routes/_auth.tsx",
-      "isLayout": false,
-      "isIndex": false
-    },
-    {
-      "file": "tests/fixtures/remix-app/app/routes/_auth.tsx",
-      "routePattern": null,
-      "exports": [
-        "default"
-      ],
-      "parentLayout": null,
-      "isLayout": true,
-      "isIndex": false
-    },
-    {
-      "file": "tests/fixtures/remix-app/app/routes/_index.tsx",
-      "routePattern": "/",
-      "exports": [
-        "loader",
-        "meta",
-        "default"
-      ],
-      "parentLayout": null,
-      "isLayout": true,
-      "isIndex": true
-    },
-    {
-      "file": "tests/fixtures/remix-app/app/routes/users.$id.tsx",
-      "routePattern": "/users/:id",
-      "exports": [
-        "loader",
-        "action",
-        "default"
-      ],
-      "parentLayout": null,
-      "isLayout": false,
-      "isIndex": false
-    }
-  ],
-  "routeTree": [
-    {
-      "file": "tests/fixtures/remix-app/app/routes/_index.tsx",
-      "routePattern": "/",
-      "children": []
-    },
-    {
-      "file": "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
-      "routePattern": "/login",
-      "children": []
-    },
-    {
-      "file": "tests/fixtures/remix-app/app/routes/users.$id.tsx",
-      "routePattern": "/users/:id",
-      "children": []
-    }
-  ],
+  "routeModules": [],
+  "routeTree": [],
+  "serverRoutes": [],
   "summary": {
     "totalComponents": 5,
-    "totalRouteModules": 4,
+    "totalRouteModules": 0,
     "totalUsageEdges": 0,
-    "routeConventions": {
-      "action": 2,
-      "default": 4,
-      "loader": 2,
-      "meta": 1
-    },
+    "totalServerRoutes": 0,
+    "routeConventions": {},
     "mostUsedComponents": [],
-    "layoutDepth": 1
+    "layoutDepth": 0
   }
 }

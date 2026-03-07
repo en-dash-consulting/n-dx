@@ -13,6 +13,8 @@ import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
 import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
+import { HealthGauge } from "../visualization/index.js";
+import { ReorganizePanel } from "../components/prd-tree/reorganize-panel.js";
 import { usePolling } from "../hooks/use-polling.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -51,6 +53,20 @@ interface NextTask {
   priority?: string;
   description?: string;
   tags?: string[];
+}
+
+interface HealthDimensions {
+  depth: number;
+  balance: number;
+  granularity: number;
+  completeness: number;
+  staleness: number;
+}
+
+interface HealthData {
+  overall: number;
+  dimensions: HealthDimensions;
+  suggestions: string[];
 }
 
 interface DashboardData {
@@ -150,30 +166,42 @@ function StatChip({ value, label, color, accent }: {
 /** Quick action button for starting the next task */
 function StartButton({ taskId, onStarted }: { taskId: string; onStarted: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleStart = useCallback(async (e: Event) => {
     e.stopPropagation();
     setLoading(true);
+    setError(null);
     try {
-      await fetch(`/api/rex/items/${taskId}`, {
+      const res = await fetch(`/api/rex/items/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "in_progress" }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `Failed (${res.status})`);
+      }
       onStarted();
-    } catch {
-      // silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start task");
+      setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(false);
     }
   }, [taskId, onStarted]);
 
-  return h("button", {
-    class: "rex-dash-start-btn",
-    onClick: handleStart,
-    disabled: loading,
-    "aria-label": "Start this task",
-  }, loading ? "Starting…" : "Start Task");
+  return h("div", { class: "rex-dash-start-wrapper" },
+    h("button", {
+      class: "rex-dash-start-btn",
+      onClick: handleStart,
+      disabled: loading,
+      "aria-label": "Start this task",
+    }, loading ? "Starting…" : "Start Task"),
+    error
+      ? h("div", { class: "rex-dash-start-error", role: "alert" }, error)
+      : null,
+  );
 }
 
 /** Epic card with enhanced progress and status display */
@@ -202,12 +230,12 @@ function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: Navigate
           class: "rex-dash-epic-link",
         }),
         stats.inProgress > 0
-          ? h("span", { class: "rex-dash-epic-active-badge" },
+          ? h("span", { class: "status-badge status-badge--in_progress" },
               `${stats.inProgress} active`,
             )
           : null,
         stats.blocked > 0
-          ? h("span", { class: "rex-dash-epic-blocked-badge" },
+          ? h("span", { class: "status-badge status-badge--blocked" },
               `${stats.blocked} blocked`,
             )
           : null,
@@ -238,6 +266,9 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [reorgOpen, setReorgOpen] = useState(false);
+  const [reorgCount, setReorgCount] = useState(0);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -258,9 +289,35 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     }
   }, []);
 
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rex/health");
+      if (res.ok) {
+        setHealth(await res.json());
+      }
+    } catch {
+      // Non-critical — silently skip
+    }
+  }, []);
+
+  const fetchReorgCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rex/reorganize?mode=fast");
+      if (res.ok) {
+        const data = await res.json();
+        setReorgCount(data.proposals?.length ?? 0);
+      }
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
   useEffect(() => {
-    fetchDashboard().then(() => setLoading(false));
-  }, [fetchDashboard]);
+    Promise.all([fetchDashboard(), fetchHealth()])
+      .then(() => setLoading(false));
+    // Reorg count is non-critical and can be slow — don't block initial render
+    fetchReorgCount();
+  }, [fetchDashboard, fetchHealth, fetchReorgCount]);
 
   // Visibility-aware polling via polling manager
   usePolling("rex-dashboard", fetchDashboard, 10_000);
@@ -386,7 +443,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   nextTask.status === "pending"
                     ? h(StartButton, { taskId: nextTask.id, onStarted: fetchDashboard })
                     : nextTask.status === "in_progress"
-                      ? h("span", { class: "rex-dash-next-status-badge" }, "In Progress")
+                      ? h("span", { class: "status-badge status-badge--in_progress" }, "In Progress")
                       : null,
                 ),
                 h(RexTaskLink, {
@@ -471,6 +528,41 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             )
           : null,
 
+        // Structure health card
+        health
+          ? h("div", { class: "rex-dash-panel" },
+              h("h3", { class: "rex-dash-panel-title" }, "Structure Health"),
+              h("div", { class: "rex-dash-health" },
+                h("div", { class: "rex-dash-health-gauge" },
+                  h(HealthGauge, { value: health.overall / 100, label: "Overall", size: 80 }),
+                ),
+                h("div", { class: "rex-dash-health-dims" },
+                  ...(["depth", "balance", "granularity", "completeness", "staleness"] as const).map((dim) =>
+                    h("div", { key: dim, class: "rex-dash-health-dim" },
+                      h("span", { class: "rex-dash-health-dim-label" },
+                        dim.charAt(0).toUpperCase() + dim.slice(1),
+                      ),
+                      h("div", { class: "rex-dash-health-dim-track" },
+                        h("div", {
+                          class: `rex-dash-health-dim-fill${health.dimensions[dim] >= 70 ? " good" : health.dimensions[dim] >= 40 ? " mid" : " low"}`,
+                          style: `width: ${health.dimensions[dim]}%`,
+                        }),
+                      ),
+                      h("span", { class: "rex-dash-health-dim-val" }, String(Math.round(health.dimensions[dim]))),
+                    ),
+                  ),
+                ),
+                health.suggestions.length > 0
+                  ? h("ul", { class: "rex-dash-health-suggestions" },
+                      health.suggestions.slice(0, 3).map((s, i) =>
+                        h("li", { key: i }, s),
+                      ),
+                    )
+                  : null,
+              ),
+            )
+          : null,
+
         // Status breakdown (small summary)
         h("div", { class: "rex-dash-panel" },
           h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
@@ -524,10 +616,25 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   class: "rex-dash-action-btn",
                   onClick: () => navigateTo("validation" as ViewId),
                 }, "Validate PRD"),
+                h("button", {
+                  class: `rex-dash-action-btn${reorgCount > 0 ? " rex-dash-action-btn-accent" : ""}`,
+                  onClick: () => setReorgOpen(true),
+                }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
               ),
             )
           : null,
       ),
     ),
+
+    // Reorganize slide-out panel
+    h(ReorganizePanel, {
+      open: reorgOpen,
+      onClose: () => setReorgOpen(false),
+      onApplied: () => {
+        fetchDashboard();
+        fetchHealth();
+        fetchReorgCount();
+      },
+    }),
   );
 }

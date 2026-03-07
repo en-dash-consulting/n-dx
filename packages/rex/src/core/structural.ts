@@ -1,5 +1,5 @@
 import type { PRDItem, ItemLevel } from "../schema/index.js";
-import { LEVEL_HIERARCHY } from "../schema/index.js";
+import { LEVEL_HIERARCHY, isRootLevel, getContainerLevels } from "../schema/index.js";
 import { walkTree, collectAllIds } from "./tree.js";
 
 export interface EpiclessFeature {
@@ -152,9 +152,9 @@ function findOrphanedItems(items: PRDItem[]): OrphanedItem[] {
 
 /**
  * Container levels that should have children to be meaningful.
- * Tasks and subtasks are leaf-level work items and don't require children.
+ * Work items (tasks/subtasks) are leaf-level and don't require children.
  */
-const CONTAINER_LEVELS = new Set<ItemLevel>(["epic", "feature"]);
+const CONTAINER_LEVELS = new Set<ItemLevel>(getContainerLevels());
 
 /**
  * Terminal statuses where an empty container is expected or acceptable.

@@ -1,7 +1,8 @@
 import { h, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
-import { meterClass, getZoneColorByIndex, basename } from "../utils.js";
+import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
+import { basename } from "../utils.js";
 import type { VNode } from "preact";
 
 interface DetailPanelProps {
@@ -53,7 +54,7 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
       h("div", {
         class: "detail-header",
       },
-        h("h3", null, detail.title || "Details"),
+        h("h3", { title: detail.title || "Details" }, detail.title || "Details"),
         h("button", {
           class: "detail-close",
           onClick: onClose,

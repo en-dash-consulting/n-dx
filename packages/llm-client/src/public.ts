@@ -79,7 +79,7 @@
  *
  * const result = await client.complete({
  *   prompt: "Hello",
- *   model: "claude-sonnet-4-20250514",
+ *   model: "claude-sonnet-4-6",
  * });
  *
  * console.log(result.text);

@@ -1,0 +1,38 @@
+{
+  "id": "hench/process",
+  "name": "Process",
+  "description": "17 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/process/concurrent-execution-metrics.ts",
+    "packages/hench/src/process/exec-shell.ts",
+    "packages/hench/src/process/exec.ts",
+    "packages/hench/src/process/index.ts",
+    "packages/hench/src/process/lifecycle.ts",
+    "packages/hench/src/process/limiter.ts",
+    "packages/hench/src/process/memory-throttle.ts",
+    "packages/hench/src/process/pool.ts",
+    "packages/hench/src/process/process-memory-tracker.ts",
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
+    "packages/hench/tests/unit/process/exec.test.ts",
+    "packages/hench/tests/unit/process/lifecycle.test.ts",
+    "packages/hench/tests/unit/process/limiter.test.ts",
+    "packages/hench/tests/unit/process/memory-throttle.test.ts",
+    "packages/hench/tests/unit/process/pool.test.ts",
+    "packages/hench/tests/unit/process/process-memory-tracker.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/process/index.ts",
+    "packages/hench/src/process/limiter.ts",
+    "packages/hench/src/process/memory-throttle.ts",
+    "packages/hench/src/process/concurrent-execution-metrics.ts",
+    "packages/hench/src/process/lifecycle.ts",
+    "packages/hench/src/process/pool.ts",
+    "packages/hench/src/process/process-memory-tracker.ts",
+    "packages/hench/src/tools/exec-shell.ts"
+  ],
+  "cohesion": 0.64,
+  "coupling": 0.36,
+  "fileCount": 17,
+  "lineCount": 6245
+}

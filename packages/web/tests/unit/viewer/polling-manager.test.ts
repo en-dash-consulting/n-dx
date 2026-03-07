@@ -20,11 +20,11 @@ import {
   getRegisteredPollers,
   getPollerCount,
   resetPollingManager,
-} from "../../../src/viewer/polling-manager.js";
+} from "../../../src/viewer/polling/polling-manager.js";
 import {
   startTabVisibilityMonitor,
   resetTabVisibility,
-} from "../../../src/viewer/tab-visibility.js";
+} from "../../../src/viewer/polling/tab-visibility.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

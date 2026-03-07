@@ -115,7 +115,7 @@ describe("Token Usage API routes", () => {
           inputTokens: 400,
           outputTokens: 200,
           vendor: "claude",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
         },
         targetPath: tmpDir,
         version: "1.0.0",
@@ -304,7 +304,7 @@ describe("Token Usage API routes", () => {
       JSON.stringify({
         llm: {
           vendor: "claude",
-          claude: { model: "claude-sonnet-4-20250514" },
+          claude: { model: "claude-sonnet-4-6" },
         },
       }),
     );
@@ -315,7 +315,7 @@ describe("Token Usage API routes", () => {
 
     expect(data.configured).toEqual({
       vendor: "claude",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
     });
     expect(data.source.rex).toBe(".rex/execution-log.jsonl");
     expect(data.source.hench).toBe(".hench/runs/*.json");
@@ -333,7 +333,7 @@ describe("Token Usage API routes", () => {
     expect(data.byVendorModel[0].toolBreakdown.hench.inputTokens).toBe(8000);
     expect(data.byVendorModel[0].toolBreakdown.rex.inputTokens).toBe(2000);
     expect(data.byVendorModel[1].vendor).toBe("claude");
-    expect(data.byVendorModel[1].model).toBe("claude-sonnet-4-20250514");
+    expect(data.byVendorModel[1].model).toBe("claude-sonnet-4-6");
     expect(data.byVendorModel[1].inputTokens).toBe(400);
     expect(data.byVendorModel[1].outputTokens).toBe(200);
     expect(data.byVendorModel[1].toolBreakdown.sv.inputTokens).toBe(400);
@@ -376,7 +376,7 @@ describe("Token Usage API routes", () => {
       vm.vendor === "codex" && vm.model === "gpt-5-codex",
     )).toBe(true);
     expect(data.byVendorModel.some((vm: { vendor: string; model: string }) =>
-      vm.vendor === "claude" && vm.model === "claude-sonnet-4-20250514",
+      vm.vendor === "claude" && vm.model === "claude-sonnet-4-6",
     )).toBe(true);
     expect(data.byVendorModel.some((vm: { vendor: string; model: string }) =>
       vm.vendor === "claude" && vm.model === "claude-opus-4-20250514",

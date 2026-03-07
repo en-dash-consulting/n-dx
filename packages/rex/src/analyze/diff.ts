@@ -130,7 +130,20 @@ export function formatDiff(
         const taskExists = featureChildren.has(taskKey);
         const pri = t.priority ? ` [${t.priority}]` : "";
 
-        if (taskExists) {
+        if (t.decomposition) {
+          // Show decomposed task with children indented beneath
+          const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
+          const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
+          const decompSuffix = `${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`;
+          lines.push({ marker: "+", level: "task", title: t.title, suffix: decompSuffix, indent: 2 });
+          addCount++;
+          for (const child of t.decomposition.children) {
+            const childPri = child.priority ? ` [${child.priority}]` : "";
+            const childLoe = child.loe !== undefined ? ` (LoE: ${child.loe}w)` : "";
+            lines.push({ marker: "+", level: "child", title: `↳ ${child.title}`, suffix: `${childPri}${childLoe}`, indent: 3 });
+            addCount++;
+          }
+        } else if (taskExists) {
           lines.push({ marker: "=", level: "task", title: t.title, suffix: pri, indent: 2 });
           unchangedCount++;
         } else {

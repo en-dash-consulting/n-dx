@@ -11,6 +11,20 @@ const PolicyLimitsConfigSchema = z.object({
   maxTotalCommands: z.number().int().nonnegative().optional(),
 }).optional();
 
+const MemoryThrottleConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  delayThreshold: z.number().min(0).max(100).optional(),
+  rejectThreshold: z.number().min(0).max(100).optional(),
+  baseDelayMs: z.number().positive().optional(),
+  maxDelayMs: z.number().positive().optional(),
+  maxRetries: z.number().int().nonnegative().optional(),
+}).optional();
+
+const MemoryMonitorConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  spawnThreshold: z.number().min(0).max(100).optional(),
+}).optional();
+
 const GuardConfigSchema = z.object({
   blockedPaths: z.array(z.string()),
   allowedCommands: z.array(z.string()),
@@ -23,6 +37,8 @@ const GuardConfigSchema = z.object({
     "branch", "checkout", "stash", "show", "rev-parse",
   ]),
   policy: PolicyLimitsConfigSchema,
+  memoryThrottle: MemoryThrottleConfigSchema,
+  memoryMonitor: MemoryMonitorConfigSchema,
 });
 
 const RetryConfigSchema = z.object({

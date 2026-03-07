@@ -1,0 +1,19 @@
+{
+  "id": "hench/unit/hench",
+  "name": "Hench/unit/hench",
+  "description": "7 files, primarily JSON, Other, Markdown",
+  "files": [
+    "packages/hench/Hench-F.png",
+    "packages/hench/Hench.png",
+    "packages/hench/README.md",
+    "packages/hench/package-lock.json",
+    "packages/hench/package.json",
+    "packages/hench/tsconfig.json",
+    "packages/hench/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 2148
+}

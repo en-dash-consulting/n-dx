@@ -3,7 +3,7 @@
  * to .sourcevision/zones/{zone-id}/.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   Inventory,
@@ -13,6 +13,7 @@ import type {
   ZoneCrossing,
   Finding,
   ZoneSummary,
+  ZoneRiskMetrics,
 } from "../schema/index.js";
 import { toCanonicalJSON } from "../util/sort.js";
 
@@ -36,6 +37,9 @@ export function generateZoneContext(
   lines.push("");
   lines.push(`Zone: ${zone.name} (\`${zone.id}\`)`);
   lines.push(`Files: ${zone.files.length}, Cohesion: ${zone.cohesion.toFixed(2)}, Coupling: ${zone.coupling.toFixed(2)}`);
+  if (zone.riskMetrics) {
+    lines.push(`Risk: ${zone.riskMetrics.riskLevel} (score: ${zone.riskMetrics.riskScore.toFixed(2)})`);
+  }
   if (zone.description) {
     lines.push(`Description: ${zone.description}`);
   }
@@ -148,6 +152,27 @@ export function generateZoneContext(
     lines.push("");
   }
 
+  // ── Sub-crossings ──
+  if (zone.subCrossings && zone.subCrossings.length > 0) {
+    lines.push("<sub-crossings>");
+    lines.push("");
+    lines.push("Cross-dependencies between sub-zones:");
+
+    // Group by directed zone pair and count
+    const pairCounts = new Map<string, number>();
+    for (const c of zone.subCrossings) {
+      const key = `${c.fromZone} → ${c.toZone}`;
+      pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+    }
+    for (const [pair, count] of sortedEntries(pairCounts)) {
+      lines.push(`  ${pair}: ${count}`);
+    }
+
+    lines.push("");
+    lines.push("</sub-crossings>");
+    lines.push("");
+  }
+
   // ── Sub-zones ──
   if (zone.subZones && zone.subZones.length > 0) {
     lines.push("<sub-zones>");
@@ -183,7 +208,7 @@ export function buildZoneSummary(
     .filter((f) => fileSet.has(f.path))
     .reduce((sum, f) => sum + f.lineCount, 0);
 
-  return {
+  const summary: ZoneSummary = {
     id: zone.id,
     name: zone.name,
     description: zone.description,
@@ -194,6 +219,13 @@ export function buildZoneSummary(
     fileCount: zone.files.length,
     lineCount,
   };
+
+  // Include risk metrics when available on the zone
+  if (zone.riskMetrics) {
+    summary.riskMetrics = zone.riskMetrics;
+  }
+
+  return summary;
 }
 
 /**
@@ -209,8 +241,37 @@ export function emitZoneOutputs(
 ): void {
   const zonesDir = join(outputDir, "zones");
 
+  pruneStaleZoneFolders(zonesDir, zones);
+
   for (const zone of zones.zones) {
     emitSingleZoneOutput(zonesDir, zone, inventory, imports, zones);
+  }
+}
+
+/**
+ * Remove zone folders that no longer correspond to any active zone.
+ * Prevents stale folders from accumulating when zone IDs change between runs.
+ */
+export function pruneStaleZoneFolders(zonesDir: string, zones: Zones): void {
+  if (!existsSync(zonesDir)) return;
+
+  // Collect all active zone folder names (leaf segment of zone.id, colon→dash)
+  const activeNames = new Set<string>();
+  function collectNames(zoneList: Zone[]): void {
+    for (const zone of zoneList) {
+      const dirName = zone.id.includes("/")
+        ? zone.id.split("/").pop()!.replace(/:/g, "-")
+        : zone.id.replace(/:/g, "-");
+      activeNames.add(dirName);
+      if (zone.subZones) collectNames(zone.subZones);
+    }
+  }
+  collectNames(zones.zones);
+
+  for (const entry of readdirSync(zonesDir, { withFileTypes: true })) {
+    if (entry.isDirectory() && !activeNames.has(entry.name)) {
+      rmSync(join(zonesDir, entry.name), { recursive: true });
+    }
   }
 }
 

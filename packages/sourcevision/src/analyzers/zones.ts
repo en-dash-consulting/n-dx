@@ -18,11 +18,12 @@
  * @see {@link generateStructuralInsights} for automated metric interpretation
  */
 
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   Inventory,
   Imports,
+  ImportEdge,
   Zone,
   ZoneCrossing,
   Zones,
@@ -40,9 +41,11 @@ import {
 import { sortZonesData } from "../util/sort.js";
 import {
   buildUndirectedGraph,
+  addDirectoryProximityEdges,
   louvainPhase1,
   mergeBidirectionalCoupling,
   mergeSmallCommunities,
+  mergeSatelliteCommunities,
   capZoneCount,
   splitLargeCommunities,
 } from "./louvain.js";
@@ -58,6 +61,41 @@ export interface AnalyzeZonesResult {
   structureChanged: boolean;
 }
 
+/** Options for the reusable zone detection pipeline. */
+export interface ZonePipelineOptions {
+  /** Import edges to cluster (pre-filtered for scope). */
+  edges: ImportEdge[];
+  /** Full inventory for zone descriptions and file metadata. */
+  inventory: Inventory;
+  /** Full imports for entry point detection and crossing computation. */
+  imports: Imports;
+  /** File paths in scope for zone assignment. */
+  scopeFiles: string[];
+  /** Maximum number of root-level zones. Default: 15. */
+  maxZones?: number;
+  /**
+   * Maximum percentage of scope files a single zone may contain (1–100).
+   * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+   * Set to `100` to disable the zone size cap.
+   */
+  maxZonePercent?: number;
+  /** Parent zone ID for sub-zone ID derivation. Reserved for subdivision. */
+  parentId?: string;
+  /** Current recursion depth. Reserved for subdivision. */
+  depth?: number;
+  /** Test files excluded from cohesion/coupling metric computation. */
+  testFiles?: Set<string>;
+}
+
+/** Result of running the zone detection pipeline. */
+export interface ZonePipelineResult {
+  zones: Zone[];
+  crossings: ZoneCrossing[];
+  unzoned: string[];
+  /** Zone IDs that were derived from filename patterns rather than directory structure. */
+  filenameBasedZoneIds: Set<string>;
+}
+
 // ── Zone ID / name derivation ───────────────────────────────────────────────
 
 const GENERIC_SEGMENTS = new Set([
@@ -67,6 +105,12 @@ const GENERIC_SEGMENTS = new Set([
   "packages",
   "internal",
   "pkg",
+]);
+
+/** Segments skipped during zone ID derivation (generic + test directories). */
+const SKIPPABLE_SEGMENTS = new Set([
+  ...GENERIC_SEGMENTS,
+  "tests", "test", "spec", "specs", "mocks",
 ]);
 
 /**
@@ -80,8 +124,8 @@ const GENERIC_SEGMENTS = new Set([
 export function deriveZoneId(files: string[], parentId?: string): string {
   // When deriving sub-zone IDs, treat parent's ID segments as generic
   const skip = parentId
-    ? new Set([...GENERIC_SEGMENTS, ...parentId.split("/").map(s => s.toLowerCase())])
-    : GENERIC_SEGMENTS;
+    ? new Set([...SKIPPABLE_SEGMENTS, ...parentId.split("/").map(s => s.toLowerCase())])
+    : SKIPPABLE_SEGMENTS;
 
   const segmentCounts = new Map<string, number>();
 
@@ -96,21 +140,22 @@ export function deriveZoneId(files: string[], parentId?: string): string {
     // Find first non-skip segment
     let found = false;
     for (const part of parts) {
-      const normalized = part.toLowerCase().replace(/_/g, "-");
-      if (!skip.has(part) && !skip.has(normalized)) {
-        segmentCounts.set(
-          normalized,
-          (segmentCounts.get(normalized) ?? 0) + 1
-        );
-        found = true;
-        break;
-      }
+      const normalized = part.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+      if (!normalized || skip.has(part) || skip.has(normalized)) continue;
+      segmentCounts.set(
+        normalized,
+        (segmentCounts.get(normalized) ?? 0) + 1
+      );
+      found = true;
+      break;
     }
     // If all segments were skipped, use the last one
     if (!found && parts.length > 0) {
       const last = parts[parts.length - 1];
-      const normalized = last.toLowerCase().replace(/_/g, "-");
-      segmentCounts.set(normalized, (segmentCounts.get(normalized) ?? 0) + 1);
+      const normalized = last.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+      if (normalized) {
+        segmentCounts.set(normalized, (segmentCounts.get(normalized) ?? 0) + 1);
+      }
     }
   }
 
@@ -130,6 +175,129 @@ export function deriveZoneId(files: string[], parentId?: string): string {
 }
 
 /**
+ * Disambiguate a zone ID by finding the most common path segment that
+ * appears AFTER the baseId segment in file paths. Returns `${baseId}-${next}`
+ * (e.g., "routes-admin") or just `baseId` if no discriminator found.
+ */
+export function disambiguateZoneId(
+  baseId: string,
+  files: string[],
+  parentId?: string
+): string {
+  const parentSegments = parentId
+    ? new Set(parentId.split("/").map(s => s.toLowerCase()))
+    : new Set<string>();
+
+  const nextCounts = new Map<string, number>();
+
+  for (const file of files) {
+    const parts = dirname(file).split("/");
+    // Find the index of the baseId segment
+    let baseIdx = -1;
+    for (let i = 0; i < parts.length; i++) {
+      const normalized = parts[i].toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+      if (normalized === baseId) {
+        baseIdx = i;
+        break;
+      }
+    }
+    if (baseIdx === -1) continue;
+
+    // Look for the first meaningful segment after baseId
+    for (let i = baseIdx + 1; i < parts.length; i++) {
+      const normalized = parts[i].toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+      if (
+        !normalized ||
+        SKIPPABLE_SEGMENTS.has(normalized) ||
+        parentSegments.has(normalized)
+      ) {
+        continue;
+      }
+      nextCounts.set(normalized, (nextCounts.get(normalized) ?? 0) + 1);
+      break;
+    }
+  }
+
+  if (nextCounts.size === 0) return baseId;
+
+  // Pick the most common next segment, tie-break lexicographic
+  let bestSegment = "";
+  let bestCount = 0;
+  for (const [seg, count] of nextCounts) {
+    if (count > bestCount || (count === bestCount && seg < bestSegment)) {
+      bestSegment = seg;
+      bestCount = count;
+    }
+  }
+
+  return bestSegment ? `${baseId}-${bestSegment}` : baseId;
+}
+
+/** Words skipped during filename-based zone ID derivation (too generic). */
+const FILENAME_SKIP_WORDS = new Set([
+  "test", "spec", "index", "utils", "helpers", "types",
+  "config", "constants", "main", "app", "mod", "lib",
+]);
+
+/**
+ * Derive a zone ID from the dominant theme word in filename stems.
+ * Used as a fallback when directory-based derivation produces duplicate IDs.
+ *
+ * Algorithm:
+ * 1. Filter out test files (*.test.ts, *.spec.ts)
+ * 2. Extract filename stems, split by `-`, `_`, and camelCase boundaries
+ * 3. Skip generic words (index, utils, types, etc.)
+ * 4. Count word frequency (deduplicated per file)
+ * 5. Return the most common word if it appears in ≥30% of source files (min 2 files)
+ * 6. Tie-break lexicographically for determinism
+ */
+export function deriveZoneIdFromFilenames(files: string[]): string | null {
+  // Filter out test files
+  const sourceFiles = files.filter(
+    (f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts")
+      && !f.endsWith(".test.js") && !f.endsWith(".spec.js")
+      && !f.endsWith(".test.tsx") && !f.endsWith(".spec.tsx")
+  );
+  if (sourceFiles.length < 2) return null;
+
+  const wordCounts = new Map<string, number>();
+
+  for (const file of sourceFiles) {
+    const stem = basename(file).replace(/\.[^.]+$/, "");
+    // Split by `-`, `_`, and camelCase boundaries
+    const words = stem
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .split(/[-_\s]+/)
+      .filter((w) => w.length > 1 && !FILENAME_SKIP_WORDS.has(w));
+
+    // Deduplicate per file
+    const unique = new Set(words);
+    for (const word of unique) {
+      wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
+    }
+  }
+
+  if (wordCounts.size === 0) return null;
+
+  // Find the most common word, tie-break lexicographically
+  let bestWord = "";
+  let bestCount = 0;
+  for (const [word, count] of wordCounts) {
+    if (count > bestCount || (count === bestCount && word < bestWord)) {
+      bestWord = word;
+      bestCount = count;
+    }
+  }
+
+  // Must appear in ≥30% of source files and at least 2 files
+  const threshold = Math.max(2, Math.ceil(sourceFiles.length * 0.3));
+  if (bestCount < threshold) return null;
+
+  return bestWord;
+}
+
+/**
  * Title-case a zone ID: "detail-panel" → "Detail Panel"
  */
 export function deriveZoneName(id: string): string {
@@ -137,6 +305,23 @@ export function deriveZoneName(id: string): string {
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+// ── Generic zone name detection ──────────────────────────────────────────────
+
+const GENERIC_BASES = new Set([
+  "src", "lib", "app", "packages", "internal", "pkg",
+  "root", "tests", "test", "spec", "specs", "mocks",
+  "source", "library", "application", "package",
+]);
+
+function isGenericZoneName(name: string, id: string): boolean {
+  // "Src 2", "Lib 3" etc — generic base + numeric suffix
+  const match = name.match(/^(\w+)\s+(\d+)$/);
+  if (match && GENERIC_BASES.has(match[1].toLowerCase())) return true;
+  // Name unchanged from algorithmic default when ID has numeric suffix
+  if (/-\d+$/.test(id) && name === deriveZoneName(id)) return true;
+  return false;
 }
 
 // ── Zone description from language stats ────────────────────────────────────
@@ -174,7 +359,8 @@ function describeZone(
  */
 export function assignByProximity(
   zones: Zone[],
-  unzonedFiles: string[]
+  unzonedFiles: string[],
+  maxZoneSize?: number,
 ): { zones: Zone[]; remaining: string[] } {
   if (unzonedFiles.length === 0 || zones.length === 0) {
     return { zones, remaining: unzonedFiles };
@@ -197,6 +383,13 @@ export function assignByProximity(
   const assignments = new Map<string, string[]>(); // zoneId → files to add
   const remaining: string[] = [];
 
+  // Track pending additions per zone to enforce size cap
+  const pendingCounts = new Map<string, number>();
+  const zoneSizes = new Map<string, number>();
+  for (const zone of zones) {
+    zoneSizes.set(zone.id, zone.files.length);
+  }
+
   for (const file of [...unzonedFiles].sort()) {
     let dir = dirname(file);
     let assigned = false;
@@ -205,13 +398,26 @@ export function assignByProximity(
       const counts = dirZones.get(dir);
       if (counts && counts.size > 0) {
         // Pick zone with most files in this directory, tie-break by ID
+        // Skip zones that are already at the size cap
         let bestZone = "";
         let bestCount = 0;
         for (const [zoneId, count] of counts) {
+          if (maxZoneSize) {
+            const currentSize = (zoneSizes.get(zoneId) ?? 0) + (pendingCounts.get(zoneId) ?? 0);
+            if (currentSize >= maxZoneSize) continue;
+          }
           if (count > bestCount || (count === bestCount && zoneId < bestZone)) {
             bestZone = zoneId;
             bestCount = count;
           }
+        }
+
+        if (!bestZone) {
+          // All candidate zones in this directory are full, try parent
+          const parent = dirname(dir);
+          if (parent === dir) break;
+          dir = parent;
+          continue;
         }
 
         let list = assignments.get(bestZone);
@@ -220,6 +426,7 @@ export function assignByProximity(
           assignments.set(bestZone, list);
         }
         list.push(file);
+        pendingCounts.set(bestZone, (pendingCounts.get(bestZone) ?? 0) + 1);
         assigned = true;
         break;
       }
@@ -253,13 +460,18 @@ export const SUBDIVISION_THRESHOLD = 50;
 export const MAX_SUBDIVISION_DEPTH = 3;
 
 /**
- * Subdivide a large zone by running Louvain on its internal import graph.
- * Returns sub-zones with IDs prefixed by parent zone ID.
+ * Subdivide a large zone by running the full zone pipeline on its internal
+ * import graph. Returns sub-zones with IDs prefixed by parent zone ID.
+ *
+ * Uses the same algorithm at every zoom level (resolution escalation,
+ * proximity edges, splitLargeCommunities, mergeSameIdCommunities) and
+ * stores cross-sub-zone edges on `zone.subCrossings`.
  */
 export function subdivideZone(
   zone: Zone,
   imports: Imports,
   inventory: Inventory,
+  testFiles: Set<string> = new Set(),
   depth: number = 0
 ): Zone[] {
   // Don't subdivide small zones or if we've hit max depth
@@ -279,100 +491,29 @@ export function subdivideZone(
     return [];
   }
 
-  // Build sub-graph and run Louvain
-  const subGraph = buildUndirectedGraph(internalEdges);
-  let community = louvainPhase1(subGraph);
-  community = mergeBidirectionalCoupling(community, subGraph);
-  community = mergeSmallCommunities(community, subGraph);
-  // Cap at 8 sub-zones per parent
-  community = capZoneCount(community, subGraph, 8);
+  // Run full pipeline on the zone's internal graph
+  const result = runZonePipeline({
+    edges: internalEdges,
+    inventory,
+    imports,
+    scopeFiles: zone.files,
+    maxZones: 8,
+    parentId: zone.id,
+    depth: depth + 1,
+    testFiles,
+  });
 
-  // Gather community → members
-  const communityMembers = new Map<string, string[]>();
-  for (const [node, comm] of community) {
-    let list = communityMembers.get(comm);
-    if (!list) {
-      list = [];
-      communityMembers.set(comm, list);
-    }
-    list.push(node);
-  }
-
-  // If Louvain found only 1 community, no meaningful subdivision
-  if (communityMembers.size <= 1) {
+  // If pipeline found only 1 or 0 zones, no meaningful subdivision
+  if (result.zones.length <= 1) {
     return [];
   }
 
-  // Build sub-zones
-  const usedIds = new Set<string>();
-  const subZones: Zone[] = [];
-
-  const sortedCommunities = [...communityMembers.entries()]
-    .map(([comm, members]) => [comm, members.sort()] as const)
-    .sort(([, a], [, b]) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-
-  for (const [, members] of sortedCommunities) {
-    let subId = deriveZoneId(members, zone.id);
-    if (usedIds.has(subId)) {
-      let suffix = 2;
-      while (usedIds.has(`${subId}-${suffix}`)) suffix++;
-      subId = `${subId}-${suffix}`;
-    }
-    usedIds.add(subId);
-
-    // Prefix with parent zone ID
-    const fullId = `${zone.id}/${subId}`;
-
-    // Entry points: files imported from outside this sub-zone (but within parent zone)
-    const memberSet = new Set(members);
-    const entryPoints: string[] = [];
-    for (const edge of internalEdges) {
-      if (memberSet.has(edge.to) && !memberSet.has(edge.from)) {
-        if (!entryPoints.includes(edge.to)) {
-          entryPoints.push(edge.to);
-        }
-      }
-    }
-
-    // Cohesion / coupling from sub-graph
-    let internalEdgeCount = 0;
-    let totalEdgesFromSubZone = 0;
-    for (const node of members) {
-      const neighbors = subGraph.get(node);
-      if (!neighbors) continue;
-      for (const [neighbor] of neighbors) {
-        totalEdgesFromSubZone++;
-        if (memberSet.has(neighbor)) internalEdgeCount++;
-      }
-    }
-    const cohesion =
-      totalEdgesFromSubZone > 0 ? internalEdgeCount / totalEdgesFromSubZone : 1;
-    const coupling =
-      totalEdgesFromSubZone > 0
-        ? (totalEdgesFromSubZone - internalEdgeCount) / totalEdgesFromSubZone
-        : 0;
-
-    const subZone: Zone = {
-      id: fullId,
-      name: deriveZoneName(subId),
-      description: describeZone(members, inventory),
-      files: members,
-      entryPoints,
-      cohesion: Math.round(cohesion * 100) / 100,
-      coupling: Math.round(coupling * 100) / 100,
-      depth: (zone.depth ?? 0) + 1,
-    };
-
-    // Recursively subdivide if still large
-    const nestedSubZones = subdivideZone(subZone, imports, inventory, depth + 1);
-    if (nestedSubZones.length > 0) {
-      subZone.subZones = nestedSubZones;
-    }
-
-    subZones.push(subZone);
+  // Store sub-crossings on parent zone
+  if (result.crossings.length > 0) {
+    zone.subCrossings = result.crossings;
   }
 
-  return subZones;
+  return result.zones;
 }
 
 // ── Structure hash ──────────────────────────────────────────────────────────
@@ -405,19 +546,11 @@ export function computeZoneContentHash(
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
 }
 
-/**
- * Hash all zone content hashes into a single global content hash.
- * Changes when any zone's content changes.
- */
-export function computeGlobalContentHash(
-  zoneContentHashes: Record<string, string>
-): string {
-  const data = Object.keys(zoneContentHashes)
-    .sort()
-    .map((id) => `${id}\0${zoneContentHashes[id]}`)
-    .join("\n");
-  return createHash("sha256").update(data).digest("hex").slice(0, 16);
-}
+// Imported from zone-hash.ts to break circular dependency with enrich.ts.
+// Both zones.ts and enrich.ts need this function; placing it in a third
+// module prevents the cycle.
+import { computeGlobalContentHash } from "./zone-hash.js";
+export { computeGlobalContentHash } from "./zone-hash.js";
 
 // ── Structural insights ─────────────────────────────────────────────────────
 
@@ -449,9 +582,11 @@ export function generateStructuralInsights(
   imports: Imports,
   totalFiles: number,
   callGraphStats?: { zoneStats: Array<{ zoneId: string; internalCalls: number; outgoingCalls: number; incomingCalls: number; callCohesion: number; callCoupling: number }>; crossZonePatterns: Array<{ fromZone: string; toZone: string; callCount: number }> },
-): { zoneInsights: Map<string, string[]>; globalInsights: string[] } {
+  filenameBasedZoneIds?: Set<string>,
+): { zoneInsights: Map<string, string[]>; globalInsights: string[]; findings: Finding[] } {
   const zoneInsights = new Map<string, string[]>();
   const globalInsights: string[] = [];
+  const findings: Finding[] = [];
 
   for (const zone of zones) {
     zoneInsights.set(zone.id, []);
@@ -507,6 +642,12 @@ export function generateStructuralInsights(
     if (zone.entryPoints.length > 8) {
       insights.push(
         `${zone.entryPoints.length} entry points — wide API surface, consider consolidating exports`
+      );
+    }
+
+    if (isGenericZoneName(zone.name, zone.id)) {
+      insights.push(
+        `Generic zone name "${zone.name}" — enrichment did not assign a meaningful name reflecting this zone's domain purpose`
       );
     }
   }
@@ -635,7 +776,63 @@ export function generateStructuralInsights(
     }
   }
 
-  return { zoneInsights, globalInsights };
+  // ── File-structure recommendations ──
+
+  // 2a. Flat directory spanning 3+ zones
+  const dirToZones = new Map<string, Set<string>>();
+  for (const zone of zones) {
+    for (const f of zone.files) {
+      const dir = dirname(f);
+      let set = dirToZones.get(dir);
+      if (!set) { set = new Set(); dirToZones.set(dir, set); }
+      set.add(zone.id);
+    }
+  }
+  for (const [dir, zoneSet] of dirToZones) {
+    if (zoneSet.size >= 3) {
+      const names = [...zoneSet].sort().join(", ");
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: "global",
+        text: `${dir}/ contains files from ${zoneSet.size} zones (${names}) — consider grouping into subdirectories to clarify architectural boundaries`,
+        severity: "info",
+      });
+    }
+  }
+
+  // 2b. Zone with scattered files (5+ directories)
+  for (const zone of zones) {
+    const dirs = new Set(zone.files.map((f) => dirname(f)));
+    if (dirs.size >= 5) {
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zone.id,
+        text: `Zone "${zone.id}" has files across ${dirs.size} directories — consider consolidating under a dedicated directory`,
+        severity: "info",
+      });
+    }
+  }
+
+  // 2c. Filename-derived zone
+  if (filenameBasedZoneIds) {
+    for (const zoneId of filenameBasedZoneIds) {
+      const zone = zones.find((z) => z.id === zoneId);
+      if (!zone || zone.files.length === 0) continue;
+      const primaryDir = dirname(zone.files[0]);
+      const leafId = zoneId.includes("/") ? zoneId.split("/").pop()! : zoneId;
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zoneId,
+        text: `Zone "${leafId}" was identified from filename patterns, not directory structure — consider creating ${primaryDir}/${leafId}/ and moving related files there`,
+        severity: "info",
+      });
+    }
+  }
+
+  return { zoneInsights, globalInsights, findings };
 }
 
 // ── Helper: merge same-ID communities ────────────────────────────────────────
@@ -753,19 +950,88 @@ function dominantPackageRoot(files: string[]): string | null {
   return ratio >= 0.7 ? bestRoot : null;
 }
 
+// ── Helper: compute zone metrics ─────────────────────────────────────────────
+
+/**
+ * Compute cohesion and coupling metrics for a set of files in a zone.
+ * Test files are excluded from the calculation — both as iteration sources
+ * and as neighbors — because test→source and source→test edges represent
+ * test dependencies, not architectural coupling. Without this exclusion,
+ * zones with many test files (e.g. E2E suites) produce misleading metrics
+ * where test-file neighbors inflate internal/external edge counts.
+ */
+function computeZoneMetrics(
+  files: string[],
+  graph: Map<string, Map<string, number>>,
+  testFiles: Set<string>,
+): { cohesion: number; coupling: number } {
+  const memberSet = new Set(files);
+  let internalEdgeCount = 0;
+  let totalEdgesFromZone = 0;
+  let productionNodeCount = 0;
+  for (const node of files) {
+    if (testFiles.has(node)) continue;
+    productionNodeCount++;
+    const neighbors = graph.get(node);
+    if (!neighbors) continue;
+    for (const [neighbor] of neighbors) {
+      if (testFiles.has(neighbor)) continue;
+      totalEdgesFromZone++;
+      if (memberSet.has(neighbor)) internalEdgeCount++;
+    }
+  }
+  // A zone with ≤1 production files cannot form internal production edges,
+  // so cohesion/coupling are structurally meaningless. Return healthy defaults
+  // to avoid false-positive risk alerts on test-dominated or single-file zones.
+  if (productionNodeCount <= 1) {
+    return { cohesion: 1, coupling: 0 };
+  }
+  return {
+    cohesion: totalEdgesFromZone > 0
+      ? Math.round((internalEdgeCount / totalEdgesFromZone) * 100) / 100 : 1,
+    coupling: totalEdgesFromZone > 0
+      ? Math.round(((totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone) * 100) / 100 : 0,
+  };
+}
+
+// ── Helper: compute entry points ─────────────────────────────────────────────
+
+/** Find files imported from outside the given member set. */
+function computeEntryPoints(
+  memberSet: Set<string>,
+  imports: Imports,
+): string[] {
+  const entryPoints: string[] = [];
+  for (const edge of imports.edges) {
+    if (memberSet.has(edge.to) && !memberSet.has(edge.from)) {
+      if (!entryPoints.includes(edge.to)) {
+        entryPoints.push(edge.to);
+      }
+    }
+  }
+  return entryPoints;
+}
+
 // ── Helper: build zones from communities ─────────────────────────────────────
 
 /**
  * Convert Louvain community assignments into Zone objects with metrics.
  * Computes entry points, cohesion/coupling, and recursive subdivision.
+ *
+ * When `parentId` is provided (subdivision), zone IDs are derived relative
+ * to the parent and prefixed with `parentId/`. The `depth` parameter is
+ * threaded to `subdivideZone` for recursion limiting.
  */
 function buildZonesFromCommunities(
   community: Map<string, string>,
   graph: Map<string, Map<string, number>>,
   imports: Imports,
   inventory: Inventory,
-  testFiles: Set<string>
-): Zone[] {
+  testFiles: Set<string>,
+  parentId?: string,
+  depth: number = 0,
+  maxMergeSize?: number,
+): { zones: Zone[]; filenameBasedZoneIds: Set<string> } {
   const communityMembers = new Map<string, string[]>();
   for (const [node, comm] of community) {
     let list = communityMembers.get(comm);
@@ -778,50 +1044,63 @@ function buildZonesFromCommunities(
 
   const usedIds = new Set<string>();
   const zones: Zone[] = [];
+  const filenameBasedZoneIds = new Set<string>();
 
   const sortedCommunities = [...communityMembers.entries()]
     .map(([comm, members]) => [comm, members.sort()] as const)
     .sort(([, a], [, b]) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 
   for (const [, members] of sortedCommunities) {
-    let id = deriveZoneId(members);
+    let id = deriveZoneId(members, parentId);
     if (usedIds.has(id)) {
-      let suffix = 2;
-      while (usedIds.has(`${id}-${suffix}`)) suffix++;
-      id = `${id}-${suffix}`;
-    }
-    usedIds.add(id);
-
-    const memberSet = new Set(members);
-    const entryPoints: string[] = [];
-    for (const edge of imports.edges) {
-      if (memberSet.has(edge.to) && !memberSet.has(edge.from)) {
-        if (!entryPoints.includes(edge.to)) {
-          entryPoints.push(edge.to);
+      const disambiguated = disambiguateZoneId(id, members, parentId);
+      if (disambiguated !== id && !usedIds.has(disambiguated)) {
+        id = disambiguated;
+      } else {
+        // Try filename-based derivation before merging or adding numeric suffix
+        const filenameId = deriveZoneIdFromFilenames(members);
+        if (filenameId && !usedIds.has(filenameId)) {
+          id = filenameId;
+          filenameBasedZoneIds.add(parentId ? `${parentId}/${id}` : id);
+        } else {
+          // Merge into existing zone instead of creating a numbered duplicate,
+          // but only if the combined size doesn't exceed the zone size cap
+          const targetId = parentId ? `${parentId}/${id}` : id;
+          const existing = zones.find(z => z.id === targetId);
+          if (existing && (!maxMergeSize || existing.files.length + members.length <= maxMergeSize)) {
+            existing.files.push(...members);
+            existing.files.sort();
+            existing.description = describeZone(existing.files, inventory);
+            const mergedSet = new Set(existing.files);
+            existing.entryPoints = computeEntryPoints(mergedSet, imports);
+            const metrics = computeZoneMetrics(existing.files, graph, testFiles);
+            existing.cohesion = metrics.cohesion;
+            existing.coupling = metrics.coupling;
+            // Re-subdivide with merged files
+            existing.subZones = undefined;
+            const subZones = subdivideZone(existing, imports, inventory, testFiles, depth);
+            if (subZones.length > 0) {
+              existing.subZones = subZones;
+            }
+            continue; // Skip creating a new zone
+          }
+          // Fallback: numeric suffix when merge would exceed size cap
+          let suffix = 2;
+          while (usedIds.has(`${id}-${suffix}`)) suffix++;
+          id = `${id}-${suffix}`;
         }
       }
     }
+    usedIds.add(id);
 
-    // Cohesion / coupling metrics from the import graph.
-    // Test files excluded: test→source edges represent test dependencies,
-    // not architectural coupling, and would inflate coupling metrics.
-    let internalEdgeCount = 0;
-    let totalEdgesFromZone = 0;
-    for (const node of members) {
-      if (testFiles.has(node)) continue;
-      const neighbors = graph.get(node);
-      if (!neighbors) continue;
-      for (const [neighbor] of neighbors) {
-        totalEdgesFromZone++;
-        if (memberSet.has(neighbor)) internalEdgeCount++;
-      }
+    // Prefix with parent zone ID for subdivision
+    if (parentId) {
+      id = `${parentId}/${id}`;
     }
-    const cohesion =
-      totalEdgesFromZone > 0 ? internalEdgeCount / totalEdgesFromZone : 1;
-    const coupling =
-      totalEdgesFromZone > 0
-        ? (totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone
-        : 0;
+
+    const memberSet = new Set(members);
+    const entryPoints = computeEntryPoints(memberSet, imports);
+    const { cohesion, coupling } = computeZoneMetrics(members, graph, testFiles);
 
     const zone: Zone = {
       id,
@@ -829,11 +1108,12 @@ function buildZonesFromCommunities(
       description: describeZone(members, inventory),
       files: members,
       entryPoints,
-      cohesion: Math.round(cohesion * 100) / 100,
-      coupling: Math.round(coupling * 100) / 100,
+      cohesion,
+      coupling,
+      ...(depth > 0 ? { depth } : {}),
     };
 
-    const subZones = subdivideZone(zone, imports, inventory);
+    const subZones = subdivideZone(zone, imports, inventory, testFiles, depth);
     if (subZones.length > 0) {
       zone.subZones = subZones;
     }
@@ -841,7 +1121,7 @@ function buildZonesFromCommunities(
     zones.push(zone);
   }
 
-  return zones;
+  return { zones, filenameBasedZoneIds };
 }
 
 // ── Helper: collect unzoned files ────────────────────────────────────────────
@@ -887,6 +1167,44 @@ function computeContentHashes(
   return { zoneContentHashes, globalContentHash };
 }
 
+/**
+ * Remap content hash keys from pre-enrichment zone IDs to post-enrichment IDs.
+ *
+ * Enrichment (AI or fast-mode preservation) may rename zone IDs. This function
+ * builds a mapping by matching zones positionally (same index = same zone) and
+ * returns a new hash record keyed by the final zone IDs.
+ *
+ * If no IDs changed, the original record is returned as-is for efficiency.
+ */
+function remapContentHashKeys(
+  originalHashes: Record<string, string>,
+  preEnrichmentZones: Zone[],
+  postEnrichmentZones: Zone[],
+): Record<string, string> {
+  // Build old→new ID mapping. Zones are matched by array position since
+  // enrichment preserves zone order and count.
+  const idMap = new Map<string, string>();
+  let anyChanged = false;
+  const limit = Math.min(preEnrichmentZones.length, postEnrichmentZones.length);
+  for (let i = 0; i < limit; i++) {
+    const oldId = preEnrichmentZones[i].id;
+    const newId = postEnrichmentZones[i].id;
+    if (oldId !== newId) {
+      anyChanged = true;
+    }
+    idMap.set(oldId, newId);
+  }
+
+  if (!anyChanged) return originalHashes;
+
+  const remapped: Record<string, string> = {};
+  for (const [key, hash] of Object.entries(originalHashes)) {
+    const newKey = idMap.get(key) ?? key;
+    remapped[newKey] = hash;
+  }
+  return remapped;
+}
+
 // ── Helper: AI enrichment ────────────────────────────────────────────────────
 
 /** Result of enrichment or preservation of previous zone data. */
@@ -912,6 +1230,8 @@ async function applyEnrichment(
   enrich: boolean,
   perZone: boolean,
   fileArchetypes?: Map<string, string | null>,
+  currentContentHashes?: Record<string, string>,
+  hints?: string,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -943,7 +1263,7 @@ async function applyEnrichment(
 
     if (perZone) {
       const result = await enrichZonesPerZone(
-        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
+        expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
       );
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
@@ -954,6 +1274,7 @@ async function applyEnrichment(
     } else {
       const result = await enrichZonesWithAI(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
+        currentContentHashes, hints,
       );
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
@@ -1115,7 +1436,7 @@ function mergeGlobalInsights(
  */
 function assembleFindings(
   finalZones: Zone[],
-  structural: { zoneInsights: Map<string, string[]>; globalInsights: string[] },
+  structural: { zoneInsights: Map<string, string[]>; globalInsights: string[]; findings: Finding[] },
   aiFindings: Finding[],
   metaUpdatedFindings: Finding[] | null,
   validPrevious: Zones | undefined,
@@ -1139,7 +1460,9 @@ function assembleFindings(
             ? "warning"
             : text.includes("entry points")
               ? "warning"
-              : "info",
+              : text.includes("Generic zone name")
+                ? "warning"
+                : "info",
       });
     }
   }
@@ -1185,7 +1508,7 @@ function assembleFindings(
     }
   }
 
-  return enforceSeverityRules(deduplicateFindings([...structuralFindings, ...prevAiFindings, ...aiFindings]));
+  return enforceSeverityRules(deduplicateFindings([...structuralFindings, ...structural.findings, ...prevAiFindings, ...aiFindings]));
 }
 
 // ── Helper: back-populate insights ───────────────────────────────────────────
@@ -1226,7 +1549,7 @@ function backPopulateInsights(
   }
 }
 
-// ── Main entry point ────────────────────────────────────────────────────────
+// ── Zone detection pipeline ──────────────────────────────────────────────────
 
 /**
  * Maximum percentage of project files a single zone should contain.
@@ -1234,6 +1557,100 @@ function backPopulateInsights(
  * Default: 30% — prevents over-aggregation where one zone dominates the codebase.
  */
 export const DEFAULT_MAX_ZONE_PERCENT = 30;
+
+/**
+ * Run the full zone detection pipeline: graph construction, Louvain community
+ * detection, community merging/splitting, zone construction with subdivision,
+ * proximity assignment, and crossing computation.
+ *
+ * This is the shared pipeline used by both root-level analysis and (future)
+ * recursive zone subdivision.
+ */
+export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResult {
+  const {
+    edges,
+    inventory,
+    imports,
+    scopeFiles,
+    maxZones = 15,
+    maxZonePercent = DEFAULT_MAX_ZONE_PERCENT,
+    parentId,
+    depth = 0,
+    testFiles = new Set<string>(),
+  } = options;
+
+  // ── Build undirected graph ──
+  const graph = buildUndirectedGraph(edges);
+
+  // ── Add directory proximity edges ──
+  // Only for files not already in the import graph, and only those sharing
+  // a directory with at least one other non-import file. Files with imports
+  // are clustered purely by import structure; files without imports get
+  // proximity-based grouping among themselves.
+  const importGraphNodes = new Set(graph.keys());
+  const nonImportFiles = scopeFiles.filter(f => !importGraphNodes.has(f));
+
+  const nonImportDirCounts = new Map<string, number>();
+  for (const f of nonImportFiles) {
+    const lastSlash = f.lastIndexOf("/");
+    const dir = lastSlash === -1 ? "." : f.slice(0, lastSlash);
+    nonImportDirCounts.set(dir, (nonImportDirCounts.get(dir) ?? 0) + 1);
+  }
+  const clusterableNonImportFiles = nonImportFiles.filter(f => {
+    const lastSlash = f.lastIndexOf("/");
+    const dir = lastSlash === -1 ? "." : f.slice(0, lastSlash);
+    return (nonImportDirCounts.get(dir) ?? 0) >= 2;
+  });
+  addDirectoryProximityEdges(graph, clusterableNonImportFiles);
+
+  // ── Scale maxZones by file count ──
+  // Small packages shouldn't fragment into many zones. Scale from 3 (≤45 files)
+  // up to the configured cap (default 15 at 225+ files).
+  // Also ensure we allow enough zones for the size policy to work —
+  // if maxZonePercent limits zone size, we need at least ceil(n/maxSize) zones.
+  const graphNodeCount = graph.size;
+  const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 15));
+  const maxPct = Math.max(1, Math.min(100, maxZonePercent));
+  const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
+  const minForSizePolicy = maxPct < 100 ? Math.ceil(graphNodeCount / maxZoneSize) : 0;
+  const scaledMaxZones = Math.min(maxZones, Math.max(scaledByCount, minForSizePolicy));
+
+  // ── Louvain community detection ──
+  let community = louvainPhase1(graph);
+  community = mergeBidirectionalCoupling(community, graph);
+  community = mergeSmallCommunities(community, graph);
+  community = mergeSatelliteCommunities(community, graph);
+  community = capZoneCount(community, graph, scaledMaxZones);
+
+  // ── Split oversized communities ──
+  community = splitLargeCommunities(community, graph, maxZoneSize);
+
+  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
+  community = capZoneCount(community, graph, scaledMaxZones);  // re-cap after split
+
+  // ── Build zones from communities ──
+  const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
+    community, graph, imports, inventory, testFiles, parentId, depth,
+    maxPct < 100 ? maxZoneSize : undefined,
+  );
+
+  // ── Assign unzoned files by directory proximity ──
+  const zonedFiles = new Set<string>();
+  for (const zone of zones) {
+    for (const f of zone.files) zonedFiles.add(f);
+  }
+  const initialUnzoned = scopeFiles.filter(f => !zonedFiles.has(f));
+  const { zones: expandedZones, remaining: unzoned } = assignByProximity(
+    zones, initialUnzoned, maxPct < 100 ? maxZoneSize : undefined,
+  );
+
+  // ── Build crossings ──
+  const crossings = buildCrossings(expandedZones, imports, []);
+
+  return { zones: expandedZones, crossings, unzoned, filenameBasedZoneIds };
+}
+
+// ── Main entry point ────────────────────────────────────────────────────────
 
 export async function analyzeZones(
   inventory: Inventory,
@@ -1247,6 +1664,8 @@ export async function analyzeZones(
     onReset?: (fromPass: number, toPass: number) => void;
     /** File archetype classifications for enrichment prompts. */
     fileArchetypes?: Map<string, string | null>;
+    /** Project context from .sourcevision/hints.md, injected into enrichment prompts. */
+    hints?: string;
     /**
      * Maximum percentage of project files a single zone may contain (1–100).
      * Zones exceeding this are split via internal Louvain subdivision.
@@ -1271,7 +1690,9 @@ export async function analyzeZones(
       )
     : imports.edges;
 
-  const graph = buildUndirectedGraph(filteredEdges);
+  const scopeFiles = inventory.files
+    .filter(f => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes))
+    .map(f => f.path);
 
   // Build set of test files for metric exclusion
   const testFiles = new Set<string>();
@@ -1279,30 +1700,16 @@ export async function analyzeZones(
     if (f.role === "test") testFiles.add(f.path);
   }
 
-  // ── Louvain community detection ──
-  let community = louvainPhase1(graph);
-  community = mergeBidirectionalCoupling(community, graph);
-  community = mergeSmallCommunities(community, graph);
-  community = capZoneCount(community, graph, 15);
-
-  // ── Split oversized communities ──
-  const maxPct = Math.max(1, Math.min(100, options?.maxZonePercent ?? DEFAULT_MAX_ZONE_PERCENT));
-  const graphNodeCount = graph.size;
-  const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
-  community = splitLargeCommunities(community, graph, maxZoneSize);
-
-  mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
-
-  // ── Build zones from communities ──
-  const zones = buildZonesFromCommunities(
-    community, graph, imports, inventory, testFiles
-  );
-
-  // ── Assign unzoned files by directory proximity ──
-  const initialUnzoned = collectUnzonedFiles(zones, inventory, subAnalyzedPrefixes);
-  const { zones: expandedZones, remaining: unzoned } = assignByProximity(
-    zones, initialUnzoned
-  );
+  // ── Run zone detection pipeline ──
+  const pipeline = runZonePipeline({
+    edges: filteredEdges,
+    inventory,
+    imports,
+    scopeFiles,
+    maxZonePercent: options?.maxZonePercent,
+    testFiles,
+  });
+  const { zones: expandedZones, unzoned, filenameBasedZoneIds } = pipeline;
 
   // ── Structure hash & change detection ──
   const structureHash = computeStructureHash(expandedZones);
@@ -1320,9 +1727,18 @@ export async function analyzeZones(
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
+    zoneContentHashes, options?.hints,
   );
   const { finalZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
+
+  // ── Remap content hashes to post-enrichment zone IDs ──
+  // Enrichment may rename zone IDs (e.g. "dom" → "dom-performance-monitoring").
+  // The content hashes were computed with pre-enrichment IDs and must be remapped
+  // so that downstream consumers can join zone metadata with content hashes by ID.
+  const remappedContentHashes = remapContentHashKeys(
+    zoneContentHashes, expandedZones, finalZones,
+  );
 
   // ── Promote zones from sub-analyses ──
   const promotedZones: Zone[] = [];
@@ -1344,7 +1760,9 @@ export async function analyzeZones(
     finalZones,
     crossings.filter((c) => !c.fromZone.includes(":") && !c.toZone.includes(":")),
     imports,
-    rootFileCount
+    rootFileCount,
+    undefined,
+    filenameBasedZoneIds,
   );
 
   // ── Merge insights ──
@@ -1356,7 +1774,7 @@ export async function analyzeZones(
   // ── Assemble findings ──
   const allFindings = assembleFindings(
     finalZones, structural, aiFindings, metaUpdatedFindings,
-    validPrevious, previousZones, zoneContentHashes, globalContentHash
+    validPrevious, previousZones, remappedContentHashes, globalContentHash
   );
 
   // ── Back-populate findings into insights for backward compatibility ──
@@ -1380,7 +1798,7 @@ export async function analyzeZones(
       enrichmentPass: allFindings.length > 0 ? displayPass : undefined,
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
-      zoneContentHashes,
+      zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
     }),
     tokenUsage: enrichTokenUsage,

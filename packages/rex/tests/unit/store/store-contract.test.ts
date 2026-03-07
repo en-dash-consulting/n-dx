@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PRDStore } from "../../../src/store/types.js";
+import type { PRDStore } from "../../../src/store/contracts.js";
 import type { PRDItem, PRDDocument } from "../../../src/schema/index.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";

@@ -1,4 +1,14 @@
 // @vitest-environment jsdom
+/**
+ * Integration tests for virtual scroll rendering in PRDTree.
+ *
+ * The old CulledNode + IntersectionObserver culling approach has been replaced
+ * by virtual scrolling (see virtual-scroll.ts). These tests verify that the
+ * virtual scroll container renders correctly, nodes are laid out as a flat
+ * list, and the tree remains functional without the old culling infrastructure.
+ *
+ * Pure function tests for the virtual scroll engine live in virtual-scroll.test.ts.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -10,64 +20,6 @@ import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/ty
 // jsdom doesn't implement scrollIntoView
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function () {};
-}
-
-// ─── IntersectionObserver mock ───────────────────────────────────────────────
-
-type ObserverCallback = (entries: IntersectionObserverEntry[]) => void;
-
-interface MockObserverInstance {
-  observe: ReturnType<typeof vi.fn>;
-  unobserve: ReturnType<typeof vi.fn>;
-  disconnect: ReturnType<typeof vi.fn>;
-  trigger: (entries: Partial<IntersectionObserverEntry>[]) => void;
-  callback: ObserverCallback;
-  observedElements: Set<Element>;
-}
-
-let mockObserverInstances: MockObserverInstance[] = [];
-
-function installMockIntersectionObserver() {
-  mockObserverInstances = [];
-
-  (globalThis as any).IntersectionObserver = class MockIntersectionObserver {
-    readonly mock: MockObserverInstance;
-
-    constructor(callback: ObserverCallback, _options?: IntersectionObserverInit) {
-      const observedElements = new Set<Element>();
-      const observe = vi.fn((el: Element) => observedElements.add(el));
-      const unobserve = vi.fn((el: Element) => observedElements.delete(el));
-      const disconnect = vi.fn(() => observedElements.clear());
-
-      this.mock = {
-        observe,
-        unobserve,
-        disconnect,
-        trigger: (entries) => callback(entries as IntersectionObserverEntry[]),
-        callback,
-        observedElements,
-      };
-
-      (this as any).observe = observe;
-      (this as any).unobserve = unobserve;
-      (this as any).disconnect = disconnect;
-
-      mockObserverInstances.push(this.mock);
-    }
-  };
-}
-
-function makeEntry(
-  target: Element,
-  isIntersecting: boolean,
-  height: number = 40,
-): Partial<IntersectionObserverEntry> {
-  return {
-    target,
-    isIntersecting,
-    boundingClientRect: { height, width: 200, x: 0, y: 0, top: 0, left: 0, bottom: height, right: 200 } as DOMRectReadOnly,
-    intersectionRatio: isIntersecting ? 1 : 0,
-  };
 }
 
 // ─── Test data ───────────────────────────────────────────────────────────────
@@ -117,144 +69,48 @@ function renderToDiv(vnode: ReturnType<typeof h>) {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe("PRDTree node culling integration", () => {
-  beforeEach(() => {
-    installMockIntersectionObserver();
-  });
-
-  afterEach(() => {
-    mockObserverInstances = [];
-    delete (globalThis as any).IntersectionObserver;
-  });
-
-  it("renders all nodes initially (before observer fires)", () => {
+describe("PRDTree virtual scroll rendering", () => {
+  it("renders all nodes in the flat virtual list", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
     expect(root.textContent).toContain("Authentication");
     expect(root.textContent).toContain("Dashboard");
-  });
-
-  it("creates a NodeCuller (IntersectionObserver) on mount", () => {
-    renderToDiv(h(PRDTree, { document: sampleDoc }));
-    // At least one observer should be created (the culler)
-    expect(mockObserverInstances.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("observes tree node elements after effects flush", () => {
-    renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
-    // After act() flushes effects, the culler's observer should have observed elements
-    const cullerObserver = mockObserverInstances[0];
-    expect(cullerObserver.observe).toHaveBeenCalled();
-    expect(cullerObserver.observedElements.size).toBeGreaterThan(0);
-  });
-
-  it("replaces node content with placeholder when culled", () => {
-    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
-
-    // Initially the task titles should be visible
     expect(root.textContent).toContain("Add OAuth support");
-
-    // Find a node element that's being observed and cull it
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    // Find the element containing "Add OAuth support"
-    const targetEl = observedEls.find(el => el.textContent?.includes("Add OAuth support"));
-    expect(targetEl).toBeDefined();
-
-    // Trigger it as off-screen
-    act(() => {
-      cullerObserver.trigger([makeEntry(targetEl!, false, 40)]);
-    });
-
-    // After culling, the culled node should have placeholder class
-    const culledNodes = root.querySelectorAll(".prd-node-culled");
-    expect(culledNodes.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("re-creates node content when scrolled back into view", () => {
+  it("renders the virtual scroll container with correct classes", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
+    const tree = root.querySelector(".prd-tree.prd-tree-virtual");
+    expect(tree).not.toBeNull();
+  });
+
+  it("renders node rows directly inside the tree container (flat layout)", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
-
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    // Find the Dashboard node
-    const dashboardEl = observedEls.find(el => el.textContent?.includes("Dashboard"));
-    expect(dashboardEl).toBeDefined();
-
-    // Cull it
-    act(() => {
-      cullerObserver.trigger([makeEntry(dashboardEl!, false, 40)]);
-    });
-
-    // Content should be removed
-    const culledNode = root.querySelector(".prd-node-culled");
-    expect(culledNode).not.toBeNull();
-    expect(culledNode!.textContent).toBe(""); // Placeholder is empty
-
-    // Bring it back — the culled node is now the observed element
-    act(() => {
-      cullerObserver.trigger([makeEntry(culledNode!, true)]);
-    });
-
-    // Content should be re-created
-    expect(root.textContent).toContain("Dashboard");
+    const tree = root.querySelector(".prd-tree-virtual");
+    const nodeRows = tree!.querySelectorAll(".prd-node-row");
+    // All expanded visible items rendered as flat siblings
+    expect(nodeRows.length).toBeGreaterThan(0);
+    // No nested .prd-children wrappers (old recursive approach)
+    expect(tree!.querySelector(".prd-children")).toBeNull();
   });
 
-  it("culled placeholders preserve height via inline style", () => {
+  it("does not use IntersectionObserver for culling", () => {
+    // Virtual scrolling replaces IntersectionObserver-based culling.
+    // No .prd-node-culled placeholders should appear.
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
-
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    // Find the Dashboard node
-    const dashboardEl = observedEls.find(el => el.textContent?.includes("Dashboard"));
-    expect(dashboardEl).toBeDefined();
-
-    // Cull with known height
-    act(() => {
-      cullerObserver.trigger([makeEntry(dashboardEl!, false, 56)]);
-    });
-
-    const culledNode = root.querySelector(".prd-node-culled") as HTMLElement;
-    expect(culledNode).not.toBeNull();
-    expect(culledNode.style.height).toBe("56px");
+    expect(root.querySelector(".prd-node-culled")).toBeNull();
   });
 
-  it("culled placeholders have aria-hidden attribute", () => {
+  it("does not render CulledNode wrapper divs", () => {
+    // Old approach wrapped each item in .prd-node; virtual scroll renders flat
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
-
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    const dashboardEl = observedEls.find(el => el.textContent?.includes("Dashboard"));
-    expect(dashboardEl).toBeDefined();
-
-    act(() => {
-      cullerObserver.trigger([makeEntry(dashboardEl!, false, 40)]);
-    });
-
-    const culledNode = root.querySelector(".prd-node-culled");
-    expect(culledNode).not.toBeNull();
-    expect(culledNode!.getAttribute("aria-hidden")).toBe("true");
+    // .prd-node wrappers should not exist in the virtual scroll tree
+    const tree = root.querySelector(".prd-tree-virtual");
+    expect(tree!.querySelector(".prd-node")).toBeNull();
   });
 
-  it("disconnects observer when component unmounts", () => {
-    const root = document.createElement("div");
-    act(() => {
-      render(h(PRDTree, { document: sampleDoc }), root);
-    });
-
-    const cullerObserver = mockObserverInstances[0];
-
-    // Unmount
-    act(() => {
-      render(null, root);
-    });
-
-    expect(cullerObserver.disconnect).toHaveBeenCalled();
-  });
-
-  it("does not cull highlighted (deep-link) nodes", () => {
+  it("renders highlighted nodes without special culling protection", () => {
+    // In the old approach, highlighted nodes had neverCull=true.
+    // With virtual scrolling, highlighted nodes are just normal items.
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 2,
@@ -262,63 +118,62 @@ describe("PRDTree node culling integration", () => {
       deepLinkExpandIds: new Set<string>(),
     }));
 
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    // The highlighted node (Dashboard) should NOT be observed
-    // because neverCull=true skips the observer registration
-    const dashboardEl = observedEls.find(el => el.textContent?.includes("Dashboard"));
-    expect(dashboardEl).toBeUndefined();
-
-    // Dashboard should still be visible
+    // Dashboard should be visible
     expect(root.textContent).toContain("Dashboard");
+
+    // The highlighted node should have the highlight class
+    const highlightedNode = root.querySelector(".prd-node-highlighted");
+    expect(highlightedNode).not.toBeNull();
+    expect(highlightedNode!.textContent).toContain("Dashboard");
   });
 
-  it("event listeners are removed when nodes are culled", () => {
-    const onSelectItem = vi.fn();
-    const root = renderToDiv(h(PRDTree, {
-      document: sampleDoc,
-      defaultExpandDepth: 2,
-      onSelectItem,
-    }));
+  it("renders event target data attributes on node rows", () => {
+    // Event delegation relies on data-node-id attributes
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
 
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
+    const epicRow = root.querySelector("[data-node-id='epic-1']");
+    expect(epicRow).not.toBeNull();
+    // Expandable nodes have data-has-children
+    expect(epicRow!.hasAttribute("data-has-children")).toBe(true);
 
-    // Find the Dashboard node
-    const dashboardEl = observedEls.find(el => el.textContent?.includes("Dashboard"));
-    expect(dashboardEl).toBeDefined();
-
-    // Cull it
-    act(() => {
-      cullerObserver.trigger([makeEntry(dashboardEl!, false, 40)]);
-    });
-
-    // The culled node should have no interactive children
-    const culledNode = root.querySelector(".prd-node-culled");
-    expect(culledNode).not.toBeNull();
-    // Placeholder should have no treeitem children (NodeRow is removed)
-    const treeItems = culledNode!.querySelectorAll("[role='treeitem']");
-    expect(treeItems.length).toBe(0);
+    const taskRow = root.querySelector("[data-node-id='task-1']");
+    expect(taskRow).not.toBeNull();
   });
 
-  it("listener lifecycle manager is disposed on tree unmount", () => {
+  it("renders proper ARIA attributes on tree items", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
+
+    const treeItems = root.querySelectorAll("[role='treeitem']");
+    expect(treeItems.length).toBeGreaterThan(0);
+
+    // Epic (expanded) should have aria-expanded="true"
+    const epicRow = root.querySelector("[data-node-id='epic-1']");
+    expect(epicRow!.getAttribute("aria-expanded")).toBe("true");
+
+    // Leaf node should not have aria-expanded
+    const taskRow = root.querySelector("[data-node-id='task-1']");
+    expect(taskRow!.getAttribute("aria-expanded")).toBeNull();
+  });
+
+  it("cleans up when component unmounts", () => {
     const root = document.createElement("div");
     act(() => {
       render(h(PRDTree, { document: sampleDoc }), root);
     });
+
+    // Verify component is rendered
+    expect(root.querySelector(".prd-tree-virtual")).not.toBeNull();
 
     // Unmount
     act(() => {
       render(null, root);
     });
 
-    // The culler observer should have been disconnected (verifies cleanup path)
-    const cullerObserver = mockObserverInstances[0];
-    expect(cullerObserver.disconnect).toHaveBeenCalled();
+    // Verify cleanup
+    expect(root.querySelector(".prd-tree-virtual")).toBeNull();
   });
 
-  it("culled nodes have no residual interactive elements", () => {
+  it("renders inline delete buttons when onRemoveItem is provided", () => {
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 2,
@@ -326,54 +181,29 @@ describe("PRDTree node culling integration", () => {
       onRemoveItem: vi.fn(),
     }));
 
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
-
-    // Cull all observed elements
-    act(() => {
-      const entries = observedEls.map(el => makeEntry(el, false, 40));
-      cullerObserver.trigger(entries);
-    });
-
-    // All culled nodes should have no treeitem children, buttons, or inputs
-    const culledNodes = root.querySelectorAll(".prd-node-culled");
-    for (const node of culledNodes) {
-      expect(node.querySelectorAll("[role='treeitem']").length).toBe(0);
-      expect(node.querySelectorAll("button").length).toBe(0);
-      expect(node.querySelectorAll("input").length).toBe(0);
-    }
+    const deleteButtons = root.querySelectorAll(".prd-node-action-delete");
+    expect(deleteButtons.length).toBeGreaterThan(0);
   });
 
-  it("listener count remains proportional during cull/uncull cycles", () => {
-    const root = renderToDiv(h(PRDTree, {
-      document: sampleDoc,
-      defaultExpandDepth: 2,
-      onSelectItem: vi.fn(),
-    }));
+  it("renders correct depth indentation for all visible items", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
 
-    const cullerObserver = mockObserverInstances[0];
-    const observedEls = Array.from(cullerObserver.observedElements);
+    // Epic-1 at depth 0: padding-left: 8px
+    const epic = root.querySelector("[data-node-id='epic-1']") as HTMLElement;
+    expect(epic.style.paddingLeft).toBe("8px");
 
-    // Count initial treeitem elements
-    const initialTreeItems = root.querySelectorAll("[role='treeitem']").length;
-    expect(initialTreeItems).toBeGreaterThan(0);
+    // Task-1 at depth 1: padding-left: 32px
+    const task = root.querySelector("[data-node-id='task-1']") as HTMLElement;
+    expect(task.style.paddingLeft).toBe("32px");
+  });
 
-    // Cull first element
-    const firstEl = observedEls[0];
-    act(() => {
-      cullerObserver.trigger([makeEntry(firstEl, false, 40)]);
-    });
+  it("renders all tree items in correct order", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 2 }));
 
-    const afterCullItems = root.querySelectorAll("[role='treeitem']").length;
-    expect(afterCullItems).toBeLessThan(initialTreeItems);
+    const nodeRows = root.querySelectorAll("[role='treeitem']");
+    const ids = Array.from(nodeRows).map(el => el.getAttribute("data-node-id"));
 
-    // Uncull it
-    const culledNode = root.querySelector(".prd-node-culled");
-    act(() => {
-      cullerObserver.trigger([makeEntry(culledNode!, true)]);
-    });
-
-    const afterUncullItems = root.querySelectorAll("[role='treeitem']").length;
-    expect(afterUncullItems).toBe(initialTreeItems);
+    // Depth-first, pre-order: epic-1 → task-1 → task-2 → epic-2
+    expect(ids).toEqual(["epic-1", "task-1", "task-2", "epic-2"]);
   });
 });

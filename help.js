@@ -164,7 +164,7 @@ const COMMAND_REGISTRY = [
     name: "config",
     category: "Orchestration",
     summary: "View and edit settings across all packages",
-    keywords: ["settings", "configuration", "preferences", "edit", "view"],
+    keywords: ["settings", "configuration", "preferences", "edit", "view", "feature", "toggle"],
     related: [],
   },
   // ── Tool delegation commands ──
@@ -553,18 +553,20 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.\nAuto-configures Claude Code integration (MCP servers, skills, permissions) unless --no-claude.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
       { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
+      { flag: "--no-claude", description: "Skip Claude Code integration (no .claude/ modifications)" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
       { command: "ndx init --provider=claude .", description: "Initialize with Claude (skips vendor prompt)" },
       { command: "ndx init --provider=codex .", description: "Initialize with Codex (skips vendor prompt)" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
+      { command: "ndx init --no-claude .", description: "Initialize without Claude Code integration" },
     ],
     related: ["plan", "status", "config"],
   },

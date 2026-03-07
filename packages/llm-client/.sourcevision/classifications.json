@@ -511,27 +511,59 @@
   "files": [
     {
       "path": "src/api-provider.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Factory function that creates a Claude API client — implements the LLMProvider/ClaudeClient interfaces with direct Anthropic SDK calls, retry logic, and error classification.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/auth.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Authentication detection and validation service — probes CLI availability, validates API keys, and produces diagnostic summaries. Pure business logic with no UI.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/cli-provider.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Factory function that creates a CLI-based Claude client — spawns the claude binary, parses output formats, and implements retry with backoff.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/codex-cli-provider.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Factory function that creates a Codex CLI client — spawns codex exec, manages temp files, classifies errors, and implements retry logic.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/config.ts",
@@ -549,45 +581,101 @@
     },
     {
       "path": "src/create-client.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Top-level factory orchestrating provider selection (API vs CLI) based on available credentials — primary entry point for Claude client creation.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/exec.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Shared process execution abstraction — exec, spawnTool, spawnManaged, ProcessPool — foundation-layer infrastructure used across all packages.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/help-format.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "CLI help formatting utilities — ANSI color helpers, formatHelp, formatUsage — shared presentation logic with no business logic.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/json.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Single-function canonical JSON serialization utility used monorepo-wide for deterministic output.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/llm-client.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Vendor-neutral LLM client factory — wraps Claude and Codex providers behind a unified createLLMClient interface with vendor detection.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/llm-config.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Vendor-neutral config loader — reads .n-dx.json and extracts the LLMConfig shape with legacy fallback handling.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/llm-types.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "types",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "path",
+          "detail": "Pure type definitions — LLMConfig, CodexConfig, LLMVendor, LLMClient — no runtime logic beyond a type alias.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/output.ts",
@@ -605,33 +693,73 @@
     },
     {
       "path": "src/project-config.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Shared config utilities (deepMerge, loadProjectOverrides, mergeWithOverrides) used across multiple packages — infrastructure helpers with no vendor logic.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/project-dirs.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "types",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "path",
+          "detail": "Single constant object (PROJECT_DIRS) with directory name literals and a derived type — pure constants, no logic.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/provider-interface.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "types",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "path",
+          "detail": "Defines the LLMProvider interface, ProviderInfo, StreamChunk, and associated types — pure structural contracts with no runtime logic.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/provider-registry.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "store",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "store",
+          "signalKind": "path",
+          "detail": "ProviderRegistry class maintains a vendor→factory map with register/create/getActiveProvider — stateful registry with high fan-in from provider consumers.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/provider-session.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "store",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "store",
+          "signalKind": "path",
+          "detail": "ProviderSession class holds mutable active-provider state with vendor switching — session-scoped state management wrapping the registry.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/public.ts",
@@ -649,15 +777,31 @@
     },
     {
       "path": "src/suggest.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Levenshtein distance and typo suggestion utilities for CLI command correction — pure algorithm helpers shared across packages.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/token-usage.ts",
-      "archetype": null,
-      "confidence": 0,
-      "source": "algorithmic"
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Token usage parsing utilities for API and CLI response formats — pure transformation functions with no side effects.",
+          "weight": 0.7
+        }
+      ]
     },
     {
       "path": "src/types.ts",
@@ -675,16 +819,19 @@
     }
   ],
   "summary": {
-    "totalClassified": 4,
-    "totalUnclassified": 18,
+    "totalClassified": 22,
+    "totalUnclassified": 0,
     "byArchetype": {
+      "service": 7,
       "config": 1,
-      "utility": 1,
-      "entrypoint": 1,
-      "types": 1
+      "utility": 7,
+      "types": 4,
+      "store": 2,
+      "entrypoint": 1
     },
     "bySource": {
-      "algorithmic": 22
+      "llm": 18,
+      "algorithmic": 4
     }
   }
 }

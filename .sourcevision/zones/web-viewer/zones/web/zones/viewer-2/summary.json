@@ -1,0 +1,16 @@
+{
+  "id": "web-viewer/web/viewer-2",
+  "name": "Web Viewer/web/viewer 2",
+  "description": "4 files, primarily CSS",
+  "files": [
+    "packages/web/src/viewer/styles/branding.css",
+    "packages/web/src/viewer/styles/breadcrumb.css",
+    "packages/web/src/viewer/styles/call-graph-explorer.css",
+    "packages/web/src/viewer/styles/cards.css"
+  ],
+  "entryPoints": [],
+  "cohesion": 0.75,
+  "coupling": 0.25,
+  "fileCount": 4,
+  "lineCount": 854
+}

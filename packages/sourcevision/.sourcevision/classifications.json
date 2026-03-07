@@ -1,0 +1,1432 @@
+{
+  "archetypes": [
+    {
+      "id": "cli-command",
+      "name": "CLI Command",
+      "description": "CLI command handlers and subcommand implementations.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/commands/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/cmd/",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "description": "CLI command modules handle user-facing terminal commands"
+      }
+    },
+    {
+      "id": "component",
+      "name": "Component",
+      "description": "React/UI component files with JSX-returning functions.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "\\.[tj]sx$",
+          "weight": 0.4
+        },
+        {
+          "kind": "directory",
+          "pattern": "/components/",
+          "weight": 0.6
+        },
+        {
+          "kind": "directory",
+          "pattern": "/ui/",
+          "weight": 0.5
+        }
+      ],
+      "analysisHints": {
+        "godFunctionThresholdMultiplier": "2",
+        "description": "Components have inflated call counts from hooks, state setters, and JSX rendering"
+      }
+    },
+    {
+      "id": "config",
+      "name": "Config",
+      "description": "Configuration files and settings modules.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^config\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.config\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/config/",
+          "weight": 0.6
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "deadExports": "skip",
+        "description": "High fan-in expected — config modules are widely imported"
+      }
+    },
+    {
+      "id": "entrypoint",
+      "name": "Entry Point",
+      "description": "Module entry points, public APIs, and CLI entry files where uncalled exports are expected.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^index\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^main\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^cli\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^public\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^mod\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Uncalled exports are expected in entry points"
+      }
+    },
+    {
+      "id": "gateway",
+      "name": "Gateway",
+      "description": "Re-export-heavy gateway modules that concentrate cross-package imports.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^(?:deps|gateway|barrel)\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Gateway modules are expected to re-export heavily"
+      }
+    },
+    {
+      "id": "hook",
+      "name": "Hook",
+      "description": "React hooks — custom hooks encapsulating reusable stateful logic.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^use[A-Z].*\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/hooks/",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "description": "React hooks follow the use* naming convention"
+      }
+    },
+    {
+      "id": "middleware",
+      "name": "Middleware",
+      "description": "Request/response middleware in server frameworks.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/middleware/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/middlewares/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.middleware\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "description": "Middleware modules"
+      }
+    },
+    {
+      "id": "model",
+      "name": "Model",
+      "description": "Data models, schemas, and ORM definitions.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/models/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.model\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.schema\\.[tj]sx?$",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "description": "Data model definitions"
+      }
+    },
+    {
+      "id": "page",
+      "name": "Page",
+      "description": "Page-level components, views, or screens — top-level UI entry points for routes.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/pages/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/views/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/screens/",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "godFunctionThresholdMultiplier": "2",
+        "description": "Page/view components orchestrate many sub-components and have inflated call counts"
+      }
+    },
+    {
+      "id": "route-handler",
+      "name": "Route Handler",
+      "description": "Server-side HTTP route handlers (Express, Hono, Koa, etc.).",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^routes?[-.]",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^router\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/routes/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/api/",
+          "weight": 0.6
+        }
+      ],
+      "analysisHints": {
+        "description": "Server-side route handlers"
+      }
+    },
+    {
+      "id": "route-module",
+      "name": "Route Module",
+      "description": "Framework convention route modules (Remix/React Router) with loader/action/default exports.",
+      "signals": [
+        {
+          "kind": "export",
+          "pattern": "^(loader|action|default|meta|links|headers|ErrorBoundary)$",
+          "weight": 0.8
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Convention exports are expected in route modules"
+      }
+    },
+    {
+      "id": "schema",
+      "name": "Schema",
+      "description": "Runtime validation schemas and data shape definitions (Zod, Yup, Joi, etc.).",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/schema/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/schemas/",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^validate\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^validation\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "deadExports": "skip",
+        "description": "Schema modules define runtime data shapes for validation"
+      }
+    },
+    {
+      "id": "service",
+      "name": "Service",
+      "description": "Service layer modules — API clients, data fetching, and business logic orchestration.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/services/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/service/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.service\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/clients/",
+          "weight": 0.6
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.client\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "description": "Service modules orchestrate business logic and external calls"
+      }
+    },
+    {
+      "id": "store",
+      "name": "Store",
+      "description": "State management stores and slices where high fan-in is expected.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/store/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/stores/",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.store\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.slice\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "description": "High fan-in is expected for state management modules"
+      }
+    },
+    {
+      "id": "test-helper",
+      "name": "Test Helper",
+      "description": "Test utilities, fixtures, and mocks.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/fixtures/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/mocks/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/__mocks__/",
+          "weight": 0.9
+        },
+        {
+          "kind": "directory",
+          "pattern": "/__fixtures__/",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^test-utils\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^test-helpers\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "kind": "filename",
+          "pattern": "^setup\\.[tj]sx?$",
+          "weight": 0.5
+        }
+      ],
+      "analysisHints": {
+        "description": "Test utility files"
+      }
+    },
+    {
+      "id": "types",
+      "name": "Types & Constants",
+      "description": "Type definitions, constants, and enums — companion files, not logic.",
+      "signals": [
+        {
+          "kind": "filename",
+          "pattern": "^types\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^constants\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "^enums\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.types\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.constants\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "kind": "filename",
+          "pattern": "\\.d\\.ts$",
+          "weight": 0.9
+        }
+      ],
+      "analysisHints": {
+        "couplingExpectation": "unidirectional",
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "deadExports": "skip",
+        "description": "Unidirectional coupling and high fan-in expected for type files"
+      }
+    },
+    {
+      "id": "utility",
+      "name": "Utility",
+      "description": "Shared utility, helper, and infrastructure modules where high fan-in is expected.",
+      "signals": [
+        {
+          "kind": "directory",
+          "pattern": "/core/",
+          "weight": 0.7
+        },
+        {
+          "kind": "directory",
+          "pattern": "/utils/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/helpers/",
+          "weight": 0.8
+        },
+        {
+          "kind": "directory",
+          "pattern": "/lib/",
+          "weight": 0.6
+        },
+        {
+          "kind": "filename",
+          "pattern": "^output\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^logger\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^logging\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "kind": "filename",
+          "pattern": "^errors\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ],
+      "analysisHints": {
+        "hubThresholdMultiplier": "2",
+        "hotspotThresholdMultiplier": "2",
+        "description": "High fan-in is expected for utility modules"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "src/analyzers/archetypes.ts",
+      "archetype": "types",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "path",
+          "detail": "Defines BUILTIN_ARCHETYPES constant array — pure data/type definitions with no logic, serves as a stable vocabulary for the classification engine.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/branch-work-classifier.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Pure functions for classifying branch work significance — no I/O, no side effects, shared classification logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/branch-work-collector.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Orchestrates multi-step data collection: reads PRD from disk, diffs git history, builds enriched work items — I/O-heavy service logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/branch-work-filter.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Pure filtering functions for branch-scoped work items — stateless helpers with no I/O.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/branch-work-store.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Persistent JSON storage with Zod validation for branch work records — manages read/write lifecycle for a specific data entity.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/callgraph-findings.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Generates architectural findings from call graph data — analysis/business logic producing structured output from structured input.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/callgraph.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "TypeScript AST-based call graph analyzer — complex analysis pipeline producing CallGraph data structures.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/classify.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "File classification engine — multi-signal scoring logic with optional AI calls, orchestrates archetype matching.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/claude-client.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "LLM bridge module — wraps @n-dx/llm-client with module-level state, config resolution, and vendor detection; API client service layer.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/completion-reader.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Reads and aggregates PRD completion metadata from disk with graceful degradation — data extraction service.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/components.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "AST-based component and route analyzer — single-pass JSX/TSX analysis producing structured component catalog data.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/context.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "CONTEXT.md generator — orchestrates multiple analysis inputs into a structured output document.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/enrich-batch.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Batch AI enrichment with retry logic and prompt construction — orchestration service for LLM calls.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/enrich-config.ts",
+      "archetype": "config",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "config",
+          "signalKind": "path",
+          "detail": "Configuration constants and helpers for AI enrichment passes — pass configs, thresholds, and tuning parameters.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/enrich-parsing.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "JSON parsing and finding extraction from LLM responses — stateless parsing helpers.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/enrich-per-zone.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Per-zone AI enrichment orchestration — manages incremental, parallelizable enrichment with cache invalidation.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/enrich.ts",
+      "archetype": "entrypoint",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "path",
+          "detail": "Barrel re-export module that aggregates and re-exports from enrich-config, claude-client, enrich-batch, and enrich-per-zone — serves as the stable public surface for the enrichment subsystem.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/imports.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "TypeScript AST-based import graph analyzer — produces ImportEdge data structures from source files.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/index.ts",
+      "archetype": "entrypoint",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"index.ts\" matches ^index\\.[tj]sx?$",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/inventory.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "File inventory analyzer — walks the filesystem, computes hashes, and builds structured FileEntry records.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/llms-txt.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "llms.txt generator — transforms analysis data into a structured Markdown document for LLM consumption.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/louvain.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Louvain community detection algorithm implementation — pure graph algorithm with no I/O, high fan-in from zone analysis.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/manifest.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Manifest read/write management with git integration — stateful persistence service for analysis metadata.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/next-steps.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Pure derivation of prioritized next steps from zone findings — stateless transformation logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/risk-scoring.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Pure architectural risk scoring computations — deterministic metrics with no I/O or side effects.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/route-detection.ts",
+      "archetype": "route-handler",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "route-handler",
+          "signalKind": "filename",
+          "detail": "filename \"route-detection.ts\" matches ^routes?[-.]",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/server-route-detection.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "AST-based HTTP route detection heuristics — stateless pattern matching helpers used by other analyzers.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/token-usage.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Small pure utility functions for accumulating token usage counters — stateless helpers with high fan-in.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/workspace-aggregate.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Workspace aggregation engine — merges pre-analyzed repos into unified output, reads/writes multiple JSON files.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/workspace-crossings.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Cross-repo crossing computation — resolves external imports to workspace members, pure transformation logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/workspace.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Workspace detection and sub-directory analysis orchestration — filesystem traversal producing SubAnalysis structures.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/zone-hash.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Single hashing utility extracted to break circular deps — pure crypto helper with no I/O.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/zone-output.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Orchestrates zone output generation — builds context markdown, summary JSON, and emits files to disk. Pure business logic with no CLI or UI concerns.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyzers/zones.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Core zone analysis engine implementing Louvain community detection and zone metric computation. Substantial business logic, not a schema or utility.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/analyze-phases.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/analyze.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/constants.ts",
+      "archetype": "types",
+      "secondaryArchetypes": [
+        "cli-command"
+      ],
+      "confidence": 0.9,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "filename",
+          "detail": "filename \"constants.ts\" matches ^constants\\.[tj]sx?$",
+          "weight": 0.9
+        },
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/export-pdf.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/git-credential-helper.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/init.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/pr-markdown.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/prd-epic-resolver.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/reset.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/validate.ts",
+      "archetype": "cli-command",
+      "secondaryArchetypes": [
+        "schema"
+      ],
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "schema",
+          "signalKind": "filename",
+          "detail": "filename \"validate.ts\" matches ^validate\\.[tj]sx?$",
+          "weight": 0.7
+        },
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/commands/workspace.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/errors.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "filename",
+          "detail": "filename \"errors.ts\" matches ^errors\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/help.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Provides help text content and formatting for CLI commands. High fan-in potential (called by multiple command handlers), no side effects beyond console output.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/index.ts",
+      "archetype": "entrypoint",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"index.ts\" matches ^index\\.[tj]sx?$",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/cli/mcp.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Creates and configures the MCP server, registers all tools and resources, and manages data loading/caching. Substantial service logic, not a thin CLI command handler.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/output.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "filename",
+          "detail": "filename \"output.ts\" matches ^output\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/serve.ts",
+      "archetype": "cli-command",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "path",
+          "detail": "Thin CLI command handler that delegates `sourcevision serve` to the web package via process spawn. Pure command dispatch with no domain logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/constants.ts",
+      "archetype": "types",
+      "confidence": 0.9,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "types",
+          "signalKind": "filename",
+          "detail": "filename \"constants.ts\" matches ^constants\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "path": "src/export/pdf-report.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "PDF report generation service — transforms analysis data into a structured PDF document. Contains substantial rendering and layout logic.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/generators/pr-markdown-template.ts",
+      "archetype": "service",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "service",
+          "signalKind": "path",
+          "detail": "Transforms BranchWorkRecord data into PR markdown. Pure functions with clear input/output transformation logic — a content generation service.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/public.ts",
+      "archetype": "entrypoint",
+      "confidence": 0.9,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"public.ts\" matches ^public\\.[tj]sx?$",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "path": "src/schema/data-files.ts",
+      "archetype": "schema",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "schema",
+          "signalKind": "directory",
+          "detail": "path contains \"/schema/\"",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/schema/index.ts",
+      "archetype": "entrypoint",
+      "secondaryArchetypes": [
+        "schema"
+      ],
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"index.ts\" matches ^index\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "archetypeId": "schema",
+          "signalKind": "directory",
+          "detail": "path contains \"/schema/\"",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/schema/v1.ts",
+      "archetype": "schema",
+      "confidence": 0.7,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "schema",
+          "signalKind": "directory",
+          "detail": "path contains \"/schema/\"",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/schema/validate.ts",
+      "archetype": "schema",
+      "confidence": 1,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "schema",
+          "signalKind": "directory",
+          "detail": "path contains \"/schema/\"",
+          "weight": 0.7
+        },
+        {
+          "archetypeId": "schema",
+          "signalKind": "filename",
+          "detail": "filename \"validate.ts\" matches ^validate\\.[tj]sx?$",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/util/merge.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Shared utility functions for merging inventory and import chunks. High fan-in expected, pure data transformation helpers.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/util/paths.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Single-function path normalization utility (toPosix). Minimal shared helper.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/util/sort.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Canonical sorting utilities for all schema types. Explicitly noted as high fan-in in project memory; pure deterministic sort functions used across the codebase.",
+          "weight": 0.7
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalClassified": 62,
+    "totalUnclassified": 0,
+    "byArchetype": {
+      "types": 3,
+      "utility": 16,
+      "service": 22,
+      "config": 1,
+      "entrypoint": 5,
+      "route-handler": 1,
+      "cli-command": 11,
+      "schema": 3
+    },
+    "bySource": {
+      "llm": 40,
+      "algorithmic": 22
+    }
+  }
+}

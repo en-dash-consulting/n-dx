@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
-import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/types.js";
+import type { PRDDocumentData, ItemStatus } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
   const root = document.createElement("div");
@@ -154,6 +154,7 @@ describe("PRDTree", () => {
       document: sampleDoc,
       defaultExpandDepth: 3,
       weeklyBudget: { budget: 50_000, source: "vendor_default" },
+      showTokenBudget: true,
       taskUsageById: {
         "task-2": { totalTokens: 1234, runCount: 2 },
       },
@@ -161,22 +162,75 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("1.2k tokens | 2%");
   });
 
-  it("renders missing-budget fallback label and reason on usage chips", () => {
+  it("renders missing-budget fallback label and reason on token badges", () => {
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 3,
+      showTokenBudget: true,
       taskUsageById: {
         "task-2": { totalTokens: 1234, runCount: 2 },
       },
     }));
     expect(root.textContent).toContain("1.2k tokens | No budget");
-    const chip = root.querySelector(".prd-usage-chip");
-    expect(chip?.getAttribute("data-utilization-reason")).toBe("missing_budget");
+    const badge = root.querySelector(".prd-token-badge");
+    expect(badge?.getAttribute("data-utilization-reason")).toBe("missing_budget");
   });
 
-  it("renders explicit zero usage for tasks without associated runs", () => {
+  it("hides budget info on token badges when showTokenBudget is false", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: false,
+      weeklyBudget: { budget: 50_000, source: "vendor_default" },
+      taskUsageById: {
+        "task-2": { totalTokens: 1234, runCount: 2 },
+      },
+    }));
+    // Token count still visible
+    expect(root.textContent).toContain("1.2k tokens");
+    // Budget percentage should NOT appear
+    expect(root.textContent).not.toContain("| 2%");
+    // No utilization-reason data attribute
+    const badge = root.querySelector(".prd-token-badge");
+    expect(badge?.getAttribute("data-utilization-reason")).toBeNull();
+  });
+
+  it("hides token badge for tasks with zero usage", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
-    expect(root.textContent).toContain("0 tokens");
+    // Zero-usage tasks should show no badge at all
+    expect(root.textContent).not.toContain("0 tokens");
+    const badges = root.querySelectorAll(".prd-token-badge");
+    expect(badges.length).toBe(0);
+  });
+
+  it("shows token badge when showTokenBudget is false and usage is non-zero", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: false,
+      taskUsageById: {
+        "task-2": { totalTokens: 5000, runCount: 1 },
+      },
+    }));
+    const badge = root.querySelector(".prd-token-badge");
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toBe("5.0k tokens");
+  });
+
+  it("shows token badge when showTokenBudget is true and usage is non-zero", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: true,
+      weeklyBudget: { budget: 100_000, source: "vendor_default" },
+      taskUsageById: {
+        "task-2": { totalTokens: 5000, runCount: 1 },
+      },
+    }));
+    const badge = root.querySelector(".prd-token-badge");
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain("5.0k tokens");
+    expect(badge?.classList.contains("prd-token-badge--budget")).toBe(true);
   });
 
   it("renders tree role for accessibility", () => {
@@ -237,23 +291,26 @@ describe("PRDTree", () => {
     expect(segments.length).toBeGreaterThan(0);
   });
 
-  it("renders status filter controls", () => {
+  it("does not render status filter controls (filter bar is now external)", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
+    // StatusFilter is now rendered by PRDView, not by PRDTree
     const filterGroup = root.querySelector("[role='group'][aria-label='Filter by status']");
-    expect(filterGroup).not.toBeNull();
+    expect(filterGroup).toBeNull();
   });
 
-  it("renders status filter chips for all statuses", () => {
-    const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
-    const chips = root.querySelectorAll(".prd-status-chip");
-    // Should have chips for all 7 statuses
-    expect(chips.length).toBe(7);
+  it("accepts controlled activeStatuses prop to show all items", () => {
+    const allStatuses = new Set<ItemStatus>(["pending", "in_progress", "completed", "failing", "blocked", "deferred", "deleted"]);
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, activeStatuses: allStatuses, defaultExpandDepth: 3 }));
+    // With all statuses visible, completed task should appear
+    expect(root.textContent).toContain("Build login form");
   });
 
-  it("renders filter preset buttons", () => {
-    const root = renderToDiv(h(PRDTree, { document: sampleDoc }));
-    const presets = root.querySelectorAll(".prd-status-preset");
-    expect(presets.length).toBe(4); // "All Items", "Active Work", "Completed", "Blocked/Deferred"
+  it("uses default Active Work filter when activeStatuses prop is omitted", () => {
+    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
+    // Completed items should be hidden by the default Active Work filter
+    expect(root.textContent).not.toContain("Build login form");
+    // In-progress items should be visible
+    expect(root.textContent).toContain("Add OAuth support");
   });
 
   it("hides deleted items by default", () => {
