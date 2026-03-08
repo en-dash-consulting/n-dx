@@ -61,7 +61,12 @@
 
         "packages/rex/src/cli/commands/constants.ts": "rex-runtime-data",
 
-        "packages/web/src/server/rex-gateway.ts": "mcp-route-layer"
+        "packages/web/src/server/rex-gateway.ts": "mcp-route-layer",
+
+        "packages/web/src/server/domain-gateway.ts": "web-viewer",
+        "packages/web/src/server/routes-mcp.ts": "web-viewer",
+        "packages/web/tests/unit/server/domain-gateway.test.ts": "web-viewer",
+        "packages/web/tests/unit/server/routes-mcp.test.ts": "web-viewer"
       }
     },
     "riskJustifications": [
@@ -88,11 +93,15 @@
       },
       {
         "zone": "mcp-route-layer",
-        "reason": "Coupling of 0.6 is architectural: routes-mcp.ts imports rex-gateway.ts (runtime gateway, required for MCP server creation) and types.ts (type-only import, erased at compile). The bidirectional coupling with web-dashboard follows the composition-root pattern — start.ts wires the MCP handler into the HTTP server. Extracting shared types would not reduce real runtime coupling."
+        "reason": "Coupling of 0.6 is architectural: routes-mcp.ts imports rex-gateway.ts (runtime gateway, required for MCP server creation) and types.ts (type-only import, erased at compile). After pinning routes-mcp.ts and domain-gateway.ts into web-viewer, the web-server zone is dissolved, eliminating bidirectional coupling. The remaining mcp-route-layer (rex-gateway.ts) is a gateway module that correctly concentrates cross-package imports."
       },
       {
-        "zone": "web-build-infrastructure",
-        "reason": "Low cohesion (0.33) and high coupling (0.67) were artifacts of misclassified viewer files. Zone pins corrected to assign elapsed-time.ts, use-tick.ts, route-state.ts, and task-audit.ts to web-viewer (web-dashboard dissolved). After re-analysis, this zone collapses to a pure build-config cluster (build.js, dev.js, package.json, tsconfig.json) with no cross-zone coupling."
+        "zone": "web",
+        "reason": "Low cohesion (0.33) is inherent: this zone contains root-level project files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts, logo assets) with no shared import edges. These are configuration and build infrastructure files — they are not expected to import each other. Splitting would not improve cohesion."
+      },
+      {
+        "zone": "web-viewer",
+        "reason": "10 entry points reflect the zone's role as the web package's primary surface: server gateways (prd-io.ts, rex-gateway.ts, types.ts), shared UI primitives (logos.ts, rex-task-link.ts, sidebar.ts), polling infrastructure (index.ts, polling-state.ts), viewer types, and usage constants. Each entry point serves a distinct consumer (server routes, viewer components, or external tests). Consolidation would force artificial re-exports without reducing the API surface."
       },
       {
         "zone": "packages-rex:notion-integration",

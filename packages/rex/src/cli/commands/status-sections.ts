@@ -17,25 +17,15 @@ import type { PRDItem, ItemStatus } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
-import type { CoverageMap } from "./status.js";
+import type { CoverageMap } from "./status-shared.js";
 import {
+  STATUS_ICONS,
   renderTree,
   filterCompleted,
   filterDeleted,
   formatStats,
   formatTimestamp,
-} from "./status.js";
-
-// Re-used status icon map (kept in sync with status.ts)
-const STATUS_ICONS: Record<string, string> = {
-  pending: "○",
-  in_progress: "◐",
-  completed: "●",
-  failing: "✗",
-  deferred: "◌",
-  blocked: "⊘",
-  deleted: "✕",
-};
+} from "./status-shared.js";
 
 interface OverrideMarkerSummaryItem {
   id: string;
