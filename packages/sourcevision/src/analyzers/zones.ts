@@ -33,6 +33,10 @@ import type {
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
 import {
+  buildPackageMap,
+  computeCrossRepoCrossings,
+} from "./workspace-crossings.js";
+import {
   promoteZones,
   promoteCrossings,
   getSubAnalyzedPrefixes,
@@ -1853,6 +1857,17 @@ export async function analyzeZones(
     promotedCrossings.push(...promoteCrossings(sub));
   }
   const allZones = [...pinnedFinalZones, ...promotedZones];
+
+  // ── Compute cross-package crossings ──
+  // Resolve workspace member npm imports (e.g. `@n-dx/llm-client`) into
+  // zone crossings so foundation-tier coupling is visible in the monorepo graph.
+  if (subAnalyses.length > 0) {
+    const packageMap = buildPackageMap(subAnalyses);
+    const crossRepoCrossings = computeCrossRepoCrossings(
+      subAnalyses, allZones, packageMap,
+    );
+    promotedCrossings.push(...crossRepoCrossings);
+  }
 
   // ── Build final crossings ──
   const crossings = buildCrossings(allZones, imports, promotedCrossings);

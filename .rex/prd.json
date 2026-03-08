@@ -19759,10 +19759,12 @@
         {
           "id": "1db08695-80c1-43f0-93b4-42d0c0ce1223",
           "title": "Include llm-client in monorepo zone analysis",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Add monorepo-level zone-analysis pass that includes llm-client's internal zones so foundation-tier coupling is visible. Addresses finding 2.",
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-03-08T07:30:10.201Z",
+          "completedAt": "2026-03-08T07:36:02.907Z"
         },
         {
           "id": "42983eb6-08c9-4e6b-9c4e-6e8671f18c5a",
