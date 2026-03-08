@@ -22,6 +22,8 @@ import * as gateway from "../../../src/prd/rex-gateway.js";
 const EXPECTED_EXPORTS = [
   // Schema version
   "SCHEMA_VERSION",
+  "isCompatibleSchema",
+  "assertSchemaVersion",
   // Store factory
   "resolveStore",
   // Tree utilities
@@ -81,7 +83,7 @@ describe("rex-gateway compatibility", () => {
     }
   });
 
-  // Constants (non-function exports)
+  // Constants (non-function exports) — SCHEMA_VERSION is a string constant
   const CONSTANT_EXPORTS = new Set(["SCHEMA_VERSION"]);
 
   // Verify each individual export to give clear diagnostics on failure

@@ -42,10 +42,11 @@
  *    gateway (cli/commands/run.ts, agent/planning/brief.ts,
  *    tools/rex.ts). Each imports only the subset it needs.
  *
- * **Type-only** imports (`import type { PRDStore, … } from "rex"`)
- * are deliberately excluded — they are erased at compile time and
- * create zero runtime coupling.  Those stay at the call-site where
- * they provide local type-safety.
+ * **Type-only** imports (`import type { PRDStore, … }`) must also
+ * flow through this gateway to prevent the type-import promotion
+ * erosion path — a type import can be promoted to a runtime import
+ * during refactoring, silently bypassing the gateway pattern.
+ * This is enforced by domain-isolation.test.js.
  *
  * @module hench/prd/rex-gateway
  * @see packages/web/src/server/domain-gateway.ts — web's equivalent gateway
@@ -82,3 +83,9 @@ export { isRootLevel, isWorkItem } from "rex";
 
 // ---- Finding acknowledgment -------------------------------------------------
 export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "rex";
+
+// ---- Type re-exports --------------------------------------------------------
+// All type imports from rex must flow through this gateway to prevent
+// type-import promotion erosion (a type import can be promoted to a
+// runtime import during refactoring, silently bypassing the gateway).
+export type { PRDStore, PRDItem, ItemStatus, CommandExecutor, TreeEntry } from "rex";

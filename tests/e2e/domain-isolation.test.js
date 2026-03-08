@@ -113,6 +113,38 @@ describe("hasRuntimeImportFrom self-tests", () => {
   });
 });
 
+/**
+ * Find type-only imports from a specific package in file content.
+ * Returns true if the file has `import type { ... } from "pkg"`.
+ */
+function hasTypeImportFrom(content, pkg) {
+  const lines = content.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+
+    const fromPkg = new RegExp(`from\\s+["']${pkg}["']`);
+    if (!fromPkg.test(trimmed)) continue;
+
+    if (/^import\s+type\s/.test(trimmed)) return true;
+  }
+  return false;
+}
+
+describe("hasTypeImportFrom self-tests", () => {
+  it("detects type-only imports", () => {
+    expect(hasTypeImportFrom('import type { Foo } from "rex"', "rex")).toBe(true);
+  });
+
+  it("excludes runtime imports", () => {
+    expect(hasTypeImportFrom('import { foo } from "rex"', "rex")).toBe(false);
+  });
+
+  it("excludes export type re-exports", () => {
+    expect(hasTypeImportFrom('export type { Foo } from "rex"', "rex")).toBe(false);
+  });
+});
+
 describe("gateway-rules.json validation", () => {
   it("all gateway files referenced in gateway-rules.json exist on disk", () => {
     const stale = [];
@@ -345,6 +377,149 @@ describe("architecture policy: gateway enforcement", () => {
         );
       }
     });
+  }
+
+  /**
+   * Type-import gateway enforcement — closes the promotion erosion path.
+   *
+   * Even `import type { Foo } from "rex"` outside a gateway is an erosion
+   * risk: a developer may later promote it to a runtime import during
+   * refactoring, silently bypassing the gateway pattern. Routing all
+   * imports (runtime AND type) through gateways eliminates this pathway.
+   *
+   * Exception: viewer files in the web package are exempt because the
+   * server/viewer boundary prevents them from reaching the server-side
+   * gateway. Type-only imports in viewer code are erased at compile time
+   * and create zero runtime coupling.
+   */
+  const TYPE_IMPORT_EXEMPT_DIRS = new Set([
+    "packages/web/src/viewer",
+  ]);
+
+  for (const rule of GATEWAY_RULES) {
+    it(`${rule.packageDir} type imports from "${rule.externalPkg}" must go through gateway`, () => {
+      const pkgSrc = walk(join(ROOT, rule.packageDir));
+      const violations = [];
+
+      for (const file of pkgSrc) {
+        const rel = relative(ROOT, file).replace(/\\/g, "/");
+
+        // The gateway itself is allowed
+        if (rule.gatewayFiles.has(rel)) continue;
+
+        // Exempt directories (viewer can't reach server gateway due to boundary rule)
+        let exempt = false;
+        for (const dir of TYPE_IMPORT_EXEMPT_DIRS) {
+          if (rel.startsWith(dir + "/")) { exempt = true; break; }
+        }
+        if (exempt) continue;
+
+        const content = readFileSync(file, "utf-8");
+        if (hasTypeImportFrom(content, rule.externalPkg)) {
+          violations.push(rel);
+        }
+      }
+
+      if (violations.length > 0) {
+        const gw = [...rule.gatewayFiles][0];
+        expect.fail(
+          [
+            `Type imports from '${rule.externalPkg}' found outside the gateway.`,
+            `All imports (including type-only) must go through: ${gw}`,
+            "This prevents type-import promotion from silently bypassing the gateway.",
+            "",
+            "Violations:",
+            ...violations.map((v) => `  - ${v}`),
+            "",
+            `To fix: import the type from the gateway instead of '${rule.externalPkg}' directly.`,
+            `If the type is not yet re-exported, add it to ${gw} first.`,
+          ].join("\n"),
+        );
+      }
+    });
+  }
+
+  /**
+   * Gateway files must contain only re-export statements — no logic.
+   *
+   * The gateway pattern requires that gateway files are pure passthrough
+   * modules: they re-export symbols from the upstream package and contain
+   * no function bodies, class declarations, variable assignments, or any
+   * other logic. This makes the cross-package surface auditable at a glance.
+   *
+   * This test walks each gateway file's content and asserts every meaningful
+   * line is an export/re-export declaration, a type export, a comment, or
+   * whitespace. Any logic (function, class, const, let, var, if, etc.)
+   * triggers a failure.
+   */
+  for (const rule of GATEWAY_RULES) {
+    for (const gwPath of rule.gatewayFiles) {
+      it(`gateway ${gwPath} contains only re-exports (no logic)`, () => {
+        const fullPath = join(ROOT, gwPath);
+        if (!existsSync(fullPath)) return;
+
+        const content = readFileSync(fullPath, "utf-8");
+        const lines = content.split("\n");
+        const violations = [];
+
+        // Track multi-line comment blocks
+        let inBlockComment = false;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+
+          // Handle block comments
+          if (inBlockComment) {
+            if (trimmed.includes("*/")) {
+              inBlockComment = false;
+            }
+            continue;
+          }
+
+          if (trimmed.startsWith("/*")) {
+            if (!trimmed.includes("*/")) {
+              inBlockComment = true;
+            }
+            continue;
+          }
+
+          // Allow: blank lines, single-line comments, export/re-export statements
+          if (trimmed === "") continue;
+          if (trimmed.startsWith("//")) continue;
+          if (trimmed.startsWith("*")) continue; // JSDoc continuation
+
+          // Allow: export { ... } from "..."  and  export type { ... } from "..."
+          // These may span multiple lines, so also allow continuation lines
+          // that are part of a multi-line export (contain only identifiers, commas, braces)
+          if (/^export\s+(type\s+)?{/.test(trimmed)) continue;
+          if (/^export\s+{/.test(trimmed)) continue;
+          // Continuation of multi-line export: "  foo," or "  foo, bar," or "} from '...'"
+          if (/^[A-Za-z_$][\w$]*\s*,?\s*$/.test(trimmed)) continue;
+          if (/^}\s*from\s+["']/.test(trimmed)) continue;
+
+          // Allow: @module, @see JSDoc tags (without leading *)
+          if (/^@\w+/.test(trimmed)) continue;
+
+          // Anything else is logic — flag it
+          violations.push({ line: i + 1, content: trimmed });
+        }
+
+        if (violations.length > 0) {
+          expect.fail(
+            [
+              `Gateway file ${gwPath} contains logic — gateways must be re-export-only.`,
+              "Gateway files may only contain: export/re-export declarations, type exports, and comments.",
+              "",
+              "Violations:",
+              ...violations.map((v) => `  line ${v.line}: ${v.content}`),
+              "",
+              "Move any logic to the upstream package or a local utility module.",
+            ].join("\n"),
+          );
+        }
+      });
+    }
   }
 
   /**

@@ -7,7 +7,7 @@ import {
   collectRequirements,
   isWorkItem,
 } from "../../prd/rex-gateway.js";
-import type { PRDStore, PRDItem, TreeEntry } from "rex";
+import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
 import type {
   TaskBrief,
   TaskBriefTask,

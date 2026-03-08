@@ -1,4 +1,4 @@
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../prd/rex-gateway.js";
 import type { SystemMemoryMonitor } from "../process/memory-monitor.js";
 
 /**

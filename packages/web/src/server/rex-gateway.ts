@@ -83,3 +83,6 @@ export { detectReorganizations, applyProposals } from "rex";
 // ---- Rex reshape (LLM-powered restructuring) --------------------------------
 export { applyReshape, reasonForReshape } from "rex";
 export type { ReshapeProposal } from "rex";
+
+// ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
+export type { Proposal, ProposalFeature, ProposalTask } from "rex";

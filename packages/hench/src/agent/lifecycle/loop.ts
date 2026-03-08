@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";

@@ -54,8 +54,8 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
-- **Re-export only** — gateways re-export; they contain no logic.
-- **Type imports excluded** — `import type` is erased at compile time and stays at the call-site.
+- **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Exception: web viewer files are exempt because the server/viewer boundary prevents them from reaching the server-side gateway.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.

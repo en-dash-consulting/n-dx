@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
