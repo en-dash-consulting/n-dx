@@ -35,8 +35,8 @@
     "packages/hench/src/store/run-retention-scheduler.ts",
     "packages/hench/src/store/run-retention.ts"
   ],
-  "cohesion": 0.77,
-  "coupling": 0.23,
+  "cohesion": 0.75,
+  "coupling": 0.25,
   "fileCount": 22,
   "lineCount": 3790
 }

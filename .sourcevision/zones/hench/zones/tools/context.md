@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/tools (`hench/tools`)
-Files: 12, Cohesion: 0.76, Coupling: 0.24
+Files: 12, Cohesion: 0.74, Coupling: 0.26
 Description: 12 files, primarily TypeScript
 Entry points: packages/hench/src/agent/tools.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/index.ts, packages/hench/src/tools/shell.ts
 Lines: 1862

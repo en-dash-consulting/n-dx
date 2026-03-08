@@ -1,0 +1,35 @@
+{
+  "id": "unit-analyze/unit/cli",
+  "name": "Unit Analyze/unit/cli",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "src/analyze/reshape-reason.ts",
+    "src/cli/commands/chunked-review-state.ts",
+    "src/cli/commands/chunked-review.ts",
+    "src/cli/commands/prune.ts",
+    "src/cli/commands/reshape.ts",
+    "src/cli/commands/smart-add-duplicates.ts",
+    "src/cli/commands/smart-add.ts",
+    "src/core/reshape.ts",
+    "src/store/project-config.ts",
+    "tests/integration/claude-config.test.ts",
+    "tests/unit/cli/commands/chunked-review.test.ts",
+    "tests/unit/cli/commands/loe-display.test.ts",
+    "tests/unit/cli/commands/smart-add-duplicates.test.ts",
+    "tests/unit/cli/commands/smart-add.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyze/reshape-reason.ts",
+    "src/cli/commands/chunked-review.ts",
+    "src/cli/commands/prune.ts",
+    "src/cli/commands/reshape.ts",
+    "src/cli/commands/smart-add-duplicates.ts",
+    "src/cli/commands/smart-add.ts",
+    "src/core/reshape.ts",
+    "src/store/project-config.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 14,
+  "lineCount": 8408
+}

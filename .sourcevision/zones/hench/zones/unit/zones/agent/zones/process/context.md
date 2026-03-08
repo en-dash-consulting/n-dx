@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/agent/process (`hench/unit/agent/process`)
-Files: 37, Cohesion: 0.75, Coupling: 0.25
-Description: 37 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/process/index.ts, packages/hench/src/process/limiter.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/process/memory-throttle.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/tools/exec-shell.ts
-Lines: 11783
+Files: 35, Cohesion: 0.73, Coupling: 0.27
+Description: 35 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/process/index.ts, packages/hench/src/process/limiter.ts, packages/hench/src/process/memory-monitor.ts, packages/hench/src/process/memory-throttle.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/tools/exec-shell.ts
+Lines: 11682
 
 </zone>
 
@@ -17,7 +17,6 @@ Lines: 11783
 packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
-packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
 packages/hench/src/agent/planning/prompt.ts (TypeScript, 76 lines, source)
 packages/hench/src/cli/commands/config.ts (TypeScript, 584 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
@@ -39,7 +38,6 @@ packages/hench/tests/e2e/cli-init.test.ts (TypeScript, 135 lines, test)
 packages/hench/tests/unit/agent/adaptive.test.ts (TypeScript, 531 lines, test)
 packages/hench/tests/unit/agent/prompt.test.ts (TypeScript, 100 lines, test)
 packages/hench/tests/unit/agent/summary.test.ts (TypeScript, 241 lines, test)
-packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
 packages/hench/tests/unit/agent/workflow.test.ts (TypeScript, 388 lines, test)
 packages/hench/tests/unit/cli/commands/config.test.ts (TypeScript, 211 lines, test)
 packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts (TypeScript, 872 lines, test)
@@ -60,7 +58,6 @@ Internal:
   packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
   packages/hench/src/agent/analysis/summary.ts → packages/hench/src/schema/v1.ts {ToolCallRecord, RunSummaryData, CommandRecord, TestRecord}
   packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/schema/v1.ts {RunRecord, RunStatus, HenchConfig}
-  packages/hench/src/agent/lifecycle/token-budget.ts → packages/hench/src/schema/index.ts {TokenUsage}
   packages/hench/src/agent/planning/prompt.ts → packages/hench/src/schema/index.ts {HenchConfig, TaskBriefProject}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/index.ts {validateConfig, formatValidationErrors}
   packages/hench/src/cli/commands/config.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
@@ -87,7 +84,6 @@ Internal:
   packages/hench/src/process/memory-monitor.ts → packages/hench/src/process/memory-throttle.ts {SystemMemoryReader}
   packages/hench/src/public.ts → packages/hench/src/agent/analysis/adaptive.ts {DEFAULT_ADAPTIVE_SETTINGS}
   packages/hench/src/public.ts → packages/hench/src/agent/analysis/adaptive.ts {AdaptiveSettings, AdjustmentCategory, AdjustmentPriority, ProjectMetrics, WorkflowAdjustment, AdjustmentNotification, AdaptiveAnalysis}
-  packages/hench/src/public.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
   packages/hench/src/public.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics, DEFAULT_CONCURRENT_EXECUTION_METRICS_CONFIG}
   packages/hench/src/public.ts → packages/hench/src/process/concurrent-execution-metrics.ts {ConcurrentExecutionMetricsConfig, ExecutionMetricsSnapshot, TaskResourceMetrics, UtilizationPatterns, ExecutionMetricsSummary}
   packages/hench/src/public.ts → packages/hench/src/process/lifecycle.ts {ProcessLifecycleValidator, LifecycleAuditTrail}
@@ -120,9 +116,6 @@ Internal:
   packages/hench/tests/unit/agent/prompt.test.ts → packages/hench/src/schema/v1.ts {TaskBriefProject}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
   packages/hench/tests/unit/agent/summary.test.ts → packages/hench/src/schema/v1.ts {ToolCallRecord}
-  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
-  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
-  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/schema/v1.ts {TokenUsage}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats, _resetIdCounter}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/agent/analysis/workflow.ts {WorkflowSuggestion}
   packages/hench/tests/unit/agent/workflow.test.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}

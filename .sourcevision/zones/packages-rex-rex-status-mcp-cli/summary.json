@@ -1,0 +1,50 @@
+{
+  "id": "packages-rex:rex-status-mcp-cli",
+  "name": "Rex Status & MCP CLI",
+  "description": "The read-oriented CLI surface for rex: status display, health checks, usage analytics, and MCP server wiring.",
+  "files": [
+    "packages/rex/src/cli/commands/constants.ts",
+    "packages/rex/src/cli/commands/health.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/cli/mcp-tools.ts",
+    "packages/rex/src/cli/mcp.ts",
+    "packages/rex/src/core/health.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/token-usage.ts",
+    "packages/rex/src/workflow/default.ts",
+    "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
+    "packages/rex/tests/unit/cli/commands/smart-add-merge.test.ts",
+    "packages/rex/tests/unit/cli/commands/status.test.ts",
+    "packages/rex/tests/unit/cli/mcp.test.ts",
+    "packages/rex/tests/unit/core/health.test.ts",
+    "packages/rex/tests/unit/core/token-usage-regression.test.ts",
+    "packages/rex/tests/unit/core/token-usage.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/constants.ts",
+    "packages/rex/src/cli/commands/health.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/cli/mcp.ts",
+    "packages/rex/src/core/health.ts",
+    "packages/rex/src/core/stats.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 20,
+  "lineCount": 7237,
+  "riskMetrics": {
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true,
+    "riskJustification": "Read-only CLI commands (status, health, usage, report) and MCP tool definitions. After absorbing report.ts and pinning constants.ts to rex-runtime-data, the zone focuses on query/display operations. Remaining coupling reflects legitimate dependencies on core stats, health checks, and token usage modules."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "packages-rex:rex-runtime-data",
+  "name": "Rex Runtime Data",
+  "description": "Persisted runtime state for the rex PRD tracker: project config, the PRD tree, execution log, and human-readable workflow state.",
+  "files": [
+    "packages/rex/.rex/config.json",
+    "packages/rex/.rex/execution-log.jsonl",
+    "packages/rex/.rex/prd.json",
+    "packages/rex/.rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 66,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "notion-integration",
+  "name": "Notion Integration Adapter",
+  "description": "Implements the Notion sync adapter including data mapping and store-level adapter logic for syncing PRD items with Notion databases.",
+  "files": [
+    "src/core/notion-map.ts",
+    "src/store/notion-adapter.ts",
+    "tests/unit/core/notion-map.test.ts",
+    "tests/unit/store/notion-adapter.test.ts"
+  ],
+  "entryPoints": [
+    "src/store/notion-adapter.ts"
+  ],
+  "cohesion": 0.14,
+  "coupling": 0.86,
+  "fileCount": 4,
+  "lineCount": 3481,
+  "riskMetrics": {
+    "cohesion": 0.14,
+    "coupling": 0.86,
+    "riskScore": 0.86,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

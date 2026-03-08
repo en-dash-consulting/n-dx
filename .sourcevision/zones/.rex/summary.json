@@ -1,0 +1,27 @@
+{
+  "id": ".rex",
+  "name": ".rex",
+  "description": "8 files, primarily JSON, Other, Markdown",
+  "files": [
+    ".rex/acknowledged-findings.json",
+    ".rex/archive.json",
+    ".rex/config.json",
+    ".rex/execution-log.1.jsonl",
+    ".rex/execution-log.jsonl",
+    ".rex/pending-proposals.json",
+    ".rex/prd.json",
+    ".rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 26010,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

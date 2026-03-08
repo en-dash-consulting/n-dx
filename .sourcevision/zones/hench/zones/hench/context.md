@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/hench (`hench/hench`)
-Files: 6, Cohesion: 1.00, Coupling: 0.00
+Files: 6, Cohesion: 0.00, Coupling: 0.00
 Description: 6 files, primarily Other, JSON, Markdown
 Lines: 178
 

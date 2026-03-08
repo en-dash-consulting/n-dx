@@ -1,0 +1,49 @@
+{
+  "id": "rex-status-mcp-cli",
+  "name": "Rex Status & MCP CLI",
+  "description": "The read-oriented CLI surface for rex: status display, health checks, usage analytics, and MCP server wiring.",
+  "files": [
+    "src/cli/commands/constants.ts",
+    "src/cli/commands/health.ts",
+    "src/cli/commands/init.ts",
+    "src/cli/commands/status-sections.ts",
+    "src/cli/commands/status.ts",
+    "src/cli/commands/token-format.ts",
+    "src/cli/commands/usage.ts",
+    "src/cli/mcp-tools.ts",
+    "src/cli/mcp.ts",
+    "src/core/health.ts",
+    "src/core/stats.ts",
+    "src/core/token-usage.ts",
+    "src/workflow/default.ts",
+    "tests/integration/smart-add-duplicate-outcomes.test.ts",
+    "tests/unit/cli/commands/smart-add-merge.test.ts",
+    "tests/unit/cli/commands/status.test.ts",
+    "tests/unit/cli/mcp.test.ts",
+    "tests/unit/core/health.test.ts",
+    "tests/unit/core/token-usage-regression.test.ts",
+    "tests/unit/core/token-usage.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/constants.ts",
+    "src/cli/commands/health.ts",
+    "src/cli/commands/init.ts",
+    "src/cli/commands/status.ts",
+    "src/cli/commands/token-format.ts",
+    "src/cli/commands/usage.ts",
+    "src/cli/mcp.ts",
+    "src/core/health.ts",
+    "src/core/stats.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 20,
+  "lineCount": 7237,
+  "riskMetrics": {
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

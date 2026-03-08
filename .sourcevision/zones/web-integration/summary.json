@@ -1,0 +1,22 @@
+{
+  "id": "web-integration",
+  "name": "Web Integration",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/landing/landing.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts",
+    "packages/web/tests/unit/landing/landing.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 627,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

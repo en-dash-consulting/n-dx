@@ -167,6 +167,7 @@
         "If a clean re-analysis confirms the src-2 boundary, assign the zone name 'llm-provider-types-and-utilities': the confirmed file list includes types (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts), config (config.ts, llm-config.ts), and utilities (token-usage.ts, exec.ts, project-config.ts, help-format.ts, json.ts, output.ts, suggest.ts). The name should reflect this dual-archetype composition rather than either archetype alone.",
         "All src-2 zone metrics — size (42% of files), cohesion (0.56), coupling (0.44), zone name, and entry-point counts — are provisional until sourcevision analyze is re-run with a clean manifest. The stale manifest (status: 'running', completedAt predating startedAt) means Louvain community detection and the enrichment LLM call may both have produced incomplete output. No structural remediation of src-2 should begin before re-analysis.",
         "Run `sourcevision analyze` to produce a clean zone manifest before acting on any src-2 findings. This is the prerequisite gate for all src-2 severity assessments. If re-analysis produces a different zone boundary, findings src-2/0 (42% of files), src-2/1 (generic name), src-2/4 (ZONE.md suggestion), and global/21 (fuzzy boundary inference) may all resolve without structural action.",
+        "After clean re-analysis, if the src-2 zone boundary is confirmed, assign the zone name 'llm-cli-utilities' in sourcevision zone configuration and add a one-paragraph ZONE.md documenting: which file categories belong here (CLI config resolvers, token parsers, exec wrappers, output formatters), the boundary rule distinguishing it from the src zone (no provider service classes), and which files are candidates for the shared types extraction if reverse edges persist. This is a zero-cost action independent of all structural work.",
         "[call graph] 269 internal calls, 0 outgoing, 4 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -623,6 +624,13 @@
     "global/23 infers that the src-2 zone enrichment failure 'independently corroborates' a fuzzy zone boundary. global/13 refutes this with a concrete mechanism: the manifest records status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed process — not ambiguous file content. A crashed process is a deterministic failure with no content-quality signal. global/23's corroboration claim is therefore invalid. Rely on global/13; do not use global/23 as evidence for any zone-split or naming action beyond what the size metric alone justifies.",
     "The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs.",
     "At least 13 findings (global/0, 4, 6, 8, 11, 17, 20, 22, 25, 31, 32, 33, 34) independently describe aspects of the same 3 reverse import edges from different angles: automated heuristic edge counting, two independent LLM analysis passes, and multiple meta-evaluation passes all converged unprompted on the same root cause and the same fix candidate. This cross-method convergence — without any single pass being able to see the others — is strong evidence the finding is real and not a false positive, and justifies treating it as the highest-priority work item even before clean re-analysis confirms edge persistence.",
+    "The 53 findings reduce to exactly 4 ordered action items: (1) re-run sourcevision analyze as a mandatory gate — all zone-derived metrics are suspect given the crashed zones phase; (2) after clean re-analysis, resolve the 3 reverse import edges via zone pinning first (zero code change), falling back to extracting types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts into a new zero-dependency zone only if pinning is unavailable or unstable; (3) add utility test coverage for every export in the src-2 zone; (4) add one integration test asserting a constructed session contains a valid auth token. Items 3 and 4 are independent of each other but both depend on item 2 producing a stable shared interface. All remaining findings are corroborating evidence, positive invariants to preserve, or process artifacts from the crashed zones phase.",
+    "Pass 5 meta-findings use internal numbering ('finding 8', 'finding 11', 'global/7') that references their own analysis pass, not the accumulated finding set indices. The mapping is imprecise: global/21 references 'global/7 is a positive architectural property (no zone imports from package-root)' but the actual global/7 in the accumulated set is a documentation suggestion about test-to-module mapping. The correct target of that claim is global/34 (flat index 49), which is the relationship finding describing the clean boundary. Consumers must not treat pass 5 cross-references as direct index lookups.",
+    "The manifest confirms the zones crash: completedAt (01:59:02) predates startedAt (05:42:31) by 3h43m, and status remains 'running'. Components and callgraph phases completed using zones output from a prior run, meaning all zone-derived metrics (src-2 cohesion 0.56, coupling 0.44, 19 files, 42% share; src zone 12 entry points, 13 files) should be treated as potentially stale. This is not a minor data quality flag — it is a hard prerequisite gate. Acting on any zone metric before re-analysis risks executing a refactor against an artifact boundary.",
+    "Two findings violate the evaluation constraint that positive architectural properties must carry 'info' severity: global/34 (flat index 49, critical) describes a confirmed-clean boundary invariant with no action required; global/21 (flat index 36, critical) is a meta-observation describing another positive property. Both are downgraded. The critical severity pool should contain only: global/9 (compounding risk cluster resolution plan), global/19 (canonical action sequence), and global/35 (missing base types zone anti-pattern).",
+    "global/34 is marked critical but describes a confirmed positive architectural property: no zone imports from package-root at runtime. This is an invariant to preserve, not a defect to remediate. Per evaluation constraints, positive findings must carry 'info' severity. The current critical designation inverts the severity signal — a reader scanning for must-fix items will encounter a clean boundary and lose trust in the severity distribution. Severity must be 'info'.",
+    "global/22 is marked critical and states 'Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists'. This is a convergence observation — it adds epistemic weight to findings already captured at appropriate severity (global/9 is critical, global/35 is critical). Convergence evidence is not itself a new critical defect. Retaining critical severity here inflates the must-fix count and makes global/22 indistinguishable from the actual action items. Severity should be 'warning'.",
+    "Finding inflation: 53 findings across 6 zones encode 4 action items. The ratio of corroborating evidence to independent findings is approximately 12:1. For future analysis passes on packages below 50 files, suppressions should be applied for: (a) findings that describe the same root cause as an already-critical finding, (b) findings that reference positive invariants with no prescribed action, and (c) meta-findings that describe severity miscategorizations rather than structural defects. Applying these suppressions here reduces the working set to 6 actionable findings.",
     "[call graph] 88 calls: \"unit\" → \"src\""
   ],
   "findings": [
@@ -791,7 +799,21 @@
       "type": "suggestion",
       "pass": 5,
       "scope": "global",
+      "text": "global/22 is marked critical and states 'Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists'. This is a convergence observation — it adds epistemic weight to findings already captured at appropriate severity (global/9 is critical, global/35 is critical). Convergence evidence is not itself a new critical defect. Retaining critical severity here inflates the must-fix count and makes global/22 indistinguishable from the actual action items. Severity should be 'warning'.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
       "text": "global/23 infers that the src-2 zone enrichment failure 'independently corroborates' a fuzzy zone boundary. global/13 refutes this with a concrete mechanism: the manifest records status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed process — not ambiguous file content. A crashed process is a deterministic failure with no content-quality signal. global/23's corroboration claim is therefore invalid. Rely on global/13; do not use global/23 as evidence for any zone-split or naming action beyond what the size metric alone justifies.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "global/34 is marked critical but describes a confirmed positive architectural property: no zone imports from package-root at runtime. This is an invariant to preserve, not a defect to remediate. Per evaluation constraints, positive findings must carry 'info' severity. The current critical designation inverts the severity signal — a reader scanning for must-fix items will encounter a clean boundary and lose trust in the severity distribution. Severity must be 'info'.",
       "severity": "info"
     },
     {
@@ -834,7 +856,14 @@
       "pass": 5,
       "scope": "global",
       "text": "Finding global/7 is a positive architectural property (no zone imports from package-root at runtime) and must carry 'info' severity per evaluation constraints. Its critical designation conflates a confirmed-good invariant with genuine structural problems in findings 8 and 11, distorting the severity distribution.",
-      "severity": "critical"
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Finding inflation: 53 findings across 6 zones encode 4 action items. The ratio of corroborating evidence to independent findings is approximately 12:1. For future analysis passes on packages below 50 files, suppressions should be applied for: (a) findings that describe the same root cause as an already-critical finding, (b) findings that reference positive invariants with no prescribed action, and (c) meta-findings that describe severity miscategorizations rather than structural defects. Applying these suppressions here reduces the working set to 6 actionable findings.",
+      "severity": "info"
     },
     {
       "type": "pattern",
@@ -883,14 +912,14 @@
       "pass": 5,
       "scope": "global",
       "text": "The automated enrichment failure on the src-2 zone name (src-2/1) is a process signal: the zone's internal coherence is low enough that the LLM could not identify a clear domain label from its file contents. This is independent corroboration that the zone's boundary is fuzzy, reinforcing src-2/0's size warning without requiring a split — it is sufficient to assign a name manually and add a zone-level README documenting the intended scope.",
-      "severity": "warning"
+      "severity": "info"
     },
     {
       "type": "pattern",
       "pass": 5,
       "scope": "global",
       "text": "The cluster-criticality heuristic confirmed in global/20 applies here: findings 5, 11, and 20 individually describe sub-threshold risks (test gap, implicit coupling, zone fuzziness), but their co-occurrence on the same change surface (auth.ts, config.ts, token-usage.ts) removes all safety layers. This pattern — multiple warning-level findings concentrated on the same 2-3 files — should be the primary triage signal in future analysis passes, surfaced before individual finding severity is assessed.",
-      "severity": "info"
+      "severity": "warning"
     },
     {
       "type": "pattern",
@@ -973,6 +1002,13 @@
       "type": "suggestion",
       "pass": 5,
       "scope": "src-2",
+      "text": "After clean re-analysis, if the src-2 zone boundary is confirmed, assign the zone name 'llm-cli-utilities' in sourcevision zone configuration and add a one-paragraph ZONE.md documenting: which file categories belong here (CLI config resolvers, token parsers, exec wrappers, output formatters), the boundary rule distinguishing it from the src zone (no provider service classes), and which files are candidates for the shared types extraction if reverse edges persist. This is a zero-cost action independent of all structural work.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "src-2",
       "text": "If a clean re-analysis confirms the src-2 boundary, assign the zone name 'llm-provider-types-and-utilities': the confirmed file list includes types (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts), config (config.ts, llm-config.ts), and utilities (token-usage.ts, exec.ts, project-config.ts, help-format.ts, json.ts, output.ts, suggest.ts). The name should reflect this dual-archetype composition rather than either archetype alone.",
       "severity": "info"
     },
@@ -999,7 +1035,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 8,
+  "metaEvaluationCount": 9,
   "structureHash": "b67064233d99c70c",
   "zoneContentHashes": {
     "root": "ba8bddb6ce77ae93",

@@ -366,6 +366,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/cli-loop.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
       "symbols": [
@@ -506,6 +514,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
       "to": "packages/hench/src/process/memory-monitor.ts",
       "type": "static",
       "symbols": [
@@ -638,6 +654,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/shared.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/shared.ts",
       "to": "packages/hench/src/process/index.ts",
       "type": "static",
       "symbols": [
@@ -746,6 +770,16 @@
         "walkTree",
         "collectRequirements",
         "isWorkItem"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/planning/brief.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "PRDItem",
+        "TreeEntry"
       ]
     },
     {
@@ -965,7 +999,17 @@
         "findItem",
         "collectCompletedIds",
         "isRootLevel",
-        "isWorkItem"
+        "isWorkItem",
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/run.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDStore"
       ]
     },
     {
@@ -2268,6 +2312,14 @@
     },
     {
       "from": "packages/hench/src/tools/contracts.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/contracts.ts",
       "to": "packages/hench/src/process/memory-monitor.ts",
       "type": "type",
       "symbols": [
@@ -2423,6 +2475,17 @@
         "loadAcknowledged",
         "saveAcknowledged",
         "acknowledgeFinding"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore",
+        "PRDItem",
+        "ItemStatus",
+        "CommandExecutor"
       ]
     },
     {
@@ -6197,6 +6260,14 @@
     },
     {
       "from": "packages/rex/src/cli/commands/analyze.ts",
+      "to": "packages/rex/src/store/atomic-write.ts",
+      "type": "static",
+      "symbols": [
+        "atomicWriteJSON"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/analyze.ts",
       "to": "packages/rex/src/store/index.ts",
       "type": "static",
       "symbols": [
@@ -7314,6 +7385,14 @@
     },
     {
       "from": "packages/rex/src/cli/commands/smart-add.ts",
+      "to": "packages/rex/src/store/atomic-write.ts",
+      "type": "static",
+      "symbols": [
+        "atomicWriteJSON"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/smart-add.ts",
       "to": "packages/rex/src/store/index.ts",
       "type": "static",
       "symbols": [
@@ -7330,6 +7409,103 @@
       ]
     },
     {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/cli/commands/status.ts",
+      "type": "static",
+      "symbols": [
+        "renderTree",
+        "filterCompleted",
+        "filterDeleted",
+        "formatStats",
+        "formatTimestamp"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/cli/commands/status.ts",
+      "type": "type",
+      "symbols": [
+        "CoverageMap"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "type": "static",
+      "symbols": [
+        "formatAggregateTokenUsage",
+        "formatBudgetWarnings"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/cli/output.ts",
+      "type": "static",
+      "symbols": [
+        "info",
+        "warn",
+        "result"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/core/stats.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/core/token-usage.ts",
+      "type": "static",
+      "symbols": [
+        "aggregateTokenUsage",
+        "checkBudget"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/core/token-usage.ts",
+      "type": "type",
+      "symbols": [
+        "TokenUsageFilter"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/core/verify.ts",
+      "type": "type",
+      "symbols": [
+        "VerifyResult"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/status-sections.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDStore"
+      ]
+    },
+    {
       "from": "packages/rex/src/cli/commands/status.ts",
       "to": "packages/rex/src/cli/commands/constants.ts",
       "type": "static",
@@ -7339,11 +7515,17 @@
     },
     {
       "from": "packages/rex/src/cli/commands/status.ts",
-      "to": "packages/rex/src/cli/commands/token-format.ts",
+      "to": "packages/rex/src/cli/commands/status-sections.ts",
       "type": "static",
       "symbols": [
-        "formatAggregateTokenUsage",
-        "formatBudgetWarnings"
+        "buildCoverageMap",
+        "renderJsonOutput",
+        "renderStaleReport",
+        "renderTreeView",
+        "renderCoverageSummary",
+        "renderTokenUsageSection",
+        "renderAutoCompletableHints",
+        "renderStaleWarnings"
       ]
     },
     {
@@ -7351,8 +7533,7 @@
       "to": "packages/rex/src/cli/errors.ts",
       "type": "static",
       "symbols": [
-        "CLIError",
-        "BudgetExceededError"
+        "CLIError"
       ]
     },
     {
@@ -7360,8 +7541,6 @@
       "to": "packages/rex/src/cli/output.ts",
       "type": "static",
       "symbols": [
-        "info",
-        "warn",
         "result",
         "isQuiet"
       ]
@@ -7397,23 +7576,6 @@
       "type": "type",
       "symbols": [
         "TreeStats"
-      ]
-    },
-    {
-      "from": "packages/rex/src/cli/commands/status.ts",
-      "to": "packages/rex/src/core/structural.ts",
-      "type": "static",
-      "symbols": [
-        "validateStructure"
-      ]
-    },
-    {
-      "from": "packages/rex/src/cli/commands/status.ts",
-      "to": "packages/rex/src/core/token-usage.ts",
-      "type": "static",
-      "symbols": [
-        "aggregateTokenUsage",
-        "checkBudget"
       ]
     },
     {
@@ -7461,8 +7623,7 @@
       "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
-        "PRDItem",
-        "ItemStatus"
+        "PRDItem"
       ]
     },
     {
@@ -7840,7 +8001,8 @@
       "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
-        "SCHEMA_VERSION"
+        "SCHEMA_VERSION",
+        "isCompatibleSchema"
       ]
     },
     {
@@ -8769,35 +8931,6 @@
         "PRDItem",
         "Priority",
         "Requirement"
-      ]
-    },
-    {
-      "from": "packages/rex/src/core/notion-map.ts",
-      "to": "packages/rex/src/core/tree.ts",
-      "type": "static",
-      "symbols": [
-        "walkTree"
-      ]
-    },
-    {
-      "from": "packages/rex/src/core/notion-map.ts",
-      "to": "packages/rex/src/schema/index.ts",
-      "type": "static",
-      "symbols": [
-        "SCHEMA_VERSION",
-        "isRootLevel"
-      ]
-    },
-    {
-      "from": "packages/rex/src/core/notion-map.ts",
-      "to": "packages/rex/src/schema/index.ts",
-      "type": "type",
-      "symbols": [
-        "ItemLevel",
-        "ItemStatus",
-        "PRDItem",
-        "PRDDocument",
-        "Priority"
       ]
     },
     {
@@ -9909,6 +10042,9 @@
       "to": "packages/rex/src/schema/v1.ts",
       "type": "reexport",
       "symbols": [
+        "SCHEMA_VERSION",
+        "isCompatibleSchema",
+        "assertSchemaVersion",
         "PRIORITY_ORDER",
         "LEVEL_HIERARCHY",
         "VALID_LEVELS",
@@ -10165,6 +10301,8 @@
       "type": "reexport",
       "symbols": [
         "SCHEMA_VERSION",
+        "isCompatibleSchema",
+        "assertSchemaVersion",
         "LEVEL_HIERARCHY",
         "PRIORITY_ORDER",
         "VALID_LEVELS",
@@ -10228,6 +10366,8 @@
       "to": "packages/rex/src/schema/v1.ts",
       "type": "static",
       "symbols": [
+        "SCHEMA_VERSION",
+        "isCompatibleSchema",
         "VALID_STATUSES",
         "VALID_LEVELS",
         "VALID_PRIORITIES",
@@ -10324,6 +10464,14 @@
         "validateDocument",
         "validateConfig",
         "validateLogEntry"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/file-adapter.ts",
+      "to": "packages/rex/src/store/atomic-write.ts",
+      "type": "static",
+      "symbols": [
+        "atomicWriteJSON"
       ]
     },
     {
@@ -10589,27 +10737,6 @@
     },
     {
       "from": "packages/rex/src/store/notion-adapter.ts",
-      "to": "packages/rex/src/core/notion-map.ts",
-      "type": "static",
-      "symbols": [
-        "mapItemToNotion",
-        "mapNotionToItem",
-        "mapNotionToDocument",
-        "resolveParentPage",
-        "buildStatusGroupMap",
-        "validateDatabaseSchema"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/notion-adapter.ts",
-      "to": "packages/rex/src/core/notion-map.ts",
-      "type": "type",
-      "symbols": [
-        "NotionStatusGroup"
-      ]
-    },
-    {
-      "from": "packages/rex/src/store/notion-adapter.ts",
       "to": "packages/rex/src/core/sync.ts",
       "type": "static",
       "symbols": [
@@ -10671,11 +10798,61 @@
     },
     {
       "from": "packages/rex/src/store/notion-adapter.ts",
+      "to": "packages/rex/src/store/notion-map.ts",
+      "type": "static",
+      "symbols": [
+        "mapItemToNotion",
+        "mapNotionToItem",
+        "mapNotionToDocument",
+        "resolveParentPage",
+        "buildStatusGroupMap",
+        "validateDatabaseSchema"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-adapter.ts",
+      "to": "packages/rex/src/store/notion-map.ts",
+      "type": "type",
+      "symbols": [
+        "NotionStatusGroup"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-adapter.ts",
       "to": "packages/rex/src/store/project-config.ts",
       "type": "static",
       "symbols": [
         "loadProjectOverrides",
         "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-map.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-map.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "packages/rex/src/store/notion-map.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "ItemLevel",
+        "ItemStatus",
+        "PRDItem",
+        "PRDDocument",
+        "Priority"
       ]
     },
     {
@@ -12367,7 +12544,16 @@
     },
     {
       "from": "packages/rex/tests/unit/core/notion-map.test.ts",
-      "to": "packages/rex/src/core/notion-map.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/core/notion-map.test.ts",
+      "to": "packages/rex/src/store/notion-map.ts",
       "type": "static",
       "symbols": [
         "mapItemToNotion",
@@ -12386,19 +12572,10 @@
     },
     {
       "from": "packages/rex/tests/unit/core/notion-map.test.ts",
-      "to": "packages/rex/src/core/notion-map.ts",
+      "to": "packages/rex/src/store/notion-map.ts",
       "type": "type",
       "symbols": [
         "NotionStatusGroup"
-      ]
-    },
-    {
-      "from": "packages/rex/tests/unit/core/notion-map.test.ts",
-      "to": "packages/rex/src/schema/index.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItem",
-        "PRDDocument"
       ]
     },
     {
@@ -12930,6 +13107,24 @@
       ]
     },
     {
+      "from": "packages/rex/tests/unit/schema/schema-version.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "isCompatibleSchema",
+        "assertSchemaVersion"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/schema/schema-version.test.ts",
+      "to": "packages/rex/src/schema/validate.ts",
+      "type": "static",
+      "symbols": [
+        "validateDocument"
+      ]
+    },
+    {
       "from": "packages/rex/tests/unit/schema/validate.test.ts",
       "to": "packages/rex/src/schema/validate.ts",
       "type": "static",
@@ -12998,6 +13193,15 @@
         "resolveRemoteStore",
         "resolveStore",
         "createStore"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/unit/store/atomic-write.test.ts",
+      "to": "packages/rex/src/store/atomic-write.ts",
+      "type": "static",
+      "symbols": [
+        "atomicWrite",
+        "atomicWriteJSON"
       ]
     },
     {
@@ -16757,6 +16961,14 @@
       ]
     },
     {
+      "from": "packages/web/src/server/incremental-task-usage.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator"
+      ]
+    },
+    {
       "from": "packages/web/src/server/index.ts",
       "to": "packages/web/src/server/port.ts",
       "type": "reexport",
@@ -16812,6 +17024,47 @@
       ]
     },
     {
+      "from": "packages/web/src/server/prd-io.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "SCHEMA_VERSION",
+        "isCompatibleSchema"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/prd-io.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/register-scheduler.ts",
+      "to": "packages/web/src/server/incremental-task-usage.ts",
+      "type": "type",
+      "symbols": [
+        "IncrementalTaskUsageAggregator"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/register-scheduler.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "CollectAllIdsFn"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/register-scheduler.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "startUsageCleanupScheduler"
+      ]
+    },
+    {
       "from": "packages/web/src/server/routes-adaptive.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
@@ -16845,6 +17098,15 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-data.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "prdExists",
+        "prdPath"
       ]
     },
     {
@@ -16896,6 +17158,14 @@
       "type": "static",
       "symbols": [
         "ConcurrentExecutionMetrics"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-hench.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
       ]
     },
     {
@@ -17041,78 +17311,34 @@
       ]
     },
     {
-      "from": "packages/web/src/server/routes-rex.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "type": "dynamic",
-      "symbols": [
-        "reasonForReshape"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/routes-rex.ts",
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
       "to": "packages/web/src/server/rex-gateway.ts",
       "type": "static",
       "symbols": [
-        "PRIORITY_ORDER",
-        "LEVEL_HIERARCHY",
-        "VALID_LEVELS",
-        "VALID_STATUSES",
-        "VALID_PRIORITIES",
-        "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES",
-        "CHILD_LEVEL",
-        "isPriority",
-        "isItemLevel",
-        "isRequirementCategory",
-        "isValidationType",
-        "findItem",
-        "walkTree",
-        "rexInsertChild",
-        "rexUpdateInTree",
-        "removeFromTree",
-        "computeStats",
-        "rexFindNextTask",
-        "collectCompletedIds",
-        "computeTimestampUpdates",
-        "validateMerge",
-        "previewMerge",
-        "mergeItems",
-        "countSubtree",
-        "isFullyCompleted",
-        "findPrunableItems",
-        "pruneItems",
-        "computeEpicStats",
-        "computePriorityDistribution",
-        "computeRequirementsSummary",
-        "isRootLevel",
-        "isWorkItem",
-        "computeHealthScore",
-        "detectReorganizations",
-        "applyProposals",
-        "applyReshape"
+        "isPriority"
       ]
     },
     {
-      "from": "packages/web/src/server/routes-rex.ts",
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
       "to": "packages/web/src/server/rex-gateway.ts",
       "type": "type",
       "symbols": [
-        "Priority",
-        "ItemLevel",
-        "ItemStatus",
-        "PRDItem",
-        "PRDDocument",
-        "TreeEntry",
-        "TreeStats",
-        "MergeValidation",
-        "EpicStats",
-        "PriorityDistribution",
-        "RequirementsSummary",
-        "ReshapeProposal"
+        "PRDItem"
       ]
     },
     {
-      "from": "packages/web/src/server/routes-rex.ts",
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "insertChild",
+        "loadPRD",
+        "savePRD",
+        "appendLog"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
       "symbols": [
@@ -17122,7 +17348,7 @@
       ]
     },
     {
-      "from": "packages/web/src/server/routes-rex.ts",
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "type",
       "symbols": [
@@ -17130,11 +17356,475 @@
       ]
     },
     {
-      "from": "packages/web/src/server/routes-rex.ts",
+      "from": "packages/web/src/server/routes-rex/analysis.ts",
       "to": "packages/web/src/server/websocket.ts",
       "type": "type",
       "symbols": [
         "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats",
+        "isRootLevel"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "loadPRD",
+        "appendLog"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/execution.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "dynamic",
+      "symbols": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "computeHealthScore",
+        "detectReorganizations",
+        "applyProposals",
+        "applyReshape"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "ReshapeProposal"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRD",
+        "savePRD"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/health.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/analysis.ts",
+      "type": "static",
+      "symbols": [
+        "routeProposals"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/execution.ts",
+      "type": "reexport",
+      "symbols": [
+        "shutdownRexExecution"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/execution.ts",
+      "type": "static",
+      "symbols": [
+        "routeExecution"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/execution.ts",
+      "type": "type",
+      "symbols": [
+        "ShutdownRexResult"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/health.ts",
+      "type": "static",
+      "symbols": [
+        "routeHealthReorganize"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/items.ts",
+      "type": "static",
+      "symbols": [
+        "routeItems"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/prune.ts",
+      "type": "static",
+      "symbols": [
+        "routePrune"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/reads.ts",
+      "type": "static",
+      "symbols": [
+        "routePrdReads"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/routes-rex/requirements.ts",
+      "type": "static",
+      "symbols": [
+        "routeItemRequirements",
+        "routeRequirementsAnalytics"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/index.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "LEVEL_HIERARCHY",
+        "CHILD_LEVEL",
+        "isPriority",
+        "isItemLevel",
+        "removeFromTree",
+        "validateMerge",
+        "previewMerge",
+        "mergeItems"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "ItemLevel",
+        "TreeEntry"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "insertChild",
+        "updateInTree",
+        "loadPRD",
+        "savePRD",
+        "appendLog",
+        "API_SETTABLE_STATUSES",
+        "parentIdOf"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/items.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree",
+        "countSubtree",
+        "isWorkItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "loadPRD",
+        "savePRD",
+        "appendLog",
+        "parentIdOf"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/prune.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/reads.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "computeStats",
+        "computeEpicStats",
+        "computePriorityDistribution",
+        "computeRequirementsSummary"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/reads.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRD",
+        "findNextTask",
+        "collectCompletedIds"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/reads.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/reads.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "isPriority",
+        "isRequirementCategory",
+        "isValidationType",
+        "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "Requirement"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/routes-rex/shared.ts",
+      "type": "static",
+      "symbols": [
+        "findItemById",
+        "loadPRD",
+        "savePRD",
+        "appendLog"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "static",
+      "symbols": [
+        "jsonResponse",
+        "errorResponse",
+        "readBody"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/requirements.ts",
+      "to": "packages/web/src/server/websocket.ts",
+      "type": "type",
+      "symbols": [
+        "WebSocketBroadcaster"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/shared.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync",
+        "savePRDSync"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/shared.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "VALID_STATUSES",
+        "findItem",
+        "rexInsertChild",
+        "rexUpdateInTree",
+        "rexFindNextTask",
+        "collectCompletedIds",
+        "computeTimestampUpdates"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/shared.ts",
+      "to": "packages/web/src/server/rex-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem",
+        "PRDDocument",
+        "ItemStatus",
+        "TreeEntry"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-rex/shared.ts",
+      "to": "packages/web/src/server/types.ts",
+      "type": "type",
+      "symbols": [
+        "ServerContext"
       ]
     },
     {
@@ -17201,6 +17891,14 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-status.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
       ]
     },
     {
@@ -17273,6 +17971,14 @@
     },
     {
       "from": "packages/web/src/server/routes-validation.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/routes-validation.ts",
       "to": "packages/web/src/server/rex-gateway.ts",
       "type": "static",
       "symbols": [
@@ -17326,6 +18032,14 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/search-index.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
       ]
     },
     {
@@ -17441,7 +18155,7 @@
     },
     {
       "from": "packages/web/src/server/start.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "handleRexRoute",
@@ -17512,7 +18226,7 @@
       "to": "packages/web/src/server/task-usage.ts",
       "type": "static",
       "symbols": [
-        "startUsageCleanupScheduler"
+        "registerUsageScheduler"
       ]
     },
     {
@@ -17554,8 +18268,29 @@
       "to": "packages/web/src/server/incremental-task-usage.ts",
       "type": "reexport",
       "symbols": [
-        "IncrementalTaskUsageAggregator",
-        "TaskUsageAccumulator"
+        "IncrementalTaskUsageAggregator"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/task-usage.ts",
+      "to": "packages/web/src/server/register-scheduler.ts",
+      "type": "reexport",
+      "symbols": [
+        "registerUsageScheduler",
+        "RegisterSchedulerOptions"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/task-usage.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator",
+        "CollectAllIdsFn",
+        "OrphanedEntry",
+        "CleanupResult",
+        "CleanupConfig",
+        "CleanupLogEntry"
       ]
     },
     {
@@ -17568,12 +18303,7 @@
         "identifyOrphanedEntries",
         "loadCleanupConfig",
         "writeCleanupLog",
-        "DEFAULT_CLEANUP_INTERVAL_MS",
-        "CollectAllIdsFn",
-        "CleanupResult",
-        "CleanupConfig",
-        "CleanupLogEntry",
-        "OrphanedEntry"
+        "DEFAULT_CLEANUP_INTERVAL_MS"
       ]
     },
     {
@@ -17581,8 +18311,28 @@
       "to": "packages/web/src/server/incremental-task-usage.ts",
       "type": "type",
       "symbols": [
-        "IncrementalTaskUsageAggregator",
-        "TaskUsageAccumulator"
+        "IncrementalTaskUsageAggregator"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator",
+        "CollectAllIdsFn",
+        "OrphanedEntry",
+        "CleanupResult",
+        "CleanupLogEntry",
+        "CleanupConfig"
       ]
     },
     {
@@ -21586,7 +22336,7 @@
     },
     {
       "from": "packages/web/tests/integration/smart-add-dispatch.test.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "handleRexRoute"
@@ -21615,6 +22365,14 @@
       "symbols": [
         "createWebSocketManager",
         "WsHealthTracker"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/landing/landing.test.ts",
+      "to": "packages/web/src/landing/landing.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
       ]
     },
     {
@@ -21683,6 +22441,22 @@
       "type": "type",
       "symbols": [
         "ServerContext"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/domain-gateway.test.ts",
+      "to": "packages/sourcevision/src/public.ts",
+      "type": "dynamic",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/domain-gateway.test.ts",
+      "to": "packages/web/src/server/domain-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "createSourcevisionMcpServer"
       ]
     },
     {
@@ -21998,7 +22772,7 @@
     },
     {
       "from": "packages/web/tests/unit/server/routes-requirements.test.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "handleRexRoute"
@@ -22014,7 +22788,7 @@
     },
     {
       "from": "packages/web/tests/unit/server/routes-rex.test.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "handleRexRoute"
@@ -22145,7 +22919,7 @@
     },
     {
       "from": "packages/web/tests/unit/server/scope.test.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "handleRexRoute"
@@ -22195,7 +22969,7 @@
     },
     {
       "from": "packages/web/tests/unit/server/shutdown-handler.test.ts",
-      "to": "packages/web/src/server/routes-rex.ts",
+      "to": "packages/web/src/server/routes-rex/index.ts",
       "type": "static",
       "symbols": [
         "shutdownRexExecution"
@@ -22208,6 +22982,35 @@
       "symbols": [
         "registerShutdownHandlers",
         "DEFAULT_SHUTDOWN_TIMEOUT_MS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/task-usage.test.ts",
+      "to": "packages/web/src/server/task-usage.ts",
+      "type": "static",
+      "symbols": [
+        "IncrementalTaskUsageAggregator",
+        "startUsageCleanupScheduler",
+        "runCleanupCycle",
+        "identifyOrphanedEntries",
+        "loadCleanupConfig",
+        "writeCleanupLog",
+        "DEFAULT_CLEANUP_INTERVAL_MS",
+        "registerUsageScheduler"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/task-usage.test.ts",
+      "to": "packages/web/src/server/task-usage.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator",
+        "CollectAllIdsFn",
+        "OrphanedEntry",
+        "CleanupResult",
+        "CleanupConfig",
+        "CleanupLogEntry",
+        "RegisterSchedulerOptions"
       ]
     },
     {
@@ -22247,11 +23050,8 @@
       "to": "packages/web/src/server/rex-gateway.ts",
       "type": "static",
       "symbols": [
-        "GATEWAY_PRIORITY_ORDER",
         "GATEWAY_LEVEL_HIERARCHY",
-        "GATEWAY_VALID_LEVELS",
         "GATEWAY_VALID_STATUSES",
-        "GATEWAY_VALID_PRIORITIES",
         "GATEWAY_VALID_REQ_CATEGORIES",
         "GATEWAY_VALID_VALIDATION_TYPES",
         "GATEWAY_CHILD_LEVEL",
@@ -24077,6 +24877,29 @@
       ]
     },
     {
+      "from": "tests/e2e/cli-output-contracts.test.js",
+      "to": "tests/e2e/e2e-helpers.js",
+      "type": "static",
+      "symbols": [
+        "createTmpDir",
+        "removeTmpDir",
+        "setupRexDir",
+        "setupSourcevisionDir",
+        "CLI_PATH"
+      ]
+    },
+    {
+      "from": "tests/e2e/mcp-transport.test.js",
+      "to": "tests/e2e/e2e-helpers.js",
+      "type": "static",
+      "symbols": [
+        "createTmpDir",
+        "removeTmpDir",
+        "setupRexDir",
+        "setupSourcevisionDir"
+      ]
+    },
+    {
       "from": "tests/unit/help.test.js",
       "to": "help.js",
       "type": "static",
@@ -24212,7 +25035,8 @@
         "packages/sourcevision/tests/unit/analyzers/zone-enrichment.test.ts",
         "packages/web/src/server/routes-hench.ts",
         "packages/web/src/server/routes-project.ts",
-        "packages/web/src/server/routes-rex.ts",
+        "packages/web/src/server/routes-rex/analysis.ts",
+        "packages/web/src/server/routes-rex/execution.ts",
         "packages/web/tests/unit/server/routes-hench-shutdown.test.ts"
       ],
       "symbols": [
@@ -24277,11 +25101,9 @@
         "claude-integration.js",
         "cli.js",
         "pr-check.js",
-        "tests/e2e/cli-contract.test.mjs",
         "web.js"
       ],
       "symbols": [
-        "execFileSync",
         "execSync",
         "spawn"
       ]
@@ -24305,7 +25127,6 @@
         "refresh-artifacts.js",
         "refresh-validate.js",
         "scripts/hench-callgraph-analysis.mjs",
-        "tests/e2e/cli-contract.test.mjs",
         "web.js"
       ],
       "symbols": [
@@ -24350,7 +25171,6 @@
         "pr-check.js",
         "refresh-artifacts.js",
         "refresh-validate.js",
-        "tests/e2e/cli-contract.test.mjs",
         "web.js"
       ],
       "symbols": [
@@ -24549,15 +25369,8 @@
     {
       "package": "rex",
       "importedBy": [
-        "packages/hench/src/agent/lifecycle/cli-loop.ts",
-        "packages/hench/src/agent/lifecycle/loop.ts",
-        "packages/hench/src/agent/lifecycle/shared.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/cli/commands/run.ts",
         "packages/hench/src/cli/commands/task-lookup.ts",
         "packages/hench/src/prd/rex-gateway.ts",
-        "packages/hench/src/tools/contracts.ts",
-        "packages/hench/src/tools/rex.ts",
         "packages/hench/tests/integration/codex-token-accounting.test.ts",
         "packages/hench/tests/unit/agent/api-auth.test.ts",
         "packages/hench/tests/unit/agent/atomic-transition.test.ts",
@@ -24574,49 +25387,29 @@
       ],
       "symbols": [
         "*",
-        "ApplyResult",
         "CHILD_LEVEL",
         "CommandExecutor",
-        "EpicStats",
-        "HealthDimensions",
-        "HealthOptions",
         "ItemLevel",
         "ItemStatus",
         "LEVEL_HIERARCHY",
-        "MergePreview",
-        "MergeResult",
-        "MergeValidation",
         "PRDDocument",
         "PRDItem",
         "PRDStore",
-        "PRIORITY_ORDER",
-        "Priority",
-        "PriorityDistribution",
         "Proposal",
         "ProposalFeature",
         "ProposalTask",
-        "ReorganizationPlan",
-        "ReorganizationProposal",
         "Requirement",
-        "RequirementCategory",
-        "RequirementValidationType",
-        "RequirementsSummary",
-        "ReshapeAction",
         "ReshapeProposal",
-        "ReshapeReasonOptions",
-        "ReshapeReasonResult",
-        "ReshapeResult",
-        "StructureHealthScore",
+        "SCHEMA_VERSION",
         "TreeEntry",
         "TreeStats",
-        "VALID_LEVELS",
-        "VALID_PRIORITIES",
         "VALID_REQUIREMENT_CATEGORIES",
         "VALID_STATUSES",
         "VALID_VALIDATION_TYPES",
         "acknowledgeFinding",
         "applyProposals",
         "applyReshape",
+        "assertSchemaVersion",
         "collectAllIds",
         "collectCompletedIds",
         "collectRequirements",
@@ -24634,15 +25427,9 @@
         "findAutoCompletions",
         "findItem",
         "findNextTask",
-        "findPrunableItems",
-        "formatApplyResult",
-        "formatHealthScore",
         "formatRequirementsValidation",
-        "formatReshapeProposal",
-        "getLevelLabel",
         "insertChild",
-        "isContainerLevel",
-        "isFullyCompleted",
+        "isCompatibleSchema",
         "isItemLevel",
         "isPriority",
         "isRequirementCategory",
@@ -24652,7 +25439,6 @@
         "loadAcknowledged",
         "mergeItems",
         "previewMerge",
-        "pruneItems",
         "reasonForReshape",
         "removeFromTree",
         "resolveStore",
@@ -24691,8 +25477,7 @@
         "ci.js",
         "claude-integration.js",
         "cli.js",
-        "pr-check.js",
-        "tests/e2e/cli-contract.test.mjs"
+        "pr-check.js"
       ],
       "symbols": [
         "fileURLToPath"
@@ -24896,8 +25681,10 @@
         "packages/rex/tests/unit/core/verify.test.ts",
         "packages/rex/tests/unit/recommend/conflict-detection.test.ts",
         "packages/rex/tests/unit/recommend/create-from-recommendations.test.ts",
+        "packages/rex/tests/unit/schema/schema-version.test.ts",
         "packages/rex/tests/unit/schema/validate.test.ts",
         "packages/rex/tests/unit/store/adapter-registry.test.ts",
+        "packages/rex/tests/unit/store/atomic-write.test.ts",
         "packages/rex/tests/unit/store/file-adapter.test.ts",
         "packages/rex/tests/unit/store/integration-schema.test.ts",
         "packages/rex/tests/unit/store/notion-adapter.test.ts",
@@ -24969,9 +25756,11 @@
         "packages/web/tests/integration/smart-add-dispatch.test.ts",
         "packages/web/tests/integration/token-usage-route-regression.test.ts",
         "packages/web/tests/integration/ws-health-integration.test.ts",
+        "packages/web/tests/unit/landing/landing.test.ts",
         "packages/web/tests/unit/server/aggregation-cache.test.ts",
         "packages/web/tests/unit/server/data-loading-efficiency.test.ts",
         "packages/web/tests/unit/server/dev-reload.test.ts",
+        "packages/web/tests/unit/server/domain-gateway.test.ts",
         "packages/web/tests/unit/server/incremental-task-usage.test.ts",
         "packages/web/tests/unit/server/memory-leak-fixes.test.ts",
         "packages/web/tests/unit/server/port.test.ts",
@@ -25003,6 +25792,7 @@
         "packages/web/tests/unit/server/scope.test.ts",
         "packages/web/tests/unit/server/search-index.test.ts",
         "packages/web/tests/unit/server/shutdown-handler.test.ts",
+        "packages/web/tests/unit/server/task-usage.test.ts",
         "packages/web/tests/unit/server/type-consistency.test.ts",
         "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
         "packages/web/tests/unit/server/websocket.test.ts",
@@ -25097,11 +25887,13 @@
         "tests/e2e/cli-arg-contracts.test.js",
         "tests/e2e/cli-ci.test.js",
         "tests/e2e/cli-config.test.js",
+        "tests/e2e/cli-contract.test.js",
         "tests/e2e/cli-delegation.test.js",
         "tests/e2e/cli-dev.test.js",
         "tests/e2e/cli-errors.test.js",
         "tests/e2e/cli-init.test.js",
         "tests/e2e/cli-orchestration.test.js",
+        "tests/e2e/cli-output-contracts.test.js",
         "tests/e2e/cli-pr-check.test.js",
         "tests/e2e/cli-refresh.test.js",
         "tests/e2e/cli-spawn-boundary.test.js",
@@ -25109,6 +25901,7 @@
         "tests/e2e/cli-tool-resolution.test.js",
         "tests/e2e/cli-web.test.js",
         "tests/e2e/domain-isolation.test.js",
+        "tests/e2e/mcp-transport.test.js",
         "tests/unit/help.test.js",
         "tests/unit/refresh-artifacts.test.js",
         "tests/unit/refresh-plan.test.js",
@@ -25116,7 +25909,9 @@
         "vitest.config.js"
       ],
       "symbols": [
+        "afterAll",
         "afterEach",
+        "beforeAll",
         "beforeEach",
         "defineConfig",
         "describe",
@@ -25147,14 +25942,21 @@
     }
   ],
   "summary": {
-    "totalEdges": 2592,
+    "totalEdges": 2686,
     "totalExternal": 18,
-    "circularCount": 0,
-    "circulars": [],
+    "circularCount": 1,
+    "circulars": [
+      {
+        "cycle": [
+          "packages/rex/src/cli/commands/status-sections.ts",
+          "packages/rex/src/cli/commands/status.ts"
+        ]
+      }
+    ],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
-        "count": 48
+        "count": 49
       },
       {
         "path": "packages/rex/src/schema/index.ts",
@@ -25170,7 +25972,7 @@
       },
       {
         "path": "packages/rex/src/cli/output.ts",
-        "count": 27
+        "count": 28
       },
       {
         "path": "packages/rex/src/cli/errors.ts",
@@ -25185,6 +25987,10 @@
         "count": 23
       },
       {
+        "path": "packages/web/src/server/types.ts",
+        "count": 22
+      },
+      {
         "path": "packages/hench/src/store/config.ts",
         "count": 20
       },
@@ -25193,11 +25999,11 @@
         "count": 19
       },
       {
-        "path": "packages/rex/src/core/canonical.ts",
-        "count": 16
+        "path": "packages/web/src/server/rex-gateway.ts",
+        "count": 17
       },
       {
-        "path": "packages/web/src/server/types.ts",
+        "path": "packages/rex/src/core/canonical.ts",
         "count": 16
       },
       {
@@ -25227,12 +26033,8 @@
       {
         "path": "packages/llm-client/src/types.ts",
         "count": 11
-      },
-      {
-        "path": "packages/sourcevision/src/analyzers/claude-client.ts",
-        "count": 11
       }
     ],
-    "avgImportsPerFile": 3.4
+    "avgImportsPerFile": 3.44
   }
 }

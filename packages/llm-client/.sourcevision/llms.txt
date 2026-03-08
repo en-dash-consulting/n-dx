@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (42), JSON (3)
 - **Zones**: 4 (4 with descriptions)
 - **Git**: feature/integrate-codex @ 3acc839
-- **Analyzed**: 2026-03-08T01:59:02.400Z
+- **Analyzed**: 2026-03-08T05:44:58.083Z
 
 ## Architecture Zones
 
@@ -83,12 +83,12 @@
 - At least 13 findings (global/0, 4, 6, 8, 11, 17, 20, 22, 25, 31, 32, 33, 34) independently describe aspects of the same 3 reverse import edges from different angles: automated heuristic edge counting, two independent LLM analysis passes, and multiple meta-evaluation passes all converged unprompted on the same root cause and the same fix candidate. This cross-method convergence — without any single pass being able to see the others — is strong evidence the finding is real and not a false positive, and justifies treating it as the highest-priority work item even before clean re-analysis confirms edge persistence. [info]
 - Canonical action plan distilled from findings global/19, 28, 29, 30, and 31 with correct sequencing: Step 0 (gate) — re-run sourcevision analyze; if the 3 reverse edges no longer exist after clean re-analysis, steps 1–3 are unnecessary. Step 1 — if edges persist, extract exactly four files (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts — all already classified as 'types' archetype) into a new zero-dependency zone; update import paths in api-provider.ts, cli-provider.ts, and auth.ts only. Step 2 — add utility test coverage for every export in the src-2 zone. Step 3 — add one integration test asserting a constructed session contains a valid auth token. Steps 1–3 are ordered; step 0 is the prerequisite gate for all three. [critical]
 - Finding global/6 describes a near-clean layered architecture that is 'one refactor away' from a strict DAG. The underlying problem (3 reverse edges) is already captured at appropriate severity in findings 4, 8, 11, and 12. Finding 6 is corroborating evidence, not an independent critical defect — retaining critical severity double-counts the same root cause. [warning]
-- Finding global/7 is a positive architectural property (no zone imports from package-root at runtime) and must carry 'info' severity per evaluation constraints. Its critical designation conflates a confirmed-good invariant with genuine structural problems in findings 8 and 11, distorting the severity distribution. [critical]
+- Finding global/7 is a positive architectural property (no zone imports from package-root at runtime) and must carry 'info' severity per evaluation constraints. Its critical designation conflates a confirmed-good invariant with genuine structural problems in findings 8 and 11, distorting the severity distribution. [warning]
+- Finding inflation: 53 findings across 6 zones encode 4 action items. The ratio of corroborating evidence to independent findings is approximately 12:1. For future analysis passes on packages below 50 files, suppressions should be applied for: (a) findings that describe the same root cause as an already-critical finding, (b) findings that reference positive invariants with no prescribed action, and (c) meta-findings that describe severity miscategorizations rather than structural defects. Applying these suppressions here reduces the working set to 6 actionable findings. [info]
 - Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists, so llm-provider-core imports upward into llm-cli-utilities to access shared config and token shapes. This single missing layer is the origin of all three compounding risks in finding 11. It should be tracked as one work unit, not five separate issues. [critical]
 - Findings 3 and 9 are complementary and do not contradict each other. Finding 3 (four zones is appropriate granularity) operates at the inter-zone level; finding 9 (HTTP and subprocess strategies are co-located without sub-boundary) operates at the intra-zone level. Both are correct simultaneously. Finding 3 does not imply that all intra-zone organization is optimal. [info]
 - Findings 7 (critical, positive boundary) and 2 (info, positive entry-point pattern) share the same underlying characteristic — both describe architectural properties that are working correctly and should be preserved. Neither warrants any action. They should be treated as invariants to protect during the types-extraction refactor described in finding 14, not as issues to address. [info]
-- The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves. [warning]
-- ... and 8 more
+- ... and 9 more
 
 ### Relationships
 
@@ -119,8 +119,8 @@
 - The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs. [warning]
 - The minimum-effort resolution for the 3 reverse import edges is zone pinning via sourcevision configuration, not a structural refactor. Add a zone configuration entry pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a named anchor cluster. This instructs Louvain to place these files in a fixed foundation zone on every re-analysis, drawing zone boundaries so provider service files (api-provider.ts, cli-provider.ts, auth.ts) cluster above them — eliminating reverse edges with zero import-path changes and zero test disruption. Attempt zone pinning first after re-running sourcevision analyze. Only proceed to the import-path refactor described in global/31 if pinning produces an unstable boundary on re-analysis. [warning]
 - The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down. [critical]
-- global/23 infers that the src-2 zone enrichment failure 'independently corroborates' a fuzzy zone boundary. global/13 refutes this with a concrete mechanism: the manifest records status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed process — not ambiguous file content. A crashed process is a deterministic failure with no content-quality signal. global/23's corroboration claim is therefore invalid. Rely on global/13; do not use global/23 as evidence for any zone-split or naming action beyond what the size metric alone justifies. [info]
-- ... and 7 more
+- global/22 is marked critical and states 'Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists'. This is a convergence observation — it adds epistemic weight to findings already captured at appropriate severity (global/9 is critical, global/35 is critical). Convergence evidence is not itself a new critical defect. Retaining critical severity here inflates the must-fix count and makes global/22 indistinguishable from the actual action items. Severity should be 'warning'. [warning]
+- ... and 10 more
 
 ## Next Steps
 
@@ -128,7 +128,7 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **The compounding risk cluster (finding 11, now critical) sho… (+6 related)**
+1. **The compounding risk cluster (finding 11, now critical) sho… (+5 related)**
 
 ### Medium Priority
 
@@ -159,12 +159,15 @@ Prioritized work items derived from analysis:
 1. **Findings src/0 (12 entry points, automated heuristic) and global/2 (single publ…**
    Files: `src/api-provider.ts`, `src/cli-provider.ts`, `src/codex-cli-provider.ts`
 
-1. **Finding global/6 describes a near-clean layered architectur… (+5 related)**
+1. **Finding global/6 describes a near-clean layered architectur… (+6 related)**
 
 ### Low Priority
 
 1. **Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.0…**
    Files: `package-lock.json`, `package.json`, `tsconfig.json`
+
+1. **After clean re-analysis, if the src-2 zone boundary is confirmed, assign the zo…**
+   Files: `src/auth.ts`, `src/config.ts`, `src/exec.ts`
 
 1. **If a clean re-analysis confirms the src-2 boundary, assign the zone name 'llm-p…**
    Files: `src/auth.ts`, `src/config.ts`, `src/exec.ts`
@@ -178,6 +181,8 @@ Prioritized work items derived from analysis:
 
 1. **global/23 infers that the src-2 zone enrichment failure 'independently corrobor…**
 
+1. **global/34 is marked critical but describes a confirmed positive architectural p…**
+
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
@@ -185,19 +190,19 @@ Prioritized work items derived from analysis:
 | `package-lock.json` | generated |  | root |
 | `package.json` | config |  | root |
 | `src/api-provider.ts` | source | service | src |
-| `src/auth.ts` | source | service | src-2 |
+| `src/auth.ts` | source | utility | src-2 |
 | `src/cli-provider.ts` | source | service | src |
 | `src/codex-cli-provider.ts` | source | service | src |
 | `src/config.ts` | source | config | src-2 |
-| `src/create-client.ts` | source | service | src |
+| `src/create-client.ts` | source | utility | src |
 | `src/exec.ts` | source | utility | src-2 |
 | `src/help-format.ts` | source | utility | src-2 |
 | `src/json.ts` | source | utility | src-2 |
-| `src/llm-client.ts` | source | service | src |
+| `src/llm-client.ts` | source | utility | src |
 | `src/llm-config.ts` | source | config | src |
 | `src/llm-types.ts` | source | types | src |
 | `src/output.ts` | source | utility | src-2 |
-| `src/project-config.ts` | source | config | src-2 |
+| `src/project-config.ts` | source | utility | src-2 |
 | `src/project-dirs.ts` | source | types | src-2 |
 | `src/provider-interface.ts` | source | types | src |
 | `src/provider-registry.ts` | source | service | src |

@@ -1,12 +1,11 @@
 {
   "id": "hench/unit/agent/process",
   "name": "Hench/unit/agent/process",
-  "description": "37 files, primarily TypeScript",
+  "description": "35 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/summary.ts",
     "packages/hench/src/agent/analysis/workflow.ts",
-    "packages/hench/src/agent/lifecycle/token-budget.ts",
     "packages/hench/src/agent/planning/prompt.ts",
     "packages/hench/src/cli/commands/config.ts",
     "packages/hench/src/process/concurrent-execution-metrics.ts",
@@ -28,7 +27,6 @@
     "packages/hench/tests/unit/agent/adaptive.test.ts",
     "packages/hench/tests/unit/agent/prompt.test.ts",
     "packages/hench/tests/unit/agent/summary.test.ts",
-    "packages/hench/tests/unit/agent/token-budget.test.ts",
     "packages/hench/tests/unit/agent/workflow.test.ts",
     "packages/hench/tests/unit/cli/commands/config.test.ts",
     "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
@@ -43,7 +41,6 @@
   ],
   "entryPoints": [
     "packages/hench/src/agent/analysis/summary.ts",
-    "packages/hench/src/agent/lifecycle/token-budget.ts",
     "packages/hench/src/agent/planning/prompt.ts",
     "packages/hench/src/cli/commands/config.ts",
     "packages/hench/src/process/index.ts",
@@ -54,8 +51,8 @@
     "packages/hench/src/schema/v1.ts",
     "packages/hench/src/tools/exec-shell.ts"
   ],
-  "cohesion": 0.75,
-  "coupling": 0.25,
-  "fileCount": 37,
-  "lineCount": 11783
+  "cohesion": 0.73,
+  "coupling": 0.27,
+  "fileCount": 35,
+  "lineCount": 11682
 }

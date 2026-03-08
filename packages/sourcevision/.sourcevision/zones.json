@@ -230,6 +230,7 @@
         "Zone finding 4 (critical risk, score 0.69) is overstated. Three independent sources — zone finding 3 (LLM), global finding 5 (LLM), and global finding 10 (heuristic cross-check) — identify the coupling and low-cohesion scores as Louvain over-partitioning artifacts. The constraint against escalating single-heuristic findings applies in reverse: three sources of corroboration for a false-positive justify downgrading from critical to info. No file-level refactoring is warranted; subdirectory organization of src/analyzers/ addresses the root cause.",
         "All four zone-level findings (generic name, high coupling 0.69, low cohesion 0.31, composite risk score 0.69) share a single root cause: Louvain over-partitioning of src/analyzers/ into artificial sub-zones. No independent heuristic or LLM finding corroborates genuine code-quality risk within this zone's 6 files in isolation. The 'critical risk' label is an artifact of Louvain-inflated coupling inputs, not a reflection of actual architectural debt.",
         "The 'critical risk' designation (finding 3) is entirely derived from Louvain partition artifacts. The cohesion/coupling metrics measure intra-domain edges within src/analyzers/ that the algorithm split across zone boundaries. No independent refactoring of this zone is required.",
+        "All four zone findings are partition artifacts from Louvain splitting one coherent analyzers domain across three zone identifiers. The 'critical risk' score is an emergent measurement artifact with no genuine architectural basis. No refactoring of this zone's cohesion or coupling metrics is warranted; the actionable fix is subdirectory organization of src/analyzers/.",
         "[call graph] 245 internal calls, 587 outgoing, 52 incoming (cohesion: 0.29, coupling: 0.71)"
       ],
       "riskMetrics": {
@@ -305,6 +306,8 @@
         "registerMcpTools in src/cli/mcp.ts is the highest-priority actionable finding in this package, corroborated independently by automated fan-out analysis (36 outgoing calls, global finding 11) and LLM analysis (cli finding 1). Decompose into three sequential named sub-registrar functions within the same file — one per capability domain (analysis tools, status/reporting tools, workflow tools) — called in sequence from registerMcpTools. This is an in-file decomposition only; no file split is required or warranted at this threshold.",
         "registerMcpTools is the single highest-confidence actionable finding in the entire package, corroborated by both automated fan-out analysis (36 outgoing calls) and LLM structural analysis independently. No other cli finding approaches this level of corroboration.",
         "Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar functions called in sequence: one for analysis tools (sv_inventory, sv_imports, sv_zones, sv_components, sv_context), one for status/reporting tools (rex_status, rex_next, rex_validate), and one for workflow tools (rex_add, rex_update, rex_analyze, rex_recommend). All three remain in mcp.ts; registerMcpTools becomes a three-call orchestrator. This is the only file-level change required.",
+        "registerMcpTools is the single highest-confidence actionable finding in the entire package, corroborated by three independent analysis methods: automated call-graph fan-out counting (36 outgoing calls), LLM structural review, and LLM synthesis. The in-file decomposition into three sequential named sub-registrar functions is warranted and well-scoped.",
+        "Remove detectBranchLifecycle from src/analyzers/branch-work-filter.ts and resolveWorkedEpicTitlesForRange from src/cli/commands/prd-epic-resolver.ts — both exports are confirmed dead (no callers found anywhere in the package, only declaration sites). Removal is low-risk and independent of all other findings.",
         "[call graph] 362 internal calls, 5 outgoing, 89 incoming (cohesion: 0.99, coupling: 0.01)"
       ],
       "riskMetrics": {
@@ -516,6 +519,7 @@
         "The coupling metric (0.57) is dominated by test-to-implementation imports, which are expected by design and carry no architectural risk.",
         "Zone finding 0 (coupling warning 0.57, 27 imports to analyzers) should be treated as info: per global finding 11, the 27 crossings are unit-test files importing their implementations under test — structurally correct by design. Only the reverse direction (analyzers production code importing from unit-scope modules) would constitute a real layering violation.",
         "Test-to-implementation coupling in this zone is structurally correct and expected by design; the 27 imports targeting analyzers are unit tests covering their subject module, not an architectural problem.",
+        "Test files importing from analyzers is correct by design — unit zone coupling to analyzers is not an architectural defect but structural confirmation that tests exercise their implementation targets.",
         "[call graph] 1339 internal calls, 270 outgoing, 579 incoming (cohesion: 0.83, coupling: 0.17)"
       ],
       "riskMetrics": {
@@ -1372,6 +1376,14 @@
     "Three findings (cli finding 1, cli finding 2, global finding 14) independently identify the same root cause — registerMcpTools fan-out of 36 — through different analysis methods (LLM structural review, LLM synthesis, automated call-graph counting). This triple corroboration from independent sources elevates confidence beyond any other finding in the package. It is the only finding that satisfies the multi-source corroboration standard required for a warning recommendation.",
     "Eight findings were downgraded from warning to info because their severity was derived solely from Louvain zone partition artifacts rather than genuine architectural problems. The metrics (coupling 0.52–0.69, cohesion 0.31, 'critical risk' score) measured intra-domain edge crossings within src/analyzers/ that the community detection algorithm assigned to separate zone identifiers. None of these metrics reflect cross-concern dependencies in the architectural sense.",
     "Global finding 0 (bidirectional coupling warning) directly contradicts global findings 10 and 13 (LLM analysis). Finding 13 explicitly resolves the contradiction: the 27-crossing unit→analyzers direction is expected test coupling that must not be flagged as warning; only the 7-crossing analyzers→unit direction is a genuine concern, already captured with full specificity by global finding 5. Global finding 0 is superseded and its warning severity is incorrect.",
+    "The dominant theme across all 37 findings is Louvain partitioning splitting a single coherent src/analyzers/ domain into three zone identifiers (analyzers, analyzers-2, analyzers-3). This inflated coupling metrics across 8 findings, generated a false 'critical risk' score, and produced two generic zone names — all of which are measurement artifacts rather than architectural problems. Subdirectory organization within src/analyzers/ would eliminate the root cause of the majority of warnings in one structural change.",
+    "Only one finding meets the multi-source corroboration standard required for warning confidence: registerMcpTools fan-out in src/cli/mcp.ts, confirmed by automated call-graph analysis (36 outgoing calls), LLM structural review, and LLM synthesis independently. All other warnings originate from a single heuristic source and should be treated as info until corroborated.",
+    "Two confirmed dead exports exist: detectBranchLifecycle (src/analyzers/branch-work-filter.ts:347) and resolveWorkedEpicTitlesForRange (src/cli/commands/prd-epic-resolver.ts:256). Neither has any callers in the package. These are the lowest-risk, highest-certainty removals available and should be addressed before any structural refactoring.",
+    "The .claude and root zone at-risk scores are systematic false positives — cohesion/coupling metrics are undefined for zones containing only configuration files and orchestration scripts with no import graph edges. These zones should be excluded from risk scoring heuristics; their score of 0.50 reflects division-by-zero fallback behavior, not architectural risk.",
+    "Global finding 0 (bidirectional coupling analyzers↔unit, warning severity) is superseded by the LLM analysis establishing that 27 of the 34 total crossings are expected test→implementation imports. Only the 7-crossing analyzers→unit direction warrants examination, and that specific concern is already fully captured by global finding 5 (production-file imports crossing into the unit/test layer). Global finding 0 adds no actionable signal beyond what finding 5 already expresses.",
+    "Execution sequence for all confirmed actionable findings, in dependency order: (1) grep and remove detectBranchLifecycle and resolveWorkedEpicTitlesForRange — independent, no downstream risk; (2) audit 6 production-file imports from src/analyzers/ that cross into the unit/test layer — independent of step 1; (3) if step 2 finds shared declarations in test-only files, extract them to src/types/ or src/shared/; (4) decompose registerMcpTools into three sequential named sub-registrar functions within src/cli/mcp.ts — independent of steps 1–3, can proceed in parallel; (5) apply subdirectory grouping within src/analyzers/ after step 3 completes to resolve Louvain partition artifacts. Steps 1, 2, and 4 have no dependencies and may proceed simultaneously.",
+    "Zone metrics (cohesion, coupling, risk score) are unreliable for zones whose files have zero import edges to each other — this includes the .claude and root zones. Applying the 0.50 at-risk threshold to these zones produces systematic false positives because the score reflects an undefined-input fallback rather than a measured architectural property. These zones should be filtered from risk-score ranking outputs.",
+    "src/analyzers/ directory spans files from five zone identifiers (analyzers, analyzers-2, analyzers-3, cli, unit). This directory-to-zone mismatch is the root cause of 8 findings being flagged with inflated severity. Introducing subdirectories within src/analyzers/ (e.g. src/analyzers/zones/, src/analyzers/imports/, src/analyzers/branch/) would allow future Louvain passes to produce zone boundaries that match the intended domain structure, eliminating the partition artifact problem at its source.",
     "[call graph] 574 calls: \"analyzers-3\" → \"unit\"",
     "[call graph] 187 calls: \"unit\" → \"analyzers\"",
     "[call graph] 74 calls: \"analyzers\" → \"cli\"",
@@ -1509,6 +1521,13 @@
       "pass": 5,
       "scope": "cli",
       "text": "Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar functions called in sequence: one for analysis tools (sv_inventory, sv_imports, sv_zones, sv_components, sv_context), one for status/reporting tools (rex_status, rex_next, rex_validate), and one for workflow tools (rex_add, rex_update, rex_analyze, rex_recommend). All three remain in mcp.ts; registerMcpTools becomes a three-call orchestrator. This is the only file-level change required.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "cli",
+      "text": "Remove detectBranchLifecycle from src/analyzers/branch-work-filter.ts and resolveWorkedEpicTitlesForRange from src/cli/commands/prd-epic-resolver.ts — both exports are confirmed dead (no callers found anywhere in the package, only declaration sites). Removal is low-risk and independent of all other findings.",
       "severity": "warning"
     },
     {
@@ -1516,7 +1535,7 @@
       "pass": 5,
       "scope": "cli",
       "text": "registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API.",
-      "severity": "warning"
+      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -1618,6 +1637,13 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
+      "text": "Execution sequence for all confirmed actionable findings, in dependency order: (1) grep and remove detectBranchLifecycle and resolveWorkedEpicTitlesForRange — independent, no downstream risk; (2) audit 6 production-file imports from src/analyzers/ that cross into the unit/test layer — independent of step 1; (3) if step 2 finds shared declarations in test-only files, extract them to src/types/ or src/shared/; (4) decompose registerMcpTools into three sequential named sub-registrar functions within src/cli/mcp.ts — independent of steps 1–3, can proceed in parallel; (5) apply subdirectory grouping within src/analyzers/ after step 3 completes to resolve Louvain partition artifacts. Steps 1, 2, and 4 have no dependencies and may proceed simultaneously.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
       "text": "Global finding 0 (bidirectional coupling warning) directly contradicts global findings 10 and 13 (LLM analysis). Finding 13 explicitly resolves the contradiction: the 27-crossing unit→analyzers direction is expected test coupling that must not be flagged as warning; only the 7-crossing analyzers→unit direction is a genuine concern, already captured with full specificity by global finding 5. Global finding 0 is superseded and its warning severity is incorrect.",
       "severity": "info"
     },
@@ -1626,6 +1652,20 @@
       "pass": 5,
       "scope": "global",
       "text": "Three findings (cli finding 1, cli finding 2, global finding 14) independently identify the same root cause — registerMcpTools fan-out of 36 — through different analysis methods (LLM structural review, LLM synthesis, automated call-graph counting). This triple corroboration from independent sources elevates confidence beyond any other finding in the package. It is the only finding that satisfies the multi-source corroboration standard required for a warning recommendation.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Zone metrics (cohesion, coupling, risk score) are unreliable for zones whose files have zero import edges to each other — this includes the .claude and root zones. Applying the 0.50 at-risk threshold to these zones produces systematic false positives because the score reflects an undefined-input fallback rather than a measured architectural property. These zones should be filtered from risk-score ranking outputs.",
+      "severity": "info"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "src/analyzers/ directory spans files from five zone identifiers (analyzers, analyzers-2, analyzers-3, cli, unit). This directory-to-zone mismatch is the root cause of 8 findings being flagged with inflated severity. Introducing subdirectories within src/analyzers/ (e.g. src/analyzers/zones/, src/analyzers/imports/, src/analyzers/branch/) would allow future Louvain passes to produce zone boundaries that match the intended domain structure, eliminating the partition artifact problem at its source.",
       "severity": "warning"
     },
     {
@@ -1661,7 +1701,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 7,
+  "metaEvaluationCount": 8,
   "structureHash": "f32b1cbf85e49a7a",
   "zoneContentHashes": {
     ".claude": "ae7d308f88d1a243",

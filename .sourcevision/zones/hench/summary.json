@@ -159,13 +159,14 @@
     "packages/hench/tests/unit/tools/test-runner.test.ts",
     "packages/hench/tsconfig.json",
     "packages/hench/vitest.config.ts",
-    "packages/web/tests/integration/build-output-contract.test.ts"
+    "packages/web/src/landing/index.html",
+    "packages/web/src/landing/landing.css"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 157,
-  "lineCount": 35684,
+  "fileCount": 158,
+  "lineCount": 37239,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

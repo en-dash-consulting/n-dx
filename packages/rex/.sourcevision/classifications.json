@@ -518,7 +518,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Manages acknowledged-findings persistence and hash-based lookup — business logic with state management.",
+          "detail": "Implements state management with I/O for acknowledged findings — loads/saves store and provides domain operations (not pure types, not pure utility).",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared helpers (token parsing, JSON extraction, prompt constants) used across multiple analyze modules.",
+          "detail": "Shared constants, token helpers, JSON extraction/repair, and prompt constants used across the analyze module — no I/O, high fan-in.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Post-processing pipeline step that invokes a secondary LLM consolidation pass on oversized proposal output.",
+          "detail": "Business logic pipeline that detects oversized proposals and triggers a secondary LLM consolidation pass.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-driven recursive task decomposition pipeline — orchestrates multi-round LLM calls with depth limiting.",
+          "detail": "LoE-driven recursive task decomposition orchestration with LLM calls and Zod validation — domain business logic.",
           "weight": 0.7
         }
       ]
@@ -574,7 +574,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Pure algorithmic deduplication using multi-signal similarity scoring; no side effects or state.",
+          "detail": "Pure multi-signal similarity scoring, union-find deduplication, and bigram Dice — no I/O, standalone testable utility.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Formats a human-readable diff view of proposals vs existing PRD — presentation utility with no side effects.",
+          "detail": "Pure formatting utility that produces visual diff output comparing proposals to existing PRD items.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Requirements extraction engine with LLM fallback — orchestrates parsing, deduplication, and classification.",
+          "detail": "Structured extraction engine that parses documents into proposals via pattern recognition and LLM fallback — orchestration-heavy service.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "File format validation helpers (extension, MIME, magic bytes, size) — stateless validation utilities.",
+          "detail": "Input validation for files (existence, extension, size, binary, encoding) before processing — pure validation utility.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Interactive multi-round LLM clarification loop that produces a full PRD spec — complex orchestration logic.",
+          "detail": "Interactive clarification loop that gathers requirements via LLM and user interaction to build guided context.",
           "weight": 0.7
         }
       ]
@@ -651,14 +651,14 @@
     },
     {
       "path": "src/analyze/llm-bridge.ts",
-      "archetype": "service",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "LLM client singleton management and spawnClaude abstraction — service-layer infrastructure.",
+          "detail": "LLM client configuration singleton providing dependency injection and client lifecycle management across the analyze module.",
           "weight": 0.7
         }
       ]
@@ -672,41 +672,27 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-powered proposal modification pipeline with validation and token accumulation.",
+          "detail": "LLM-powered proposal modification pipeline — takes proposals and a natural-language request, returns revised proposals.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/propose.ts",
-      "archetype": "service",
+      "archetype": "types",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Builds hierarchical PRD proposals from scan results using multi-strategy task placement logic.",
+          "detail": "Pure type definitions for proposal domain objects (ProposalTask, ProposalFeature, Proposal, etc.) — no logic.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reason.ts",
-      "archetype": "schema",
-      "confidence": 0.7,
-      "source": "llm",
-      "evidence": [
-        {
-          "archetypeId": "schema",
-          "signalKind": "path",
-          "detail": "Defines Zod schemas for proposal validation and parseProposalResponse; re-exports from analyze-shared/llm-bridge for backward compatibility.",
-          "weight": 0.7
-        }
-      ]
-    },
-    {
-      "path": "src/analyze/reconcile.ts",
       "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
@@ -714,7 +700,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Fuzzy-matches scan results against existing PRD items to filter duplicates and detect update candidates.",
+          "detail": "Central LLM reasoning orchestrator with prompt construction, response parsing, validation, and retry logic — also re-exports for backward compat.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/analyze/reconcile.ts",
+      "archetype": "utility",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "utility",
+          "signalKind": "path",
+          "detail": "Pure fuzzy-matching utility that reconciles proposals against existing PRD items using similarity scoring.",
           "weight": 0.7
         }
       ]
@@ -728,7 +728,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM reasoning pipeline for reshape proposals — parses discriminated-union action responses into validated arrays.",
+          "detail": "LLM reasoning for PRD reshape operations (merge/update/move/prune/split) with Zod validation — domain service.",
           "weight": 0.7
         }
       ]
@@ -742,7 +742,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Multi-source scanner orchestrating extraction from tests, docs, sourcevision output, and package.json.",
+          "detail": "Multi-source scanner that walks the filesystem and extracts requirements from tests, docs, sourcevision, and package metadata.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Stateless validation of natural-language modification requests — word count, vague-phrase detection, intent classification.",
+          "detail": "Pure validation of natural-language modification requests — detects intent, checks specificity, returns structured errors.",
           "weight": 0.7
         }
       ]
@@ -1065,6 +1065,20 @@
       ]
     },
     {
+      "path": "src/cli/commands/status-sections.ts",
+      "archetype": "cli-command",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "directory",
+          "detail": "path contains \"/commands/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
       "path": "src/cli/commands/status.ts",
       "archetype": "cli-command",
       "confidence": 0.8,
@@ -1201,14 +1215,14 @@
     },
     {
       "path": "src/cli/help.ts",
-      "archetype": "utility",
+      "archetype": "types",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Static help text definitions and formatting for rex CLI commands — shared presentation utility.",
+          "detail": "Pure data: COMMAND_DEFS record containing help text for each rex command — no logic.",
           "weight": 0.7
         }
       ]
@@ -1229,14 +1243,14 @@
     },
     {
       "path": "src/cli/mcp-tools.ts",
-      "archetype": "route-handler",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "route-handler",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Handles incoming MCP tool invocations (handleGetPrdStatus, handleAddItem, etc.) analogous to HTTP route handlers.",
+          "detail": "MCP tool handler implementations — each function handles a single tool's business logic against the PRD store.",
           "weight": 0.7
         }
       ]
@@ -1250,7 +1264,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "MCP server factory that wires all tools and resources with stdio/HTTP transport support.",
+          "detail": "MCP server factory that instantiates and configures McpServer, registers tools and resources, returns a ready server.",
           "weight": 0.7
         }
       ]
@@ -1278,7 +1292,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Stateless CLI input validation helpers with consistent error messages — pure utility functions.",
+          "detail": "Centralized CLI input validation helpers (validateLevel, requireParent, validateFormat) with assert-style type guards.",
           "weight": 0.7
         }
       ]
@@ -1789,14 +1803,14 @@
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "archetype": "service",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Conflict detection service using similarity scoring to compare recommendations against existing PRD items.",
+          "detail": "Pure conflict/duplicate detection between recommendations and existing PRD items using similarity scoring.",
           "weight": 0.7
         }
       ]
@@ -1810,7 +1824,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Atomic PRD item creation pipeline with hierarchy validation, DAG integrity checks, and schema validation before persistence.",
+          "detail": "Atomic PRD item creation from recommendations with hierarchy validation and DAG integrity checks.",
           "weight": 0.7
         }
       ]
@@ -1902,6 +1916,20 @@
     },
     {
       "path": "src/store/adapter-registry.ts",
+      "archetype": "store",
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "store",
+          "signalKind": "directory",
+          "detail": "path contains \"/store/\"",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "path": "src/store/atomic-write.ts",
       "archetype": "store",
       "confidence": 0.8,
       "source": "algorithmic",
@@ -2074,36 +2102,34 @@
     },
     {
       "path": "src/workflow/default.ts",
-      "archetype": "config",
+      "archetype": "types",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "config",
+          "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Static default workflow instructions and execution contract for the autonomous agent — configuration/content, no logic.",
+          "detail": "Single constant export (DEFAULT_WORKFLOW string) — pure data, no logic.",
           "weight": 0.7
         }
       ]
     }
   ],
   "summary": {
-    "totalClassified": 109,
+    "totalClassified": 111,
     "totalUnclassified": 0,
     "byArchetype": {
-      "service": 14,
-      "utility": 44,
+      "service": 12,
+      "utility": 46,
       "entrypoint": 6,
-      "schema": 4,
-      "cli-command": 28,
-      "types": 2,
-      "route-handler": 1,
-      "store": 9,
-      "config": 1
+      "types": 5,
+      "cli-command": 29,
+      "schema": 3,
+      "store": 10
     },
     "bySource": {
       "llm": 24,
-      "algorithmic": 85
+      "algorithmic": 87
     }
   }
 }

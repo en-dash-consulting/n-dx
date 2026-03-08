@@ -1,22 +1,20 @@
 {
   "id": "unit-analyze/unit-analyze",
   "name": "Unit Analyze/unit Analyze",
-  "description": "7 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
-    "src/analyze/extract.ts",
-    "src/analyze/file-validation.ts",
-    "tests/unit/analyze/extract-llm-mock.test.ts",
-    "tests/unit/analyze/extract-llm.test.ts",
-    "tests/unit/analyze/extract-text.test.ts",
-    "tests/unit/analyze/extract.test.ts",
-    "tests/unit/analyze/file-validation.test.ts"
+    "src/analyze/dedupe.ts",
+    "src/analyze/scanners.ts",
+    "tests/unit/analyze/dedupe.test.ts",
+    "tests/unit/analyze/propose.test.ts",
+    "tests/unit/analyze/scanners.test.ts"
   ],
   "entryPoints": [
-    "src/analyze/extract.ts",
-    "src/analyze/file-validation.ts"
+    "src/analyze/dedupe.ts",
+    "src/analyze/scanners.ts"
   ],
-  "cohesion": 0.22,
-  "coupling": 0.78,
-  "fileCount": 7,
+  "cohesion": 0.18,
+  "coupling": 0.82,
+  "fileCount": 5,
   "lineCount": 0
 }

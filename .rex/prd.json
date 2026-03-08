@@ -19717,10 +19717,12 @@
         {
           "id": "824bbfb3-3d3f-48cd-bed0-6232e0ee69ff",
           "title": "Web zone reclassification: misplaced viewer files and web-dashboard dissolution",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Reclassify elapsed-time.ts, use-tick.ts, route-state.ts, task-audit.ts to web-viewer zone. Dissolve web-dashboard micro-zone into web-viewer. Addresses findings 8, 13.",
-          "priority": "high"
+          "priority": "high",
+          "startedAt": "2026-03-08T06:57:32.316Z",
+          "completedAt": "2026-03-08T07:01:45.397Z"
         },
         {
           "id": "063c1715-fcdb-4723-ba7f-6f9664a200f1",
@@ -19735,10 +19737,12 @@
         {
           "id": "eece6999-1355-4644-9bef-8c0740bb7ec0",
           "title": "Test coverage: landing.ts smoke test and task-usage.ts unit tests",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Add smoke test for landing.ts (zero coverage zone). Add unit tests for task-usage.ts public API. Addresses findings 10, 12.",
-          "priority": "high"
+          "priority": "high",
+          "startedAt": "2026-03-08T06:52:54.025Z",
+          "completedAt": "2026-03-08T06:57:04.019Z"
         },
         {
           "id": "9fc27914-0c61-4963-8b29-b1aa90c9a1c3",

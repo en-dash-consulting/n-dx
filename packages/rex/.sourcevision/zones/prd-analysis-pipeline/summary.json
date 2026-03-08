@@ -1,7 +1,7 @@
 {
   "id": "prd-analysis-pipeline",
   "name": "PRD Analysis Pipeline",
-  "description": "The core PRD analysis engine: scanning projects, proposing items, deduplicating, diffing, extracting, and reshaping the PRD tree.",
+  "description": "The full PRD analysis subsystem: LLM-driven proposal generation, deduplication, consolidation, decomposition, extraction, guided-analysis flows, and the CLI commands that orchestrate them.",
   "files": [
     "src/analyze/analyze-shared.ts",
     "src/analyze/consolidation-guard.ts",
@@ -29,9 +29,15 @@
     "src/cli/commands/reshape.ts",
     "src/cli/commands/smart-add-duplicates.ts",
     "src/cli/commands/smart-add.ts",
+    "src/cli/commands/validate-interactive.ts",
+    "src/cli/commands/validate.ts",
+    "src/core/epic-correlation.ts",
     "src/core/reshape.ts",
+    "src/core/structural.ts",
+    "src/store/atomic-write.ts",
     "src/store/project-config.ts",
     "tests/integration/claude-config.test.ts",
+    "tests/integration/smart-add-orphaned-parent.test.ts",
     "tests/unit/analyze/consolidation-guard.test.ts",
     "tests/unit/analyze/decompose.test.ts",
     "tests/unit/analyze/dedupe.test.ts",
@@ -62,7 +68,14 @@
     "tests/unit/cli/commands/format-loe.test.ts",
     "tests/unit/cli/commands/loe-display.test.ts",
     "tests/unit/cli/commands/smart-add-duplicates.test.ts",
-    "tests/unit/cli/commands/smart-add.test.ts"
+    "tests/unit/cli/commands/smart-add.test.ts",
+    "tests/unit/cli/commands/validate-epicless.test.ts",
+    "tests/unit/cli/commands/validate-interactive.test.ts",
+    "tests/unit/cli/commands/validate.test.ts",
+    "tests/unit/core/epic-correlation.test.ts",
+    "tests/unit/core/epicless.test.ts",
+    "tests/unit/core/structural.test.ts",
+    "tests/unit/store/atomic-write.test.ts"
   ],
   "entryPoints": [
     "src/analyze/consolidation-guard.ts",
@@ -80,17 +93,20 @@
     "src/cli/commands/reshape.ts",
     "src/cli/commands/smart-add-duplicates.ts",
     "src/cli/commands/smart-add.ts",
+    "src/cli/commands/validate.ts",
     "src/core/reshape.ts",
+    "src/core/structural.ts",
+    "src/store/atomic-write.ts",
     "src/store/project-config.ts"
   ],
-  "cohesion": 0.66,
-  "coupling": 0.34,
-  "fileCount": 60,
-  "lineCount": 29207,
+  "cohesion": 0.63,
+  "coupling": 0.37,
+  "fileCount": 73,
+  "lineCount": 34250,
   "riskMetrics": {
-    "cohesion": 0.66,
-    "coupling": 0.34,
-    "riskScore": 0.33999999999999997,
+    "cohesion": 0.63,
+    "coupling": 0.37,
+    "riskScore": 0.37,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

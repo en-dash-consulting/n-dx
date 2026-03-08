@@ -21,16 +21,16 @@ Import edges: 350, External packages: 7
   files: .claude/settings.json, .claude/settings.local.json
 [analyzers] Analyzers (39 files, coh=0.67 coup=0.33)
   39 files, primarily TypeScript
-  files: src/analyzers/archetypes.ts [types], src/analyzers/callgraph-findings.ts [service], src/analyzers/classify.ts [service], src/analyzers/claude-client.ts [service], src/analyzers/completion-reader.ts [service], src/analyzers/context.ts [service], src/analyzers/enrich-batch.ts [service], src/analyzers/enrich-config.ts [types], src/analyzers/enrich-parsing.ts [utility], src/analyzers/enrich-per-zone.ts [service] +29
+  files: src/analyzers/archetypes.ts [types], src/analyzers/callgraph-findings.ts [service], src/analyzers/classify.ts [service], src/analyzers/claude-client.ts [service], src/analyzers/completion-reader.ts [service], src/analyzers/context.ts [service], src/analyzers/enrich-batch.ts [service], src/analyzers/enrich-config.ts [config], src/analyzers/enrich-parsing.ts [utility], src/analyzers/enrich-per-zone.ts [service] +29
 [analyzers-2] Analyzers 2 (11 files, coh=0.48 coup=0.52)
   11 files, primarily TypeScript
   files: src/analyzers/callgraph.ts [service], src/analyzers/components.ts [service], src/analyzers/imports.ts [service], src/analyzers/index.ts [entrypoint], src/analyzers/inventory.ts [service], src/analyzers/route-detection.ts [route-handler], src/util/paths.ts [utility], tests/unit/analyzers/callgraph.test.ts, tests/unit/analyzers/components.test.ts, tests/unit/analyzers/imports.test.ts +1
 [analyzers-3] Analyzers 3 (6 files, coh=0.31 coup=0.69)
   6 files, primarily TypeScript
-  files: src/analyzers/louvain.ts [service], src/analyzers/zone-hash.ts [utility], src/analyzers/zones.ts [service], tests/unit/analyzers/zone-detection.test.ts, tests/unit/analyzers/zone-size-policy.test.ts, tests/unit/analyzers/zone-subdivision.test.ts
+  files: src/analyzers/louvain.ts [utility], src/analyzers/zone-hash.ts [utility], src/analyzers/zones.ts [service], tests/unit/analyzers/zone-detection.test.ts, tests/unit/analyzers/zone-size-policy.test.ts, tests/unit/analyzers/zone-subdivision.test.ts
 [cli] Cli (26 files, coh=0.67 coup=0.33)
   26 files, primarily TypeScript
-  files: src/analyzers/branch-work-collector.ts [service], src/analyzers/manifest.ts [service], src/cli/commands/constants.ts [types], src/cli/commands/export-pdf.ts [cli-command], src/cli/commands/git-credential-helper.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/commands/pr-markdown.ts [cli-command], src/cli/commands/prd-epic-resolver.ts [cli-command], src/cli/commands/reset.ts [cli-command], src/cli/commands/validate.ts [cli-command] +16
+  files: src/analyzers/branch-work-collector.ts [service], src/analyzers/manifest.ts [store], src/cli/commands/constants.ts [types], src/cli/commands/export-pdf.ts [cli-command], src/cli/commands/git-credential-helper.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/commands/pr-markdown.ts [cli-command], src/cli/commands/prd-epic-resolver.ts [cli-command], src/cli/commands/reset.ts [cli-command], src/cli/commands/validate.ts [cli-command] +16
 [e2e] E2e (5 files, coh=1.00 coup=0.00)
   4 files, primarily TypeScript
   files: src/schema/validate.ts [schema], tests/e2e/cli-analyze.test.ts, tests/e2e/cli-serve.test.ts, tests/integration/pipeline.test.ts, tests/unit/schema/validate.test.ts
@@ -42,7 +42,7 @@ Import edges: 350, External packages: 7
   files: ARCHITECTURE.md, README.md, SourceVision-F.png, SourceVision.png, WORKSPACE_DESIGN.md, package-lock.json, package.json, tsconfig.json, tsconfig.tsbuildinfo, vitest.config.ts
 [unit] Unit (28 files, coh=0.42 coup=0.58)
   28 files, primarily TypeScript
-  files: src/analyzers/branch-work-classifier.ts [service], src/analyzers/branch-work-filter.ts [service], src/analyzers/branch-work-store.ts [store], src/analyzers/risk-scoring.ts [service], src/analyzers/workspace-aggregate.ts [service], src/cli/commands/workspace.ts [cli-command], src/cli/mcp.ts [cli-command], src/generators/pr-markdown-template.ts [service], src/public.ts [entrypoint], src/schema/data-files.ts [schema] +18
+  files: src/analyzers/branch-work-classifier.ts [service], src/analyzers/branch-work-filter.ts [utility], src/analyzers/branch-work-store.ts [store], src/analyzers/risk-scoring.ts [service], src/analyzers/workspace-aggregate.ts [service], src/cli/commands/workspace.ts [cli-command], src/cli/mcp.ts [cli-command], src/generators/pr-markdown-template.ts [utility], src/public.ts [entrypoint], src/schema/data-files.ts [schema] +18
 [unzoned] 3 files: tests/fixtures/remix-app/app/root.tsx, tests/fixtures/remix-app/tsconfig.json, tests/fixtures/small-ts-project/tsconfig.json
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
@@ -75,10 +75,10 @@ Most imported:
 [warning] Low cohesion (0.31) — files are loosely related, consider splitting this zone [analyzers-3]
 [warning] Bidirectional coupling: "analyzers" ↔ "unit" (7+27 crossings) — consider extracting shared interface
 [warning] High coupling (0.58) — 27 imports target "analyzers" [unit]
-[warning] Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar functions called in sequence: one for analysis tools (sv_inventory, sv_imports, sv_zones, sv_components, sv_context), one for status/reporting tools (rex_status, rex_next, rex_validate), and one for workflow tools (rex_add, rex_update, rex_analyze, rex_recommend). All three remain in mcp.ts; registerMcpTools becomes a three-call orchestrator. This is the only file-level change required. [cli]
-[warning] registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API. [cli]
+[warning] Remove detectBranchLifecycle from src/analyzers/branch-work-filter.ts and resolveWorkedEpicTitlesForRange from src/cli/commands/prd-epic-resolver.ts — both exports are confirmed dead (no callers found anywhere in the package, only declaration sites). Removal is low-risk and independent of all other findings. [cli]
 [warning] registerMcpTools in src/cli/mcp.ts is the highest-priority actionable finding in this package, corroborated independently by automated fan-out analysis (36 outgoing calls, global finding 11) and LLM analysis (cli finding 1). Decompose into three sequential named sub-registrar functions within the same file — one per capability domain (analysis tools, status/reporting tools, workflow tools) — called in sequence from registerMcpTools. This is an in-file decomposition only; no file split is required or warranted at this threshold. [cli]
 [warning] Three findings (cli finding 1, cli finding 2, global finding 14) independently identify the same root cause — registerMcpTools fan-out of 36 — through different analysis methods (LLM structural review, LLM synthesis, automated call-graph counting). This triple corroboration from independent sources elevates confidence beyond any other finding in the package. It is the only finding that satisfies the multi-source corroboration standard required for a warning recommendation.
+[warning] src/analyzers/ directory spans files from five zone identifiers (analyzers, analyzers-2, analyzers-3, cli, unit). This directory-to-zone mismatch is the root cause of 8 findings being flagged with inflated severity. Introducing subdirectories within src/analyzers/ (e.g. src/analyzers/zones/, src/analyzers/imports/, src/analyzers/branch/) would allow future Louvain passes to produce zone boundaries that match the intended domain structure, eliminating the partition artifact problem at its source.
 [warning] God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — consider decomposing into smaller, focused functions
 [warning] Zone "Analyzers 3" (analyzers-3) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development [analyzers-3]
 
@@ -107,12 +107,9 @@ Most imported:
 [medium] High coupling (0.52) — 15 imports target "analyzers"
   files: src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts
   category: refactor
-[medium] God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — co…
+[medium] src/analyzers/ directory spans files from five zone identif… (+1 related)
   category: refactor
-[medium] Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar fun…
-  files: src/analyzers/branch-work-collector.ts, src/analyzers/manifest.ts, src/cli/commands/constants.ts
-  category: refactor
-[medium] registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed int…
+[medium] Remove detectBranchLifecycle from src/analyzers/branch-work-filter.ts and resol…
   files: src/analyzers/branch-work-collector.ts, src/analyzers/manifest.ts, src/cli/commands/constants.ts
   category: refactor
 [medium] registerMcpTools in src/cli/mcp.ts is the highest-priority actionable finding i…

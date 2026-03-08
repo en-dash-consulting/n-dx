@@ -1,7 +1,7 @@
 {
   "id": "web",
   "name": "Web",
-  "description": "16 files, primarily TypeScript, Other, JavaScript",
+  "description": "15 files, primarily TypeScript, Other, JavaScript",
   "files": [
     "packages/web/SourceVision-F.png",
     "packages/web/SourceVision.png",
@@ -13,19 +13,18 @@
   ],
   "entryPoints": [
     "packages/web/src/viewer/components/elapsed-time.ts",
-    "packages/web/src/viewer/polling/tick-timer.ts",
     "packages/web/src/viewer/route-state.ts",
     "packages/web/src/viewer/views/task-audit.ts"
   ],
-  "cohesion": 0.59,
-  "coupling": 0.41,
+  "cohesion": 0.33,
+  "coupling": 0.67,
   "fileCount": 7,
   "lineCount": 433,
   "riskMetrics": {
-    "cohesion": 0.59,
-    "coupling": 0.41,
-    "riskScore": 0.41000000000000003,
-    "riskLevel": "healthy",
-    "failsThreshold": false
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
   }
 }

@@ -21,10 +21,10 @@ Import edges: 114, External packages: 2
   files: package-lock.json, package.json, tsconfig.json, vitest.config.ts
 [src] Src (13 files, coh=0.77 coup=0.23)
   13 files, primarily TypeScript
-  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [service], src/provider-session.ts [service] +3
+  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [utility], src/llm-client.ts [utility], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [service], src/provider-session.ts [service] +3
 [src-2] Src 2 (19 files, coh=0.56 coup=0.44)
   19 files, primarily TypeScript
-  files: src/auth.ts [service], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [config], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
+  files: src/auth.ts [utility], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [utility], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
 [unit] Unit (9 files, coh=1.00 coup=0.00)
   9 files, primarily TypeScript
   files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
@@ -65,14 +65,14 @@ Most imported:
 [warning] The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs.
 [warning] The minimum-effort resolution for the 3 reverse import edges is zone pinning via sourcevision configuration, not a structural refactor. Add a zone configuration entry pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a named anchor cluster. This instructs Louvain to place these files in a fixed foundation zone on every re-analysis, drawing zone boundaries so provider service files (api-provider.ts, cli-provider.ts, auth.ts) cluster above them — eliminating reverse edges with zero import-path changes and zero test disruption. Attempt zone pinning first after re-running sourcevision analyze. Only proceed to the import-path refactor described in global/31 if pinning produces an unstable boundary on re-analysis.
 [critical] The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down.
-[critical] Canonical action plan distilled from findings global/19, 28, 29, 30, and 31 with correct sequencing: Step 0 (gate) — re-run sourcevision analyze; if the 3 reverse edges no longer exist after clean re-analysis, steps 1–3 are unnecessary. Step 1 — if edges persist, extract exactly four files (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts — all already classified as 'types' archetype) into a new zero-dependency zone; update import paths in api-provider.ts, cli-provider.ts, and auth.ts only. Step 2 — add utility test coverage for every export in the src-2 zone. Step 3 — add one integration test asserting a constructed session contains a valid auth token. Steps 1–3 are ordered; step 0 is the prerequisite gate for all three.
-... +16 more
+[warning] global/22 is marked critical and states 'Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists'. This is a convergence observation — it adds epistemic weight to findings already captured at appropriate severity (global/9 is critical, global/35 is critical). Convergence evidence is not itself a new critical defect. Retaining critical severity here inflates the must-fix count and makes global/22 indistinguishable from the actual action items. Severity should be 'warning'.
+... +17 more
 
 </findings>
 
 <next-steps>
 
-[high] The compounding risk cluster (finding 11, now critical) sho… (+6 related)
+[high] The compounding risk cluster (finding 11, now critical) sho… (+5 related)
   category: fix
 [medium] Add a short ZONE.md at the src-2 zone root documenting: (1) the domain name cho…
   files: src/auth.ts, src/config.ts, src/exec.ts
@@ -101,7 +101,7 @@ Most imported:
 [medium] Findings src/0 (12 entry points, automated heuristic) and global/2 (single publ…
   files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
   category: refactor
-[medium] Finding global/6 describes a near-clean layered architectur… (+5 related)
+[medium] Finding global/6 describes a near-clean layered architectur… (+6 related)
   category: extract
 [medium] HTTP and subprocess provider strategies (api-provider vs cl… (+1 related)
   category: refactor

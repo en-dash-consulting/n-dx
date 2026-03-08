@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Hench/unit/agent/cli Commands (`hench/unit/agent/cli-commands`)
-Files: 22, Cohesion: 0.77, Coupling: 0.23
+Files: 22, Cohesion: 0.75, Coupling: 0.25
 Description: 22 files, primarily TypeScript
 Entry points: packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts, packages/hench/src/store/index.ts, packages/hench/src/store/run-change-detector.ts, packages/hench/src/store/run-retention-scheduler.ts, packages/hench/src/store/run-retention.ts
 Lines: 3790

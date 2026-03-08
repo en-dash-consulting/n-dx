@@ -5,34 +5,30 @@
 <zone>
 
 Zone: Unit Analyze/unit Analyze (`unit-analyze/unit-analyze`)
-Files: 7, Cohesion: 0.22, Coupling: 0.78
-Description: 7 files, primarily TypeScript
-Entry points: src/analyze/extract.ts, src/analyze/file-validation.ts
-Lines: 4985
+Files: 5, Cohesion: 0.18, Coupling: 0.82
+Description: 5 files, primarily TypeScript
+Entry points: src/analyze/dedupe.ts, src/analyze/scanners.ts
+Lines: 3289
 
 </zone>
 
 <files>
 
-src/analyze/extract.ts (TypeScript, 1688 lines, source)
-src/analyze/file-validation.ts (TypeScript, 587 lines, source)
-tests/unit/analyze/extract-llm-mock.test.ts (TypeScript, 382 lines, test)
-tests/unit/analyze/extract-llm.test.ts (TypeScript, 264 lines, test)
-tests/unit/analyze/extract-text.test.ts (TypeScript, 778 lines, test)
-tests/unit/analyze/extract.test.ts (TypeScript, 570 lines, test)
-tests/unit/analyze/file-validation.test.ts (TypeScript, 716 lines, test)
+src/analyze/dedupe.ts (TypeScript, 373 lines, source)
+src/analyze/scanners.ts (TypeScript, 958 lines, source)
+tests/unit/analyze/dedupe.test.ts (TypeScript, 404 lines, test)
+tests/unit/analyze/propose.test.ts (TypeScript, 355 lines, test)
+tests/unit/analyze/scanners.test.ts (TypeScript, 1199 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  src/analyze/extract.ts → src/analyze/file-validation.ts {validateFileInput, validateMarkdownContent, validateTextContent, validateJsonContent, validateYamlContent, FileValidationError}
-  tests/unit/analyze/extract-llm-mock.test.ts → src/analyze/extract.ts {maybeDisambiguate, extractFromText}
-  tests/unit/analyze/extract-llm.test.ts → src/analyze/extract.ts {isAmbiguousStructure, maybeDisambiguate, extractFromText, extractFromMarkdown}
-  tests/unit/analyze/extract-llm.test.ts → src/analyze/extract.ts {ExtractionResult}
-  tests/unit/analyze/extract-text.test.ts → src/analyze/extract.ts {extractFromText, classifyHeadingLevels, isAllCapsHeader, isRequirementSentence, extractRequirementSentences, parseNumberedSection, extractPriorityTag}
-  tests/unit/analyze/extract.test.ts → src/analyze/extract.ts {extractFromMarkdown, extractFromText, classifyHeadingLevels}
-  tests/unit/analyze/file-validation.test.ts → src/analyze/file-validation.ts {validateFileInput, validateMarkdownContent, validateTextContent, validateJsonContent, validateYamlContent, detectMagicBytes, FileValidationError, SUPPORTED_EXTENSIONS, MAX_FILE_SIZE_BYTES, LARGE_FILE_WARNING_BYTES}
+  src/analyze/dedupe.ts → src/analyze/scanners.ts {ScanResult}
+  tests/unit/analyze/dedupe.test.ts → src/analyze/dedupe.ts {similarity, deduplicateScanResults}
+  tests/unit/analyze/dedupe.test.ts → src/analyze/scanners.ts {ScanResult}
+  tests/unit/analyze/propose.test.ts → src/analyze/scanners.ts {ScanResult}
+  tests/unit/analyze/scanners.test.ts → src/analyze/scanners.ts {scanTests, scanDocs, scanSourceVision, scanPackageJson}
 
 </imports>

@@ -5,266 +5,110 @@
 <zone>
 
 Zone: Web Viewer/web/unit (`web-viewer/web/unit`)
-Files: 66, Cohesion: 0.92, Coupling: 0.08
-Description: 66 files, primarily TypeScript
-Entry points: packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts, packages/web/src/viewer/views/graph.ts
-Lines: 27004
+Files: 28, Cohesion: 0.56, Coupling: 0.44
+Description: 28 files, primarily TypeScript
+Entry points: packages/web/src/viewer/bootstrap.ts, packages/web/src/viewer/hooks/use-graceful-degradation.ts, packages/web/src/viewer/hooks/use-memory-monitor.ts, packages/web/src/viewer/performance/dom-update-gate.ts, packages/web/src/viewer/performance/graceful-degradation.ts, packages/web/src/viewer/performance/memory-monitor.ts, packages/web/src/viewer/performance/response-buffer-gate.ts, packages/web/src/viewer/polling/polling-manager.ts
+Lines: 10427
 
 </zone>
 
 <files>
 
-packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 53 lines, source)
-packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
-packages/web/src/server/domain-gateway.ts (TypeScript, 19 lines, source)
-packages/web/src/server/index.ts (TypeScript, 40 lines, source)
-packages/web/src/server/mcp-deps.ts (TypeScript, 6 lines, source)
-packages/web/src/server/port.ts (TypeScript, 195 lines, source)
-packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
-packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
-packages/web/src/server/rex-gateway.ts (TypeScript, 89 lines, source)
-packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
-packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
-packages/web/src/server/routes-data.ts (TypeScript, 147 lines, source)
-packages/web/src/server/routes-features.ts (TypeScript, 302 lines, source)
-packages/web/src/server/routes-hench.ts (TypeScript, 2508 lines, source)
-packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
-packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
-packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
-packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 3076 lines, source)
-packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
-packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
-packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
-packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
-packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
-packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
-packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 684 lines, source)
-packages/web/src/server/types.ts (TypeScript, 62 lines, source)
-packages/web/src/viewer/graph/index.ts (TypeScript, 35 lines, source)
-packages/web/src/viewer/graph/physics.ts (TypeScript, 443 lines, source)
-packages/web/src/viewer/graph/renderer.ts (TypeScript, 1636 lines, source)
-packages/web/src/viewer/views/graph.ts (TypeScript, 388 lines, source)
-packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
-packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
-packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
-packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
-packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
-packages/web/tests/unit/server/routes-adaptive.test.ts (TypeScript, 446 lines, test)
-packages/web/tests/unit/server/routes-config.test.ts (TypeScript, 234 lines, test)
-packages/web/tests/unit/server/routes-data.test.ts (TypeScript, 124 lines, test)
-packages/web/tests/unit/server/routes-hench-audit.test.ts (TypeScript, 249 lines, test)
-packages/web/tests/unit/server/routes-hench-concurrency.test.ts (TypeScript, 254 lines, test)
-packages/web/tests/unit/server/routes-hench-config.test.ts (TypeScript, 305 lines, test)
-packages/web/tests/unit/server/routes-hench-execute.test.ts (TypeScript, 398 lines, test)
-packages/web/tests/unit/server/routes-hench-health.test.ts (TypeScript, 230 lines, test)
-packages/web/tests/unit/server/routes-hench-heartbeat.test.ts (TypeScript, 218 lines, test)
-packages/web/tests/unit/server/routes-hench-memory.test.ts (TypeScript, 120 lines, test)
-packages/web/tests/unit/server/routes-hench-shutdown.test.ts (TypeScript, 425 lines, test)
-packages/web/tests/unit/server/routes-hench-templates.test.ts (TypeScript, 332 lines, test)
-packages/web/tests/unit/server/routes-mcp.test.ts (TypeScript, 230 lines, test)
-packages/web/tests/unit/server/routes-notion.test.ts (TypeScript, 255 lines, test)
-packages/web/tests/unit/server/routes-project.test.ts (TypeScript, 249 lines, test)
-packages/web/tests/unit/server/routes-requirements.test.ts (TypeScript, 333 lines, test)
-packages/web/tests/unit/server/routes-rex.test.ts (TypeScript, 969 lines, test)
-packages/web/tests/unit/server/routes-search.test.ts (TypeScript, 277 lines, test)
-packages/web/tests/unit/server/routes-sourcevision.test.ts (TypeScript, 369 lines, test)
-packages/web/tests/unit/server/routes-status.test.ts (TypeScript, 394 lines, test)
-packages/web/tests/unit/server/routes-validation.test.ts (TypeScript, 416 lines, test)
-packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, test)
-packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
-packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
-packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
-packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, test)
-packages/web/tests/unit/viewer/graph-destroy.test.ts (TypeScript, 132 lines, test)
-packages/web/tests/unit/viewer/graph-layout.test.ts (TypeScript, 313 lines, test)
+packages/web/src/viewer/bootstrap.ts (TypeScript, 38 lines, source)
+packages/web/src/viewer/hooks/use-graceful-degradation.ts (TypeScript, 74 lines, source)
+packages/web/src/viewer/hooks/use-memory-monitor.ts (TypeScript, 126 lines, source)
+packages/web/src/viewer/hooks/use-tab-visibility.ts (TypeScript, 73 lines, source)
+packages/web/src/viewer/performance/dom-update-gate.ts (TypeScript, 353 lines, source)
+packages/web/src/viewer/performance/graceful-degradation.ts (TypeScript, 227 lines, source)
+packages/web/src/viewer/performance/memory-monitor.ts (TypeScript, 327 lines, source)
+packages/web/src/viewer/performance/response-buffer-gate.ts (TypeScript, 258 lines, source)
+packages/web/src/viewer/polling/polling-manager.ts (TypeScript, 316 lines, source)
+packages/web/src/viewer/polling/tab-visibility.ts (TypeScript, 411 lines, source)
+packages/web/src/viewer/polling/tick-visibility-gate.ts (TypeScript, 218 lines, source)
+packages/web/tests/integration/background-suspension-recovery.test.ts (TypeScript, 930 lines, test)
+packages/web/tests/integration/memory-aware-polling-suspension.test.ts (TypeScript, 1032 lines, test)
+packages/web/tests/unit/viewer/degradation-banner.test.ts (TypeScript, 150 lines, test)
+packages/web/tests/unit/viewer/dom-update-gate.test.ts (TypeScript, 942 lines, test)
+packages/web/tests/unit/viewer/execution-panel-polling.test.ts (TypeScript, 210 lines, test)
+packages/web/tests/unit/viewer/graceful-degradation.test.ts (TypeScript, 402 lines, test)
+packages/web/tests/unit/viewer/loader-memory.test.ts (TypeScript, 298 lines, test)
+packages/web/tests/unit/viewer/loader-polling.test.ts (TypeScript, 211 lines, test)
+packages/web/tests/unit/viewer/memory-monitor.test.ts (TypeScript, 381 lines, test)
+packages/web/tests/unit/viewer/memory-warning.test.ts (TypeScript, 216 lines, test)
+packages/web/tests/unit/viewer/polling-manager.test.ts (TypeScript, 626 lines, test)
+packages/web/tests/unit/viewer/response-buffer-gate.test.ts (TypeScript, 590 lines, test)
+packages/web/tests/unit/viewer/status-indicators-memory.test.ts (TypeScript, 297 lines, test)
+packages/web/tests/unit/viewer/status-indicators-polling.test.ts (TypeScript, 210 lines, test)
+packages/web/tests/unit/viewer/tab-visibility.test.ts (TypeScript, 693 lines, test)
+packages/web/tests/unit/viewer/tick-visibility-gate.test.ts (TypeScript, 609 lines, test)
+packages/web/tests/unit/viewer/usage-polling.test.ts (TypeScript, 209 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/cli/index.ts → packages/web/src/server/start.ts {startServer}
-  packages/web/src/cli/index.ts → packages/web/src/server/types.ts {ViewerScope}
-  packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
-  packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
-  packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
-  packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
-  packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
-  packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
-  packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
-  packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
-  packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
-  packages/web/src/server/mcp-deps.ts → packages/web/src/server/domain-gateway.ts {*}
-  packages/web/src/server/mcp-deps.ts → packages/web/src/server/rex-gateway.ts {*}
-  packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {jsonResponse}
-  packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/process-memory-tracker.ts {ProcessMemoryTracker}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/routes-status.ts {clearStatusCache}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/domain-gateway.ts {createSourcevisionMcpServer}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/rex-gateway.ts {createRexMcpServer}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-project.ts → packages/web/src/server/types.ts {jsonResponse}
-  packages/web/src/server/routes-project.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {reasonForReshape}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {PRIORITY_ORDER, LEVEL_HIERARCHY, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES, CHILD_LEVEL, isPriority, isItemLevel, isRequirementCategory, isValidationType, findItem, walkTree, rexInsertChild, rexUpdateInTree, removeFromTree, computeStats, rexFindNextTask, collectCompletedIds, computeTimestampUpdates, validateMerge, previewMerge, mergeItems, countSubtree, isFullyCompleted, findPrunableItems, pruneItems, computeEpicStats, computePriorityDistribution, computeRequirementsSummary, isRootLevel, isWorkItem, computeHealthScore, detectReorganizations, applyProposals, applyReshape}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {Priority, ItemLevel, ItemStatus, PRDItem, PRDDocument, TreeEntry, TreeStats, MergeValidation, EpicStats, PriorityDistribution, RequirementsSummary, ReshapeProposal}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-search.ts → packages/web/src/server/search-index.ts {SearchIndex}
-  packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
-  packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {classifyPRMarkdownRefreshFailureCode}
-  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
-  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-static.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {computeStats, collectCompletedIds, findNextTask}
-  packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {PRDDocument, TreeStats}
-  packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {jsonResponse}
-  packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, isItemLevel, walkTree, findItem, collectAllIds}
-  packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {ItemLevel, PRDItem, PRDDocument}
-  packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
-  packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
-  packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
-  packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
-  packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-integrations.ts {handleIntegrationRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-project.ts {handleProjectRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-rex.ts {handleRexRoute, shutdownRexExecution}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-search.ts {handleSearchRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute, isProjectInitialized}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-status.ts {handleStatusRoute, clearStatusCache}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
-  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, buildQuadTree, bhRepulsion, tick, PhysicsNode, PhysicsLink, QTNode, SimState, TickCallbacks}
-  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer, GraphNode, GraphLink, ZoneInfo, GraphRendererOptions}
-  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {initZoneClusteredPositions, tick}
-  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
-  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer}
-  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphNode, GraphLink, ZoneInfo}
-  packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
-  packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
-  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
-  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
-  packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
-  packages/web/tests/unit/server/port.test.ts → packages/web/src/server/start.ts {PORT_FILE}
-  packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {buildPRMarkdownRefreshFailure, classifyPRMarkdownRefreshFailureCode, classifyPRMarkdownRefreshPreflightCode, GIT_CREDENTIAL_HELPER_COMMAND, getPRMarkdownRefreshRemediationHints, resolvePRMarkdownRefreshPreflightErrorContract, resolvePRMarkdownRefreshGuidance, shouldUsePRMarkdownFallback, shouldUsePRMarkdownFallbackForCode, validatePRMarkdownRefreshPreflightErrorContract}
-  packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
-  packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-config.test.ts → packages/web/src/server/routes-config.ts {handleConfigRoute, clearConfigCaches}
-  packages/web/tests/unit/server/routes-config.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-data.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
-  packages/web/tests/unit/server/routes-data.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-audit.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-audit.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-concurrency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-concurrency.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-config.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-config.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-execute.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-execute.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-health.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-health.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-heartbeat.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-heartbeat.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-memory.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-memory.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions, handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute, closeAllMcpSessions}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
-  packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-project.test.ts → packages/web/src/server/routes-project.ts {handleProjectRoute, extractProjectMetadata, extractRepoName, clearProjectMetadataCache}
-  packages/web/tests/unit/server/routes-project.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
-  packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
-  packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-search.test.ts → packages/web/src/server/routes-search.ts {handleSearchRoute, clearSearchIndexCache}
-  packages/web/tests/unit/server/routes-search.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
-  packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-status.test.ts → packages/web/src/server/routes-status.ts {handleStatusRoute, clearStatusCache}
-  packages/web/tests/unit/server/routes-status.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-validation.test.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
-  packages/web/tests/unit/server/routes-validation.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-workflow.test.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
-  packages/web/tests/unit/server/routes-workflow.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {jsonResponse}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
-  packages/web/tests/unit/server/search-index.test.ts → packages/web/src/server/search-index.ts {SearchIndex, parseQuery}
-  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions}
-  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex.ts {shutdownRexExecution}
-  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
-  packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_PRIORITY_ORDER, GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_LEVELS, GATEWAY_VALID_STATUSES, GATEWAY_VALID_PRIORITIES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
-  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {tick}
-  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
-  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, tick}
-  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
+  packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager}
+  packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor}
+  packages/web/src/viewer/bootstrap.ts → packages/web/src/viewer/polling/tick-visibility-gate.ts {createTickVisibilityGate}
+  packages/web/src/viewer/hooks/use-graceful-degradation.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, stopDegradation, onDegradationChange, getDegradationState, isFeatureDisabled}
+  packages/web/src/viewer/hooks/use-memory-monitor.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, stopMemoryMonitor, onSnapshot, getLatestSnapshot, getSnapshotHistory, resetMemoryMonitor}
+  packages/web/src/viewer/hooks/use-memory-monitor.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemorySnapshot, MemoryLevel, MemoryThresholds}
+  packages/web/src/viewer/hooks/use-tab-visibility.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, stopTabVisibilityMonitor, onVisibilityChange, getTabVisibilitySnapshot, getVisibilityCapabilities}
+  packages/web/src/viewer/hooks/use-tab-visibility.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilityState, TabVisibilitySnapshot, VisibilityAPICapabilities}
+  packages/web/src/viewer/performance/dom-update-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {onVisibilityChange, isTabVisible}
+  packages/web/src/viewer/performance/dom-update-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
+  packages/web/src/viewer/performance/graceful-degradation.ts → packages/web/src/viewer/performance/memory-monitor.ts {onSnapshot, getCurrentLevel, getLatestSnapshot}
+  packages/web/src/viewer/performance/graceful-degradation.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemoryLevel, MemorySnapshot}
+  packages/web/src/viewer/performance/response-buffer-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {onVisibilityChange, isTabVisible}
+  packages/web/src/viewer/performance/response-buffer-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
+  packages/web/src/viewer/polling/polling-manager.ts → packages/web/src/viewer/polling/tab-visibility.ts {onVisibilityChange, isTabVisible}
+  packages/web/src/viewer/polling/polling-manager.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
+  packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {onVisibilityChange, isTabVisible}
+  packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
+  packages/web/tests/integration/background-suspension-recovery.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, isFeatureDisabled, onDegradationChange, getDegradationState, getCurrentTier, resetDegradation}
+  packages/web/tests/integration/background-suspension-recovery.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, resetMemoryMonitor}
+  packages/web/tests/integration/background-suspension-recovery.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isSuspended, isPollerActive, getRegisteredPollers, getPollerCount, resetPollingManager}
+  packages/web/tests/integration/background-suspension-recovery.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, getTabVisibility, isTabVisible, onVisibilityChange, getTransitionHistory, resetTabVisibility}
+  packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, isFeatureDisabled, onDegradationChange, getDegradationState, getCurrentTier, resetDegradation}
+  packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, getCurrentLevel, resetMemoryMonitor}
+  packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isSuspended, isPollerActive, getRegisteredPollers, getPollerCount, resetPollingManager}
+  packages/web/tests/integration/memory-aware-polling-suspension.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/degradation-banner.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {DegradableFeature}
+  packages/web/tests/unit/viewer/degradation-banner.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemoryLevel}
+  packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/performance/dom-update-gate.ts {createDomUpdateGate}
+  packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/performance/dom-update-gate.ts {DomUpdateGate}
+  packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/execution-panel-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/execution-panel-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/graceful-degradation.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {featuresForTier, summaryForTier, startDegradation, stopDegradation, onDegradationChange, isFeatureDisabled, getDegradationState, getCurrentTier, resetDegradation}
+  packages/web/tests/unit/viewer/graceful-degradation.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {DegradableFeature}
+  packages/web/tests/unit/viewer/graceful-degradation.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, resetMemoryMonitor}
+  packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, isFeatureDisabled, onDegradationChange, resetDegradation}
+  packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, resetMemoryMonitor}
+  packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/loader-memory.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/loader-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/loader-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/memory-monitor.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {classifyLevel, takeSnapshot, formatBytes, formatRatio, startMemoryMonitor, stopMemoryMonitor, getLatestSnapshot, getSnapshotHistory, getCurrentLevel, onSnapshot, resetMemoryMonitor, hasPerformanceMemory}
+  packages/web/tests/unit/viewer/memory-monitor.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemoryThresholds, MemoryLevel, MemorySnapshot}
+  packages/web/tests/unit/viewer/memory-warning.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {MemorySnapshot, MemoryLevel}
+  packages/web/tests/unit/viewer/polling-manager.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, stopPollingManager, registerPoller, unregisterPoller, suspendAll, resumeAll, isSuspended, isPollerActive, getRegisteredPollers, getPollerCount, resetPollingManager}
+  packages/web/tests/unit/viewer/polling-manager.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/response-buffer-gate.test.ts → packages/web/src/viewer/performance/response-buffer-gate.ts {createResponseBufferGate}
+  packages/web/tests/unit/viewer/response-buffer-gate.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/performance/graceful-degradation.ts {startDegradation, isFeatureDisabled, onDegradationChange, resetDegradation}
+  packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/performance/memory-monitor.ts {startMemoryMonitor, resetMemoryMonitor}
+  packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, unregisterPoller, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/status-indicators-memory.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/tab-visibility.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, stopTabVisibilityMonitor, getTabVisibility, getTabVisibilitySnapshot, isTabVisible, onVisibilityChange, resetTabVisibility, detectVisibilityAPI, getVisibilityCapabilities, getTransitionHistory}
+  packages/web/tests/unit/viewer/tab-visibility.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot, TabVisibilityState}
+  packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
+  packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tick-visibility-gate.ts {createTickVisibilityGate}
+  packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tick-visibility-gate.ts {TickVisibilityGate}
+  packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/polling/polling-manager.ts {startPollingManager, registerPoller, isSuspended, isPollerActive, getRegisteredPollers, resetPollingManager}
+  packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, resetTabVisibility}
 
 </imports>
-
-<sub-crossings>
-
-Cross-dependencies between sub-zones:
-  web-viewer/web/unit/server → web-viewer/web/unit/server-2: 1
-  web-viewer/web/unit/server → web-viewer/web/unit/server-3: 1
-  web-viewer/web/unit/server-2 → web-viewer/web/unit/server: 7
-  web-viewer/web/unit/server-3 → web-viewer/web/unit/server: 5
-  web-viewer/web/unit/server-3 → web-viewer/web/unit/server-2: 1
-
-</sub-crossings>
-
-<sub-zones>
-
-This zone has 4 sub-zone(s):
-
-- **Web Viewer/web/unit/server** (`web-viewer/web/unit/server`): 52 files, cohesion 0.96, coupling 0.04
-- **Web Viewer/web/unit/server 2** (`web-viewer/web/unit/server-2`): 5 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/unit/server 3** (`web-viewer/web/unit/server-3`): 3 files, cohesion 1, coupling 0
-- **Web Viewer/web/unit/viewer** (`web-viewer/web/unit/viewer`): 6 files, cohesion 1, coupling 0
-
-Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
-
-</sub-zones>

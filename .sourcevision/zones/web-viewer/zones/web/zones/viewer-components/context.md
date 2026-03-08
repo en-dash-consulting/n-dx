@@ -5,32 +5,57 @@
 <zone>
 
 Zone: Web Viewer/web/viewer Components (`web-viewer/web/viewer-components`)
-Files: 5, Cohesion: 0.64, Coupling: 0.36
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/crash-recovery-banner.ts, packages/web/src/viewer/hooks/use-crash-recovery.ts
-Lines: 1093
+Files: 15, Cohesion: 0.51, Coupling: 0.49
+Description: 15 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/degradation-banner.ts, packages/web/src/viewer/components/memory-warning.ts, packages/web/src/viewer/components/prd-tree/execution-panel.ts, packages/web/src/viewer/components/refresh-queue-status.ts, packages/web/src/viewer/hooks/use-prd-websocket.ts, packages/web/src/viewer/hooks/use-refresh-throttle.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/performance/refresh-throttle.ts, packages/web/src/viewer/performance/update-batcher.ts
+Lines: 4730
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/crash-recovery-banner.ts (TypeScript, 92 lines, source)
-packages/web/src/viewer/hooks/use-crash-recovery.ts (TypeScript, 134 lines, source)
-packages/web/src/viewer/performance/crash-detector.ts (TypeScript, 316 lines, source)
-packages/web/tests/unit/viewer/crash-detector.test.ts (TypeScript, 277 lines, test)
-packages/web/tests/unit/viewer/crash-recovery-banner.test.ts (TypeScript, 274 lines, test)
+packages/web/src/viewer/components/degradation-banner.ts (TypeScript, 100 lines, source)
+packages/web/src/viewer/components/memory-warning.ts (TypeScript, 83 lines, source)
+packages/web/src/viewer/components/prd-tree/execution-panel.ts (TypeScript, 406 lines, source)
+packages/web/src/viewer/components/refresh-queue-status.ts (TypeScript, 98 lines, source)
+packages/web/src/viewer/hooks/use-dom-performance-monitor.ts (TypeScript, 175 lines, source)
+packages/web/src/viewer/hooks/use-prd-websocket.ts (TypeScript, 157 lines, source)
+packages/web/src/viewer/hooks/use-refresh-throttle.ts (TypeScript, 108 lines, source)
+packages/web/src/viewer/performance/dom-performance-monitor.ts (TypeScript, 505 lines, source)
+packages/web/src/viewer/performance/index.ts (TypeScript, 95 lines, source)
+packages/web/src/viewer/performance/refresh-throttle.ts (TypeScript, 364 lines, source)
+packages/web/src/viewer/performance/update-batcher.ts (TypeScript, 188 lines, source)
+packages/web/tests/unit/viewer/dom-performance-monitor.test.ts (TypeScript, 1011 lines, test)
+packages/web/tests/unit/viewer/refresh-throttle.test.ts (TypeScript, 531 lines, test)
+packages/web/tests/unit/viewer/update-batcher.test.ts (TypeScript, 537 lines, test)
+packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts (TypeScript, 372 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/components/crash-recovery-banner.ts → packages/web/src/viewer/performance/crash-detector.ts {SavedNavigationState}
-  packages/web/src/viewer/hooks/use-crash-recovery.ts → packages/web/src/viewer/performance/crash-detector.ts {detectCrash, saveNavigationState, clearSavedNavigationState, markRecoveryShown, wasRecoveryShown, resetCrashDetector}
-  packages/web/src/viewer/hooks/use-crash-recovery.ts → packages/web/src/viewer/performance/crash-detector.ts {CrashDetectionResult, SavedNavigationState}
-  packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/src/viewer/performance/crash-detector.ts {detectCrash, saveNavigationState, clearSavedNavigationState, markRecoveryShown, wasRecoveryShown, getDetectionResult, clearCrashHistory, resetCrashDetector, _testHelpers}
-  packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/src/viewer/performance/crash-detector.ts {CrashDetectionResult, SavedNavigationState}
-  packages/web/tests/unit/viewer/crash-recovery-banner.test.ts → packages/web/src/viewer/components/crash-recovery-banner.ts {CrashRecoveryBanner}
-  packages/web/tests/unit/viewer/crash-recovery-banner.test.ts → packages/web/src/viewer/performance/crash-detector.ts {SavedNavigationState}
+  packages/web/src/viewer/components/degradation-banner.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, DegradableFeature}
+  packages/web/src/viewer/components/memory-warning.ts → packages/web/src/viewer/performance/index.ts {formatBytes, formatRatio}
+  packages/web/src/viewer/components/memory-warning.ts → packages/web/src/viewer/performance/index.ts {MemorySnapshot, MemoryLevel}
+  packages/web/src/viewer/components/prd-tree/execution-panel.ts → packages/web/src/viewer/performance/index.ts {isFeatureDisabled, onDegradationChange}
+  packages/web/src/viewer/components/refresh-queue-status.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, RefreshQueueState}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, recordRender, recordUpdate, measureOperation, computeSummary, resetDOMPerformanceMonitor, countDOMNodes, readHeapUsage}
+  packages/web/src/viewer/hooks/use-dom-performance-monitor.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, DOMPerformanceConfig, RenderTiming, UpdateComparison, PerformanceSummary}
+  packages/web/src/viewer/hooks/use-prd-websocket.ts → packages/web/src/viewer/performance/index.ts {createUpdateBatcher, createDomUpdateGate, createResponseBufferGate}
+  packages/web/src/viewer/hooks/use-refresh-throttle.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, RefreshQueueState, RefreshPriority}
+  packages/web/src/viewer/hooks/use-refresh-throttle.ts → packages/web/src/viewer/performance/refresh-throttle.ts {startRefreshThrottle, stopRefreshThrottle, onQueueChange, getQueueState, enqueueRefresh, getRecommendedInterval, resetRefreshThrottle}
+  packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {countDOMNodes, readHeapUsage, formatDuration, formatNodeCount, formatDelta, recordRender, recordUpdate, measureOperation, takeDOMSnapshot, computeSummary, onDOMSnapshot, setObservedContainer, startDOMPerformanceMonitor, stopDOMPerformanceMonitor, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, getObservedContainer, resetDOMPerformanceMonitor, DOMNodeSnapshot, RenderTiming, UpdateComparison, PerformanceSummary, DOMPerformanceConfig, DOMSnapshotHandler}
+  packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/refresh-throttle.ts {RefreshQueueState, RefreshPriority}
+  packages/web/src/viewer/performance/index.ts → packages/web/src/viewer/performance/update-batcher.ts {createUpdateBatcher, UpdateBatcher, UpdateBatcherConfig}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {countDOMNodes, readHeapUsage, formatDuration, formatNodeCount, formatDelta, recordRender, recordUpdate, measureOperation, takeDOMSnapshot, computeSummary, startDOMPerformanceMonitor, stopDOMPerformanceMonitor, onDOMSnapshot, getLatestDOMSnapshot, getDOMSnapshotHistory, getRenderTimings, getUpdateComparisons, setObservedContainer, getObservedContainer, resetDOMPerformanceMonitor}
+  packages/web/tests/unit/viewer/dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {DOMNodeSnapshot, RenderTiming, UpdateComparison, PerformanceSummary}
+  packages/web/tests/unit/viewer/refresh-throttle.test.ts → packages/web/src/viewer/performance/refresh-throttle.ts {startRefreshThrottle, stopRefreshThrottle, enqueueRefresh, getQueueState, getRecommendedInterval, getThrottleLevel, onQueueChange, resetRefreshThrottle}
+  packages/web/tests/unit/viewer/refresh-throttle.test.ts → packages/web/src/viewer/performance/refresh-throttle.ts {RefreshQueueState}
+  packages/web/tests/unit/viewer/update-batcher.test.ts → packages/web/src/viewer/performance/update-batcher.ts {createUpdateBatcher}
+  packages/web/tests/unit/viewer/update-batcher.test.ts → packages/web/src/viewer/performance/update-batcher.ts {UpdateBatcher}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/hooks/use-dom-performance-monitor.ts {useDOMPerformanceMonitor}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/hooks/use-dom-performance-monitor.ts {UseDOMPerformanceMonitorResult}
+  packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts → packages/web/src/viewer/performance/dom-performance-monitor.ts {resetDOMPerformanceMonitor, getLatestDOMSnapshot, getObservedContainer, getRenderTimings, getUpdateComparisons, getDOMSnapshotHistory}
 
 </imports>

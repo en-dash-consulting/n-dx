@@ -5,47 +5,53 @@
 <zone>
 
 Zone: Web Viewer (`web-viewer`)
-Files: 374, Cohesion: 0.98, Coupling: 0.02
+Files: 379, Cohesion: 0.98, Coupling: 0.02
 Risk: healthy (score: 0.02)
-Description: 357 files, primarily TypeScript, CSS
-Entry points: packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/usage/constants.ts
-Lines: 123053
+Description: 367 files, primarily TypeScript, CSS
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/usage/constants.ts
+Lines: 122748
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 53 lines, source)
+packages/web/src/public.ts (TypeScript, 55 lines, source)
 packages/web/src/schema/v1.ts (TypeScript, 378 lines, source)
 packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
-packages/web/src/server/domain-gateway.ts (TypeScript, 19 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
-packages/web/src/server/mcp-deps.ts (TypeScript, 6 lines, source)
 packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
+packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
-packages/web/src/server/rex-gateway.ts (TypeScript, 89 lines, source)
+packages/web/src/server/rex-gateway.ts (TypeScript, 88 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
 packages/web/src/server/routes-data.ts (TypeScript, 147 lines, source)
 packages/web/src/server/routes-features.ts (TypeScript, 302 lines, source)
-packages/web/src/server/routes-hench.ts (TypeScript, 2508 lines, source)
+packages/web/src/server/routes-hench.ts (TypeScript, 2492 lines, source)
 packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
-packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
-packages/web/src/server/routes-rex.ts (TypeScript, 3076 lines, source)
+packages/web/src/server/routes-rex/analysis.ts (TypeScript, 710 lines, source)
+packages/web/src/server/routes-rex/execution.ts (TypeScript, 478 lines, source)
+packages/web/src/server/routes-rex/health.ts (TypeScript, 160 lines, source)
+packages/web/src/server/routes-rex/index.ts (TypeScript, 87 lines, source)
+packages/web/src/server/routes-rex/items.ts (TypeScript, 478 lines, source)
+packages/web/src/server/routes-rex/prune.ts (TypeScript, 489 lines, source)
+packages/web/src/server/routes-rex/reads.ts (TypeScript, 132 lines, source)
+packages/web/src/server/routes-rex/requirements.ts (TypeScript, 574 lines, source)
+packages/web/src/server/routes-rex/shared.ts (TypeScript, 107 lines, source)
 packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
 packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
 packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
 packages/web/src/server/routes-token-usage.ts (TypeScript, 998 lines, source)
-packages/web/src/server/routes-validation.ts (TypeScript, 508 lines, source)
+packages/web/src/server/routes-validation.ts (TypeScript, 501 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 684 lines, source)
+packages/web/src/server/start.ts (TypeScript, 683 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
 packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
 packages/web/src/shared/data-files.ts (TypeScript, 20 lines, source)
@@ -286,7 +292,6 @@ packages/web/tests/unit/server/routes-hench-heartbeat.test.ts (TypeScript, 218 l
 packages/web/tests/unit/server/routes-hench-memory.test.ts (TypeScript, 120 lines, test)
 packages/web/tests/unit/server/routes-hench-shutdown.test.ts (TypeScript, 425 lines, test)
 packages/web/tests/unit/server/routes-hench-templates.test.ts (TypeScript, 332 lines, test)
-packages/web/tests/unit/server/routes-mcp.test.ts (TypeScript, 230 lines, test)
 packages/web/tests/unit/server/routes-notion.test.ts (TypeScript, 255 lines, test)
 packages/web/tests/unit/server/routes-project.test.ts (TypeScript, 249 lines, test)
 packages/web/tests/unit/server/routes-requirements.test.ts (TypeScript, 333 lines, test)
@@ -301,7 +306,7 @@ packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, t
 packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
-packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 236 lines, test)
+packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 225 lines, test)
 packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
 packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
 packages/web/tests/unit/viewer/accessibility.test.ts (TypeScript, 401 lines, test)
@@ -409,18 +414,20 @@ Internal:
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
   packages/web/src/server/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
-  packages/web/src/server/mcp-deps.ts → packages/web/src/server/domain-gateway.ts {*}
-  packages/web/src/server/mcp-deps.ts → packages/web/src/server/rex-gateway.ts {*}
+  packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {SCHEMA_VERSION, isCompatibleSchema}
+  packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-data.ts → packages/web/src/server/prd-io.ts {prdExists, prdPath}
   packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-data.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES, SUPPLEMENTARY_FILES}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/process-memory-tracker.ts {ProcessMemoryTracker}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
@@ -430,19 +437,66 @@ Internal:
   packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/domain-gateway.ts {createSourcevisionMcpServer}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/rex-gateway.ts {createRexMcpServer}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-project.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/src/server/routes-project.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {reasonForReshape}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {PRIORITY_ORDER, LEVEL_HIERARCHY, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES, CHILD_LEVEL, isPriority, isItemLevel, isRequirementCategory, isValidationType, findItem, walkTree, rexInsertChild, rexUpdateInTree, removeFromTree, computeStats, rexFindNextTask, collectCompletedIds, computeTimestampUpdates, validateMerge, previewMerge, mergeItems, countSubtree, isFullyCompleted, findPrunableItems, pruneItems, computeEpicStats, computePriorityDistribution, computeRequirementsSummary, isRootLevel, isWorkItem, computeHealthScore, detectReorganizations, applyProposals, applyReshape}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/rex-gateway.ts {Priority, ItemLevel, ItemStatus, PRDItem, PRDDocument, TreeEntry, TreeStats, MergeValidation, EpicStats, PriorityDistribution, RequirementsSummary, ReshapeProposal}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-rex.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/rex-gateway.ts {isPriority}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/rex-gateway.ts {PRDItem}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/routes-rex/shared.ts {insertChild, loadPRD, savePRD, appendLog}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/rex-gateway.ts {computeStats, isRootLevel}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/rex-gateway.ts {PRDItem}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, appendLog}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {reasonForReshape}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {computeHealthScore, detectReorganizations, applyProposals, applyReshape}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {ReshapeProposal}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/routes-rex/shared.ts {loadPRD, savePRD}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/analysis.ts {routeProposals}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {shutdownRexExecution}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {routeExecution}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {ShutdownRexResult}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/health.ts {routeHealthReorganize}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/items.ts {routeItems}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/prune.ts {routePrune}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/reads.ts {routePrdReads}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/requirements.ts {routeItemRequirements, routeRequirementsAnalytics}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, CHILD_LEVEL, isPriority, isItemLevel, removeFromTree, validateMerge, previewMerge, mergeItems}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/rex-gateway.ts {PRDItem, ItemLevel, TreeEntry}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, insertChild, updateInTree, loadPRD, savePRD, appendLog, API_SETTABLE_STATUSES, parentIdOf}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/rex-gateway.ts {walkTree, countSubtree, isWorkItem}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/rex-gateway.ts {PRDItem}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, savePRD, appendLog, parentIdOf}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/rex-gateway.ts {computeStats, computeEpicStats, computePriorityDistribution, computeRequirementsSummary}
+  packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/routes-rex/shared.ts {loadPRD, findNextTask, collectCompletedIds}
+  packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
+  packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/rex-gateway.ts {isPriority, isRequirementCategory, isValidationType, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/rex-gateway.ts {PRDItem, Requirement}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, savePRD, appendLog}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/prd-io.ts {loadPRDSync, savePRDSync}
+  packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/rex-gateway.ts {VALID_STATUSES, findItem, rexInsertChild, rexUpdateInTree, rexFindNextTask, collectCompletedIds, computeTimestampUpdates}
+  packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument, ItemStatus, TreeEntry}
+  packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-search.ts → packages/web/src/server/search-index.ts {SearchIndex}
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {ServerContext}
@@ -451,6 +505,7 @@ Internal:
   packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-sourcevision.ts → packages/web/src/shared/data-files.ts {DATA_FILES}
   packages/web/src/server/routes-static.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-status.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {computeStats, collectCompletedIds, findNextTask}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {PRDDocument, TreeStats}
   packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {jsonResponse}
@@ -459,12 +514,14 @@ Internal:
   packages/web/src/server/routes-token-usage.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache}
   packages/web/src/server/routes-token-usage.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-token-usage.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-validation.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, isItemLevel, walkTree, findItem, collectAllIds}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {ItemLevel, PRDItem, PRDDocument}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/search-index.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
   packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
@@ -475,10 +532,9 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator}
   packages/web/src/server/start.ts → packages/web/src/server/routes-integrations.ts {handleIntegrationRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-project.ts {handleProjectRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-rex.ts {handleRexRoute, shutdownRexExecution}
+  packages/web/src/server/start.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute, shutdownRexExecution}
   packages/web/src/server/start.ts → packages/web/src/server/routes-search.ts {handleSearchRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute, isProjectInitialized}
@@ -937,7 +993,7 @@ Internal:
   packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {createCallRateLimiter}
   packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/message-coalescer.ts {createMessageCoalescer}
   packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/message-throttle.ts {createMessageThrottle}
-  packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
+  packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/src/viewer/main.ts {*}
   packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
@@ -949,7 +1005,6 @@ Internal:
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/memory-leak-fixes.test.ts → packages/web/src/server/routes-mcp.ts {closeAllMcpSessions}
   packages/web/tests/unit/server/memory-leak-fixes.test.ts → packages/web/src/viewer/loader.ts {onDataChange, clearOnChange, getData}
   packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
   packages/web/tests/unit/server/port.test.ts → packages/web/src/server/start.ts {PORT_FILE}
@@ -978,15 +1033,13 @@ Internal:
   packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute, closeAllMcpSessions}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
   packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-project.test.ts → packages/web/src/server/routes-project.ts {handleProjectRoute, extractProjectMetadata, extractRepoName, clearProjectMetadataCache}
   packages/web/tests/unit/server/routes-project.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
+  packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
+  packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-search.test.ts → packages/web/src/server/routes-search.ts {handleSearchRoute, clearSearchIndexCache}
   packages/web/tests/unit/server/routes-search.test.ts → packages/web/src/server/types.ts {ServerContext}
@@ -1002,15 +1055,15 @@ Internal:
   packages/web/tests/unit/server/routes-workflow.test.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
   packages/web/tests/unit/server/routes-workflow.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-rex.ts {handleRexRoute}
+  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
   packages/web/tests/unit/server/search-index.test.ts → packages/web/src/server/search-index.ts {SearchIndex, parseQuery}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions}
-  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex.ts {shutdownRexExecution}
+  packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex/index.ts {shutdownRexExecution}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
-  packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_PRIORITY_ORDER, GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_LEVELS, GATEWAY_VALID_STATUSES, GATEWAY_VALID_PRIORITIES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
+  packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_STATUSES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
   packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
   packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
   packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/guide.ts {Guide}
@@ -1197,79 +1250,66 @@ Internal:
   packages/web/tests/unit/viewer/zone-inline-subzones.test.ts → packages/web/src/viewer/views/zones.ts {convertSubZones}
 
 Outgoing (this zone → other zones):
-  → packages-rex:unit-analyze: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
-  → web-server: packages/web/src/server/routes-hench.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts
+  → packages-rex:prd-operations-core: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
+  → usage: packages/web/src/server/routes-hench.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts
+  → web-server: packages/web/src/server/start.ts → packages/web/src/server/routes-mcp.ts; packages/web/tests/unit/server/memory-leak-fixes.test.ts → packages/web/src/server/routes-mcp.ts
+
+Incoming (other zones → this zone):
+  ← usage: packages/web/src/server/usage-cleanup-scheduler.ts → packages/web/src/server/prd-io.ts
+  ← web-server: packages/web/src/server/routes-mcp.ts → packages/web/src/server/rex-gateway.ts; packages/web/src/server/routes-mcp.ts → packages/web/src/server/types.ts; packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/types.ts
 
 </imports>
 
 <findings>
 
-[observation] [info] Contains 60% of project files (374/627) — subdivided into 6 sub-zones
+[observation] [warning] 10 entry points — wide API surface, consider consolidating exports
+[observation] [info] Contains 59% of project files (379/642) — subdivided into 8 sub-zones
 [observation] [info] High cohesion (0.98) — files are tightly interconnected
-[suggestion] [info] Zone "web-viewer" has files across 22 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "web-viewer" has files across 23 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (0.98) — files are tightly interconnected
-- Contains 60% of project files (374/627) — subdivided into 6 sub-zones
-- Contains 60% of project files (374/628) — subdivided into 6 sub-zones
-- Exemplary cohesion (0.98) across 374 files confirms the Louvain algorithm correctly unified all viewer UI, server logic, and MCP endpoint code into a single architectural boundary.
-- The three imports flowing into web-server create a deliberate seam — task-usage services are lightly separated, which is appropriate given they have independent test coverage.
-- Gateway files (domain-gateway.ts, rex-gateway.ts) are correctly co-located inside the server layer, keeping all cross-package import surfaces explicit and auditable.
-- 374-file zone with 0.98 cohesion and 0.02 coupling is an exceptionally clean architectural boundary — the community detection has correctly unified a complex multi-layer package.
-- Multiple entrypoints (viewer/performance, viewer/polling, viewer/components/*) indicate the viewer sub-tree exposes a fine-grained public API; consider auditing whether all are intentionally public or if some should be internal.
-- Server and viewer code coexist in one zone — this is appropriate for a collocated SSR/SPA package, but worth monitoring as the viewer grows to ensure build-time separation remains clean.
-- Zone "web-dashboard" has files across 22 directories — consider consolidating under a dedicated directory
-- Acts as the sole hub in a hub-and-spoke topology: all three co-located web-package satellite zones (landing-page, viewer-html-shell, usage-analytics-service) depend on or are consumed by web-dashboard, with zero coupling between the satellites themselves.
-- The 22-directory span of this zone combined with 0.02 coupling means web-dashboard absorbs almost all intra-web-package coordination — any future zone extraction will require deliberate seam identification rather than natural import-graph splits.
-- web-dashboard is the integration hub for the entire web package; all satellite zones (landing-page, viewer-html-shell, usage-analytics-service) couple to it rather than to each other, creating a single point of change for cross-cutting web concerns.
-- No satellite zone imports from another satellite — the star topology is clean, but it means adding a new satellite (e.g. a settings panel) requires passing through web-dashboard rather than forming a peer relationship, which may inflate the hub over time.
-- No browser-environment globals (window, document, navigator) were found in server/ files, and no Node.js-only imports (node:*, process.env) were found in viewer/ files — the server/viewer coexistence is currently clean at the import level, not just architecturally tolerated.
-- routes-hench.ts imports IncrementalTaskUsageAggregator via task-usage.ts (the facade), not directly from incremental-task-usage.ts — the facade contract is respected in practice for all three inbound web-dashboard → usage-analytics-service imports.
-- mcp-deps.ts carries a @deprecated JSDoc tag internally directing consumers to rex-gateway.ts and domain-gateway.ts, but public.ts (lines 36-44) still documents mcp-deps.ts as the canonical runtime import gateway — the deprecation is in direct conflict with the public API documentation, creating contradictory guidance for new contributors.
-- aggregation-cache.ts is classified in web-dashboard but its cache invalidation fingerprint is defined entirely by the three data sources owned by usage-analytics-service (hench runs, rex execution log, sourcevision manifest). The cache is analytics-domain knowledge embedded in the dashboard zone, creating an implicit conceptual coupling that does not appear in the import graph.
-- mcp-deps.ts is classified as [config] but it contains no configuration — it is a deprecated re-export barrel that combines both gateway modules into a single import surface. The [config] classification will mislead zone tooling and future contributors about the file's purpose.
-- mcp-deps.ts is @deprecated internally but public.ts still presents it as the canonical gateway (lines 36-44). Remove or update the public.ts documentation to point exclusively to rex-gateway.ts and domain-gateway.ts, then add an ESLint no-restricted-imports rule for mcp-deps.ts to enforce migration without relying on the deprecated JSDoc tag alone.
-- mcp-deps.ts is classified as [config] but is a deprecated re-export barrel — reclassify it as [gateway] (or [deprecated] if the archetype exists) so zone tooling and contributors can correctly interpret its role.
-- aggregation-cache.ts implements cache invalidation logic that is structurally coupled to usage-analytics-service's three data sources (hench runs, rex log, sv manifest). Consider moving it into usage-analytics-service to co-locate the cache with its domain, which would also improve that zone's cohesion from 0.75 toward 1.0.
-- Zone "web-viewer" has files across 22 directories — consider consolidating under a dedicated directory
-- [call graph] 7130 internal calls, 22 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Contains 59% of project files (379/642) — subdivided into 8 sub-zones
+- 10 entry points — wide API surface, consider consolidating exports
+- Zone "web-viewer" has files across 23 directories — consider consolidating under a dedicated directory
+- [call graph] 7126 internal calls, 25 outgoing, 2 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  web-viewer/web → web-viewer/web-unit: 2
-  web-viewer/web → web-viewer/web-viewer: 5
-  web-viewer/web-2 → web-viewer/web-3: 3
-  web-viewer/web-2 → web-viewer/web-unit: 2
-  web-viewer/web-2 → web-viewer/web-viewer: 8
-  web-viewer/web-3 → web-viewer/web-2: 1
-  web-viewer/web-3 → web-viewer/web-unit: 1
-  web-viewer/web-3 → web-viewer/web-viewer: 9
-  web-viewer/web-viewer → web-viewer/web: 5
-  web-viewer/web-viewer → web-viewer/web-2: 16
-  web-viewer/web-viewer → web-viewer/web-3: 5
-  web-viewer/web-viewer → web-viewer/web-unit: 1
+  web-viewer/crash → web-viewer/web: 3
+  web-viewer/status → web-viewer/web: 3
+  web-viewer/status → web-viewer/web-unit: 1
+  web-viewer/web → web-viewer/crash: 3
+  web-viewer/web → web-viewer/status: 1
+  web-viewer/web → web-viewer/web-2: 1
+  web-viewer/web → web-viewer/web-4: 2
+  web-viewer/web → web-viewer/web-unit: 5
+  web-viewer/web → web-viewer/web-viewer: 3
+  web-viewer/web-2 → web-viewer/web: 4
+  web-viewer/web-4 → web-viewer/web: 4
+  web-viewer/web-viewer → web-viewer/web: 6
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 6 sub-zone(s):
+This zone has 8 sub-zone(s):
 
-- **Web Viewer/web** (`web-viewer/web`): 82 files, cohesion 0.94, coupling 0.06
-  - Has 5 nested sub-zone(s)
-- **Web Viewer/web 2** (`web-viewer/web-2`): 43 files, cohesion 0.68, coupling 0.32
-- **Web Viewer/web 3** (`web-viewer/web-3`): 68 files, cohesion 0.91, coupling 0.09
-  - Has 4 nested sub-zone(s)
-- **Web Viewer/web 4** (`web-viewer/web-4`): 43 files, cohesion 1, coupling 0
-- **Web Viewer/web Unit** (`web-viewer/web-unit`): 16 files, cohesion 0.81, coupling 0.19
-- **Web Viewer/web Viewer** (`web-viewer/web-viewer`): 105 files, cohesion 0.89, coupling 0.11
+- **Web Viewer/crash** (`web-viewer/crash`): 5 files, cohesion 0.29, coupling 0.71
+- **Web Viewer/status** (`web-viewer/status`): 3 files, cohesion 0.29, coupling 0.71
+- **Web Viewer/web** (`web-viewer/web`): 282 files, cohesion 0.96, coupling 0.04
   - Has 7 nested sub-zone(s)
+- **Web Viewer/web 2** (`web-viewer/web-2`): 6 files, cohesion 0.62, coupling 0.38
+- **Web Viewer/web 3** (`web-viewer/web-3`): 43 files, cohesion 0, coupling 0
+- **Web Viewer/web 4** (`web-viewer/web-4`): 3 files, cohesion 0.44, coupling 0.56
+- **Web Viewer/web Unit** (`web-viewer/web-unit`): 16 files, cohesion 0.81, coupling 0.19
+- **Web Viewer/web Viewer** (`web-viewer/web-viewer`): 9 files, cohesion 0.67, coupling 0.33
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

@@ -5,9 +5,9 @@
 <zone>
 
 Zone: Unit Analyze/unit Analyze (`unit-analyze/unit-analyze`)
-Files: 7, Cohesion: 0.22, Coupling: 0.78
-Description: 7 files, primarily TypeScript
-Entry points: src/analyze/extract.ts, src/analyze/file-validation.ts
+Files: 5, Cohesion: 0.18, Coupling: 0.82
+Description: 5 files, primarily TypeScript
+Entry points: src/analyze/dedupe.ts, src/analyze/scanners.ts
 Lines: 0
 
 </zone>

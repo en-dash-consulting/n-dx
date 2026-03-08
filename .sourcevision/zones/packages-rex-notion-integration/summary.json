@@ -1,0 +1,26 @@
+{
+  "id": "packages-rex:notion-integration",
+  "name": "Notion Integration Adapter",
+  "description": "Implements the Notion sync adapter including data mapping and store-level adapter logic for syncing PRD items with Notion databases.",
+  "files": [
+    "packages/rex/src/core/notion-map.ts",
+    "packages/rex/src/store/notion-adapter.ts",
+    "packages/rex/tests/unit/core/notion-map.test.ts",
+    "packages/rex/tests/unit/store/notion-adapter.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/notion-adapter.ts"
+  ],
+  "cohesion": 0.14,
+  "coupling": 0.86,
+  "fileCount": 4,
+  "lineCount": 2719,
+  "riskMetrics": {
+    "cohesion": 0.14,
+    "coupling": 0.86,
+    "riskScore": 0.86,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true,
+    "riskJustification": "Cohesion 0.14 is a zone-size artifact: with only 2 production files (notion-map.ts, notion-adapter.ts) plus their Notion schema, the ratio of internal to external imports is inherently low. The files form a tight functional unit — notion-map provides bidirectional mapping consumed exclusively by notion-adapter. Pin of integration-schemas/notion.ts reunites the Notion contract in a single zone. Physical relocation of notion-map.ts from core/ to store/ colocates it with its sole consumer."
+  }
+}

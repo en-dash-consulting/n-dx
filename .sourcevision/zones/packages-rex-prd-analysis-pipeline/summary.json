@@ -1,7 +1,7 @@
 {
   "id": "packages-rex:prd-analysis-pipeline",
   "name": "PRD Analysis Pipeline",
-  "description": "The core PRD analysis engine: scanning projects, proposing items, deduplicating, diffing, extracting, and reshaping the PRD tree.",
+  "description": "The full PRD analysis subsystem: LLM-driven proposal generation, deduplication, consolidation, decomposition, extraction, guided-analysis flows, and the CLI commands that orchestrate them.",
   "files": [
     "packages/rex/src/analyze/analyze-shared.ts",
     "packages/rex/src/analyze/consolidation-guard.ts",
@@ -29,9 +29,15 @@
     "packages/rex/src/cli/commands/reshape.ts",
     "packages/rex/src/cli/commands/smart-add-duplicates.ts",
     "packages/rex/src/cli/commands/smart-add.ts",
+    "packages/rex/src/cli/commands/validate-interactive.ts",
+    "packages/rex/src/cli/commands/validate.ts",
+    "packages/rex/src/core/epic-correlation.ts",
     "packages/rex/src/core/reshape.ts",
+    "packages/rex/src/core/structural.ts",
+    "packages/rex/src/store/atomic-write.ts",
     "packages/rex/src/store/project-config.ts",
     "packages/rex/tests/integration/claude-config.test.ts",
+    "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
     "packages/rex/tests/unit/analyze/consolidation-guard.test.ts",
     "packages/rex/tests/unit/analyze/decompose.test.ts",
     "packages/rex/tests/unit/analyze/dedupe.test.ts",
@@ -62,7 +68,14 @@
     "packages/rex/tests/unit/cli/commands/format-loe.test.ts",
     "packages/rex/tests/unit/cli/commands/loe-display.test.ts",
     "packages/rex/tests/unit/cli/commands/smart-add-duplicates.test.ts",
-    "packages/rex/tests/unit/cli/commands/smart-add.test.ts"
+    "packages/rex/tests/unit/cli/commands/smart-add.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate-epicless.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate-interactive.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate.test.ts",
+    "packages/rex/tests/unit/core/epic-correlation.test.ts",
+    "packages/rex/tests/unit/core/epicless.test.ts",
+    "packages/rex/tests/unit/core/structural.test.ts",
+    "packages/rex/tests/unit/store/atomic-write.test.ts"
   ],
   "entryPoints": [
     "packages/rex/src/analyze/consolidation-guard.ts",
@@ -80,18 +93,22 @@
     "packages/rex/src/cli/commands/reshape.ts",
     "packages/rex/src/cli/commands/smart-add-duplicates.ts",
     "packages/rex/src/cli/commands/smart-add.ts",
+    "packages/rex/src/cli/commands/validate.ts",
     "packages/rex/src/core/reshape.ts",
+    "packages/rex/src/core/structural.ts",
+    "packages/rex/src/store/atomic-write.ts",
     "packages/rex/src/store/project-config.ts"
   ],
-  "cohesion": 0.66,
-  "coupling": 0.34,
-  "fileCount": 60,
-  "lineCount": 29207,
+  "cohesion": 0.63,
+  "coupling": 0.37,
+  "fileCount": 73,
+  "lineCount": 34250,
   "riskMetrics": {
-    "cohesion": 0.66,
-    "coupling": 0.34,
-    "riskScore": 0.33999999999999997,
+    "cohesion": 0.63,
+    "coupling": 0.37,
+    "riskScore": 0.37,
     "riskLevel": "healthy",
-    "failsThreshold": false
+    "failsThreshold": false,
+    "riskJustification": "Large cross-cutting zone spanning analyze/ and recommend/ subsystems. High coupling reflects shared dependencies on store, types, and LLM client. The analyze and recommend features are functionally related (recommendations feed into analysis proposals). Splitting would not improve cohesion — the Louvain algorithm correctly identified these as a community."
   }
 }

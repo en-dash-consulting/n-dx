@@ -5,18 +5,21 @@
 <zone>
 
 Zone: Hench/unit/store (`hench/unit/store`)
-Files: 4, Cohesion: 0.33, Coupling: 0.67
-Description: 4 files, primarily TypeScript
-Entry points: packages/hench/src/store/json.ts, packages/hench/src/store/runs.ts
-Lines: 430
+Files: 7, Cohesion: 0.20, Coupling: 0.80
+Description: 7 files, primarily TypeScript
+Entry points: packages/hench/src/store/json.ts, packages/hench/src/store/project-config.ts, packages/hench/src/store/runs.ts
+Lines: 1128
 
 </zone>
 
 <files>
 
 packages/hench/src/store/json.ts (TypeScript, 2 lines, source)
+packages/hench/src/store/project-config.ts (TypeScript, 123 lines, source)
 packages/hench/src/store/runs.ts (TypeScript, 97 lines, source)
 packages/hench/tests/integration/codex-token-accounting.test.ts (TypeScript, 183 lines, test)
+packages/hench/tests/unit/agent/api-auth.test.ts (TypeScript, 391 lines, test)
+packages/hench/tests/unit/store/claude-config.test.ts (TypeScript, 184 lines, test)
 packages/hench/tests/unit/store/run-compressed-reads.test.ts (TypeScript, 148 lines, test)
 
 </files>
@@ -26,6 +29,9 @@ packages/hench/tests/unit/store/run-compressed-reads.test.ts (TypeScript, 148 li
 Internal:
   packages/hench/src/store/runs.ts → packages/hench/src/store/json.ts {toCanonicalJSON}
   packages/hench/tests/integration/codex-token-accounting.test.ts → packages/hench/src/store/runs.ts {saveRun, listRuns}
+  packages/hench/tests/unit/agent/api-auth.test.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, resolveApiKey, resolveCliPath}
+  packages/hench/tests/unit/store/claude-config.test.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, resolveApiKey, resolveCliPath}
+  packages/hench/tests/unit/store/claude-config.test.ts → packages/hench/src/store/project-config.ts {ClaudeConfig}
   packages/hench/tests/unit/store/run-compressed-reads.test.ts → packages/hench/src/store/runs.ts {saveRun, loadRun, listRuns}
 
 </imports>

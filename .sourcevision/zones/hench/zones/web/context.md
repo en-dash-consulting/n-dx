@@ -5,15 +5,15 @@
 <zone>
 
 Zone: Hench/web (`hench/web`)
-Files: 2, Cohesion: 1.00, Coupling: 0.00
-Description: 2 files, primarily TypeScript
-Lines: 201
+Files: 2, Cohesion: 0.00, Coupling: 0.00
+Description: 2 files, primarily HTML, CSS
+Lines: 1626
 
 </zone>
 
 <files>
 
-packages/web/tests/integration/boundary-check.test.ts (TypeScript, 84 lines, test)
-packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 117 lines, test)
+packages/web/src/landing/index.html (HTML, 309 lines, other)
+packages/web/src/landing/landing.css (CSS, 1317 lines, other)
 
 </files>

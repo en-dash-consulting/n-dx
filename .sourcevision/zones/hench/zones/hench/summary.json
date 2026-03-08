@@ -11,7 +11,7 @@
     "packages/hench/vitest.config.ts"
   ],
   "entryPoints": [],
-  "cohesion": 1,
+  "cohesion": 0,
   "coupling": 0,
   "fileCount": 6,
   "lineCount": 178

@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench/unit/agent Analysis (`hench/unit/agent-analysis`)
-Files: 5, Cohesion: 0.27, Coupling: 0.73
-Description: 5 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts
-Lines: 830
+Files: 7, Cohesion: 0.29, Coupling: 0.71
+Description: 7 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/lifecycle/token-budget.ts
+Lines: 931
 
 </zone>
 
@@ -17,8 +17,10 @@ Lines: 830
 packages/hench/src/agent/analysis/review.ts (TypeScript, 110 lines, source)
 packages/hench/src/agent/analysis/stuck.ts (TypeScript, 70 lines, source)
 packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
+packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 34 lines, source)
 packages/hench/tests/unit/agent/review.test.ts (TypeScript, 372 lines, test)
 packages/hench/tests/unit/agent/stuck.test.ts (TypeScript, 203 lines, test)
+packages/hench/tests/unit/agent/token-budget.test.ts (TypeScript, 67 lines, test)
 
 </files>
 
@@ -28,7 +30,11 @@ Internal:
   packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
   packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {ReviewResult, ReviewDiff}
   packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
   packages/hench/tests/unit/agent/review.test.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
   packages/hench/tests/unit/agent/stuck.test.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, getStuckTaskIds, isStuckTask}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/tests/unit/agent/token-budget.test.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
 
 </imports>

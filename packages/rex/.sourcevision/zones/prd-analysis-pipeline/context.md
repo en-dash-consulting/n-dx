@@ -5,11 +5,11 @@
 <zone>
 
 Zone: PRD Analysis Pipeline (`prd-analysis-pipeline`)
-Files: 60, Cohesion: 0.66, Coupling: 0.34
-Risk: healthy (score: 0.34)
-Description: The core PRD analysis engine: scanning projects, proposing items, deduplicating, diffing, extracting, and reshaping the PRD tree.
-Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts, src/analyze/extract.ts, src/analyze/file-validation.ts, src/analyze/index.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/reshape-reason.ts, src/analyze/scanners.ts, src/cli/commands/analyze.ts, src/cli/commands/prune.ts, src/cli/commands/reshape.ts, src/cli/commands/smart-add-duplicates.ts, src/cli/commands/smart-add.ts, src/core/reshape.ts, src/store/project-config.ts
-Lines: 29207
+Files: 73, Cohesion: 0.63, Coupling: 0.37
+Risk: healthy (score: 0.37)
+Description: The full PRD analysis subsystem: LLM-driven proposal generation, deduplication, consolidation, decomposition, extraction, guided-analysis flows, and the CLI commands that orchestrate them.
+Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts, src/analyze/extract.ts, src/analyze/file-validation.ts, src/analyze/index.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/reshape-reason.ts, src/analyze/scanners.ts, src/cli/commands/analyze.ts, src/cli/commands/prune.ts, src/cli/commands/reshape.ts, src/cli/commands/smart-add-duplicates.ts, src/cli/commands/smart-add.ts, src/cli/commands/validate.ts, src/core/reshape.ts, src/core/structural.ts, src/store/atomic-write.ts, src/store/project-config.ts
+Lines: 34250
 
 </zone>
 
@@ -32,7 +32,7 @@ src/analyze/reconcile.ts (TypeScript, 124 lines, source)
 src/analyze/reshape-reason.ts (TypeScript, 357 lines, source)
 src/analyze/scanners.ts (TypeScript, 958 lines, source)
 src/analyze/validate-modification.ts (TypeScript, 218 lines, source)
-src/cli/commands/analyze.ts (TypeScript, 783 lines, source)
+src/cli/commands/analyze.ts (TypeScript, 784 lines, source)
 src/cli/commands/chunked-review-state.ts (TypeScript, 870 lines, source)
 src/cli/commands/chunked-review.ts (TypeScript, 212 lines, source)
 src/cli/commands/decomposition-review.ts (TypeScript, 323 lines, source)
@@ -40,10 +40,16 @@ src/cli/commands/format-loe.ts (TypeScript, 45 lines, source)
 src/cli/commands/prune.ts (TypeScript, 613 lines, source)
 src/cli/commands/reshape.ts (TypeScript, 215 lines, source)
 src/cli/commands/smart-add-duplicates.ts (TypeScript, 335 lines, source)
-src/cli/commands/smart-add.ts (TypeScript, 1671 lines, source)
+src/cli/commands/smart-add.ts (TypeScript, 1672 lines, source)
+src/cli/commands/validate-interactive.ts (TypeScript, 344 lines, source)
+src/cli/commands/validate.ts (TypeScript, 266 lines, source)
+src/core/epic-correlation.ts (TypeScript, 279 lines, source)
 src/core/reshape.ts (TypeScript, 290 lines, source)
+src/core/structural.ts (TypeScript, 377 lines, source)
+src/store/atomic-write.ts (TypeScript, 39 lines, source)
 src/store/project-config.ts (TypeScript, 77 lines, source)
 tests/integration/claude-config.test.ts (TypeScript, 233 lines, test)
+tests/integration/smart-add-orphaned-parent.test.ts (TypeScript, 330 lines, test)
 tests/unit/analyze/consolidation-guard.test.ts (TypeScript, 238 lines, test)
 tests/unit/analyze/decompose.test.ts (TypeScript, 505 lines, test)
 tests/unit/analyze/dedupe.test.ts (TypeScript, 404 lines, test)
@@ -75,6 +81,13 @@ tests/unit/cli/commands/format-loe.test.ts (TypeScript, 94 lines, test)
 tests/unit/cli/commands/loe-display.test.ts (TypeScript, 245 lines, test)
 tests/unit/cli/commands/smart-add-duplicates.test.ts (TypeScript, 465 lines, test)
 tests/unit/cli/commands/smart-add.test.ts (TypeScript, 655 lines, test)
+tests/unit/cli/commands/validate-epicless.test.ts (TypeScript, 280 lines, test)
+tests/unit/cli/commands/validate-interactive.test.ts (TypeScript, 856 lines, test)
+tests/unit/cli/commands/validate.test.ts (TypeScript, 594 lines, test)
+tests/unit/core/epic-correlation.test.ts (TypeScript, 531 lines, test)
+tests/unit/core/epicless.test.ts (TypeScript, 196 lines, test)
+tests/unit/core/structural.test.ts (TypeScript, 882 lines, test)
+tests/unit/store/atomic-write.test.ts (TypeScript, 67 lines, test)
 
 </files>
 
@@ -152,6 +165,7 @@ Internal:
   src/cli/commands/analyze.ts → src/cli/commands/chunked-review.ts {BatchAcceptanceRecord}
   src/cli/commands/analyze.ts → src/cli/commands/decomposition-review.ts {countDecomposedTasks, autoResolveDecompositions, runDecompositionReview, formatDecompositionSummary}
   src/cli/commands/analyze.ts → src/cli/commands/format-loe.ts {formatTaskLoE, formatTaskLoERationale}
+  src/cli/commands/analyze.ts → src/store/atomic-write.ts {atomicWriteJSON}
   src/cli/commands/analyze.ts → src/store/project-config.ts {loadClaudeConfig, loadLLMConfig}
   src/cli/commands/chunked-review-state.ts → src/analyze/index.ts {Proposal}
   src/cli/commands/chunked-review-state.ts → src/analyze/validate-modification.ts {classifyModificationRequest}
@@ -182,10 +196,23 @@ Internal:
   src/cli/commands/smart-add.ts → src/cli/commands/format-loe.ts {formatTaskLoE, formatTaskLoERationale}
   src/cli/commands/smart-add.ts → src/cli/commands/smart-add-duplicates.ts {matchProposalNodesToPRD, attachDuplicateReasonsToProposals, buildDuplicateOverrideMarkerIndex}
   src/cli/commands/smart-add.ts → src/cli/commands/smart-add-duplicates.ts {ProposalDuplicateMatch}
+  src/cli/commands/smart-add.ts → src/store/atomic-write.ts {atomicWriteJSON}
   src/cli/commands/smart-add.ts → src/store/project-config.ts {loadClaudeConfig, loadLLMConfig}
+  src/cli/commands/validate-interactive.ts → src/core/epic-correlation.ts {correlateEpiclessFeatures, formatScore}
+  src/cli/commands/validate-interactive.ts → src/core/epic-correlation.ts {CorrelationResult}
+  src/cli/commands/validate-interactive.ts → src/core/structural.ts {EpiclessFeature}
+  src/cli/commands/validate.ts → src/cli/commands/validate-interactive.ts {resolveEpiclessFeatures, applyEpiclessResolutions}
+  src/cli/commands/validate.ts → src/cli/commands/validate-interactive.ts {PromptFn}
+  src/cli/commands/validate.ts → src/core/structural.ts {validateStructure, findEpiclessFeatures}
+  src/core/epic-correlation.ts → src/analyze/dedupe.ts {similarity}
+  src/core/epic-correlation.ts → src/core/structural.ts {EpiclessFeature}
   tests/integration/claude-config.test.ts → src/analyze/reason.ts {setClaudeConfig, setClaudeClient, getAuthMode}
   tests/integration/claude-config.test.ts → src/store/project-config.ts {loadClaudeConfig, resolveCliPath, resolveApiKey}
   tests/integration/claude-config.test.ts → src/store/project-config.ts {ClaudeConfig}
+  tests/integration/smart-add-orphaned-parent.test.ts → src/analyze/index.ts {Proposal}
+  tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/smart-add.ts {cmdSmartAdd}
+  tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/validate.ts {cmdValidate}
+  tests/integration/smart-add-orphaned-parent.test.ts → src/core/structural.ts {validateStructure}
   tests/unit/analyze/consolidation-guard.test.ts → src/analyze/consolidation-guard.ts {countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard}
   tests/unit/analyze/consolidation-guard.test.ts → src/analyze/propose.ts {Proposal, ProposalTask}
   tests/unit/analyze/consolidation-guard.test.ts → src/analyze/reason.ts {spawnClaude}
@@ -252,66 +279,80 @@ Internal:
   tests/unit/cli/commands/smart-add.test.ts → src/analyze/index.ts {Proposal, QualityIssue}
   tests/unit/cli/commands/smart-add.test.ts → src/cli/commands/smart-add-duplicates.ts {ProposalDuplicateMatch}
   tests/unit/cli/commands/smart-add.test.ts → src/cli/commands/smart-add.ts {formatProposalTree, formatProposalSummary, countProposalItems, filterProposalsByIndex, parseApprovalInput, parseDuplicatePromptInput, parseGranularityInput, remapDuplicateMatchesForSelectedProposals, formatQualityWarnings, classifySmartAddError}
+  tests/unit/cli/commands/validate-epicless.test.ts → src/cli/commands/validate.ts {cmdValidate}
+  tests/unit/cli/commands/validate-interactive.test.ts → src/cli/commands/validate-interactive.ts {resolveEpiclessFeatures, applyEpiclessResolutions}
+  tests/unit/cli/commands/validate-interactive.test.ts → src/cli/commands/validate-interactive.ts {EpiclessResolution, PromptFn}
+  tests/unit/cli/commands/validate-interactive.test.ts → src/core/structural.ts {EpiclessFeature}
+  tests/unit/cli/commands/validate.test.ts → src/cli/commands/validate.ts {cmdValidate}
+  tests/unit/core/epic-correlation.test.ts → src/core/epic-correlation.ts {computeTagOverlap, computeCorrelationSignals, computeCombinedScore, rankEpicsForFeature, correlateEpiclessFeatures, formatScore}
+  tests/unit/core/epic-correlation.test.ts → src/core/structural.ts {EpiclessFeature}
+  tests/unit/core/epicless.test.ts → src/core/structural.ts {findEpiclessFeatures}
+  tests/unit/core/structural.test.ts → src/core/structural.ts {validateStructure}
+  tests/unit/store/atomic-write.test.ts → src/store/atomic-write.ts {atomicWrite, atomicWriteJSON}
 
 Outgoing (this zone → other zones):
-  → cli-command-layer: src/analyze/guided.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/cli/commands/token-format.ts; src/cli/commands/analyze.ts → src/cli/errors.ts; src/cli/commands/analyze.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/cli/validate-input.ts; src/cli/commands/chunked-review.ts → src/cli/output.ts; src/cli/commands/decomposition-review.ts → src/cli/output.ts; src/cli/commands/prune.ts → src/cli/errors.ts; src/cli/commands/prune.ts → src/cli/output.ts; src/cli/commands/reshape.ts → src/cli/errors.ts; src/cli/commands/reshape.ts → src/cli/output.ts; src/cli/commands/smart-add.ts → src/cli/errors.ts; src/cli/commands/smart-add.ts → src/cli/output.ts
-  → prd-store-sync: src/analyze/analyze-shared.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/dedupe.ts → src/schema/index.ts; src/analyze/diff.ts → src/schema/index.ts; src/analyze/extract.ts → src/schema/index.ts; src/analyze/modify-reason.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reconcile.ts → src/schema/index.ts; src/analyze/reshape-reason.ts → src/schema/index.ts; src/analyze/scanners.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/store/index.ts; src/cli/commands/prune.ts → src/core/canonical.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/store/index.ts; src/cli/commands/reshape.ts → src/core/canonical.ts; src/cli/commands/reshape.ts → src/schema/index.ts; src/cli/commands/reshape.ts → src/store/index.ts; src/cli/commands/smart-add-duplicates.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/core/cascade-reset.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/store/index.ts; src/core/reshape.ts → src/schema/index.ts; tests/unit/analyze/consolidation-guard.test.ts → src/schema/v1.ts; tests/unit/analyze/diff.test.ts → src/schema/v1.ts; tests/unit/analyze/reconcile.test.ts → src/schema/index.ts; tests/unit/analyze/token-tracking.test.ts → src/schema/v1.ts; tests/unit/cli/commands/smart-add-duplicates.test.ts → src/schema/index.ts
-  → prd-tree-operations: src/analyze/diff.ts → src/core/tree.ts; src/analyze/reason.ts → src/core/tree.ts; src/analyze/reconcile.ts → src/core/tree.ts; src/analyze/reshape-reason.ts → src/core/tree.ts; src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/prune.ts → src/cli/commands/constants.ts; src/cli/commands/prune.ts → src/core/prune.ts; src/cli/commands/reshape.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add-duplicates.ts → src/core/tree.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/core/tree.ts; src/core/reshape.ts → src/core/move.ts; src/core/reshape.ts → src/core/tree.ts
-  → recommend-acknowledge: src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts
+  → data-persistence-validation: src/cli/commands/validate.ts → src/schema/validate.ts
+  → mutation-commands: src/analyze/guided.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/cli/errors.ts; src/cli/commands/analyze.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/cli/validate-input.ts; src/cli/commands/chunked-review.ts → src/cli/output.ts; src/cli/commands/decomposition-review.ts → src/cli/output.ts; src/cli/commands/prune.ts → src/cli/errors.ts; src/cli/commands/prune.ts → src/cli/output.ts; src/cli/commands/reshape.ts → src/cli/errors.ts; src/cli/commands/reshape.ts → src/cli/output.ts; src/cli/commands/smart-add.ts → src/cli/errors.ts; src/cli/commands/smart-add.ts → src/cli/output.ts; src/cli/commands/validate-interactive.ts → src/cli/output.ts; src/cli/commands/validate.ts → src/cli/output.ts
+  → prd-operations-core: src/analyze/analyze-shared.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/dedupe.ts → src/schema/index.ts; src/analyze/diff.ts → src/schema/index.ts; src/analyze/extract.ts → src/schema/index.ts; src/analyze/modify-reason.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reconcile.ts → src/schema/index.ts; src/analyze/reshape-reason.ts → src/schema/index.ts; src/analyze/scanners.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/core/prune.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/reshape.ts → src/schema/index.ts; src/cli/commands/smart-add-duplicates.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/core/cascade-reset.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/validate-interactive.ts → src/core/remove-feature.ts; src/cli/commands/validate-interactive.ts → src/schema/index.ts; src/cli/commands/validate-interactive.ts → src/schema/index.ts; src/cli/commands/validate.ts → src/schema/index.ts; src/cli/commands/validate.ts → src/schema/index.ts; src/core/epic-correlation.ts → src/core/keywords.ts; src/core/epic-correlation.ts → src/schema/index.ts; src/core/epic-correlation.ts → src/schema/index.ts; src/core/reshape.ts → src/schema/index.ts; src/core/structural.ts → src/schema/index.ts; src/core/structural.ts → src/schema/index.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/schema/index.ts; tests/unit/analyze/consolidation-guard.test.ts → src/schema/v1.ts; tests/unit/analyze/diff.test.ts → src/schema/v1.ts; tests/unit/analyze/reconcile.test.ts → src/schema/index.ts; tests/unit/analyze/token-tracking.test.ts → src/schema/v1.ts; tests/unit/cli/commands/smart-add-duplicates.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate-epicless.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate-interactive.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate.test.ts → src/schema/index.ts; tests/unit/core/epic-correlation.test.ts → src/schema/index.ts; tests/unit/core/epicless.test.ts → src/schema/index.ts; tests/unit/core/structural.test.ts → src/schema/index.ts
+  → remote-integration: src/analyze/diff.ts → src/core/tree.ts; src/analyze/reason.ts → src/core/tree.ts; src/analyze/reconcile.ts → src/core/tree.ts; src/analyze/reshape-reason.ts → src/core/tree.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/cli/commands/analyze.ts → src/store/index.ts; src/cli/commands/prune.ts → src/core/canonical.ts; src/cli/commands/prune.ts → src/store/index.ts; src/cli/commands/reshape.ts → src/core/canonical.ts; src/cli/commands/reshape.ts → src/store/index.ts; src/cli/commands/smart-add-duplicates.ts → src/core/tree.ts; src/cli/commands/smart-add.ts → src/core/tree.ts; src/cli/commands/smart-add.ts → src/store/index.ts; src/cli/commands/validate-interactive.ts → src/core/tree.ts; src/cli/commands/validate.ts → src/core/dag.ts; src/cli/commands/validate.ts → src/store/index.ts; src/core/reshape.ts → src/core/move.ts; src/core/reshape.ts → src/core/tree.ts; src/core/structural.ts → src/core/tree.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/store/index.ts
+  → rex-status-mcp-cli: src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/analyze.ts → src/cli/commands/token-format.ts; src/cli/commands/prune.ts → src/cli/commands/constants.ts; src/cli/commands/reshape.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/cli/commands/validate.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/init.ts
 
 Incoming (other zones → this zone):
-  ← cli-command-layer: src/cli/index.ts → src/cli/commands/analyze.ts; src/cli/index.ts → src/cli/commands/prune.ts; src/cli/index.ts → src/cli/commands/reshape.ts; src/cli/index.ts → src/cli/commands/smart-add.ts
-  ← prd-store-sync: src/store/file-adapter.ts → src/store/project-config.ts; src/store/notion-adapter.ts → src/store/project-config.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts
-  ← prd-tree-operations: src/cli/commands/reorganize.ts → src/analyze/reason.ts; src/cli/commands/reorganize.ts → src/analyze/reshape-reason.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/store/project-config.ts; src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; src/core/reorganize.ts → src/analyze/dedupe.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/propose.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/reshape.ts
-  ← prd-validation: src/core/epic-correlation.ts → src/analyze/dedupe.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/analyze/index.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/smart-add.ts
-  ← recommend-acknowledge: src/recommend/conflict-detection.ts → src/analyze/dedupe.ts; tests/unit/analyze/scanners-acknowledge.test.ts → src/analyze/scanners.ts
+  ← data-persistence-validation: src/cli/commands/report.ts → src/core/structural.ts; src/store/file-adapter.ts → src/store/atomic-write.ts; src/store/file-adapter.ts → src/store/project-config.ts
+  ← mutation-commands: src/cli/index.ts → src/cli/commands/analyze.ts; src/cli/index.ts → src/cli/commands/prune.ts; src/cli/index.ts → src/cli/commands/reshape.ts; src/cli/index.ts → src/cli/commands/smart-add.ts; src/cli/index.ts → src/cli/commands/validate.ts
+  ← notion-integration: src/store/notion-adapter.ts → src/store/project-config.ts
+  ← prd-operations-core: src/cli/commands/reorganize.ts → src/analyze/reason.ts; src/cli/commands/reorganize.ts → src/analyze/reshape-reason.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/store/project-config.ts; src/core/reorganize.ts → src/analyze/dedupe.ts; src/core/reorganize.ts → src/core/structural.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/consolidation-guard.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/decompose.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/analyze/extract.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/file-validation.ts; src/public.ts → src/analyze/propose.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/reshape.ts
+  ← remote-integration: src/recommend/conflict-detection.ts → src/analyze/dedupe.ts; tests/unit/analyze/scanners-acknowledge.test.ts → src/analyze/scanners.ts
+  ← rex-status-mcp-cli: src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] 17 entry points — wide API surface, consider consolidating exports
-[observation] [info] 17 entry points for a single zone is high; introducing an explicit index barrel (src/analyze/index.ts already exists) and routing all external consumers through it would clarify the public API boundary.
-[observation] [info] Strong cohesion (0.66) across 60 files is a positive indicator that the Louvain community detection correctly identified a semantically unified analysis domain.
-[observation] [warning] The bidirectional import relationship with the cli zone (13 imports each way) is a potential coupling risk; prefer making cli depend on unit-analyze unidirectionally to respect the four-tier hierarchy.
-[suggestion] [info] Zone "prd-analysis-pipeline" has files across 7 directories — consider consolidating under a dedicated directory
-[suggestion] [info] guided.ts and reason.ts follow a different naming convention than the rest of the zone (extract.ts, dedupe.ts, diff.ts use verb-noun). Rename to reflect action: guided.ts → clarify.ts or interactive-clarify.ts; reason.ts → build-reason.ts or reason-builder.ts. Consistent verb-noun naming across the zone makes the action each module performs visible from the filename alone.
-[pattern] [warning] The single concrete reverse import (guided.ts → cli/output.js) is the root cause of the 13-import unit-analyze → cli relationship. Extracting a Logger or OutputPort interface that CLI implements would sever this inversion without restructuring files.
-[relationship] [critical] unit-analyze participates in a three-zone dependency cycle: unit-core → unit-analyze (22 imports) → unit-store (37 imports) → unit-core (16 imports). This forms a closed loop across three zones and is the most critical structural risk in the codebase.
-[anti-pattern] [warning] guided.ts owns both the AI clarification protocol (buildClarifyPrompt, clarify) and interactive terminal I/O (promptLine using readline/process.stdin). Embedding process.stdin reading in a domain service makes unit testing impossible without mocking node internals and violates single responsibility — the prompting concern belongs in the CLI command that calls guided.ts.
+[observation] [warning] 20 entry points — wide API surface, consider consolidating exports
+[observation] [warning] 14 imports from unit-analyze into the CLI command layer (unit-cli) suggest the analysis pipeline directly invokes CLI-layer utilities — this upward dependency direction should be audited.
+[observation] [info] Cohesion of 0.63 is the highest among the multi-file zones, reflecting well-scoped responsibility — the analysis pipeline is a model for how other zones should be organized.
+[observation] [info] With 73 files this is the largest zone; as it grows, consider splitting guided vs. automated analysis flows into sub-modules to keep individual files focused.
+[suggestion] [info] Zone "prd-analysis-pipeline" has files across 9 directories — consider consolidating under a dedicated directory
+[suggestion] [warning] The 21 imports from prd-analysis-pipeline into remote-integration (unit-analyze → unit) are not flagged in any existing health summary despite being the third-largest cross-zone traffic path. Audit these 21 import sites to determine which remote-integration files are being consumed and whether those files should be moved to core to eliminate the dependency on the low-cohesion zone.
+[pattern] [warning] The 20 reverse imports from core into unit-analyze break the otherwise clean directional boundary; if any of these pull in analysis-pipeline-specific types or utilities, they represent an upward dependency that must be extracted into a shared schema or moved to the call site.
+[relationship] [info] prd-analysis-pipeline → core is the healthiest cross-zone relationship in the codebase: high volume (49 imports), predominantly unidirectional, and cohesion-preserving. Use it as the benchmark when evaluating other zone pairs.
+[anti-pattern] [warning] src/cli/commands/analyze.ts and src/cli/commands/smart-add.ts import atomic-write directly from the store layer internals rather than delegating file persistence to a store service or facade. CLI commands should not import store primitives directly.
 
 </findings>
 
 <insights>
 
-- 17 entry points — wide API surface, consider consolidating exports
-- Cohesion of 0.66 is healthy for a 60-file zone — the community detection correctly grouped a large but coherent set of analysis concerns together.
-- The 17 entry points signal that this zone is a major API surface; auditing which ones are truly public vs. internal could reduce accidental coupling from other zones.
-- unit-analyze receives 13 imports from the cli zone and sends 13 back, indicating a bidirectional relationship that could introduce subtle coupling; verify there are no circular dependencies between these two zones.
-- Strong cohesion (0.66) across 60 files is a positive indicator that the Louvain community detection correctly identified a semantically unified analysis domain.
-- The bidirectional import relationship with the cli zone (13 imports each way) is a potential coupling risk; prefer making cli depend on unit-analyze unidirectionally to respect the four-tier hierarchy.
-- 17 entry points for a single zone is high; introducing an explicit index barrel (src/analyze/index.ts already exists) and routing all external consumers through it would clarify the public API boundary.
-- Zone "prd-analysis-pipeline" has files across 7 directories — consider consolidating under a dedicated directory
-- src/analyze/guided.ts imports from ../cli/output.js, meaning analysis pipeline reaches into CLI for console output — this is a concrete example of the abstraction leak; the output concern should be injected or extracted to a shared utilities layer
-- unit-analyze participates in a three-zone dependency cycle: unit-core → unit-analyze (22 imports) → unit-store (37 imports) → unit-core (16 imports). This forms a closed loop across three zones and is the most critical structural risk in the codebase.
-- The single concrete reverse import (guided.ts → cli/output.js) is the root cause of the 13-import unit-analyze → cli relationship. Extracting a Logger or OutputPort interface that CLI implements would sever this inversion without restructuring files.
-- analyze/guided.ts embeds readline terminal I/O (the promptLine function reading from process.stdin) directly alongside AI clarification logic, mixing presentation concerns into a domain service and making the clarification round untestable without a real terminal.
-- guided.ts owns both the AI clarification protocol (buildClarifyPrompt, clarify) and interactive terminal I/O (promptLine using readline/process.stdin). Embedding process.stdin reading in a domain service makes unit testing impossible without mocking node internals and violates single responsibility — the prompting concern belongs in the CLI command that calls guided.ts.
-- The file naming convention within this zone splits into two distinct styles: verb-noun action files (extract.ts, dedupe.ts, diff.ts, decompose.ts, propose.ts) and noun/adjective-only files (guided.ts, reason.ts, scanners.ts, analyze-shared.ts). The action-verb pattern is more self-documenting; 'guided.ts' and 'reason.ts' in particular give no indication of what action they perform.
-- guided.ts and reason.ts follow a different naming convention than the rest of the zone (extract.ts, dedupe.ts, diff.ts use verb-noun). Rename to reflect action: guided.ts → clarify.ts or interactive-clarify.ts; reason.ts → build-reason.ts or reason-builder.ts. Consistent verb-noun naming across the zone makes the action each module performs visible from the filename alone.
-- [call graph] 2618 internal calls, 257 outgoing, 43 incoming (cohesion: 0.91, coupling: 0.09)
+- 20 entry points — wide API surface, consider consolidating exports
+- At 73 files with cohesion 0.63, this is the best-structured large zone in the codebase — the community-detection algorithm correctly grouped the analysis pipeline together.
+- The 49 imports into the core zone show a healthy directional dependency: analysis logic consumes core primitives without the reverse.
+- atomic-write.ts appearing as an entry point here rather than in the store zone suggests file-safety utilities may be scattered; verify there is only one canonical atomic-write implementation.
+- Cohesion of 0.63 is the highest among the multi-file zones, reflecting well-scoped responsibility — the analysis pipeline is a model for how other zones should be organized.
+- With 73 files this is the largest zone; as it grows, consider splitting guided vs. automated analysis flows into sub-modules to keep individual files focused.
+- 14 imports from unit-analyze into the CLI command layer (unit-cli) suggest the analysis pipeline directly invokes CLI-layer utilities — this upward dependency direction should be audited.
+- Zone "prd-analysis-pipeline" has files across 9 directories — consider consolidating under a dedicated directory
+- With 49 outbound imports to core and only 20 reverse imports (core → unit-analyze), the analysis pipeline is the closest to a true unidirectional consumer in the codebase — the 20 reverse imports are the only structural concern and should be audited to confirm they are not upward dependencies into analysis-specific logic.
+- prd-analysis-pipeline is the only large zone (>10 files) where coupling direction is predominantly downward — it should serve as the reference pattern when refactoring mutation-commands and remote-integration.
+- The 20 reverse imports from core into unit-analyze break the otherwise clean directional boundary; if any of these pull in analysis-pipeline-specific types or utilities, they represent an upward dependency that must be extracted into a shared schema or moved to the call site.
+- prd-analysis-pipeline → core is the healthiest cross-zone relationship in the codebase: high volume (49 imports), predominantly unidirectional, and cohesion-preserving. Use it as the benchmark when evaluating other zone pairs.
+- atomic-write.ts is correctly located in src/store/ — but CLI commands (analyze.ts, smart-add.ts) import it directly from the store layer rather than routing through a store service, creating a CLI→store internal coupling that bypasses the store abstraction boundary.
+- src/cli/commands/analyze.ts and src/cli/commands/smart-add.ts import atomic-write directly from the store layer internals rather than delegating file persistence to a store service or facade. CLI commands should not import store primitives directly.
+- unit-analyze → unit: 21 imports is the third-highest cross-zone import count in the package, yet it receives no dedicated attention in existing insights. This means prd-analysis-pipeline — the zone cited as the healthiest large zone — has a substantial hidden dependency on remote-integration (the zone with the worst cohesion). The health narrative for prd-analysis-pipeline is overstated: its clean unidirectional relationship with core coexists with 21 imports from the most structurally problematic zone in the package.
+- src/analyze/ contains two files (acknowledge.ts, consolidation-guard.ts) whose responsibilities belong to different layers — acknowledge.ts is a store-layer module and consolidation-guard.ts is a guard/validator — yet both are directory-co-located with analysis pipeline logic. The analyze/ directory has become a secondary catch-all for modules that do not fit the main store/ or core/ directories.
+- The 21 imports from prd-analysis-pipeline into remote-integration (unit-analyze → unit) are not flagged in any existing health summary despite being the third-largest cross-zone traffic path. Audit these 21 import sites to determine which remote-integration files are being consumed and whether those files should be moved to core to eliminate the dependency on the low-cohesion zone.
+- [call graph] 3099 internal calls, 326 outgoing, 41 incoming (cohesion: 0.9, coupling: 0.1)
 
 </insights>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  unit-analyze/cli → unit-analyze/unit: 11
-  unit-analyze/unit → unit-analyze/cli: 7
   unit-analyze/unit → unit-analyze/unit-2: 3
-  unit-analyze/unit → unit-analyze/unit-analyze: 5
+  unit-analyze/unit → unit-analyze/unit-analyze: 10
   unit-analyze/unit-2 → unit-analyze/unit: 6
-  unit-analyze/unit-analyze → unit-analyze/unit: 9
+  unit-analyze/unit-analyze → unit-analyze/unit: 1
+  unit-analyze/unit-cli → unit-analyze/unit: 2
+  unit-analyze/unit-cli → unit-analyze/unit-analyze: 1
 
 </sub-crossings>
 
@@ -319,10 +360,11 @@ Cross-dependencies between sub-zones:
 
 This zone has 4 sub-zone(s):
 
-- **Unit Analyze/cli** (`unit-analyze/cli`): 9 files, cohesion 0.55, coupling 0.45
-- **Unit Analyze/unit** (`unit-analyze/unit`): 41 files, cohesion 0.76, coupling 0.24
+- **Unit Analyze/unit** (`unit-analyze/unit`): 54 files, cohesion 0.91, coupling 0.09
+  - Has 4 nested sub-zone(s)
 - **Unit Analyze/unit 2** (`unit-analyze/unit-2`): 3 files, cohesion 1, coupling 0
-- **Unit Analyze/unit Analyze** (`unit-analyze/unit-analyze`): 7 files, cohesion 0.22, coupling 0.78
+- **Unit Analyze/unit Analyze** (`unit-analyze/unit-analyze`): 5 files, cohesion 0.18, coupling 0.82
+- **Unit Analyze/unit Cli** (`unit-analyze/unit-cli`): 11 files, cohesion 0.91, coupling 0.09
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

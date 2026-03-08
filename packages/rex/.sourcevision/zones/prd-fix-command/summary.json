@@ -1,0 +1,25 @@
+{
+  "id": "prd-fix-command",
+  "name": "PRD Fix Command",
+  "description": "The isolated fix operation: a CLI command, its core implementation, and co-located unit tests.",
+  "files": [
+    "src/cli/commands/fix.ts",
+    "src/core/fix.ts",
+    "tests/unit/cli/commands/fix.test.ts",
+    "tests/unit/core/fix.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/fix.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 4,
+  "lineCount": 1230,
+  "riskMetrics": {
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

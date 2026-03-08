@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web (`web`)
-Files: 7, Cohesion: 0.59, Coupling: 0.41
-Risk: healthy (score: 0.41)
-Description: 16 files, primarily TypeScript, Other, JavaScript
-Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/polling/tick-timer.ts, packages/web/src/viewer/route-state.ts, packages/web/src/viewer/views/task-audit.ts
+Files: 7, Cohesion: 0.33, Coupling: 0.67
+Risk: critical (score: 0.67)
+Description: 15 files, primarily TypeScript, Other, JavaScript
+Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/route-state.ts, packages/web/src/viewer/views/task-audit.ts
 Lines: 433
 
 </zone>
@@ -25,24 +25,16 @@ packages/web/vitest.config.ts (TypeScript, 33 lines, config)
 
 </files>
 
+<findings>
+
+[observation] [warning] Low cohesion (0.33) — files are loosely related, consider splitting this zone
+[suggestion] [warning] Zone "Web" (web) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development
+
+</findings>
+
 <insights>
 
-- The zone hint explicitly identifies that viewer files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are misplaced here alongside build.js and dev.js — these viewer files should be classified under web-viewer.
-- Cohesion of 0.59 reflects this structural mismatch: build scripts and UI components have different roles and should not share a community.
-- Once viewer entry points are correctly attributed to the web-viewer zone, this zone should collapse to a small, high-cohesion set of pure build/config files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts).
-- Viewer entry points (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are community-detected into this build-config zone but belong in web-viewer per the developer's zone hints — apply zone pins to correct the attribution.
-- Cohesion of 0.59 is above the low-cohesion warning threshold but reflects the structural mismatch between build scripts and UI components sharing a detected community.
-- build.js and dev.js are correctly identified as executable entrypoints (not static config); this distinction matters for CI tooling that scans for runnable scripts.
-- The 0.41 coupling coefficient is the highest in this batch and is entirely attributable to misclassified viewer files — once zone pins reclassify those files into web-viewer, this zone's coupling will drop to 0, making all zones in this batch ≤ 0.25.
-- The coupling in this zone is an artifact of classification error, not genuine architectural coupling between build infrastructure and UI components — this distinguishes it from 'real' coupling warnings elsewhere.
-- This zone's 0.41 coupling is a classification artifact: the viewer files that generate cross-zone imports do not logically belong here. Post-correction, this zone becomes a zero-coupling build config cluster, restoring the expected architectural shape.
-- The misattributed viewer files carry web-viewer→web-server import edges into this zone, making build infrastructure appear coupled to the server layer — a false positive that obscures the true dependency topology until zone pins are applied.
-- After zone pins move viewer files to web-viewer, the residual zone will contain only 5 build/config files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts). At this size, future Louvain runs may re-absorb these files into an adjacent zone — a zone pin should be applied to the build-config cluster itself, not just to the misattributed viewer files.
-- No zone pin stabilizes the build-config cluster itself — only the misattributed viewer files are candidates for pinning. After reclassification, the 5 remaining files have no import edges connecting them to each other, meaning Louvain has no structural signal to keep them together and may fragment or re-merge them incorrectly in subsequent analyses.
-- This zone is the only zone in the codebase with BOTH cohesion below 0.65 AND coupling above 0.30 simultaneously, making it the single highest-risk zone by the combined fragility criterion. Even though the coupling is identified as a classification artifact, the zone is currently in a fragile state and any analysis run before zone pins are applied will produce misleading health metrics.
-- SourceVision-F.png and SourceVision.png in this zone are logo assets, paralleling Hench-F.png/Hench.png in autonomous-agent. Both sets of logo assets are absorbed into their respective package code zones rather than the dedicated logo zone — this is a consistent misattribution pattern across two zones that a single logo-zone pin policy would resolve.
-- This is the only zone with both cohesion < 0.65 and coupling > 0.30 — the combined fragility criterion. While the coupling is a classification artifact, the zone will report as high-risk on every analysis run until zone pins are applied. Prioritize applying viewer-file zone pins before the next analysis cycle to eliminate the false-positive fragility signal.
-- SourceVision-F.png and SourceVision.png are logo assets misattributed to the build-config zone, matching the same pattern as Hench-F.png/Hench.png in autonomous-agent. Define a monorepo-wide zone-pin policy for all *-F.png and *.png logo assets to consistently route them to the logo zone regardless of which package directory they reside in.
+- Low cohesion (0.33) — files are loosely related, consider splitting this zone
 - [call graph] 21 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

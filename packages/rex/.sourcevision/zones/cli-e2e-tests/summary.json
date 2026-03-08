@@ -1,0 +1,32 @@
+{
+  "id": "cli-e2e-tests",
+  "name": "CLI End-to-End Tests",
+  "description": "Contains the full suite of end-to-end CLI tests covering adapter, analyze, import, prune, quiet mode, recommend, smart-add, sync, and other command paths.",
+  "files": [
+    "tests/e2e/cli-adapter.test.ts",
+    "tests/e2e/cli-analyze.test.ts",
+    "tests/e2e/cli-import.test.ts",
+    "tests/e2e/cli-prune.test.ts",
+    "tests/e2e/cli-quiet.test.ts",
+    "tests/e2e/cli-recommend.test.ts",
+    "tests/e2e/cli-smart-add.test.ts",
+    "tests/e2e/cli-sync.test.ts",
+    "tests/e2e/cli-workflow.test.ts",
+    "tests/e2e/fixtures/sample-prd/.rex/config.json",
+    "tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl",
+    "tests/e2e/fixtures/sample-prd/.rex/prd.json",
+    "tests/e2e/fixtures/sample-prd/.rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 13,
+  "lineCount": 2596,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

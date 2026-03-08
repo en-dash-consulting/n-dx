@@ -1,0 +1,32 @@
+{
+  "id": "packages-rex:data-persistence-validation",
+  "name": "Data Persistence & Validation",
+  "description": "The storage and integrity layer: file-based PRD adapter, schema validation, and the report command that surfaces store state.",
+  "files": [
+    "packages/rex/src/cli/commands/report.ts",
+    "packages/rex/src/schema/validate.ts",
+    "packages/rex/src/store/file-adapter.ts",
+    "packages/rex/tests/e2e/cli-init.test.ts",
+    "packages/rex/tests/unit/cli/commands/report.test.ts",
+    "packages/rex/tests/unit/schema/validate.test.ts",
+    "packages/rex/tests/unit/store/file-adapter.test.ts",
+    "packages/rex/tests/unit/store/store-contract.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/report.ts",
+    "packages/rex/src/schema/validate.ts",
+    "packages/rex/src/store/file-adapter.ts"
+  ],
+  "cohesion": 0.17,
+  "coupling": 0.83,
+  "fileCount": 8,
+  "lineCount": 2789,
+  "riskMetrics": {
+    "cohesion": 0.17,
+    "coupling": 0.83,
+    "riskScore": 0.83,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true,
+    "riskJustification": "After pinning report.ts to rex-status-mcp-cli and cli-init.test.ts to cli-e2e-tests, remaining files (file-adapter.ts, validate.ts, store-contract.test.ts) form a cohesive persistence + validation cluster. High coupling reflects legitimate dependencies on schema types and the store interface contract."
+  }
+}

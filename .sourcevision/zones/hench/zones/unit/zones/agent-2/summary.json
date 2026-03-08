@@ -1,20 +1,17 @@
 {
   "id": "hench/unit/agent-2",
   "name": "Hench/unit/agent 2",
-  "description": "6 files, primarily TypeScript",
+  "description": "3 files, primarily TypeScript",
   "files": [
-    "packages/hench/src/store/config.ts",
-    "packages/hench/tests/integration/store-roundtrip.test.ts",
-    "packages/hench/tests/unit/agent/atomic-transition.test.ts",
-    "packages/hench/tests/unit/agent/loop.test.ts",
-    "packages/hench/tests/unit/agent/task-failure.test.ts",
-    "packages/hench/tests/unit/store/project-config.test.ts"
+    "packages/hench/src/agent/lifecycle/token-usage.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+    "packages/hench/tests/unit/agent/token-usage.test.ts"
   ],
   "entryPoints": [
-    "packages/hench/src/store/config.ts"
+    "packages/hench/src/agent/lifecycle/token-usage.ts"
   ],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 6,
-  "lineCount": 999
+  "fileCount": 3,
+  "lineCount": 657
 }

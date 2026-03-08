@@ -1,20 +1,23 @@
 {
   "id": "hench/unit/agent-analysis",
   "name": "Hench/unit/agent Analysis",
-  "description": "5 files, primarily TypeScript",
+  "description": "7 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/review.ts",
     "packages/hench/src/agent/analysis/stuck.ts",
     "packages/hench/src/agent/index.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts",
     "packages/hench/tests/unit/agent/review.test.ts",
-    "packages/hench/tests/unit/agent/stuck.test.ts"
+    "packages/hench/tests/unit/agent/stuck.test.ts",
+    "packages/hench/tests/unit/agent/token-budget.test.ts"
   ],
   "entryPoints": [
     "packages/hench/src/agent/analysis/review.ts",
-    "packages/hench/src/agent/analysis/stuck.ts"
+    "packages/hench/src/agent/analysis/stuck.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts"
   ],
-  "cohesion": 0.27,
-  "coupling": 0.73,
-  "fileCount": 5,
-  "lineCount": 830
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 7,
+  "lineCount": 931
 }

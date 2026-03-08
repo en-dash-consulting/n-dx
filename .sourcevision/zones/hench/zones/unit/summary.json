@@ -1,7 +1,7 @@
 {
   "id": "hench/unit",
   "name": "Hench/unit",
-  "description": "125 files, primarily TypeScript",
+  "description": "116 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/review.ts",
@@ -16,9 +16,9 @@
     "packages/hench/src/agent/lifecycle/shared.ts",
     "packages/hench/src/agent/lifecycle/task-display.ts",
     "packages/hench/src/agent/lifecycle/token-budget.ts",
+    "packages/hench/src/agent/lifecycle/token-usage.ts",
     "packages/hench/src/agent/planning/brief.ts",
     "packages/hench/src/agent/planning/prompt.ts",
-    "packages/hench/src/agent/tools.ts",
     "packages/hench/src/cli/commands/config.ts",
     "packages/hench/src/cli/commands/constants.ts",
     "packages/hench/src/cli/commands/init.ts",
@@ -60,15 +60,8 @@
     "packages/hench/src/store/run-retention.ts",
     "packages/hench/src/store/runs.ts",
     "packages/hench/src/store/templates.ts",
-    "packages/hench/src/tools/contracts.ts",
-    "packages/hench/src/tools/dispatch.ts",
     "packages/hench/src/tools/exec-shell.ts",
-    "packages/hench/src/tools/files.ts",
-    "packages/hench/src/tools/git.ts",
-    "packages/hench/src/tools/index.ts",
     "packages/hench/src/tools/rex.ts",
-    "packages/hench/src/tools/shell.ts",
-    "packages/hench/src/tools/test-runner.ts",
     "packages/hench/src/types/index.ts",
     "packages/hench/src/types/output.ts",
     "packages/hench/tests/e2e/cli-init.test.ts",
@@ -92,6 +85,8 @@
     "packages/hench/tests/unit/agent/task-failure.test.ts",
     "packages/hench/tests/unit/agent/token-budget.test.ts",
     "packages/hench/tests/unit/agent/token-tracking.test.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+    "packages/hench/tests/unit/agent/token-usage.test.ts",
     "packages/hench/tests/unit/agent/workflow.test.ts",
     "packages/hench/tests/unit/cli/commands/config.test.ts",
     "packages/hench/tests/unit/cli/commands/constants.test.ts",
@@ -123,23 +118,20 @@
     "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
     "packages/hench/tests/unit/store/run-retention.test.ts",
     "packages/hench/tests/unit/store/templates.test.ts",
-    "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
-    "packages/hench/tests/unit/tools/files.test.ts",
-    "packages/hench/tests/unit/tools/git.test.ts",
-    "packages/hench/tests/unit/tools/rex.test.ts",
-    "packages/hench/tests/unit/tools/test-runner.test.ts"
+    "packages/hench/tests/unit/tools/rex.test.ts"
   ],
   "entryPoints": [
     "packages/hench/src/cli/commands/run.ts",
+    "packages/hench/src/prd/rex-gateway.ts",
     "packages/hench/src/process/index.ts",
-    "packages/hench/src/schema/index.ts",
+    "packages/hench/src/process/memory-monitor.ts",
     "packages/hench/src/schema/v1.ts",
     "packages/hench/src/store/config.ts",
-    "packages/hench/src/tools/rex.ts",
-    "packages/hench/src/tools/shell.ts"
+    "packages/hench/src/tools/exec-shell.ts",
+    "packages/hench/src/tools/rex.ts"
   ],
-  "cohesion": 0.97,
-  "coupling": 0.03,
-  "fileCount": 125,
-  "lineCount": 30580
+  "cohesion": 0.95,
+  "coupling": 0.05,
+  "fileCount": 116,
+  "lineCount": 29421
 }

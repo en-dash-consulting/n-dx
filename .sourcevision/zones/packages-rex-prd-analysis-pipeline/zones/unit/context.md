@@ -5,9 +5,9 @@
 <zone>
 
 Zone: Unit Analyze/unit (`unit-analyze/unit`)
-Files: 41, Cohesion: 0.76, Coupling: 0.24
-Description: 41 files, primarily TypeScript
-Entry points: src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts, src/analyze/index.ts, src/analyze/llm-bridge.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/scanners.ts, src/analyze/validate-modification.ts, src/cli/commands/analyze.ts, src/cli/commands/format-loe.ts, src/cli/commands/smart-add-duplicates.ts, src/cli/commands/smart-add.ts
+Files: 54, Cohesion: 0.91, Coupling: 0.09
+Description: 54 files, primarily TypeScript
+Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/extract.ts, src/analyze/file-validation.ts, src/analyze/index.ts, src/analyze/propose.ts, src/analyze/reason.ts, src/analyze/reshape-reason.ts, src/cli/commands/analyze.ts, src/cli/commands/prune.ts, src/cli/commands/reshape.ts, src/cli/commands/smart-add-duplicates.ts, src/cli/commands/smart-add.ts, src/core/reshape.ts, src/store/atomic-write.ts, src/store/project-config.ts
 Lines: 0
 
 </zone>
@@ -16,3 +16,29 @@ Lines: 0
 
 
 </files>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  unit-analyze/unit/analyze → unit-analyze/unit/analyze-2: 15
+  unit-analyze/unit/analyze → unit-analyze/unit/analyze-3: 3
+  unit-analyze/unit/analyze → unit-analyze/unit/cli: 5
+  unit-analyze/unit/analyze-2 → unit-analyze/unit/analyze: 5
+  unit-analyze/unit/analyze-3 → unit-analyze/unit/analyze: 4
+  unit-analyze/unit/analyze-3 → unit-analyze/unit/analyze-2: 5
+  unit-analyze/unit/cli → unit-analyze/unit/analyze: 20
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 4 sub-zone(s):
+
+- **Unit Analyze/unit/analyze** (`unit-analyze/unit/analyze`): 28 files, cohesion 0.57, coupling 0.43
+- **Unit Analyze/unit/analyze 2** (`unit-analyze/unit/analyze-2`): 7 files, cohesion 0.31, coupling 0.69
+- **Unit Analyze/unit/analyze 3** (`unit-analyze/unit/analyze-3`): 5 files, cohesion 1, coupling 0
+- **Unit Analyze/unit/cli** (`unit-analyze/unit/cli`): 14 files, cohesion 0.56, coupling 0.44
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

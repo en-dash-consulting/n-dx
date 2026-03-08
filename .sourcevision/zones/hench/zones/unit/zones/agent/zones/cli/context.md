@@ -5,23 +5,23 @@
 <zone>
 
 Zone: Hench/unit/agent/cli (`hench/unit/agent/cli`)
-Files: 9, Cohesion: 0.33, Coupling: 0.67
+Files: 9, Cohesion: 0.30, Coupling: 0.70
 Description: 9 files, primarily TypeScript
-Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/tools/rex.ts
-Lines: 4430
+Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/prd/rex-gateway.ts, packages/hench/src/tools/rex.ts
+Lines: 4476
 
 </zone>
 
 <files>
 
 packages/hench/src/agent/planning/brief.ts (TypeScript, 353 lines, source)
-packages/hench/src/cli/commands/run.ts (TypeScript, 1096 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 81 lines, source)
-packages/hench/src/tools/rex.ts (TypeScript, 254 lines, source)
+packages/hench/src/cli/commands/run.ts (TypeScript, 1118 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 91 lines, source)
+packages/hench/src/tools/rex.ts (TypeScript, 253 lines, source)
 packages/hench/tests/unit/agent/brief.test.ts (TypeScript, 1531 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic.test.ts (TypeScript, 529 lines, test)
-packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 90 lines, test)
+packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 105 lines, test)
 packages/hench/tests/unit/tools/rex.test.ts (TypeScript, 248 lines, test)
 
 </files>
@@ -30,11 +30,14 @@ packages/hench/tests/unit/tools/rex.test.ts (TypeScript, 248 lines, test)
 
 Internal:
   packages/hench/src/agent/planning/brief.ts → packages/hench/src/prd/rex-gateway.ts {findNextTask, findActionableTasks, collectCompletedIds, findItem, walkTree, collectRequirements, isWorkItem}
+  packages/hench/src/agent/planning/brief.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore, PRDItem, TreeEntry}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {collectEpicTaskIds}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {getActionableTasks, collectEpicTaskIds}
   packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {walkTree}
-  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {resolveStore, findNextTask, findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {resolveStore, findNextTask, findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {PRDItem, PRDStore}
   packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding}
+  packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore, PRDItem, ItemStatus, CommandExecutor}
   packages/hench/tests/unit/agent/brief.test.ts → packages/hench/src/agent/planning/brief.ts {formatTaskBrief, assembleTaskBrief, getActionableTasks, TaskNotActionableError, collectEpicTaskIds}
   packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {getOrderedEpics, printEpicByEpicSummary}
   packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicRunSummary, EpicScopeInfo}

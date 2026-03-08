@@ -1,0 +1,51 @@
+{
+  "id": "mutation-commands",
+  "name": "Mutation Commands",
+  "description": "CLI commands and supporting infrastructure for PRD mutation operations: move, remove, update, verify, adapter management, and the output/error formatting layer.",
+  "files": [
+    "src/cli/commands/adapter.ts",
+    "src/cli/commands/move.ts",
+    "src/cli/commands/remove.ts",
+    "src/cli/commands/update.ts",
+    "src/cli/commands/verify.ts",
+    "src/cli/errors.ts",
+    "src/cli/help.ts",
+    "src/cli/index.ts",
+    "src/cli/output.ts",
+    "src/cli/validate-input.ts",
+    "src/core/parent-completion.ts",
+    "src/core/parent-reset.ts",
+    "src/core/timestamps.ts",
+    "tests/unit/cli/commands/add.test.ts",
+    "tests/unit/cli/commands/move.test.ts",
+    "tests/unit/cli/commands/remove.test.ts",
+    "tests/unit/cli/commands/update.test.ts",
+    "tests/unit/cli/commands/verify.test.ts",
+    "tests/unit/cli/errors.test.ts",
+    "tests/unit/cli/help.test.ts",
+    "tests/unit/cli/output.test.ts",
+    "tests/unit/cli/validate-input.test.ts",
+    "tests/unit/core/parent-completion.test.ts",
+    "tests/unit/core/parent-reset.test.ts",
+    "tests/unit/core/timestamps.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/errors.ts",
+    "src/cli/output.ts",
+    "src/cli/validate-input.ts",
+    "src/core/parent-completion.ts",
+    "src/core/parent-reset.ts",
+    "src/core/timestamps.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 25,
+  "lineCount": 5662,
+  "riskMetrics": {
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "packages-rex:integration-schemas",
+  "name": "Integration Schemas",
+  "description": "Defines and exports the Zod/type schemas that describe the data shapes exchanged with external integrations (Jira, Notion) at the store boundary.",
+  "files": [
+    "packages/rex/src/store/integration-schemas/index.ts",
+    "packages/rex/src/store/integration-schemas/jira.ts",
+    "packages/rex/src/store/integration-schemas/notion.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/integration-schemas/index.ts",
+    "packages/rex/src/store/integration-schemas/jira.ts",
+    "packages/rex/src/store/integration-schemas/notion.ts"
+  ],
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 3,
+  "lineCount": 287,
+  "riskMetrics": {
+    "cohesion": 0.31,
+    "coupling": 0.69,
+    "riskScore": 0.69,
+    "riskLevel": "critical",
+    "failsThreshold": true,
+    "riskJustification": "After pinning notion.ts to notion-integration, this zone contains only jira.ts and its barrel index.ts. Low cohesion is inherent to a schema-only zone with no shared internal logic. When a Jira adapter is added, this zone should be reconsidered for merging into a jira-integration zone."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "integration-schemas",
+  "name": "Integration Schemas",
+  "description": "Defines and exports the Zod/type schemas that describe the data shapes exchanged with external integrations (Jira, Notion) at the store boundary.",
+  "files": [
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts"
+  ],
+  "entryPoints": [
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts"
+  ],
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 3,
+  "lineCount": 287,
+  "riskMetrics": {
+    "cohesion": 0.31,
+    "coupling": 0.69,
+    "riskScore": 0.69,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}
