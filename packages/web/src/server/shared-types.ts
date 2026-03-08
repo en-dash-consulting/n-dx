@@ -7,11 +7,24 @@
  * `CollectAllIdsFn` and `TaskUsageAccumulator` create implicit coupling
  * when one zone defines them and the other imports them directly.
  *
+ * ## Stability contract
+ *
+ * **@public** — These types form the cross-zone analytics contract.
+ * Breaking changes (field renames, type narrowing, removal) require
+ * coordinated updates in all consuming files:
+ *   - task-usage.ts, incremental-task-usage.ts (task-usage-analytics zone)
+ *   - usage-cleanup-scheduler.ts, register-scheduler.ts (web-dashboard zone)
+ *   - public.ts (package public API)
+ *
+ * Add new types freely. Modify existing types only with a grep for all
+ * import sites in `packages/web/src/server/`.
+ *
  * Rules:
  * - Types only — no runtime code, no side effects.
  * - Both zones import FROM here; neither zone re-exports these types.
  * - New cross-zone types should be added here rather than in leaf files.
  *
+ * @public
  * @module web/server/shared-types
  */
 

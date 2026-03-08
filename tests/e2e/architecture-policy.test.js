@@ -162,6 +162,87 @@ describe("architecture policy: intra-package layering", () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Orchestration-tier spawn-only enforcement
+// ---------------------------------------------------------------------------
+
+/**
+ * Orchestration-tier files (cli.js, web.js, ci.js) must not contain
+ * runtime imports from package internals. They should only spawn CLIs
+ * as child processes. config.js is the documented exception.
+ *
+ * Peer orchestration imports (cli.js importing from web.js, etc.) are
+ * allowed — they are all at the same tier level.
+ */
+const ORCHESTRATION_FILES = ["cli.js", "web.js", "ci.js"];
+
+/**
+ * Files at the orchestration tier that are allowed to be imported by
+ * other orchestration files (peer imports within the same tier).
+ */
+const ORCHESTRATION_PEERS = new Set([
+  "config.js",
+  "web.js",
+  "ci.js",
+  "help.js",
+  "refresh-plan.js",
+  "refresh-artifacts.js",
+  "refresh-validate.js",
+  "claude-integration.js",
+]);
+
+/**
+ * Pattern that matches import statements pulling from package directories.
+ * Captures: import/export … from "packages/…" or "./packages/…"
+ * Also catches: from "rex", from "sourcevision", from "hench",
+ * from "@n-dx/llm-client", from "@n-dx/web"
+ */
+const PACKAGE_IMPORT_PATTERN =
+  /(?:import|export)\s+.*\s+from\s+["'](?:\.\/)?packages\//;
+const DIRECT_PKG_IMPORT_PATTERN =
+  /(?:import|export)\s+.*\s+from\s+["'](?:rex|sourcevision|hench|@n-dx\/)/;
+
+describe("architecture policy: orchestration spawn-only rule", () => {
+  for (const file of ORCHESTRATION_FILES) {
+    it(`${file} does not import from package internals`, () => {
+      const fullPath = join(ROOT, file);
+      if (!existsSync(fullPath)) return; // skip if file doesn't exist
+
+      const content = readFileSync(fullPath, "utf-8");
+      const violations = [];
+
+      for (const [lineNum, line] of content.split("\n").entries()) {
+        // Skip comments
+        const trimmed = line.trim();
+        if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+
+        if (PACKAGE_IMPORT_PATTERN.test(line)) {
+          violations.push(`  line ${lineNum + 1}: ${trimmed}`);
+        }
+        if (DIRECT_PKG_IMPORT_PATTERN.test(line)) {
+          violations.push(`  line ${lineNum + 1}: ${trimmed}`);
+        }
+      }
+
+      if (violations.length > 0) {
+        expect.fail(
+          [
+            `${file} contains runtime imports from package internals.`,
+            "Orchestration-tier scripts must spawn CLIs, not import libraries.",
+            "See CLAUDE.md 'Tier boundary crossing' for the decision rule.",
+            "",
+            "Violations:",
+            ...violations,
+            "",
+            "To fix: use spawn() to invoke the package's CLI instead,",
+            "or move the logic to a peer orchestration module.",
+          ].join("\n"),
+        );
+      }
+    });
+  }
+});
+
 describe("architecture policy: process execution", () => {
   it("ALLOWED list contains no stale entries (all files exist on disk)", () => {
     const stale = [];

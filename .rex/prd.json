@@ -19885,6 +19885,142 @@
         },
         "findingCount": 12
       }
+    },
+    {
+      "id": "bc1247a4-d914-4971-af3f-94cb56913989",
+      "title": "Address observation issues (7 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Bidirectional coupling: \"task-usage-analytics\" ↔ \"web-dashboard\" (1+3 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- Low cohesion (0.27) — files are loosely related, consider splitting this zone\n- Cohesion 0.27 is below the healthy threshold — this zone is an import-graph residual grouping unrelated files (build scripts, a hench store module, viewer UI components) that do not share a domain purpose.\n- Coupling 0.73 exceeds the high-coupling threshold — the cross-package mixing of hench and web files artificially inflates the boundary surface; resolving the misclassifications should bring coupling down significantly.\n- packages/hench/src/store/suggestions.ts is grouped with web package files despite belonging to the hench store layer — this misclassification should be corrected so the hench agent zone fully captures its own store.\n- 11 entry points — wide API surface, consider consolidating exports",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "3a7c4a7768da",
+          "3a82920140f7",
+          "c11c699653bb",
+          "10857b80a8cd",
+          "066f7ee93d5d",
+          "d299ef6f2a45",
+          "606920a99dff"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 7
+        },
+        "findingCount": 7
+      }
+    },
+    {
+      "id": "eda8459d-58bd-4c57-818f-7c60f011b211",
+      "title": "Address suggestion issues (21 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Define a maximum-scope policy for rex-gateway.ts: document which categories of rex API are in-scope for re-export (task selection, store read/write) and which are explicitly out-of-scope. Without this, the gateway will grow to mirror the entire rex public API as new hench features are added, defeating its purpose as a narrow boundary.\n- Dissolving this zone is a prerequisite for any coupling trend analysis to be meaningful across the web package — the 0.73 coupling score conflates two independent architectural signals (hench-store misclassification and viewer-component placement) into one metric that cannot be acted on without disambiguation.\n- Zone \"Web Build Infrastructure\" (web-build-infrastructure) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention\n- concurrent-execution-metrics.ts name implies it tracks hench agent execution concurrency. Verify this file does not import from the hench package — such an import would violate the four-tier hierarchy (web is domain tier, hench is execution tier, domain must not import from execution).\n- Add integration tests at the monorepo root that validate spawn call sites in cli.js against the actual CLI argument parsers of each sub-package. Currently, a breaking CLI argument change in rex or sourcevision would only be caught at runtime, not in CI.\n- Document the decision rule for crossing tier boundaries in CLAUDE.md: when should a new cross-package relationship use spawn isolation (orchestration→domain) vs a gateway module (hench→rex pattern)? The current documentation describes both mechanisms but provides no guidance on which to choose for a new use case.\n- The HTTP MCP transport endpoints (/mcp/rex, /mcp/sourcevision) introduced per CLAUDE.md are the recommended integration path for Claude Code but have zero test coverage at any level (unit, integration, or e2e). Add at minimum one integration test validating session creation and one e2e test validating tool call round-trips before treating HTTP transport as production-ready.\n- The spawn-only rule for orchestration-tier scripts (cli.js, web.js, ci.js, config.js exception documented) has no automated enforcement. Add a static check — either an eslint rule or an extension to architecture-policy.test.js — that fails if orchestration-tier files contain runtime imports from package internals other than the documented config.js exception.\n- 7 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:rex-mcp-service-layer, packages-rex:prd-fix-operations, web-build-infrastructure, packages-sourcevision:zone-detection-engine, packages-rex:prd-schema-foundation, packages-rex:prd-domain-operations, packages-rex:remote-sync-adapters — mandatory refactoring recommended before further development\n- Add an e2e test for the complete MCP HTTP workflow: start server, verify /mcp/rex and /mcp/sourcevision respond to tool calls, stop server. This is the recommended transport per CLAUDE.md but has no e2e coverage, meaning regressions in the HTTP MCP layer are invisible to the test suite.\n- Add an integration test for the HTTP MCP transport contract: verify that /mcp/rex and /mcp/sourcevision endpoints respond correctly, that Mcp-Session-Id header is returned on session creation, and that tool calls return valid JSON-RPC responses. This contract currently has zero test coverage at the integration boundary.\n- Add an integration test for the rex analyze → sourcevision output consumption flow: verify that rex's analyze command correctly reads and parses .sourcevision/CONTEXT.md and inventory files produced by sourcevision analyze. This is the highest-frequency cross-package data contract and is currently untested at the integration level.\n- Define and document a concurrency contract for the four orchestration entry points: which commands are safe to run in parallel and which require exclusive access to shared state files. Without this, concurrent CI + dev-server runs are a silent data-corruption risk.\n- Add a top-level `schemaVersion` field to prd.json and config.json (and validate it on read). Without a version sentinel, a user upgrading rex with a breaking schema change will receive an opaque parse error rather than a clear migration prompt.\n- The zone exports types through shared-types.ts directly rather than through a gateway module. As the web package grows, add a thin re-export gateway (analytics-gateway.ts) in web-dashboard that proxies analytics types, mirroring the rex-gateway.ts and domain-gateway.ts pattern already established in the codebase.\n- Zone \"Rex Mcp Service Layer\" (packages-rex:rex-mcp-service-layer) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: 0.78) — requires immediate architectural intervention\n- Zone \"Prd Fix Operations\" (packages-rex:prd-fix-operations) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention\n- Zone \"Zone Detection Engine\" (packages-sourcevision:zone-detection-engine) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention\n- Zone \"Prd Schema Foundation\" (packages-rex:prd-schema-foundation) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development\n- Zone \"Prd Domain Operations\" (packages-rex:prd-domain-operations) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development\n- Zone \"Remote Sync Adapters\" (packages-rex:remote-sync-adapters) has critical risk (score: 0.61, cohesion: 0.39, coupling: 0.61) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-08T17:57:51.793Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "d6880f504dff",
+          "ae4991365be0",
+          "b2a06544e28c",
+          "873608d723a9",
+          "ea39bf00a30d",
+          "7a681fa6f496",
+          "42ae98f205a3",
+          "18095305efa3",
+          "75b6ec3f9e9f",
+          "e4777ae4df28",
+          "28be67313ba3",
+          "ee35967a5af7",
+          "229a3233fc90",
+          "598f9cc4a793",
+          "28b6f2cdb596",
+          "2b94c960c2ac",
+          "08b3b16243f5",
+          "c099259ebea7",
+          "638da8d8eb92",
+          "8c02d33b72bd",
+          "4b8cf7025763"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 17,
+          "critical": 4
+        },
+        "findingCount": 21
+      },
+      "completedAt": "2026-03-08T18:03:51.024Z"
+    },
+    {
+      "id": "37c37dde-4887-48a0-97cc-6f99eaf0f386",
+      "title": "Address pattern issues (2 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- The data-layer contract (never imported at runtime) is convention-only. Consider adding a lint rule or CI check that asserts no `.ts`/`.js` source file contains an import path resolving into `.rex/` to make the contract machine-enforceable rather than doc-only.\n- The cleanup scheduler (usage-cleanup-scheduler.ts) is a stateful process-level concern but is absent from monorepo-integration-tests — if the scheduler interacts with rex or sourcevision stores at startup, that contract is currently untested at the integration boundary",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "aac0ffe7f4cb",
+          "670e1786e5e6"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 2
+        },
+        "findingCount": 2
+      }
+    },
+    {
+      "id": "d8e50c7c-d2a3-40df-aaee-9e67380fc676",
+      "title": "Address relationship issues (3 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- docs/architecture/ files are referenced from CLAUDE.md but have no automated freshness check. If architectural decisions change (e.g. the four-tier hierarchy evolves or gateway rules shift), these documents will silently become stale without any tooling signal.\n- The co-location of packages/hench/src/store/suggestions.ts with web package files in this zone creates a false import-graph edge between the hench and web tiers. Any zone-coupling metric that includes this zone will over-report cross-tier coupling until suggestions.ts is reassigned to hench-agent.\n- The single usage→web-dashboard import is the only dependency that flows against the expected data-consumer direction (viewer should pull from analytics, not the reverse); verify this import is not a hidden circular initialization dependency",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "91f3ba9527fb",
+          "80c032628054",
+          "a9d09aa871be"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 3
+        },
+        "findingCount": 3
+      }
+    },
+    {
+      "id": "3010ce31-28c9-42c4-b918-07b6a8a1613b",
+      "title": "Address anti-pattern issues (7 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- architecture-policy.test.js is a single point of failure for four-tier hierarchy enforcement. If this file is skipped, broken, or omitted from a CI run, cross-tier import violations can merge undetected. The policy should be backed by at least one redundant mechanism (e.g. an eslint import boundary rule or a dedicated CI step that runs before package tests).\n- Only 2 integration test files exist at the monorepo boundary. As cross-package interactions grow (rex↔sourcevision data flow, hench↔rex task selection, web↔rex MCP contract), the integration ring has no mechanism to enforce proportional growth — unlike the e2e suite which has an architecture-policy guard. A test coverage policy for cross-package contracts is absent.\n- The two-phase pending-proposals.json → acknowledged-findings.json workflow has no crash-recovery sentinel. A tool run that terminates between the two writes leaves both files in an inconsistent state with no machine-detectable signal. This is a data-integrity gap that could cause silent PRD corruption on restart.\n- shared-types.ts defines types consumed cross-zone by web-dashboard but lives inside the analytics zone with no explicit export contract. Consumers reach into zone-internal types rather than through a stable interface boundary, making the contract implicit and fragile if the zone is ever refactored.\n- The phantom zone's 0.73 coupling score is being counted in aggregate web-package health metrics. Any CI gate or automated report that sums or averages zone coupling will treat the web package as unhealthy due solely to a community-detection artifact, not a real architectural problem. This false signal may cause teams to ignore legitimate future coupling regressions because the baseline is already flagged.\n- Zone mixes Node.js server code and browser Preact viewer code in a single zone. These two sub-environments are mutually exclusive at runtime — Node modules (http, fs) cannot load in the browser and vice versa. A split into web-server and web-viewer sub-zones would enforce the runtime boundary structurally, not just by convention.\n- God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 34 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-08T17:45:09.198Z",
+      "completedAt": "2026-03-08T17:57:01.166Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "4c385be769f8",
+          "fd877d96c76c",
+          "4f61bee422c0",
+          "4f237842f6a6",
+          "a02102876b62",
+          "c0cd4002b25a",
+          "486aefc7b2f8"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "critical": 1,
+          "warning": 6
+        },
+        "findingCount": 7
+      }
     }
   ]
 }

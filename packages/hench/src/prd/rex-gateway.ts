@@ -42,6 +42,37 @@
  *    gateway (cli/commands/run.ts, agent/planning/brief.ts,
  *    tools/rex.ts). Each imports only the subset it needs.
  *
+ * ## Maximum-scope policy
+ *
+ * This gateway intentionally limits its surface to the rex APIs that
+ * hench needs for its core mission: picking a task, running an agent
+ * loop, and recording the result. Categories explicitly in-scope and
+ * out-of-scope are listed below. New re-exports must fit an in-scope
+ * category — if they don't, the feature should be reconsidered or the
+ * policy updated with a documented rationale.
+ *
+ * **In-scope (re-export permitted):**
+ * - Schema version contract (read/validate prd.json compatibility)
+ * - Store factory (open a PRDStore for reading/writing)
+ * - Tree traversal (findItem, walkTree — locate items in the tree)
+ * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
+ * - Timestamp computation (status change timestamps)
+ * - Parent auto-completion (bubble-up completion when children finish)
+ * - Requirements validation (verify task acceptance criteria)
+ * - Level helpers (isRootLevel, isWorkItem — classify items)
+ * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
+ *
+ * **Out-of-scope (must NOT be re-exported):**
+ * - PRD mutation (insertChild, updateInTree, removeFromTree — hench
+ *   mutates via rex MCP tools, not direct tree manipulation)
+ * - Analytics & health (computeEpicStats, computeHealthScore — these
+ *   serve the dashboard/UI, not the agent loop)
+ * - Merge/consolidation (validateMerge, mergeItems — user-facing operations)
+ * - Reorganize/reshape (detectReorganizations, applyReshape — LLM-powered
+ *   restructuring is an interactive workflow, not an agent concern)
+ * - MCP server factory (createRexMcpServer — web-tier concern only)
+ * - Domain constants (PRIORITY_ORDER, LEVEL_HIERARCHY — UI display aids)
+ *
  * **Type-only** imports (`import type { PRDStore, … }`) must also
  * flow through this gateway to prevent the type-import promotion
  * erosion path — a type import can be promoted to a runtime import

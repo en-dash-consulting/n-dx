@@ -60,6 +60,39 @@ Rules:
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
 
+### Tier boundary crossing: spawn vs gateway
+
+When a new feature requires crossing a tier boundary, use this decision rule:
+
+| Signal | Use spawn (child process) | Use gateway module (direct import) |
+|--------|--------------------------|-----------------------------------|
+| Caller tier | Orchestration (cli.js, ci.js, web.js) | Execution or Domain |
+| Data flow | Fire-and-forget or exit-code only | Structured return values needed in-process |
+| Frequency | Per-command (once per CLI invocation) | Per-request (hot path, many calls per second) |
+| Error handling | Exit code + stderr is sufficient | Caller needs typed errors, retries, or partial results |
+| State sharing | None (each spawn is stateless) | Shared in-memory state (e.g. PRDStore instance) |
+
+**Rules of thumb:**
+- Orchestration-tier scripts **always spawn** — they must not `import` from packages (exception: `config.js` for cross-package config reads).
+- If the consumer is a library (hench, web), use a **gateway module** to keep the import surface explicit and auditable.
+- If in doubt, prefer spawn — it provides stronger isolation and can always be replaced with a gateway later if performance requires it.
+
+### Concurrency contract
+
+The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) share mutable state files on disk. Concurrent execution rules:
+
+| Command pair | Safe? | Notes |
+|-------------|-------|-------|
+| `ndx start` + `ndx status` | ✅ | Status is read-only |
+| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`, server reads `.rex/prd.json` — no conflict |
+| `ndx start` + `ndx plan` | ⚠️ | Plan writes `.rex/prd.json` which the server reads — server may see partial writes. Restart server after plan. |
+| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` and `.rex/prd.json` concurrently |
+| `ndx plan` + `ndx work` | ❌ | Both write `.rex/prd.json` — data corruption risk |
+| `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
+| `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
+
+**General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+
 ### Package conventions
 
 | Convention | Pattern | Notes |
