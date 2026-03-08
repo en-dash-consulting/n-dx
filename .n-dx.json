@@ -39,16 +39,36 @@
         "packages/web/src/viewer/polling/tick-timer.ts": "web-dashboard",
         "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-dashboard",
         "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts": "web-dashboard",
-        "scripts/hench-callgraph-analysis.mjs": "monorepo-maintenance-scripts"
+        "scripts/hench-callgraph-analysis.mjs": "monorepo-maintenance-scripts",
+
+        "packages/rex/src/store/integration-schemas/notion.ts": "notion-integration",
+
+        "packages/rex/src/cli/commands/report.ts": "rex-status-mcp-cli",
+        "packages/rex/tests/unit/cli/commands/report.test.ts": "rex-status-mcp-cli",
+        "packages/rex/tests/e2e/cli-init.test.ts": "cli-e2e-tests",
+
+        "packages/rex/src/core/move.ts": "prd-operations-core",
+        "packages/rex/tests/unit/core/move.test.ts": "prd-operations-core",
+        "packages/rex/src/analyze/acknowledge.ts": "prd-operations-core",
+        "packages/rex/tests/unit/analyze/acknowledge.test.ts": "prd-operations-core",
+        "packages/rex/src/recommend/types.ts": "prd-operations-core",
+        "packages/rex/src/recommend/create-from-recommendations.ts": "prd-operations-core",
+
+        "packages/rex/src/cli/commands/recommend.ts": "mutation-commands",
+        "packages/rex/tests/unit/cli/commands/recommend.test.ts": "mutation-commands",
+        "packages/rex/src/cli/commands/sync.ts": "mutation-commands",
+        "packages/rex/tests/unit/cli/commands/sync.test.ts": "mutation-commands",
+
+        "packages/rex/src/cli/commands/constants.ts": "rex-runtime-data"
       }
     },
     "riskJustifications": [
       {
-        "zone": "packages-rex:unit-core",
-        "reason": "Test-dominated zone (5 test files for 2 source files). High coupling is inherent: test files import store, types, and fixtures from across rex. The CLI command + core next-task logic are cohesive; the apparent low cohesion is an artifact of test files having many external imports. No refactoring would reduce coupling without splitting tests from source."
+        "zone": "packages-rex:task-selection-engine",
+        "reason": "Test-dominated zone (5 test files for 2 source files). High coupling is inherent: test files import store, types, and fixtures from across rex. The CLI command + core next-task logic are cohesive; the apparent low cohesion is an artifact of test files having many external imports. Production-level call graph shows cohesion 0.95, coupling 0.05. No refactoring would reduce coupling without splitting tests from source."
       },
       {
-        "zone": "packages-rex:unit-cli",
+        "zone": "packages-rex:prd-fix-command",
         "reason": "Test-dominated zone (2 test files for 2 source files). The fix CLI command and core fix logic form a natural pair. High coupling is driven by test imports of store, validation, and type modules. Structurally sound — the zone boundary correctly groups the feature's implementation and tests."
       },
       {
@@ -56,8 +76,8 @@
         "reason": "Core zone analysis engine (Louvain algorithm, zone detection, zone hashing) with 3 test files. High coupling is expected: these files import inventory types, import graph types, and shared utilities that are fundamental to the analysis pipeline. The files are tightly cohesive in purpose — splitting them would create artificial boundaries in the zone detection pipeline."
       },
       {
-        "zone": "packages-rex:unit",
-        "reason": "Large cross-cutting zone spanning analyze/ and recommend/ subsystems (19 files). High coupling reflects shared dependencies on store, types, and LLM client. The analyze and recommend features are functionally related (recommendations feed into analysis proposals). Splitting would not improve cohesion — the Louvain algorithm correctly identified these as a community."
+        "zone": "packages-rex:prd-analysis-pipeline",
+        "reason": "Large cross-cutting zone spanning analyze/ and recommend/ subsystems. High coupling reflects shared dependencies on store, types, and LLM client. The analyze and recommend features are functionally related (recommendations feed into analysis proposals). Splitting would not improve cohesion — the Louvain algorithm correctly identified these as a community."
       },
       {
         "zone": "global",
@@ -71,6 +91,30 @@
       {
         "zone": "web-build-infrastructure",
         "reason": "Low cohesion (0.33) and high coupling (0.67) are artifacts of misclassified viewer files. Zone pins have been corrected to assign elapsed-time.ts, route-state.ts, and task-audit.ts to web-dashboard. After re-analysis, this zone will collapse to a pure build-config cluster (build.js, dev.js, package.json, tsconfig.json) with no cross-zone coupling."
+      },
+      {
+        "zone": "packages-rex:notion-integration",
+        "reason": "Cohesion 0.14 is a zone-size artifact: with only 2 production files (notion-map.ts, notion-adapter.ts) plus their Notion schema, the ratio of internal to external imports is inherently low. The files form a tight functional unit — notion-map provides bidirectional mapping consumed exclusively by notion-adapter. Pin of integration-schemas/notion.ts reunites the Notion contract in a single zone. Physical relocation of notion-map.ts from core/ to store/ colocates it with its sole consumer."
+      },
+      {
+        "zone": "packages-rex:data-persistence-validation",
+        "reason": "After pinning report.ts to rex-status-mcp-cli and cli-init.test.ts to cli-e2e-tests, remaining files (file-adapter.ts, validate.ts, store-contract.test.ts) form a cohesive persistence + validation cluster. High coupling reflects legitimate dependencies on schema types and the store interface contract."
+      },
+      {
+        "zone": "packages-rex:remote-integration",
+        "reason": "After pinning tree/DAG primitives to prd-operations-core, acknowledge.ts to prd-operations-core, recommend types/creators to prd-operations-core, and CLI commands to mutation-commands, the zone contracts to its true domain: remote adapter registry, Notion client, sync engine, and conflict detection. Remaining coupling is expected for integration infrastructure."
+      },
+      {
+        "zone": "packages-rex:integration-schemas",
+        "reason": "After pinning notion.ts to notion-integration, this zone contains only jira.ts and its barrel index.ts. Low cohesion is inherent to a schema-only zone with no shared internal logic. When a Jira adapter is added, this zone should be reconsidered for merging into a jira-integration zone."
+      },
+      {
+        "zone": "packages-rex:mutation-commands",
+        "reason": "CLI mutation command handlers (add, move, remove, update, verify, recommend, sync) with shared infrastructure (errors.ts, output.ts, validate-input.ts). High coupling is expected: commands import from core/, schema/, and store/ to perform mutations. After absorbing recommend.ts and sync.ts commands, the zone has a clear purpose: all user-facing write operations."
+      },
+      {
+        "zone": "packages-rex:rex-status-mcp-cli",
+        "reason": "Read-only CLI commands (status, health, usage, report) and MCP tool definitions. After absorbing report.ts and pinning constants.ts to rex-runtime-data, the zone focuses on query/display operations. Remaining coupling reflects legitimate dependencies on core stats, health checks, and token usage modules."
       }
     ]
   }

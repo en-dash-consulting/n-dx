@@ -35,3 +35,25 @@ together route handlers.
 `packages/rex/src/schema/index.ts` has high fan-in by design. It is the single
 public surface for rex's type definitions and domain constants. The stability
 contract is documented in its docblock.
+
+## Rex zone refactoring (notion-integration, remote-integration, etc.)
+
+The Notion integration code is colocated in `packages/rex/src/store/`:
+- `notion-map.ts` — bidirectional mapping between PRD items and Notion pages
+- `notion-adapter.ts` — Notion database adapter implementing PRDStore
+- `integration-schemas/notion.ts` — Notion schema definitions
+These three files form a single "notion-integration" zone.
+
+The remote-integration zone should focus on remote sync infrastructure:
+- `store/adapter-registry.ts`, `store/integration-schema.ts`, `store/notion-client.ts`
+- `core/dag.ts`, `core/canonical.ts`, `core/tree.ts` (when used for sync)
+- Sync engine and conflict detection modules
+
+Files like `core/move.ts`, `analyze/acknowledge.ts`, and `recommend/types.ts`
+are PRD operations core — they serve the entire package, not just remote sync.
+
+CLI commands `recommend.ts` and `sync.ts` are mutation commands (write operations),
+not remote infrastructure. `report.ts` is a read-only status display command.
+
+`constants.ts` is a foundation-level shared module with 7-zone fan-out — it
+belongs in rex-runtime-data, not in any feature-specific zone.

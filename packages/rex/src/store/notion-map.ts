@@ -21,7 +21,7 @@ import type {
   Priority,
 } from "../schema/index.js";
 import { SCHEMA_VERSION, isRootLevel } from "../schema/index.js";
-import { walkTree } from "./tree.js";
+import { walkTree } from "../core/tree.js";
 
 // ---------------------------------------------------------------------------
 // Notion property shapes (minimal types for the API subset we use)
