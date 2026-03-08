@@ -44,12 +44,10 @@ import {
 } from "../../../../rex/src/schema/v1.js";
 
 // Gateway re-exports (should be identical references)
+// Only symbols that are actually re-exported by the trimmed gateway
 import {
-  PRIORITY_ORDER as GATEWAY_PRIORITY_ORDER,
   LEVEL_HIERARCHY as GATEWAY_LEVEL_HIERARCHY,
-  VALID_LEVELS as GATEWAY_VALID_LEVELS,
   VALID_STATUSES as GATEWAY_VALID_STATUSES,
-  VALID_PRIORITIES as GATEWAY_VALID_PRIORITIES,
   VALID_REQUIREMENT_CATEGORIES as GATEWAY_VALID_REQ_CATEGORIES,
   VALID_VALIDATION_TYPES as GATEWAY_VALID_VALIDATION_TYPES,
   CHILD_LEVEL as GATEWAY_CHILD_LEVEL,
@@ -57,37 +55,24 @@ import {
   isItemLevel as gatewayIsItemLevel,
   isRequirementCategory as gatewayIsReqCategory,
   isValidationType as gatewayIsValidationType,
-  resolveStore as gatewayResolveStore,
 } from "../../../src/server/rex-gateway.js";
-
-// Canonical store exports from Rex
-import { resolveStore as canonicalResolveStore } from "../../../../rex/src/store/index.js";
 
 describe("Gateway re-exports are identical to canonical", () => {
   /**
    * Since the gateway re-exports directly from rex, these should be
    * the exact same references. This test guards against accidental
    * re-introduction of local duplicates in the gateway.
+   *
+   * Only symbols actually consumed by web production code are re-exported
+   * through the gateway — see rex-gateway.ts for the full list.
    */
-
-  it("PRIORITY_ORDER is same reference", () => {
-    expect(GATEWAY_PRIORITY_ORDER).toBe(CANONICAL_PRIORITY_ORDER);
-  });
 
   it("LEVEL_HIERARCHY is same reference", () => {
     expect(GATEWAY_LEVEL_HIERARCHY).toBe(CANONICAL_LEVEL_HIERARCHY);
   });
 
-  it("VALID_LEVELS is same reference", () => {
-    expect(GATEWAY_VALID_LEVELS).toBe(CANONICAL_VALID_LEVELS);
-  });
-
   it("VALID_STATUSES is same reference", () => {
     expect(GATEWAY_VALID_STATUSES).toBe(CANONICAL_VALID_STATUSES);
-  });
-
-  it("VALID_PRIORITIES is same reference", () => {
-    expect(GATEWAY_VALID_PRIORITIES).toBe(CANONICAL_VALID_PRIORITIES);
   });
 
   it("VALID_REQUIREMENT_CATEGORIES is same reference", () => {
@@ -116,10 +101,6 @@ describe("Gateway re-exports are identical to canonical", () => {
 
   it("isValidationType is same reference", () => {
     expect(gatewayIsValidationType).toBe(canonicalIsValidationType);
-  });
-
-  it("resolveStore is same reference", () => {
-    expect(gatewayResolveStore).toBe(canonicalResolveStore);
   });
 });
 
