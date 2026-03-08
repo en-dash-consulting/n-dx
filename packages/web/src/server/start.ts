@@ -9,7 +9,7 @@ import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
-import { handleRexRoute, shutdownRexExecution } from "./routes-rex.js";
+import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";

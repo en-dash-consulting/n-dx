@@ -42,7 +42,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 });
 
 // Import AFTER mock registration
-import { handleRexRoute } from "../../src/server/routes-rex.js";
+import { handleRexRoute } from "../../src/server/routes-rex/index.js";
 import type { ServerContext } from "../../src/server/types.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────

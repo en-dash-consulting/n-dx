@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ServerContext, ViewerScope } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
-import { handleRexRoute } from "../../../src/server/routes-rex.js";
+import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
 import { jsonResponse } from "../../../src/server/types.js";
 
