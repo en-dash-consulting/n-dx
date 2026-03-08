@@ -1,0 +1,22 @@
+{
+  "id": "unit-analyze/unit-analyze",
+  "name": "Unit Analyze/unit Analyze",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "src/analyze/extract.ts",
+    "src/analyze/file-validation.ts",
+    "tests/unit/analyze/extract-llm-mock.test.ts",
+    "tests/unit/analyze/extract-llm.test.ts",
+    "tests/unit/analyze/extract-text.test.ts",
+    "tests/unit/analyze/extract.test.ts",
+    "tests/unit/analyze/file-validation.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyze/extract.ts",
+    "src/analyze/file-validation.ts"
+  ],
+  "cohesion": 0.22,
+  "coupling": 0.78,
+  "fileCount": 7,
+  "lineCount": 0
+}

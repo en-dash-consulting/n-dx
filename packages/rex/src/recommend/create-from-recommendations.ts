@@ -63,6 +63,18 @@ export interface SkippedRecommendation {
 }
 
 /**
+ * A recommendation that updated an existing pending item in-place.
+ */
+export interface UpdatedRecommendation {
+  /** Index of the recommendation in the original input array. */
+  index: number;
+  /** Title of the recommendation. */
+  title: string;
+  /** ID of the existing item that was updated. */
+  existingItemId: string;
+}
+
+/**
  * A recommendation that was reparented as a child of a completed item.
  */
 export interface ReparentedRecommendation {
@@ -93,6 +105,8 @@ export interface CreationResult {
   }>;
   /** Recommendations that were skipped due to conflicts (only with skip strategy). */
   skipped?: SkippedRecommendation[];
+  /** Recommendations that updated existing pending items in-place. */
+  updated?: UpdatedRecommendation[];
   /** Recommendations reparented as children of completed items. */
   reparented?: ReparentedRecommendation[];
   /** Full conflict report when conflict detection was run. */
@@ -199,6 +213,7 @@ export async function createItemsFromRecommendations(
   let conflictReport: ConflictReport | undefined;
   let effectiveRecommendations = recommendations;
   const skipped: SkippedRecommendation[] = [];
+  const updated: UpdatedRecommendation[] = [];
   const reparented: ReparentedRecommendation[] = [];
 
   if (strategy !== "force") {
@@ -222,7 +237,7 @@ export async function createItemsFromRecommendations(
         );
       }
 
-      // strategy === "skip": split completed-item conflicts (reparent) from active conflicts (skip)
+      // strategy === "skip": split conflicts into update / reparent / skip
       const reparentedRecs: EnrichedRecommendation[] = [];
 
       for (const idx of conflictReport.conflictingIndices) {
@@ -233,6 +248,28 @@ export async function createItemsFromRecommendations(
         const intraDup = conflictReport.intraBatchDuplicates.find(
           (d) => d.indexB === idx,
         );
+
+        // Pending-item conflicts from same source: update in-place rather than
+        // skipping. Recommendation items are refreshed each run with updated
+        // findings — the existing pending item should reflect the latest data.
+        if (
+          conflict &&
+          conflict.matchedItem.status === "pending" &&
+          rec.source
+        ) {
+          const matched = findItem(doc.items, conflict.matchedItem.id);
+          if (matched && matched.item.source === rec.source) {
+            matched.item.description = rec.description;
+            matched.item.priority = rec.priority;
+            if (rec.meta) matched.item.recommendationMeta = rec.meta;
+            updated.push({
+              index: idx,
+              title: rec.title,
+              existingItemId: conflict.matchedItem.id,
+            });
+            continue;
+          }
+        }
 
         // Completed-item conflicts: reparent as child (if level allows demotion
         // AND the matched item's level is a valid parent for the demoted level)
@@ -275,7 +312,20 @@ export async function createItemsFromRecommendations(
       ];
 
       if (effectiveRecommendations.length === 0) {
+        // Even with no new items to create, we may have updated existing items
+        if (updated.length > 0) {
+          await store.saveDocument(doc);
+          for (const u of updated) {
+            await store.appendLog({
+              timestamp: new Date().toISOString(),
+              event: "item_updated",
+              itemId: u.existingItemId,
+              detail: `Updated ${u.title} from recommendation refresh`,
+            });
+          }
+        }
         const result: CreationResult = { created: [], skipped, conflictReport };
+        if (updated.length > 0) result.updated = updated;
         if (reparented.length > 0) result.reparented = reparented;
         return result;
       }
@@ -344,7 +394,7 @@ export async function createItemsFromRecommendations(
   // 7. Persist atomically — single write for all items
   await store.saveDocument(doc);
 
-  // 8. Log creation events
+  // 8. Log creation and update events
   const created: CreationResult["created"] = [];
   for (const { item, parentId } of pending) {
     await store.appendLog({
@@ -360,9 +410,18 @@ export async function createItemsFromRecommendations(
       parentId,
     });
   }
+  for (const u of updated) {
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "item_updated",
+      itemId: u.existingItemId,
+      detail: `Updated ${u.title} from recommendation refresh`,
+    });
+  }
 
   const result: CreationResult = { created };
   if (skipped.length > 0) result.skipped = skipped;
+  if (updated.length > 0) result.updated = updated;
   if (reparented.length > 0) result.reparented = reparented;
   if (conflictReport) result.conflictReport = conflictReport;
   return result;

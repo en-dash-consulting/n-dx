@@ -19635,10 +19635,12 @@
         {
           "id": "365d6811-7d94-481c-91ca-d8e215f7ec58",
           "title": "Decompose cmdStatus into focused rendering functions",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "cmdStatus in status.ts is 518 lines calling 36 functions. Extract tree rendering, coverage formatting, budget warnings, and auto-complete suggestions into focused helpers.",
-          "priority": "low"
+          "priority": "low",
+          "startedAt": "2026-03-08T05:30:56.334Z",
+          "completedAt": "2026-03-08T05:37:45.266Z"
         }
       ],
       "recommendationMeta": {

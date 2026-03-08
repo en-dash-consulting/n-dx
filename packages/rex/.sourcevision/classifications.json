@@ -518,7 +518,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Manages the acknowledged-findings store: load, save, hash, and lookup operations with persistent state.",
+          "detail": "Manages acknowledged-findings persistence and hash-based lookup — business logic with state management.",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared constants, helpers, and types (DEFAULT_MODEL, PRD_SCHEMA, extractJson, etc.) consumed across the analyze pipeline.",
+          "detail": "Shared helpers (token parsing, JSON extraction, prompt constants) used across multiple analyze modules.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-driven service that checks proposal task counts and applies a consolidation pass via spawnClaude.",
+          "detail": "Post-processing pipeline step that invokes a secondary LLM consolidation pass on oversized proposal output.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-driven service that decomposes over-large tasks into sub-tasks via spawnClaude.",
+          "detail": "LLM-driven recursive task decomposition pipeline — orchestrates multi-round LLM calls with depth limiting.",
           "weight": 0.7
         }
       ]
@@ -574,7 +574,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Pure deduplication helpers (similarity scoring, deduplicateScanResults) with high fan-in across the codebase.",
+          "detail": "Pure algorithmic deduplication using multi-signal similarity scoring; no side effects or state.",
           "weight": 0.7
         }
       ]
@@ -588,21 +588,21 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Utility that formats diffs between proposals and the existing PRD tree.",
+          "detail": "Formats a human-readable diff view of proposals vs existing PRD — presentation utility with no side effects.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/extract.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Large extraction utility (markdown, text, file) with high fan-in; shared infrastructure for parsing input into proposals.",
+          "detail": "Requirements extraction engine with LLM fallback — orchestrates parsing, deduplication, and classification.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Stateless file validation helpers (validateFileInput, detectMagicBytes, etc.) consumed by extract and exported publicly.",
+          "detail": "File format validation helpers (extension, MIME, magic bytes, size) — stateless validation utilities.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Orchestrates a guided spec generation flow: clarify questions and generateSpecFromContext via LLM calls.",
+          "detail": "Interactive multi-round LLM clarification loop that produces a full PRD spec — complex orchestration logic.",
           "weight": 0.7
         }
       ]
@@ -658,7 +658,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Adapter/bridge that configures and exposes spawnClaude and vendor-switching helpers to the rest of the analyze layer.",
+          "detail": "LLM client singleton management and spawnClaude abstraction — service-layer infrastructure.",
           "weight": 0.7
         }
       ]
@@ -672,7 +672,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-driven service that applies user modification instructions to an existing proposal set via spawnClaude.",
+          "detail": "LLM-powered proposal modification pipeline with validation and token accumulation.",
           "weight": 0.7
         }
       ]
@@ -686,21 +686,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Builds structured Proposal trees from raw ScanResults; central service in the proposal pipeline.",
+          "detail": "Builds hierarchical PRD proposals from scan results using multi-strategy task placement logic.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reason.ts",
-      "archetype": "utility",
+      "archetype": "schema",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "schema",
           "signalKind": "path",
-          "detail": "Core reasoning engine and re-export hub for the analyze layer; very high fan-in, re-exports from analyze-shared and llm-bridge alongside its own logic.",
+          "detail": "Defines Zod schemas for proposal validation and parseProposalResponse; re-exports from analyze-shared/llm-bridge for backward compatibility.",
           "weight": 0.7
         }
       ]
@@ -714,7 +714,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reconciles new ScanResults against the existing PRD tree using similarity matching to find update candidates.",
+          "detail": "Fuzzy-matches scan results against existing PRD items to filter duplicates and detect update candidates.",
           "weight": 0.7
         }
       ]
@@ -728,7 +728,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-driven service that generates reshape proposals (prune/reorganize) for the PRD tree.",
+          "detail": "LLM reasoning pipeline for reshape proposals — parses discriminated-union action responses into validated arrays.",
           "weight": 0.7
         }
       ]
@@ -742,7 +742,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Project scanners (scanTests, scanDocs, scanSourceVision, scanPackageJson) that produce ScanResults from filesystem artifacts.",
+          "detail": "Multi-source scanner orchestrating extraction from tests, docs, sourcevision output, and package.json.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Pure validation and classification helpers for modification requests, no LLM calls, consumed by modify-reason and CLI.",
+          "detail": "Stateless validation of natural-language modification requests — word count, vague-phrase detection, intent classification.",
           "weight": 0.7
         }
       ]
@@ -1208,7 +1208,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Generates and prints CLI help text; stateless utility consumed only by the CLI index and tests.",
+          "detail": "Static help text definitions and formatting for rex CLI commands — shared presentation utility.",
           "weight": 0.7
         }
       ]
@@ -1236,21 +1236,21 @@
         {
           "archetypeId": "route-handler",
           "signalKind": "path",
-          "detail": "Contains all MCP tool handler functions (handleGetPrdStatus, handleAddItem, etc.) dispatched by the MCP server.",
+          "detail": "Handles incoming MCP tool invocations (handleGetPrdStatus, handleAddItem, etc.) analogous to HTTP route handlers.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/cli/mcp.ts",
-      "archetype": "cli-command",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "cli-command",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Sets up and starts the MCP server (createRexMcpServer, startMcpServer); CLI command entry point for the mcp subcommand.",
+          "detail": "MCP server factory that wires all tools and resources with stdio/HTTP transport support.",
           "weight": 0.7
         }
       ]
@@ -1278,7 +1278,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "CLI input validation helpers (parseIntSafe, validateLevel, requireParent, etc.) shared across CLI commands.",
+          "detail": "Stateless CLI input validation helpers with consistent error messages — pure utility functions.",
           "weight": 0.7
         }
       ]
@@ -1789,14 +1789,14 @@
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Pure conflict and duplicate detection logic for recommendations, using similarity scoring and tree walking.",
+          "detail": "Conflict detection service using similarity scoring to compare recommendations against existing PRD items.",
           "weight": 0.7
         }
       ]
@@ -1810,7 +1810,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Orchestrates creation of PRD items from enriched recommendations, handling conflict resolution and DAG validation.",
+          "detail": "Atomic PRD item creation pipeline with hierarchy validation, DAG integrity checks, and schema validation before persistence.",
           "weight": 0.7
         }
       ]
@@ -2081,7 +2081,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Exports a single DEFAULT_WORKFLOW constant used during init; purely declarative configuration data.",
+          "detail": "Static default workflow instructions and execution contract for the autonomous agent — configuration/content, no logic.",
           "weight": 0.7
         }
       ]
@@ -2091,13 +2091,13 @@
     "totalClassified": 109,
     "totalUnclassified": 0,
     "byArchetype": {
-      "service": 11,
-      "utility": 47,
+      "service": 14,
+      "utility": 44,
       "entrypoint": 6,
-      "cli-command": 29,
+      "schema": 4,
+      "cli-command": 28,
       "types": 2,
       "route-handler": 1,
-      "schema": 3,
       "store": 9,
       "config": 1
     },

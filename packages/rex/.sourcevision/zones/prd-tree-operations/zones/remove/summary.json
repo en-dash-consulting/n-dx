@@ -1,0 +1,24 @@
+{
+  "id": "unit-core/remove",
+  "name": "Unit Core/remove",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/update.ts",
+    "src/core/delete.ts",
+    "src/core/remove-epic.ts",
+    "src/core/remove-task.ts",
+    "tests/unit/cli/commands/update.test.ts",
+    "tests/unit/core/remove-epic.test.ts",
+    "tests/unit/core/remove-task.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/update.ts",
+    "src/core/delete.ts",
+    "src/core/remove-epic.ts",
+    "src/core/remove-task.ts"
+  ],
+  "cohesion": 0.3,
+  "coupling": 0.7,
+  "fileCount": 7,
+  "lineCount": 1350
+}

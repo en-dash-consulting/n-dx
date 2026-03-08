@@ -1,0 +1,20 @@
+{
+  "id": "hench/unit/schema",
+  "name": "Hench/unit/schema",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/cli/commands/template.ts",
+    "packages/hench/src/schema/templates.ts",
+    "packages/hench/src/store/templates.ts",
+    "packages/hench/tests/unit/schema/templates.test.ts",
+    "packages/hench/tests/unit/store/templates.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/commands/template.ts",
+    "packages/hench/src/schema/templates.ts"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.63,
+  "fileCount": 5,
+  "lineCount": 1061
+}

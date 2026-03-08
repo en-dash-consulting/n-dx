@@ -1392,13 +1392,13 @@
     },
     {
       "path": "tsconfig.tsbuildinfo",
-      "size": 83756,
+      "size": 83855,
       "language": "Other",
       "lineCount": 1,
-      "hash": "5704e51081456633efa533c0a138be7a7838e7c54d9b0f14bac2eeb7dd799822",
+      "hash": "b71a11efa3678bbfdc97fec0d468f7459ed1d5888f36e21bf57337cf178e18f3",
       "role": "config",
       "category": "root",
-      "lastModified": 1772906259594
+      "lastModified": 1772933252914
     },
     {
       "path": "vitest.config.ts",

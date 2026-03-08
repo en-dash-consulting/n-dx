@@ -133,6 +133,7 @@ Incoming (other zones → this zone):
 - Zone "unit" has files across 11 directories — consider consolidating under a dedicated directory
 - The coupling metric (0.57) is dominated by test-to-implementation imports, which are expected by design and carry no architectural risk.
 - Zone finding 0 (coupling warning 0.57, 27 imports to analyzers) should be treated as info: per global finding 11, the 27 crossings are unit-test files importing their implementations under test — structurally correct by design. Only the reverse direction (analyzers production code importing from unit-scope modules) would constitute a real layering violation.
+- Test-to-implementation coupling in this zone is structurally correct and expected by design; the 27 imports targeting analyzers are unit tests covering their subject module, not an architectural problem.
 - [call graph] 1339 internal calls, 270 outgoing, 579 incoming (cohesion: 0.83, coupling: 0.17)
 
 </insights>

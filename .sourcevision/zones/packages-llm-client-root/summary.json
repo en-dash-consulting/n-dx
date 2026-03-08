@@ -9,15 +9,15 @@
     "packages/llm-client/vitest.config.ts"
   ],
   "entryPoints": [],
-  "cohesion": 1,
+  "cohesion": 0,
   "coupling": 0,
   "fileCount": 4,
   "lineCount": 51,
   "riskMetrics": {
-    "cohesion": 1,
+    "cohesion": 0,
     "coupling": 0,
-    "riskScore": 0,
-    "riskLevel": "healthy",
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
     "failsThreshold": false
   }
 }

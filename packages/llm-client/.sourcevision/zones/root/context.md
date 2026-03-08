@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Root (`root`)
-Files: 4, Cohesion: 1.00, Coupling: 0.00
-Risk: healthy (score: 0.00)
+Files: 4, Cohesion: 0.00, Coupling: 0.00
+Risk: at-risk (score: 0.50)
 Description: 4 files, primarily JSON, TypeScript
 Lines: 1970
 
@@ -23,12 +23,14 @@ vitest.config.ts (TypeScript, 11 lines, config)
 
 <findings>
 
-[observation] [info] High cohesion (1) — files are tightly interconnected
+[observation] [info] Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)
+[suggestion] [info] Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
 
 </findings>
 
 <insights>
 
+- Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)
 - High cohesion (1) — files are tightly interconnected
 - Standard package scaffolding — no source files present, as expected for a configuration-only root.
 - Vitest config co-located here confirms test tooling is package-local rather than inherited from monorepo root.

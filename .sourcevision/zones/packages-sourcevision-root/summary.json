@@ -15,15 +15,15 @@
     "packages/sourcevision/vitest.config.ts"
   ],
   "entryPoints": [],
-  "cohesion": 1,
+  "cohesion": 0,
   "coupling": 0,
   "fileCount": 10,
   "lineCount": 989,
   "riskMetrics": {
-    "cohesion": 1,
+    "cohesion": 0,
     "coupling": 0,
-    "riskScore": 0,
-    "riskLevel": "healthy",
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
     "failsThreshold": false
   }
 }

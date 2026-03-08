@@ -112,7 +112,7 @@
     },
     {
       "from": "src/analyze/dedupe.ts",
-      "to": "src/schema/v1.ts",
+      "to": "src/schema/index.ts",
       "type": "static",
       "symbols": [
         "PRIORITY_ORDER"
@@ -1672,6 +1672,15 @@
       "symbols": [
         "formatConflict",
         "formatIntraBatchDuplicate"
+      ]
+    },
+    {
+      "from": "src/cli/commands/recommend.ts",
+      "to": "src/recommend/conflict-detection.ts",
+      "type": "type",
+      "symbols": [
+        "RecommendationConflict",
+        "IntraBatchDuplicate"
       ]
     },
     {
@@ -3471,7 +3480,7 @@
     },
     {
       "from": "src/core/code-coverage.ts",
-      "to": "src/schema/v1.ts",
+      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem"
@@ -3562,7 +3571,7 @@
     },
     {
       "from": "src/core/facets.ts",
-      "to": "src/schema/v1.ts",
+      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
@@ -4030,7 +4039,7 @@
     },
     {
       "from": "src/core/requirements.ts",
-      "to": "src/schema/v1.ts",
+      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
@@ -4076,7 +4085,7 @@
     },
     {
       "from": "src/core/scope-creep.ts",
-      "to": "src/schema/levels.ts",
+      "to": "src/schema/index.ts",
       "type": "static",
       "symbols": [
         "isContainerLevel"
@@ -4084,7 +4093,7 @@
     },
     {
       "from": "src/core/scope-creep.ts",
-      "to": "src/schema/v1.ts",
+      "to": "src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem"
@@ -4828,6 +4837,7 @@
         "RecommendationMeta",
         "CreationResult",
         "SkippedRecommendation",
+        "UpdatedRecommendation",
         "ReparentedRecommendation"
       ]
     },
@@ -4992,7 +5002,8 @@
       "to": "src/recommend/types.ts",
       "type": "type",
       "symbols": [
-        "EnrichedRecommendation"
+        "EnrichedRecommendation",
+        "RecommendationMeta"
       ]
     },
     {
@@ -8418,7 +8429,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 890,
+    "totalEdges": 891,
     "totalExternal": 5,
     "circularCount": 0,
     "circulars": [],
@@ -8429,7 +8440,7 @@
       },
       {
         "path": "src/schema/index.ts",
-        "count": 42
+        "count": 44
       },
       {
         "path": "src/store/index.ts",
@@ -8492,18 +8503,18 @@
         "count": 7
       },
       {
-        "path": "src/schema/v1.ts",
-        "count": 7
-      },
-      {
         "path": "src/schema/validate.ts",
         "count": 7
       },
       {
         "path": "src/analyze/reshape-reason.ts",
         "count": 6
+      },
+      {
+        "path": "src/store/adapter-registry.ts",
+        "count": 6
       }
     ],
-    "avgImportsPerFile": 4.36
+    "avgImportsPerFile": 4.37
   }
 }

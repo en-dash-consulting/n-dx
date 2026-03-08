@@ -1,43 +1,43 @@
 {
   "schemaVersion": "1.0.0",
   "toolVersion": "0.1.0",
-  "analyzedAt": "2026-03-07T18:54:32.250Z",
+  "analyzedAt": "2026-03-08T02:09:42.003Z",
   "targetPath": "/Users/nick/development/endash/n-dx/rex",
   "modules": {
     "inventory": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:52:22.670Z",
-      "completedAt": "2026-03-07T18:52:22.697Z"
+      "startedAt": "2026-03-08T01:59:02.451Z",
+      "completedAt": "2026-03-08T01:59:02.479Z"
     },
     "imports": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:52:22.697Z",
-      "completedAt": "2026-03-07T18:52:22.887Z"
+      "startedAt": "2026-03-08T01:59:02.479Z",
+      "completedAt": "2026-03-08T01:59:02.670Z"
     },
     "zones": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:53:16.957Z",
-      "completedAt": "2026-03-07T18:54:31.712Z"
+      "startedAt": "2026-03-08T02:00:25.162Z",
+      "completedAt": "2026-03-08T02:09:41.426Z"
     },
     "components": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:54:31.712Z",
-      "completedAt": "2026-03-07T18:54:31.735Z"
+      "startedAt": "2026-03-08T02:09:41.426Z",
+      "completedAt": "2026-03-08T02:09:41.447Z"
     },
     "classifications": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:52:22.887Z",
-      "completedAt": "2026-03-07T18:53:16.956Z"
+      "startedAt": "2026-03-08T01:59:02.670Z",
+      "completedAt": "2026-03-08T02:00:25.162Z"
     },
     "callgraph": {
       "status": "complete",
-      "startedAt": "2026-03-07T18:54:31.735Z",
-      "completedAt": "2026-03-07T18:54:32.250Z"
+      "startedAt": "2026-03-08T02:09:41.448Z",
+      "completedAt": "2026-03-08T02:09:42.003Z"
     }
   },
   "zoneOutputs": true,
   "tokenUsage": {
-    "calls": 2,
+    "calls": 9,
     "inputTokens": 0,
     "outputTokens": 0,
     "vendor": "claude",

@@ -162,13 +162,13 @@
     },
     {
       "path": "src/analyze/dedupe.ts",
-      "size": 12300,
+      "size": 12303,
       "language": "TypeScript",
       "lineCount": 373,
-      "hash": "c0beac462e702d1b5e72eb0adac6e78b991325dbfc30c923a418916d69414fee",
+      "hash": "41a4bcdd99b100b67cdfe48d2ad35246fa5e58d2f462a3f7c1a122edffd8af6a",
       "role": "source",
       "category": "analyze",
-      "lastModified": 1772432096043
+      "lastModified": 1772933659703
     },
     {
       "path": "src/analyze/diff.ts",
@@ -442,13 +442,13 @@
     },
     {
       "path": "src/cli/commands/recommend.ts",
-      "size": 15551,
+      "size": 17973,
       "language": "TypeScript",
-      "lineCount": 453,
-      "hash": "b2f07d58a9ef5ee9fcb701ce69b784f88bb5d521d4c5fd1169cb4698295c4ae4",
+      "lineCount": 537,
+      "hash": "7f095e29ba344a4b32a43d32b46453ec1e59298f89da02a758fd0e055ff4c4a3",
       "role": "source",
       "category": "cli",
-      "lastModified": 1772682844138
+      "lastModified": 1772933392875
     },
     {
       "path": "src/cli/commands/remove.ts",
@@ -692,13 +692,13 @@
     },
     {
       "path": "src/core/code-coverage.ts",
-      "size": 3513,
+      "size": 3516,
       "language": "TypeScript",
       "lineCount": 122,
-      "hash": "5f1e8d41fa2968ed5bfebc9b0d05682b560ff30c91d0a53a8d7171620077ab9d",
+      "hash": "f3a6e49bd86e7cadff8bc140e20efac65ed9d3afe2f14dc3ce8a3d692dc6860b",
       "role": "source",
       "category": "core",
-      "lastModified": 1772682844141
+      "lastModified": 1772933657851
     },
     {
       "path": "src/core/dag.ts",
@@ -732,13 +732,13 @@
     },
     {
       "path": "src/core/facets.ts",
-      "size": 7057,
+      "size": 7060,
       "language": "TypeScript",
       "lineCount": 214,
-      "hash": "2b062e206a5468c8c3be3f8aca49a8c9940832d12ca985ee6dda09e994f4659d",
+      "hash": "b64ba6c35c806639289e522dbc2ac366dd034ebf3c53f4167e886d8ce578bf36",
       "role": "source",
       "category": "core",
-      "lastModified": 1772682844141
+      "lastModified": 1772933658711
     },
     {
       "path": "src/core/fix.ts",
@@ -892,13 +892,13 @@
     },
     {
       "path": "src/core/requirements.ts",
-      "size": 12300,
+      "size": 12303,
       "language": "TypeScript",
       "lineCount": 402,
-      "hash": "5771fdd266e1e1b86a7fe707cfe8aa0fd97a6335fe36f57adfed69af7aa97c55",
+      "hash": "f1a2ea4a41f1dc4ff237ffdd909ea35c207cee34e1f3cf6c5621e88c09110f08",
       "role": "source",
       "category": "core",
-      "lastModified": 1772432096017
+      "lastModified": 1772933676538
     },
     {
       "path": "src/core/reshape.ts",
@@ -912,13 +912,13 @@
     },
     {
       "path": "src/core/scope-creep.ts",
-      "size": 2210,
+      "size": 2212,
       "language": "TypeScript",
       "lineCount": 72,
-      "hash": "a497f8e637f1f5777227a5d0373bdf3be4dba9ebb7c1cf168dff50ee00819338",
+      "hash": "28884475492e886459c4fcbe457f0d46cbe342021219ddc8a98b873ad160959d",
       "role": "source",
       "category": "core",
-      "lastModified": 1772682844142
+      "lastModified": 1772933656933
     },
     {
       "path": "src/core/stats.ts",
@@ -1012,33 +1012,33 @@
     },
     {
       "path": "src/public.ts",
-      "size": 11704,
+      "size": 11727,
       "language": "TypeScript",
       "lineCount": 362,
-      "hash": "c9d363c3d6ef951b9125c397d51d07eb997e6e82f6386f410eb2ca99d8561a1f",
+      "hash": "5ed7ec70e39a87bb479d67a39e9ed6b05e3382b3a57103ab34bedc769c8dbe7b",
       "role": "source",
       "category": "src",
-      "lastModified": 1772849531150
+      "lastModified": 1772931425336
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "size": 11751,
+      "size": 12373,
       "language": "TypeScript",
-      "lineCount": 344,
-      "hash": "6fbce06e17eedebfb431b51429303c3e1b638d3462d513db07e29e125105aa8b",
+      "lineCount": 355,
+      "hash": "686b8b0c8bd0c3503c9d40c00b929e5bec2519304c2c22a90a4ac471030da9ca",
       "role": "source",
       "category": "recommend",
-      "lastModified": 1772682844144
+      "lastModified": 1772917856475
     },
     {
       "path": "src/recommend/create-from-recommendations.ts",
-      "size": 13159,
+      "size": 15323,
       "language": "TypeScript",
-      "lineCount": 369,
-      "hash": "a675a1f16911a77d74cc133ff74683e935ed7ea276ba3de50c0dcda736f400e4",
+      "lineCount": 428,
+      "hash": "c052f16c7590013f8f8a583631f7229f203bceaed0ee206151b65cf0b604fde3",
       "role": "source",
       "category": "recommend",
-      "lastModified": 1772682844144
+      "lastModified": 1772931446388
     },
     {
       "path": "src/recommend/types.ts",
@@ -2413,7 +2413,7 @@
   ],
   "summary": {
     "totalFiles": 241,
-    "totalLines": 85580,
+    "totalLines": 85734,
     "byLanguage": {
       "JSON": 9,
       "Other": 4,

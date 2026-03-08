@@ -82,13 +82,13 @@
     },
     {
       "path": ".rex/execution-log.jsonl",
-      "size": 102504,
+      "size": 107470,
       "language": "Other",
-      "lineCount": 419,
-      "hash": "f9763050ce14d21b45c7d0fae99aedbdd0624aea8aced57ddd17d1972cb67540",
+      "lineCount": 439,
+      "hash": "d27a01edcff5ad938e5699638fd4c3b1e3d3faea3a6624270d029c98b76d3eb0",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772909357729
+      "lastModified": 1772933948752
     },
     {
       "path": ".rex/pending-proposals.json",
@@ -102,13 +102,13 @@
     },
     {
       "path": ".rex/prd.json",
-      "size": 999584,
+      "size": 1001018,
       "language": "JSON",
-      "lineCount": 19437,
-      "hash": "9a718b272263282708a4f9bb1f1941cd8e4805479ab864bd73a5e814870881a7",
+      "lineCount": 19464,
+      "hash": "2377c450ebf65cff6dbd82eae49c35f6f6937bc2a3e3fa4d9c2e65efc7dc0d4f",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1772909357728
+      "lastModified": 1772933948684
     },
     {
       "path": ".rex/workflow.md",
@@ -2552,13 +2552,13 @@
     },
     {
       "path": "packages/rex/src/analyze/dedupe.ts",
-      "size": 12300,
+      "size": 12303,
       "language": "TypeScript",
       "lineCount": 373,
-      "hash": "c0beac462e702d1b5e72eb0adac6e78b991325dbfc30c923a418916d69414fee",
+      "hash": "41a4bcdd99b100b67cdfe48d2ad35246fa5e58d2f462a3f7c1a122edffd8af6a",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772432096043
+      "lastModified": 1772933659703
     },
     {
       "path": "packages/rex/src/analyze/diff.ts",
@@ -2832,13 +2832,13 @@
     },
     {
       "path": "packages/rex/src/cli/commands/recommend.ts",
-      "size": 15551,
+      "size": 17973,
       "language": "TypeScript",
-      "lineCount": 453,
-      "hash": "b2f07d58a9ef5ee9fcb701ce69b784f88bb5d521d4c5fd1169cb4698295c4ae4",
+      "lineCount": 537,
+      "hash": "7f095e29ba344a4b32a43d32b46453ec1e59298f89da02a758fd0e055ff4c4a3",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844138
+      "lastModified": 1772933392875
     },
     {
       "path": "packages/rex/src/cli/commands/remove.ts",
@@ -3082,13 +3082,13 @@
     },
     {
       "path": "packages/rex/src/core/code-coverage.ts",
-      "size": 3513,
+      "size": 3516,
       "language": "TypeScript",
       "lineCount": 122,
-      "hash": "5f1e8d41fa2968ed5bfebc9b0d05682b560ff30c91d0a53a8d7171620077ab9d",
+      "hash": "f3a6e49bd86e7cadff8bc140e20efac65ed9d3afe2f14dc3ce8a3d692dc6860b",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844141
+      "lastModified": 1772933657851
     },
     {
       "path": "packages/rex/src/core/dag.ts",
@@ -3122,13 +3122,13 @@
     },
     {
       "path": "packages/rex/src/core/facets.ts",
-      "size": 7057,
+      "size": 7060,
       "language": "TypeScript",
       "lineCount": 214,
-      "hash": "2b062e206a5468c8c3be3f8aca49a8c9940832d12ca985ee6dda09e994f4659d",
+      "hash": "b64ba6c35c806639289e522dbc2ac366dd034ebf3c53f4167e886d8ce578bf36",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844141
+      "lastModified": 1772933658711
     },
     {
       "path": "packages/rex/src/core/fix.ts",
@@ -3282,13 +3282,13 @@
     },
     {
       "path": "packages/rex/src/core/requirements.ts",
-      "size": 12300,
+      "size": 12303,
       "language": "TypeScript",
       "lineCount": 402,
-      "hash": "5771fdd266e1e1b86a7fe707cfe8aa0fd97a6335fe36f57adfed69af7aa97c55",
+      "hash": "f1a2ea4a41f1dc4ff237ffdd909ea35c207cee34e1f3cf6c5621e88c09110f08",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772432096017
+      "lastModified": 1772933676538
     },
     {
       "path": "packages/rex/src/core/reshape.ts",
@@ -3302,13 +3302,13 @@
     },
     {
       "path": "packages/rex/src/core/scope-creep.ts",
-      "size": 2210,
+      "size": 2212,
       "language": "TypeScript",
       "lineCount": 72,
-      "hash": "a497f8e637f1f5777227a5d0373bdf3be4dba9ebb7c1cf168dff50ee00819338",
+      "hash": "28884475492e886459c4fcbe457f0d46cbe342021219ddc8a98b873ad160959d",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844142
+      "lastModified": 1772933656933
     },
     {
       "path": "packages/rex/src/core/stats.ts",
@@ -3402,33 +3402,33 @@
     },
     {
       "path": "packages/rex/src/public.ts",
-      "size": 11704,
+      "size": 11727,
       "language": "TypeScript",
       "lineCount": 362,
-      "hash": "c9d363c3d6ef951b9125c397d51d07eb997e6e82f6386f410eb2ca99d8561a1f",
+      "hash": "5ed7ec70e39a87bb479d67a39e9ed6b05e3382b3a57103ab34bedc769c8dbe7b",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772849531150
+      "lastModified": 1772931425336
     },
     {
       "path": "packages/rex/src/recommend/conflict-detection.ts",
-      "size": 11751,
+      "size": 12373,
       "language": "TypeScript",
-      "lineCount": 344,
-      "hash": "6fbce06e17eedebfb431b51429303c3e1b638d3462d513db07e29e125105aa8b",
+      "lineCount": 355,
+      "hash": "686b8b0c8bd0c3503c9d40c00b929e5bec2519304c2c22a90a4ac471030da9ca",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844144
+      "lastModified": 1772917856475
     },
     {
       "path": "packages/rex/src/recommend/create-from-recommendations.ts",
-      "size": 13159,
+      "size": 15323,
       "language": "TypeScript",
-      "lineCount": 369,
-      "hash": "a675a1f16911a77d74cc133ff74683e935ed7ea276ba3de50c0dcda736f400e4",
+      "lineCount": 428,
+      "hash": "c052f16c7590013f8f8a583631f7229f203bceaed0ee206151b65cf0b604fde3",
       "role": "source",
       "category": "rex",
-      "lastModified": 1772682844144
+      "lastModified": 1772931446388
     },
     {
       "path": "packages/rex/src/recommend/types.ts",
@@ -6262,13 +6262,13 @@
     },
     {
       "path": "packages/web/src/public.ts",
-      "size": 2494,
+      "size": 2664,
       "language": "TypeScript",
-      "lineCount": 53,
-      "hash": "25542cd64d33dcfa3e33e056781c8a0741a6813f694681d4609c2471c1e05858",
+      "lineCount": 55,
+      "hash": "0a02a67d8fe4c2f3b0322ea092446ca5b9bc3f2568feec2466395df86b833b65",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844173
+      "lastModified": 1772933835878
     },
     {
       "path": "packages/web/src/schema/v1.ts",
@@ -6326,16 +6326,6 @@
       "language": "TypeScript",
       "lineCount": 40,
       "hash": "6dc6209fefaae9e7f3d0cfb915c17d1a576e28d80681ca5dc45e7a831596f731",
-      "role": "source",
-      "category": "web",
-      "lastModified": 1772682844174
-    },
-    {
-      "path": "packages/web/src/server/mcp-deps.ts",
-      "size": 188,
-      "language": "TypeScript",
-      "lineCount": 6,
-      "hash": "f703ec4b65eadce71c576a2959d72e33b987f51d0d0d720d06e88ea13a4ba562",
       "role": "source",
       "category": "web",
       "lastModified": 1772682844174
@@ -7192,13 +7182,13 @@
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/types.ts",
-      "size": 3273,
+      "size": 3276,
       "language": "TypeScript",
       "lineCount": 119,
-      "hash": "4ba2a54d38d49161f2e4874d42efdcb610f63a1593f0039f92bdeac8ceac1ede",
+      "hash": "ca5c266e008318bfd189eb280d6f6361820802f19ee7facaf2554aeb2da34fa9",
       "role": "source",
       "category": "web",
-      "lastModified": 1772682844184
+      "lastModified": 1772933836843
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
@@ -10472,15 +10462,15 @@
     }
   ],
   "summary": {
-    "totalFiles": 1047,
-    "totalLines": 342064,
+    "totalFiles": 1046,
+    "totalLines": 342261,
     "byLanguage": {
       "YAML": 3,
       "Other": 17,
       "JSON": 27,
       "Markdown": 31,
       "JavaScript": 40,
-      "TypeScript": 882,
+      "TypeScript": 881,
       "Text": 1,
       "HTML": 2,
       "CSS": 44
@@ -10490,7 +10480,7 @@
       "config": 20,
       "other": 59,
       "docs": 31,
-      "source": 488,
+      "source": 487,
       "asset": 11,
       "test": 432,
       "generated": 1
@@ -10505,7 +10495,7 @@
       "llm-client": 44,
       "rex": 239,
       "sourcevision": 137,
-      "web": 393,
+      "web": 392,
       "scripts": 4,
       "tests": 23
     }

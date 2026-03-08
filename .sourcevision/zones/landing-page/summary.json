@@ -1,0 +1,22 @@
+{
+  "id": "landing-page",
+  "name": "Landing Page",
+  "description": "Self-contained static landing page with its own HTML, CSS, and TypeScript entry point, bundled independently from the main dashboard.",
+  "files": [
+    "packages/web/src/landing/index.html",
+    "packages/web/src/landing/landing.css",
+    "packages/web/src/landing/landing.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 1977,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web-5",
+  "name": "Web Viewer/web 5",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts",
+    "packages/web/src/viewer/views/suggestions.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts",
+    "packages/web/src/viewer/views/suggestions.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 3,
+  "lineCount": 128
+}

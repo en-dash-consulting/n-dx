@@ -1,0 +1,28 @@
+{
+  "id": "packages-rex:project-root",
+  "name": "Project Root",
+  "description": "Top-level project configuration, documentation, and build metadata that anchors the monorepo.",
+  "files": [
+    "packages/rex/README.md",
+    "packages/rex/Rex-F.png",
+    "packages/rex/Rex.png",
+    "packages/rex/context.md",
+    "packages/rex/llms.txt",
+    "packages/rex/package-lock.json",
+    "packages/rex/package.json",
+    "packages/rex/tsconfig.json",
+    "packages/rex/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 9,
+  "lineCount": 535,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

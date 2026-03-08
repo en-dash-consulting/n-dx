@@ -1,0 +1,33 @@
+{
+  "id": "packages-rex:prd-validation",
+  "name": "PRD Validation",
+  "description": "Structural integrity checks for the PRD — validate commands, epic-correlation heuristics, and interactive fix prompts — co-located with their unit and integration tests.",
+  "files": [
+    "packages/rex/src/cli/commands/validate-interactive.ts",
+    "packages/rex/src/cli/commands/validate.ts",
+    "packages/rex/src/core/epic-correlation.ts",
+    "packages/rex/src/core/structural.ts",
+    "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate-epicless.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate-interactive.test.ts",
+    "packages/rex/tests/unit/cli/commands/validate.test.ts",
+    "packages/rex/tests/unit/core/epic-correlation.test.ts",
+    "packages/rex/tests/unit/core/epicless.test.ts",
+    "packages/rex/tests/unit/core/structural.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/validate.ts",
+    "packages/rex/src/core/structural.ts"
+  ],
+  "cohesion": 0.34,
+  "coupling": 0.66,
+  "fileCount": 11,
+  "lineCount": 4935,
+  "riskMetrics": {
+    "cohesion": 0.34,
+    "coupling": 0.66,
+    "riskScore": 0.6599999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

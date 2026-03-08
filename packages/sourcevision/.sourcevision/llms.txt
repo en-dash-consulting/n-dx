@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (128), JSON (7), Markdown (3), Other (3)
 - **Zones**: 9 (9 with descriptions)
 - **Git**: main @ 63d150a
-- **Analyzed**: 2026-03-07T18:58:52.762Z
+- **Analyzed**: 2026-03-08T02:11:50.649Z
 
 ## Architecture Zones
 
@@ -19,7 +19,7 @@
 2 files, primarily JSON
 
 - Files: 2
-- Cohesion: 1.00, Coupling: 0.00
+- Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/.claude/context.md`
 
 ### Analyzers (`analyzers`)
@@ -80,7 +80,7 @@
 10 files, primarily Markdown, Other, JSON
 
 - Files: 10
-- Cohesion: 1.00, Coupling: 0.00
+- Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/root/context.md`
 
 ### Unit (`unit`)
@@ -121,7 +121,6 @@
 
 ### Anti-patterns
 
-- Global finding 0 (bidirectional coupling analyzers↔unit, warning) is directly contradicted by global finding 9 (LLM analysis). Finding 9 establishes that the 27-crossing unit→analyzers direction is expected test-to-implementation coupling that must not be flagged as an anti-pattern, and that only the 7-crossing analyzers→unit direction represents genuine risk — which is already captured with full specificity by global finding 5. Global finding 0 is superseded by findings 5 and 9 and should be treated as resolved by those two more precise entries. [info]
 - God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
@@ -129,13 +128,13 @@
 - Zone finding 1 (coupling warning 0.52, 15 imports to analyzers) is a Louvain partitioning artifact corroborated by global finding 10. The 15 crossings are intra-domain edges within one coherent analyzers domain that the algorithm split across zone boundaries. No refactoring of coupling is warranted; the actionable fix is structural (subdirectory organization of src/analyzers/). [info] (analyzers-2)
 - Zone finding 0 (coupling warning to analyzers-2) is confirmed as a false positive by two independent sources: zone finding 1 (LLM) and global finding 10 (heuristic cross-check). E2e tests importing from the analyzers domain is correct by design. Severity should be treated as info. [info] (e2e)
 - Zone finding 0 (warning: coupling 0.57 to 'analyzers-2') is contradicted by global finding 10. E2e tests coupling to what is semantically one analyzers domain is expected; the warning severity is not justified. The coupling flag measures intra-domain edges that Louvain partitioned into separate zone identifiers, not genuine cross-concern dependencies. [info] (e2e)
-- Global finding 0 (bidirectional coupling analyzers ↔ unit, 7+27 crossings) conflates two structurally different relationships. The 27-crossing unit→analyzers direction is expected test-to-implementation coupling (corroborated by unit finding 2 and global finding 9) and carries no risk. The 7-crossing analyzers→unit direction is the sole surviving concern and is captured more precisely by global finding 10. The aggregate bidirectional framing of finding 0 is misleading; only the minority direction (analyzers→unit) warrants a warning, and only pending the audit prescribed by global finding 10. [info]
-- The two potentially unused exports — detectBranchLifecycle in src/analyzers/branch-work-filter.ts (global finding 7) and resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts (global finding 8) — are independent, low-cost verification tasks. Neither requires architectural analysis: a project-wide grep for each symbol confirms or refutes the dead-export claim in under a minute. These should be verified and the exports removed if unused before any structural reorganization, to avoid carrying dead surface area into the reorganized layout. [info]
-- analyzers-2 finding 0 and analyzers-3 finding 0 (generic zone names 'Analyzers 2' and 'Analyzers 3') are symptoms of the same root cause as their coupling/cohesion warnings: Louvain over-partitioning of the src/analyzers/ domain. Generic names are not an enrichment failure—they correctly signal that the algorithm could not identify a distinct semantic identity because none exists independently. After subdirectory reorganization, these artificial zones will collapse into the parent analyzers zone and the naming issue disappears without any manual enrichment. [info]
+- Eight findings were downgraded from warning to info because their severity was derived solely from Louvain zone partition artifacts rather than genuine architectural problems. The metrics (coupling 0.52–0.69, cohesion 0.31, 'critical risk' score) measured intra-domain edge crossings within src/analyzers/ that the community detection algorithm assigned to separate zone identifiers. None of these metrics reflect cross-concern dependencies in the architectural sense. [info]
+- Global finding 0 (bidirectional coupling warning) directly contradicts global findings 10 and 13 (LLM analysis). Finding 13 explicitly resolves the contradiction: the 27-crossing unit→analyzers direction is expected test coupling that must not be flagged as warning; only the 7-crossing analyzers→unit direction is a genuine concern, already captured with full specificity by global finding 5. Global finding 0 is superseded and its warning severity is incorrect. [info]
+- Three findings (cli finding 1, cli finding 2, global finding 14) independently identify the same root cause — registerMcpTools fan-out of 36 — through different analysis methods (LLM structural review, LLM synthesis, automated call-graph counting). This triple corroboration from independent sources elevates confidence beyond any other finding in the package. It is the only finding that satisfies the multi-source corroboration standard required for a warning recommendation. [warning]
 
 ### Observations
 
-- High cohesion (1) — files are tightly interconnected [info] (.claude)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0) [info] (.claude)
 - 16 entry points — wide API surface, consider consolidating exports [warning] (analyzers)
 - Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [warning] (analyzers-2)
 - High coupling (0.52) — 15 imports target "analyzers" [warning] (analyzers-2)
@@ -151,15 +150,15 @@
 
 - Zone "analyzers" has files across 9 directories — consider consolidating under a dedicated directory [info] (analyzers)
 - Zone "cli" has files across 7 directories — consider consolidating under a dedicated directory [info] (cli)
+- Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar functions called in sequence: one for analysis tools (sv_inventory, sv_imports, sv_zones, sv_components, sv_context), one for status/reporting tools (rex_status, rex_next, rex_validate), and one for workflow tools (rex_add, rex_update, rex_analyze, rex_recommend). All three remain in mcp.ts; registerMcpTools becomes a three-call orchestrator. This is the only file-level change required. [warning] (cli)
 - registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed into focused sub-registrar functions grouped by capability domain (e.g. registration of analysis tools, status tools, and workflow tools as separate named functions called in sequence). This is an in-file decomposition of the single oversized function — not a file split — which reduces call-graph fan-out and isolates the impact of future tool additions without changing the module's public API. [warning] (cli)
 - registerMcpTools in src/cli/mcp.ts is the highest-priority actionable finding in this package, corroborated independently by automated fan-out analysis (36 outgoing calls, global finding 11) and LLM analysis (cli finding 1). Decompose into three sequential named sub-registrar functions within the same file — one per capability domain (analysis tools, status/reporting tools, workflow tools) — called in sequence from registerMcpTools. This is an in-file decomposition only; no file split is required or warranted at this threshold. [warning] (cli)
 - Zone "fixtures" has files across 5 directories — consider consolidating under a dedicated directory [info] (fixtures)
 - src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Audit the 6 specific src/analyzers/ production-file imports that cross into the unit/test layer (global finding 10) before reorganizing src/analyzers/ into subdirectories (global finding 8). If any target test utilities, fixtures, or unit-only types, extract those shared declarations to a neutral location such as src/types/ or src/shared/. This audit gate prevents the subdirectory reorganization from silently preserving a prod→test dependency under a cleaner directory structure. Recommended order: audit the 6 edges → extract shared types if needed → then proceed with subdirectory layout. [info]
-- Recommended execution sequence for all actionable findings: (1) Verify and remove dead exports detectBranchLifecycle and resolveWorkedEpicTitlesForRange if confirmed unused. (2) Audit the 6 specific production→test import edges (global finding 5) and extract any shared declarations to src/types/ or src/shared/ if needed. (3) Decompose registerMcpTools in src/cli/mcp.ts into focused sub-registrar functions. (4) Apply subdirectory grouping within src/analyzers/ to collapse the three artificial Louvain zones into one coherent domain zone. Steps 1–3 are independent and can proceed in parallel; step 4 depends on step 2 being clean. [warning]
+- Recommended execution sequence for remaining actionable findings, accounting for dependencies: (1) grep for detectBranchLifecycle and resolveWorkedEpicTitlesForRange project-wide and remove if unused — independent, under five minutes each; (2) audit the 6 specific production-file imports from src/analyzers/ that cross into the unit/test layer — independent of step 1; (3) if step 2 finds shared declarations in test-only files, extract them to src/types/ or src/shared/ before proceeding; (4) decompose registerMcpTools in src/cli/mcp.ts into three sequential sub-registrar functions — independent of steps 1–3; (5) apply subdirectory grouping within src/analyzers/ — depends on step 3 being complete. Steps 1, 2, and 4 can proceed in parallel. [info]
 - Hub function: info in src/cli/output.ts is called from 9 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - Potentially unused export: detectBranchLifecycle in src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed [info]
-- ... and 3 more
+- ... and 5 more
 
 ## Next Steps
 
@@ -192,6 +191,9 @@ Prioritized work items derived from analysis:
 
 1. **God function: registerMcpTools in src/cli/mcp.ts calls 36 unique functions — co…**
 
+1. **Decompose registerMcpTools in src/cli/mcp.ts into three named sub-registrar fun…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/analyzers/manifest.ts`, `src/cli/commands/constants.ts`
+
 1. **registerMcpTools in src/cli/mcp.ts (36 outgoing calls) should be decomposed int…**
    Files: `src/analyzers/branch-work-collector.ts`, `src/analyzers/manifest.ts`, `src/cli/commands/constants.ts`
 
@@ -201,7 +203,7 @@ Prioritized work items derived from analysis:
 1. **16 entry points — wide API surface, consider consolidating exports**
    Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/classify.ts`
 
-1. **Recommended execution sequence for all actionable findings: (1) Verify and remo…**
+1. **Three findings (cli finding 1, cli finding 2, global finding 14) independently …**
 
 1. **Bidirectional coupling: "analyzers" ↔ "unit" (7+27 crossings) — consider extrac…**
 
@@ -216,6 +218,12 @@ Prioritized work items derived from analysis:
 
 1. **Potentially unused export: resolveWorkedEpicTitlesForRange in src/cli/commands/…**
 
+1. **Zone ".claude" (.claude) has at-risk risk (score: 0.50, cohesion: 0.00, couplin…**
+   Files: `.claude/settings.json`, `.claude/settings.local.json`
+
+1. **Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.0…**
+   Files: `ARCHITECTURE.md`, `README.md`, `SourceVision-F.png`
+
 1. **Zone "analyzers" has files across 9 directories — consider consolidating under …**
    Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/classify.ts`
 
@@ -226,8 +234,6 @@ Prioritized work items derived from analysis:
    Files: `tests/fixtures/remix-app/app/routes/_auth.login.tsx`, `tests/fixtures/remix-app/app/routes/_auth.tsx`, `tests/fixtures/remix-app/app/routes/_index.tsx`
 
 1. **src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3…**
-
-1. **Audit the 6 specific src/analyzers/ production-file imports that cross into the…**
 
 ## File Inventory
 
@@ -243,10 +249,10 @@ Prioritized work items derived from analysis:
 | `package-lock.json` | generated |  | root |
 | `package.json` | config |  | root |
 | `src/analyzers/archetypes.ts` | source | types | analyzers |
-| `src/analyzers/branch-work-classifier.ts` | source | utility | unit |
+| `src/analyzers/branch-work-classifier.ts` | source | service | unit |
 | `src/analyzers/branch-work-collector.ts` | source | service | cli |
-| `src/analyzers/branch-work-filter.ts` | source | utility | unit |
-| `src/analyzers/branch-work-store.ts` | source | service | unit |
+| `src/analyzers/branch-work-filter.ts` | source | service | unit |
+| `src/analyzers/branch-work-store.ts` | source | store | unit |
 | `src/analyzers/callgraph-findings.ts` | source | service | analyzers |
 | `src/analyzers/callgraph.ts` | source | service | analyzers-2 |
 | `src/analyzers/classify.ts` | source | service | analyzers |
@@ -255,23 +261,23 @@ Prioritized work items derived from analysis:
 | `src/analyzers/components.ts` | source | service | analyzers-2 |
 | `src/analyzers/context.ts` | source | service | analyzers |
 | `src/analyzers/enrich-batch.ts` | source | service | analyzers |
-| `src/analyzers/enrich-config.ts` | source | config | analyzers |
+| `src/analyzers/enrich-config.ts` | source | types | analyzers |
 | `src/analyzers/enrich-parsing.ts` | source | utility | analyzers |
 | `src/analyzers/enrich-per-zone.ts` | source | service | analyzers |
-| `src/analyzers/enrich.ts` | source | gateway | analyzers |
+| `src/analyzers/enrich.ts` | source | service | analyzers |
 | `src/analyzers/imports.ts` | source | service | analyzers-2 |
 | `src/analyzers/index.ts` | source | entrypoint | analyzers-2 |
 | `src/analyzers/inventory.ts` | source | service | analyzers-2 |
 | `src/analyzers/llms-txt.ts` | source | service | analyzers |
-| `src/analyzers/louvain.ts` | source | utility | analyzers-3 |
+| `src/analyzers/louvain.ts` | source | service | analyzers-3 |
 | `src/analyzers/manifest.ts` | source | service | cli |
-| `src/analyzers/next-steps.ts` | source | utility | analyzers |
-| `src/analyzers/risk-scoring.ts` | source | utility | unit |
+| `src/analyzers/next-steps.ts` | source | service | analyzers |
+| `src/analyzers/risk-scoring.ts` | source | service | unit |
 | `src/analyzers/route-detection.ts` | source | route-handler | analyzers-2 |
 | `src/analyzers/server-route-detection.ts` | source | service | analyzers |
-| `src/analyzers/token-usage.ts` | source | utility | analyzers |
+| `src/analyzers/token-usage.ts` | source | service | analyzers |
 | `src/analyzers/workspace-aggregate.ts` | source | service | unit |
-| `src/analyzers/workspace-crossings.ts` | source | utility | analyzers |
+| `src/analyzers/workspace-crossings.ts` | source | service | analyzers |
 | `src/analyzers/workspace.ts` | source | service | analyzers |
 | `src/analyzers/zone-hash.ts` | source | utility | analyzers-3 |
 | `src/analyzers/zone-output.ts` | source | service | analyzers |
@@ -288,14 +294,14 @@ Prioritized work items derived from analysis:
 | `src/cli/commands/validate.ts` | source | cli-command | cli |
 | `src/cli/commands/workspace.ts` | source | cli-command | unit |
 | `src/cli/errors.ts` | source | utility | cli |
-| `src/cli/help.ts` | source | utility | cli |
+| `src/cli/help.ts` | source | cli-command | cli |
 | `src/cli/index.ts` | source | entrypoint | cli |
-| `src/cli/mcp.ts` | source | service | unit |
+| `src/cli/mcp.ts` | source | cli-command | unit |
 | `src/cli/output.ts` | source | utility | cli |
 | `src/cli/serve.ts` | source | cli-command | cli |
 | `src/constants.ts` | source | types | cli |
 | `src/export/pdf-report.ts` | source | service | analyzers |
-| `src/generators/pr-markdown-template.ts` | source | utility | unit |
+| `src/generators/pr-markdown-template.ts` | source | service | unit |
 | `src/public.ts` | source | entrypoint | unit |
 | `src/schema/data-files.ts` | source | schema | unit |
 | `src/schema/index.ts` | source | entrypoint | analyzers |

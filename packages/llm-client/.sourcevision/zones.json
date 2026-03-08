@@ -11,9 +11,10 @@
         "vitest.config.ts"
       ],
       "entryPoints": [],
-      "cohesion": 1,
+      "cohesion": 0,
       "coupling": 0,
       "insights": [
+        "Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)",
         "High cohesion (1) — files are tightly interconnected",
         "Standard package scaffolding — no source files present, as expected for a configuration-only root.",
         "Vitest config co-located here confirms test tooling is package-local rather than inherited from monorepo root.",
@@ -23,10 +24,10 @@
         "package-root has no runtime edges to any other zone; it is a pure configuration leaf consumed only by external tooling (tsc, vitest). This is the ideal state for a config zone."
       ],
       "riskMetrics": {
-        "cohesion": 1,
+        "cohesion": 0,
         "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
+        "riskScore": 0.5,
+        "riskLevel": "at-risk",
         "failsThreshold": false
       }
     },
@@ -613,6 +614,15 @@
     "Severity reassessment summary: global/6 downgraded critical→warning (double-counts root cause already in global/8); global/7 downgraded critical→info (positive architectural property, must be info per evaluation constraints); global/11 upgraded info→critical (cluster-criticality justification confirmed across global/22 and 23 — three co-occurring sub-threshold risks on the same change surface eliminates all defensive layers); global/14 downgraded critical→info (meta-finding about global/7 which is itself a positive property); global/15 downgraded critical→warning (descriptive convergence finding, root cause independently covered by global/8 at critical); global/31 downgraded critical→warning (planning prerequisite, not a structural defect); src-2/1 and src-2/6 downgraded warning→info (missing zone name is a process gap, not an architectural defect or risk).",
     "Canonical action plan distilled from findings global/19, 28, 29, 30, and 31 with correct sequencing: Step 0 (gate) — re-run sourcevision analyze; if the 3 reverse edges no longer exist after clean re-analysis, steps 1–3 are unnecessary. Step 1 — if edges persist, extract exactly four files (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts — all already classified as 'types' archetype) into a new zero-dependency zone; update import paths in api-provider.ts, cli-provider.ts, and auth.ts only. Step 2 — add utility test coverage for every export in the src-2 zone. Step 3 — add one integration test asserting a constructed session contains a valid auth token. Steps 1–3 are ordered; step 0 is the prerequisite gate for all three.",
     "Zone pinning (global/27) should be evaluated against the import-path refactor (global/28) before committing to either approach. Pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a fixed Louvain anchor cluster via sourcevision zone configuration eliminates the 3 reverse edges with zero code changes and zero import-path updates. It is strictly lower risk than a structural refactor and achieves the same zone-boundary outcome. Only if zone pinning is unavailable or produces an unstable boundary on re-analysis should the import-path refactor proceed.",
+    "The entire 49-finding set converges on a single structural root cause: 3 reverse import edges from llm-provider-core into llm-cli-utilities caused by the absence of a zero-dependency shared types zone. All remaining findings are either corroboration of this root cause, resolution planning artifacts, or independent process issues (stale manifest, missing zone name).",
+    "The zone pinning approach (zero import-path changes) is strictly lower risk than the structural refactor and appears only in info/warning findings, while the refactor approach dominates critical-severity findings — inverting the correct triage order. Zone pinning should be attempted first as the minimum-effort resolution gate before any code restructuring proceeds.",
+    "A mandatory prerequisite gate — re-run sourcevision analyze to produce a clean zone manifest — is buried across multiple findings (src-2/7, global/14 step 0, src-2/2) rather than surfaced as the single first action. Until this gate passes, zone-level metrics for src-2 (42% file share, generic name, cohesion/coupling values) are unreliable artifacts of a crashed analysis run and cannot justify structural action.",
+    "The cluster-criticality pattern identified in global/24 and global/25 — multiple sub-threshold warnings co-located on the same 2–3 files (auth.ts, config.ts, token-usage.ts) eliminating all defensive layers simultaneously — is documented only retrospectively. Future analysis passes should check for warning-cluster concentration on the same change surface before assigning individual finding severities, as individual metrics can appear acceptable while the combination is critical.",
+    "Finding global/23 (enrichment failure corroborates fuzzy zone boundary) directly contradicts finding global/13 (enrichment failure is a crashed-process artifact, not a content-coherence signal). A deterministic process failure cannot produce a content-quality signal. global/13 is correct; global/23's inference is invalid and should not influence any zone boundary decision.",
+    "The minimum-effort resolution for the 3 reverse import edges is zone pinning via sourcevision configuration, not a structural refactor. Add a zone configuration entry pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a named anchor cluster. This instructs Louvain to place these files in a fixed foundation zone on every re-analysis, drawing zone boundaries so provider service files (api-provider.ts, cli-provider.ts, auth.ts) cluster above them — eliminating reverse edges with zero import-path changes and zero test disruption. Attempt zone pinning first after re-running sourcevision analyze. Only proceed to the import-path refactor described in global/31 if pinning produces an unstable boundary on re-analysis.",
+    "global/23 infers that the src-2 zone enrichment failure 'independently corroborates' a fuzzy zone boundary. global/13 refutes this with a concrete mechanism: the manifest records status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed process — not ambiguous file content. A crashed process is a deterministic failure with no content-quality signal. global/23's corroboration claim is therefore invalid. Rely on global/13; do not use global/23 as evidence for any zone-split or naming action beyond what the size metric alone justifies.",
+    "The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs.",
+    "At least 13 findings (global/0, 4, 6, 8, 11, 17, 20, 22, 25, 31, 32, 33, 34) independently describe aspects of the same 3 reverse import edges from different angles: automated heuristic edge counting, two independent LLM analysis passes, and multiple meta-evaluation passes all converged unprompted on the same root cause and the same fix candidate. This cross-method convergence — without any single pass being able to see the others — is strong evidence the finding is real and not a false positive, and justifies treating it as the highest-priority work item even before clean re-analysis confirms edge persistence.",
     "[call graph] 88 calls: \"unit\" → \"src\""
   ],
   "findings": [
@@ -622,48 +632,6 @@
       "scope": "global",
       "text": "Bidirectional coupling: \"src\" ↔ \"src-2\" (3+23 crossings) — consider extracting shared interface",
       "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "root",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "src",
-      "text": "12 entry points — wide API surface, consider consolidating exports",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "src-2",
-      "text": "Contains 42% of project files (19/45) — may be too broad, consider splitting",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "src-2",
-      "text": "Generic zone name \"Src 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "unit",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "global",
-      "text": "tests/unit/ contains files from 3 zones (src, src-2, unit) — consider grouping into subdirectories to clarify architectural boundaries",
-      "severity": "info"
     },
     {
       "type": "observation",
@@ -687,39 +655,81 @@
       "severity": "warning"
     },
     {
-      "type": "pattern",
-      "pass": 2,
+      "type": "observation",
+      "pass": 5,
       "scope": "global",
-      "text": "The asymmetry between test coverage (core only) and source coupling (core ↔ utilities) means the package's test suite validates the intended architecture but not the actual architecture — a dedicated utility test zone would close this gap.",
+      "text": "Severity reassessment summary: global/6 downgraded critical→warning (double-counts root cause already in global/8); global/7 downgraded critical→info (positive architectural property, must be info per evaluation constraints); global/11 upgraded info→critical (cluster-criticality justification confirmed across global/22 and 23 — three co-occurring sub-threshold risks on the same change surface eliminates all defensive layers); global/14 downgraded critical→info (meta-finding about global/7 which is itself a positive property); global/15 downgraded critical→warning (descriptive convergence finding, root cause independently covered by global/8 at critical); global/31 downgraded critical→warning (planning prerequisite, not a structural defect); src-2/1 and src-2/6 downgraded warning→info (missing zone name is a process gap, not an architectural defect or risk).",
       "severity": "info"
     },
     {
-      "type": "pattern",
-      "pass": 2,
+      "type": "observation",
+      "pass": 5,
       "scope": "global",
-      "text": "The three source zones form a layered architecture (utilities → core ← tests) that is one refactor away from being a clean strict DAG — only 3 import edges need to be redirected or extracted into a shared types module to achieve full unidirectionality.",
-      "severity": "critical"
+      "text": "The stale zones manifest (status: 'running') is an independent corroboration of why the src-2 zone received no name from automated enrichment (src-2/1): the enrichment LLM call likely never completed or its output was not persisted. This means the zone naming failure is a process artifact, not a signal about zone coherence. Finding global/19's inference that 'enrichment failure corroborates fuzzy zone boundary' is therefore invalid — the failure source is a crashed process, not ambiguous content.",
+      "severity": "info"
     },
     {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "global",
-      "text": "No zone imports from package-root at runtime — configuration is consumed by external tooling only. This clean boundary means config changes cannot introduce runtime regressions in source zones.",
-      "severity": "critical"
+      "type": "observation",
+      "pass": 0,
+      "scope": "root",
+      "text": "Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)",
+      "severity": "info"
     },
     {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "global",
-      "text": "A shared base types zone is missing: both llm-provider-core and llm-cli-utilities need the same fundamental types (provider config shapes, token structs, project dir records), causing core to import upward into utilities to get them. Introducing a zero-dependency types-only zone that both source zones import downward from would eliminate the cycle with no behavioral change.",
-      "severity": "critical"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "global",
-      "text": "HTTP and subprocess provider strategies (api-provider vs cli-provider/codex-cli-provider) are co-located in the same zone with no sub-boundary — a consumer cannot depend on just the HTTP strategy without also pulling in subprocess execution code, and adding a new transport requires editing files adjacent to unrelated transports.",
+      "type": "observation",
+      "pass": 0,
+      "scope": "src",
+      "text": "12 entry points — wide API surface, consider consolidating exports",
       "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "src",
+      "text": "Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src-2",
+      "text": "Contains 42% of project files (19/45) — may be too broad, consider splitting",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "src-2",
+      "text": "Generic zone name \"Src 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "src-2",
+      "text": "The sourcevision manifest.json records the zones module as status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed or interrupted zone analysis phase. Re-run sourcevision analyze to produce a clean zone map before acting on any zone-level findings — the src-2 name, cohesion/coupling metrics, and entry-point counts may all reflect an incomplete Louvain pass.",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "src-2",
+      "text": "src-2/2 and src-2/3 should be downgraded to info: both recommend zero-cost naming and documentation actions with no structural impact. Warning severity implies a defect requiring remediation; a missing zone name and README are process gaps, not architectural defects.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "unit",
+      "text": "High cohesion (1) — files are tightly interconnected",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "global",
+      "text": "tests/unit/ contains files from 3 zones (src, src-2, unit) — consider grouping into subdirectories to clarify architectural boundaries",
+      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -736,38 +746,73 @@
       "severity": "info"
     },
     {
-      "type": "observation",
+      "type": "suggestion",
       "pass": 5,
       "scope": "global",
-      "text": "Severity reassessment summary: global/6 downgraded critical→warning (double-counts root cause already in global/8); global/7 downgraded critical→info (positive architectural property, must be info per evaluation constraints); global/11 upgraded info→critical (cluster-criticality justification confirmed across global/22 and 23 — three co-occurring sub-threshold risks on the same change surface eliminates all defensive layers); global/14 downgraded critical→info (meta-finding about global/7 which is itself a positive property); global/15 downgraded critical→warning (descriptive convergence finding, root cause independently covered by global/8 at critical); global/31 downgraded critical→warning (planning prerequisite, not a structural defect); src-2/1 and src-2/6 downgraded warning→info (missing zone name is a process gap, not an architectural defect or risk).",
-      "severity": "info"
+      "text": "The compounding risk cluster (finding 11, now critical) should be resolved as a single sequential work unit: step 1 — introduce a new zero-dependency zone containing only shared provider config shapes and token structs, update llm-provider-core and llm-cli-utilities to import downward from it, eliminating the 3 reverse edges; step 2 — add a test zone for llm-cli-utilities with at minimum one test per exported utility to close the coverage gap identified in finding 5; step 3 — add one integration-level test asserting that a constructed session contains a valid auth token, making the session–auth coupling in finding 11 regression-protected. Steps must be done in this order: the types extraction in step 1 defines the stable interface that steps 2 and 3 test against.",
+      "severity": "critical"
     },
     {
-      "type": "observation",
+      "type": "suggestion",
       "pass": 5,
       "scope": "global",
-      "text": "The stale zones manifest (status: 'running') is an independent corroboration of why the src-2 zone received no name from automated enrichment (src-2/1): the enrichment LLM call likely never completed or its output was not persisted. This means the zone naming failure is a process artifact, not a signal about zone coherence. Finding global/19's inference that 'enrichment failure corroborates fuzzy zone boundary' is therefore invalid — the failure source is a crashed process, not ambiguous content.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 5,
-      "scope": "src",
-      "text": "Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export.",
+      "text": "The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify.",
       "severity": "warning"
     },
     {
-      "type": "observation",
+      "type": "suggestion",
       "pass": 5,
-      "scope": "src-2",
-      "text": "The sourcevision manifest.json records the zones module as status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed or interrupted zone analysis phase. Re-run sourcevision analyze to produce a clean zone map before acting on any zone-level findings — the src-2 name, cohesion/coupling metrics, and entry-point counts may all reflect an incomplete Louvain pass.",
+      "scope": "global",
+      "text": "The exact symbols forcing the 3 reverse import edges from llm-provider-core into llm-cli-utilities are: ClaudeConfig, AuthMode, TokenUsage (from types.ts), LLMConfig, CodexConfig (from llm-types.ts), and the provider interface from provider-interface.ts — all already classified as 'types' archetype per global/15 and global/18. The new shared zone must contain exactly these files and no others. Logic-containing files (exec.ts, files.ts, config.ts resolver functions, token-usage.ts parsing helpers) must not move; only pure type/interface/constant definitions qualify.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "The minimum-effort resolution for the 3 reverse import edges is zone pinning via sourcevision configuration, not a structural refactor. Add a zone configuration entry pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a named anchor cluster. This instructs Louvain to place these files in a fixed foundation zone on every re-analysis, drawing zone boundaries so provider service files (api-provider.ts, cli-provider.ts, auth.ts) cluster above them — eliminating reverse edges with zero import-path changes and zero test disruption. Attempt zone pinning first after re-running sourcevision analyze. Only proceed to the import-path refactor described in global/31 if pinning produces an unstable boundary on re-analysis.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down.",
+      "severity": "critical"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "global/23 infers that the src-2 zone enrichment failure 'independently corroborates' a fuzzy zone boundary. global/13 refutes this with a concrete mechanism: the manifest records status 'running' with completedAt predating startedAt by over 3 hours, indicating a crashed process — not ambiguous file content. A crashed process is a deterministic failure with no content-quality signal. global/23's corroboration claim is therefore invalid. Rely on global/13; do not use global/23 as evidence for any zone-split or naming action beyond what the size metric alone justifies.",
       "severity": "info"
     },
     {
-      "type": "observation",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "global",
+      "text": "The asymmetry between test coverage (core only) and source coupling (core ↔ utilities) means the package's test suite validates the intended architecture but not the actual architecture — a dedicated utility test zone would close this gap.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "global",
+      "text": "The three source zones form a layered architecture (utilities → core ← tests) that is one refactor away from being a clean strict DAG — only 3 import edges need to be redirected or extracted into a shared types module to achieve full unidirectionality.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
       "pass": 5,
-      "scope": "src-2",
-      "text": "src-2/2 and src-2/3 should be downgraded to info: both recommend zero-cost naming and documentation actions with no structural impact. Warning severity implies a defect requiring remediation; a missing zone name and README are process gaps, not architectural defects.",
+      "scope": "global",
+      "text": "At least 13 findings (global/0, 4, 6, 8, 11, 17, 20, 22, 25, 31, 32, 33, 34) independently describe aspects of the same 3 reverse import edges from different angles: automated heuristic edge counting, two independent LLM analysis passes, and multiple meta-evaluation passes all converged unprompted on the same root cause and the same fix candidate. This cross-method convergence — without any single pass being able to see the others — is strong evidence the finding is real and not a false positive, and justifies treating it as the highest-priority work item even before clean re-analysis confirms edge persistence.",
       "severity": "info"
     },
     {
@@ -817,7 +862,7 @@
       "pass": 5,
       "scope": "global",
       "text": "The 3 reverse import edges (llm-provider-core → llm-cli-utilities) are most likely produced by core provider service files (api-provider.ts, cli-provider.ts, auth.ts) importing shared utility/config symbols from files classified as utility or config archetypes — specifically the resolver functions in config.ts (resolveApiKey, resolveCliPath, resolveModel) and parsing helpers in token-usage.ts (parseApiTokenUsage, parseCliTokenUsage, parseStreamTokenUsage), plus the exec wrapper in exec.ts. These are exactly the 'provider config shapes and token structs' named in finding 8. They are not type-only files — they contain logic — so the extraction target for the new shared layer is the types and interfaces these files depend on (ClaudeConfig, AuthMode, TokenUsage from types.ts; LLMConfig, CodexConfig from llm-types.ts), not the files themselves.",
-      "severity": "info"
+      "severity": "warning"
     },
     {
       "type": "pattern",
@@ -831,7 +876,7 @@
       "pass": 5,
       "scope": "global",
       "text": "The 37-finding set contains at least 13 findings (global/0, 4, 6, 8, 11, 12, 14, 17, 18, 24, 25, 26, 27) that all describe aspects of the same root cause. Before treating these as independent work items, confirm via clean re-analysis that the 3 reverse edges still exist — if the zone boundary shifts on re-analysis, the entire cluster of findings may resolve without a structural refactor.",
-      "severity": "warning"
+      "severity": "info"
     },
     {
       "type": "pattern",
@@ -876,46 +921,32 @@
       "severity": "warning"
     },
     {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "global",
+      "text": "No zone imports from package-root at runtime — configuration is consumed by external tooling only. This clean boundary means config changes cannot introduce runtime regressions in source zones.",
+      "severity": "critical"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "global",
+      "text": "A shared base types zone is missing: both llm-provider-core and llm-cli-utilities need the same fundamental types (provider config shapes, token structs, project dir records), causing core to import upward into utilities to get them. Introducing a zero-dependency types-only zone that both source zones import downward from would eliminate the cycle with no behavioral change.",
+      "severity": "critical"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "global",
+      "text": "HTTP and subprocess provider strategies (api-provider vs cli-provider/codex-cli-provider) are co-located in the same zone with no sub-boundary — a consumer cannot depend on just the HTTP strategy without also pulling in subprocess execution code, and adding a new transport requires editing files adjacent to unrelated transports.",
+      "severity": "warning"
+    },
+    {
       "type": "anti-pattern",
       "pass": 5,
       "scope": "global",
       "text": "Findings src/0 (12 entry points in src zone) and global/2 (all zones follow single public entry point pattern) are mutually exclusive at the intra-package import level. If src has 12 files imported from src-2, the public.ts single-surface convention is being bypassed for 11 of them. The automated heuristic (src/0) is based on call-graph edge counting and is more precise than the LLM's general observation (global/2). Until the 12 entry points are audited, global/2 should not be relied upon as a confirmed invariant — it may describe intent rather than reality.",
       "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "If the clean re-analysis confirms reverse edges persist after zone re-clustering, the minimum-effort fix is not to create a subdirectory but to pin the affected files (types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts) to a named zone via sourcevision zone configuration. This instructs Louvain to treat them as a fixed anchor cluster, which would re-draw zone boundaries so type/config files anchor a foundation zone and service files cluster above it — eliminating the reverse edges with zero code changes and zero import path updates.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "The compounding risk cluster (finding 11, now critical) should be resolved as a single sequential work unit: step 1 — introduce a new zero-dependency zone containing only shared provider config shapes and token structs, update llm-provider-core and llm-cli-utilities to import downward from it, eliminating the 3 reverse edges; step 2 — add a test zone for llm-cli-utilities with at minimum one test per exported utility to close the coverage gap identified in finding 5; step 3 — add one integration-level test asserting that a constructed session contains a valid auth token, making the session–auth coupling in finding 11 regression-protected. Steps must be done in this order: the types extraction in step 1 defines the stable interface that steps 2 and 3 test against.",
-      "severity": "critical"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "The exact symbols forcing the 3 reverse import edges from llm-provider-core into llm-cli-utilities are: ClaudeConfig, AuthMode, TokenUsage (from types.ts), LLMConfig, CodexConfig (from llm-types.ts), and the provider interface from provider-interface.ts — all already classified as 'types' archetype per global/15 and global/18. The new shared zone must contain exactly these files and no others. Logic-containing files (exec.ts, files.ts, config.ts resolver functions, token-usage.ts parsing helpers) must not move; only pure type/interface/constant definitions qualify.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 5,
-      "scope": "global",
-      "text": "The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down.",
-      "severity": "critical"
     },
     {
       "type": "suggestion",
@@ -958,10 +989,17 @@
       "scope": "src-2",
       "text": "Run `sourcevision analyze` to produce a clean zone manifest before acting on any src-2 findings. This is the prerequisite gate for all src-2 severity assessments. If re-analysis produces a different zone boundary, findings src-2/0 (42% of files), src-2/1 (generic name), src-2/4 (ZONE.md suggestion), and global/21 (fuzzy boundary inference) may all resolve without structural action.",
       "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "root",
+      "text": "Zone \"Root\" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
+      "severity": "info"
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 7,
+  "metaEvaluationCount": 8,
   "structureHash": "b67064233d99c70c",
   "zoneContentHashes": {
     "root": "ba8bddb6ce77ae93",

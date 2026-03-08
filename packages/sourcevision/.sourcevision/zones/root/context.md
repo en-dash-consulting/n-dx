@@ -5,8 +5,8 @@
 <zone>
 
 Zone: Root (`root`)
-Files: 10, Cohesion: 1.00, Coupling: 0.00
-Risk: healthy (score: 0.00)
+Files: 10, Cohesion: 0.00, Coupling: 0.00
+Risk: at-risk (score: 0.50)
 Description: 10 files, primarily Markdown, Other, JSON
 Lines: 3810
 
@@ -29,12 +29,14 @@ vitest.config.ts (TypeScript, 20 lines, config)
 
 <findings>
 
-[observation] [info] High cohesion (1) — files are tightly interconnected
+[observation] [info] Isolated files — no import edges between 10 files, cohesion is unmeasurable (reported as 0)
+[suggestion] [info] Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
 
 </findings>
 
 <insights>
 
+- Isolated files — no import edges between 10 files, cohesion is unmeasurable (reported as 0)
 - High cohesion (1) — files are tightly interconnected
 - The presence of both package-lock.json and pnpm workspaces suggests a mixed lockfile situation worth auditing — only one lockfile should be authoritative.
 - tsconfig.tsbuildinfo at the root implies a root-level composite TypeScript build; confirm it stays in sync after each package build.

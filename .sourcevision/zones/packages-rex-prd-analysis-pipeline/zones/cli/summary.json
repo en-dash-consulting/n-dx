@@ -1,0 +1,29 @@
+{
+  "id": "unit-analyze/cli",
+  "name": "Unit Analyze/cli",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "src/analyze/reshape-reason.ts",
+    "src/cli/commands/chunked-review-state.ts",
+    "src/cli/commands/chunked-review.ts",
+    "src/cli/commands/prune.ts",
+    "src/cli/commands/reshape.ts",
+    "src/core/reshape.ts",
+    "src/store/project-config.ts",
+    "tests/integration/claude-config.test.ts",
+    "tests/unit/cli/commands/chunked-review.test.ts"
+  ],
+  "entryPoints": [
+    "src/analyze/reshape-reason.ts",
+    "src/cli/commands/chunked-review-state.ts",
+    "src/cli/commands/chunked-review.ts",
+    "src/cli/commands/prune.ts",
+    "src/cli/commands/reshape.ts",
+    "src/core/reshape.ts",
+    "src/store/project-config.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 9,
+  "lineCount": 0
+}

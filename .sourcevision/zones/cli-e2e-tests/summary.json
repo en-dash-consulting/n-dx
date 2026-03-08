@@ -1,0 +1,37 @@
+{
+  "id": "cli-e2e-tests",
+  "name": "CLI End-to-End Tests",
+  "description": "Comprehensive end-to-end test suite that validates CLI argument contracts, delegation behavior, error handling, and architecture policy across the full monorepo orchestration layer.",
+  "files": [
+    "tests/e2e/architecture-policy.test.js",
+    "tests/e2e/cli-arg-contracts.test.js",
+    "tests/e2e/cli-ci.test.js",
+    "tests/e2e/cli-config.test.js",
+    "tests/e2e/cli-delegation.test.js",
+    "tests/e2e/cli-dev.test.js",
+    "tests/e2e/cli-errors.test.js",
+    "tests/e2e/cli-init.test.js",
+    "tests/e2e/cli-orchestration.test.js",
+    "tests/e2e/cli-pr-check.test.js",
+    "tests/e2e/cli-refresh.test.js",
+    "tests/e2e/cli-spawn-boundary.test.js",
+    "tests/e2e/cli-start.test.js",
+    "tests/e2e/cli-tool-resolution.test.js",
+    "tests/e2e/cli-web.test.js",
+    "tests/e2e/domain-isolation.test.js",
+    "tests/e2e/e2e-helpers.js",
+    "tests/e2e/verify-build.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 18,
+  "lineCount": 5107,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

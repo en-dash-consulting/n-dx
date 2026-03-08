@@ -1,0 +1,14 @@
+{
+  "id": "hench/web",
+  "name": "Hench/web",
+  "description": "2 files, primarily TypeScript",
+  "files": [
+    "packages/web/tests/integration/boundary-check.test.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 201
+}

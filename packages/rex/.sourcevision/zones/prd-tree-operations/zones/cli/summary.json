@@ -1,0 +1,23 @@
+{
+  "id": "unit-core/cli",
+  "name": "Unit Core/cli",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/health.ts",
+    "src/cli/commands/report.ts",
+    "src/core/health.ts",
+    "src/core/stats.ts",
+    "tests/unit/cli/commands/report.test.ts",
+    "tests/unit/core/health.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/health.ts",
+    "src/cli/commands/report.ts",
+    "src/core/health.ts",
+    "src/core/stats.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 6,
+  "lineCount": 1594
+}

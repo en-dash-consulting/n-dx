@@ -1,0 +1,26 @@
+{
+  "id": "hench/unit/agent/agent",
+  "name": "Hench/unit/agent/agent",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/spin.ts",
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/agent/lifecycle/shared.ts",
+    "packages/hench/tests/unit/agent/cli-retry.test.ts",
+    "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+    "packages/hench/tests/unit/agent/heartbeat.test.ts",
+    "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+    "packages/hench/tests/unit/agent/spin-detection.test.ts",
+    "packages/hench/tests/unit/agent/token-tracking.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts"
+  ],
+  "cohesion": 0.37,
+  "coupling": 0.63,
+  "fileCount": 11,
+  "lineCount": 3331
+}

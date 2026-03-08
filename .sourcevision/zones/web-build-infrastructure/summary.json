@@ -1,0 +1,30 @@
+{
+  "id": "web-build-infrastructure",
+  "name": "Web Build Infrastructure",
+  "description": "Web package build runner scripts and configuration files that define how the dashboard and MCP server are compiled and served in development.",
+  "files": [
+    "packages/web/SourceVision-F.png",
+    "packages/web/SourceVision.png",
+    "packages/web/build.js",
+    "packages/web/dev.js",
+    "packages/web/package.json",
+    "packages/web/tsconfig.json",
+    "packages/web/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/elapsed-time.ts",
+    "packages/web/src/viewer/route-state.ts",
+    "packages/web/src/viewer/views/task-audit.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 7,
+  "lineCount": 433,
+  "riskMetrics": {
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

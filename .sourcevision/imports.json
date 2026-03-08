@@ -5143,7 +5143,7 @@
     },
     {
       "from": "packages/rex/src/analyze/dedupe.ts",
-      "to": "packages/rex/src/schema/v1.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
         "PRIORITY_ORDER"
@@ -6703,6 +6703,15 @@
       "symbols": [
         "formatConflict",
         "formatIntraBatchDuplicate"
+      ]
+    },
+    {
+      "from": "packages/rex/src/cli/commands/recommend.ts",
+      "to": "packages/rex/src/recommend/conflict-detection.ts",
+      "type": "type",
+      "symbols": [
+        "RecommendationConflict",
+        "IntraBatchDuplicate"
       ]
     },
     {
@@ -8502,7 +8511,7 @@
     },
     {
       "from": "packages/rex/src/core/code-coverage.ts",
-      "to": "packages/rex/src/schema/v1.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem"
@@ -8593,7 +8602,7 @@
     },
     {
       "from": "packages/rex/src/core/facets.ts",
-      "to": "packages/rex/src/schema/v1.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
@@ -9061,7 +9070,7 @@
     },
     {
       "from": "packages/rex/src/core/requirements.ts",
-      "to": "packages/rex/src/schema/v1.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem",
@@ -9107,7 +9116,7 @@
     },
     {
       "from": "packages/rex/src/core/scope-creep.ts",
-      "to": "packages/rex/src/schema/levels.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "static",
       "symbols": [
         "isContainerLevel"
@@ -9115,7 +9124,7 @@
     },
     {
       "from": "packages/rex/src/core/scope-creep.ts",
-      "to": "packages/rex/src/schema/v1.ts",
+      "to": "packages/rex/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "PRDItem"
@@ -9859,6 +9868,7 @@
         "RecommendationMeta",
         "CreationResult",
         "SkippedRecommendation",
+        "UpdatedRecommendation",
         "ReparentedRecommendation"
       ]
     },
@@ -10023,7 +10033,8 @@
       "to": "packages/rex/src/recommend/types.ts",
       "type": "type",
       "symbols": [
-        "EnrichedRecommendation"
+        "EnrichedRecommendation",
+        "RecommendationMeta"
       ]
     },
     {
@@ -16798,22 +16809,6 @@
       "type": "type",
       "symbols": [
         "WebSocketBroadcaster"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/mcp-deps.ts",
-      "to": "packages/web/src/server/domain-gateway.ts",
-      "type": "reexport",
-      "symbols": [
-        "*"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/mcp-deps.ts",
-      "to": "packages/web/src/server/rex-gateway.ts",
-      "type": "reexport",
-      "symbols": [
-        "*"
       ]
     },
     {
@@ -25152,7 +25147,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2593,
+    "totalEdges": 2592,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],
@@ -25163,7 +25158,7 @@
       },
       {
         "path": "packages/rex/src/schema/index.ts",
-        "count": 42
+        "count": 44
       },
       {
         "path": "packages/rex/src/store/index.ts",

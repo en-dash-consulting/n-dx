@@ -5,8 +5,8 @@
 <zone>
 
 Zone: .claude (`packages-sourcevision:.claude`)
-Files: 2, Cohesion: 1.00, Coupling: 0.00
-Risk: healthy (score: 0.00)
+Files: 2, Cohesion: 0.00, Coupling: 0.00
+Risk: at-risk (score: 0.50)
 Description: 2 files, primarily JSON
 Lines: 0
 
@@ -17,8 +17,15 @@ Lines: 0
 
 </files>
 
+<findings>
+
+[suggestion] [info] Zone ".claude" (packages-sourcevision:.claude) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
+
+</findings>
+
 <insights>
 
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
 - High cohesion (1) — files are tightly interconnected
 - These files are project-scoped IDE configuration and should remain isolated from source code zones.
 - Both files carry zero coupling, confirming correct isolation from the analysis graph.
