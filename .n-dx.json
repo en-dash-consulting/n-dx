@@ -13,37 +13,33 @@
     },
     "zones": {
       "pins": {
-        "packages/web/src/viewer/components/elapsed-time.ts": "web-viewer",
-        "packages/web/src/viewer/views/task-audit.ts": "web-viewer",
-        "packages/web/src/server/websocket.ts": "web-viewer",
-        "packages/web/tests/unit/server/websocket.test.ts": "web-viewer",
-        "packages/web/tests/unit/server/ws-health-tracker.test.ts": "web-viewer",
-        "packages/web/tests/integration/ws-health-integration.test.ts": "web-viewer",
-        "packages/web/tests/integration/boundary-check.test.ts": "web-viewer",
-        "packages/web/src/viewer/performance/crash-detector.ts": "web-viewer",
-        "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/crash-detector.test.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/use-crash-recovery.test.ts": "web-viewer",
-        "packages/web/tests/helpers/crash-detector-test-support.ts": "web-viewer",
-        "packages/web/src/viewer/route-state.ts": "web-viewer",
-        "packages/web/src/viewer/hooks/use-tick.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/route-state.test.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-viewer",
-        "scripts/check-gateway-test.mjs": "monorepo-orchestration",
-        "scripts/check-gateway-regex.mjs": "monorepo-orchestration",
-        "tests/e2e/cli-contract.test.mjs": "monorepo-root",
-        "packages/web/src/viewer/components/prd-tree/analyze-panel.ts": "web-viewer",
-        "packages/web/src/viewer/views/analysis.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/analyze-panel.test.ts": "web-viewer",
-        "packages/web/src/viewer/components/prd-tree/lazy-children.ts": "web-viewer",
-        "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts": "web-viewer",
-        "scripts/hench-callgraph-analysis.mjs": "monorepo-orchestration",
-        "scripts/test-zone-consistency.mjs": "monorepo-orchestration",
-        "packages/web/src/viewer/polling/tick-timer.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-viewer",
-        "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts": "web-viewer"
+        "packages/web/src/viewer/components/elapsed-time.ts": "web-dashboard",
+        "packages/web/src/viewer/views/task-audit.ts": "web-dashboard",
+        "packages/web/src/server/websocket.ts": "web-dashboard",
+        "packages/web/tests/unit/server/websocket.test.ts": "web-dashboard",
+        "packages/web/tests/unit/server/ws-health-tracker.test.ts": "web-dashboard",
+        "packages/web/tests/integration/ws-health-integration.test.ts": "web-dashboard",
+        "packages/web/tests/integration/boundary-check.test.ts": "web-dashboard",
+        "packages/web/src/viewer/performance/crash-detector.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/crash-detector.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/use-crash-recovery.test.ts": "web-dashboard",
+        "packages/web/tests/helpers/crash-detector-test-support.ts": "web-dashboard",
+        "packages/web/src/viewer/route-state.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-tick.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/route-state.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-dashboard",
+        "packages/web/src/viewer/components/prd-tree/analyze-panel.ts": "web-dashboard",
+        "packages/web/src/viewer/views/analysis.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/analyze-panel.test.ts": "web-dashboard",
+        "packages/web/src/viewer/components/prd-tree/lazy-children.ts": "web-dashboard",
+        "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts": "web-dashboard",
+        "packages/web/src/viewer/polling/tick-timer.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts": "web-dashboard",
+        "scripts/hench-callgraph-analysis.mjs": "monorepo-maintenance-scripts"
       }
     },
     "riskJustifications": [
@@ -67,6 +63,14 @@
         "zone": "global",
         "file": "packages/rex/src/schema/index.ts",
         "reason": "Schema barrel file with high fan-in (22+ importers) is by design. It serves as the single public surface for rex's type definitions and domain constants. The docblock explicitly documents the stability contract: adding exports is safe, renaming/removing requires updating all consumers. Splitting the barrel would scatter the public API without reducing coupling."
+      },
+      {
+        "zone": "mcp-route-layer",
+        "reason": "Coupling of 0.6 is architectural: routes-mcp.ts imports rex-gateway.ts (runtime gateway, required for MCP server creation) and types.ts (type-only import, erased at compile). The bidirectional coupling with web-dashboard follows the composition-root pattern — start.ts wires the MCP handler into the HTTP server. Extracting shared types would not reduce real runtime coupling."
+      },
+      {
+        "zone": "web-build-infrastructure",
+        "reason": "Low cohesion (0.33) and high coupling (0.67) are artifacts of misclassified viewer files. Zone pins have been corrected to assign elapsed-time.ts, route-state.ts, and task-audit.ts to web-dashboard. After re-analysis, this zone will collapse to a pure build-config cluster (build.js, dev.js, package.json, tsconfig.json) with no cross-zone coupling."
       }
     ]
   }
