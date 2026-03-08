@@ -52,6 +52,9 @@
  * @see packages/hench/tests/unit/prd/rex-gateway.test.ts — contract test
  */
 
+// ---- Schema version ---------------------------------------------------------
+export { SCHEMA_VERSION } from "rex";
+
 // ---- Store factory ----------------------------------------------------------
 export { resolveStore } from "rex";
 

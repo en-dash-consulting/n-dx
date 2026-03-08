@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path";
-import { access, writeFile, readFile, unlink } from "node:fs/promises";
+import { access, readFile, unlink } from "node:fs/promises";
+import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
@@ -137,7 +138,7 @@ function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string
 
 async function savePending(dir: string, proposals: Proposal[]): Promise<void> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
-  await writeFile(filePath, JSON.stringify(proposals, null, 2));
+  await atomicWriteJSON(filePath, proposals);
 }
 
 async function loadPending(dir: string): Promise<Proposal[] | null> {

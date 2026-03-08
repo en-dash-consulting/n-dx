@@ -85,6 +85,7 @@ export type {
   FacetDefinition, LoEConfig,
 } from "./schema/v1.js";
 export {
+  SCHEMA_VERSION,
   PRIORITY_ORDER,
   LEVEL_HIERARCHY,
   VALID_LEVELS,
@@ -274,7 +275,7 @@ export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowled
 export { createItemsFromRecommendations } from "./recommend/create-from-recommendations.js";
 export type {
   EnrichedRecommendation, RecommendationMeta, CreationResult,
-  SkippedRecommendation, ReparentedRecommendation,
+  SkippedRecommendation, UpdatedRecommendation, ReparentedRecommendation,
 } from "./recommend/create-from-recommendations.js";
 
 // ---- Core: facets -----------------------------------------------------------

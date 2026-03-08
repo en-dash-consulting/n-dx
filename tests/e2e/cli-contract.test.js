@@ -10,15 +10,12 @@
  * @see ci.js  — CI pipeline
  */
 
-import { execFileSync } from "child_process";
-import { dirname, resolve, join } from "path";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
-const __dir = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dir, "../..");
+const root = join(import.meta.dirname, "../..");
 
 /**
  * Resolve a package's CLI entry point from its package.json bin field.
@@ -88,14 +85,13 @@ describe("CLI orchestration contract", () => {
         it(`supports "${cmd}" subcommand`, () => {
           // Verify the command name appears in the help output.
           // This catches renamed/removed subcommands at test time.
-          const found = helpOutput.includes(cmd);
-          assert.ok(
-            found,
+          expect(
+            helpOutput.includes(cmd),
             `${toolName} CLI does not mention "${cmd}" in its --help output.\n` +
             `cli.js/ci.js invokes this subcommand — if it was renamed or removed,\n` +
             `update the orchestration layer to match.\n\n` +
             `Help output:\n${helpOutput.slice(0, 1000)}`,
-          );
+          ).toBe(true);
         });
       }
     });

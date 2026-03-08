@@ -20,6 +20,8 @@ import * as gateway from "../../../src/prd/rex-gateway.js";
  * acknowledgment of cross-package surface changes.
  */
 const EXPECTED_EXPORTS = [
+  // Schema version
+  "SCHEMA_VERSION",
   // Store factory
   "resolveStore",
   // Tree utilities
@@ -47,19 +49,19 @@ const EXPECTED_EXPORTS = [
 ] as const;
 
 describe("rex-gateway compatibility", () => {
-  it("re-exports all expected functions from rex", () => {
+  it("re-exports all expected symbols from rex", () => {
     const missing: string[] = [];
 
     for (const name of EXPECTED_EXPORTS) {
       const exported = (gateway as Record<string, unknown>)[name];
-      if (typeof exported !== "function") {
+      if (exported === undefined) {
         missing.push(name);
       }
     }
 
     if (missing.length > 0) {
       expect.fail(
-        `rex-gateway is missing or has non-function exports: ${missing.join(", ")}.\n` +
+        `rex-gateway is missing exports: ${missing.join(", ")}.\n` +
         "This means rex's public API has changed. Update rex-gateway.ts and this test.",
       );
     }
@@ -79,12 +81,23 @@ describe("rex-gateway compatibility", () => {
     }
   });
 
+  // Constants (non-function exports)
+  const CONSTANT_EXPORTS = new Set(["SCHEMA_VERSION"]);
+
   // Verify each individual export to give clear diagnostics on failure
   for (const name of EXPECTED_EXPORTS) {
-    it(`exports "${name}" as a function`, () => {
-      const exported = (gateway as Record<string, unknown>)[name];
-      expect(exported).toBeDefined();
-      expect(typeof exported).toBe("function");
-    });
+    if (CONSTANT_EXPORTS.has(name)) {
+      it(`exports "${name}" as a constant`, () => {
+        const exported = (gateway as Record<string, unknown>)[name];
+        expect(exported).toBeDefined();
+        expect(typeof exported).toBe("string");
+      });
+    } else {
+      it(`exports "${name}" as a function`, () => {
+        const exported = (gateway as Record<string, unknown>)[name];
+        expect(exported).toBeDefined();
+        expect(typeof exported).toBe("function");
+      });
+    }
   }
 });
