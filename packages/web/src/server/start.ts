@@ -14,7 +14,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
-import { startUsageCleanupScheduler, type CollectAllIdsFn } from "./task-usage.js";
+import { registerUsageScheduler, type CollectAllIdsFn } from "./task-usage.js";
 import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
@@ -618,13 +618,12 @@ export async function startServer(
 
     // Start periodic usage cleanup — prunes orphaned aggregation entries
     // for tasks that no longer exist in the PRD (configurable, default weekly).
-    const cleanupInterval = startUsageCleanupScheduler(
+    const cleanupInterval = registerUsageScheduler({
       ctx,
-      () => getAggregator(watcherHandles.henchRunsDir),
-      ws.broadcast,
-      undefined, // use config interval
-      collectAllIds as CollectAllIdsFn,
-    );
+      getAggregator: () => getAggregator(watcherHandles.henchRunsDir),
+      broadcast: ws.broadcast,
+      collectAllIds: collectAllIds as CollectAllIdsFn,
+    });
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }
 

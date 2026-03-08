@@ -21,6 +21,9 @@
 import { join } from "node:path";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
+import type { TaskUsageAccumulator } from "./shared-types.js";
+
+export type { TaskUsageAccumulator } from "./shared-types.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,12 +39,6 @@ interface FileSnapshot {
 interface FileContribution {
   taskId: string;
   totalTokens: number;
-}
-
-/** Aggregated token usage for a single task. */
-export interface TaskUsageAccumulator {
-  totalTokens: number;
-  runCount: number;
 }
 
 // ---------------------------------------------------------------------------

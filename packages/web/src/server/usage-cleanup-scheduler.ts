@@ -32,8 +32,11 @@
 
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import type { IncrementalTaskUsageAggregator, TaskUsageAccumulator } from "./incremental-task-usage.js";
+import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
+import type { TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "./shared-types.js";
 import { loadPRDSync } from "./prd-io.js";
+
+export type { CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "./shared-types.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -41,38 +44,6 @@ import { loadPRDSync } from "./prd-io.js";
 
 /** Default cleanup interval: 7 days (weekly). */
 export const DEFAULT_CLEANUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** A single orphaned usage entry identified during cleanup. */
-export interface OrphanedEntry {
-  taskId: string;
-  totalTokens: number;
-  runCount: number;
-}
-
-/** Result of a single cleanup cycle. */
-export interface CleanupResult {
-  timestamp: string;
-  prdAvailable: boolean;
-  orphanedEntries: OrphanedEntry[];
-  totalOrphaned: number;
-  totalTokensRemoved: number;
-  totalRunsRemoved: number;
-}
-
-/** Persistent log entry written to the cleanup JSONL audit file. */
-export interface CleanupLogEntry extends CleanupResult {
-  event: "usage_cleanup";
-}
-
-/** Cleanup configuration read from `.n-dx.json`. */
-export interface CleanupConfig {
-  /** Cleanup interval in milliseconds. */
-  intervalMs: number;
-}
 
 // ---------------------------------------------------------------------------
 // Pure functions
@@ -153,13 +124,7 @@ interface PRDShape {
   items?: unknown[];
 }
 
-/**
- * Callback that extracts valid task IDs from a flat array of PRD items.
- * Injected by the caller to avoid a direct import of rex-gateway, which
- * would create a bidirectional dependency cycle between the web-server
- * and web-viewer zones.
- */
-export type CollectAllIdsFn = (items: unknown[]) => Set<string>;
+// CollectAllIdsFn is imported from shared-types.ts and re-exported above.
 
 /**
  * Load valid task IDs from the PRD file.
