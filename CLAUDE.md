@@ -74,6 +74,7 @@ Rules:
 - **Intra-package gateways** — within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through `external.ts` for viewer consumers.
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
 - **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Exception: web viewer files are exempt because the server/viewer boundary prevents them from reaching the server-side gateway.
+- **Messaging exemption** — `src/viewer/messaging/` files may import directly from `src/shared/` without going through `external.ts`. The shared/ directory is neutral (neither server nor viewer), and messaging utilities access it directly to avoid zone-level dependency inversion. Enforced by `boundary-check.test.ts` (lines 74–80). New files added to `viewer/messaging/` inherit this exemption — review them to ensure they are genuine messaging infrastructure, not general viewer code.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.

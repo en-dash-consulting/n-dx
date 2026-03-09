@@ -71,6 +71,7 @@ Rules:
 - **One gateway per package** — all runtime cross-package imports pass through it.
 - **Re-export only** — gateways re-export; they contain no logic.
 - **Type imports excluded** — `import type` is erased at compile time and stays at the call-site.
+- **Messaging exemption** — `src/viewer/messaging/` files may import directly from `src/shared/` without going through `external.ts`. The shared/ directory is neutral (neither server nor viewer), so messaging utilities access it directly to avoid zone-level dependency inversion. Enforced by `boundary-check.test.ts`.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.

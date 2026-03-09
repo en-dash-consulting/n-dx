@@ -6,6 +6,11 @@ import { describe, it, expect } from "vitest";
  * The renderer stores viewport state as (viewX, viewY, viewW, viewH) and
  * derives scale = viewW / containerWidth. These tests verify the math in
  * isolation without requiring SVG DOM.
+ *
+ * Source implementation: src/viewer/graph/renderer.ts
+ * These functions are duplicated here because the renderer does not export
+ * its internal algorithms. If the renderer is refactored to extract pure
+ * logic modules, these tests should import from those modules directly.
  */
 
 // ── Viewport state type (mirrors renderer internals) ─────────────────────────

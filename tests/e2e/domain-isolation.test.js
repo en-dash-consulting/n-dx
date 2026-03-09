@@ -25,6 +25,8 @@
  *
  * @see CLAUDE.md — Architecture section
  * @see PACKAGE_GUIDELINES.md — Gateway pattern reference
+ * @see packages/web/tests/integration/boundary-check.test.ts — intra-package server/viewer boundary
+ * @see tests/e2e/architecture-policy.test.js — orchestration spawn-only + zone cycle detection
  */
 
 import { describe, it, expect } from "vitest";

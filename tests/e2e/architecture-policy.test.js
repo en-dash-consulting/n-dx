@@ -6,6 +6,12 @@
  * spawnTool(), and spawnManaged() so domain packages never need to
  * import from node:child_process directly.
  *
+ * @see tests/e2e/domain-isolation.test.js — cross-package gateway enforcement
+ * @see packages/web/tests/integration/boundary-check.test.ts — intra-package server/viewer boundary
+ *
+ * These three test files together enforce the full architectural guardrail suite.
+ * Changes to one should be reviewed against the others for consistency.
+ *
  * Allowed exceptions:
  *   1. @n-dx/llm-client/src/exec.ts — the abstraction itself
  *   2. @n-dx/llm-client/src/cli-provider.ts — Claude CLI streaming (needs raw spawn for event parsing)
@@ -312,6 +318,10 @@ const DOCUMENTED_POLICIES = [
     rule: "No source file may import from .rex/, .sourcevision/, or .hench/ directories",
     enforcedBy: "domain-isolation.test.js → data-layer contract",
   },
+  {
+    rule: "No import crosses the server/viewer boundary within the web package",
+    enforcedBy: "boundary-check.test.ts → server/client boundary",
+  },
 ];
 
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
@@ -321,7 +331,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(13);
+    expect(DOCUMENTED_POLICIES.length).toBe(14);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -329,7 +339,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
       // Each entry must reference a real test file
       const testFile = policy.enforcedBy.split(" → ")[0];
       expect(
-        ["architecture-policy.test.js", "domain-isolation.test.js"].includes(testFile),
+        ["architecture-policy.test.js", "domain-isolation.test.js", "boundary-check.test.ts"].includes(testFile),
         `Unknown enforcement test file: ${testFile}`,
       ).toBe(true);
     });

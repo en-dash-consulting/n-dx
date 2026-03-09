@@ -31,7 +31,8 @@
         "architecture-docs": "infrastructure",
         "rex-runtime-data": "infrastructure",
         "root-gateway-contracts": "test",
-        "root-concurrency-contracts": "test"
+        "root-concurrency-contracts": "test",
+        "web-build-infrastructure": "infrastructure"
       },
       "pins": {
         "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-viewer",
@@ -74,8 +75,8 @@
         "scripts/hench-callgraph-analysis.mjs": "monorepo-root",
         "scripts/parse-gateway-exports.mjs": "monorepo-root",
 
-        "packages/web/build.js": "web-dashboard",
-        "packages/web/dev.js": "web-dashboard",
+        "packages/web/build.js": "web-build-infrastructure",
+        "packages/web/dev.js": "web-build-infrastructure",
         "packages/web/package.json": "web-dashboard",
         "packages/web/tsconfig.json": "web-dashboard",
         "packages/web/vitest.config.ts": "web-dashboard",
@@ -86,11 +87,12 @@
         "packages/web/src/viewer/messaging/fetch-pipeline.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/call-rate-limiter.test.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/fetch-pipeline.test.ts": "viewer-message-pipeline",
 
         "packages/web/tests/unit/viewer/sidebar.test.ts": "web-viewer",
 
-        "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-dashboard",
-        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-dashboard",
+        "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-viewer",
 
         "packages/web/src/landing/landing.ts": "web-dashboard",
         "packages/web/tests/unit/landing/landing.test.ts": "web-dashboard",

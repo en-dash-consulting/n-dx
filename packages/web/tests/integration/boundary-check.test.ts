@@ -4,6 +4,12 @@
  * Ensures no import crosses the boundary between src/server/ and src/viewer/.
  * This catches accidental coupling that would not be flagged by the build
  * since both sides compile under the same tsconfig.
+ *
+ * @see tests/e2e/domain-isolation.test.js — cross-package gateway enforcement
+ * @see tests/e2e/architecture-policy.test.js — orchestration spawn-only + zone cycle detection
+ *
+ * These three test files together enforce the full architectural guardrail suite.
+ * Changes to one should be reviewed against the others for consistency.
  */
 
 import { describe, it, expect } from "vitest";

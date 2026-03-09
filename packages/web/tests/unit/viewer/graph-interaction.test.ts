@@ -6,6 +6,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * Tests the findNodeIndex DOM-walking logic, drag/click state machine,
  * selection highlighting, and coordinate transforms — all in isolation
  * without requiring a full browser SVG environment.
+ *
+ * Source implementation: src/viewer/graph/renderer.ts
+ * These functions are duplicated here because the renderer does not export
+ * its internal algorithms. If the renderer is refactored to extract pure
+ * logic modules, these tests should import from those modules directly.
  */
 
 // ── findNodeIndex logic (mirrors renderer implementation) ────────────────────
