@@ -7,27 +7,28 @@
 Zone: Web Viewer/web/server/unit 2 (`web-viewer/web/server/unit-2`)
 Files: 5, Cohesion: 0.50, Coupling: 0.50
 Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/server/routes-sourcevision.ts
-Lines: 1941
+Entry points: packages/web/src/server/routes-token-usage.ts
+Lines: 2402
 
 </zone>
 
 <files>
 
-packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
-packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
-packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
-packages/web/tests/unit/server/routes-sourcevision.test.ts (TypeScript, 369 lines, test)
-packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
+packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
+packages/web/src/server/routes-token-usage.ts (TypeScript, 998 lines, source)
+packages/web/tests/unit/server/aggregation-cache.test.ts (TypeScript, 492 lines, test)
+packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts (TypeScript, 107 lines, test)
+packages/web/tests/unit/server/routes-token-usage.test.ts (TypeScript, 583 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {classifyPRMarkdownRefreshFailureCode}
-  packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {buildPRMarkdownRefreshFailure, classifyPRMarkdownRefreshFailureCode, classifyPRMarkdownRefreshPreflightCode, GIT_CREDENTIAL_HELPER_COMMAND, getPRMarkdownRefreshRemediationHints, resolvePRMarkdownRefreshPreflightErrorContract, resolvePRMarkdownRefreshGuidance, shouldUsePRMarkdownFallback, shouldUsePRMarkdownFallbackForCode, validatePRMarkdownRefreshPreflightErrorContract}
-  packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
-  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
+  packages/web/src/server/routes-token-usage.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache}
+  packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache, takeFingerprint, fingerprintsMatch}
+  packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {SourceFingerprint}
+  packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts → packages/web/src/server/routes-token-usage.ts {resolveWeeklyBudget}
+  packages/web/tests/unit/server/routes-token-usage.test.ts → packages/web/src/server/routes-token-usage.ts {handleTokenUsageRoute, resetAggregationCache}
 
 </imports>

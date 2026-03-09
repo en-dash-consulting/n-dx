@@ -5,215 +5,102 @@
 <zone>
 
 Zone: Cli (`cli`)
-Files: 40, Cohesion: 0.47, Coupling: 0.53
-Risk: healthy (score: 0.53)
-Description: 40 files, primarily TypeScript
-Entry points: src/analyze/reshape-reason.ts, src/cli/commands/chunked-review.ts, src/cli/commands/constants.ts, src/cli/commands/init.ts, src/cli/commands/token-format.ts, src/cli/commands/usage.ts, src/cli/commands/verify.ts, src/cli/errors.ts, src/cli/mcp.ts, src/cli/output.ts, src/core/reshape.ts, src/core/stats.ts, src/core/token-usage.ts
-Lines: 14230
+Files: 11, Cohesion: 0.22, Coupling: 0.78
+Risk: catastrophic (score: 0.78)
+Description: 11 files, primarily TypeScript
+Entry points: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts, src/cli/mcp.ts, src/core/health.ts
+Lines: 2417
 
 </zone>
 
 <files>
 
-src/analyze/reshape-reason.ts (TypeScript, 357 lines, source)
-src/cli/commands/adapter.ts (TypeScript, 290 lines, source)
-src/cli/commands/chunked-review-state.ts (TypeScript, 870 lines, source)
-src/cli/commands/chunked-review.ts (TypeScript, 212 lines, source)
 src/cli/commands/constants.ts (TypeScript, 51 lines, source)
+src/cli/commands/health.ts (TypeScript, 28 lines, source)
 src/cli/commands/init.ts (TypeScript, 71 lines, source)
-src/cli/commands/move.ts (TypeScript, 54 lines, source)
-src/cli/commands/prune.ts (TypeScript, 613 lines, source)
-src/cli/commands/remove.ts (TypeScript, 254 lines, source)
-src/cli/commands/report.ts (TypeScript, 278 lines, source)
-src/cli/commands/reshape.ts (TypeScript, 215 lines, source)
-src/cli/commands/token-format.ts (TypeScript, 115 lines, source)
-src/cli/commands/update.ts (TypeScript, 197 lines, source)
-src/cli/commands/usage.ts (TypeScript, 248 lines, source)
-src/cli/commands/verify.ts (TypeScript, 108 lines, source)
-src/cli/errors.ts (TypeScript, 142 lines, source)
-src/cli/help.ts (TypeScript, 616 lines, source)
-src/cli/index.ts (TypeScript, 469 lines, source)
 src/cli/mcp-tools.ts (TypeScript, 623 lines, source)
 src/cli/mcp.ts (TypeScript, 226 lines, source)
-src/cli/output.ts (TypeScript, 77 lines, source)
-src/core/reshape.ts (TypeScript, 290 lines, source)
-src/core/stats.ts (TypeScript, 60 lines, source)
-src/core/token-usage.ts (TypeScript, 739 lines, source)
+src/core/health.ts (TypeScript, 436 lines, source)
 src/workflow/default.ts (TypeScript, 20 lines, source)
 tests/integration/smart-add-duplicate-outcomes.test.ts (TypeScript, 257 lines, test)
-tests/unit/cli/commands/add.test.ts (TypeScript, 376 lines, test)
-tests/unit/cli/commands/chunked-review.test.ts (TypeScript, 2169 lines, test)
-tests/unit/cli/commands/loe-display.test.ts (TypeScript, 245 lines, test)
-tests/unit/cli/commands/move.test.ts (TypeScript, 210 lines, test)
-tests/unit/cli/commands/remove.test.ts (TypeScript, 464 lines, test)
-tests/unit/cli/commands/report.test.ts (TypeScript, 419 lines, test)
 tests/unit/cli/commands/smart-add-merge.test.ts (TypeScript, 163 lines, test)
-tests/unit/cli/commands/update.test.ts (TypeScript, 387 lines, test)
-tests/unit/cli/errors.test.ts (TypeScript, 206 lines, test)
-tests/unit/cli/help.test.ts (TypeScript, 151 lines, test)
 tests/unit/cli/mcp.test.ts (TypeScript, 169 lines, test)
-tests/unit/cli/output.test.ts (TypeScript, 140 lines, test)
-tests/unit/core/token-usage-regression.test.ts (TypeScript, 162 lines, test)
-tests/unit/core/token-usage.test.ts (TypeScript, 1517 lines, test)
+tests/unit/core/health.test.ts (TypeScript, 373 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  src/analyze/reshape-reason.ts → src/core/reshape.ts {ReshapeProposal, ReshapeAction}
-  src/cli/commands/adapter.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/adapter.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/adapter.ts → src/cli/output.ts {info, result}
-  src/cli/commands/chunked-review.ts → src/cli/commands/chunked-review-state.ts {GranularityAdjustmentRecord, ChunkReviewState, ChunkAction, GranularityRequest, BatchAcceptanceRecord, GranularityHandler, AssessmentHandler, ModificationHandler, ProposalAssessment, createReviewState, getCurrentChunk, formatPaginationHeader, formatChunk, formatActionMenu, buildPrompt, parseChunkInput, applyAction, replaceProposals, getAcceptedProposals, getRemainingProposals, buildBatchRecord, formatBatchSummary}
-  src/cli/commands/chunked-review.ts → src/cli/commands/chunked-review-state.ts {createReviewState, formatPaginationHeader, formatChunk, formatActionMenu, buildPrompt, parseChunkInput, applyAction, replaceProposals, getAcceptedProposals, getRemainingProposals, buildBatchRecord, formatBatchSummary}
-  src/cli/commands/chunked-review.ts → src/cli/commands/chunked-review-state.ts {GranularityHandler, AssessmentHandler, ModificationHandler, BatchAcceptanceRecord}
-  src/cli/commands/chunked-review.ts → src/cli/output.ts {info}
+  src/cli/commands/health.ts → src/cli/commands/constants.ts {REX_DIR}
+  src/cli/commands/health.ts → src/core/health.ts {computeHealthScore, formatHealthScore}
   src/cli/commands/init.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/init.ts → src/cli/output.ts {info}
   src/cli/commands/init.ts → src/workflow/default.ts {DEFAULT_WORKFLOW}
-  src/cli/commands/move.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/move.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/move.ts → src/cli/output.ts {info, result}
-  src/cli/commands/prune.ts → src/analyze/reshape-reason.ts {reasonForReshape, formatReshapeProposal}
-  src/cli/commands/prune.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/prune.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/prune.ts → src/cli/output.ts {info, result}
-  src/cli/commands/prune.ts → src/core/reshape.ts {applyReshape}
-  src/cli/commands/prune.ts → src/core/reshape.ts {ReshapeProposal}
-  src/cli/commands/remove.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/remove.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/remove.ts → src/cli/output.ts {info, warn, result}
-  src/cli/commands/report.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/report.ts → src/cli/output.ts {result}
-  src/cli/commands/report.ts → src/core/stats.ts {computeStats}
-  src/cli/commands/report.ts → src/core/stats.ts {TreeStats}
-  src/cli/commands/reshape.ts → src/analyze/reshape-reason.ts {reasonForReshape, formatReshapeProposal}
-  src/cli/commands/reshape.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/reshape.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/reshape.ts → src/cli/output.ts {info, result}
-  src/cli/commands/reshape.ts → src/core/reshape.ts {applyReshape}
-  src/cli/commands/reshape.ts → src/core/reshape.ts {ReshapeProposal}
-  src/cli/commands/token-format.ts → src/core/token-usage.ts {aggregateTokenUsage, checkBudget}
-  src/cli/commands/token-format.ts → src/core/token-usage.ts {AggregateTokenUsage, BudgetCheckResult}
-  src/cli/commands/update.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/update.ts → src/cli/errors.ts {CLIError, requireRexDir}
-  src/cli/commands/update.ts → src/cli/output.ts {info, result}
-  src/cli/commands/usage.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/usage.ts → src/cli/commands/token-format.ts {formatAggregateTokenUsage, formatBudgetWarnings}
-  src/cli/commands/usage.ts → src/cli/errors.ts {CLIError, BudgetExceededError}
-  src/cli/commands/usage.ts → src/cli/output.ts {info, warn, result}
-  src/cli/commands/usage.ts → src/core/token-usage.ts {aggregateTokenUsage, estimateCost, collectTokenEvents, groupByCommand, groupByTimePeriod, checkBudget}
-  src/cli/commands/usage.ts → src/core/token-usage.ts {AggregateTokenUsage, TokenUsageFilter, CommandTokenUsage, TimePeriod, PeriodBucket}
-  src/cli/commands/verify.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/commands/verify.ts → src/cli/errors.ts {CLIError}
-  src/cli/commands/verify.ts → src/cli/output.ts {info, result}
-  src/cli/errors.ts → src/cli/commands/constants.ts {REX_DIR}
-  src/cli/index.ts → src/cli/commands/adapter.ts {cmdAdapter}
-  src/cli/index.ts → src/cli/commands/constants.ts {usage}
-  src/cli/index.ts → src/cli/commands/init.ts {cmdInit}
-  src/cli/index.ts → src/cli/commands/move.ts {cmdMove}
-  src/cli/index.ts → src/cli/commands/prune.ts {cmdPrune}
-  src/cli/index.ts → src/cli/commands/remove.ts {cmdRemove}
-  src/cli/index.ts → src/cli/commands/report.ts {cmdReport}
-  src/cli/index.ts → src/cli/commands/reshape.ts {cmdReshape}
-  src/cli/index.ts → src/cli/commands/update.ts {cmdUpdate}
-  src/cli/index.ts → src/cli/commands/usage.ts {cmdUsage}
-  src/cli/index.ts → src/cli/commands/verify.ts {cmdVerify}
-  src/cli/index.ts → src/cli/errors.ts {CLIError, handleCLIError, requireRexDir}
-  src/cli/index.ts → src/cli/help.ts {showCommandHelp}
-  src/cli/index.ts → src/cli/mcp.ts {startMcpServer}
-  src/cli/index.ts → src/cli/output.ts {setQuiet}
-  src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts {reasonForReshape}
   src/cli/mcp-tools.ts → src/cli/commands/constants.ts {REX_DIR}
   src/cli/mcp-tools.ts → src/cli/commands/constants.ts {TOOL_VERSION}
-  src/cli/mcp-tools.ts → src/core/stats.ts {computeStats}
+  src/cli/mcp-tools.ts → src/core/health.ts {computeHealthScore}
   src/cli/mcp.ts → src/cli/commands/constants.ts {REX_DIR, TOOL_VERSION}
   src/cli/mcp.ts → src/cli/mcp-tools.ts {handleGetPrdStatus, handleGetNextTask, handleUpdateTaskStatus, handleAddItem, handleMoveItem, handleMergeItems, handleGetItem, handleAppendLog, handleSyncWithRemote, handleGetRecommendations, handleVerifyCriteria, handleGetCapabilities, handleReorganize, handleHealth, handleFacets}
   tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/constants.ts {REX_DIR}
   tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/init.ts {cmdInit}
-  tests/unit/cli/commands/add.test.ts → src/cli/errors.ts {CLIError}
-  tests/unit/cli/commands/chunked-review.test.ts → src/cli/commands/chunked-review-state.ts {createReviewState, getCurrentChunk, formatPaginationHeader, formatChunk, formatActionMenu, buildPrompt, parseChunkInput, applyAction, getAcceptedProposals, getRemainingProposals, replaceProposals, buildBatchRecord, formatBatchSummary}
-  tests/unit/cli/commands/chunked-review.test.ts → src/cli/commands/chunked-review-state.ts {ChunkReviewState, ChunkAction, BatchAcceptanceRecord, GranularityRequest, GranularityAdjustmentRecord, ProposalAssessment}
-  tests/unit/cli/commands/loe-display.test.ts → src/cli/commands/chunked-review-state.ts {createReviewState, formatChunk}
-  tests/unit/cli/commands/move.test.ts → src/cli/commands/move.ts {cmdMove}
-  tests/unit/cli/commands/move.test.ts → src/cli/errors.ts {CLIError}
-  tests/unit/cli/commands/remove.test.ts → src/cli/commands/remove.ts {cmdRemove}
-  tests/unit/cli/commands/remove.test.ts → src/cli/errors.ts {CLIError}
-  tests/unit/cli/commands/report.test.ts → src/cli/commands/report.ts {cmdReport}
   tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/constants.ts {REX_DIR}
   tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/init.ts {cmdInit}
-  tests/unit/cli/commands/update.test.ts → src/cli/commands/update.ts {cmdUpdate}
-  tests/unit/cli/commands/update.test.ts → src/cli/errors.ts {CLIError}
-  tests/unit/cli/errors.test.ts → src/cli/errors.ts {CLIError, BudgetExceededError, formatCLIError, handleCLIError, requireRexDir}
-  tests/unit/cli/help.test.ts → src/cli/help.ts {showCommandHelp}
   tests/unit/cli/mcp.test.ts → src/cli/mcp.ts {createRexMcpServer, startMcpServer}
-  tests/unit/cli/output.test.ts → src/cli/output.ts {setQuiet, isQuiet, info, warn, result, startSpinner}
-  tests/unit/core/token-usage-regression.test.ts → src/core/token-usage.ts {aggregateTokenUsage, collectTokenEvents, groupByCommand, checkBudget}
-  tests/unit/core/token-usage-regression.test.ts → src/core/token-usage.ts {AggregateTokenUsage}
-  tests/unit/core/token-usage.test.ts → src/cli/commands/token-format.ts {formatAggregateTokenUsage, formatBudgetWarnings}
-  tests/unit/core/token-usage.test.ts → src/core/token-usage.ts {extractRexTokenUsage, extractHenchTokenUsage, extractSvTokenUsage, aggregateTokenUsage, estimateCost, extractRexTokenEvents, extractHenchTokenEvents, extractSvTokenEvents, collectTokenEvents, groupByCommand, groupByTimePeriod, periodKey, checkBudget}
-  tests/unit/core/token-usage.test.ts → src/core/token-usage.ts {AggregateTokenUsage, TokenEvent, BudgetConfig}
+  tests/unit/core/health.test.ts → src/core/health.ts {computeHealthScore, formatHealthScore}
 
 Outgoing (this zone → other zones):
-  → core: src/analyze/reshape-reason.ts → src/core/tree.ts; src/cli/commands/move.ts → src/core/move.ts; src/cli/commands/prune.ts → src/core/prune.ts; src/cli/commands/remove.ts → src/core/prune.ts; src/cli/commands/remove.ts → src/core/remove-epic.ts; src/cli/commands/remove.ts → src/core/remove-feature.ts; src/cli/commands/remove.ts → src/core/remove-task.ts; src/cli/commands/remove.ts → src/core/timestamps.ts; src/cli/commands/remove.ts → src/core/tree.ts; src/cli/commands/report.ts → src/core/dag.ts; src/cli/commands/report.ts → src/core/tree.ts; src/cli/commands/update.ts → src/core/dag.ts; src/cli/commands/update.ts → src/core/delete.ts; src/cli/commands/update.ts → src/core/parent-completion.ts; src/cli/commands/update.ts → src/core/timestamps.ts; src/cli/commands/update.ts → src/core/tree.ts; src/cli/commands/verify.ts → src/core/tree.ts; src/cli/commands/verify.ts → src/core/verify.ts; src/cli/index.ts → src/cli/commands/health.ts; src/cli/index.ts → src/cli/commands/reorganize.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/delete.ts; src/cli/mcp-tools.ts → src/core/facets.ts; src/cli/mcp-tools.ts → src/core/health.ts; src/cli/mcp-tools.ts → src/core/merge.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/parent-completion.ts; src/cli/mcp-tools.ts → src/core/reorganize-executor.ts; src/cli/mcp-tools.ts → src/core/reorganize.ts; src/cli/mcp-tools.ts → src/core/timestamps.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/cli/mcp-tools.ts → src/core/verify.ts; src/core/reshape.ts → src/core/move.ts; src/core/reshape.ts → src/core/tree.ts; src/core/stats.ts → src/core/tree.ts; tests/unit/cli/mcp.test.ts → src/public.ts
-  → e2e: src/cli/commands/report.ts → src/schema/validate.ts
-  → store: src/cli/commands/adapter.ts → src/store/adapter-registry.ts; src/cli/commands/adapter.ts → src/store/adapter-registry.ts; src/cli/commands/init.ts → src/core/canonical.ts; src/cli/commands/init.ts → src/store/index.ts; src/cli/commands/move.ts → src/store/index.ts; src/cli/commands/prune.ts → src/core/canonical.ts; src/cli/commands/prune.ts → src/store/index.ts; src/cli/commands/remove.ts → src/store/index.ts; src/cli/commands/reshape.ts → src/core/canonical.ts; src/cli/commands/reshape.ts → src/store/index.ts; src/cli/commands/token-format.ts → src/store/index.ts; src/cli/commands/update.ts → src/store/index.ts; src/cli/commands/usage.ts → src/store/index.ts; src/cli/commands/verify.ts → src/store/index.ts; src/cli/index.ts → src/cli/commands/sync.ts; src/cli/mcp-tools.ts → src/store/index.ts; src/cli/mcp.ts → src/store/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/store/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/store/index.ts; tests/unit/cli/mcp.test.ts → src/core/canonical.ts; tests/unit/cli/mcp.test.ts → src/store/index.ts
-  → unit: src/cli/index.ts → src/cli/commands/recommend.ts
-  → unit-analyze: src/analyze/reshape-reason.ts → src/analyze/reason.ts; src/analyze/reshape-reason.ts → src/schema/index.ts; src/cli/commands/chunked-review-state.ts → src/analyze/index.ts; src/cli/commands/chunked-review-state.ts → src/analyze/validate-modification.ts; src/cli/commands/chunked-review-state.ts → src/cli/commands/format-loe.ts; src/cli/commands/chunked-review.ts → src/analyze/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/analyze/reason.ts; src/cli/commands/prune.ts → src/cli/commands/analyze.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/store/project-config.ts; src/cli/commands/remove.ts → src/schema/index.ts; src/cli/commands/remove.ts → src/schema/index.ts; src/cli/commands/report.ts → src/core/structural.ts; src/cli/commands/report.ts → src/schema/index.ts; src/cli/commands/report.ts → src/schema/index.ts; src/cli/commands/reshape.ts → src/analyze/reason.ts; src/cli/commands/reshape.ts → src/cli/commands/analyze.ts; src/cli/commands/reshape.ts → src/schema/index.ts; src/cli/commands/reshape.ts → src/store/project-config.ts; src/cli/commands/update.ts → src/core/transitions.ts; src/cli/commands/update.ts → src/schema/index.ts; src/cli/commands/update.ts → src/schema/index.ts; src/cli/index.ts → src/cli/commands/add.ts; src/cli/index.ts → src/cli/commands/analyze.ts; src/cli/index.ts → src/cli/commands/smart-add.ts; src/cli/index.ts → src/cli/commands/status.ts; src/cli/index.ts → src/cli/commands/validate.ts; src/cli/index.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/core/cascade-reset.ts; src/cli/mcp-tools.ts → src/core/transitions.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; src/cli/mcp.ts → src/schema/index.ts; src/core/reshape.ts → src/schema/index.ts; src/core/stats.ts → src/schema/index.ts; src/core/stats.ts → src/schema/index.ts; src/core/token-usage.ts → src/schema/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/schema/index.ts; tests/unit/cli/commands/add.test.ts → src/cli/commands/add.ts; tests/unit/cli/commands/chunked-review.test.ts → src/analyze/index.ts; tests/unit/cli/commands/loe-display.test.ts → src/analyze/index.ts; tests/unit/cli/commands/loe-display.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/report.test.ts → src/schema/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/update.test.ts → src/schema/index.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/core/token-usage-regression.test.ts → src/schema/index.ts; tests/unit/core/token-usage.test.ts → src/schema/index.ts
-  → unit-cli: src/cli/index.ts → src/cli/commands/fix.ts
-  → unit-core: src/cli/index.ts → src/cli/commands/next.ts; src/cli/mcp-tools.ts → src/core/next-task.ts
+  → core: src/cli/mcp-tools.ts → src/core/delete.ts; src/cli/mcp-tools.ts → src/core/facets.ts; src/cli/mcp-tools.ts → src/core/merge.ts; src/cli/mcp-tools.ts → src/core/reorganize-executor.ts; src/cli/mcp-tools.ts → src/core/reorganize.ts; src/core/health.ts → src/core/prune.ts; tests/unit/cli/mcp.test.ts → src/public.ts
+  → store: src/cli/commands/health.ts → src/store/index.ts; src/cli/commands/init.ts → src/core/canonical.ts; src/cli/commands/init.ts → src/store/index.ts; src/cli/mcp-tools.ts → src/store/index.ts; src/cli/mcp.ts → src/store/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/store/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/store/index.ts; tests/unit/cli/mcp.test.ts → src/core/canonical.ts; tests/unit/cli/mcp.test.ts → src/store/index.ts
+  → unit: src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/core/cascade-reset.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/transitions.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp.ts → src/schema/index.ts; src/core/health.ts → src/core/tree.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/schema/index.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts
+  → unit-analyze: src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts
+  → unit-cli: src/cli/commands/health.ts → src/cli/output.ts; src/cli/commands/init.ts → src/cli/output.ts; src/cli/mcp-tools.ts → src/core/parent-completion.ts; src/cli/mcp-tools.ts → src/core/stats.ts; src/cli/mcp-tools.ts → src/core/timestamps.ts; src/cli/mcp-tools.ts → src/core/verify.ts
+  → unit-core: src/cli/mcp-tools.ts → src/core/next-task.ts
 
 Incoming (other zones → this zone):
-  ← core: src/cli/commands/health.ts → src/cli/commands/constants.ts; src/cli/commands/health.ts → src/cli/output.ts; src/cli/commands/reorganize.ts → src/analyze/reshape-reason.ts; src/cli/commands/reorganize.ts → src/cli/commands/constants.ts; src/cli/commands/reorganize.ts → src/cli/errors.ts; src/cli/commands/reorganize.ts → src/cli/output.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/cli/commands/reorganize.ts → src/core/reshape.ts; src/core/analytics.ts → src/core/stats.ts; src/core/analytics.ts → src/core/stats.ts; src/core/move.ts → src/cli/errors.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/analyze/reshape-reason.ts; src/public.ts → src/cli/mcp.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/reshape.ts; src/public.ts → src/core/stats.ts; src/public.ts → src/core/stats.ts; tests/unit/core/move.test.ts → src/cli/errors.ts; tests/unit/core/tree-hardened.test.ts → src/core/stats.ts; tests/unit/core/tree.test.ts → src/core/stats.ts
-  ← store: src/cli/commands/sync.ts → src/cli/commands/constants.ts; src/cli/commands/sync.ts → src/cli/errors.ts; src/cli/commands/sync.ts → src/cli/output.ts
-  ← unit: src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/recommend.ts → src/cli/output.ts
-  ← unit-analyze: src/analyze/guided.ts → src/cli/output.ts; src/analyze/index.ts → src/analyze/reshape-reason.ts; src/analyze/index.ts → src/analyze/reshape-reason.ts; src/cli/commands/add.ts → src/cli/commands/constants.ts; src/cli/commands/add.ts → src/cli/errors.ts; src/cli/commands/add.ts → src/cli/output.ts; src/cli/commands/analyze.ts → src/cli/commands/chunked-review.ts; src/cli/commands/analyze.ts → src/cli/commands/chunked-review.ts; src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/analyze.ts → src/cli/commands/token-format.ts; src/cli/commands/analyze.ts → src/cli/errors.ts; src/cli/commands/analyze.ts → src/cli/output.ts; src/cli/commands/decomposition-review.ts → src/cli/output.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/cli/errors.ts; src/cli/commands/smart-add.ts → src/cli/output.ts; src/cli/commands/status.ts → src/cli/commands/constants.ts; src/cli/commands/status.ts → src/cli/commands/token-format.ts; src/cli/commands/status.ts → src/cli/errors.ts; src/cli/commands/status.ts → src/cli/output.ts; src/cli/commands/status.ts → src/core/stats.ts; src/cli/commands/status.ts → src/core/stats.ts; src/cli/commands/status.ts → src/core/token-usage.ts; src/cli/commands/status.ts → src/core/token-usage.ts; src/cli/commands/validate-interactive.ts → src/cli/output.ts; src/cli/commands/validate.ts → src/cli/commands/constants.ts; src/cli/commands/validate.ts → src/cli/output.ts; src/cli/validate-input.ts → src/cli/errors.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/init.ts; tests/unit/cli/commands/status.test.ts → src/cli/errors.ts; tests/unit/cli/commands/usage.test.ts → src/cli/commands/usage.ts; tests/unit/cli/commands/verify.test.ts → src/cli/commands/verify.ts; tests/unit/cli/commands/verify.test.ts → src/cli/errors.ts; tests/unit/cli/validate-input.test.ts → src/cli/errors.ts
-  ← unit-cli: src/cli/commands/fix.ts → src/cli/commands/constants.ts; src/cli/commands/fix.ts → src/cli/output.ts
-  ← unit-core: src/cli/commands/next.ts → src/cli/commands/constants.ts; src/cli/commands/next.ts → src/cli/output.ts
+  ← core: src/cli/commands/reorganize.ts → src/cli/commands/constants.ts; src/public.ts → src/cli/mcp.ts; src/public.ts → src/core/health.ts; src/public.ts → src/core/health.ts
+  ← fix: src/cli/commands/fix.ts → src/cli/commands/constants.ts
+  ← store: src/cli/commands/sync.ts → src/cli/commands/constants.ts
+  ← unit: src/cli/commands/add.ts → src/cli/commands/constants.ts; src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/report.ts → src/cli/commands/constants.ts
+  ← unit-analyze: src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/prune.ts → src/cli/commands/constants.ts; src/cli/commands/reshape.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/cli/commands/validate.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/init.ts
+  ← unit-cli: src/cli/commands/adapter.ts → src/cli/commands/constants.ts; src/cli/commands/move.ts → src/cli/commands/constants.ts; src/cli/commands/remove.ts → src/cli/commands/constants.ts; src/cli/commands/status.ts → src/cli/commands/constants.ts; src/cli/commands/update.ts → src/cli/commands/constants.ts; src/cli/commands/usage.ts → src/cli/commands/constants.ts; src/cli/commands/verify.ts → src/cli/commands/constants.ts; src/cli/errors.ts → src/cli/commands/constants.ts; src/cli/index.ts → src/cli/commands/constants.ts; src/cli/index.ts → src/cli/commands/health.ts; src/cli/index.ts → src/cli/commands/init.ts; src/cli/index.ts → src/cli/mcp.ts
+  ← unit-core: src/cli/commands/next.ts → src/cli/commands/constants.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] 13 entry points — wide API surface, consider consolidating exports
-[observation] [warning] High coupling (0.53) — 58 imports target "unit-analyze"
-[suggestion] [info] Zone "cli" has files across 9 directories — consider consolidating under a dedicated directory
-[suggestion] [warning] The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.
-[suggestion] [warning] The concrete action to resolve the cli↔unit-analyze bidirectional coupling (58+35 crossings, global-0) is: audit src/cli/commands/ for any file that imports from unit-analyze internals without routing through an explicit gateway, then consolidate those imports into a single cli-side gateway module mirroring the existing hench/src/prd/rex-gateway.ts pattern. The only call-site confirmed to require this treatment is src/cli/commands/analyze.ts (44 outgoing calls to unit-analyze, global-12). No file splits are required.
+[observation] [warning] High coupling (0.78) — 17 imports target "unit"
+[observation] [warning] Low cohesion (0.22) — files are loosely related, consider splitting this zone
+[suggestion] [info] Zone "cli" has files across 8 directories — consider consolidating under a dedicated directory
+[suggestion] [critical] Zone "Cli" (cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: 0.78) — requires immediate architectural intervention
 
 </findings>
 
 <insights>
 
-- High coupling (0.53) — 58 imports target "unit-analyze"
-- 13 entry points — wide API surface, consider consolidating exports
-- High coupling (0.53) — 58 imports target "prd-analysis-core"
-- 13 entry points — wide API surface, consider consolidating exports
-- High coupling (0.51) — 58 imports target "prd-analysis-core"
-- 13 entry points — wide API surface, consider consolidating exports
-- The bidirectional import relationship with prd-analysis-core (58 outbound, 35 inbound) is an architectural red flag — CLI should depend on domain, but domain importing from CLI suggests shared utilities or types that should be extracted to a neutral foundation layer.
-- The chunked-review-state.ts alongside chunked-review.ts indicates stateful multi-step workflows in the CLI; ensure this state is not leaking into the domain layer through the reverse imports.
-- The co-location of mcp.ts with CLI command infrastructure is sensible — MCP is another transport layer for the same domain operations — but verify the MCP handler delegates to the same domain functions as the CLI rather than duplicating logic.
-- Reverse imports from prd-analysis-core back into the cli zone (35 imports) break the expected CLI→Domain dependency direction. Extract any shared utilities or types into a neutral module to restore layering.
-- Token usage tracking (token-usage.ts, token-format.ts) co-located with command routing and MCP infrastructure is a natural fit — these are all cross-cutting CLI concerns rather than domain logic.
-- Zone "cli-mcp-interface" has files across 9 directories — consider consolidating under a dedicated directory
-- cli-mcp-interface sends imports to three zones (unit-analyze: 58, core: 36, store: 21) while receiving from all three back (35+21+3), forming a three-way bidirectional entanglement rather than a single isolated coupling pair.
-- The 21-import path cli → store combined with store → unit-analyze (22) creates a transitive chain that duplicates the direct cli → unit-analyze (58) path — two routes to the same destination suggest the abstraction boundaries between these three zones are not meaningful at runtime.
-- cli-mcp-interface participates in bidirectional coupling with three separate zones simultaneously (prd-analysis-core, core, store) — the CLI layer has no clean downstream; it is structurally merged with the entire domain.
-- cli → store (21) + store → prd-analysis-core (22) creates a parallel transitive path alongside the direct cli → prd-analysis-core (58) route, indicating the store abstraction boundary is not enforced — consumers bypass it freely.
-- reshape-reason.ts is physically in src/analyze/ and logically depends only on analysis/core internals, yet Louvain assigned it to this zone — its presence here is an artifact of import-graph community detection noise, not a deliberate architectural decision.
-- src/analyze/reshape-reason.ts is misclassified in the CLI zone: it lives in src/analyze/, imports from reason.ts and core/reshape.ts, and contains no CLI or transport concerns — move it to prd-analysis-core.
-- chunked-review-state.ts implements a manually-built state machine for multi-step interactive workflows with no shared abstraction — if any other command ever requires multi-step stateful interaction, this pattern will be re-implemented ad-hoc rather than reused, suggesting a StatefulCommand or WorkflowStep interface should be extracted.
-- Token telemetry (token-usage.ts, token-format.ts) lives exclusively in the CLI zone, meaning domain operations have zero visibility into token consumption — it is architecturally impossible to enforce token budgets or emit token telemetry from domain-layer analysis operations without first moving telemetry to a lower layer.
-- cli-mcp-interface has cohesion 0.49 and coupling 0.51, both crossing the warning threshold simultaneously like recommendation-scanning — these are the two fragile zones; all other source zones have at least one metric on the safe side.
-- cli-mcp-interface shares the dual-threshold fragility pattern with recommendation-scanning (cohesion below 0.5, coupling above 0.5 simultaneously). Both zones should be addressed in the same refactoring pass since they are structurally linked via bidirectional imports.
-- Token telemetry is CLI-layer-only. Move token consumption tracking to a cross-cutting concern at the llm-client foundation layer so domain analysis operations can emit telemetry without depending on CLI infrastructure.
-- chunked-review-state.ts is a one-off stateful workflow implementation with no shared contract. Extract a WorkflowStep or StatefulCommand interface to prevent this pattern from being re-implemented ad-hoc in future multi-step commands.
-- Zone "cli" has files across 9 directories — consider consolidating under a dedicated directory
-- The bidirectional coupling between cli and unit-analyze (58 outbound + 35 inbound = 93 crossings, finding global-0) is corroborated by cmdAnalyze calling 44 unique functions (finding global-12) and the CLI-boundary pattern analysis (finding global-11). The concrete fix is contained to two files: (1) decompose src/cli/commands/analyze.ts so that cmdAnalyze delegates to focused sub-handlers rather than calling 44 functions directly, and (2) audit src/cli/commands/ for files that import unit-analyze internals directly and route those calls through the existing gateway pattern. No file splits are required — this is import discipline and delegation, not decomposition.
-- The concrete action to resolve the cli↔unit-analyze bidirectional coupling (58+35 crossings, global-0) is: audit src/cli/commands/ for any file that imports from unit-analyze internals without routing through an explicit gateway, then consolidate those imports into a single cli-side gateway module mirroring the existing hench/src/prd/rex-gateway.ts pattern. The only call-site confirmed to require this treatment is src/cli/commands/analyze.ts (44 outgoing calls to unit-analyze, global-12). No file splits are required.
-- The bidirectional cli↔unit-analyze coupling is corroborated by four independent findings: global-0 (58+35 crossings), cli[3] and cli[4] (LLM analysis identifying analyze.ts as the locus), and global-12 (cmdAnalyze 44 outgoing calls). This convergence elevates confidence: the problem is real, narrow, and fixable without file splits.
-- [call graph] 1552 internal calls, 202 outgoing, 351 incoming (cohesion: 0.88, coupling: 0.12)
+- Low cohesion (0.22) — files are loosely related, consider splitting this zone
+- High coupling (0.78) — 17 imports target "unit"
+- High coupling (0.78) — 17 imports target "prd-schema-foundation"
+- Low cohesion (0.22) and high coupling (0.78) indicate this zone mixes unrelated responsibilities — MCP transport, CLI lifecycle, and health checks should ideally be separated.
+- Integration test files co-located with service entry points dilute the zone's identity; moving tests to a dedicated test zone would improve cohesion.
+- The 'mcp-tools.ts' route-handler and 'mcp.ts' service together define the MCP surface; ensure these stay in sync as new tools are added to avoid undocumented tool drift.
+- Cohesion of 0.22 is well below the 0.4 threshold — the zone bundles CLI bootstrapping, MCP transport, health monitoring, and workflow configuration into a single community, obscuring each concern's boundaries.
+- Coupling of 0.78 reflects that nearly every file here imports from adjacent zones; the 12 inbound imports from unit-cli and 9 from store suggest this zone acts as a fan-in hub rather than a focused layer.
+- 'workflow/default.ts' classified as config and 'core/health.ts' classified as utility are both pulled into a CLI-dominated zone, indicating these files have not yet found stable homes in the architecture.
+- Zone "rex-mcp-service-layer" has files across 8 directories — consider consolidating under a dedicated directory
+- prd-cli-operations directs 12 imports at rex-mcp-service-layer (unit-cli → cli), meaning CLI command files depend on MCP transport infrastructure — this inverts the expected direction where transport adapts domain commands, not the other way around.
+- The MCP service layer pulls in both remote-sync-adapters (9 imports) and receives 12 imports from prd-cli-operations simultaneously, making it a bidirectional hub between CLI and storage concerns that should instead be a pure transport leaf.
+- prd-cli-operations imports rex-mcp-service-layer 12 times, meaning CLI commands depend on MCP transport infrastructure. This inverts the expected dependency direction — transport layers should adapt domain commands, never be imported by them.
+- src/core/health.ts (utility) and src/cli/commands/health.ts (cli-command) split health monitoring across two archetypes within a single zone with no clear ownership boundary — neither file has a natural home, making it ambiguous whether health is a domain concern or a transport concern.
+- workflow/default.ts is the only config-archetyped file in a zone otherwise composed of transport infrastructure and CLI lifecycle files; it has no runtime relationship to MCP and has drifted into this zone purely by import proximity.
+- src/workflow/default.ts (config archetype) is misplaced in the MCP service layer; workflow configuration has no runtime relationship to MCP transport and should be relocated to the domain operations zone or a dedicated configuration zone.
+- Health monitoring is fragmented across src/core/health.ts (utility) and src/cli/commands/health.ts (cli-command) within an MCP-transport-dominated zone. The two-file split without a unifying interface means health check logic and CLI health reporting evolve independently with no enforced contract between them.
+- The health domain (src/core/health.ts + src/cli/commands/health.ts) is the only CLI/core paired concept whose two files were assigned to different zones — fix and next-task both maintain their CLI/core pairs within a single zone. The split is caused by import-graph proximity pulling health.ts toward MCP infrastructure rather than toward a domain pairing.
+- The three integration test files in this zone (tests/integration/smart-add-duplicate-outcomes.test.ts + 2 more) are testing prd-domain-operations concerns, not MCP transport concerns — their zone assignment reveals they import from MCP infrastructure paths that happen to be co-located, not that they logically belong here.
+- src/cli/commands/health.ts and src/core/health.ts are the only CLI/core sibling pair split across zone boundaries — the fix and task-selection zones correctly co-locate their pairs. Realigning health.ts imports to reduce affinity toward MCP infrastructure would allow the next analysis pass to reunite the pair in a dedicated health zone.
+- Integration tests co-located in this zone test duplicate-outcome and smart-add scenarios that belong to prd-domain-operations, not MCP transport. Their import paths determine their zone assignment; moving them to tests/integration/domain/ would break the false affinity and assign them to the correct zone in future analyses.
+- Three independent signals converge on this zone: lowest source-zone cohesion (0.22), bidirectional coupling with unit/unit-cli/store simultaneously, and the god-function + tight-coupling findings both targeting src/cli/commands/prune.ts. This multi-signal convergence makes the critical severity well-supported rather than a single-heuristic escalation.
+- Zone "cli" has files across 8 directories — consider consolidating under a dedicated directory
+- [call graph] 211 internal calls, 83 outgoing, 6 incoming (cohesion: 0.72, coupling: 0.28)
 
 </insights>

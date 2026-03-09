@@ -1,19 +1,20 @@
 {
   "id": "unit-analyze/unit-analyze",
   "name": "Unit Analyze/unit Analyze",
-  "description": "4 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
     "src/analyze/dedupe.ts",
-    "src/cli/commands/smart-add-duplicates.ts",
+    "src/analyze/scanners.ts",
     "tests/unit/analyze/dedupe.test.ts",
-    "tests/unit/cli/commands/smart-add-duplicates.test.ts"
+    "tests/unit/analyze/propose.test.ts",
+    "tests/unit/analyze/scanners.test.ts"
   ],
   "entryPoints": [
     "src/analyze/dedupe.ts",
-    "src/cli/commands/smart-add-duplicates.ts"
+    "src/analyze/scanners.ts"
   ],
-  "cohesion": 0.22,
-  "coupling": 0.78,
-  "fileCount": 4,
-  "lineCount": 1577
+  "cohesion": 0.18,
+  "coupling": 0.82,
+  "fileCount": 5,
+  "lineCount": 3289
 }

@@ -5,36 +5,157 @@
 <zone>
 
 Zone: Web Viewer/web/viewer (`web-viewer/web/viewer`)
-Files: 6, Cohesion: 1.00, Coupling: 0.00
-Description: 6 files, primarily TypeScript
-Entry points: packages/web/src/viewer/views/graph.ts
-Lines: 2947
+Files: 47, Cohesion: 0.77, Coupling: 0.23
+Description: 47 files, primarily TypeScript
+Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/components/prd-tree/facet-filter.ts, packages/web/src/viewer/components/prd-tree/index.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/analysis.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/views/zones.ts, packages/web/src/viewer/visualization/index.ts
+Lines: 12271
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/graph/index.ts (TypeScript, 35 lines, source)
-packages/web/src/viewer/graph/physics.ts (TypeScript, 443 lines, source)
-packages/web/src/viewer/graph/renderer.ts (TypeScript, 1636 lines, source)
-packages/web/src/viewer/views/graph.ts (TypeScript, 388 lines, source)
-packages/web/tests/unit/viewer/graph-destroy.test.ts (TypeScript, 132 lines, test)
-packages/web/tests/unit/viewer/graph-layout.test.ts (TypeScript, 313 lines, test)
+packages/web/src/schema/v1.ts (TypeScript, 378 lines, source)
+packages/web/src/viewer/components/constants.ts (TypeScript, 10 lines, source)
+packages/web/src/viewer/components/data-display/collapsible-section.ts (TypeScript, 95 lines, source)
+packages/web/src/viewer/components/data-display/findings-list.ts (TypeScript, 197 lines, source)
+packages/web/src/viewer/components/data-display/health-gauge.ts (TypeScript, 111 lines, source)
+packages/web/src/viewer/components/data-display/mini-charts.ts (TypeScript, 183 lines, source)
+packages/web/src/viewer/components/data-display/tree-view.ts (TypeScript, 135 lines, source)
+packages/web/src/viewer/components/data-display/zone-map.ts (TypeScript, 387 lines, source)
+packages/web/src/viewer/components/prd-tree/analyze-panel.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/components/prd-tree/batch-import-panel.ts (TypeScript, 626 lines, source)
+packages/web/src/viewer/components/prd-tree/facet-filter.ts (TypeScript, 306 lines, source)
+packages/web/src/viewer/components/prd-tree/index.ts (TypeScript, 31 lines, source)
+packages/web/src/viewer/components/prd-tree/lazy-children.ts (TypeScript, 93 lines, source)
+packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts (TypeScript, 225 lines, source)
+packages/web/src/viewer/components/prd-tree/proposal-editor.ts (TypeScript, 704 lines, source)
+packages/web/src/viewer/components/prd-tree/smart-add-input.ts (TypeScript, 604 lines, source)
+packages/web/src/viewer/components/search-filter.ts (TypeScript, 68 lines, source)
+packages/web/src/viewer/components/zone-slideout.ts (TypeScript, 303 lines, source)
+packages/web/src/viewer/hooks/use-file-edges.ts (TypeScript, 286 lines, source)
+packages/web/src/viewer/hooks/use-pan-zoom.ts (TypeScript, 146 lines, source)
+packages/web/src/viewer/hooks/use-subzone-edges.ts (TypeScript, 187 lines, source)
+packages/web/src/viewer/hooks/use-zone-drag.ts (TypeScript, 94 lines, source)
+packages/web/src/viewer/utils.ts (TypeScript, 65 lines, source)
+packages/web/src/viewer/views/analysis.ts (TypeScript, 156 lines, source)
+packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
+packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
+packages/web/src/viewer/views/zone-types.ts (TypeScript, 80 lines, source)
+packages/web/src/viewer/views/zones.ts (TypeScript, 1863 lines, source)
+packages/web/src/viewer/visualization/colors.ts (TypeScript, 44 lines, source)
+packages/web/src/viewer/visualization/flow.ts (TypeScript, 146 lines, source)
+packages/web/src/viewer/visualization/index.ts (TypeScript, 57 lines, source)
+packages/web/src/viewer/visualization/metrics.ts (TypeScript, 14 lines, source)
+packages/web/tests/unit/viewer/analyze-panel.test.ts (TypeScript, 214 lines, test)
+packages/web/tests/unit/viewer/bar-chart.test.ts (TypeScript, 47 lines, test)
+packages/web/tests/unit/viewer/batch-import-panel.test.ts (TypeScript, 372 lines, test)
+packages/web/tests/unit/viewer/collapsible-section.test.ts (TypeScript, 149 lines, test)
+packages/web/tests/unit/viewer/flow-data-builders.test.ts (TypeScript, 95 lines, test)
+packages/web/tests/unit/viewer/flow-diagram.test.ts (TypeScript, 55 lines, test)
+packages/web/tests/unit/viewer/label-utils.test.ts (TypeScript, 101 lines, test)
+packages/web/tests/unit/viewer/lazy-children.test.ts (TypeScript, 295 lines, test)
+packages/web/tests/unit/viewer/listener-lifecycle.test.ts (TypeScript, 417 lines, test)
+packages/web/tests/unit/viewer/proposal-editor.test.ts (TypeScript, 289 lines, test)
+packages/web/tests/unit/viewer/smart-add-input.test.ts (TypeScript, 605 lines, test)
+packages/web/tests/unit/viewer/tree-view.test.ts (TypeScript, 58 lines, test)
+packages/web/tests/unit/viewer/zone-drill-down.test.ts (TypeScript, 543 lines, test)
+packages/web/tests/unit/viewer/zone-inline-subzones.test.ts (TypeScript, 257 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, buildQuadTree, bhRepulsion, tick, PhysicsNode, PhysicsLink, QTNode, SimState, TickCallbacks}
-  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer, GraphNode, GraphLink, ZoneInfo, GraphRendererOptions}
-  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {initZoneClusteredPositions, tick}
-  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
-  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer}
-  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphNode, GraphLink, ZoneInfo}
-  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {tick}
-  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
-  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, tick}
-  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
+  packages/web/src/viewer/components/constants.ts → packages/web/src/viewer/visualization/colors.ts {ZONE_COLORS}
+  packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/schema/v1.ts {Finding}
+  packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
+  packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
+  packages/web/src/viewer/components/data-display/zone-map.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
+  packages/web/src/viewer/components/data-display/zone-map.ts → packages/web/src/viewer/utils.ts {getZoneColorByIndex, basename}
+  packages/web/src/viewer/components/prd-tree/analyze-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/analyze-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/prd-tree/batch-import-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/batch-import-panel.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanel}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanelProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/facet-filter.ts {FacetFilter}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/facet-filter.ts {FacetFilterProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildren, UNMOUNT_DELAY_MS}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildrenProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerLifecycleManager, useNodeListeners}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerRecord, ListenerLifecycleState}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal, ProposalEditorProps}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInput}
+  packages/web/src/viewer/components/prd-tree/index.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInputProps}
+  packages/web/src/viewer/components/prd-tree/smart-add-input.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/src/viewer/components/prd-tree/smart-add-input.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
+  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/utils.ts {basename}
+  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex}
+  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
+  packages/web/src/viewer/hooks/use-file-edges.ts → packages/web/src/viewer/views/zone-types.ts {FileConnectionMap, FileToFileMap, ZoneData, FlowEdge, BoxRect}
+  packages/web/src/viewer/hooks/use-subzone-edges.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, FlowEdge, BoxRect, FileConnectionMap, ExpandedSubZones}
+  packages/web/src/viewer/hooks/use-zone-drag.ts → packages/web/src/viewer/hooks/use-pan-zoom.ts {ViewBox}
+  packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex, getZoneColor, buildZoneColorMap}
+  packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/flow.ts {buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, buildFlowNodes}
+  packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
+  packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/analyze-panel.ts {AnalyzePanel}
+  packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/index.ts {SmartAddInput, BatchImportPanel}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/schema/v1.ts {Zone, Finding}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/schema/v1.ts {Finding}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
+  packages/web/src/viewer/views/routes.ts → packages/web/src/schema/v1.ts {RouteTreeNode, RouteExportKind, ComponentUsageEdge}
+  packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
+  packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeView, CollapsibleSection, BarChart}
+  packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeNode}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/schema/v1.ts {CallGraph, Zone, ZoneCrossing}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/zone-slideout.ts {ZoneSlideout}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-file-edges.ts {useFileEdges}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-pan-zoom.ts {usePanZoom}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-subzone-edges.ts {useSubZoneEdges}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-zone-drag.ts {useZoneDrag}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/utils.ts {basename}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, FileInfo, ZoneBreadcrumb, ExpandedSubZones}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/visualization/index.ts {CollapsibleSection, buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, getZoneColorByIndex}
+  packages/web/src/viewer/visualization/colors.ts → packages/web/src/schema/v1.ts {Zones}
+  packages/web/src/viewer/visualization/flow.ts → packages/web/src/schema/v1.ts {Zones, CallEdge, ExternalImport}
+  packages/web/src/viewer/visualization/flow.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/findings-list.ts {FindingsList}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/health-gauge.ts {HealthGauge, PatternBadge, MetricCard}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/mini-charts.ts {BarChart, FlowDiagram}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/tree-view.ts {TreeView}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/tree-view.ts {TreeNode}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/zone-map.ts {ZoneMap, ZoneDetail}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/visualization/colors.ts {ZONE_COLORS, getZoneColorByIndex, getZoneColor, buildZoneColorMap}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/visualization/flow.ts {buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, buildFlowNodes}
+  packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
+  packages/web/tests/unit/viewer/analyze-panel.test.ts → packages/web/src/viewer/components/prd-tree/analyze-panel.ts {AnalyzePanel}
+  packages/web/tests/unit/viewer/bar-chart.test.ts → packages/web/src/viewer/components/data-display/mini-charts.ts {BarChart}
+  packages/web/tests/unit/viewer/batch-import-panel.test.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchImportPanel, BatchItemRow}
+  packages/web/tests/unit/viewer/batch-import-panel.test.ts → packages/web/src/viewer/components/prd-tree/batch-import-panel.ts {BatchItem}
+  packages/web/tests/unit/viewer/collapsible-section.test.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
+  packages/web/tests/unit/viewer/flow-data-builders.test.ts → packages/web/src/schema/v1.ts {ZoneCrossing, CallEdge, Zones}
+  packages/web/tests/unit/viewer/flow-data-builders.test.ts → packages/web/src/viewer/visualization/flow.ts {buildFlowEdges, buildCallFlowEdges, buildFileToZoneMap}
+  packages/web/tests/unit/viewer/flow-diagram.test.ts → packages/web/src/viewer/components/data-display/mini-charts.ts {FlowDiagram}
+  packages/web/tests/unit/viewer/label-utils.test.ts → packages/web/src/viewer/utils.ts {truncateFilename, basename}
+  packages/web/tests/unit/viewer/lazy-children.test.ts → packages/web/src/viewer/components/prd-tree/lazy-children.ts {LazyChildren, UNMOUNT_DELAY_MS}
+  packages/web/tests/unit/viewer/listener-lifecycle.test.ts → packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts {ListenerLifecycleManager}
+  packages/web/tests/unit/viewer/proposal-editor.test.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {ProposalEditor}
+  packages/web/tests/unit/viewer/proposal-editor.test.ts → packages/web/src/viewer/components/prd-tree/proposal-editor.ts {RawProposal}
+  packages/web/tests/unit/viewer/smart-add-input.test.ts → packages/web/src/viewer/components/prd-tree/smart-add-input.ts {SmartAddInput}
+  packages/web/tests/unit/viewer/tree-view.test.ts → packages/web/src/viewer/components/data-display/tree-view.ts {TreeView}
+  packages/web/tests/unit/viewer/tree-view.test.ts → packages/web/src/viewer/components/data-display/tree-view.ts {TreeNode}
+  packages/web/tests/unit/viewer/zone-drill-down.test.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
+  packages/web/tests/unit/viewer/zone-drill-down.test.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, FlowEdge, ZoneBreadcrumb}
+  packages/web/tests/unit/viewer/zone-drill-down.test.ts → packages/web/src/viewer/views/zones.ts {convertSubZones, convertCrossings, ZoneBreadcrumbNav}
+  packages/web/tests/unit/viewer/zone-inline-subzones.test.ts → packages/web/src/schema/v1.ts {Zone}
+  packages/web/tests/unit/viewer/zone-inline-subzones.test.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, FileInfo, FlowEdge, BoxRect, FileConnectionMap, ExpandedSubZones}
+  packages/web/tests/unit/viewer/zone-inline-subzones.test.ts → packages/web/src/viewer/views/zones.ts {convertSubZones}
 
 </imports>

@@ -1539,8 +1539,8 @@
       "to": "src/analyze/reshape-reason.ts",
       "type": "dynamic",
       "symbols": [
-        "reasonForReshape",
-        "formatReshapeProposal"
+        "formatReshapeProposal",
+        "reasonForReshape"
       ]
     },
     {

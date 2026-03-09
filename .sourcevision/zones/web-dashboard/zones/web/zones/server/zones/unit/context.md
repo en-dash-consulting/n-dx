@@ -5,24 +5,26 @@
 <zone>
 
 Zone: Web Viewer/web/server/unit (`web-viewer/web/server/unit`)
-Files: 56, Cohesion: 0.88, Coupling: 0.12
-Description: 56 files, primarily TypeScript
-Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-rex/index.ts, packages/web/src/server/types.ts
-Lines: 21112
+Files: 64, Cohesion: 0.96, Coupling: 0.04
+Description: 64 files, primarily TypeScript
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-rex/index.ts, packages/web/src/server/types.ts
+Lines: 23306
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 55 lines, source)
+packages/web/src/public.ts (TypeScript, 68 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
 packages/web/src/server/port.ts (TypeScript, 195 lines, source)
+packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
 packages/web/src/server/rex-gateway.ts (TypeScript, 88 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
+packages/web/src/server/routes-data.ts (TypeScript, 147 lines, source)
 packages/web/src/server/routes-features.ts (TypeScript, 302 lines, source)
 packages/web/src/server/routes-hench.ts (TypeScript, 2492 lines, source)
 packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
@@ -45,11 +47,15 @@ packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
 packages/web/src/server/start.ts (TypeScript, 683 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
+packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
+packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
+packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
 packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
 packages/web/tests/unit/server/routes-adaptive.test.ts (TypeScript, 446 lines, test)
 packages/web/tests/unit/server/routes-config.test.ts (TypeScript, 234 lines, test)
+packages/web/tests/unit/server/routes-data.test.ts (TypeScript, 124 lines, test)
 packages/web/tests/unit/server/routes-hench-audit.test.ts (TypeScript, 249 lines, test)
 packages/web/tests/unit/server/routes-hench-concurrency.test.ts (TypeScript, 254 lines, test)
 packages/web/tests/unit/server/routes-hench-config.test.ts (TypeScript, 305 lines, test)
@@ -70,6 +76,8 @@ packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, t
 packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 225 lines, test)
+packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
+packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
 
 </files>
 
@@ -83,24 +91,33 @@ Internal:
   packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
+  packages/web/src/public.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/server/index.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler}
+  packages/web/src/server/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {SCHEMA_VERSION, isCompatibleSchema}
+  packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-data.ts → packages/web/src/server/prd-io.ts {prdExists, prdPath}
+  packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {jsonResponse}
+  packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/process-memory-tracker.ts {ProcessMemoryTracker}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/routes-status.ts {clearStatusCache}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
@@ -112,17 +129,20 @@ Internal:
   packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/routes-rex/shared.ts {insertChild, loadPRD, savePRD, appendLog}
   packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/analysis.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/rex-gateway.ts {computeStats, isRootLevel}
   packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/rex-gateway.ts {PRDItem}
   packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, appendLog}
   packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/execution.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {reasonForReshape}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {computeHealthScore, detectReorganizations, applyProposals, applyReshape}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/rex-gateway.ts {ReshapeProposal}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/routes-rex/shared.ts {loadPRD, savePRD}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/health.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/health.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/analysis.ts {routeProposals}
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {shutdownRexExecution}
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {routeExecution}
@@ -133,16 +153,19 @@ Internal:
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/reads.ts {routePrdReads}
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/requirements.ts {routeItemRequirements, routeRequirementsAnalytics}
   packages/web/src/server/routes-rex/index.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/items.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, CHILD_LEVEL, isPriority, isItemLevel, removeFromTree, validateMerge, previewMerge, mergeItems}
   packages/web/src/server/routes-rex/items.ts → packages/web/src/server/rex-gateway.ts {PRDItem, ItemLevel, TreeEntry}
   packages/web/src/server/routes-rex/items.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, insertChild, updateInTree, loadPRD, savePRD, appendLog, API_SETTABLE_STATUSES, parentIdOf}
   packages/web/src/server/routes-rex/items.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/items.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/items.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/rex-gateway.ts {walkTree, countSubtree, isWorkItem}
   packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/rex-gateway.ts {PRDItem}
   packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, savePRD, appendLog, parentIdOf}
   packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/prune.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/rex-gateway.ts {computeStats, computeEpicStats, computePriorityDistribution, computeRequirementsSummary}
   packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/routes-rex/shared.ts {loadPRD, findNextTask, collectCompletedIds}
   packages/web/src/server/routes-rex/reads.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
@@ -152,6 +175,8 @@ Internal:
   packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/routes-rex/shared.ts {findItemById, loadPRD, savePRD, appendLog}
   packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-rex/requirements.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/prd-io.ts {loadPRDSync, savePRDSync}
   packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/rex-gateway.ts {VALID_STATUSES, findItem, rexInsertChild, rexUpdateInTree, rexFindNextTask, collectCompletedIds, computeTimestampUpdates}
   packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument, ItemStatus, TreeEntry}
   packages/web/src/server/routes-rex/shared.ts → packages/web/src/server/types.ts {ServerContext}
@@ -159,22 +184,26 @@ Internal:
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-search.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-static.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-status.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {computeStats, collectCompletedIds, findNextTask}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {PRDDocument, TreeStats}
   packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-validation.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, isItemLevel, walkTree, findItem, collectAllIds}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {ItemLevel, PRDItem, PRDDocument}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-workflow.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/search-index.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
   packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
   packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
+  packages/web/src/server/start.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator}
   packages/web/src/server/start.ts → packages/web/src/server/routes-integrations.ts {handleIntegrationRoute}
@@ -187,8 +216,13 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
   packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
+  packages/web/src/server/start.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
+  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
+  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
+  packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
@@ -197,6 +231,8 @@ Internal:
   packages/web/tests/unit/server/routes-adaptive.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-config.test.ts → packages/web/src/server/routes-config.ts {handleConfigRoute, clearConfigCaches}
   packages/web/tests/unit/server/routes-config.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/unit/server/routes-data.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
+  packages/web/tests/unit/server/routes-data.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-audit.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/routes-hench-audit.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-concurrency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
@@ -236,5 +272,7 @@ Internal:
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex/index.ts {shutdownRexExecution}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_STATUSES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
+  packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
+  packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
 
 </imports>

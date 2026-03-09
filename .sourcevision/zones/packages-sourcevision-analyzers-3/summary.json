@@ -1,0 +1,29 @@
+{
+  "id": "packages-sourcevision:analyzers-3",
+  "name": "Analyzers 3",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/louvain.ts",
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zones.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-detection.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-size-policy.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-subdivision.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/zone-hash.ts",
+    "packages/sourcevision/src/analyzers/zones.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 6,
+  "lineCount": 5927,
+  "riskMetrics": {
+    "cohesion": 0.29,
+    "coupling": 0.71,
+    "riskScore": 0.71,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true,
+    "riskJustification": "Core zone analysis engine (Louvain algorithm, zone detection, zone hashing) with 3 test files. High coupling is expected: these files import inventory types, import graph types, and shared utilities that are fundamental to the analysis pipeline. The files are tightly cohesive in purpose — splitting them would create artificial boundaries in the zone detection pipeline."
+  }
+}

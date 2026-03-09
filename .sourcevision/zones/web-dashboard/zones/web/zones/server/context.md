@@ -5,17 +5,18 @@
 <zone>
 
 Zone: Web Viewer/web/server (`web-viewer/web/server`)
-Files: 69, Cohesion: 0.97, Coupling: 0.03
-Description: 69 files, primarily TypeScript
-Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts
-Lines: 25234
+Files: 81, Cohesion: 0.98, Coupling: 0.02
+Description: 81 files, primarily TypeScript
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/shared/data-files.ts, packages/web/src/viewer/views/pr-markdown.ts
+Lines: 29185
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 55 lines, source)
+packages/web/src/public.ts (TypeScript, 68 lines, source)
+packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
 packages/web/src/server/port.ts (TypeScript, 195 lines, source)
@@ -44,14 +45,21 @@ packages/web/src/server/routes-search.ts (TypeScript, 102 lines, source)
 packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
 packages/web/src/server/routes-static.ts (TypeScript, 203 lines, source)
 packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
+packages/web/src/server/routes-token-usage.ts (TypeScript, 998 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 501 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
 packages/web/src/server/start.ts (TypeScript, 683 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
 packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
+packages/web/src/shared/data-files.ts (TypeScript, 20 lines, source)
+packages/web/src/shared/index.ts (TypeScript, 13 lines, source)
+packages/web/src/shared/node-culler.ts (TypeScript, 170 lines, source)
+packages/web/src/viewer/views/pr-markdown.ts (TypeScript, 466 lines, source)
+packages/web/tests/integration/pr-markdown-refresh.test.ts (TypeScript, 176 lines, test)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
+packages/web/tests/unit/server/aggregation-cache.test.ts (TypeScript, 492 lines, test)
 packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
 packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
@@ -75,6 +83,8 @@ packages/web/tests/unit/server/routes-rex.test.ts (TypeScript, 969 lines, test)
 packages/web/tests/unit/server/routes-search.test.ts (TypeScript, 277 lines, test)
 packages/web/tests/unit/server/routes-sourcevision.test.ts (TypeScript, 369 lines, test)
 packages/web/tests/unit/server/routes-status.test.ts (TypeScript, 394 lines, test)
+packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts (TypeScript, 107 lines, test)
+packages/web/tests/unit/server/routes-token-usage.test.ts (TypeScript, 583 lines, test)
 packages/web/tests/unit/server/routes-validation.test.ts (TypeScript, 416 lines, test)
 packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, test)
 packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
@@ -83,6 +93,8 @@ packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, 
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 225 lines, test)
 packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
 packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
+packages/web/tests/unit/viewer/node-culler.test.ts (TypeScript, 350 lines, test)
+packages/web/tests/unit/viewer/pr-markdown.test.ts (TypeScript, 341 lines, test)
 
 </files>
 
@@ -112,6 +124,7 @@ Internal:
   packages/web/src/server/routes-data.ts → packages/web/src/server/prd-io.ts {prdExists, prdPath}
   packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/src/server/routes-data.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-data.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES, SUPPLEMENTARY_FILES}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-features.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
@@ -191,12 +204,17 @@ Internal:
   packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {classifyPRMarkdownRefreshFailureCode}
   packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
   packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-sourcevision.ts → packages/web/src/shared/data-files.ts {DATA_FILES}
   packages/web/src/server/routes-static.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-status.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {computeStats, collectCompletedIds, findNextTask}
   packages/web/src/server/routes-status.ts → packages/web/src/server/rex-gateway.ts {PRDDocument, TreeStats}
   packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {jsonResponse}
   packages/web/src/server/routes-status.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/src/server/routes-status.ts → packages/web/src/shared/data-files.ts {DATA_FILES}
+  packages/web/src/server/routes-token-usage.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache}
+  packages/web/src/server/routes-token-usage.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse}
+  packages/web/src/server/routes-token-usage.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {LEVEL_HIERARCHY, isItemLevel, walkTree, findItem, collectAllIds}
   packages/web/src/server/routes-validation.ts → packages/web/src/server/rex-gateway.ts {ItemLevel, PRDItem, PRDDocument}
@@ -222,13 +240,23 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute, isProjectInitialized}
   packages/web/src/server/start.ts → packages/web/src/server/routes-status.ts {handleStatusRoute, clearStatusCache}
+  packages/web/src/server/start.ts → packages/web/src/server/routes-token-usage.ts {handleTokenUsageRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
   packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
   packages/web/src/server/start.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
+  packages/web/src/server/start.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES}
+  packages/web/src/shared/index.ts → packages/web/src/shared/data-files.ts {DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES}
+  packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCuller}
+  packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCullerOptions, NodeCullerState, VisibilityCallback}
+  packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
+  packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/src/viewer/views/pr-markdown.ts {PRMarkdownView}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
+  packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache, takeFingerprint, fingerprintsMatch}
+  packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {SourceFingerprint}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
@@ -276,6 +304,9 @@ Internal:
   packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-status.test.ts → packages/web/src/server/routes-status.ts {handleStatusRoute, clearStatusCache}
   packages/web/tests/unit/server/routes-status.test.ts → packages/web/src/server/types.ts {ServerContext}
+  packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts → packages/web/src/server/routes-token-usage.ts {resolveWeeklyBudget}
+  packages/web/tests/unit/server/routes-token-usage.test.ts → packages/web/src/server/routes-token-usage.ts {handleTokenUsageRoute, resetAggregationCache}
+  packages/web/tests/unit/server/routes-token-usage.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-validation.test.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/tests/unit/server/routes-validation.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-workflow.test.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
@@ -292,29 +323,35 @@ Internal:
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_STATUSES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
   packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
   packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
+  packages/web/tests/unit/viewer/node-culler.test.ts → packages/web/src/shared/node-culler.ts {NodeCuller}
+  packages/web/tests/unit/viewer/node-culler.test.ts → packages/web/src/shared/node-culler.ts {VisibilityCallback}
+  packages/web/tests/unit/viewer/pr-markdown.test.ts → packages/web/src/viewer/views/pr-markdown.ts {PRMarkdownView}
 
 </imports>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  web-viewer/web/server/server → web-viewer/web/server/unit: 7
-  web-viewer/web/server/server → web-viewer/web/server/unit-2: 1
-  web-viewer/web/server/unit → web-viewer/web/server/server: 6
+  web-viewer/web/server/integration → web-viewer/web/server/unit: 1
+  web-viewer/web/server/integration → web-viewer/web/server/unit-3: 1
+  web-viewer/web/server/unit → web-viewer/web/server/shared: 3
   web-viewer/web/server/unit → web-viewer/web/server/unit-2: 1
-  web-viewer/web/server/unit → web-viewer/web/server/unit-3: 11
-  web-viewer/web/server/unit-2 → web-viewer/web/server/unit: 7
+  web-viewer/web/server/unit → web-viewer/web/server/unit-3: 2
+  web-viewer/web/server/unit-2 → web-viewer/web/server/unit: 3
+  web-viewer/web/server/unit-3 → web-viewer/web/server/shared: 1
+  web-viewer/web/server/unit-3 → web-viewer/web/server/unit: 7
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 4 sub-zone(s):
+This zone has 5 sub-zone(s):
 
-- **Web Viewer/web/server/server** (`web-viewer/web/server/server`): 4 files, cohesion 0.2, coupling 0.8
-- **Web Viewer/web/server/unit** (`web-viewer/web/server/unit`): 56 files, cohesion 0.88, coupling 0.12
+- **Web Viewer/web/server/integration** (`web-viewer/web/server/integration`): 3 files, cohesion 1, coupling 0
+- **Web Viewer/web/server/shared** (`web-viewer/web/server/shared`): 4 files, cohesion 0.5, coupling 0.5
+- **Web Viewer/web/server/unit** (`web-viewer/web/server/unit`): 64 files, cohesion 0.96, coupling 0.04
 - **Web Viewer/web/server/unit 2** (`web-viewer/web/server/unit-2`): 5 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/server/unit 3** (`web-viewer/web/server/unit-3`): 4 files, cohesion 1, coupling 0
+- **Web Viewer/web/server/unit 3** (`web-viewer/web/server/unit-3`): 5 files, cohesion 0.4, coupling 0.6
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

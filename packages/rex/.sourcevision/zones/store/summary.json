@@ -1,0 +1,47 @@
+{
+  "id": "store",
+  "name": "Store",
+  "description": "18 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/sync.ts",
+    "src/core/canonical.ts",
+    "src/store/adapter-registry.ts",
+    "src/store/index.ts",
+    "src/store/integration-schema.ts",
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts",
+    "src/store/notion-adapter.ts",
+    "src/store/notion-map.ts",
+    "tests/integration/project-config.test.ts",
+    "tests/integration/store-roundtrip.test.ts",
+    "tests/unit/cli/commands/sync.test.ts",
+    "tests/unit/core/canonical.test.ts",
+    "tests/unit/core/notion-map.test.ts",
+    "tests/unit/store/adapter-registry.test.ts",
+    "tests/unit/store/integration-schema.test.ts",
+    "tests/unit/store/resolve-store.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/sync.ts",
+    "src/core/canonical.ts",
+    "src/store/adapter-registry.ts",
+    "src/store/index.ts",
+    "src/store/integration-schema.ts",
+    "src/store/integration-schemas/index.ts",
+    "src/store/integration-schemas/jira.ts",
+    "src/store/integration-schemas/notion.ts",
+    "src/store/notion-adapter.ts"
+  ],
+  "cohesion": 0.39,
+  "coupling": 0.61,
+  "fileCount": 18,
+  "lineCount": 6254,
+  "riskMetrics": {
+    "cohesion": 0.39,
+    "coupling": 0.61,
+    "riskScore": 0.61,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

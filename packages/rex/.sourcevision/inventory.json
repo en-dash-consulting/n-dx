@@ -322,13 +322,13 @@
     },
     {
       "path": "src/cli/commands/analyze.ts",
-      "size": 26456,
+      "size": 28203,
       "language": "TypeScript",
-      "lineCount": 784,
-      "hash": "6fc6af0fc1350e642cfc8972377e5621d7989d07faad6d69113eeb8a280b3b01",
+      "lineCount": 838,
+      "hash": "5105261e30206960f60d85c13ded7e1a43ecdc1e838fdcf1ada17658b0b1c31f",
       "role": "source",
       "category": "cli",
-      "lastModified": 1772944331679
+      "lastModified": 1772992616455
     },
     {
       "path": "src/cli/commands/chunked-review-state.ts",
@@ -432,13 +432,13 @@
     },
     {
       "path": "src/cli/commands/prune.ts",
-      "size": 20736,
+      "size": 22640,
       "language": "TypeScript",
-      "lineCount": 632,
-      "hash": "58869730d7771a7efc55beac96e17923b3d441047ccde10535275b3cee10a698",
+      "lineCount": 699,
+      "hash": "8444dccc7f82c3a99d88758272805970c0070f95ddcf2511f0b1003a0eb3eedd",
       "role": "source",
       "category": "cli",
-      "lastModified": 1772953801036
+      "lastModified": 1772992616456
     },
     {
       "path": "src/cli/commands/recommend.ts",
@@ -2463,7 +2463,7 @@
   ],
   "summary": {
     "totalFiles": 246,
-    "totalLines": 86171,
+    "totalLines": 86292,
     "byLanguage": {
       "JSON": 9,
       "Other": 4,

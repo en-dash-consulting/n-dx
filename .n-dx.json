@@ -39,6 +39,22 @@
         "packages/web/src/viewer/polling/tick-timer.ts": "web-viewer",
         "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-viewer",
         "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts": "web-viewer",
+        "packages/web/src/viewer/usage/constants.ts": "web-viewer",
+        "packages/web/src/viewer/usage/index.ts": "web-viewer",
+        "packages/web/src/viewer/views/token-usage.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/usage-polling.test.ts": "web-viewer",
+        "packages/web/build.js": "web-dashboard",
+        "packages/web/dev.js": "web-dashboard",
+        "packages/web/package.json": "web-dashboard",
+        "packages/web/tsconfig.json": "web-dashboard",
+        "packages/web/vitest.config.ts": "web-dashboard",
+        "packages/web/SourceVision-F.png": "web-dashboard",
+        "packages/web/SourceVision.png": "web-dashboard",
+        "packages/web/src/landing/index.html": "web-dashboard",
+        "packages/web/src/landing/landing.css": "web-dashboard",
+        "packages/web/src/landing/landing.ts": "web-dashboard",
+        "packages/web/tests/integration/build-output-contract.test.ts": "web-dashboard",
+        "packages/web/tests/unit/landing/landing.test.ts": "web-dashboard",
         "scripts/hench-callgraph-analysis.mjs": "monorepo-maintenance-scripts",
 
         "packages/rex/src/store/integration-schemas/notion.ts": "notion-integration",
@@ -169,7 +185,7 @@
       },
       {
         "zone": "hench-agent-2",
-        "reason": "Residual detection artifact from Louvain community detection after pinning hench store files to hench-agent. Contains leftover files that did not get absorbed by the primary zone. Metrics are non-representative — this zone should be treated as a detection artifact, not a genuine architectural unit."
+        "reason": "RESOLVED: Zone dissolved by pinning remaining files to their correct zones (viewer files → web-viewer, build infrastructure → web-dashboard). The bidirectional coupling, low cohesion, and high coupling findings were artifacts of zone misclassification, not architectural problems."
       }
     ]
   }

@@ -1,0 +1,21 @@
+{
+  "id": "cross-package-integration-tests",
+  "name": "Cross-Package Integration Tests",
+  "description": "Integration test suite that verifies cross-package contracts and scheduler startup behavior at the monorepo boundary.",
+  "files": [
+    "tests/integration/cross-package-contracts.test.js",
+    "tests/integration/scheduler-startup.test.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 803,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,7 +1,7 @@
 {
   "id": "monorepo-root",
   "name": "Monorepo Root",
-  "description": "Top-level orchestration scripts, CI pipeline, and shared configuration governing the entire n-dx monorepo.",
+  "description": "Repository-level configuration, documentation, and orchestration entry points that define the overall project structure and developer contracts.",
   "files": [
     ".DS_Store",
     ".gitignore",
@@ -39,7 +39,7 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 31,
-  "lineCount": 10001,
+  "lineCount": 10511,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

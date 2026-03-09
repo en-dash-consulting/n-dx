@@ -6712,8 +6712,8 @@
       "to": "packages/rex/src/analyze/reshape-reason.ts",
       "type": "dynamic",
       "symbols": [
-        "reasonForReshape",
-        "formatReshapeProposal"
+        "formatReshapeProposal",
+        "reasonForReshape"
       ]
     },
     {
@@ -17102,6 +17102,19 @@
     },
     {
       "from": "packages/web/src/public.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator",
+        "CollectAllIdsFn",
+        "OrphanedEntry",
+        "CleanupResult",
+        "CleanupLogEntry",
+        "CleanupConfig"
+      ]
+    },
+    {
+      "from": "packages/web/src/public.ts",
       "to": "packages/web/src/server/start.ts",
       "type": "reexport",
       "symbols": [
@@ -25281,7 +25294,8 @@
       ],
       "symbols": [
         "execSync",
-        "spawn"
+        "spawn",
+        "spawnSync"
       ]
     },
     {
@@ -26078,6 +26092,7 @@
         "tests/e2e/cli-tool-resolution.test.js",
         "tests/e2e/cli-web.test.js",
         "tests/e2e/domain-isolation.test.js",
+        "tests/e2e/integration-coverage-policy.test.js",
         "tests/e2e/mcp-transport.test.js",
         "tests/integration/cross-package-contracts.test.js",
         "tests/integration/scheduler-startup.test.js",
@@ -26121,7 +26136,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2703,
+    "totalEdges": 2704,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],

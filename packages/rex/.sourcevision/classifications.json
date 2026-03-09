@@ -511,14 +511,14 @@
   "files": [
     {
       "path": "src/analyze/acknowledge.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Hash computation and file I/O for acknowledged findings — pure helper functions with no orchestration",
+          "detail": "Handles acknowledgment/acceptance of analysis proposals — business logic orchestration within the analyze pipeline.",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared constants, token usage types, and parsing helpers extracted to break circular dependencies",
+          "detail": "Shared helpers and common logic reused across multiple analyze modules.",
           "weight": 0.7
         }
       ]
@@ -546,21 +546,21 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Post-processing safety guard that enforces task count ceiling — pure transformation logic",
+          "detail": "Guard logic to prevent over-consolidation during analysis — a focused helper with no orchestration role.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/decompose.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Recursively decomposes high-LoE items into child proposals — pure data transformation",
+          "detail": "Decomposes epics/tasks into structured PRD items — core business logic in the analyze pipeline.",
           "weight": 0.7
         }
       ]
@@ -574,7 +574,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Similarity scoring algorithms (bigrams, word sets) — pure functional deduplication logic",
+          "detail": "Deduplication utility — stateless transformation logic reused across analyze steps.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Generates human-readable diffs between proposals and existing PRD — pure transformation",
+          "detail": "Computes diffs between PRD states — pure transformation utility.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Requirements extraction engine that parses markdown/JSON/YAML into hierarchical PRD proposals — business logic orchestration",
+          "detail": "Extracts structured data from source material — analyze pipeline business logic.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "File format validation, size limits, and binary detection — pure validation helpers",
+          "detail": "Validates input files before processing — focused validation helper.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Interactive clarification loop with readline-based user input — stateful orchestration logic",
+          "detail": "Orchestrates the guided analysis workflow — high-level service coordinating multiple analyze steps.",
           "weight": 0.7
         }
       ]
@@ -651,14 +651,14 @@
     },
     {
       "path": "src/analyze/llm-bridge.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Module-level LLM client state and factory — bridge utility to break circular dependency",
+          "detail": "Bridges to the LLM API for AI-assisted analysis — API client / integration service.",
           "weight": 0.7
         }
       ]
@@ -672,49 +672,49 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-powered proposal modification via natural-language requests — business logic orchestration",
+          "detail": "Generates or processes modification reasoning during analysis — business logic module.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/propose.ts",
-      "archetype": "types",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "types",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Core proposal type definitions (ProposalTask, ProposalFeature, Proposal) and deduplication logic against existing PRD",
+          "detail": "Generates PRD proposals from analysis results — core analyze pipeline service.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reason.ts",
-      "archetype": "gateway",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "gateway",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Re-exports from analyze-shared and llm-bridge for backward compatibility while serving as the main reasoning hub — re-export-heavy gateway pattern",
+          "detail": "Core reasoning logic for the analyze pipeline — business logic orchestration.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reconcile.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Fuzzy matching and reconciliation of proposals against existing PRD items — pure algorithmic logic",
+          "detail": "Reconciles differences between existing PRD and new proposals — stateful business logic.",
           "weight": 0.7
         }
       ]
@@ -728,21 +728,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "LLM-powered reshape proposals — builds prompts, parses JSON responses for PRD restructuring",
+          "detail": "Reshapes or transforms reasoning artifacts during analysis — pipeline service module.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/scanners.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "File system scanning functions and result accumulation — shared scanning infrastructure",
+          "detail": "Implements codebase scanners that feed the analyze pipeline — data-fetching/business logic service.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Pure validation logic for natural-language modification requests — input validation helpers",
+          "detail": "Validates proposed modifications before applying — focused validation helper.",
           "weight": 0.7
         }
       ]
@@ -1229,14 +1229,14 @@
     },
     {
       "path": "src/cli/help.ts",
-      "archetype": "types",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "types",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "COMMAND_DEFS constant record with help text definitions — pure data, no logic",
+          "detail": "Generates or stores CLI help text — output formatting utility, not a command handler itself.",
           "weight": 0.7
         }
       ]
@@ -1257,20 +1257,6 @@
     },
     {
       "path": "src/cli/mcp-tools.ts",
-      "archetype": "route-handler",
-      "confidence": 0.7,
-      "source": "llm",
-      "evidence": [
-        {
-          "archetypeId": "route-handler",
-          "signalKind": "path",
-          "detail": "MCP tool handler implementations — each handler receives store + args and returns MCP response, analogous to route handlers",
-          "weight": 0.7
-        }
-      ]
-    },
-    {
-      "path": "src/cli/mcp.ts",
       "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
@@ -1278,7 +1264,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "MCP server factory that configures and registers all tools/resources — transport-agnostic server setup",
+          "detail": "Implements MCP tool handlers — business logic behind each MCP tool call.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/mcp.ts",
+      "archetype": "cli-command",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "cli-command",
+          "signalKind": "path",
+          "detail": "CLI command handler that wires up and starts the MCP server.",
           "weight": 0.7
         }
       ]
@@ -1306,7 +1306,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Centralized CLI flag parsing and input validation helpers for command handlers",
+          "detail": "Validates CLI input arguments — reusable validation helper across commands.",
           "weight": 0.7
         }
       ]
@@ -1803,14 +1803,14 @@
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Duplicate/conflict detection algorithms before creating PRD items — pure algorithmic logic",
+          "detail": "Detects conflicts among recommendations — domain logic service within the recommend subsystem.",
           "weight": 0.7
         }
       ]
@@ -1824,7 +1824,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Atomically creates PRD items from selected recommendations — business logic orchestration",
+          "detail": "Creates PRD items from sourcevision recommendations — orchestration logic bridging recommend → PRD.",
           "weight": 0.7
         }
       ]
@@ -2123,7 +2123,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Exports DEFAULT_WORKFLOW string constant — configuration/default value module",
+          "detail": "Defines default workflow configuration/state — declarative settings, not procedural logic.",
           "weight": 0.7
         }
       ]
@@ -2133,13 +2133,11 @@
     "totalClassified": 112,
     "totalUnclassified": 0,
     "byArchetype": {
-      "utility": 49,
-      "service": 6,
+      "service": 14,
+      "utility": 44,
       "entrypoint": 6,
-      "types": 4,
-      "gateway": 1,
-      "cli-command": 30,
-      "route-handler": 1,
+      "cli-command": 31,
+      "types": 2,
       "schema": 3,
       "store": 11,
       "config": 1

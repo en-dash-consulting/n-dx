@@ -6,117 +6,117 @@
 ## Project Overview
 
 - **Files**: 246
-- **Lines of code**: 86,171
+- **Lines of code**: 86,292
 - **Languages**: TypeScript (228), JSON (9), Other (4), Markdown (4), Text (1)
 - **Zones**: 12 (12 with descriptions)
-- **Analyzed**: 2026-03-08T17:17:49.428Z
+- **Analyzed**: 2026-03-08T23:54:02.887Z
 
 ## Architecture Zones
 
-### Monorepo Config (`monorepo-config`)
+### .rex (`.rex`)
 
-Root-level project scaffolding including package manifest, TypeScript config, test runner config, documentation assets, and AI-context output files.
+4 files, primarily JSON, Other, Markdown
 
-- Files: 9
+- Files: 4
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/monorepo-config/context.md`
+- Detail: `.sourcevision/zones/.rex/context.md`
 
-### Notion Sync Client (`notion-sync-client`)
+### Cli (`cli`)
 
-Implements the Notion API client and store contract providing the concrete remote-sync adapter for PRD persistence.
-
-- Files: 4
-- Cohesion: 1.00, Coupling: 0.00
-- Entry points: src/store/notion-client.ts
-- Detail: `.sourcevision/zones/notion-sync-client/context.md`
-
-### Prd Analysis Engine (`prd-analysis-engine`)
-
-The PRD analysis and proposal pipeline: scans project files, deduplicates and decomposes items, validates structure, proposes new PRD entries, and exposes the analyze and reshape CLI commands.
-
-- Files: 73
-- Cohesion: 0.63, Coupling: 0.37
-- Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts, src/analyze/extract.ts, src/analyze/file-validation.ts (+15 more)
-- Detail: `.sourcevision/zones/prd-analysis-engine/context.md`
-
-### Prd Cli Operations (`prd-cli-operations`)
-
-CLI command handlers for PRD mutation and reporting (status, update, move, remove, adapter) together with the shared output formatting, error handling, and core lifecycle utilities (timestamps, stats, parent-completion) they depend on.
-
-- Files: 37
-- Cohesion: 0.46, Coupling: 0.54
-- Entry points: src/cli/commands/token-format.ts, src/cli/commands/usage.ts, src/cli/errors.ts, src/cli/output.ts, src/cli/validate-input.ts (+5 more)
-- Detail: `.sourcevision/zones/prd-cli-operations/context.md`
-
-### Prd Domain Operations (`prd-domain-operations`)
-
-The primary domain services layer for rex, containing CRUD operations (delete, merge, prune, remove), reorganization, sync, analytics, code coverage, and the public API surface.
-
-- Files: 32
-- Cohesion: 0.36, Coupling: 0.64
-- Entry points: src/cli/commands/reorganize.ts, src/core/delete.ts, src/core/facets.ts, src/core/keywords.ts, src/core/merge.ts (+12 more)
-- Detail: `.sourcevision/zones/prd-domain-operations/context.md`
-
-### Prd Fix Operations (`prd-fix-operations`)
-
-Encapsulates the CLI command and core logic for fixing malformed or inconsistent PRD items, paired directly with its unit tests.
-
-- Files: 4
-- Cohesion: 0.25, Coupling: 0.75
-- Entry points: src/cli/commands/fix.ts
-- Detail: `.sourcevision/zones/prd-fix-operations/context.md`
-
-### Prd Schema Foundation (`prd-schema-foundation`)
-
-The shared foundational layer of the rex package: schema type definitions, tree traversal primitives, core domain operations (DAG, transitions, cascade-reset), and the file-store adapter that all other zones depend on.
-
-- Files: 32
-- Cohesion: 0.31, Coupling: 0.69
-- Entry points: src/analyze/acknowledge.ts, src/cli/commands/add.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts, src/core/cascade-reset.ts (+9 more)
-- Detail: `.sourcevision/zones/prd-schema-foundation/context.md`
-
-### Remote Sync Adapters (`remote-sync-adapters`)
-
-Manages remote synchronization with third-party project trackers (Jira, Notion) through a registry-based adapter pattern, including integration schemas and canonical ID mapping.
-
-- Files: 18
-- Cohesion: 0.39, Coupling: 0.61
-- Entry points: src/cli/commands/sync.ts, src/core/canonical.ts, src/store/adapter-registry.ts, src/store/index.ts, src/store/integration-schema.ts (+4 more)
-- Detail: `.sourcevision/zones/remote-sync-adapters/context.md`
-
-### Rex CLI E2E Tests (`rex-cli-e2e-tests`)
-
-End-to-end test suite validating all major rex CLI commands (analyze, import, prune, sync, recommend, smart-add) against real filesystem and process behavior.
-
-- Files: 13
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/rex-cli-e2e-tests/context.md`
-
-### Rex Mcp Service Layer (`rex-mcp-service-layer`)
-
-Provides the MCP server entry point, CLI infrastructure commands (init, health), tool registrations, and workflow defaults that bootstrap the rex service.
+11 files, primarily TypeScript
 
 - Files: 11
 - Cohesion: 0.22, Coupling: 0.78
 - Entry points: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts, src/cli/mcp.ts, src/core/health.ts
-- Detail: `.sourcevision/zones/rex-mcp-service-layer/context.md`
+- Detail: `.sourcevision/zones/cli/context.md`
 
-### Rex Runtime State (`rex-runtime-state`)
+### Core (`core`)
 
-Persisted runtime artifacts for the rex PRD manager: structured PRD data, project configuration, execution history, and human-readable workflow state.
+32 files, primarily TypeScript
+
+- Files: 32
+- Cohesion: 0.36, Coupling: 0.64
+- Entry points: src/cli/commands/reorganize.ts, src/core/delete.ts, src/core/facets.ts, src/core/keywords.ts, src/core/merge.ts (+12 more)
+- Detail: `.sourcevision/zones/core/context.md`
+
+### E2e (`e2e`)
+
+13 files, primarily TypeScript, JSON, Other
+
+- Files: 13
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/e2e/context.md`
+
+### Fix (`fix`)
+
+4 files, primarily TypeScript
 
 - Files: 4
+- Cohesion: 0.25, Coupling: 0.75
+- Entry points: src/cli/commands/fix.ts
+- Detail: `.sourcevision/zones/fix/context.md`
+
+### Root (`root`)
+
+9 files, primarily JSON, Markdown, Other
+
+- Files: 9
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/rex-runtime-state/context.md`
+- Detail: `.sourcevision/zones/root/context.md`
 
-### Task Selection Engine (`task-selection-engine`)
+### Store (`store`)
 
-Implements the next-task selection algorithm including scoring, priority weighting, feature filtering, and requirements prioritization, exposed via the 'next' CLI command.
+18 files, primarily TypeScript
+
+- Files: 18
+- Cohesion: 0.39, Coupling: 0.61
+- Entry points: src/cli/commands/sync.ts, src/core/canonical.ts, src/store/adapter-registry.ts, src/store/index.ts, src/store/integration-schema.ts (+4 more)
+- Detail: `.sourcevision/zones/store/context.md`
+
+### Unit (`unit`)
+
+32 files, primarily TypeScript
+
+- Files: 32
+- Cohesion: 0.31, Coupling: 0.69
+- Entry points: src/analyze/acknowledge.ts, src/cli/commands/add.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts, src/core/cascade-reset.ts (+9 more)
+- Detail: `.sourcevision/zones/unit/context.md`
+
+### Unit Analyze (`unit-analyze`)
+
+73 files, primarily TypeScript
+
+- Files: 73
+- Cohesion: 0.63, Coupling: 0.37
+- Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts, src/analyze/extract.ts, src/analyze/file-validation.ts (+15 more)
+- Detail: `.sourcevision/zones/unit-analyze/context.md`
+
+### Unit Cli (`unit-cli`)
+
+37 files, primarily TypeScript
+
+- Files: 37
+- Cohesion: 0.46, Coupling: 0.54
+- Entry points: src/cli/commands/token-format.ts, src/cli/commands/usage.ts, src/cli/errors.ts, src/cli/output.ts, src/cli/validate-input.ts (+5 more)
+- Detail: `.sourcevision/zones/unit-cli/context.md`
+
+### Unit Core (`unit-core`)
+
+7 files, primarily TypeScript
 
 - Files: 7
 - Cohesion: 0.17, Coupling: 0.83
 - Entry points: src/cli/commands/next.ts, src/core/next-task.ts
-- Detail: `.sourcevision/zones/task-selection-engine/context.md`
+- Detail: `.sourcevision/zones/unit-core/context.md`
+
+### Unit Store (`unit-store`)
+
+4 files, primarily TypeScript
+
+- Files: 4
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: src/store/notion-client.ts
+- Detail: `.sourcevision/zones/unit-store/context.md`
 
 ## Key Dependencies
 
@@ -145,67 +145,45 @@ Implements the next-task selection algorithm including scoring, priority weighti
 
 ### Anti-patterns
 
-- Single-production-file zone: notion-sync-client contains one source file and three test files. Algorithmic community detection formed this boundary from test proximity, creating a degenerate zone that inflates zone count and dilutes health dashboard averages. Merge notion-client.ts into the store zone. [warning] (notion-sync-client)
-- src/cli/commands/adapter.ts imports store/adapter-registry.ts directly, bypassing the store gateway pattern mandated in CLAUDE.md. The adapter command is runtime infrastructure for configuring persistence — its store access should route through the same gateway as other CLI-tier consumers to prevent the store public API from fragmenting across four independent import paths. [warning] (prd-cli-operations)
-- CLI command files (add.ts, recommend.ts, report.ts) are grouped in the schema/foundation zone purely due to import weight. Files whose primary purpose is command dispatch belong in the CLI tier regardless of their dependency count; their presence inflates the foundation's entry-point count and makes the zone's stated purpose ambiguous. [warning] (prd-schema-foundation)
-- Notion integration files (notion-client.ts, notion-adapter.ts, notion-map.ts) coexist in src/store/ alongside generic adapter infrastructure (adapter-registry.ts, integration-schema.ts). Both the notion-sync-client zone and remote-sync-adapters zone draw from the same directory, meaning zone boundaries cannot be enforced or visualized through directory structure — the only boundary is the import graph, which is invisible to filesystem-based tools. [warning] (remote-sync-adapters)
-- Two barrel index files (src/store/index.ts and src/store/integration-schemas/index.ts) coexist in the remote-sync-adapters zone without a declared hierarchy. Consumers importing from either barrel bypass the other, creating two implicit partial contracts for the same store layer and making it impossible to enforce a single public surface through code review alone. [warning] (remote-sync-adapters)
-- E2e suite likely conflates behavioral and output-format assertions. Output format changes will require touching all 13 test files even when behavior is unchanged. Separate behavioral contract tests from output-format snapshot tests to scope change impact. [info] (rex-cli-e2e-tests)
-- Health monitoring is fragmented across src/core/health.ts (utility) and src/cli/commands/health.ts (cli-command) within an MCP-transport-dominated zone. The two-file split without a unifying interface means health check logic and CLI health reporting evolve independently with no enforced contract between them. [warning] (rex-mcp-service-layer)
-- src/workflow/default.ts (config archetype) is misplaced in the MCP service layer; workflow configuration has no runtime relationship to MCP transport and should be relocated to the domain operations zone or a dedicated configuration zone. [warning] (rex-mcp-service-layer)
-- src/core/next-task.ts (594 lines) implements five independently testable scoring dimensions in a single file, confirmed by five dedicated unit test files each targeting a distinct scoring concern. The monolithic implementation file against a decomposed test suite is an anti-pattern — the test decomposition should guide a matching module decomposition (e.g. next-task-scoring.ts, next-task-matching.ts) to make each concern independently navigable and modifiable. [warning] (task-selection-engine)
-- God function: cmdPrune in src/cli/commands/prune.ts calls 34 unique functions — consider decomposing into smaller, focused functions [warning]
+- God function: buildProposals in src/analyze/propose.ts calls 31 unique functions — consider decomposing into smaller, focused functions [warning]
 
 ### Patterns
 
-- The cli zone (cohesion 0.22, 11 files) occupies a structural crossroads: it receives 12 imports from prd-cli-operations and exports shared utilities (output.ts, errors.ts) consumed by 7 zones. Its low cohesion reflects this mixed role. Formalizing it as an explicit CLI infrastructure layer with a defined public API would improve cohesion and remove the ambiguity that allows upward imports from foundation into it. [warning] (prd-cli-operations)
-- The fix zone's minimal cross-zone footprint (1 import each direction with prd-cli-operations only) gives it the cleanest dependency profile among the source zones and demonstrates the value of keeping small features as isolated satellites rather than merging them into the nearest large zone. [info] (prd-fix-operations)
-- constants.ts is co-located in src/cli/commands/ but is imported by 7 zones across all tiers. Moving it to a shared infrastructure location (e.g. src/shared/ or src/config/) would eliminate the upward import pressure on every zone that needs project constants. [warning] (prd-schema-foundation)
-- 9 entry points for an 18-file zone is a 50% entry-point ratio; a healthy module should expose a small fraction of its files as public API. Consolidating exports through a single src/store/public.ts would narrow the contract surface and enable safe internal restructuring. [warning] (remote-sync-adapters)
-- At 13 files with coupling 0 and no shared support module, duplicated spawn/fixture setup is the highest-probability maintenance debt in this zone; extracting a single e2e-support file would preserve zero coupling while eliminating copy-paste drift. [warning] (rex-cli-e2e-tests)
-- Test files constitute 71% (5/7) of this zone's file count, artificially suppressing the cohesion metric to 0.17 — excluding test files from cohesion computation would yield a more accurate signal for the production core. [info] (task-selection-engine)
+- Dual cohesion scoring (with and without test files) is a prerequisite for reliable zone-health decisions, not an optional enhancement. At minimum three zones have cohesion scores materially influenced by test co-location (unit-core 0.17, fix 0.25, and the three degenerate zones from finding 13 with test fractions of 71%, 27%, and 50%). All zone dissolution or consolidation decisions should be deferred until this metric is available — acting on contaminated cohesion scores risks misattributing measurement artifacts as structural problems. [warning]
+- The god-function finding (cmdPrune, 34 unique function calls, finding 18) and the tight-coupling finding (prune.ts ↔ output.ts, 60 cross-file calls, finding 19) are independently-derived signals pointing to the same source file. This corroboration elevates confidence above single-heuristic noise. The 60-call unidirectional coupling to output.ts is the more actionable signal: it indicates prune.ts drives its own formatting directly rather than delegating through an abstraction, which is the observable behavior associated with a god function that is growing in the CLI presentation direction. [warning]
+- Zone taxonomy mixes two incompatible naming conventions: test-tier prefixes (unit-, e2e-, unit-core, unit-cli, unit-store, unit-analyze) and domain-layer names (core, store, cli, fix). This mixing causes zone health metrics to conflate test-suite structure with source code structure in aggregate views. The individual zone findings for fix and unit-core are symptoms of this systemic taxonomy gap. Adopting a consistent taxonomy (e.g. source zones as domain-layer, test zones as domain-tier) would also improve zone detection by giving the algorithm consistent naming signals. [info]
 
 ### Relationships
 
-- Zone coupling metric (0) contradicts documented bidirectional import crossings with store zone (4+5); the inconsistency suggests test files are excluded from coupling calculation but included in cross-zone import counts — document this distinction or unify the metrics to prevent false confidence in isolation. [warning] (notion-sync-client)
-- core → prd-analysis-engine (20 imports) → prd-schema-foundation (60 imports) is the cleanest multi-hop dependency chain in the package — a strict top-down cascade with no reverse edges. This pipeline pattern should be the model for future analysis phase additions. [info] (prd-analysis-engine)
-- prd-analysis-engine → prd-cli-operations (15 imports, confirmed via guided.ts importing cli/output.ts): domain analysis logic calling a presentation-layer logger is a leaky abstraction. Injecting a logger interface would remove the cross-tier dependency without changing runtime behavior. [warning] (prd-analysis-engine)
-- prd-cli-operations and the cli zone both import directly from the store layer (11 and 9 imports respectively) with no shared gateway. Per CLAUDE.md, all imports from a given upstream package should flow through a single gateway — creating a store gateway for CLI-tier consumers would make the store's public surface explicit and auditable. [warning] (prd-cli-operations)
-- The 9 imports from prd-domain-operations (core) into prd-cli-operations (unit-cli) violate the layering rule that domain logic must not import from CLI commands. Shared types or constants driving these imports should be moved down to the schema/foundation layer. [critical] (prd-domain-operations)
-- src/public.ts residing in a 32-file catch-all zone couples external API stability to internal zone health — extracting public.ts to a dedicated entry-point location before decomposing this zone would decouple these concerns. [warning] (prd-domain-operations)
-- prd-schema-foundation → prd-cli-operations (12 imports): the foundation tier importing from the CLI tier is a confirmed layering inversion. These 12 imports must be resolved — either the depended-on symbols belong in the foundation and should be moved down, or the imports are accidental and should be removed. [critical] (prd-schema-foundation)
-- Three upstream zones import the store layer directly without a shared gateway, creating three independent implicit contracts. Per the CLAUDE.md gateway pattern a single store gateway is required; changes to adapter internals currently require simultaneous validation across all three consumers. [warning] (remote-sync-adapters)
-- prd-cli-operations imports rex-mcp-service-layer 12 times, meaning CLI commands depend on MCP transport infrastructure. This inverts the expected dependency direction — transport layers should adapt domain commands, never be imported by them. [critical] (rex-mcp-service-layer)
-- rex-runtime-state does not appear on either side of any cross-zone import edge, confirming it is a pure data layer with no source coupling. This is the correct relationship for runtime-generated files and should be preserved. [info] (rex-runtime-state)
-- ... and 1 more
+- Tightly coupled modules: src/cli/commands/prune.ts and src/cli/output.ts — 57 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
 
 ### Observations
 
-- Bidirectional coupling: "prd-domain-operations" ↔ "prd-schema-foundation" (63+5 crossings) — consider extracting shared interface [warning]
-- Hub: src/schema/index.ts is imported by 8 zones — cross-cutting dependency [info]
-- Size imbalance: largest zone has 73 files vs smallest with 4 — uneven decomposition [info]
-- Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects [warning]
-- Isolated files — no import edges between 9 files, cohesion is unmeasurable (reported as 0) [info] (monorepo-config)
-- Generated AI context files (llms.txt, context.md) living at the monorepo root rather than inside a package directory suggests they are intended for cross-package consumption, which is architecturally appropriate. [info] (monorepo-config)
-- Zero cohesion and coupling are expected for a root config zone — these files share a location, not a runtime dependency, so the metrics are not actionable. [info] (monorepo-config)
-- High cohesion (1) — files are tightly interconnected [info] (notion-sync-client)
-- The store-contract test pattern is valuable — if no corresponding interface type exists in the public API, adding one would let the type checker enforce adapter conformance rather than relying on runtime tests alone. [info] (notion-sync-client)
-- Zero coupling and perfect cohesion signal the Notion client is correctly encapsulated; this isolation should be preserved as new sync targets are added. [info] (notion-sync-client)
-- ... and 48 more
+- Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0) [info] (.rex)
+- High coupling (0.78) — 17 imports target "unit" [warning] (cli)
+- Low cohesion (0.22) — files are loosely related, consider splitting this zone [warning] (cli)
+- 17 entry points — wide API surface, consider consolidating exports [warning] (core)
+- High coupling (0.64) — 63 imports target "unit" [warning] (core)
+- Low cohesion (0.36) — files are loosely related, consider splitting this zone [warning] (core)
+- High cohesion (1) — files are tightly interconnected [info] (e2e)
+- High coupling (0.75) — 4 imports target "unit" [warning] (fix)
+- Low cohesion (0.25) — files are loosely related, consider splitting this zone [warning] (fix)
+- Bidirectional coupling: "core" ↔ "unit" (63+5 crossings) — consider extracting shared interface [warning]
+- ... and 17 more
 
 ### Suggestions
 
-- src/cli/commands/ contains files from 8 zones (prd-analysis-engine, prd-cli-operations, prd-domain-operations, prd-fix-operations, prd-schema-foundation, remote-sync-adapters, rex-mcp-service-layer, task-selection-engine) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Cohesion is inversely correlated with zone size in the source zones (larger zones have higher cohesion), indicating algorithmic splits are degrading rather than improving cohesion signal. Before re-running community detection, introduce filesystem subdirectory boundaries in src/cli/commands/ and src/store/ to give the algorithm structural constraints that guide it toward semantically coherent communities. [warning]
-- Document the alias-to-zone-ID mapping (unit→prd-schema-foundation, unit-analyze→prd-analysis-engine, unit-cli→prd-cli-operations, unit-core→core) in a developer reference file. Any future lint rule, import-graph assertion, or architecture-as-code check will need this mapping to function correctly. [info]
-- Establish a zone naming taxonomy: source zones should follow '<domain>-<layer>' (e.g. 'prd-schema', 'store-adapters'), test zones should follow '<domain>-<test-tier>' (e.g. 'prd-unit', 'cli-e2e'). Apply consistently across all 12 zones to make tier membership and domain ownership readable from zone IDs without tracing imports. [info]
-- No zone in the package achieves both cohesion >0.6 and coupling <0.4 simultaneously. Establish a zone health target of cohesion ≥0.5 AND coupling ≤0.5 for all source zones, and track progress toward this dual target explicitly — optimizing for a single metric in isolation risks trading one problem for the other. [info]
-- Risk area summary: two zones combine low cohesion with high bidirectional coupling — 'cli' (cohesion 0.22, 4-zone bidirectional coupling) and 'unit-core' (cohesion 0.17, single-edge degenerate). These are the two highest structural fragility points in the package and should be prioritized for dissolution or redesign before the codebase grows further. [critical]
-- The -shared.ts naming pattern is used informally in at least two zones as intra-zone decomposition. Before this becomes a cross-zone import pattern, establish and document a project-wide rule: files named -shared.ts are zone-private and must not be imported outside their zone. Enforce this with an ESLint import rule or a CI check in sourcevision's boundary validation. [info]
-- The perfectly symmetric bidirectional import count between core and unit-cli (9 each direction) indicates no clear canonical dependency direction. Audit the 9 symbols flowing core→unit-cli and the 9 flowing unit-cli→core and classify each as 'belongs in core', 'belongs in cli-operations', or 'needs a new shared home'. Symmetric cycles are the hardest to break incrementally — a deliberate classification pass before any refactoring will prevent oscillation where fixing one direction recreates the other. [warning]
-- The store zone accumulates 22 schema imports — more than the CLI presentation layer — suggesting it contains domain computation rather than pure persistence. Audit src/store/ files that drive the 22 prd-schema-foundation→store imports and extract any filtering, sorting, or transformation logic into the core or domain zones. A persistence layer should ideally have fewer schema imports than the layers above it. [warning]
-- The three degenerate low-cohesion zones (task-selection-engine: 0.17, rex-mcp-service-layer: 0.22, prd-fix-operations: 0.25) all have test files as a significant fraction of their file count (71%, 27%, 50% respectively). Before performing structural splits, remove test files from zone membership calculations to confirm whether the low cohesion is a domain problem or a measurement artifact — this validation step prevents unnecessary refactoring. [warning]
-- ... and 40 more
+- Zone "cli" has files across 8 directories — consider consolidating under a dedicated directory [info] (cli)
+- Zone "Cli" (cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: 0.78) — requires immediate architectural intervention [critical] (cli)
+- Zone "core" has files across 6 directories — consider consolidating under a dedicated directory [info] (core)
+- Zone "Core" (core) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development [warning] (core)
+- Zone "fix" was identified from filename patterns, not directory structure — consider creating src/cli/commands/fix/ and moving related files there [info] (fix)
+- This zone has 4 files and cohesion 0.25. Before dissolving, confirm whether test files account for ≥50% of its membership (consistent with the measurement-artifact pattern in global finding 13). If cohesion improves substantially when test files are excluded, defer structural action until the dual cohesion metric is available. [info] (fix)
+- Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention [critical] (fix)
+- src/cli/commands/ contains files from 8 zones (cli, core, fix, store, unit, unit-analyze, unit-cli, unit-core) — consider grouping into subdirectories to clarify architectural boundaries [info]
+- Hub function: walkTree in src/core/tree.ts is called from 30 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
+- 6 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): unit-core, cli, fix, unit, core, store — mandatory refactoring recommended before further development [warning]
+- ... and 9 more
 
 ## Next Steps
 
@@ -217,342 +195,330 @@ Prioritized work items derived from analysis:
 
 1. **Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact …**
 
-1. **Zone "Rex Mcp Service Layer" (rex-mcp-service-layer) has ca… (+1 related)**
+1. **Zone "Unit Core" (unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17…**
+   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
+
+1. **High coupling (0.83) — 9 imports target "unit"**
+   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
+
+1. **Low cohesion (0.17) — files are loosely related, consider splitting this zone**
+   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
+
+1. **Zone "Cli" (cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: …**
    Files: `src/cli/commands/constants.ts`, `src/cli/commands/health.ts`, `src/cli/commands/init.ts`
 
-1. **Health monitoring is fragmented across src/core/health.ts (… (+1 related)**
+1. **High coupling (0.78) — 17 imports target "unit"**
    Files: `src/cli/commands/constants.ts`, `src/cli/commands/health.ts`, `src/cli/commands/init.ts`
 
-1. **Notion integration files (notion-client.ts, notion-adapter.… (+1 related)**
-   Files: `src/cli/commands/sync.ts`, `src/core/canonical.ts`, `src/store/adapter-registry.ts`
+1. **Low cohesion (0.22) — files are loosely related, consider splitting this zone**
+   Files: `src/cli/commands/constants.ts`, `src/cli/commands/health.ts`, `src/cli/commands/init.ts`
 
-1. **9 entry points for an 18-file zone is a 50% entry-point rat… (+1 related)**
-   Files: `src/cli/commands/sync.ts`, `src/core/canonical.ts`, `src/store/adapter-registry.ts`
+1. **Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: …**
+   Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
 
-1. **Zone "Task Selection Engine" (task-selection-engine) has catastrophic risk (sco…**
-   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
-
-1. **src/core/next-task.ts (594 lines) implements five independently testable scorin…**
-   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
-
-1. **task-selection-engine combines the package's lowest cohesion (0.17) with its hi…**
-   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
-
-1. **High coupling (0.83) — 9 imports target "prd-schema-foundation"**
-   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
+1. **High coupling (0.75) — 4 imports target "unit"**
+   Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
 
 ### Medium Priority
-
-1. **The cli zone (cohesion 0.22, 11 files) occupies a structura… (+1 related)**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
-
-1. **src/cli/commands/adapter.ts imports store/adapter-registry.ts directly, bypassi…**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
 
 1. **10 entry points — wide API surface, consider consolidating exports**
    Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
 
-1. **High coupling (0.54) — 43 imports target "prd-schema-foundation"**
+1. **High coupling (0.54) — 43 imports target "unit"**
    Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
 
-1. **Bidirectional imports between this zone and 'prd-schema-foundation' (43 in, 12 …**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
-
-1. **Coupling of 0.54 exceeds the healthy midpoint, driven partly by core lifecycle …**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
-
-1. **God function: cmdPrune in src/cli/commands/prune.ts calls 34 unique functions —…**
-
-1. **prd-analysis-engine → prd-cli-operations (15 imports, confirmed via guided.ts i…**
-   Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
-
-1. **src/analyze/file-validation.ts belongs at the CLI input boundary (validate befo…**
-   Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
+1. **God function: buildProposals in src/analyze/propose.ts calls 31 unique function…**
 
 1. **20 entry points — wide API surface, consider consolidating exports**
    Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
+
+1. **Dual cohesion scoring (with and without test files) is a pr… (+1 related)**
+
+1. **Bidirectional coupling: "core" ↔ "unit" (63+5 crossings) — consider extracting …**
+
+1. **No source zone simultaneously achieves cohesion ≥0.5 and coupling ≤0.5 (finding…**
 
 ### Low Priority
 
 1. **Hub function: walkTree in src/core/tree.ts is called from 30 files (high fan-in…**
 
-1. **Rename to 'prd-task-selection' or 'rex-task-selection' to align with the packag…**
-   Files: `src/cli/commands/next.ts`, `src/core/next-task.ts`, `tests/unit/core/feature-filtered-task.test.ts`
-
-1. **Zone "rex-mcp-service-layer" has files across 8 directories — consider consolid…**
+1. **Zone "cli" has files across 8 directories — consider consolidating under a dedi…**
    Files: `src/cli/commands/constants.ts`, `src/cli/commands/health.ts`, `src/cli/commands/init.ts`
 
-1. **Integration tests co-located in this zone test duplicate-outcome and smart-add …**
-   Files: `src/cli/commands/constants.ts`, `src/cli/commands/health.ts`, `src/cli/commands/init.ts`
-
-1. **Rename 'prd-fix-operations' to 'prd-repair-operations' or merge it into 'prd-cl…**
+1. **Zone "fix" was identified from filename patterns, not directory structure — con…**
    Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
 
-1. **Zone "prd-schema-foundation" has files across 13 directories — consider consoli…**
+1. **This zone has 4 files and cohesion 0.25. Before dissolving, confirm whether tes…**
+   Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
+
+1. **Zone "unit" has files across 13 directories — consider consolidating under a de…**
    Files: `src/analyze/acknowledge.ts`, `src/cli/commands/add.ts`, `src/cli/commands/recommend.ts`
 
-1. **Zone "prd-domain-operations" has files across 6 directories — consider consolid…**
+1. **Zone "core" has files across 6 directories — consider consolidating under a ded…**
    Files: `src/cli/commands/reorganize.ts`, `src/core/analytics.ts`, `src/core/code-coverage.ts`
 
-1. **Zone "remote-sync-adapters" has files across 8 directories — consider consolida…**
+1. **Zone "store" has files across 8 directories — consider consolidating under a de…**
    Files: `src/cli/commands/sync.ts`, `src/core/canonical.ts`, `src/store/adapter-registry.ts`
 
-1. **Zone "prd-cli-operations" has files across 6 directories — consider consolidati…**
+1. **Zone "unit-cli" has files across 6 directories — consider consolidating under a…**
    Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
 
-1. **status.ts, status-shared.ts, and status-sections.ts form an implicit sub-zone f…**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
+1. **Zone ".rex" (.rex) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.0…**
+   Files: `.rex/config.json`, `.rex/execution-log.jsonl`, `.rex/prd.json`
+
+1. **Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.0…**
+   Files: `README.md`, `Rex-F.png`, `Rex.png`
 
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
 |------|------|-----------|------|
 | `.claude/settings.local.json` | other |  |  |
-| `.rex/config.json` | other |  | rex-runtime-state |
-| `.rex/execution-log.jsonl` | other |  | rex-runtime-state |
-| `.rex/prd.json` | other |  | rex-runtime-state |
-| `.rex/workflow.md` | docs |  | rex-runtime-state |
-| `README.md` | docs |  | monorepo-config |
-| `Rex-F.png` | asset |  | monorepo-config |
-| `Rex.png` | asset |  | monorepo-config |
-| `context.md` | docs |  | monorepo-config |
-| `llms.txt` | docs |  | monorepo-config |
-| `package-lock.json` | generated |  | monorepo-config |
-| `package.json` | config |  | monorepo-config |
-| `src/analyze/acknowledge.ts` | source | utility | prd-schema-foundation |
-| `src/analyze/analyze-shared.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/consolidation-guard.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/decompose.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/dedupe.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/diff.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/extract.ts` | source | service | prd-analysis-engine |
-| `src/analyze/file-validation.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/guided.ts` | source | service | prd-analysis-engine |
-| `src/analyze/index.ts` | source | entrypoint | prd-analysis-engine |
-| `src/analyze/llm-bridge.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/modify-reason.ts` | source | service | prd-analysis-engine |
-| `src/analyze/propose.ts` | source | types | prd-analysis-engine |
-| `src/analyze/reason.ts` | source | gateway | prd-analysis-engine |
-| `src/analyze/reconcile.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/reshape-reason.ts` | source | service | prd-analysis-engine |
-| `src/analyze/scanners.ts` | source | utility | prd-analysis-engine |
-| `src/analyze/validate-modification.ts` | source | utility | prd-analysis-engine |
-| `src/cli/commands/adapter.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/add.ts` | source | cli-command | prd-schema-foundation |
-| `src/cli/commands/analyze.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/chunked-review-state.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/chunked-review.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/constants.ts` | source | types | rex-mcp-service-layer |
-| `src/cli/commands/decomposition-review.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/fix.ts` | source | cli-command | prd-fix-operations |
-| `src/cli/commands/format-loe.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/health.ts` | source | cli-command | rex-mcp-service-layer |
-| `src/cli/commands/init.ts` | source | cli-command | rex-mcp-service-layer |
-| `src/cli/commands/move.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/next.ts` | source | cli-command | task-selection-engine |
-| `src/cli/commands/prune.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/recommend.ts` | source | cli-command | prd-schema-foundation |
-| `src/cli/commands/remove.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/reorganize.ts` | source | cli-command | prd-domain-operations |
-| `src/cli/commands/report.ts` | source | cli-command | prd-schema-foundation |
-| `src/cli/commands/reshape.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/smart-add-duplicates.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/smart-add.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/status-sections.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/status-shared.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/status.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/sync.ts` | source | cli-command | remote-sync-adapters |
-| `src/cli/commands/token-format.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/update.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/usage.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/commands/validate-interactive.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/validate.ts` | source | cli-command | prd-analysis-engine |
-| `src/cli/commands/verify.ts` | source | cli-command | prd-cli-operations |
-| `src/cli/errors.ts` | source | utility | prd-cli-operations |
-| `src/cli/help.ts` | source | types | prd-cli-operations |
-| `src/cli/index.ts` | source | entrypoint | prd-cli-operations |
-| `src/cli/mcp-tools.ts` | source | route-handler | rex-mcp-service-layer |
-| `src/cli/mcp.ts` | source | service | rex-mcp-service-layer |
-| `src/cli/output.ts` | source | utility | prd-cli-operations |
-| `src/cli/validate-input.ts` | source | utility | prd-cli-operations |
-| `src/core/analytics.ts` | source | utility | prd-domain-operations |
-| `src/core/canonical.ts` | source | utility | remote-sync-adapters |
-| `src/core/cascade-reset.ts` | source | utility | prd-schema-foundation |
-| `src/core/code-coverage.ts` | source | utility | prd-domain-operations |
-| `src/core/dag.ts` | source | utility | prd-schema-foundation |
-| `src/core/delete.ts` | source | utility | prd-domain-operations |
-| `src/core/epic-correlation.ts` | source | utility | prd-analysis-engine |
-| `src/core/facets.ts` | source | utility | prd-domain-operations |
-| `src/core/fix.ts` | source | utility | prd-fix-operations |
-| `src/core/health.ts` | source | utility | rex-mcp-service-layer |
-| `src/core/keywords.ts` | source | utility | prd-domain-operations |
-| `src/core/merge.ts` | source | utility | prd-domain-operations |
-| `src/core/move.ts` | source | utility | prd-schema-foundation |
-| `src/core/next-task.ts` | source | utility | task-selection-engine |
-| `src/core/parent-completion.ts` | source | utility | prd-cli-operations |
-| `src/core/parent-reset.ts` | source | utility | prd-cli-operations |
-| `src/core/prune.ts` | source | utility | prd-domain-operations |
-| `src/core/remove-epic.ts` | source | utility | prd-domain-operations |
-| `src/core/remove-feature.ts` | source | utility | prd-domain-operations |
-| `src/core/remove-task.ts` | source | utility | prd-domain-operations |
-| `src/core/reorganize-executor.ts` | source | utility | prd-domain-operations |
-| `src/core/reorganize.ts` | source | utility | prd-domain-operations |
-| `src/core/requirements.ts` | source | utility | prd-domain-operations |
-| `src/core/reshape.ts` | source | utility | prd-analysis-engine |
-| `src/core/scope-creep.ts` | source | utility | prd-domain-operations |
-| `src/core/stats.ts` | source | utility | prd-cli-operations |
-| `src/core/structural.ts` | source | utility | prd-analysis-engine |
-| `src/core/sync-engine.ts` | source | utility | prd-domain-operations |
-| `src/core/sync.ts` | source | utility | prd-domain-operations |
-| `src/core/timestamps.ts` | source | utility | prd-cli-operations |
-| `src/core/token-usage.ts` | source | utility | prd-cli-operations |
-| `src/core/transitions.ts` | source | utility | prd-schema-foundation |
-| `src/core/tree.ts` | source | utility | prd-schema-foundation |
-| `src/core/verify.ts` | source | utility | prd-cli-operations |
-| `src/public.ts` | source | entrypoint | prd-domain-operations |
-| `src/recommend/conflict-detection.ts` | source | utility | prd-schema-foundation |
-| `src/recommend/create-from-recommendations.ts` | source | service | prd-schema-foundation |
-| `src/recommend/types.ts` | source | types | prd-schema-foundation |
-| `src/schema/index.ts` | source | entrypoint | prd-schema-foundation |
-| `src/schema/levels.ts` | source | schema | prd-domain-operations |
-| `src/schema/v1.ts` | source | schema | prd-schema-foundation |
-| `src/schema/validate.ts` | source | schema | prd-schema-foundation |
-| `src/store/adapter-registry.ts` | source | store | remote-sync-adapters |
-| `src/store/atomic-write.ts` | source | store | prd-analysis-engine |
-| `src/store/contracts.ts` | source | store | prd-domain-operations |
-| `src/store/file-adapter.ts` | source | store | prd-schema-foundation |
-| `src/store/index.ts` | source | entrypoint | remote-sync-adapters |
-| `src/store/integration-schema.ts` | source | store | remote-sync-adapters |
-| `src/store/integration-schemas/index.ts` | source | entrypoint | remote-sync-adapters |
-| `src/store/integration-schemas/jira.ts` | source | store | remote-sync-adapters |
-| `src/store/integration-schemas/notion.ts` | source | store | remote-sync-adapters |
-| `src/store/notion-adapter.ts` | source | store | remote-sync-adapters |
-| `src/store/notion-client.ts` | source | store | notion-sync-client |
-| `src/store/notion-map.ts` | source | store | remote-sync-adapters |
-| `src/store/project-config.ts` | source | store | prd-analysis-engine |
-| `src/workflow/default.ts` | source | config | rex-mcp-service-layer |
-| `tests/e2e/cli-adapter.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-analyze.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-import.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-init.test.ts` | test |  | prd-schema-foundation |
-| `tests/e2e/cli-prune.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-quiet.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-recommend.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-smart-add.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-sync.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/cli-workflow.test.ts` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/fixtures/sample-prd/.rex/config.json` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/fixtures/sample-prd/.rex/prd.json` | test |  | rex-cli-e2e-tests |
-| `tests/e2e/fixtures/sample-prd/.rex/workflow.md` | test |  | rex-cli-e2e-tests |
+| `.rex/config.json` | other |  | .rex |
+| `.rex/execution-log.jsonl` | other |  | .rex |
+| `.rex/prd.json` | other |  | .rex |
+| `.rex/workflow.md` | docs |  | .rex |
+| `README.md` | docs |  | root |
+| `Rex-F.png` | asset |  | root |
+| `Rex.png` | asset |  | root |
+| `context.md` | docs |  | root |
+| `llms.txt` | docs |  | root |
+| `package-lock.json` | generated |  | root |
+| `package.json` | config |  | root |
+| `src/analyze/acknowledge.ts` | source | service | unit |
+| `src/analyze/analyze-shared.ts` | source | utility | unit-analyze |
+| `src/analyze/consolidation-guard.ts` | source | utility | unit-analyze |
+| `src/analyze/decompose.ts` | source | service | unit-analyze |
+| `src/analyze/dedupe.ts` | source | utility | unit-analyze |
+| `src/analyze/diff.ts` | source | utility | unit-analyze |
+| `src/analyze/extract.ts` | source | service | unit-analyze |
+| `src/analyze/file-validation.ts` | source | utility | unit-analyze |
+| `src/analyze/guided.ts` | source | service | unit-analyze |
+| `src/analyze/index.ts` | source | entrypoint | unit-analyze |
+| `src/analyze/llm-bridge.ts` | source | service | unit-analyze |
+| `src/analyze/modify-reason.ts` | source | service | unit-analyze |
+| `src/analyze/propose.ts` | source | service | unit-analyze |
+| `src/analyze/reason.ts` | source | service | unit-analyze |
+| `src/analyze/reconcile.ts` | source | service | unit-analyze |
+| `src/analyze/reshape-reason.ts` | source | service | unit-analyze |
+| `src/analyze/scanners.ts` | source | service | unit-analyze |
+| `src/analyze/validate-modification.ts` | source | utility | unit-analyze |
+| `src/cli/commands/adapter.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/add.ts` | source | cli-command | unit |
+| `src/cli/commands/analyze.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/chunked-review-state.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/chunked-review.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/constants.ts` | source | types | cli |
+| `src/cli/commands/decomposition-review.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/fix.ts` | source | cli-command | fix |
+| `src/cli/commands/format-loe.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/health.ts` | source | cli-command | cli |
+| `src/cli/commands/init.ts` | source | cli-command | cli |
+| `src/cli/commands/move.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/next.ts` | source | cli-command | unit-core |
+| `src/cli/commands/prune.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/recommend.ts` | source | cli-command | unit |
+| `src/cli/commands/remove.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/reorganize.ts` | source | cli-command | core |
+| `src/cli/commands/report.ts` | source | cli-command | unit |
+| `src/cli/commands/reshape.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/smart-add-duplicates.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/smart-add.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/status-sections.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/status-shared.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/status.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/sync.ts` | source | cli-command | store |
+| `src/cli/commands/token-format.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/update.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/usage.ts` | source | cli-command | unit-cli |
+| `src/cli/commands/validate-interactive.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/validate.ts` | source | cli-command | unit-analyze |
+| `src/cli/commands/verify.ts` | source | cli-command | unit-cli |
+| `src/cli/errors.ts` | source | utility | unit-cli |
+| `src/cli/help.ts` | source | utility | unit-cli |
+| `src/cli/index.ts` | source | entrypoint | unit-cli |
+| `src/cli/mcp-tools.ts` | source | service | cli |
+| `src/cli/mcp.ts` | source | cli-command | cli |
+| `src/cli/output.ts` | source | utility | unit-cli |
+| `src/cli/validate-input.ts` | source | utility | unit-cli |
+| `src/core/analytics.ts` | source | utility | core |
+| `src/core/canonical.ts` | source | utility | store |
+| `src/core/cascade-reset.ts` | source | utility | unit |
+| `src/core/code-coverage.ts` | source | utility | core |
+| `src/core/dag.ts` | source | utility | unit |
+| `src/core/delete.ts` | source | utility | core |
+| `src/core/epic-correlation.ts` | source | utility | unit-analyze |
+| `src/core/facets.ts` | source | utility | core |
+| `src/core/fix.ts` | source | utility | fix |
+| `src/core/health.ts` | source | utility | cli |
+| `src/core/keywords.ts` | source | utility | core |
+| `src/core/merge.ts` | source | utility | core |
+| `src/core/move.ts` | source | utility | unit |
+| `src/core/next-task.ts` | source | utility | unit-core |
+| `src/core/parent-completion.ts` | source | utility | unit-cli |
+| `src/core/parent-reset.ts` | source | utility | unit-cli |
+| `src/core/prune.ts` | source | utility | core |
+| `src/core/remove-epic.ts` | source | utility | core |
+| `src/core/remove-feature.ts` | source | utility | core |
+| `src/core/remove-task.ts` | source | utility | core |
+| `src/core/reorganize-executor.ts` | source | utility | core |
+| `src/core/reorganize.ts` | source | utility | core |
+| `src/core/requirements.ts` | source | utility | core |
+| `src/core/reshape.ts` | source | utility | unit-analyze |
+| `src/core/scope-creep.ts` | source | utility | core |
+| `src/core/stats.ts` | source | utility | unit-cli |
+| `src/core/structural.ts` | source | utility | unit-analyze |
+| `src/core/sync-engine.ts` | source | utility | core |
+| `src/core/sync.ts` | source | utility | core |
+| `src/core/timestamps.ts` | source | utility | unit-cli |
+| `src/core/token-usage.ts` | source | utility | unit-cli |
+| `src/core/transitions.ts` | source | utility | unit |
+| `src/core/tree.ts` | source | utility | unit |
+| `src/core/verify.ts` | source | utility | unit-cli |
+| `src/public.ts` | source | entrypoint | core |
+| `src/recommend/conflict-detection.ts` | source | service | unit |
+| `src/recommend/create-from-recommendations.ts` | source | service | unit |
+| `src/recommend/types.ts` | source | types | unit |
+| `src/schema/index.ts` | source | entrypoint | unit |
+| `src/schema/levels.ts` | source | schema | core |
+| `src/schema/v1.ts` | source | schema | unit |
+| `src/schema/validate.ts` | source | schema | unit |
+| `src/store/adapter-registry.ts` | source | store | store |
+| `src/store/atomic-write.ts` | source | store | unit-analyze |
+| `src/store/contracts.ts` | source | store | core |
+| `src/store/file-adapter.ts` | source | store | unit |
+| `src/store/index.ts` | source | entrypoint | store |
+| `src/store/integration-schema.ts` | source | store | store |
+| `src/store/integration-schemas/index.ts` | source | entrypoint | store |
+| `src/store/integration-schemas/jira.ts` | source | store | store |
+| `src/store/integration-schemas/notion.ts` | source | store | store |
+| `src/store/notion-adapter.ts` | source | store | store |
+| `src/store/notion-client.ts` | source | store | unit-store |
+| `src/store/notion-map.ts` | source | store | store |
+| `src/store/project-config.ts` | source | store | unit-analyze |
+| `src/workflow/default.ts` | source | config | cli |
+| `tests/e2e/cli-adapter.test.ts` | test |  | e2e |
+| `tests/e2e/cli-analyze.test.ts` | test |  | e2e |
+| `tests/e2e/cli-import.test.ts` | test |  | e2e |
+| `tests/e2e/cli-init.test.ts` | test |  | unit |
+| `tests/e2e/cli-prune.test.ts` | test |  | e2e |
+| `tests/e2e/cli-quiet.test.ts` | test |  | e2e |
+| `tests/e2e/cli-recommend.test.ts` | test |  | e2e |
+| `tests/e2e/cli-smart-add.test.ts` | test |  | e2e |
+| `tests/e2e/cli-sync.test.ts` | test |  | e2e |
+| `tests/e2e/cli-workflow.test.ts` | test |  | e2e |
+| `tests/e2e/fixtures/sample-prd/.rex/config.json` | test |  | e2e |
+| `tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl` | test |  | e2e |
+| `tests/e2e/fixtures/sample-prd/.rex/prd.json` | test |  | e2e |
+| `tests/e2e/fixtures/sample-prd/.rex/workflow.md` | test |  | e2e |
 | `tests/fixtures/token-usage-regression.json` | test |  |  |
-| `tests/integration/claude-config.test.ts` | test |  | prd-analysis-engine |
-| `tests/integration/project-config.test.ts` | test |  | remote-sync-adapters |
-| `tests/integration/smart-add-duplicate-outcomes.test.ts` | test |  | rex-mcp-service-layer |
-| `tests/integration/smart-add-orphaned-parent.test.ts` | test |  | prd-analysis-engine |
-| `tests/integration/store-roundtrip.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/analyze/acknowledge.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/analyze/consolidation-guard.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/decompose.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/dedupe.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/diff.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/extract-llm-mock.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/extract-llm.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/extract-text.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/extract.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/file-validation.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/guided.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/loe-proposal-schema.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/modify-reason.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/propose.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-assessment.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-batch.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-description.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-granularity.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-ideas.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason-multi-description.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reason.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/reconcile.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/scanners-acknowledge.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/analyze/scanners.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/token-tracking.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/analyze/validate-modification.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/add.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/commands/analyze-guided.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/chunked-review.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/decomposition-review.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/fix.test.ts` | test |  | prd-fix-operations |
-| `tests/unit/cli/commands/format-loe.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/loe-display.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/move.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/commands/recommend.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/cli/commands/remove.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/commands/report.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/cli/commands/smart-add-duplicates.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/smart-add-merge.test.ts` | test |  | rex-mcp-service-layer |
-| `tests/unit/cli/commands/smart-add.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/status.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/commands/sync.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/cli/commands/update.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/commands/usage.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/cli/commands/validate-epicless.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/validate-interactive.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/validate.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/cli/commands/verify.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/errors.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/help.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/mcp.test.ts` | test |  | rex-mcp-service-layer |
-| `tests/unit/cli/output.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/cli/validate-input.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/canonical.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/core/dag.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/core/epic-correlation.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/core/epicless.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/core/facets.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/feature-filtered-task.test.ts` | test |  | task-selection-engine |
-| `tests/unit/core/fix.test.ts` | test |  | prd-fix-operations |
-| `tests/unit/core/health.test.ts` | test |  | rex-mcp-service-layer |
-| `tests/unit/core/keywords.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/merge.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/move.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/core/next-task-matching.test.ts` | test |  | task-selection-engine |
-| `tests/unit/core/next-task-scoring.test.ts` | test |  | task-selection-engine |
-| `tests/unit/core/next-task.test.ts` | test |  | task-selection-engine |
-| `tests/unit/core/notion-map.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/core/parent-completion.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/parent-reset.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/prune.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/remove-epic.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/remove-feature.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/remove-task.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/reorganize-executor.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/reorganize.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/requirements-prioritization.test.ts` | test |  | task-selection-engine |
-| `tests/unit/core/requirements.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/structural.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/core/sync-engine.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/sync.test.ts` | test |  | prd-domain-operations |
-| `tests/unit/core/timestamps.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/token-usage-regression.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/token-usage.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/core/transitions.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/core/tree-hardened.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/core/tree.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/core/verify.test.ts` | test |  | prd-cli-operations |
-| `tests/unit/recommend/conflict-detection.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/recommend/create-from-recommendations.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/schema/schema-version.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/schema/validate.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/store/adapter-registry.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/store/atomic-write.test.ts` | test |  | prd-analysis-engine |
-| `tests/unit/store/file-adapter.test.ts` | test |  | prd-schema-foundation |
-| `tests/unit/store/integration-schema.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/store/notion-adapter.test.ts` | test |  | notion-sync-client |
-| `tests/unit/store/notion-client.test.ts` | test |  | notion-sync-client |
-| `tests/unit/store/resolve-store.test.ts` | test |  | remote-sync-adapters |
-| `tests/unit/store/store-contract.test.ts` | test |  | notion-sync-client |
-| `tsconfig.json` | config |  | monorepo-config |
-| `vitest.config.ts` | config |  | monorepo-config |
+| `tests/integration/claude-config.test.ts` | test |  | unit-analyze |
+| `tests/integration/project-config.test.ts` | test |  | store |
+| `tests/integration/smart-add-duplicate-outcomes.test.ts` | test |  | cli |
+| `tests/integration/smart-add-orphaned-parent.test.ts` | test |  | unit-analyze |
+| `tests/integration/store-roundtrip.test.ts` | test |  | store |
+| `tests/unit/analyze/acknowledge.test.ts` | test |  | unit |
+| `tests/unit/analyze/consolidation-guard.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/decompose.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/dedupe.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/diff.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/extract-llm-mock.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/extract-llm.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/extract-text.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/extract.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/file-validation.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/guided.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/loe-proposal-schema.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/modify-reason.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/propose.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-assessment.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-batch.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-description.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-granularity.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-ideas.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason-multi-description.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reason.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/reconcile.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/scanners-acknowledge.test.ts` | test |  | unit |
+| `tests/unit/analyze/scanners.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/token-tracking.test.ts` | test |  | unit-analyze |
+| `tests/unit/analyze/validate-modification.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/add.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/commands/analyze-guided.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/chunked-review.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/decomposition-review.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/fix.test.ts` | test |  | fix |
+| `tests/unit/cli/commands/format-loe.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/loe-display.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/move.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/commands/recommend.test.ts` | test |  | unit |
+| `tests/unit/cli/commands/remove.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/commands/report.test.ts` | test |  | unit |
+| `tests/unit/cli/commands/smart-add-duplicates.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/smart-add-merge.test.ts` | test |  | cli |
+| `tests/unit/cli/commands/smart-add.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/status.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/commands/sync.test.ts` | test |  | store |
+| `tests/unit/cli/commands/update.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/commands/usage.test.ts` | test |  | unit |
+| `tests/unit/cli/commands/validate-epicless.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/validate-interactive.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/validate.test.ts` | test |  | unit-analyze |
+| `tests/unit/cli/commands/verify.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/errors.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/help.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/mcp.test.ts` | test |  | cli |
+| `tests/unit/cli/output.test.ts` | test |  | unit-cli |
+| `tests/unit/cli/validate-input.test.ts` | test |  | unit-cli |
+| `tests/unit/core/canonical.test.ts` | test |  | store |
+| `tests/unit/core/dag.test.ts` | test |  | unit |
+| `tests/unit/core/epic-correlation.test.ts` | test |  | unit-analyze |
+| `tests/unit/core/epicless.test.ts` | test |  | unit-analyze |
+| `tests/unit/core/facets.test.ts` | test |  | core |
+| `tests/unit/core/feature-filtered-task.test.ts` | test |  | unit-core |
+| `tests/unit/core/fix.test.ts` | test |  | fix |
+| `tests/unit/core/health.test.ts` | test |  | cli |
+| `tests/unit/core/keywords.test.ts` | test |  | core |
+| `tests/unit/core/merge.test.ts` | test |  | core |
+| `tests/unit/core/move.test.ts` | test |  | unit |
+| `tests/unit/core/next-task-matching.test.ts` | test |  | unit-core |
+| `tests/unit/core/next-task-scoring.test.ts` | test |  | unit-core |
+| `tests/unit/core/next-task.test.ts` | test |  | unit-core |
+| `tests/unit/core/notion-map.test.ts` | test |  | store |
+| `tests/unit/core/parent-completion.test.ts` | test |  | unit-cli |
+| `tests/unit/core/parent-reset.test.ts` | test |  | unit-cli |
+| `tests/unit/core/prune.test.ts` | test |  | core |
+| `tests/unit/core/remove-epic.test.ts` | test |  | core |
+| `tests/unit/core/remove-feature.test.ts` | test |  | core |
+| `tests/unit/core/remove-task.test.ts` | test |  | core |
+| `tests/unit/core/reorganize-executor.test.ts` | test |  | core |
+| `tests/unit/core/reorganize.test.ts` | test |  | core |
+| `tests/unit/core/requirements-prioritization.test.ts` | test |  | unit-core |
+| `tests/unit/core/requirements.test.ts` | test |  | core |
+| `tests/unit/core/structural.test.ts` | test |  | unit-analyze |
+| `tests/unit/core/sync-engine.test.ts` | test |  | core |
+| `tests/unit/core/sync.test.ts` | test |  | core |
+| `tests/unit/core/timestamps.test.ts` | test |  | unit-cli |
+| `tests/unit/core/token-usage-regression.test.ts` | test |  | unit-cli |
+| `tests/unit/core/token-usage.test.ts` | test |  | unit-cli |
+| `tests/unit/core/transitions.test.ts` | test |  | unit |
+| `tests/unit/core/tree-hardened.test.ts` | test |  | unit |
+| `tests/unit/core/tree.test.ts` | test |  | unit |
+| `tests/unit/core/verify.test.ts` | test |  | unit-cli |
+| `tests/unit/recommend/conflict-detection.test.ts` | test |  | unit |
+| `tests/unit/recommend/create-from-recommendations.test.ts` | test |  | unit |
+| `tests/unit/schema/schema-version.test.ts` | test |  | unit |
+| `tests/unit/schema/validate.test.ts` | test |  | unit |
+| `tests/unit/store/adapter-registry.test.ts` | test |  | store |
+| `tests/unit/store/atomic-write.test.ts` | test |  | unit-analyze |
+| `tests/unit/store/file-adapter.test.ts` | test |  | unit |
+| `tests/unit/store/integration-schema.test.ts` | test |  | store |
+| `tests/unit/store/notion-adapter.test.ts` | test |  | unit-store |
+| `tests/unit/store/notion-client.test.ts` | test |  | unit-store |
+| `tests/unit/store/resolve-store.test.ts` | test |  | store |
+| `tests/unit/store/store-contract.test.ts` | test |  | unit-store |
+| `tsconfig.json` | config |  | root |
+| `vitest.config.ts` | config |  | root |
 
 ## Tooling
 

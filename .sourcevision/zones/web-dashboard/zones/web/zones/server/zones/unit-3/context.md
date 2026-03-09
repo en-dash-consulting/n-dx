@@ -5,27 +5,29 @@
 <zone>
 
 Zone: Web Viewer/web/server/unit 3 (`web-viewer/web/server/unit-3`)
-Files: 4, Cohesion: 1.00, Coupling: 0.00
-Description: 4 files, primarily TypeScript
-Entry points: packages/web/src/server/websocket.ts
-Lines: 1482
+Files: 5, Cohesion: 0.40, Coupling: 0.60
+Description: 5 files, primarily TypeScript
+Entry points: packages/web/src/server/routes-sourcevision.ts
+Lines: 1941
 
 </zone>
 
 <files>
 
-packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
-packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
-packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
-packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
+packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
+packages/web/src/server/routes-sourcevision.ts (TypeScript, 523 lines, source)
+packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
+packages/web/tests/unit/server/routes-sourcevision.test.ts (TypeScript, 369 lines, test)
+packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
-  packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
-  packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
+  packages/web/src/server/routes-sourcevision.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {classifyPRMarkdownRefreshFailureCode}
+  packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts → packages/web/src/server/pr-markdown-refresh-diagnostics.ts {buildPRMarkdownRefreshFailure, classifyPRMarkdownRefreshFailureCode, classifyPRMarkdownRefreshPreflightCode, GIT_CREDENTIAL_HELPER_COMMAND, getPRMarkdownRefreshRemediationHints, resolvePRMarkdownRefreshPreflightErrorContract, resolvePRMarkdownRefreshGuidance, shouldUsePRMarkdownFallback, shouldUsePRMarkdownFallbackForCode, validatePRMarkdownRefreshPreflightErrorContract}
+  packages/web/tests/unit/server/routes-sourcevision.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
+  packages/web/tests/unit/server/scope.test.ts → packages/web/src/server/routes-sourcevision.ts {handleSourcevisionRoute}
 
 </imports>

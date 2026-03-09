@@ -1,10 +1,11 @@
 {
   "id": "web-viewer/web/server",
   "name": "Web Viewer/web/server",
-  "description": "69 files, primarily TypeScript",
+  "description": "81 files, primarily TypeScript",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/public.ts",
+    "packages/web/src/server/aggregation-cache.ts",
     "packages/web/src/server/concurrent-execution-metrics.ts",
     "packages/web/src/server/index.ts",
     "packages/web/src/server/port.ts",
@@ -33,14 +34,21 @@
     "packages/web/src/server/routes-sourcevision.ts",
     "packages/web/src/server/routes-static.ts",
     "packages/web/src/server/routes-status.ts",
+    "packages/web/src/server/routes-token-usage.ts",
     "packages/web/src/server/routes-validation.ts",
     "packages/web/src/server/routes-workflow.ts",
     "packages/web/src/server/search-index.ts",
     "packages/web/src/server/start.ts",
     "packages/web/src/server/types.ts",
     "packages/web/src/server/websocket.ts",
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/node-culler.ts",
+    "packages/web/src/viewer/views/pr-markdown.ts",
+    "packages/web/tests/integration/pr-markdown-refresh.test.ts",
     "packages/web/tests/integration/smart-add-dispatch.test.ts",
     "packages/web/tests/integration/ws-health-integration.test.ts",
+    "packages/web/tests/unit/server/aggregation-cache.test.ts",
     "packages/web/tests/unit/server/data-loading-efficiency.test.ts",
     "packages/web/tests/unit/server/dev-reload.test.ts",
     "packages/web/tests/unit/server/port.test.ts",
@@ -64,6 +72,8 @@
     "packages/web/tests/unit/server/routes-search.test.ts",
     "packages/web/tests/unit/server/routes-sourcevision.test.ts",
     "packages/web/tests/unit/server/routes-status.test.ts",
+    "packages/web/tests/unit/server/routes-token-usage-weekly-budget.test.ts",
+    "packages/web/tests/unit/server/routes-token-usage.test.ts",
     "packages/web/tests/unit/server/routes-validation.test.ts",
     "packages/web/tests/unit/server/routes-workflow.test.ts",
     "packages/web/tests/unit/server/scope.test.ts",
@@ -71,16 +81,19 @@
     "packages/web/tests/unit/server/shutdown-handler.test.ts",
     "packages/web/tests/unit/server/type-consistency.test.ts",
     "packages/web/tests/unit/server/websocket.test.ts",
-    "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+    "packages/web/tests/unit/server/ws-health-tracker.test.ts",
+    "packages/web/tests/unit/viewer/node-culler.test.ts",
+    "packages/web/tests/unit/viewer/pr-markdown.test.ts"
   ],
   "entryPoints": [
     "packages/web/src/server/prd-io.ts",
     "packages/web/src/server/rex-gateway.ts",
-    "packages/web/src/server/routes-sourcevision.ts",
-    "packages/web/src/server/types.ts"
+    "packages/web/src/server/types.ts",
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/viewer/views/pr-markdown.ts"
   ],
-  "cohesion": 0.97,
-  "coupling": 0.03,
-  "fileCount": 69,
-  "lineCount": 25234
+  "cohesion": 0.98,
+  "coupling": 0.02,
+  "fileCount": 81,
+  "lineCount": 29185
 }

@@ -1,0 +1,37 @@
+{
+  "id": "packages-rex:cli",
+  "name": "Cli",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/constants.ts",
+    "packages/rex/src/cli/commands/health.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/mcp-tools.ts",
+    "packages/rex/src/cli/mcp.ts",
+    "packages/rex/src/core/health.ts",
+    "packages/rex/src/workflow/default.ts",
+    "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
+    "packages/rex/tests/unit/cli/commands/smart-add-merge.test.ts",
+    "packages/rex/tests/unit/cli/mcp.test.ts",
+    "packages/rex/tests/unit/core/health.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/constants.ts",
+    "packages/rex/src/cli/commands/health.ts",
+    "packages/rex/src/cli/commands/init.ts",
+    "packages/rex/src/cli/mcp.ts",
+    "packages/rex/src/core/health.ts"
+  ],
+  "cohesion": 0.22,
+  "coupling": 0.78,
+  "fileCount": 11,
+  "lineCount": 2417,
+  "riskMetrics": {
+    "cohesion": 0.22,
+    "coupling": 0.78,
+    "riskScore": 0.78,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true,
+    "riskJustification": "CLI command handlers are thin dispatch wrappers that import from core/, store/, schema/, and analyze/ to orchestrate operations. High coupling is by design: CLI commands are the integration layer that wires together domain modules. Low cohesion reflects diverse command responsibilities (init, status, health, validate, etc.) — grouping by CLI surface is correct."
+  }
+}

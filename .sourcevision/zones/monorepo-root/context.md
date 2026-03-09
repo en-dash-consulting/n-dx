@@ -7,23 +7,23 @@
 Zone: Monorepo Root (`monorepo-root`)
 Files: 31, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Top-level orchestration scripts, CI pipeline, and shared configuration governing the entire n-dx monorepo.
-Lines: 10001
+Description: Repository-level configuration, documentation, and orchestration entry points that define the overall project structure and developer contracts.
+Lines: 10511
 
 </zone>
 
 <files>
 
 .DS_Store (Other, 0 lines, other)
-.gitignore (Other, 14 lines, config)
+.gitignore (Other, 16 lines, config)
 .npmrc (Other, 2 lines, config)
-CLAUDE.md (Markdown, 210 lines, docs)
-CODEX.md (Markdown, 276 lines, docs)
+CLAUDE.md (Markdown, 272 lines, docs)
+CODEX.md (Markdown, 294 lines, docs)
 CODE_OF_CONDUCT.md (Markdown, 57 lines, docs)
 ENFORCEMENT.md (Markdown, 38 lines, docs)
 PACKAGE_GUIDELINES.md (Markdown, 283 lines, docs)
 README.md (Markdown, 359 lines, docs)
-ci.js (JavaScript, 745 lines, source)
+ci.js (JavaScript, 1173 lines, source)
 claude-integration.js (JavaScript, 331 lines, source)
 cli.js (JavaScript, 854 lines, source)
 config.js (JavaScript, 1052 lines, source)
@@ -69,33 +69,35 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] 31 files at the root is on the larger side; confirm that documentation files (CODEX.md, PACKAGE_GUIDELINES.md, CODE_OF_CONDUCT.md) are intentionally co-located here and not better served under docs/.
-[observation] [info] Perfect cohesion (1.0) and zero coupling match expectations for a monorepo root zone — all files are configuration or orchestration with no cross-package runtime imports.
-[observation] [info] config.js is the sole spawn-exempt orchestration script that reads cross-package config files directly — this exception is well-justified but should be kept narrow to prevent scope creep.
-[pattern] [info] Zero coupling is actively enforced by the spawn-only architecture of cli.js and web.js — any future change that introduces a direct `import` from a domain package into these scripts would immediately break the isolation guarantee and should be treated as a critical regression.
-[anti-pattern] [info] Reference documents (CODEX.md, PACKAGE_GUIDELINES.md, CODE_OF_CONDUCT.md, ENFORCEMENT.md) are co-located with executable orchestration scripts (cli.js, web.js, ci.js) at the repo root. This conflates two distinct concerns — documentation artifacts and runnable entry points — making it harder to audit the orchestration surface at a glance. Move reference docs to docs/ to make the root a clean entry-point manifest.
-[suggestion] [warning] Define and document a concurrency contract for the four orchestration entry points: which commands are safe to run in parallel and which require exclusive access to shared state files. Without this, concurrent CI + dev-server runs are a silent data-corruption risk.
-[suggestion] [info] The dual-alias pairs (n-dx/ndx, sourcevision/sv) are undocumented at the alias declaration sites. Add a single canonical comment at each alias binding point stating which name is primary and which is the shorthand, so future maintainers do not accidentally deprecate the wrong one.
+[observation] [info] 31 files span config, docs, orchestration scripts, and CI — consider verifying that no package-internal logic has leaked into root-level scripts over time, as orchestration scripts should only spawn child processes.
+[observation] [info] Cohesion of 1.0 and coupling of 0.0 confirm this zone is correctly scoped as the composition root with no upstream dependencies — ideal for an orchestration tier.
+[observation] [info] Root contains both CLAUDE.md and CODEX.md which are noted as requiring sync — a linting step to detect divergence between these two files would prevent documentation drift.
+[relationship] [info] monorepo-root → hench-agent boundary is enforced exclusively via spawn (child_process), not module imports. This means the zone graph has no edge between them despite tight behavioral coupling — zone cohesion/coupling metrics alone cannot detect spawn-based dependencies and should be supplemented with process-level dependency audits.
+[anti-pattern] [warning] The config.js spawn-exempt rule (permitted to read JSON config files directly, forbidden from importing TypeScript package modules) has no automated enforcement. The architecture-policy e2e test verifies the four-tier import hierarchy generally, but config.js's specific exception boundary is untested — a package module import added to config.js would pass CI undetected.
+[suggestion] [info] Rename web.js to start.js to align with the primary CLI command name 'ndx start'. The current legacy name misleads contributors into thinking the file only handles web serving, obscuring its process-lifecycle management responsibilities (start/stop/status subcommands, PID file management). Update CLAUDE.md monorepo structure table accordingly.
+[suggestion] [warning] cli.js command routing (ndx rex, ndx hench, ndx sourcevision, ndx sv) has no integration test. A smoke test asserting that each delegation path spawns the correct binary with correct arguments would catch routing regressions that are currently invisible to CI and only surface at runtime.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Root contains both executable orchestration scripts (cli.js, web.js, ci.js, config.js) and static config/doc files — the scripts are the primary entry points for all n-dx functionality
-- High cohesion (1.0) and zero coupling indicate this zone is entirely self-contained at the repo root, which is expected for monorepo orchestration files
-- The spawn-exempt config.js pattern is well-documented in CLAUDE.md, but worth verifying it never drifts into importing domain-package internals beyond config file paths
-- Perfect cohesion (1.0) and zero coupling match expectations for a monorepo root zone — all files are configuration or orchestration with no cross-package runtime imports.
-- 31 files at the root is on the larger side; confirm that documentation files (CODEX.md, PACKAGE_GUIDELINES.md, CODE_OF_CONDUCT.md) are intentionally co-located here and not better served under docs/.
-- config.js is the sole spawn-exempt orchestration script that reads cross-package config files directly — this exception is well-justified but should be kept narrow to prevent scope creep.
-- The spawn-only pattern in cli.js/web.js acts as a structural firewall: orchestration scripts never import domain packages at runtime, so the monorepo-root zone cannot accidentally acquire transitive dependencies from any lower tier. This is the strongest possible isolation mechanism short of a process boundary.
-- Zero coupling is actively enforced by the spawn-only architecture of cli.js and web.js — any future change that introduces a direct `import` from a domain package into these scripts would immediately break the isolation guarantee and should be treated as a critical regression.
-- CODEX.md, PACKAGE_GUIDELINES.md, CODE_OF_CONDUCT.md, and ENFORCEMENT.md are co-located with executable orchestration scripts — these are reference documents, not runnable code, and their placement at the root adds discovery friction for new contributors who expect executable entry points at root level
-- Reference documents (CODEX.md, PACKAGE_GUIDELINES.md, CODE_OF_CONDUCT.md, ENFORCEMENT.md) are co-located with executable orchestration scripts (cli.js, web.js, ci.js) at the repo root. This conflates two distinct concerns — documentation artifacts and runnable entry points — making it harder to audit the orchestration surface at a glance. Move reference docs to docs/ to make the root a clean entry-point manifest.
-- The four orchestration entry points (cli.js, web.js, ci.js, config.js) have no documented mutual-exclusivity or sequencing constraints — concurrent execution of `ndx start` and `ndx ci` could produce write conflicts on shared state files (.rex/prd.json, .rex/execution-log.jsonl) with no lock or guard mechanism
-- The dual-alias surface (n-dx/ndx, sourcevision/sv) doubles the number of command strings that must be kept in sync across documentation, CI scripts, and shell completions — a rename or deprecation of one alias has no automated propagation path
-- Define and document a concurrency contract for the four orchestration entry points: which commands are safe to run in parallel and which require exclusive access to shared state files. Without this, concurrent CI + dev-server runs are a silent data-corruption risk.
-- The dual-alias pairs (n-dx/ndx, sourcevision/sv) are undocumented at the alias declaration sites. Add a single canonical comment at each alias binding point stating which name is primary and which is the shorthand, so future maintainers do not accidentally deprecate the wrong one.
-- [call graph] 449 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Contains all top-level orchestration scripts (cli.js, web.js, ci.js, config.js) alongside config and documentation — this is the correct composition-root location for spawn-based orchestration
+- High cohesion (1.0) with zero coupling reflects a well-isolated root layer that does not import from downstream packages
+- The presence of multiple orchestration entry points here enforces the architectural rule that cross-tier coordination happens at the root, not inside packages
+- Cohesion of 1.0 and coupling of 0.0 confirm this zone is correctly scoped as the composition root with no upstream dependencies — ideal for an orchestration tier.
+- 31 files span config, docs, orchestration scripts, and CI — consider verifying that no package-internal logic has leaked into root-level scripts over time, as orchestration scripts should only spawn child processes.
+- Root contains both CLAUDE.md and CODEX.md which are noted as requiring sync — a linting step to detect divergence between these two files would prevent documentation drift.
+- The spawn-only rule enforced at the orchestration tier creates a complete import firewall between monorepo-root and all other zones — this explains coupling 0.0 despite orchestrating the entire system
+- monorepo-root's zero coupling to hench-agent, web-viewer, and all domain zones is structurally load-bearing: any accidental import from cli.js/web.js into a package would immediately appear as coupling in zone metrics, making the metric a useful canary
+- monorepo-root → hench-agent boundary is enforced exclusively via spawn (child_process), not module imports. This means the zone graph has no edge between them despite tight behavioral coupling — zone cohesion/coupling metrics alone cannot detect spawn-based dependencies and should be supplemented with process-level dependency audits.
+- config.js's spawn-exempt exception is documented but not machine-enforced: there is no CI guard preventing a developer from adding a TypeScript module import to config.js, which would silently promote an orchestration-tier script into a domain-tier consumer and violate the tier boundary without any diagnostic signal
+- The config.js spawn-exempt rule (permitted to read JSON config files directly, forbidden from importing TypeScript package modules) has no automated enforcement. The architecture-policy e2e test verifies the four-tier import hierarchy generally, but config.js's specific exception boundary is untested — a package module import added to config.js would pass CI undetected.
+- web.js retains its legacy name while the primary CLI command is 'ndx start' — the implementation file name and the primary command name are misaligned, creating a documentation-to-implementation gap for new contributors
+- cli.js as the composition root routes all sub-CLI delegation (ndx rex, ndx hench, ndx sourcevision, ndx sv) but has no integration test verifying that each delegation path spawns the correct binary with correct arguments — routing regressions are invisible until manual testing
+- The three monorepo-level config locations (.n-dx.json root-prefixed, .rex/config.json and .hench/config.json using generic names inside package dirs) apply two incompatible naming conventions that a new contributor must infer from CLAUDE.md rather than from file naming alone
+- Rename web.js to start.js to align with the primary CLI command name 'ndx start'. The current legacy name misleads contributors into thinking the file only handles web serving, obscuring its process-lifecycle management responsibilities (start/stop/status subcommands, PID file management). Update CLAUDE.md monorepo structure table accordingly.
+- cli.js command routing (ndx rex, ndx hench, ndx sourcevision, ndx sv) has no integration test. A smoke test asserting that each delegation path spawns the correct binary with correct arguments would catch routing regressions that are currently invisible to CI and only surface at runtime.
+- [call graph] 471 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

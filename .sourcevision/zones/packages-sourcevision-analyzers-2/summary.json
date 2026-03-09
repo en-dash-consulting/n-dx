@@ -1,0 +1,36 @@
+{
+  "id": "packages-sourcevision:analyzers-2",
+  "name": "Analyzers 2",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/index.ts",
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/analyzers/route-detection.ts",
+    "packages/sourcevision/src/util/paths.ts",
+    "packages/sourcevision/tests/unit/analyzers/callgraph.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/components.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/imports.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/inventory.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/util/paths.ts"
+  ],
+  "cohesion": 0.48,
+  "coupling": 0.52,
+  "fileCount": 11,
+  "lineCount": 5963,
+  "riskMetrics": {
+    "cohesion": 0.48,
+    "coupling": 0.52,
+    "riskScore": 0.52,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

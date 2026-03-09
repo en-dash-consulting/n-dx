@@ -20027,6 +20027,141 @@
         },
         "findingCount": 7
       }
+    },
+    {
+      "id": "109638b1-0eda-425d-a785-f2b87ecf6904",
+      "title": "Address observation issues (5 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Bidirectional coupling: \"hench-agent-2\" ↔ \"web-dashboard\" (4+3 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- High coupling (0.67) — 4 imports target \"web-dashboard\"\n- Low cohesion (0.33) — files are loosely related, consider splitting this zone\n- 11 entry points — wide API surface, consider consolidating exports",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T00:30:23.465Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "85ba33ea7a17",
+          "3a82920140f7",
+          "deb476e24485",
+          "e15f4c5c5eea",
+          "606920a99dff"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 5
+        },
+        "findingCount": 5
+      },
+      "completedAt": "2026-03-09T00:48:14.440Z"
+    },
+    {
+      "id": "2c481b23-6ae9-4a70-9a61-9f6d86f32daf",
+      "title": "Address suggestion issues (18 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- The duplicate 'hench-agent' zone ID blocks reliable zone-keyed tooling — metrics are non-deterministic, hints may apply to the wrong population, and CI health gates cannot reference the zone unambiguously. Resolve by adding explicit zone hints routing hench store files (suggestions.ts + test) to hench-agent and web build/server files to their respective web zones, dissolving the residual zone.\n- Zone \"Hench Agent\" (hench-agent-2) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development\n- Add a companion test that asserts each path in the domain-isolation.test.js gateway allowlist corresponds to a file that actually exists on disk. A renamed or moved gateway file currently causes the allowlist entry to silently stop enforcing — the test passes but the rule is no longer checked.\n- Add a tier-boundary assertion for @n-dx/llm-client: verify that only Domain-tier packages (rex, sourcevision) and the Foundation tier itself import from llm-client, and that Orchestration-tier scripts (cli.js, web.js, ci.js) do not. Currently the foundation package has no cross-package contract coverage despite being the lowest layer of the dependency hierarchy.\n- Add @n-dx/llm-client to zone analysis and SourceVision coverage. The foundation package currently has no zone health metrics, cohesion/coupling signals, or tier-boundary contract tests — it is the only package in the four-tier hierarchy with zero observability at the zone level.\n- Invert domain-isolation.test.js from an opt-in allowlist to an opt-out deny-list: assert that no file outside the gateway allowlist has any import matching upstream package namespaces. This eliminates the maintenance burden of updating the allowlist when new files are added and makes violations impossible to introduce silently.\n- Investigate why the root zone has cohesion 1.0 across orchestration-tier scripts. Import-graph community detection producing cohesion 1.0 for spawn-only scripts suggests these files share imports beyond Node.js built-ins. Audit cli.js, web.js, ci.js, and config.js for any shared module imports and verify each conforms to the spawn-only rule (config.js exemption aside).\n- Rename the residual 'web' zone to a non-colliding ID (e.g. 'web-package-residual' or 'web-shell') to eliminate the zone-ID/package-name collision. Zone IDs that shadow package names corrupt any tooling that resolves names across both namespaces and make zone-keyed hints, health gates, and CI rules ambiguous.\n- Zone health reports cannot distinguish detection artifacts (e.g., residual hench-agent zone metrics) from genuine structural signals — add a detection_quality or is_artifact field to zone metadata so dashboards can annotate or filter artifactual zones, preventing misleading coupling/cohesion scores from influencing architectural decisions.\n- 7 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): packages-rex:unit-core, packages-rex:cli, packages-rex:fix, packages-rex:unit, hench-agent-2, packages-rex:core, packages-rex:store — mandatory refactoring recommended before further development\n- CLAUDE.md and CODEX.md are updated independently with no machine-enforced synchronization — a contributor updating one but not the other will silently produce divergent AI assistant behaviors. Add a comment block at the top of each file listing the sections that must be mirrored in the other, making the coupling explicit without requiring full duplication.\n- Document the archive.json lifecycle in the rex README or CLAUDE.md: what command writes to it, whether it grows unboundedly, and whether it is safe to truncate or delete — absence of this contract makes archive.json an invisible operational dependency.\n- Zone \"Unit Core\" (packages-rex:unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention\n- Zone \"Cli\" (packages-rex:cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: 0.78) — requires immediate architectural intervention\n- Zone \"Fix\" (packages-rex:fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention\n- Zone \"Unit\" (packages-rex:unit) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development\n- Zone \"Core\" (packages-rex:core) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development\n- Zone \"Store\" (packages-rex:store) has critical risk (score: 0.61, cohesion: 0.39, coupling: 0.61) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T00:16:28.944Z",
+      "completedAt": "2026-03-09T00:22:34.641Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "81f14d1792f9",
+          "22ebf68d06c8",
+          "8440e1643abe",
+          "7881027a2283",
+          "6e25829c2d85",
+          "6d4994c690eb",
+          "d9e01c33254c",
+          "81100f0c2ad4",
+          "b5a4169707fe",
+          "189e27e180fb",
+          "c3ae8106a27a",
+          "a7fe5075571e",
+          "9b0769dfa7c6",
+          "7572486da148",
+          "82bf2ed3056f",
+          "2f5a2317583e",
+          "bafba9ede5e4",
+          "cc6f75eba58f"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 15,
+          "critical": 3
+        },
+        "findingCount": 18
+      }
+    },
+    {
+      "id": "1f746194-8a84-4cf7-83bb-ffd828003a8b",
+      "title": "Address pattern issues (4 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- architecture-policy.test.js acts as a global zone guardian from within the cli-e2e-tests zone, creating an implicit dependency on the correctness of every other zone's import structure. If a new tier boundary rule is added to CLAUDE.md but not to this test, the rule is documentation-only with no enforcement path.\n- The cross-package-integration-tests zone has no coupling to production code, but it implicitly monitors every zone's import graph. As new zones or packages are added, this zone must be actively extended — currently there is no automated mechanism to detect when a new cross-package import path is created without a corresponding contract test.\n- The residual 17-file zone merges files from three distinct semantic domains into one zone with misleading metrics (cohesion 0.33, coupling 0.67) — the coupling score is a detection artifact that will resolve once zone hints reclassify the files to their correct zones.\n- web-dashboard and hench are the two largest production zones (388 vs 155 files) and both connect upstream to rex via dedicated gateway files. This creates a fan-in topology where rex is the central domain — if rex's public API changes, two independent gateways must be updated simultaneously, which is a coordination risk as the codebase scales.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "80f023e42335",
+          "99e8d8f3d1b1",
+          "cf10522ba90c",
+          "a57082612d3d"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 4
+        },
+        "findingCount": 4
+      }
+    },
+    {
+      "id": "553258ae-5779-478f-8962-69dc48f72763",
+      "title": "Address relationship issues (3 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- cli-e2e-tests and cross-package-integration-tests together provide full-spectrum architectural coverage: integration tests guard the import graph (static structure), e2e tests guard the CLI interface (dynamic behavior). A gap exists for in-process behavioral tests of gateway return values — currently no zone validates that gateway re-exports return correctly typed data at runtime.\n- monorepo-root has zero import edges to all other zones (spawn-only pattern), making its cross-zone contracts invisible to static analysis — interface drift between CLI spawns and downstream package commands cannot be caught by import-graph tooling alone.\n- rex-runtime-state is a multi-writer shared-state zone with no import-graph visibility — four zones write to it under documented but unenforced exclusion rules, creating hidden coupling that static analysis cannot detect or warn about.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "3b5c75c6e4c4",
+          "8379f75792a1",
+          "556f61db13bd"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 3
+        },
+        "findingCount": 3
+      }
+    },
+    {
+      "id": "929b6802-c85a-4cbf-a594-2c968a965306",
+      "title": "Address anti-pattern issues (8 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- There is no parity assertion between gateway re-export count and tested import paths. When a new function is added to rex-gateway.ts or domain-gateway.ts, the cross-package contract test is not automatically required to cover it — the enforcement zone can fall arbitrarily behind the gateway surface area with no visible signal.\n- The residual 17-file zone groups files from packages/hench/ and packages/web/ under a single zone ID — cross-package zone membership means adding zone-level hints or health thresholds for 'hench-agent' will unintentionally affect web package files, and vice versa.\n- packages/hench/src/store/suggestions.ts and its test are stranded in the residual 17-file zone rather than the 155-file hench-agent zone — the misclassification inflates the residual zone's coupling score (0.67) and deflates hench-agent's apparent surface area, making both zones' health metrics unreliable as architectural signals.\n- config.js has no machine-enforced import boundary: its spawn-exempt exception is documented in CLAUDE.md but nothing prevents it from accumulating library imports beyond config I/O, which would silently erode the orchestration tier's spawn-only guarantee without triggering any existing CI assertion.\n- pending-proposals.json and acknowledged-findings.json are transient review-lifecycle files with no .gitignore separation from durable PRD state — absent an explicit 'safe to delete' policy or ignore rule, these files will be versioned alongside prd.json, causing spurious commit noise and merge conflicts in shared repositories.\n- The 386 non-gateway files in web-dashboard lack an exhaustive automated guard against acquiring cross-package imports. domain-isolation.test.js checks known paths but does not assert that ONLY gateway files have cross-package imports — a new leaf file that directly imports from rex or sourcevision would pass the current test suite.\n- The CLAUDE.md concurrency contract lists safe/unsafe command pairs at the process-spawn level but omits HTTP-request concurrency against the web server's in-process stateful services. A client reading aggregation-cache while ndx plan rewrites .rex/prd.json will observe a partially-written PRD with no error signal — this is an undocumented hazard specific to the always-on web server model.\n- God function: generateLlmsTxt in packages/sourcevision/src/analyzers/llms-txt.ts calls 33 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T00:23:27.753Z",
+      "completedAt": "2026-03-09T00:29:20.764Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "51b2745988d6",
+          "e603cfd50c57",
+          "47bb2adbca67",
+          "6a7bd78b5f68",
+          "92fd2ab9167c",
+          "71fd86c7463f",
+          "69246a4c8ecf",
+          "4ee452497d78"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 8
+        },
+        "findingCount": 8
+      }
     }
   ]
 }

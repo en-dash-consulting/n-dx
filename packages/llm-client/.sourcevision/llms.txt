@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (42), JSON (3)
 - **Zones**: 4 (4 with descriptions)
 - **Git**: feature/integrate-codex @ 3acc839
-- **Analyzed**: 2026-03-08T16:57:02.832Z
+- **Analyzed**: 2026-03-08T23:51:39.752Z
 
 ## Architecture Zones
 
@@ -101,22 +101,22 @@
 - Four zones for a 41-file package indicates appropriate granularity — the community detection has produced meaningful boundaries without over-fragmenting a small package. [info]
 - The bidirectional dependency between src and src-2 (25 down, 3 up) is the primary architectural risk — eliminating the 3 upward imports would make the layering clean and unidirectional. [warning]
 - Severity reassessment summary: global/6 downgraded critical→warning (double-counts root cause already in global/8); global/7 downgraded critical→info (positive architectural property, must be info per evaluation constraints); global/11 upgraded info→critical (cluster-criticality justification confirmed across global/22 and 23 — three co-occurring sub-threshold risks on the same change surface eliminates all defensive layers); global/14 downgraded critical→info (meta-finding about global/7 which is itself a positive property); global/15 downgraded critical→warning (descriptive convergence finding, root cause independently covered by global/8 at critical); global/31 downgraded critical→warning (planning prerequisite, not a structural defect); src-2/1 and src-2/6 downgraded warning→info (missing zone name is a process gap, not an architectural defect or risk). [info]
+- The 'catalogue symbols first' prerequisite established in global/14 is already satisfied by the existing classifications.json. The 4 types-archetype files are on record with confirmed classification source: types.ts (algorithmic, 0.9), llm-types.ts (LLM, 0.7), provider-interface.ts (LLM, 0.7), project-dirs.ts (LLM, 0.7). The config and utility archetype files in src-2 (config.ts, llm-config.ts, project-config.ts, exec.ts, token-usage.ts) are explicitly excluded from the extraction scope. No pre-refactor discovery work is required beyond running a clean zone analysis to confirm edge persistence. [info]
+- The manifest timestamp corruption (zones.completedAt 6h52m before zones.startedAt) confirms the src-2 zone enrichment failure is a deterministic process crash, not ambiguous file content. Finding global/31's claim that 'enrichment failure independently corroborates a fuzzy zone boundary' is therefore invalid — a crashed process provides no content-quality signal. The zone may have a well-defined boundary; the Louvain pass simply never completed. Do not use this artifact as evidence for a zone split. Zone naming and boundary validity can only be assessed after clean re-analysis. [info]
 - The stale zones manifest (status: 'running') is an independent corroboration of why the src-2 zone received no name from automated enrichment (src-2/1): the enrichment LLM call likely never completed or its output was not persisted. This means the zone naming failure is a process artifact, not a signal about zone coherence. Finding global/19's inference that 'enrichment failure corroborates fuzzy zone boundary' is therefore invalid — the failure source is a crashed process, not ambiguous content. [info]
 - Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0) [info] (root)
 - 12 entry points — wide API surface, consider consolidating exports [warning] (src)
-- Findings src/0 (12 entry points, automated heuristic) and global/2 (single public entry point pattern, LLM pass 1) contradict each other. The automated heuristic counts files in the src zone that have incoming import edges from other zones; if 12 such files exist, the src/public.ts single-entry-point convention is not being honored at the zone boundary level. Audit which of the 12 src zone files are imported directly by src-2 zone files and determine whether those imports should be consolidated to route through a single gateway or public.ts re-export. [warning] (src)
-- Contains 42% of project files (19/45) — may be too broad, consider splitting [warning] (src-2)
-- ... and 5 more
+- ... and 7 more
 
 ### Suggestions
 
 - tests/unit/ contains files from 3 zones (src, src-2, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
 - Document the one-to-one test-to-module mapping convention used in llm-provider-tests in a PACKAGE_GUIDELINES.md or test/README.md entry — this implicit convention is enforced only by social norms and will silently erode as the package grows. Codifying it prevents new contributors from breaking the mapping during refactors. [warning]
 - The 3 reverse imports (llm-provider-core → llm-cli-utilities) combined with zero utility test coverage and implicit session↔auth coupling form a compounding risk cluster: a single change to auth.ts or a utility config shape can silently break provider construction with no test signal at any layer. Treat these three issues as a single fix unit: extract shared types, add a utility test zone, and add a session-auth integration test simultaneously. [info]
+- Corrected canonical action plan incorporating zone pinning as a mandatory pre-step before any structural refactor, with explicit file names confirmed from classifications.json: Step 0 (gate, unconditional) — re-run sourcevision analyze on the llm-client package; the current manifest records a crashed zone phase and all zone metrics are unverified. Step 1 — if the 3 reverse import edges persist in the clean zone map, attempt zone pinning: add a sourcevision zone configuration entry anchoring types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a fixed foundation zone. This requires zero code changes and zero import-path updates. Step 2 — if zone pinning is unavailable or produces an unstable boundary after re-analysis, proceed to import-path refactor: update only api-provider.ts, cli-provider.ts, and auth.ts to import from the new anchored zone path. Do not move config.ts, llm-config.ts, project-config.ts, exec.ts, or token-usage.ts — these contain logic and are classified as config or utility archetype. Step 3 (independent of steps 1–2) — add at least one test per exported symbol in the src-2 zone to close the utility coverage gap. Step 4 (independent) — add one integration test asserting a constructed provider session contains a valid auth token. Zone pinning in step 1 is explicitly required before step 2; this ordering is absent from global/21 and is the primary gap in the existing action plan. [critical]
 - The compounding risk cluster (finding 11, now critical) should be resolved as a single sequential work unit: step 1 — introduce a new zero-dependency zone containing only shared provider config shapes and token structs, update llm-provider-core and llm-cli-utilities to import downward from it, eliminating the 3 reverse edges; step 2 — add a test zone for llm-cli-utilities with at minimum one test per exported utility to close the coverage gap identified in finding 5; step 3 — add one integration-level test asserting that a constructed session contains a valid auth token, making the session–auth coupling in finding 11 regression-protected. Steps must be done in this order: the types extraction in step 1 defines the stable interface that steps 2 and 3 test against. [critical]
 - The concrete prerequisite step for finding 17 is: inspect the import lines in api-provider.ts, cli-provider.ts, and auth.ts and list every symbol imported from files in the src-2 zone. Cross-reference with types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts — all classified as 'types' archetype — to identify which shared type definitions are currently anchored in the utilities zone. These are the symbols that must move to the new zero-dependency zone to eliminate the 3 reverse edges. files.ts and exec.ts contain logic and should not move; only pure type/interface/constant definitions qualify. [warning]
 - The exact symbols forcing the 3 reverse import edges from llm-provider-core into llm-cli-utilities are: ClaudeConfig, AuthMode, TokenUsage (from types.ts), LLMConfig, CodexConfig (from llm-types.ts), and the provider interface from provider-interface.ts — all already classified as 'types' archetype per global/15 and global/18. The new shared zone must contain exactly these files and no others. Logic-containing files (exec.ts, files.ts, config.ts resolver functions, token-usage.ts parsing helpers) must not move; only pure type/interface/constant definitions qualify. [warning]
-- The four ordered action items synthesized across this finding set should be tracked as a single PRD epic with four sequential tasks rather than as independent findings: Task 1 (gate) — re-run sourcevision analyze and confirm whether the 3 reverse edges persist in a clean zone map. Task 2 — if edges persist, attempt zone pinning of types.ts, llm-types.ts, provider-interface.ts, project-dirs.ts before attempting an import-path refactor; only proceed to refactor if pinning is unavailable or produces an unstable boundary. Task 3 — add utility test coverage for all exports in the current src-2 zone. Task 4 — add one session-auth integration test asserting a constructed session contains a valid auth token. Tasks 3 and 4 are independent of Tasks 1–2 but should be written against the stable interface produced by Task 2 if it runs. [warning]
 - The minimum-effort resolution for the 3 reverse import edges is zone pinning via sourcevision configuration, not a structural refactor. Add a zone configuration entry pinning types.ts, llm-types.ts, provider-interface.ts, and project-dirs.ts as a named anchor cluster. This instructs Louvain to place these files in a fixed foundation zone on every re-analysis, drawing zone boundaries so provider service files (api-provider.ts, cli-provider.ts, auth.ts) cluster above them — eliminating reverse edges with zero import-path changes and zero test disruption. Attempt zone pinning first after re-running sourcevision analyze. Only proceed to the import-path refactor described in global/31 if pinning produces an unstable boundary on re-analysis. [warning]
 - The sequential work unit in finding 14 has an implicit prerequisite: before introducing the new shared types zone, identify the exact set of types currently forcing the 3 reverse imports from llm-provider-core into llm-cli-utilities. These are the provider config shapes and token structs named in finding 8. Cataloguing them first ensures the new zone contains exactly what eliminates the cycle and nothing more, preventing the new zone from becoming a general-purpose dumping ground that recreates the problem at one layer down. [critical]
 - global/22 is marked critical and states 'Findings 0, 4, 6, 8, and 11 converge on one root cause: no zero-dependency base types zone exists'. This is a convergence observation — it adds epistemic weight to findings already captured at appropriate severity (global/9 is critical, global/35 is critical). Convergence evidence is not itself a new critical defect. Retaining critical severity here inflates the must-fix count and makes global/22 indistinguishable from the actual action items. Severity should be 'warning'. [warning]
@@ -128,7 +128,7 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **The compounding risk cluster (finding 11, now critical) sho… (+5 related)**
+1. **Corrected canonical action plan incorporating zone pinning … (+6 related)**
 
 ### Medium Priority
 
@@ -188,7 +188,7 @@ Prioritized work items derived from analysis:
 | `package-lock.json` | generated |  | root |
 | `package.json` | config |  | root |
 | `src/api-provider.ts` | source | service | src |
-| `src/auth.ts` | source | utility | src-2 |
+| `src/auth.ts` | source | service | src-2 |
 | `src/cli-provider.ts` | source | service | src |
 | `src/codex-cli-provider.ts` | source | service | src |
 | `src/config.ts` | source | config | src-2 |
@@ -200,10 +200,10 @@ Prioritized work items derived from analysis:
 | `src/llm-config.ts` | source | config | src |
 | `src/llm-types.ts` | source | types | src |
 | `src/output.ts` | source | utility | src-2 |
-| `src/project-config.ts` | source | utility | src-2 |
+| `src/project-config.ts` | source | config | src-2 |
 | `src/project-dirs.ts` | source | types | src-2 |
 | `src/provider-interface.ts` | source | types | src |
-| `src/provider-registry.ts` | source | store | src |
+| `src/provider-registry.ts` | source | service | src |
 | `src/provider-session.ts` | source | service | src |
 | `src/public.ts` | source | entrypoint | src-2 |
 | `src/suggest.ts` | source | utility | src-2 |

@@ -1,18 +1,19 @@
 {
   "id": "web-viewer/web/server/unit-3",
   "name": "Web Viewer/web/server/unit 3",
-  "description": "4 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
-    "packages/web/src/server/websocket.ts",
-    "packages/web/tests/integration/ws-health-integration.test.ts",
-    "packages/web/tests/unit/server/websocket.test.ts",
-    "packages/web/tests/unit/server/ws-health-tracker.test.ts"
+    "packages/web/src/server/pr-markdown-refresh-diagnostics.ts",
+    "packages/web/src/server/routes-sourcevision.ts",
+    "packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts",
+    "packages/web/tests/unit/server/routes-sourcevision.test.ts",
+    "packages/web/tests/unit/server/scope.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/server/websocket.ts"
+    "packages/web/src/server/routes-sourcevision.ts"
   ],
-  "cohesion": 1,
-  "coupling": 0,
-  "fileCount": 4,
-  "lineCount": 1482
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 5,
+  "lineCount": 1941
 }

@@ -8,7 +8,7 @@ Zone: Hench/unit (`hench/unit`)
 Files: 115, Cohesion: 0.94, Coupling: 0.06
 Description: 115 files, primarily TypeScript
 Entry points: packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/tools.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/process/index.ts, packages/hench/src/schema/index.ts, packages/hench/src/schema/v1.ts, packages/hench/src/store/project-config.ts, packages/hench/src/tools/rex.ts, packages/hench/src/tools/shell.ts
-Lines: 29707
+Lines: 29738
 
 </zone>
 
@@ -43,7 +43,7 @@ packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
 packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
 packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
 packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 91 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 122 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)

@@ -1,7 +1,7 @@
 {
   "id": "hench-agent",
   "name": "Hench Agent",
-  "description": "The autonomous agent package responsible for task selection, LLM-driven execution loops, tool dispatch, and run recording for n-dx's self-directed development mode.",
+  "description": "The autonomous agent package responsible for task selection, brief generation, LLM tool-use loops, run recording, and all supporting store and analysis infrastructure.",
   "files": [
     "packages/hench/Hench-F.png",
     "packages/hench/Hench.png",
@@ -73,6 +73,7 @@
     "packages/hench/src/store/run-retention-scheduler.ts",
     "packages/hench/src/store/run-retention.ts",
     "packages/hench/src/store/runs.ts",
+    "packages/hench/src/store/suggestions.ts",
     "packages/hench/src/store/templates.ts",
     "packages/hench/src/tools/contracts.ts",
     "packages/hench/src/tools/dispatch.ts",
@@ -148,6 +149,7 @@
     "packages/hench/tests/unit/store/run-compressed-reads.test.ts",
     "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
     "packages/hench/tests/unit/store/run-retention.test.ts",
+    "packages/hench/tests/unit/store/suggestions.test.ts",
     "packages/hench/tests/unit/store/templates.test.ts",
     "packages/hench/tests/unit/tools/completion-validation.test.ts",
     "packages/hench/tests/unit/tools/dispatch-memory.test.ts",
@@ -162,8 +164,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 155,
-  "lineCount": 35475,
+  "fileCount": 157,
+  "lineCount": 35723,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

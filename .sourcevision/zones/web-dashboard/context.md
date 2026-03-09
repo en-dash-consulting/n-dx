@@ -5,27 +5,37 @@
 <zone>
 
 Zone: Web Dashboard (`web-dashboard`)
-Files: 383, Cohesion: 0.98, Coupling: 0.02
+Files: 403, Cohesion: 0.98, Coupling: 0.02
 Risk: healthy (score: 0.02)
-Description: The unified web package: HTTP server, MCP route layer, PRD viewer SPA, and CLI entrypoint wired together at the composition root.
-Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/usage/constants.ts
-Lines: 123251
+Description: The unified web package providing the Express MCP/API server, aggregation caches, and the React viewer application for the n-dx dashboard.
+Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/visualization/index.ts
+Lines: 127988
 
 </zone>
 
 <files>
 
+packages/web/SourceVision-F.png (Other, 0 lines, asset)
+packages/web/SourceVision.png (Other, 0 lines, asset)
+packages/web/build.js (JavaScript, 238 lines, source)
+packages/web/dev.js (JavaScript, 114 lines, source)
+packages/web/package.json (JSON, 51 lines, config)
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 55 lines, source)
+packages/web/src/landing/index.html (HTML, 309 lines, other)
+packages/web/src/landing/landing.css (CSS, 1317 lines, other)
+packages/web/src/landing/landing.ts (TypeScript, 351 lines, source)
+packages/web/src/public.ts (TypeScript, 68 lines, source)
 packages/web/src/schema/v1.ts (TypeScript, 378 lines, source)
 packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
 packages/web/src/server/domain-gateway.ts (TypeScript, 19 lines, source)
+packages/web/src/server/incremental-task-usage.ts (TypeScript, 308 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
 packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
 packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
+packages/web/src/server/register-scheduler.ts (TypeScript, 65 lines, source)
 packages/web/src/server/rex-gateway.ts (TypeScript, 88 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
@@ -53,8 +63,11 @@ packages/web/src/server/routes-token-usage.ts (TypeScript, 998 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 501 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
+packages/web/src/server/shared-types.ts (TypeScript, 79 lines, source)
 packages/web/src/server/start.ts (TypeScript, 683 lines, source)
+packages/web/src/server/task-usage.ts (TypeScript, 48 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
+packages/web/src/server/usage-cleanup-scheduler.ts (TypeScript, 284 lines, source)
 packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
 packages/web/src/shared/data-files.ts (TypeScript, 20 lines, source)
 packages/web/src/shared/index.ts (TypeScript, 13 lines, source)
@@ -268,6 +281,7 @@ packages/web/src/viewer/visualization/metrics.ts (TypeScript, 14 lines, source)
 packages/web/tests/helpers/crash-detector-test-support.ts (TypeScript, 20 lines, test)
 packages/web/tests/integration/background-suspension-recovery.test.ts (TypeScript, 930 lines, test)
 packages/web/tests/integration/boundary-check.test.ts (TypeScript, 84 lines, test)
+packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 117 lines, test)
 packages/web/tests/integration/memory-aware-polling-suspension.test.ts (TypeScript, 1032 lines, test)
 packages/web/tests/integration/messaging-stack.test.ts (TypeScript, 464 lines, test)
 packages/web/tests/integration/pr-markdown-refresh.test.ts (TypeScript, 176 lines, test)
@@ -276,10 +290,12 @@ packages/web/tests/integration/request-dedup.test.ts (TypeScript, 626 lines, tes
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/integration/token-usage-route-regression.test.ts (TypeScript, 200 lines, test)
 packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
+packages/web/tests/unit/landing/landing.test.ts (TypeScript, 159 lines, test)
 packages/web/tests/unit/server/aggregation-cache.test.ts (TypeScript, 492 lines, test)
 packages/web/tests/unit/server/data-loading-efficiency.test.ts (TypeScript, 357 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
 packages/web/tests/unit/server/domain-gateway.test.ts (TypeScript, 28 lines, test)
+packages/web/tests/unit/server/incremental-task-usage.test.ts (TypeScript, 457 lines, test)
 packages/web/tests/unit/server/memory-leak-fixes.test.ts (TypeScript, 125 lines, test)
 packages/web/tests/unit/server/port.test.ts (TypeScript, 304 lines, test)
 packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts (TypeScript, 195 lines, test)
@@ -310,7 +326,9 @@ packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, t
 packages/web/tests/unit/server/scope.test.ts (TypeScript, 263 lines, test)
 packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 packages/web/tests/unit/server/shutdown-handler.test.ts (TypeScript, 506 lines, test)
+packages/web/tests/unit/server/task-usage.test.ts (TypeScript, 276 lines, test)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 225 lines, test)
+packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts (TypeScript, 507 lines, test)
 packages/web/tests/unit/server/websocket.test.ts (TypeScript, 454 lines, test)
 packages/web/tests/unit/server/ws-health-tracker.test.ts (TypeScript, 224 lines, test)
 packages/web/tests/unit/viewer/accessibility.test.ts (TypeScript, 401 lines, test)
@@ -398,6 +416,8 @@ packages/web/tests/unit/viewer/virtual-scroll.test.ts (TypeScript, 392 lines, te
 packages/web/tests/unit/viewer/ws-pipeline.test.ts (TypeScript, 146 lines, test)
 packages/web/tests/unit/viewer/zone-drill-down.test.ts (TypeScript, 543 lines, test)
 packages/web/tests/unit/viewer/zone-inline-subzones.test.ts (TypeScript, 257 lines, test)
+packages/web/tsconfig.json (JSON, 11 lines, config)
+packages/web/vitest.config.ts (TypeScript, 33 lines, config)
 
 </files>
 
@@ -408,10 +428,12 @@ Internal:
   packages/web/src/cli/index.ts → packages/web/src/server/types.ts {ViewerScope}
   packages/web/src/public.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
   packages/web/src/public.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
+  packages/web/src/public.ts → packages/web/src/server/shared-types.ts {TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig}
   packages/web/src/public.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
   packages/web/src/public.ts → packages/web/src/server/start.ts {ServerOptions, StartResult}
   packages/web/src/public.ts → packages/web/src/server/types.ts {ServerContext, RouteHandler, ViewerScope}
   packages/web/src/public.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
+  packages/web/src/server/incremental-task-usage.ts → packages/web/src/server/shared-types.ts {TaskUsageAccumulator}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort}
   packages/web/src/server/index.ts → packages/web/src/server/port.ts {PortCheckResult, PortAllocationResult, PortRetryOptions}
   packages/web/src/server/index.ts → packages/web/src/server/start.ts {startServer, PORT_FILE}
@@ -420,6 +442,9 @@ Internal:
   packages/web/src/server/index.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {SCHEMA_VERSION, isCompatibleSchema}
   packages/web/src/server/prd-io.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
+  packages/web/src/server/register-scheduler.ts → packages/web/src/server/incremental-task-usage.ts {IncrementalTaskUsageAggregator}
+  packages/web/src/server/register-scheduler.ts → packages/web/src/server/shared-types.ts {CollectAllIdsFn}
+  packages/web/src/server/register-scheduler.ts → packages/web/src/server/usage-cleanup-scheduler.ts {startUsageCleanupScheduler}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-adaptive.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-config.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
@@ -436,6 +461,7 @@ Internal:
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/rex-gateway.ts {PRDDocument}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/routes-status.ts {clearStatusCache}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/task-usage.ts {IncrementalTaskUsageAggregator}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
@@ -550,9 +576,18 @@ Internal:
   packages/web/src/server/start.ts → packages/web/src/server/routes-token-usage.ts {handleTokenUsageRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-validation.ts {handleValidationRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-workflow.ts {handleWorkflowRoute}
+  packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts {registerUsageScheduler}
+  packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts {CollectAllIdsFn}
   packages/web/src/server/start.ts → packages/web/src/server/types.ts {ServerContext, ViewerScope}
   packages/web/src/server/start.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
   packages/web/src/server/start.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES}
+  packages/web/src/server/task-usage.ts → packages/web/src/server/incremental-task-usage.ts {IncrementalTaskUsageAggregator}
+  packages/web/src/server/task-usage.ts → packages/web/src/server/register-scheduler.ts {registerUsageScheduler, RegisterSchedulerOptions}
+  packages/web/src/server/task-usage.ts → packages/web/src/server/shared-types.ts {TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupConfig, CleanupLogEntry}
+  packages/web/src/server/task-usage.ts → packages/web/src/server/usage-cleanup-scheduler.ts {startUsageCleanupScheduler, runCleanupCycle, identifyOrphanedEntries, loadCleanupConfig, writeCleanupLog, DEFAULT_CLEANUP_INTERVAL_MS}
+  packages/web/src/server/usage-cleanup-scheduler.ts → packages/web/src/server/incremental-task-usage.ts {IncrementalTaskUsageAggregator}
+  packages/web/src/server/usage-cleanup-scheduler.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
+  packages/web/src/server/usage-cleanup-scheduler.ts → packages/web/src/server/shared-types.ts {TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig}
   packages/web/src/shared/index.ts → packages/web/src/shared/data-files.ts {DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES}
   packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCuller}
   packages/web/src/shared/index.ts → packages/web/src/shared/node-culler.ts {NodeCullerOptions, NodeCullerState, VisibilityCallback}
@@ -1005,6 +1040,7 @@ Internal:
   packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/src/viewer/main.ts {*}
   packages/web/tests/integration/ws-health-integration.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, WsHealthTracker}
+  packages/web/tests/unit/landing/landing.test.ts → packages/web/src/landing/landing.ts {*}
   packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {AggregationResultCache, takeFingerprint, fingerprintsMatch}
   packages/web/tests/unit/server/aggregation-cache.test.ts → packages/web/src/server/aggregation-cache.ts {SourceFingerprint}
   packages/web/tests/unit/server/data-loading-efficiency.test.ts → packages/web/src/server/routes-data.ts {createDataWatcher, handleDataRoute}
@@ -1014,6 +1050,7 @@ Internal:
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/routes-static.ts {resolveStaticAssets, handleStaticRoute}
   packages/web/tests/unit/server/dev-reload.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/domain-gateway.test.ts → packages/web/src/server/domain-gateway.ts {createSourcevisionMcpServer}
+  packages/web/tests/unit/server/incremental-task-usage.test.ts → packages/web/src/server/incremental-task-usage.ts {IncrementalTaskUsageAggregator}
   packages/web/tests/unit/server/memory-leak-fixes.test.ts → packages/web/src/server/routes-mcp.ts {closeAllMcpSessions}
   packages/web/tests/unit/server/memory-leak-fixes.test.ts → packages/web/src/viewer/loader.ts {onDataChange, clearOnChange, getData}
   packages/web/tests/unit/server/port.test.ts → packages/web/src/server/port.ts {checkPort, checkPortWithRetry, findAvailablePort, DEFAULT_PORT, PORT_RANGE_START, PORT_RANGE_END}
@@ -1075,7 +1112,12 @@ Internal:
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/routes-rex/index.ts {shutdownRexExecution}
   packages/web/tests/unit/server/shutdown-handler.test.ts → packages/web/src/server/start.ts {registerShutdownHandlers, DEFAULT_SHUTDOWN_TIMEOUT_MS}
+  packages/web/tests/unit/server/task-usage.test.ts → packages/web/src/server/task-usage.ts {IncrementalTaskUsageAggregator, startUsageCleanupScheduler, runCleanupCycle, identifyOrphanedEntries, loadCleanupConfig, writeCleanupLog, DEFAULT_CLEANUP_INTERVAL_MS, registerUsageScheduler}
+  packages/web/tests/unit/server/task-usage.test.ts → packages/web/src/server/task-usage.ts {TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupConfig, CleanupLogEntry, RegisterSchedulerOptions}
   packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts {GATEWAY_LEVEL_HIERARCHY, GATEWAY_VALID_STATUSES, GATEWAY_VALID_REQ_CATEGORIES, GATEWAY_VALID_VALIDATION_TYPES, GATEWAY_CHILD_LEVEL, gatewayIsPriority, gatewayIsItemLevel, gatewayIsReqCategory, gatewayIsValidationType}
+  packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts → packages/web/src/server/incremental-task-usage.ts {IncrementalTaskUsageAggregator}
+  packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts → packages/web/src/server/usage-cleanup-scheduler.ts {identifyOrphanedEntries, writeCleanupLog, loadCleanupConfig, runCleanupCycle, startUsageCleanupScheduler, DEFAULT_CLEANUP_INTERVAL_MS}
+  packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts → packages/web/src/server/usage-cleanup-scheduler.ts {OrphanedEntry, CleanupResult, CollectAllIdsFn}
   packages/web/tests/unit/server/websocket.test.ts → packages/web/src/server/websocket.ts {createWebSocketManager, PING_INTERVAL_MS}
   packages/web/tests/unit/server/ws-health-tracker.test.ts → packages/web/src/server/websocket.ts {WsHealthTracker}
   packages/web/tests/unit/viewer/accessibility.test.ts → packages/web/src/viewer/components/guide.ts {Guide}
@@ -1262,90 +1304,88 @@ Internal:
   packages/web/tests/unit/viewer/zone-inline-subzones.test.ts → packages/web/src/viewer/views/zones.ts {convertSubZones}
 
 Outgoing (this zone → other zones):
-  → packages-rex:prd-schema-foundation: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
-  → packages-sourcevision:branch-work-analysis: packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts
-  → task-usage-analytics: packages/web/src/server/routes-hench.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts; packages/web/src/server/start.ts → packages/web/src/server/task-usage.ts
-
-Incoming (other zones → this zone):
-  ← task-usage-analytics: packages/web/src/server/usage-cleanup-scheduler.ts → packages/web/src/server/prd-io.ts
+  → packages-rex:unit: packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts; packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts
+  → packages-sourcevision:unit: packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts
 
 </imports>
 
 <findings>
 
 [observation] [warning] 11 entry points — wide API surface, consider consolidating exports
-[observation] [info] Contains 59% of project files (383/644) — subdivided into 6 sub-zones
+[observation] [info] Contains 63% of project files (403/644) — subdivided into 8 sub-zones
 [observation] [info] High cohesion (0.98) — files are tightly interconnected
-[observation] [info] At 383 files this is the largest zone in the codebase; if navigation becomes difficult, splitting server-side (MCP routes, aggregation cache, prd-io) from client-side (viewer components, polling, hooks) into sub-zones would be a natural boundary.
-[observation] [info] Cohesion of 0.98 across 383 files indicates the web package maintains strong internal coherence despite spanning server, viewer, CLI, and schema layers.
-[observation] [info] The bidirectional coupling with the usage zone (3 outbound, 1 inbound import) is the only external dependency surface — keeping it small preserves the zone's isolation guarantees.
-[suggestion] [info] Zone "web-dashboard" has files across 23 directories — consider consolidating under a dedicated directory
-[suggestion] [info] Zone name 'web-dashboard' does not reflect its actual content (server, viewer, MCP routes, CLI, schema). Rename to 'web-platform' or split into 'web-server' / 'web-viewer' to make the name a truthful description of the zone's scope.
-[suggestion] [warning] concurrent-execution-metrics.ts name implies it tracks hench agent execution concurrency. Verify this file does not import from the hench package — such an import would violate the four-tier hierarchy (web is domain tier, hench is execution tier, domain must not import from execution).
-[suggestion] [info] pr-markdown-refresh-diagnostics.ts is a utility file with a name specific enough to suggest it should live in a dedicated PR-workflow zone or in rex rather than in the general web server layer. Review whether this file has domain logic that belongs upstream in the dependency hierarchy.
-[relationship] [warning] The single usage→web-dashboard import is the only dependency that flows against the expected data-consumer direction (viewer should pull from analytics, not the reverse); verify this import is not a hidden circular initialization dependency
-[anti-pattern] [warning] Zone mixes Node.js server code and browser Preact viewer code in a single zone. These two sub-environments are mutually exclusive at runtime — Node modules (http, fs) cannot load in the browser and vice versa. A split into web-server and web-viewer sub-zones would enforce the runtime boundary structurally, not just by convention.
+[observation] [info] Exemplary cohesion (0.98) and near-zero coupling (0.02) for a 391-file zone indicates the gateway pattern is working as intended and cross-package leakage is minimal.
+[observation] [info] The concurrent-execution-metrics and incremental-task-usage services are isolated to the server layer — verify they are not being imported directly from viewer files, which would silently collapse the server/viewer boundary.
+[observation] [info] The zone spans both the CLI entrypoint (src/cli/index.ts) and the HTTP server (src/server/index.ts); confirm these two surfaces share no mutable state, since CLI invocations and long-running server sessions have incompatible lifecycles.
+[suggestion] [info] Zone "web-dashboard" has files across 26 directories — consider consolidating under a dedicated directory
+[suggestion] [warning] The gateway re-export-only contract is machine-enforced for web's gateways via domain-isolation.test.js, but hench's rex-gateway.ts has no equivalent enforcement test. The asymmetry means a logic-bearing re-export added to hench's gateway passes all CI checks undetected. Add a parallel gateway-isolation test inside the hench package or extend architecture-policy.test.js to cover all gateway files across all packages.
+[suggestion] [info] Zone ID 'web-dashboard' does not match the package directory name 'web'. In diagnostic output that reports both package names and zone IDs (e.g. sourcevision health reports, CI summaries), these identifiers appear as unrelated entities. Adopt a convention — either name zones after their package (web) or suffix all zones consistently (web-dashboard → @n-dx/web) — and enforce it in the zone detection pipeline.
+[pattern] [warning] The 'web' residual zone (cohesion: 0.33, 14 files) co-existing with the 'web-dashboard' zone (cohesion: 0.98, 391 files) indicates incomplete zone membership for the web package — files stranded in the residual zone make health metrics for both zones unreliable.
+[relationship] [info] web-dashboard has 21 outgoing cross-zone calls but 0 incoming, confirming it is the composition root; any future zone that imports from web-dashboard would invert this pattern and should be treated as a critical boundary violation.
+[anti-pattern] [warning] No automated assertion verifies that all 21 outgoing cross-zone calls flow through the two gateway files and none bypass them via direct leaf-to-leaf imports; a new developer adding a cross-package import in a non-gateway file would pass all existing tests undetected until sourcevision re-analysis.
+[anti-pattern] [warning] The 'web' residual zone (cohesion 0.33, 14 files) has persisted across at least three analysis passes without resolution, indicating zone hints for viewer components and build scripts are not being applied or are being overridden by Louvain; unresolved residual zones silently invalidate health metrics for both web-dashboard and the residual zone indefinitely.
 
 </findings>
 
 <insights>
 
 - High cohesion (0.98) — files are tightly interconnected
-- Contains 59% of project files (383/644) — subdivided into 6 sub-zones
+- Contains 63% of project files (403/644) — subdivided into 8 sub-zones
 - 11 entry points — wide API surface, consider consolidating exports
-- At 383 files and 0.98 cohesion, the zone is exceptionally well self-contained — the composition-root pattern keeps server/viewer coupling intentional and auditable
-- The 0.02 coupling score means almost no external symbols leak into the zone's internal surface; cross-package access is concentrated in rex-gateway.ts and domain-gateway.ts as designed
-- The zone spans both server-side (Node HTTP, MCP routes) and client-side (Preact viewer, polling, performance) concerns — consider whether a future split into web-server and web-viewer sub-zones would aid navigation at this file count
-- Cohesion of 0.98 across 383 files indicates the web package maintains strong internal coherence despite spanning server, viewer, CLI, and schema layers.
-- The bidirectional coupling with the usage zone (3 outbound, 1 inbound import) is the only external dependency surface — keeping it small preserves the zone's isolation guarantees.
-- At 383 files this is the largest zone in the codebase; if navigation becomes difficult, splitting server-side (MCP routes, aggregation cache, prd-io) from client-side (viewer components, polling, hooks) into sub-zones would be a natural boundary.
-- Zone "web-dashboard" has files across 23 directories — consider consolidating under a dedicated directory
-- The 3:1 import asymmetry (web-viewer consumes 3 usage symbols vs usage consuming 1 viewer symbol) reveals the viewer is the heavier consumer — usage data flows up into the UI layer, not the reverse; the single inbound import from usage→viewer is the anomalous direction worth scrutinizing
-- The single usage→web-dashboard import is the only dependency that flows against the expected data-consumer direction (viewer should pull from analytics, not the reverse); verify this import is not a hidden circular initialization dependency
-- The zone spans two incompatible runtime environments: Node.js (server, MCP routes, aggregation cache) and browser (Preact viewer, hooks, route-state). Files in these sub-environments cannot share runtime context even though they share a zone — this is a stronger argument for splitting than navigation difficulty alone.
-- register-scheduler.ts in task-usage-analytics must be called during web-dashboard server startup, creating a temporal initialization dependency that is invisible in the static import graph and cannot be caught by zone coupling metrics.
-- Zone mixes Node.js server code and browser Preact viewer code in a single zone. These two sub-environments are mutually exclusive at runtime — Node modules (http, fs) cannot load in the browser and vice versa. A split into web-server and web-viewer sub-zones would enforce the runtime boundary structurally, not just by convention.
-- The zone name 'web-dashboard' is misleading: it contains Node.js server code, Preact viewer components, MCP route handlers, CLI entry points, and schema definitions — none of which are accurately described by 'dashboard'. A rename to 'web-package' or splitting into 'web-server' and 'web-viewer' would align the name with the actual content.
-- concurrent-execution-metrics.ts and pr-markdown-refresh-diagnostics.ts are present in the zone with no clear mapping to viewer or server sub-concerns — their names suggest hench agent monitoring and PR workflow tooling respectively, which are domain-specific concerns that may not belong in the web presentation layer at all.
-- The web package has 11 entry points (public.ts, cli/index.ts, server/index.ts, plus viewer sub-entries) — this wide API surface means consumers have multiple implicit contracts to track; a single public.ts that re-exports all consumer-facing symbols would reduce the surface to one auditable file.
-- Zone name 'web-dashboard' does not reflect its actual content (server, viewer, MCP routes, CLI, schema). Rename to 'web-platform' or split into 'web-server' / 'web-viewer' to make the name a truthful description of the zone's scope.
-- concurrent-execution-metrics.ts name implies it tracks hench agent execution concurrency. Verify this file does not import from the hench package — such an import would violate the four-tier hierarchy (web is domain tier, hench is execution tier, domain must not import from execution).
-- pr-markdown-refresh-diagnostics.ts is a utility file with a name specific enough to suggest it should live in a dedicated PR-workflow zone or in rex rather than in the general web server layer. Review whether this file has domain logic that belongs upstream in the dependency hierarchy.
-- [call graph] 7144 internal calls, 22 outgoing, 1 incoming (cohesion: 1, coupling: 0)
+- Server and viewer layers are co-located in one zone but separated by directory convention (src/server/ vs src/viewer/), which keeps the composition-root pattern intact without splitting the package artificially.
+- The rex-gateway.ts and domain-gateway.ts entry points enforce the single-gateway rule, making all cross-package runtime imports auditable at a glance.
+- With 391 files and 0.98 cohesion the zone is internally well-connected; watch for the server/viewer boundary eroding over time as new features are added — type-only imports from viewer into server are the earliest warning sign.
+- Exemplary cohesion (0.98) and near-zero coupling (0.02) for a 391-file zone indicates the gateway pattern is working as intended and cross-package leakage is minimal.
+- The concurrent-execution-metrics and incremental-task-usage services are isolated to the server layer — verify they are not being imported directly from viewer files, which would silently collapse the server/viewer boundary.
+- The zone spans both the CLI entrypoint (src/cli/index.ts) and the HTTP server (src/server/index.ts); confirm these two surfaces share no mutable state, since CLI invocations and long-running server sessions have incompatible lifecycles.
+- Zone "web-dashboard" has files across 26 directories — consider consolidating under a dedicated directory
+- The 21 outgoing / 0 incoming call-graph profile confirms web-dashboard is the composition root of the entire runtime system — no other production zone depends on it, meaning it can be decomposed or refactored without downstream breakage.
+- The coexistence of a 'web' residual zone (14 files, cohesion: 0.33) alongside 'web-dashboard' (391 files) suggests Louvain is failing to absorb a small set of web package files, likely build scripts or loosely-connected configuration files — these should be explicitly assigned via zone hints rather than left in a low-cohesion residual.
+- web-dashboard has 21 outgoing cross-zone calls but 0 incoming, confirming it is the composition root; any future zone that imports from web-dashboard would invert this pattern and should be treated as a critical boundary violation.
+- The 'web' residual zone (cohesion: 0.33, 14 files) co-existing with the 'web-dashboard' zone (cohesion: 0.98, 391 files) indicates incomplete zone membership for the web package — files stranded in the residual zone make health metrics for both zones unreliable.
+- The two gateway files (rex-gateway.ts, domain-gateway.ts) are the sole bottleneck for all 21 outgoing cross-zone calls; as the zone grows, these files may accumulate re-exports and become difficult to review — a size or line-count budget on gateway files would prevent silent gateway bloat.
+- The CLI entrypoint (src/cli/index.ts) and HTTP server (src/server/index.ts) coexist in the same zone with no structural boundary between them; any module-level singleton (e.g. a cached config object) initialized in one execution mode could persist across require-cache reuse in the other, corrupting server session state during CLI invocations in the same process.
+- No automated assertion verifies that all 21 outgoing cross-zone calls flow through the two gateway files and none bypass them via direct leaf-to-leaf imports; a new developer adding a cross-package import in a non-gateway file would pass all existing tests undetected until sourcevision re-analysis.
+- The 'web' residual zone (cohesion 0.33, 14 files) has persisted across at least three analysis passes without resolution, indicating zone hints for viewer components and build scripts are not being applied or are being overridden by Louvain; unresolved residual zones silently invalidate health metrics for both web-dashboard and the residual zone indefinitely.
+- The gateway enforcement test (domain-isolation.test.js) lives inside the web package test suite, not in cli-e2e-tests — it enforces web's two gateways but provides no enforcement for hench's rex-gateway.ts, meaning the re-export-only contract is enforced asymmetrically across the two consumers of rex.
+- Zone name 'web-dashboard' diverges from package name 'web', creating a systematic mismatch between package-level and zone-level identifiers that any tooling correlating zones to packages must handle as a special case rather than a convention.
+- The gateway re-export-only contract is machine-enforced for web's gateways via domain-isolation.test.js, but hench's rex-gateway.ts has no equivalent enforcement test. The asymmetry means a logic-bearing re-export added to hench's gateway passes all CI checks undetected. Add a parallel gateway-isolation test inside the hench package or extend architecture-policy.test.js to cover all gateway files across all packages.
+- Zone ID 'web-dashboard' does not match the package directory name 'web'. In diagnostic output that reports both package names and zone IDs (e.g. sourcevision health reports, CI summaries), these identifiers appear as unrelated entities. Adopt a convention — either name zones after their package (web) or suffix all zones consistently (web-dashboard → @n-dx/web) — and enforce it in the zone detection pipeline.
+- [call graph] 7308 internal calls, 21 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  web-viewer/web → web-viewer/web-unit: 2
-  web-viewer/web → web-viewer/web-viewer: 5
-  web-viewer/web-2 → web-viewer/web-3: 3
-  web-viewer/web-2 → web-viewer/web-unit: 2
-  web-viewer/web-2 → web-viewer/web-viewer: 8
-  web-viewer/web-3 → web-viewer/web-2: 1
-  web-viewer/web-3 → web-viewer/web-unit: 1
-  web-viewer/web-3 → web-viewer/web-viewer: 9
-  web-viewer/web-viewer → web-viewer/web: 4
-  web-viewer/web-viewer → web-viewer/web-2: 16
-  web-viewer/web-viewer → web-viewer/web-3: 5
-  web-viewer/web-viewer → web-viewer/web-unit: 1
+  web-viewer/status → web-viewer/web: 3
+  web-viewer/status → web-viewer/web-unit: 1
+  web-viewer/web → web-viewer/status: 1
+  web-viewer/web → web-viewer/web-2: 1
+  web-viewer/web → web-viewer/web-4: 5
+  web-viewer/web → web-viewer/web-server: 4
+  web-viewer/web → web-viewer/web-unit: 5
+  web-viewer/web → web-viewer/web-viewer: 3
+  web-viewer/web-2 → web-viewer/web: 4
+  web-viewer/web-4 → web-viewer/web: 5
+  web-viewer/web-server → web-viewer/web: 1
+  web-viewer/web-viewer → web-viewer/web: 6
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 6 sub-zone(s):
+This zone has 8 sub-zone(s):
 
-- **Web Viewer/web** (`web-viewer/web`): 87 files, cohesion 0.96, coupling 0.04
-  - Has 5 nested sub-zone(s)
-- **Web Viewer/web 2** (`web-viewer/web-2`): 43 files, cohesion 0.68, coupling 0.32
-- **Web Viewer/web 3** (`web-viewer/web-3`): 68 files, cohesion 0.91, coupling 0.09
-  - Has 4 nested sub-zone(s)
-- **Web Viewer/web 4** (`web-viewer/web-4`): 43 files, cohesion 0, coupling 0
-- **Web Viewer/web Unit** (`web-viewer/web-unit`): 16 files, cohesion 0.81, coupling 0.19
-- **Web Viewer/web Viewer** (`web-viewer/web-viewer`): 105 files, cohesion 0.89, coupling 0.11
+- **Web Viewer/status** (`web-viewer/status`): 3 files, cohesion 0.29, coupling 0.71
+- **Web Viewer/web** (`web-viewer/web`): 279 files, cohesion 0.96, coupling 0.04
   - Has 7 nested sub-zone(s)
+- **Web Viewer/web 2** (`web-viewer/web-2`): 6 files, cohesion 0.62, coupling 0.38
+- **Web Viewer/web 3** (`web-viewer/web-3`): 43 files, cohesion 0, coupling 0
+- **Web Viewer/web 4** (`web-viewer/web-4`): 3 files, cohesion 0.29, coupling 0.71
+- **Web Viewer/web Server** (`web-viewer/web-server`): 8 files, cohesion 0.83, coupling 0.17
+- **Web Viewer/web Unit** (`web-viewer/web-unit`): 16 files, cohesion 0.81, coupling 0.19
+- **Web Viewer/web Viewer** (`web-viewer/web-viewer`): 9 files, cohesion 0.67, coupling 0.33
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

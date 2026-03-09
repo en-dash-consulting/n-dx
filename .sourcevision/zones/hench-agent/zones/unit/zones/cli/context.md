@@ -8,7 +8,7 @@ Zone: Hench/unit/cli (`hench/unit/cli`)
 Files: 9, Cohesion: 0.25, Coupling: 0.75
 Description: 9 files, primarily TypeScript
 Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/prd/rex-gateway.ts, packages/hench/src/tools/rex.ts
-Lines: 4476
+Lines: 4507
 
 </zone>
 
@@ -16,7 +16,7 @@ Lines: 4476
 
 packages/hench/src/agent/planning/brief.ts (TypeScript, 353 lines, source)
 packages/hench/src/cli/commands/run.ts (TypeScript, 1118 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 91 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 122 lines, source)
 packages/hench/src/tools/rex.ts (TypeScript, 253 lines, source)
 packages/hench/tests/unit/agent/brief.test.ts (TypeScript, 1531 lines, test)
 packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
