@@ -4,7 +4,7 @@
  * Supports both server mode (fetch from /data/) and file drop mode.
  *
  * Memory-efficient strategies:
- * - loadModule(): lazy-load individual data files on demand
+ * - loadModules(): lazy-load data files on demand in parallel
  * - Selective refresh: only reload files whose mtime changed
  */
 
@@ -96,20 +96,6 @@ async function fetchModule(mod: ModuleDef): Promise<boolean> {
 }
 
 /**
- * Lazy-load a single data module by key. Fetches from the server, validates,
- * and stores in currentData. Returns true if the module was loaded.
- * If the module is already loaded, returns immediately without fetching.
- */
-export async function loadModule(key: keyof LoadedData): Promise<boolean> {
-  if (currentData[key] !== null) return true;
-  const mod = MODULE_DEFS.find((m) => m.key === key);
-  if (!mod) return false;
-  const ok = await fetchModule(mod);
-  if (ok) notifyChange();
-  return ok;
-}
-
-/**
  * Lazy-load multiple modules in parallel. Only fetches modules that
  * are not already loaded. Returns the current data state.
  */
@@ -123,13 +109,6 @@ export async function loadModules(keys: Array<keyof LoadedData>): Promise<Loaded
     await Promise.allSettled(toLoad.map((mod) => fetchModule(mod)));
     notifyChange();
   }
-  return currentData;
-}
-
-/** Load data from the local dev server (all modules at once). */
-export async function loadFromServer(): Promise<LoadedData> {
-  await Promise.allSettled(MODULE_DEFS.map((mod) => fetchModule(mod)));
-  notifyChange();
   return currentData;
 }
 
