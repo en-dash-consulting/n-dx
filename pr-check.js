@@ -58,7 +58,10 @@ export async function runPRCheck(dir, flags, { rexCli }) {
 
   // ── Step 1: pnpm build ──────────────────────────────────────────────────
   info("── build ──");
-  const build = await runCapture("pnpm", ["build"], { cwd: dir });
+  const build = await runCapture("pnpm", ["build"], {
+    cwd: dir,
+    shell: process.platform === "win32",
+  });
   const buildOk = build.code === 0;
   if (!buildOk) allOk = false;
 
