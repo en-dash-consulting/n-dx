@@ -49,6 +49,11 @@
         "packages/web/tests/unit/viewer/route-state.test.ts": "web-viewer",
         "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-viewer",
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-viewer",
+        "packages/web/src/viewer/components/prd-tree/node-culler.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/node-culler.test.ts": "web-viewer",
+        "packages/web/src/viewer/darkmode_logo.png": "web-viewer",
+        "packages/web/src/viewer/index.html": "web-viewer",
+        "packages/web/src/viewer/lightmode_logo.png": "web-viewer",
         "packages/sourcevision/src/analyzers/louvain.ts": "packages-sourcevision:analyzers",
         "packages/sourcevision/src/analyzers/zone-hash.ts": "packages-sourcevision:analyzers",
         "packages/sourcevision/src/analyzers/zones.ts": "packages-sourcevision:analyzers"

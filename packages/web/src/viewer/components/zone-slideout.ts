@@ -1,6 +1,6 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
-import type { Zone, ZoneCrossing } from "../../schema/v1.js";
+import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
 import { basename } from "../utils.js";

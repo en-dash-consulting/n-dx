@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
-import type { Zone, Finding } from "../../schema/v1.js";
+import type { Zone, Finding } from "../external.js";
 import {
   BarChart,
   CollapsibleSection,

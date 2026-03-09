@@ -6,7 +6,7 @@
  * Extracted from utils.ts to consolidate all flow-related logic in the
  * visualization layer and reduce the hub status of the old utils module.
  */
-import type { Zones, CallEdge, ExternalImport } from "../../schema/v1.js";
+import type { Zones, CallEdge, ExternalImport } from "../external.js";
 import { getZoneColorByIndex } from "./colors.js";
 
 /** Build a map from file path to zone info (id, name, color). */

@@ -1,6 +1,6 @@
 import { h, Fragment } from "preact";
 import { useState, useMemo } from "preact/hooks";
-import type { Finding } from "../../../schema/v1.js";
+import type { Finding } from "../../external.js";
 import { CollapsibleSection } from "./collapsible-section.js";
 import { SearchFilter } from "../search-filter.js";
 

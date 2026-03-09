@@ -1,6 +1,6 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import type { Manifest, Zones } from "../../schema/v1.js";
+import type { Manifest, Zones } from "../external.js";
 import type { ViewId } from "../types.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
@@ -119,7 +119,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
   const modules = manifest?.modules ?? {};
-  const moduleNames = ["inventory", "imports", "zones", "components", "callgraph"];
+  const moduleNames = ["inventory", "imports", "classifications", "zones", "components", "callgraph"];
   const completedCount = moduleNames.filter(
     (m) => modules[m]?.status === "complete"
   ).length;

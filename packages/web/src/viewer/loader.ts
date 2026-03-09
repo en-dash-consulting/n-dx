@@ -8,7 +8,7 @@
  * - Selective refresh: only reload files whose mtime changed
  */
 
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../schema/v1.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "./external.js";
 import {
   validateManifest,
   validateInventory,
@@ -17,7 +17,7 @@ import {
   validateComponents,
   validateCallGraph,
 } from "./validate.js";
-import { DATA_FILES } from "../shared/data-files.js";
+import { DATA_FILES } from "./external.js";
 import { migrateData } from "./schema-compat.js";
 import type { LoadedData } from "./types.js";
 import { registerPoller, unregisterPoller } from "./polling/polling-manager.js";

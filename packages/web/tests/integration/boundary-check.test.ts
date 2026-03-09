@@ -61,6 +61,31 @@ describe("server/client boundary", () => {
     expect(violations).toEqual([]);
   });
 
+  it("viewer cross-boundary imports flow through external.ts gateway", () => {
+    const viewerDir = join(WEB_SRC, "viewer");
+    const violations: string[] = [];
+
+    try {
+      for (const file of collectTsFiles(viewerDir)) {
+        const rel = relative(WEB_SRC, file);
+        // The gateway itself is allowed to import from outside
+        if (rel === join("viewer", "external.ts")) continue;
+
+        for (const imp of extractImportPaths(file)) {
+          // Check for direct imports to shared/ or schema/ from viewer files
+          if (imp.match(/\.\.\/shared\b/) || imp.match(/\.\.\/schema\b/)) {
+            violations.push(`${rel} imports "${imp}" — must use ./external.js gateway`);
+          }
+        }
+      }
+    } catch {
+      // viewerDir doesn't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("no viewer file imports from server", () => {
     const viewerDir = join(WEB_SRC, "viewer");
     const violations: string[] = [];

@@ -1,4 +1,4 @@
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../schema/v1.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "./external.js";
 
 export interface LoadedData {
   manifest: Manifest | null;

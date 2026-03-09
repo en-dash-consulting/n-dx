@@ -5,7 +5,7 @@
  * (lookup helpers). Consolidated here so every visualization zone imports from
  * one module instead of reaching into unrelated directories.
  */
-import type { Zones } from "../../schema/v1.js";
+import type { Zones } from "../external.js";
 
 /** Design-token palette for zone rendering.  Wraps at length. */
 export const ZONE_COLORS = [
