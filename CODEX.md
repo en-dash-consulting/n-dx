@@ -65,7 +65,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 |---------|-------------|--------------|------------|
 | hench | `src/prd/rex-gateway.ts` | rex | 8 functions (store, tree, task selection) |
 | web | `src/server/domain-gateway.ts` | rex, sourcevision | 2 MCP server factories + rex domain types/constants |
-| web | `src/viewer/external.ts` | `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
+| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 
 Rules:
 - **One gateway per package** — all runtime cross-package imports pass through it.

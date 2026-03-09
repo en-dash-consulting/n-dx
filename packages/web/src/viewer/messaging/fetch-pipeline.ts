@@ -13,7 +13,7 @@
  */
 
 import { createCallRateLimiter, type CallRateLimiter, type CallRateLimiterConfig } from "./call-rate-limiter.js";
-import { createRequestDedup, type RequestDedup } from "../../shared/request-dedup.js";
+import { createRequestDedup, type RequestDedup } from "./request-dedup.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

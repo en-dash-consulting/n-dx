@@ -35,5 +35,5 @@ export * as V1 from "../schema/v1.js";
 export { DATA_FILES, ALL_DATA_FILES } from "../shared/data-files.js";
 
 // ── Shared utilities ───────────────────────────────────────────────────────
-export { createRequestDedup } from "../shared/request-dedup.js";
-export type { RequestDedup } from "../shared/request-dedup.js";
+export { createRequestDedup } from "./messaging/request-dedup.js";
+export type { RequestDedup } from "./messaging/request-dedup.js";

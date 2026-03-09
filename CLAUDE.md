@@ -67,11 +67,11 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | hench | `src/prd/rex-gateway.ts` | rex | 8 functions (store, tree, task selection) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory |
-| web | `src/viewer/external.ts` | `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
+| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
-- **Intra-package gateways** — within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/shared/` and `src/schema/`. The viewer-message-pipeline zone imports `RequestDedup` directly from `src/shared/` (bypassing `external.ts`) to avoid a zone cycle; this is an acknowledged exception.
+- **Intra-package gateways** — within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through `external.ts` for viewer consumers.
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
 - **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Exception: web viewer files are exempt because the server/viewer boundary prevents them from reaching the server-side gateway.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.

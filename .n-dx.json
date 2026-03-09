@@ -123,7 +123,7 @@
           "reason": "Residual zone containing orphaned web package files (config, assets) that Louvain cannot cluster. Production files like landing.ts are pinned to web-dashboard; remaining files are infrastructure artifacts with no import edges. Zero cohesion and coupling are structural invariants."
         },
         "viewer-message-pipeline": {
-          "reason": "Messaging pipeline is a composed integration layer, not a pure utility. Outbound edges to the viewer external gateway (request-dedup, schema types) are intentional cross-zone contracts. Fan-out > fan-in is expected: the pipeline consumes shared primitives and exposes a unified API surface to 4 consumer hooks."
+          "reason": "Messaging pipeline is a composed integration layer. request-dedup.ts was relocated from src/shared/ into this zone to resolve the dependency inversion (utility importing from consumer). The zone is now self-contained: all messaging primitives (coalescer, throttle, rate-limiter, request-dedup) live here, and external.ts re-exports RequestDedup for viewer consumers. Fan-out > fan-in is expected for a pipeline that exposes a unified API surface to 4 consumer hooks."
         },
         "web-dashboard": {
           "reason": "Orchestration zone with 374 files. 11 entry points are expected: the zone serves as the integration hub for viewer, messaging, and MCP subsystems. Entry points include gateway modules (rex-gateway, external), shared types, and polling infrastructure — all intentional cross-zone contracts."
