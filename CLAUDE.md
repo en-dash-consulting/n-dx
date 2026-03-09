@@ -109,6 +109,18 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
+#### HTTP-request concurrency (web server)
+
+When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:
+
+| Scenario | Risk | Mitigation |
+|----------|------|------------|
+| Dashboard reads PRD while `ndx plan` writes `.rex/prd.json` | Partial JSON read → parse error or stale tree | Restart server after plan (`ndx start stop && ndx start`) |
+| MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
+| Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
+
+**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. Any command that rewrites `.rex/prd.json` or `.sourcevision/` in bulk (plan, ci, refresh) should be followed by a server restart to flush stale caches.
+
 ### Package conventions
 
 | Convention | Pattern | Notes |

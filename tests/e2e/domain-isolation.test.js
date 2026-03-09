@@ -319,6 +319,48 @@ describe("architecture policy: orchestration tier boundary", () => {
       }
     });
   }
+
+  /**
+   * config.js is spawn-exempt but must only import from node: builtins.
+   * This prevents config.js from accumulating library imports beyond
+   * filesystem I/O and child_process coordination.
+   */
+  it("config.js must only import from node: builtins", () => {
+    const fullPath = join(ROOT, "config.js");
+    if (!existsSync(fullPath)) return;
+
+    const content = readFileSync(fullPath, "utf-8");
+    const lines = content.split("\n");
+    const violations = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+
+      // Match static import declarations: import ... from "..."
+      const importMatch = trimmed.match(/^import\s+.*from\s+["']([^"']+)["']/);
+      if (!importMatch) continue;
+
+      const source = importMatch[1];
+      if (!source.startsWith("node:")) {
+        violations.push(`line ${i + 1}: import from "${source}"`);
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "config.js is spawn-exempt but must only import from node: builtins.",
+          "It should not accumulate library imports beyond config I/O.",
+          "",
+          "Non-node: imports found:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "Move the logic into the relevant package or use child_process.spawn instead.",
+        ].join("\n"),
+      );
+    }
+  });
 });
 
 /**
@@ -579,6 +621,65 @@ describe("architecture policy: gateway enforcement", () => {
   });
 
   /**
+   * Exhaustive cross-package guard for packages/web/src.
+   *
+   * The deny-list test above only checks imports from packages already listed
+   * in GATEWAY_RULES. But a new leaf file could import from any cross-package
+   * name (e.g. "hench" or "@n-dx/llm-client") without being caught.
+   *
+   * This test scans ALL non-gateway files in packages/web/src and checks for
+   * runtime imports from ANY known cross-package name, not just the ones with
+   * existing gateway rules. This ensures no file bypasses the gateway pattern
+   * by importing from an ungated package.
+   */
+  it("packages/web/src: no non-gateway file imports from any cross-package name", () => {
+    // Foundation-tier (@n-dx/llm-client) is intentionally ungated — it is the
+    // shared bottom of the hierarchy, designed for direct use by all tiers.
+    // Only domain and execution packages require gateway routing.
+    const ALL_CROSS_PACKAGES = ["rex", "sourcevision", "hench"];
+
+    // Collect all gateway files for web
+    const webGateways = new Set();
+    for (const rule of GATEWAY_RULES) {
+      if (rule.packageDir === "packages/web/src") {
+        for (const gw of rule.gatewayFiles) webGateways.add(gw);
+      }
+    }
+
+    const webSrc = walk(join(ROOT, "packages/web/src"));
+    const violations = [];
+
+    for (const file of webSrc) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      if (webGateways.has(rel)) continue;
+
+      const content = readFileSync(file, "utf-8");
+      for (const pkg of ALL_CROSS_PACKAGES) {
+        if (hasRuntimeImportFrom(content, pkg)) {
+          violations.push(`${rel} → ${pkg}`);
+        }
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "Non-gateway files in packages/web/src have runtime imports from cross-package names.",
+          "ALL cross-package runtime imports must go through a designated gateway module,",
+          "even for packages not yet listed in gateway-rules.json.",
+          "",
+          `Checked packages: ${ALL_CROSS_PACKAGES.join(", ")}`,
+          "",
+          "Violations:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "To fix: add a gateway for the package in gateway-rules.json and route the import through it.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  /**
    * Hench must not import from sourcevision at runtime.
    * Hench only has a gateway for rex — sourcevision should not be imported at all.
    */
@@ -668,6 +769,107 @@ describe("architecture policy: gateway enforcement", () => {
       });
     }
   });
+});
+
+/**
+ * Gateway surface parity — ensures the test suite tracks every runtime
+ * re-export in each gateway file. When a new symbol is added to a gateway,
+ * this test makes the growth visible so the test suite can be updated.
+ */
+describe("gateway surface parity", () => {
+  /**
+   * Count runtime (non-type) exported symbols in a gateway source file.
+   * Parses `export { A, B, C } from "..."` statements (possibly multi-line)
+   * and counts individual symbols. Skips `export type { ... }` blocks.
+   */
+  function countRuntimeExports(content) {
+    // Remove block comments
+    const cleaned = content.replace(/\/\*[\s\S]*?\*\//g, "");
+    const lines = cleaned.split("\n");
+
+    let count = 0;
+    let inExportBlock = false;
+    let isTypeExport = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("//")) continue;
+
+      // Detect start of export statement
+      if (/^export\s+type\s+\{/.test(trimmed)) {
+        isTypeExport = true;
+        // If single-line, skip and reset
+        if (trimmed.includes("}")) {
+          isTypeExport = false;
+          continue;
+        }
+        inExportBlock = true;
+        continue;
+      }
+
+      if (/^export\s+\{/.test(trimmed)) {
+        isTypeExport = false;
+        // Single-line export: export { A, B, C } from "..."
+        if (trimmed.includes("}")) {
+          const braceContent = trimmed.match(/\{([^}]*)\}/);
+          if (braceContent) {
+            const symbols = braceContent[1].split(",").filter((s) => s.trim().length > 0);
+            count += symbols.length;
+          }
+          continue;
+        }
+        // Multi-line export starts
+        inExportBlock = true;
+        // Count any symbols on the opening line after the brace
+        const afterBrace = trimmed.replace(/^export\s+\{/, "").trim();
+        if (afterBrace) {
+          const symbols = afterBrace.split(",").filter((s) => s.trim().length > 0);
+          count += symbols.length;
+        }
+        continue;
+      }
+
+      if (inExportBlock) {
+        if (trimmed.includes("}")) {
+          // Closing brace line — count symbols before the brace
+          if (!isTypeExport) {
+            const beforeBrace = trimmed.replace(/}.*/, "").trim();
+            if (beforeBrace) {
+              const symbols = beforeBrace.split(",").filter((s) => s.trim().length > 0);
+              count += symbols.length;
+            }
+          }
+          inExportBlock = false;
+          isTypeExport = false;
+          continue;
+        }
+        // Continuation line inside braces
+        if (!isTypeExport) {
+          const symbols = trimmed.split(",").filter((s) => s.trim().length > 0);
+          count += symbols.length;
+        }
+      }
+    }
+
+    return count;
+  }
+
+  for (const rule of GATEWAY_RULES) {
+    for (const gwPath of rule.gatewayFiles) {
+      it(`${gwPath} has tracked runtime re-exports (surface > 0)`, () => {
+        const fullPath = join(ROOT, gwPath);
+        if (!existsSync(fullPath)) return;
+
+        const content = readFileSync(fullPath, "utf-8");
+        const exportCount = countRuntimeExports(content);
+
+        expect(exportCount).toBeGreaterThan(
+          0,
+          `Gateway file ${gwPath} has zero runtime re-exports — it should have at least one.`,
+        );
+      });
+    }
+  }
 });
 
 /**

@@ -66,6 +66,16 @@ etc.). They should NOT be grouped with web package files — the import graph
 places them in a residual zone due to weak connectivity, but their domain purpose
 is clearly hench agent infrastructure.
 
+## Cross-package residual zone prohibition
+
+The residual zone must never group files from different packages (e.g.
+`packages/hench/` and `packages/web/`) under a single zone ID. If the Louvain
+algorithm produces a residual community that spans package boundaries, each
+package's files must be split into their own zone or merged into the
+package-specific zone they most logically belong to. A cross-package residual
+zone makes zone-level health metrics unreliable because hints or thresholds
+applied to one package's files unintentionally affect the other package's files.
+
 ## Task usage analytics coupling
 
 The bidirectional zone crossing between task-usage-analytics and web-dashboard is

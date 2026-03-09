@@ -8,6 +8,8 @@ package-lock.json
 .n-dx-web.pid
 .n-dx-web.port
 .rex/adapters.json
+.rex/pending-proposals.json
+.rex/acknowledged-findings.json
 .sv2/
 .sv3/
 .claude/

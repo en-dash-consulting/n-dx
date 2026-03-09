@@ -22,9 +22,24 @@ export function generateLlmsTxt(
   components?: Components | null,
   classifications?: Classifications | null,
 ): string {
-  const lines: string[] = [];
+  const lines: string[] = [
+    ...buildProjectIdentity(manifest, inventory, zones),
+    ...buildArchitectureZones(zones),
+    ...buildKeyDependencies(imports),
+    ...buildRouteStructure(components),
+    ...buildFindings(zones),
+    ...buildNextSteps(zones),
+    ...buildFileInventory(inventory, zones, classifications),
+    ...buildTooling(),
+  ];
 
-  // ── Project Identity ────────────────────────────────────────────────────
+  return lines.join("\n");
+}
+
+// ── Section builders ──────────────────────────────────────────────────────
+
+function buildProjectIdentity(manifest: Manifest, inventory: Inventory, zones: Zones): string[] {
+  const lines: string[] = [];
 
   const projectName = manifest.targetPath.split("/").pop() || "project";
   lines.push(`# ${projectName}`);
@@ -59,30 +74,37 @@ export function generateLlmsTxt(
   lines.push(`- **Analyzed**: ${manifest.analyzedAt}`);
   lines.push("");
 
-  // ── Architecture Zones ──────────────────────────────────────────────────
+  return lines;
+}
 
-  if (zones.zones.length > 0) {
-    lines.push("## Architecture Zones");
+function buildArchitectureZones(zones: Zones): string[] {
+  if (zones.zones.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push("## Architecture Zones");
+  lines.push("");
+
+  for (const zone of zones.zones) {
+    lines.push(`### ${zone.name} (\`${zone.id}\`)`);
     lines.push("");
-
-    for (const zone of zones.zones) {
-      lines.push(`### ${zone.name} (\`${zone.id}\`)`);
-      lines.push("");
-      if (zone.description) {
-        lines.push(zone.description);
-        lines.push("");
-      }
-      lines.push(`- Files: ${zone.files.length}`);
-      lines.push(`- Cohesion: ${zone.cohesion.toFixed(2)}, Coupling: ${zone.coupling.toFixed(2)}`);
-      if (zone.entryPoints.length > 0) {
-        lines.push(`- Entry points: ${zone.entryPoints.slice(0, 5).join(", ")}${zone.entryPoints.length > 5 ? ` (+${zone.entryPoints.length - 5} more)` : ""}`);
-      }
-      lines.push(`- Detail: \`.sourcevision/zones/${zone.id.replace(/:/g, "-")}/context.md\``);
+    if (zone.description) {
+      lines.push(zone.description);
       lines.push("");
     }
+    lines.push(`- Files: ${zone.files.length}`);
+    lines.push(`- Cohesion: ${zone.cohesion.toFixed(2)}, Coupling: ${zone.coupling.toFixed(2)}`);
+    if (zone.entryPoints.length > 0) {
+      lines.push(`- Entry points: ${zone.entryPoints.slice(0, 5).join(", ")}${zone.entryPoints.length > 5 ? ` (+${zone.entryPoints.length - 5} more)` : ""}`);
+    }
+    lines.push(`- Detail: \`.sourcevision/zones/${zone.id.replace(/:/g, "-")}/context.md\``);
+    lines.push("");
   }
 
-  // ── Key Dependencies ──────────────────────────────────────────────────
+  return lines;
+}
+
+function buildKeyDependencies(imports: Imports): string[] {
+  const lines: string[] = [];
 
   lines.push("## Key Dependencies");
   lines.push("");
@@ -122,126 +144,139 @@ export function generateLlmsTxt(
     lines.push("");
   }
 
-  // ── Route Structure ───────────────────────────────────────────────────
+  return lines;
+}
 
+function buildRouteStructure(components?: Components | null): string[] {
   const hasClientRoutes = components && components.routeModules.length > 0;
   const hasServerRoutes = components && components.serverRoutes.length > 0;
 
-  if (hasClientRoutes || hasServerRoutes) {
-    lines.push("## Route Structure");
+  if (!hasClientRoutes && !hasServerRoutes) return [];
+
+  const lines: string[] = [];
+  lines.push("## Route Structure");
+  lines.push("");
+
+  if (hasClientRoutes) {
+    if (components.routeTree.length > 0) {
+      lines.push("### Route Tree");
+      lines.push("");
+      lines.push("```");
+      printRouteTree(components.routeTree, lines, 0);
+      lines.push("```");
+      lines.push("");
+    }
+
+    lines.push("### Convention Exports");
     lines.push("");
-
-    if (hasClientRoutes) {
-      if (components.routeTree.length > 0) {
-        lines.push("### Route Tree");
-        lines.push("");
-        lines.push("```");
-        printRouteTree(components.routeTree, lines, 0);
-        lines.push("```");
-        lines.push("");
-      }
-
-      lines.push("### Convention Exports");
-      lines.push("");
-      for (const [kind, count] of Object.entries(components.summary.routeConventions)) {
-        lines.push(`- ${kind}: ${count} modules`);
-      }
-      lines.push("");
+    for (const [kind, count] of Object.entries(components.summary.routeConventions)) {
+      lines.push(`- ${kind}: ${count} modules`);
     }
+    lines.push("");
+  }
 
-    if (hasServerRoutes) {
-      lines.push("### Server API Routes");
+  if (hasServerRoutes) {
+    lines.push("### Server API Routes");
+    lines.push("");
+    for (const group of components.serverRoutes) {
+      const handler = group.handler ? ` (${group.handler})` : "";
+      lines.push(`**${group.prefix}**${handler} — \`${group.file}\``);
       lines.push("");
-      for (const group of components.serverRoutes) {
-        const handler = group.handler ? ` (${group.handler})` : "";
-        lines.push(`**${group.prefix}**${handler} — \`${group.file}\``);
-        lines.push("");
-        lines.push("```");
-        for (const r of group.routes) {
-          lines.push(`${r.method.padEnd(7)} ${r.path}`);
-        }
-        lines.push("```");
-        lines.push("");
+      lines.push("```");
+      for (const r of group.routes) {
+        lines.push(`${r.method.padEnd(7)} ${r.path}`);
       }
-    }
-
-    if (components.summary.totalComponents > 0) {
-      lines.push(`### Components: ${components.summary.totalComponents} total, ${components.summary.totalUsageEdges} usage edges`);
+      lines.push("```");
       lines.push("");
-      if (components.summary.mostUsedComponents.length > 0) {
-        lines.push("Most used:");
-        for (const comp of components.summary.mostUsedComponents.slice(0, 10)) {
-          lines.push(`- \`${comp.name}\` in \`${comp.file}\` (${comp.usageCount} uses)`);
-        }
-        lines.push("");
-      }
     }
   }
 
-  // ── Findings ──────────────────────────────────────────────────────────
+  if (components && components.summary.totalComponents > 0) {
+    lines.push(`### Components: ${components.summary.totalComponents} total, ${components.summary.totalUsageEdges} usage edges`);
+    lines.push("");
+    if (components.summary.mostUsedComponents.length > 0) {
+      lines.push("Most used:");
+      for (const comp of components.summary.mostUsedComponents.slice(0, 10)) {
+        lines.push(`- \`${comp.name}\` in \`${comp.file}\` (${comp.usageCount} uses)`);
+      }
+      lines.push("");
+    }
+  }
 
+  return lines;
+}
+
+function buildFindings(zones: Zones): string[] {
   const findings = zones.findings ?? [];
-  if (findings.length > 0) {
-    lines.push("## Findings");
-    lines.push("");
+  if (findings.length === 0) return [];
 
-    // Group by type
-    const byType = new Map<string, typeof findings>();
-    for (const f of findings) {
-      if (!byType.has(f.type)) byType.set(f.type, []);
-      byType.get(f.type)!.push(f);
-    }
+  const lines: string[] = [];
+  lines.push("## Findings");
+  lines.push("");
 
-    const typeOrder = ["anti-pattern", "pattern", "relationship", "observation", "suggestion"];
-    for (const type of typeOrder) {
-      const group = byType.get(type);
-      if (!group?.length) continue;
-
-      lines.push(`### ${type.charAt(0).toUpperCase() + type.slice(1)}s`);
-      lines.push("");
-      for (const f of group.slice(0, 10)) {
-        const sev = f.severity ? ` [${f.severity}]` : "";
-        const scope = f.scope !== "global" ? ` (${f.scope})` : "";
-        lines.push(`- ${f.text}${sev}${scope}`);
-      }
-      if (group.length > 10) {
-        lines.push(`- ... and ${group.length - 10} more`);
-      }
-      lines.push("");
-    }
+  // Group by type
+  const byType = new Map<string, typeof findings>();
+  for (const f of findings) {
+    if (!byType.has(f.type)) byType.set(f.type, []);
+    byType.get(f.type)!.push(f);
   }
 
-  // ── Next Steps ──────────────────────────────────────────────────────
+  const typeOrder = ["anti-pattern", "pattern", "relationship", "observation", "suggestion"];
+  for (const type of typeOrder) {
+    const group = byType.get(type);
+    if (!group?.length) continue;
 
+    lines.push(`### ${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+    lines.push("");
+    for (const f of group.slice(0, 10)) {
+      const sev = f.severity ? ` [${f.severity}]` : "";
+      const scope = f.scope !== "global" ? ` (${f.scope})` : "";
+      lines.push(`- ${f.text}${sev}${scope}`);
+    }
+    if (group.length > 10) {
+      lines.push(`- ... and ${group.length - 10} more`);
+    }
+    lines.push("");
+  }
+
+  return lines;
+}
+
+function buildNextSteps(zones: Zones): string[] {
   const nextSteps = deriveNextSteps(zones);
-  if (nextSteps.length > 0) {
-    lines.push("## Next Steps");
-    lines.push("");
-    lines.push("Prioritized work items derived from analysis:");
-    lines.push("");
+  if (nextSteps.length === 0) return [];
 
-    const byPriority = { high: [] as typeof nextSteps, medium: [] as typeof nextSteps, low: [] as typeof nextSteps };
-    for (const step of nextSteps) {
-      byPriority[step.priority].push(step);
-    }
+  const lines: string[] = [];
+  lines.push("## Next Steps");
+  lines.push("");
+  lines.push("Prioritized work items derived from analysis:");
+  lines.push("");
 
-    for (const [priority, steps] of Object.entries(byPriority)) {
-      if (steps.length === 0) continue;
-      lines.push(`### ${priority.charAt(0).toUpperCase() + priority.slice(1)} Priority`);
-      lines.push("");
-      for (const step of steps.slice(0, 10)) {
-        const zone = zones.zones.find((z) => z.id === step.scope);
-        const files = zone ? zone.files.slice(0, 3).map((f) => `\`${f}\``).join(", ") : "";
-        lines.push(`1. **${step.title}**`);
-        if (files) {
-          lines.push(`   Files: ${files}`);
-        }
-        lines.push("");
+  const byPriority = { high: [] as typeof nextSteps, medium: [] as typeof nextSteps, low: [] as typeof nextSteps };
+  for (const step of nextSteps) {
+    byPriority[step.priority].push(step);
+  }
+
+  for (const [priority, steps] of Object.entries(byPriority)) {
+    if (steps.length === 0) continue;
+    lines.push(`### ${priority.charAt(0).toUpperCase() + priority.slice(1)} Priority`);
+    lines.push("");
+    for (const step of steps.slice(0, 10)) {
+      const zone = zones.zones.find((z) => z.id === step.scope);
+      const files = zone ? zone.files.slice(0, 3).map((f) => `\`${f}\``).join(", ") : "";
+      lines.push(`1. **${step.title}**`);
+      if (files) {
+        lines.push(`   Files: ${files}`);
       }
+      lines.push("");
     }
   }
 
-  // ── File Inventory ────────────────────────────────────────────────────
+  return lines;
+}
+
+function buildFileInventory(inventory: Inventory, zones: Zones, classifications?: Classifications | null): string[] {
+  const lines: string[] = [];
 
   lines.push("## File Inventory");
   lines.push("");
@@ -265,18 +300,22 @@ export function generateLlmsTxt(
   }
   lines.push("");
 
-  // ── Tooling ──────────────────────────────────────────────────────────────
-
-  lines.push("## Tooling");
-  lines.push("");
-  lines.push("This project uses n-dx for codebase analysis (Sourcevision) and requirement");
-  lines.push("tracking (Rex). MCP tools are available for interactive access to analysis");
-  lines.push("data and PRD management. Skills available: /plan, /status, /capture,");
-  lines.push("/zone, /work, /configure.");
-  lines.push("");
-
-  return lines.join("\n");
+  return lines;
 }
+
+function buildTooling(): string[] {
+  return [
+    "## Tooling",
+    "",
+    "This project uses n-dx for codebase analysis (Sourcevision) and requirement",
+    "tracking (Rex). MCP tools are available for interactive access to analysis",
+    "data and PRD management. Skills available: /plan, /status, /capture,",
+    "/zone, /work, /configure.",
+    "",
+  ];
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────
 
 function printRouteTree(nodes: import("../schema/v1.js").RouteTreeNode[], lines: string[], depth: number): void {
   for (const node of nodes) {
