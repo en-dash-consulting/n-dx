@@ -42,6 +42,13 @@
         "packages/web/src/viewer/usage/index.ts": "web-viewer",
         "packages/web/src/viewer/views/task-audit.ts": "web-viewer",
         "packages/web/src/viewer/views/token-usage.ts": "web-viewer",
+        "packages/web/tests/helpers/crash-detector-test-support.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/crash-detector.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/use-crash-recovery.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/route-state.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/tick-timer.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/token-usage-nav.test.ts": "web-viewer",
         "packages/sourcevision/src/analyzers/louvain.ts": "packages-sourcevision:analyzers",
         "packages/sourcevision/src/analyzers/zone-hash.ts": "packages-sourcevision:analyzers",
         "packages/sourcevision/src/analyzers/zones.ts": "packages-sourcevision:analyzers"
