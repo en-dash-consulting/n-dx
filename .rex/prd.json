@@ -20207,9 +20207,8 @@
             {
               "id": "45937170-e43c-47ca-93d5-a86fa3bdc1a0",
               "title": "Expose edit_item through rex-gateway and add MCP integration test",
+              "status": "completed",
               "level": "task",
-              "status": "pending",
-              "source": "smart-add",
               "description": "Re-export the new edit_item capability through the web rex-gateway.ts so the HTTP MCP server can reach it without bypassing the gateway pattern. Add an integration test that calls the edit_item endpoint over HTTP transport, verifies the 200 response shape, and confirms the change is reflected in a follow-up rex_status call.",
               "acceptanceCriteria": [
                 "rex-gateway.ts re-exports the edit_item function; no direct imports of rex internals exist outside the gateway",
@@ -20224,7 +20223,10 @@
                 "mcp",
                 "gateway",
                 "test"
-              ]
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-09T01:12:11.466Z",
+              "completedAt": "2026-03-09T01:16:11.451Z"
             }
           ]
         }

@@ -219,6 +219,101 @@ describe("MCP routes", () => {
     await Promise.all([client1.close(), client2.close()]);
   });
 
+  it("MCP client can call edit_item and see changes in get_prd_status", async () => {
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/rex`),
+    );
+
+    await client.connect(transport);
+
+    // Edit the task's title and priority
+    const editResult = await client.callTool({
+      name: "edit_item",
+      arguments: {
+        id: "task-1",
+        title: "Updated Task Title",
+        description: "A new description",
+        priority: "critical",
+        tags: ["urgent", "refactor"],
+      },
+    });
+    expect(editResult.content).toBeDefined();
+    expect(Array.isArray(editResult.content)).toBe(true);
+
+    const editText = (editResult.content as Array<{ type: string; text: string }>)[0]?.text;
+    const editParsed = JSON.parse(editText);
+    expect(editParsed.id).toBe("task-1");
+    expect(editParsed.updatedFields).toContain("title");
+    expect(editParsed.updatedFields).toContain("description");
+    expect(editParsed.updatedFields).toContain("priority");
+    expect(editParsed.updatedFields).toContain("tags");
+    expect(editParsed.item.title).toBe("Updated Task Title");
+    expect(editParsed.item.description).toBe("A new description");
+    expect(editParsed.item.priority).toBe("critical");
+    expect(editParsed.item.tags).toEqual(["urgent", "refactor"]);
+
+    // Verify changes are reflected in get_prd_status
+    const statusResult = await client.callTool({ name: "get_prd_status", arguments: {} });
+    const statusText = (statusResult.content as Array<{ type: string; text: string }>)[0]?.text;
+    const statusParsed = JSON.parse(statusText);
+
+    // The epic's child task should have the updated title
+    const epic = statusParsed.epics.find((e: { id: string }) => e.id === "epic-1");
+    expect(epic).toBeDefined();
+
+    // Verify via get_item for full detail
+    const getResult = await client.callTool({ name: "get_item", arguments: { id: "task-1" } });
+    const getText = (getResult.content as Array<{ type: string; text: string }>)[0]?.text;
+    const getParsed = JSON.parse(getText);
+    expect(getParsed.item.title).toBe("Updated Task Title");
+    expect(getParsed.item.description).toBe("A new description");
+    expect(getParsed.item.priority).toBe("critical");
+    expect(getParsed.item.tags).toEqual(["urgent", "refactor"]);
+
+    await client.close();
+  });
+
+  it("edit_item returns error for non-existent item", async () => {
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/rex`),
+    );
+
+    await client.connect(transport);
+
+    const result = await client.callTool({
+      name: "edit_item",
+      arguments: { id: "non-existent", title: "Nope" },
+    });
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text;
+    expect(text).toContain("not found");
+    expect(result.isError).toBe(true);
+
+    await client.close();
+  });
+
+  it("edit_item returns error when no fields provided", async () => {
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/rex`),
+    );
+
+    await client.connect(transport);
+
+    const result = await client.callTool({
+      name: "edit_item",
+      arguments: { id: "task-1" },
+    });
+
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text;
+    expect(text).toContain("No fields to update");
+    expect(result.isError).toBe(true);
+
+    await client.close();
+  });
+
   it("unsupported method returns 405", async () => {
     const res = await fetch(`http://localhost:${port}/mcp/rex`, {
       method: "PUT",

@@ -84,5 +84,8 @@ export { detectReorganizations, applyProposals } from "rex";
 export { applyReshape, reasonForReshape } from "rex";
 export type { ReshapeProposal } from "rex";
 
+// ---- Rex MCP tool handlers (direct invocation) -----------------------------
+export { handleEditItem } from "rex";
+
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "rex";

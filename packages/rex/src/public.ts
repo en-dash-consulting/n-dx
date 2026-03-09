@@ -363,3 +363,7 @@ export type {
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";
+
+// ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
+
+export { handleEditItem } from "./cli/mcp-tools.js";

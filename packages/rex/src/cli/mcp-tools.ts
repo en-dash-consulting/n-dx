@@ -598,6 +598,86 @@ export async function handleFacets(
   }
 }
 
+export async function handleEditItem(
+  store: PRDStore,
+  args: {
+    id: string;
+    title?: string;
+    description?: string;
+    acceptanceCriteria?: string[];
+    priority?: string;
+    tags?: string[];
+    source?: string;
+    blockedBy?: string[];
+  },
+): Promise<McpResult> {
+  try {
+    const existing = await store.getItem(args.id);
+    if (!existing) {
+      return textResult(
+        `Item "${args.id}" not found. Use get_prd_status to see available items.`,
+        true,
+      );
+    }
+
+    const updates: Partial<PRDItem> = {};
+    if (args.title !== undefined) updates.title = args.title;
+    if (args.description !== undefined) updates.description = args.description;
+    if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
+    if (args.priority !== undefined) updates.priority = args.priority as Priority;
+    if (args.tags !== undefined) updates.tags = args.tags;
+    if (args.source !== undefined) updates.source = args.source;
+    if (args.blockedBy !== undefined) {
+      // Validate dependencies before persisting
+      const doc = await store.loadDocument();
+      const simItem = { ...existing, blockedBy: args.blockedBy };
+      const entry = findItem(doc.items, args.id);
+      if (entry) {
+        // Replace in-tree temporarily for DAG validation
+        Object.assign(entry.item, { blockedBy: args.blockedBy });
+        const dagResult = validateDAG(doc.items);
+        // Restore original
+        Object.assign(entry.item, { blockedBy: existing.blockedBy });
+        if (!dagResult.valid) {
+          return textResult(
+            `Invalid dependencies: ${dagResult.errors.join("; ")}. Check IDs with get_prd_status.`,
+            true,
+          );
+        }
+      }
+      updates.blockedBy = args.blockedBy;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return textResult(
+        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy).",
+        true,
+      );
+    }
+
+    await store.updateItem(args.id, updates);
+
+    const changedFields = Object.keys(updates);
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "item_edited",
+      itemId: args.id,
+      detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
+    });
+
+    const updated = await store.getItem(args.id);
+    return textResult(
+      JSON.stringify({
+        id: args.id,
+        updatedFields: changedFields,
+        item: updated,
+      }, null, 2),
+    );
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
 export async function handleGetCapabilities(store: PRDStore): Promise<McpResult> {
   try {
     const config = await store.loadConfig();

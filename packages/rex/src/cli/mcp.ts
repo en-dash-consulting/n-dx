@@ -21,6 +21,7 @@ import {
   handleReorganize,
   handleHealth,
   handleFacets,
+  handleEditItem,
 } from "./mcp-tools.js";
 
 /**
@@ -84,6 +85,22 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
     },
     async (args) => handleAddItem(store, args),
+  );
+
+  server.tool(
+    "edit_item",
+    "Edit content fields of a PRD item (title, description, acceptance criteria, priority, tags). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    {
+      id: z.string().describe("Item ID"),
+      title: z.string().optional().describe("New title"),
+      description: z.string().optional().describe("New description"),
+      acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria"),
+      priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
+      tags: z.array(z.string()).optional().describe("New tags"),
+      source: z.string().optional().describe("New source"),
+      blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
+    },
+    async (args) => handleEditItem(store, args),
   );
 
   server.tool(
