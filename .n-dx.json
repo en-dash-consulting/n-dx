@@ -90,7 +90,12 @@
         "packages/web/tests/unit/viewer/sidebar.test.ts": "web-viewer",
 
         "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-dashboard",
-        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-dashboard"
+        "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-dashboard",
+
+        "packages/web/src/landing/landing.ts": "web-dashboard",
+        "packages/web/tests/unit/landing/landing.test.ts": "web-dashboard",
+        "packages/web/tests/integration/boundary-check.test.ts": "web-dashboard",
+        "packages/web/tests/integration/build-output-contract.test.ts": "web-dashboard"
       },
       "healthAnnotations": {
         "web-viewer-messaging": {
@@ -107,6 +112,13 @@
           "expectedCohesion": 0.27,
           "expectedCoupling": 0.73,
           "reason": "Analyzer residual zone created by Louvain community detection. Contains files that bridge multiple analyzer phases. High coupling reflects cross-phase data flow, which is architectural rather than accidental."
+        },
+        "sourcevision-mcp-gateway": {
+          "expectedCoupling": 0.6,
+          "reason": "Gateway zone bridging sourcevision MCP routes to web-dashboard. Coupling to web-dashboard is inherent to the gateway pattern — routes-mcp.ts imports server types and rex-gateway.ts. Files are pinned to web-dashboard and will merge on next analysis."
+        },
+        "web-dashboard": {
+          "reason": "Orchestration zone with 374 files. 11 entry points are expected: the zone serves as the integration hub for viewer, messaging, and MCP subsystems. Entry points include gateway modules (rex-gateway, external), shared types, and polling infrastructure — all intentional cross-zone contracts."
         }
       }
     }
