@@ -71,9 +71,20 @@ describe("server/client boundary", () => {
         // The gateway itself is allowed to import from outside
         if (rel === join("viewer", "external.ts")) continue;
 
+        // Messaging infrastructure is allowed to import directly from shared/
+        // to avoid creating a zone-level dependency inversion through external.ts.
+        // The shared/ directory is neutral (neither server nor viewer), so
+        // messaging utilities can access it without violating the server/client boundary.
+        const isMessaging = rel.startsWith(join("viewer", "messaging") + "/") ||
+          rel === join("viewer", "messaging");
+
         for (const imp of extractImportPaths(file)) {
-          // Check for direct imports to shared/ or schema/ from viewer files
-          if (imp.match(/\.\.\/shared\b/) || imp.match(/\.\.\/schema\b/)) {
+          // Check for direct imports to schema/ from viewer files
+          if (imp.match(/\.\.\/schema\b/)) {
+            violations.push(`${rel} imports "${imp}" — must use ./external.js gateway`);
+          }
+          // Check for direct imports to shared/ from non-messaging viewer files
+          if (imp.match(/shared\b/) && imp.startsWith("..") && !isMessaging) {
             violations.push(`${rel} imports "${imp}" — must use ./external.js gateway`);
           }
         }

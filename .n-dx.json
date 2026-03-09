@@ -29,7 +29,9 @@
         "packages-llm-client:root": "infrastructure",
         "monorepo-root": "infrastructure",
         "architecture-docs": "infrastructure",
-        "rex-runtime-data": "infrastructure"
+        "rex-runtime-data": "infrastructure",
+        "root-gateway-contracts": "test",
+        "root-concurrency-contracts": "test"
       },
       "pins": {
         "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-viewer",
@@ -56,7 +58,36 @@
         "packages/web/src/viewer/lightmode_logo.png": "web-viewer",
         "packages/sourcevision/src/analyzers/louvain.ts": "packages-sourcevision:analyzers",
         "packages/sourcevision/src/analyzers/zone-hash.ts": "packages-sourcevision:analyzers",
-        "packages/sourcevision/src/analyzers/zones.ts": "packages-sourcevision:analyzers"
+        "packages/sourcevision/src/analyzers/zones.ts": "packages-sourcevision:analyzers",
+
+        "tests/integration/cross-package-contracts.test.js": "root-gateway-contracts",
+        "tests/integration/scheduler-startup.test.js": "root-concurrency-contracts",
+
+        "packages/web/src/server/domain-gateway.ts": "web-dashboard",
+        "packages/web/src/server/routes-mcp.ts": "web-dashboard",
+        "packages/web/tests/unit/server/domain-gateway.test.ts": "web-dashboard",
+        "packages/web/tests/unit/server/routes-mcp.test.ts": "web-dashboard",
+
+        "packages/web/tests/integration/messaging-stack.test.ts": "cross-package-integration-tests",
+        "packages/web/tests/integration/request-dedup.test.ts": "cross-package-integration-tests",
+
+        "scripts/hench-callgraph-analysis.mjs": "monorepo-root",
+        "scripts/parse-gateway-exports.mjs": "monorepo-root",
+
+        "packages/web/build.js": "web-dashboard",
+        "packages/web/dev.js": "web-dashboard",
+        "packages/web/package.json": "web-dashboard",
+        "packages/web/tsconfig.json": "web-dashboard",
+        "packages/web/vitest.config.ts": "web-dashboard",
+        "packages/web/SourceVision-F.png": "web-dashboard",
+        "packages/web/SourceVision.png": "web-dashboard",
+
+        "packages/web/src/viewer/messaging/call-rate-limiter.ts": "viewer-message-pipeline",
+        "packages/web/src/viewer/messaging/fetch-pipeline.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/call-rate-limiter.test.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts": "viewer-message-pipeline",
+
+        "packages/web/tests/unit/viewer/sidebar.test.ts": "web-viewer"
       }
     }
   }

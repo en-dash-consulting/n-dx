@@ -659,8 +659,30 @@ export function generateStructuralInsights(
     zoneInsights.set(zone.id, []);
   }
 
-  // ── Per-zone insights ──
+  collectPerZoneInsights(zones, crossings, totalFiles, zoneInsights);
+  collectHubFileInsights(crossings, globalInsights);
+  collectBidirectionalCouplingInsights(crossings, globalInsights);
+  collectSizeImbalanceInsights(zones, globalInsights);
+  collectCircularDependencyInsights(imports, globalInsights);
 
+  if (callGraphStats) {
+    collectCallGraphInsights(zones, callGraphStats, zoneInsights, globalInsights);
+  }
+
+  collectFileStructureFindings(zones, filenameBasedZoneIds, findings);
+
+  return { zoneInsights, globalInsights, findings };
+}
+
+// ── Per-zone metric insights ────────────────────────────────────────────────
+
+/** Cohesion, coupling, size, entry point, and naming insights per zone. */
+function collectPerZoneInsights(
+  zones: Zone[],
+  crossings: ZoneCrossing[],
+  totalFiles: number,
+  zoneInsights: Map<string, string[]>,
+): void {
   for (const zone of zones) {
     const insights = zoneInsights.get(zone.id)!;
     const pct = totalFiles > 0
@@ -722,10 +744,15 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // ── Global insights ──
+// ── Hub file detection ──────────────────────────────────────────────────────
 
-  // Hub files: files imported across 3+ zones
+/** Find files imported across 3+ zones (cross-cutting dependencies). */
+function collectHubFileInsights(
+  crossings: ZoneCrossing[],
+  globalInsights: string[],
+): void {
   const fileImportingZones = new Map<string, Set<string>>();
   for (const c of crossings) {
     let set = fileImportingZones.get(c.to);
@@ -745,8 +772,15 @@ export function generateStructuralInsights(
       `Hub: ${file} is imported by ${importingZones.size} zones — cross-cutting dependency`
     );
   }
+}
 
-  // Bidirectional coupling between zone pairs
+// ── Bidirectional coupling ──────────────────────────────────────────────────
+
+/** Detect zone pairs that import from each other. */
+function collectBidirectionalCouplingInsights(
+  crossings: ZoneCrossing[],
+  globalInsights: string[],
+): void {
   const pairCounts = new Map<string, { ab: number; ba: number }>();
   for (const c of crossings) {
     const key =
@@ -772,8 +806,15 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // Zone size imbalance
+// ── Zone size imbalance ─────────────────────────────────────────────────────
+
+/** Flag when largest zone dwarfs smallest (>5× ratio). */
+function collectSizeImbalanceInsights(
+  zones: Zone[],
+  globalInsights: string[],
+): void {
   if (zones.length > 2) {
     const sizes = zones.map((z) => z.files.length).sort((a, b) => a - b);
     if (sizes[sizes.length - 1] > sizes[0] * 5) {
@@ -782,74 +823,96 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // Circular dependencies
+// ── Circular dependency reporting ───────────────────────────────────────────
+
+/** Surface file-level circular dependency counts from import analysis. */
+function collectCircularDependencyInsights(
+  imports: Imports,
+  globalInsights: string[],
+): void {
   if (imports.summary.circularCount > 0) {
     globalInsights.push(
       `${imports.summary.circularCount} circular dependency chain${imports.summary.circularCount > 1 ? "s" : ""} detected — see imports.json for details`
     );
   }
+}
 
-  // ── Call graph insights (when available) ──
+// ── Call graph insights ─────────────────────────────────────────────────────
 
-  if (callGraphStats) {
-    const { zoneStats, crossZonePatterns } = callGraphStats;
-    const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
+type CallGraphStats = NonNullable<Parameters<typeof generateStructuralInsights>[4]>;
 
-    // Per-zone call graph insights
-    for (const zone of zones) {
-      const stats = zoneStatsMap.get(zone.id);
-      if (!stats) continue;
-      const insights = zoneInsights.get(zone.id)!;
+/** Per-zone and global insights derived from the function call graph. */
+function collectCallGraphInsights(
+  zones: Zone[],
+  callGraphStats: CallGraphStats,
+  zoneInsights: Map<string, string[]>,
+  globalInsights: string[],
+): void {
+  const { zoneStats, crossZonePatterns } = callGraphStats;
+  const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
 
-      // Call cohesion divergence from import cohesion
-      const cohesionDiff = Math.abs(stats.callCohesion - zone.cohesion);
-      if (cohesionDiff > 0.3) {
-        if (stats.callCohesion < zone.cohesion) {
-          insights.push(
-            `Call cohesion (${stats.callCohesion}) much lower than import cohesion (${zone.cohesion}) — functions call across zone boundaries more than imports suggest`
-          );
-        } else {
-          insights.push(
-            `Call cohesion (${stats.callCohesion}) much higher than import cohesion (${zone.cohesion}) — tighter runtime coupling within zone than import structure suggests`
-          );
-        }
-      }
+  // Per-zone call graph insights
+  for (const zone of zones) {
+    const stats = zoneStatsMap.get(zone.id);
+    if (!stats) continue;
+    const insights = zoneInsights.get(zone.id)!;
 
-      // High incoming call traffic
-      if (stats.incomingCalls > 20) {
+    // Call cohesion divergence from import cohesion
+    const cohesionDiff = Math.abs(stats.callCohesion - zone.cohesion);
+    if (cohesionDiff > 0.3) {
+      if (stats.callCohesion < zone.cohesion) {
         insights.push(
-          `${stats.incomingCalls} incoming calls from other zones — heavily depended-on runtime API`
+          `Call cohesion (${stats.callCohesion}) much lower than import cohesion (${zone.cohesion}) — functions call across zone boundaries more than imports suggest`
+        );
+      } else {
+        insights.push(
+          `Call cohesion (${stats.callCohesion}) much higher than import cohesion (${zone.cohesion}) — tighter runtime coupling within zone than import structure suggests`
         );
       }
     }
 
-    // Global cross-zone call patterns
-    const topCrossZone = crossZonePatterns.slice(0, 3);
-    for (const pattern of topCrossZone) {
-      if (pattern.callCount >= 10) {
-        globalInsights.push(
-          `Heavy cross-zone calls: "${pattern.fromZone}" → "${pattern.toZone}" (${pattern.callCount} calls) — tight runtime coupling`
-        );
-      }
-    }
-
-    // Total cross-zone call percentage
-    const totalCalls = zoneStats.reduce((s, z) => s + z.internalCalls + z.outgoingCalls, 0);
-    const totalCrossZone = zoneStats.reduce((s, z) => s + z.outgoingCalls, 0);
-    if (totalCalls > 0) {
-      const pct = Math.round((totalCrossZone / totalCalls) * 100);
-      if (pct > 40) {
-        globalInsights.push(
-          `${pct}% of function calls cross zone boundaries — high runtime inter-zone dependency`
-        );
-      }
+    // High incoming call traffic
+    if (stats.incomingCalls > 20) {
+      insights.push(
+        `${stats.incomingCalls} incoming calls from other zones — heavily depended-on runtime API`
+      );
     }
   }
 
-  // ── File-structure recommendations ──
+  // Global cross-zone call patterns
+  const topCrossZone = crossZonePatterns.slice(0, 3);
+  for (const pattern of topCrossZone) {
+    if (pattern.callCount >= 10) {
+      globalInsights.push(
+        `Heavy cross-zone calls: "${pattern.fromZone}" → "${pattern.toZone}" (${pattern.callCount} calls) — tight runtime coupling`
+      );
+    }
+  }
 
-  // 2a. Flat directory spanning 3+ zones
+  // Total cross-zone call percentage
+  const totalCalls = zoneStats.reduce((s, z) => s + z.internalCalls + z.outgoingCalls, 0);
+  const totalCrossZone = zoneStats.reduce((s, z) => s + z.outgoingCalls, 0);
+  if (totalCalls > 0) {
+    const pct = Math.round((totalCrossZone / totalCalls) * 100);
+    if (pct > 40) {
+      globalInsights.push(
+        `${pct}% of function calls cross zone boundaries — high runtime inter-zone dependency`
+      );
+    }
+  }
+}
+
+// ── File-structure recommendations ──────────────────────────────────────────
+
+/** Directory-spanning zones, scattered files, and filename-derived zone IDs. */
+function collectFileStructureFindings(
+  zones: Zone[],
+  filenameBasedZoneIds: Set<string> | undefined,
+  findings: Finding[],
+): void {
+  // Flat directory spanning 3+ zones
   const dirToZones = new Map<string, Set<string>>();
   for (const zone of zones) {
     for (const f of zone.files) {
@@ -872,7 +935,7 @@ export function generateStructuralInsights(
     }
   }
 
-  // 2b. Zone with scattered files (5+ directories)
+  // Zone with scattered files (5+ directories)
   for (const zone of zones) {
     const dirs = new Set(zone.files.map((f) => dirname(f)));
     if (dirs.size >= 5) {
@@ -886,7 +949,7 @@ export function generateStructuralInsights(
     }
   }
 
-  // 2c. Filename-derived zone
+  // Filename-derived zone
   if (filenameBasedZoneIds) {
     for (const zoneId of filenameBasedZoneIds) {
       const zone = zones.find((z) => z.id === zoneId);
@@ -902,8 +965,6 @@ export function generateStructuralInsights(
       });
     }
   }
-
-  return { zoneInsights, globalInsights, findings };
 }
 
 // ── Helper: merge same-ID communities ────────────────────────────────────────

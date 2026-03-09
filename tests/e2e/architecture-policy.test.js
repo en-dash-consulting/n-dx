@@ -301,6 +301,10 @@ const DOCUMENTED_POLICIES = [
     enforcedBy: "architecture-policy.test.js → architecture policy: process execution",
   },
   {
+    rule: "No cycles in the zone-level import graph",
+    enforcedBy: "architecture-policy.test.js → architecture policy: zone import cycle detection",
+  },
+  {
     rule: "config.js must only import from node: builtins (spawn-exempt exception)",
     enforcedBy: "domain-isolation.test.js → architecture policy: orchestration tier boundary",
   },
@@ -330,6 +334,169 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
       ).toBe(true);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Zone-level import cycle detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects cycles in the zone-level import graph by reading
+ * .sourcevision/zones.json and running DFS on zone crossings.
+ *
+ * A cycle at the zone level (e.g. A → B → C → A) is a severe
+ * architectural violation that prevents independent extraction or
+ * testing of any zone in the cycle.
+ */
+/**
+ * Zone types that are excluded from cycle detection. Test and
+ * infrastructure zones naturally cross boundaries (test files import
+ * production code from multiple zones) — cycles among them are expected.
+ *
+ * Only production zones (domain, integration, orchestration, and untyped)
+ * are required to be acyclic.
+ */
+const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
+
+describe("architecture policy: zone import cycle detection", () => {
+  it("no cycles exist among production zones in the zone-level import graph", () => {
+    const zonesPath = join(ROOT, ".sourcevision/zones.json");
+    if (!existsSync(zonesPath)) {
+      // Skip if sourcevision hasn't been run yet
+      return;
+    }
+
+    const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
+    const crossings = data.crossings || [];
+
+    // Load zone types from .n-dx.json to identify test/infrastructure zones
+    const configPath = join(ROOT, ".n-dx.json");
+    const zoneTypes = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      : {};
+
+    // Build set of production zone IDs (exclude test and infrastructure zones)
+    const productionZones = new Set();
+    for (const zone of data.zones || []) {
+      const zoneType = zoneTypes[zone.id];
+      if (!zoneType || !CYCLE_EXEMPT_ZONE_TYPES.has(zoneType)) {
+        productionZones.add(zone.id);
+      }
+    }
+
+    // Extract package family from zone ID (e.g. "packages-rex:cli" → "packages-rex")
+    function packageFamily(zoneId) {
+      const colonIdx = zoneId.indexOf(":");
+      return colonIdx >= 0 ? zoneId.slice(0, colonIdx) : zoneId;
+    }
+
+    // Load zone pins from .n-dx.json to remap file→zone assignments
+    const zonePins = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.pins ?? {}
+      : {};
+
+    // Build file-to-zone lookup with pins applied (pins override analyzed zones)
+    const fileToZone = new Map();
+    for (const zone of data.zones || []) {
+      for (const file of zone.files || []) {
+        fileToZone.set(file, zone.id);
+      }
+    }
+    for (const [file, zoneId] of Object.entries(zonePins)) {
+      fileToZone.set(file, zoneId);
+    }
+
+    // Rebuild crossings with pin-corrected zone assignments,
+    // filtering out stale edges where the import no longer exists
+    const correctedCrossings = [];
+    for (const c of crossings) {
+      // Verify the import still exists in the source file
+      const srcPath = join(ROOT, c.from);
+      if (existsSync(srcPath)) {
+        const srcContent = readFileSync(srcPath, "utf-8");
+        // Extract the target filename stem to check import presence
+        const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
+        if (!srcContent.includes(targetBase)) continue; // import was removed
+      }
+      correctedCrossings.push({
+        ...c,
+        fromZone: fileToZone.get(c.from) ?? c.fromZone,
+        toZone: fileToZone.get(c.to) ?? c.toZone,
+      });
+    }
+
+    // Build directed adjacency list from zone crossings (production zones only,
+    // excluding intra-package edges — sub-zones within a single package naturally
+    // have bidirectional dependencies that are not architectural violations)
+    const graph = new Map();
+    for (const c of correctedCrossings) {
+      if (c.fromZone === c.toZone) continue; // skip self-edges
+      if (!productionZones.has(c.fromZone) || !productionZones.has(c.toZone)) continue;
+      if (packageFamily(c.fromZone) === packageFamily(c.toZone)) continue; // skip intra-package
+      if (!graph.has(c.fromZone)) graph.set(c.fromZone, new Set());
+      graph.get(c.fromZone).add(c.toZone);
+    }
+
+    // DFS cycle detection
+    const WHITE = 0, GRAY = 1, BLACK = 2;
+    const color = new Map();
+    const cycles = [];
+
+    for (const node of graph.keys()) {
+      if (!color.has(node)) color.set(node, WHITE);
+    }
+    // Also add nodes that are only targets
+    for (const [, targets] of graph) {
+      for (const t of targets) {
+        if (!color.has(t)) color.set(t, WHITE);
+      }
+    }
+
+    function dfs(node, path) {
+      color.set(node, GRAY);
+      path.push(node);
+
+      const neighbors = graph.get(node) || new Set();
+      for (const next of neighbors) {
+        if (color.get(next) === GRAY) {
+          // Found a cycle — extract it from the path
+          const cycleStart = path.indexOf(next);
+          const cycle = path.slice(cycleStart).concat(next);
+          cycles.push(cycle);
+        } else if (color.get(next) === WHITE) {
+          dfs(next, path);
+        }
+      }
+
+      path.pop();
+      color.set(node, BLACK);
+    }
+
+    for (const [node, c] of color) {
+      if (c === WHITE) {
+        dfs(node, []);
+      }
+    }
+
+    if (cycles.length > 0) {
+      const descriptions = cycles.map(
+        (c) => `  ${c.join(" → ")}`
+      );
+      expect.fail(
+        [
+          `Zone-level import cycles detected (${cycles.length} cycle${cycles.length > 1 ? "s" : ""}):`,
+          "",
+          ...descriptions,
+          "",
+          "Zone cycles create tightly-coupled clusters that cannot be independently",
+          "extracted, tested, or evolved. Fix by:",
+          "  1. Extracting shared symbols to a neutral module (shared-types, foundation)",
+          "  2. Inverting the dependency direction so utilities don't depend on consumers",
+          "  3. Using zone pins to correct misclassified files",
+        ].join("\n"),
+      );
+    }
+  });
 });
 
 describe("architecture policy: process execution", () => {

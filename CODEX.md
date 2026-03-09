@@ -292,3 +292,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.n-dx.json` | Project-level config overrides (web.port, etc.) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
+| `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
+| `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |

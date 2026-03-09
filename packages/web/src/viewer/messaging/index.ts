@@ -75,4 +75,4 @@ export {
 export {
   createRequestDedup,
   type RequestDedup,
-} from "../external.js";
+} from "../../shared/request-dedup.js";
