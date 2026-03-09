@@ -125,7 +125,14 @@
           "reason": "Residual zone containing orphaned web package files (config, assets) that Louvain cannot cluster. Production files like landing.ts are pinned to web-dashboard; remaining files are infrastructure artifacts with no import edges. Zero cohesion and coupling are structural invariants."
         },
         "viewer-message-pipeline": {
-          "reason": "Messaging pipeline is a composed integration layer. request-dedup.ts was relocated from src/shared/ into this zone to resolve the dependency inversion (utility importing from consumer). The zone is now self-contained: all messaging primitives (coalescer, throttle, rate-limiter, request-dedup) live here, and external.ts re-exports RequestDedup for viewer consumers. Fan-out > fan-in is expected for a pipeline that exposes a unified API surface to 4 consumer hooks."
+          "expectedCohesion": 0.35,
+          "expectedCoupling": 0.65,
+          "reason": "Messaging pipeline is a composed integration layer with one canonical implementation of each primitive (coalescer, throttle, rate-limiter, request-dedup). Low cohesion is inherent to the pipeline pattern (each stage has different concerns). High coupling reflects the viewer↔messaging integration surface — 4 consumer hooks import from this zone by design."
+        },
+        "request-deduplication": {
+          "expectedCohesion": 0.33,
+          "expectedCoupling": 0.67,
+          "reason": "Single canonical implementation in viewer/messaging/request-dedup.ts. The shared/request-dedup.ts shim was dead code and has been deleted. shared/index.ts re-exports directly from the canonical source. Coupling is inherent to the dedup pattern — it is consumed by fetch-pipeline and re-exported through external.ts."
         },
         "web-dashboard": {
           "reason": "Orchestration zone with 374 files. 11 entry points are expected: the zone serves as the integration hub for viewer, messaging, and MCP subsystems. Entry points include gateway modules (rex-gateway, external), shared types, and polling infrastructure — all intentional cross-zone contracts."

@@ -73,6 +73,13 @@ export const RISK_THRESHOLDS = {
   catastrophicCohesion: 0.3,
   /** Coupling above this with cohesion below cohesionFloor = catastrophic. */
   catastrophicCoupling: 0.7,
+  /**
+   * Minimum number of files for reliable health metrics.
+   * Zones below this threshold have high-variance cohesion/coupling readings
+   * that change dramatically with single-file additions. Findings for these
+   * zones are annotated as unreliable.
+   */
+  minZoneSize: 5,
 } as const;
 
 // ── Risk computation ────────────────────────────────────────────────────────
@@ -213,7 +220,7 @@ export function assessAllZoneRisks(
   const zoneTypeMap = opts?.zoneTypes ?? {};
 
   // Compute metrics for all zones
-  const assessed: Array<{ zone: Zone; risk: ZoneRiskMetrics; justified: boolean; typed: boolean }> = [];
+  const assessed: Array<{ zone: Zone; risk: ZoneRiskMetrics; justified: boolean; typed: boolean; smallZone: boolean }> = [];
   for (const zone of zones.zones) {
     const zoneType = zoneTypeMap[zone.id] as ZoneType | undefined;
     const justification = justificationMap.get(zone.id);
@@ -228,6 +235,7 @@ export function assessAllZoneRisks(
         risk,
         justified: !zoneType && !!justification,
         typed: !!zoneType,
+        smallZone: zone.files.length < RISK_THRESHOLDS.minZoneSize,
       });
     }
   }
@@ -236,8 +244,17 @@ export function assessAllZoneRisks(
   assessed.sort((a, b) => b.risk.riskScore - a.risk.riskScore);
 
   // Emit per-zone findings
-  for (const { zone, risk, justified, typed } of assessed) {
-    if (typed) {
+  for (const { zone, risk, justified, typed, smallZone } of assessed) {
+    if (smallZone) {
+      // Small zones have unreliable metrics — downgrade to info
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zone.id,
+        text: formatSmallZoneFinding(zone, risk),
+        severity: "info",
+      });
+    } else if (typed) {
       // Zone has a type — it exceeded even the relaxed thresholds
       findings.push({
         type: "suggestion",
@@ -266,8 +283,8 @@ export function assessAllZoneRisks(
   }
 
   // Emit global summary if multiple unjustified/untyped zones fail governance threshold
-  const failingZones = assessed.filter(({ risk, justified, typed }) =>
-    risk.failsThreshold && !justified && !typed
+  const failingZones = assessed.filter(({ risk, justified, typed, smallZone }) =>
+    risk.failsThreshold && !justified && !typed && !smallZone
   );
   if (failingZones.length >= 2) {
     findings.push({
@@ -302,6 +319,15 @@ function formatZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
     `Zone "${zone.name}" (${zone.id}) has ${level} risk ` +
     `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
     `coupling: ${risk.coupling.toFixed(2)}) — ${action}`
+  );
+}
+
+function formatSmallZoneFinding(zone: Zone, risk: ZoneRiskMetrics): string {
+  return (
+    `Zone "${zone.name}" (${zone.id}) has ${risk.riskLevel} risk ` +
+    `(score: ${risk.riskScore.toFixed(2)}, cohesion: ${risk.cohesion.toFixed(2)}, ` +
+    `coupling: ${risk.coupling.toFixed(2)}) — unreliable: zone has only ` +
+    `${zone.files.length} file${zone.files.length === 1 ? "" : "s"} (minimum ${RISK_THRESHOLDS.minZoneSize} for reliable metrics)`
   );
 }
 

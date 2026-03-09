@@ -57,6 +57,22 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
 
+#### Web package internal zone layering
+
+Within the web package, four internal zones form a directed dependency stack:
+
+```
+  web-server          (composition root — Express routes, gateways, MCP handlers)
+       ↓
+  web-viewer          (Preact UI components, hooks, views)
+       ↓
+  viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
+       ↓
+  web-shared          (framework-agnostic utilities — data-files, node-culler)
+```
+
+Import direction flows downward only. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). The `viewer-message-pipeline` zone owns all messaging primitives; `web-viewer` consumes them through `external.ts`. `web-shared` is the foundation layer with zero framework dependencies.
+
 ### Gateway modules
 
 Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
@@ -296,3 +312,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
+| `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
+| `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |

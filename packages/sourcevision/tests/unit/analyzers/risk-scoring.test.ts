@@ -13,7 +13,7 @@ function makeZone(overrides: Partial<Zone> = {}): Zone {
     id: "test-zone",
     name: "Test Zone",
     description: "A test zone",
-    files: ["src/a.ts", "src/b.ts"],
+    files: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/e.ts"],
     entryPoints: ["src/a.ts"],
     cohesion: 0.8,
     coupling: 0.2,
@@ -223,6 +223,45 @@ describe("assessAllZoneRisks", () => {
     expect(finding!.text).toContain("0.80");
     expect(finding!.text).toContain("cohesion: 0.20");
     expect(finding!.text).toContain("coupling: 0.80");
+  });
+
+  // ── Small zone threshold ────────────────────────────────────────────
+
+  it("downgrades findings for zones below minZoneSize to info", () => {
+    const zones = [
+      makeZone({
+        id: "tiny-zone",
+        name: "Tiny Zone",
+        cohesion: 0.2,
+        coupling: 0.8,
+        files: ["src/a.ts", "src/b.ts"],  // 2 files < minZoneSize (5)
+      }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    const finding = result.findings.find((f) => f.scope === "tiny-zone");
+    expect(finding).toBeDefined();
+    expect(finding!.severity).toBe("info");
+    expect(finding!.text).toContain("unreliable");
+    expect(finding!.text).toContain("2 files");
+  });
+
+  it("excludes small zones from global failing-zones summary", () => {
+    const zones = [
+      makeZone({ id: "big-bad", name: "Big Bad", cohesion: 0.2, coupling: 0.8 }),
+      makeZone({
+        id: "small-bad",
+        name: "Small Bad",
+        cohesion: 0.2,
+        coupling: 0.8,
+        files: ["src/x.ts"],  // 1 file < minZoneSize
+      }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    // Only 1 non-small failing zone, so no global summary (needs >= 2)
+    const global = result.findings.find((f) => f.scope === "global");
+    expect(global).toBeUndefined();
   });
 
   // ── Risk justifications ─────────────────────────────────────────────
