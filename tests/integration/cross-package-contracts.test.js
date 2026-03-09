@@ -587,35 +587,108 @@ describe("rex API coordination: fan-in gateway sync", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Orchestration spawn call-site validation
+// Orchestration spawn call-site validation (structural)
 // ---------------------------------------------------------------------------
 
+/**
+ * Finding: monorepo-root has zero import edges to all other zones (spawn-only
+ * pattern), making its cross-zone contracts invisible to static analysis.
+ *
+ * This section extracts the accepted subcommands directly from each package's
+ * CLI source file (the switch/case statements) and validates that every
+ * subcommand cli.js actually spawns is in the parser's accepted set.
+ *
+ * This catches interface drift that import-graph tooling cannot detect:
+ * if a package renames or removes a CLI subcommand, this test fails at
+ * build time rather than at runtime.
+ */
 describe("orchestration spawn call-sites match package CLI parsers", () => {
-  /**
-   * Validates that commands spawned by cli.js correspond to actual subcommands
-   * accepted by each package's CLI entry point. This prevents a breaking CLI
-   * argument change in rex or sourcevision from going undetected until runtime.
-   */
+  const { readFileSync, existsSync } = require("node:fs");
+  const { join } = require("node:path");
+  const ROOT = join(import.meta.dirname, "../..");
 
-  // Commands that cli.js delegates to each tool via spawn
-  const EXPECTED_SUBCOMMANDS = {
-    rex: ["init", "analyze", "status", "usage", "sync"],
-    sourcevision: ["init", "analyze", "pr-markdown"],
-    hench: ["init", "run"],
+  /**
+   * Parse accepted subcommands from a CLI entry file by extracting
+   * case "..." labels from the main dispatch switch.
+   */
+  function parseAcceptedCommands(cliSourcePath) {
+    if (!existsSync(cliSourcePath)) return [];
+    const content = readFileSync(cliSourcePath, "utf-8");
+    const commands = [];
+    // Match case "command": or case 'command': patterns
+    const caseRegex = /case\s+["']([a-z][\w-]*)["']\s*:/g;
+    let match;
+    while ((match = caseRegex.exec(content)) !== null) {
+      commands.push(match[1]);
+    }
+    return [...new Set(commands)];
+  }
+
+  /**
+   * Extract subcommands that cli.js actually spawns for each tool.
+   * Parses patterns like: run(tools.rex, ["status", ...])
+   */
+  function parseSpawnedSubcommands(cliJsPath) {
+    if (!existsSync(cliJsPath)) return {};
+    const content = readFileSync(cliJsPath, "utf-8");
+    const spawned = {};
+    // Match: run(tools.PKG, ["CMD" or runOrDie(tools.PKG, ["CMD"
+    const spawnRegex = /(?:run|runOrDie)\(tools\.(\w+),\s*\["([a-z][\w-]*)"/g;
+    let match;
+    while ((match = spawnRegex.exec(content)) !== null) {
+      const pkg = match[1] === "sv" ? "sourcevision" : match[1];
+      const cmd = match[2];
+      if (!spawned[pkg]) spawned[pkg] = new Set();
+      spawned[pkg].add(cmd);
+    }
+    // Convert Sets to arrays
+    return Object.fromEntries(
+      Object.entries(spawned).map(([k, v]) => [k, [...v]]),
+    );
+  }
+
+  const CLI_SOURCES = {
+    rex: join(ROOT, "packages/rex/src/cli/index.ts"),
+    sourcevision: join(ROOT, "packages/sourcevision/src/cli/index.ts"),
+    hench: join(ROOT, "packages/hench/src/cli/index.ts"),
   };
 
-  for (const [pkg, subcommands] of Object.entries(EXPECTED_SUBCOMMANDS)) {
-    for (const sub of subcommands) {
-      it(`${pkg} CLI accepts "${sub}" subcommand`, async () => {
-        const cliModule = await import(`../../packages/${pkg}/dist/cli/index.js?probe=${pkg}_${sub}`).catch(() => null);
-        // If the CLI module can't be imported, verify via the built parser
-        // by checking the package's command registry
-        const publicApi = await import(`../../packages/${pkg}/dist/public.js`);
-        // At minimum, verify the package builds and exports are available
-        expect(publicApi).toBeDefined();
-      });
-    }
+  const cliJsPath = join(ROOT, "cli.js");
+  const spawnedCommands = parseSpawnedSubcommands(cliJsPath);
+
+  for (const [pkg, sourcePath] of Object.entries(CLI_SOURCES)) {
+    it(`${pkg} CLI parser exists and has accepted commands`, () => {
+      const accepted = parseAcceptedCommands(sourcePath);
+      expect(
+        accepted.length,
+        `${pkg} CLI source has no case statements — parser may have changed structure`,
+      ).toBeGreaterThan(0);
+    });
+
+    it(`all spawned ${pkg} subcommands are accepted by its CLI parser`, () => {
+      const accepted = new Set(parseAcceptedCommands(sourcePath));
+      const spawned = spawnedCommands[pkg] || [];
+
+      const unrecognized = spawned.filter((cmd) => !accepted.has(cmd));
+      expect(
+        unrecognized,
+        `cli.js spawns ${pkg} subcommands not in its CLI parser: ${unrecognized.join(", ")}. ` +
+          `This indicates interface drift between the orchestration layer and the ${pkg} package.`,
+      ).toEqual([]);
+    });
   }
+
+  it("spawn extraction found all known orchestration delegations", () => {
+    // Canary: if cli.js stops spawning these, the spawn extractor may be broken
+    expect(spawnedCommands.rex).toBeDefined();
+    expect(spawnedCommands.sourcevision).toBeDefined();
+    expect(spawnedCommands.hench).toBeDefined();
+
+    // Known minimum spawned commands (from cli.js handlers)
+    expect(spawnedCommands.rex).toEqual(expect.arrayContaining(["init", "analyze", "status"]));
+    expect(spawnedCommands.sourcevision).toEqual(expect.arrayContaining(["init", "analyze"]));
+    expect(spawnedCommands.hench).toEqual(expect.arrayContaining(["init", "run"]));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -650,5 +723,350 @@ describe("rex analyze → sourcevision output consumption", () => {
     // Rex uses a namespace/version pattern, sourcevision uses semver
     expect(svPublic.SV_SCHEMA_VERSION).toMatch(/^\d+\.\d+/);
     expect(rexPublic.SCHEMA_VERSION).toMatch(/^rex\//);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Gateway behavioral tests (return-shape validation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finding: A gap exists for in-process behavioral tests of gateway return
+ * values — currently no zone validates that gateway re-exports return
+ * correctly typed data at runtime.
+ *
+ * The existing contract tests verify exports exist and have the right typeof.
+ * These tests go further: they invoke pure functions through the gateway with
+ * minimal inputs and verify the return shapes match expected contracts.
+ *
+ * Only pure/safe functions are tested (no side effects, no disk I/O).
+ * Functions that require a store instance or filesystem access are excluded.
+ */
+describe("gateway behavioral tests: hench → rex return shapes", () => {
+  /** @type {Record<string, unknown>} */
+  let gw;
+
+  it("can import hench gateway", async () => {
+    gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    expect(gw).toBeDefined();
+  });
+
+  it("SCHEMA_VERSION matches rex/N.N pattern", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    expect(gw.SCHEMA_VERSION).toMatch(/^rex\//);
+  });
+
+  it("isCompatibleSchema returns boolean for valid schema string", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const result = gw.isCompatibleSchema(gw.SCHEMA_VERSION);
+    expect(typeof result).toBe("boolean");
+    expect(result).toBe(true);
+  });
+
+  it("isCompatibleSchema returns false for invalid schema", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    expect(gw.isCompatibleSchema("invalid/0.0")).toBe(false);
+  });
+
+  it("isRootLevel correctly classifies levels", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    // Only epic can be root (parents = [null])
+    expect(gw.isRootLevel("epic")).toBe(true);
+    expect(gw.isRootLevel("feature")).toBe(false);
+    expect(gw.isRootLevel("task")).toBe(false);
+    expect(gw.isRootLevel("subtask")).toBe(false);
+  });
+
+  it("isWorkItem correctly classifies levels", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    expect(gw.isWorkItem("task")).toBe(true);
+    expect(gw.isWorkItem("subtask")).toBe(true);
+    expect(gw.isWorkItem("epic")).toBe(false);
+  });
+
+  it("findItem returns null for missing ID in empty tree", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const result = gw.findItem([], "nonexistent-id");
+    expect(result).toBeNull();
+  });
+
+  it("findItem returns TreeEntry with item and parents for a match", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const items = [
+      { id: "a", title: "Epic A", level: "epic", status: "pending", children: [
+        { id: "b", title: "Feature B", level: "feature", status: "pending", children: [] },
+      ] },
+    ];
+    const found = gw.findItem(items, "b");
+    expect(found).not.toBeNull();
+    // findItem returns { item, parents } (TreeEntry shape)
+    expect(found.item).toBeDefined();
+    expect(found.item.id).toBe("b");
+    expect(found.item.title).toBe("Feature B");
+    expect(Array.isArray(found.parents)).toBe(true);
+    expect(found.parents.length).toBe(1);
+    expect(found.parents[0].id).toBe("a");
+  });
+
+  it("walkTree is a generator yielding TreeEntry objects", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const items = [
+      { id: "a", children: [{ id: "b", children: [] }] },
+      { id: "c", children: [] },
+    ];
+    const visited = [];
+    for (const entry of gw.walkTree(items)) {
+      expect(entry.item).toBeDefined();
+      expect(Array.isArray(entry.parents)).toBe(true);
+      visited.push(entry.item.id);
+    }
+    expect(visited).toEqual(expect.arrayContaining(["a", "b", "c"]));
+    expect(visited.length).toBe(3);
+  });
+
+  it("collectCompletedIds returns Set of completed item IDs", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const items = [
+      { id: "a", status: "completed", children: [] },
+      { id: "b", status: "pending", children: [
+        { id: "c", status: "completed", children: [] },
+      ] },
+    ];
+    const result = gw.collectCompletedIds(items);
+    expect(result).toBeInstanceOf(Set);
+    expect(result.has("a")).toBe(true);
+    expect(result.has("c")).toBe(true);
+    expect(result.has("b")).toBe(false);
+  });
+
+  it("findNextTask returns null for empty tree", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    const result = gw.findNextTask([]);
+    expect(result).toBeNull();
+  });
+
+  it("computeTimestampUpdates returns object with timestamp fields", async () => {
+    if (!gw) gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
+    // Signature: computeTimestampUpdates(from, to, existing?)
+    const result = gw.computeTimestampUpdates("pending", "in_progress");
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("object");
+    // Should include startedAt for pending→in_progress
+    expect(result.startedAt).toBeDefined();
+    expect(typeof result.startedAt).toBe("string");
+  });
+});
+
+describe("gateway behavioral tests: web → rex return shapes", () => {
+  /** @type {Record<string, unknown>} */
+  let gw;
+
+  it("can import web rex-gateway", async () => {
+    gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(gw).toBeDefined();
+  });
+
+  it("LEVEL_HIERARCHY is a non-empty object", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(typeof gw.LEVEL_HIERARCHY).toBe("object");
+    expect(Object.keys(gw.LEVEL_HIERARCHY).length).toBeGreaterThan(0);
+  });
+
+  it("VALID_STATUSES contains expected status values", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(gw.VALID_STATUSES).toBeDefined();
+    // Must contain at least the core statuses
+    const statuses = Array.isArray(gw.VALID_STATUSES)
+      ? gw.VALID_STATUSES
+      : [...gw.VALID_STATUSES];
+    expect(statuses).toEqual(expect.arrayContaining(["pending", "in_progress", "completed"]));
+  });
+
+  it("CHILD_LEVEL maps parent levels to child levels", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(typeof gw.CHILD_LEVEL).toBe("object");
+    expect(gw.CHILD_LEVEL["epic"]).toBeDefined();
+    expect(gw.CHILD_LEVEL["feature"]).toBeDefined();
+  });
+
+  it("isPriority validates priority strings", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(gw.isPriority("high")).toBe(true);
+    expect(gw.isPriority("invalid")).toBe(false);
+  });
+
+  it("isItemLevel validates level strings", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    expect(gw.isItemLevel("epic")).toBe(true);
+    expect(gw.isItemLevel("invalid")).toBe(false);
+  });
+
+  it("computeStats returns stats for a tree", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    const items = [
+      { id: "a", status: "completed", level: "task", children: [] },
+      { id: "b", status: "pending", level: "task", children: [] },
+    ];
+    const stats = gw.computeStats(items);
+    expect(stats).toBeDefined();
+    expect(typeof stats).toBe("object");
+  });
+
+  it("insertChild mutates tree in-place and returns boolean", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    const items = [
+      { id: "a", level: "epic", status: "pending", children: [] },
+    ];
+    const child = { id: "b", level: "feature", status: "pending", children: [] };
+    const result = gw.insertChild(items, "a", child);
+    expect(typeof result).toBe("boolean");
+    expect(result).toBe(true);
+    expect(items[0].children.length).toBe(1);
+    expect(items[0].children[0].id).toBe("b");
+  });
+
+  it("collectAllIds returns all IDs in a tree", async () => {
+    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
+    const items = [
+      { id: "a", children: [{ id: "b", children: [] }] },
+    ];
+    const ids = gw.collectAllIds(items);
+    expect(ids).toBeInstanceOf(Set);
+    expect(ids.has("a")).toBe(true);
+    expect(ids.has("b")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rex runtime state: multi-writer zone enforcement
+// ---------------------------------------------------------------------------
+
+/**
+ * Finding: rex-runtime-state is a multi-writer shared-state zone with no
+ * import-graph visibility — four zones write to it under documented but
+ * unenforced exclusion rules, creating hidden coupling.
+ *
+ * This test makes the write sites explicit and enforceable. It scans the
+ * codebase for all locations that write to .rex/prd.json (via the known
+ * write mechanisms) and validates they belong to an allowed set of zones.
+ *
+ * If a new package or module starts writing to the PRD, this test forces
+ * a deliberate decision to add it to the allowed list.
+ */
+describe("rex runtime state: PRD write-zone enforcement", () => {
+  const { readFileSync, readdirSync, statSync, existsSync } = require("node:fs");
+  const { join, relative, sep } = require("node:path");
+  const ROOT = join(import.meta.dirname, "../..");
+
+  /**
+   * Allowed zones that may write to .rex/prd.json.
+   * Keyed by the top-level directory path prefix that identifies the zone.
+   * Any file writing to prd.json outside these zones triggers a test failure.
+   *
+   * Corresponds to the concurrency contract in CLAUDE.md.
+   */
+  const ALLOWED_PRD_WRITERS = {
+    "packages/rex/": "Rex CLI commands (store.saveDocument / atomicWriteJSON)",
+    "packages/web/src/server/": "Web server route handlers (savePRD / savePRDSync)",
+    "packages/hench/": "Hench agent (store.updateItem via rex-gateway)",
+  };
+
+  /**
+   * Patterns that indicate a file writes to .rex/prd.json.
+   * Covers both direct writes and abstracted write mechanisms.
+   */
+  const PRD_WRITE_PATTERNS = [
+    /savePRD\s*\(/,            // web server savePRD() wrapper
+    /savePRDSync\s*\(/,        // web server sync write
+    /saveDocument\s*\(/,       // rex store saveDocument()
+    /atomicWriteJSON\s*\(/,    // rex low-level atomic write
+    /store\.updateItem\s*\(/,  // hench writing via store instance
+  ];
+
+  /**
+   * Recursively collect .ts and .js source files, excluding node_modules,
+   * dist, tests, and dotfile directories.
+   */
+  function collectSourceFiles(dir) {
+    const results = [];
+    const SKIP = new Set(["node_modules", "dist", "tests", ".git", ".hench", ".rex", ".sourcevision"]);
+
+    function walk(d) {
+      let entries;
+      try { entries = readdirSync(d, { withFileTypes: true }); }
+      catch { return; }
+      for (const entry of entries) {
+        if (SKIP.has(entry.name)) continue;
+        const full = join(d, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (/\.(ts|js)$/.test(entry.name) && !entry.name.endsWith(".test.ts") && !entry.name.endsWith(".test.js")) {
+          results.push(full);
+        }
+      }
+    }
+    walk(dir);
+    return results;
+  }
+
+  it("all PRD write sites belong to allowed zones", () => {
+    const files = collectSourceFiles(join(ROOT, "packages"));
+    const violations = [];
+
+    for (const filePath of files) {
+      const content = readFileSync(filePath, "utf-8");
+      const relPath = relative(ROOT, filePath);
+
+      for (const pattern of PRD_WRITE_PATTERNS) {
+        if (pattern.test(content)) {
+          const inAllowedZone = Object.keys(ALLOWED_PRD_WRITERS).some(
+            (prefix) => relPath.startsWith(prefix),
+          );
+          if (!inAllowedZone) {
+            violations.push({ file: relPath, pattern: pattern.source });
+          }
+          break; // One match per file is sufficient
+        }
+      }
+    }
+
+    if (violations.length > 0) {
+      const details = violations
+        .map((v) => `  ${v.file} (matched: ${v.pattern})`)
+        .join("\n");
+      expect.fail(
+        `PRD write detected outside allowed zones.\n` +
+          `Allowed zones:\n` +
+          Object.entries(ALLOWED_PRD_WRITERS)
+            .map(([prefix, desc]) => `  ${prefix} — ${desc}`)
+            .join("\n") +
+          `\n\nViolations:\n${details}\n\n` +
+          `If this is intentional, add the zone to ALLOWED_PRD_WRITERS in ` +
+          `cross-package-contracts.test.js and update the concurrency contract ` +
+          `in CLAUDE.md.`,
+      );
+    }
+  });
+
+  it("allowed write zones still contain PRD write code (no stale entries)", () => {
+    const files = collectSourceFiles(join(ROOT, "packages"));
+
+    for (const [prefix, desc] of Object.entries(ALLOWED_PRD_WRITERS)) {
+      const zoneFiles = files.filter((f) =>
+        relative(ROOT, f).startsWith(prefix),
+      );
+
+      const hasWriteCode = zoneFiles.some((filePath) => {
+        const content = readFileSync(filePath, "utf-8");
+        return PRD_WRITE_PATTERNS.some((p) => p.test(content));
+      });
+
+      expect(
+        hasWriteCode,
+        `Allowed PRD write zone "${prefix}" (${desc}) no longer contains any ` +
+          `PRD write code. Remove it from ALLOWED_PRD_WRITERS to keep the ` +
+          `enforcement list accurate.`,
+      ).toBe(true);
+    }
   });
 });
