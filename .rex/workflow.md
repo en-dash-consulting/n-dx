@@ -9,7 +9,7 @@ Fight entropy. Leave the codebase better than you found it.
    If the plan requires splitting the task, use add_item to create subtasks and
    proceed with the first one.
 4. Implement using TDD where possible: failing test -> green -> refactor.
-5. Run validation and tests.
+5. Run validation and tests. If test failures are pre-existing, fix them anyway.
 6. Call update_task_status to mark the task complete.
 7. Call append_log with what was done, decisions made, and issues encountered.
 8. Commit changes.
