@@ -59,6 +59,14 @@ export {
 // ── Crash detector ────────────────────────────────────────────────────────────
 
 export {
+  detectCrash,
+  saveNavigationState,
+  clearSavedNavigationState,
+  markRecoveryShown,
+  wasRecoveryShown,
+  getDetectionResult,
+  clearCrashHistory,
+  resetCrashDetector,
   type CrashDetectionResult,
   type SavedNavigationState,
 } from "./crash-detector.js";

@@ -92,16 +92,15 @@ function shouldRunPhase(filter: PhaseFilter, phase: number, moduleName: string):
   return false;
 }
 
-export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promise<void> {
-  const absDir = resolve(targetDir);
-  if (!existsSync(absDir)) {
-    throw new CLIError(
-      `Directory not found: ${absDir}`,
-      "Check the path and try again.",
-    );
-  }
-
-  // Auto-init if needed
+/**
+ * Ensure the .sourcevision directory exists and load LLM configuration.
+ *
+ * Returns the loaded LLM config and the resolved svDir path.
+ */
+async function initAndLoadLLMConfig(absDir: string): Promise<{
+  svDir: string;
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
+}> {
   const svDir = join(absDir, SV_DIR);
   if (!existsSync(join(svDir, DATA_FILES.manifest))) {
     info("No .sourcevision/ found — initializing...");
@@ -109,46 +108,39 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     info("");
   }
 
-  // Load unified LLM config (llm.vendor + vendor-specific settings)
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   const vendor = getLLMVendor();
   if (vendor) info(`Using ${vendor} for enrichment.`);
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
-  const filter = parsePhaseFilter(extraArgs);
+  return { svDir, llmConfig };
+}
 
-  const ctx: AnalyzeContext = {
-    absDir,
-    svDir,
-    fullMode: extraArgs.includes("--full"),
-    fastMode: extraArgs.includes("--fast"),
-    tokenUsage: emptyAnalyzeTokenUsage(),
-    inventoryResult: null,
-  };
+/**
+ * Run deep-mode sub-package analyses before the root analysis.
+ */
+async function runDeepSubAnalyses(absDir: string, extraArgs: string[]): Promise<void> {
+  if (!extraArgs.includes("--deep")) return;
 
-  // ── Deep mode: re-analyze sub-packages first ──────────────────────
-  if (extraArgs.includes("--deep")) {
-    const subAnalyses = detectSubAnalyses(absDir);
-    if (subAnalyses.length > 0) {
-      info(`[deep] Found ${subAnalyses.length} sub-package${subAnalyses.length > 1 ? "s" : ""}: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
-      // Pass through flags except --deep (avoid infinite recursion)
-      const childArgs = extraArgs.filter((a) => a !== "--deep");
-      for (const sub of subAnalyses) {
-        const subDir = join(absDir, sub.prefix);
-        info(`\n[deep] Analyzing ${sub.prefix}...`);
-        await cmdAnalyze(subDir, childArgs);
-        info("");
-      }
-      info(`[deep] Sub-package analysis complete, proceeding with root.\n`);
-    }
+  const subAnalyses = detectSubAnalyses(absDir);
+  if (subAnalyses.length === 0) return;
+
+  info(`[deep] Found ${subAnalyses.length} sub-package${subAnalyses.length > 1 ? "s" : ""}: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
+  const childArgs = extraArgs.filter((a) => a !== "--deep");
+  for (const sub of subAnalyses) {
+    const subDir = join(absDir, sub.prefix);
+    info(`\n[deep] Analyzing ${sub.prefix}...`);
+    await cmdAnalyze(subDir, childArgs);
+    info("");
   }
+  info(`[deep] Sub-package analysis complete, proceeding with root.\n`);
+}
 
-  info(`Analyzing: ${absDir}`);
-  info("");
-
-  // ── Run analysis phases ────────────────────────────────────────────
-
+/**
+ * Execute filtered analysis phases, handling phase-specific errors.
+ */
+async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs: string[]): Promise<void> {
   const phases: Array<{ phase: number; module: string; run: () => Promise<void>; critical: boolean }> = [
     { phase: 1, module: "inventory",       run: () => runInventoryPhase(ctx),               critical: true },
     { phase: 2, module: "imports",         run: () => runImportsPhase(ctx),                 critical: true },
@@ -176,34 +168,66 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
       }
     }
   }
+}
 
-  // ── Generate llms.txt + CONTEXT.md ──────────────────────────────────
-  if (filter.type === "all") {
-    generateOutputFiles(ctx);
-  }
-
-  // ── Generate PR markdown from branch work record ───────────────────
-  if (filter.type === "all") {
-    await generatePrMarkdownStep(ctx);
-  }
-
-  // ── Token usage summary ─────────────────────────────────────────────
+/**
+ * Report and persist token usage to manifest for cross-package aggregation.
+ */
+function finalizeTokenUsage(
+  ctx: AnalyzeContext,
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+): void {
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {
     info(`Token usage: ${usageLine}`);
   }
 
-  // Persist token usage to manifest for cross-package aggregation
   if (ctx.tokenUsage.calls > 0) {
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
-    const manifest = readManifest(absDir);
+    const manifest = readManifest(ctx.absDir);
     manifest.tokenUsage = {
       ...ctx.tokenUsage,
       vendor: metadata.vendor,
       model: metadata.model,
     };
-    writeManifest(absDir, manifest);
+    writeManifest(ctx.absDir, manifest);
   }
+}
+
+export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promise<void> {
+  const absDir = resolve(targetDir);
+  if (!existsSync(absDir)) {
+    throw new CLIError(
+      `Directory not found: ${absDir}`,
+      "Check the path and try again.",
+    );
+  }
+
+  const { svDir, llmConfig } = await initAndLoadLLMConfig(absDir);
+  const filter = parsePhaseFilter(extraArgs);
+
+  const ctx: AnalyzeContext = {
+    absDir,
+    svDir,
+    fullMode: extraArgs.includes("--full"),
+    fastMode: extraArgs.includes("--fast"),
+    tokenUsage: emptyAnalyzeTokenUsage(),
+    inventoryResult: null,
+  };
+
+  await runDeepSubAnalyses(absDir, extraArgs);
+
+  info(`Analyzing: ${absDir}`);
+  info("");
+
+  await executePhases(ctx, filter, extraArgs);
+
+  if (filter.type === "all") {
+    generateOutputFiles(ctx);
+    await generatePrMarkdownStep(ctx);
+  }
+
+  finalizeTokenUsage(ctx, llmConfig);
 
   info("");
   info("Done.");

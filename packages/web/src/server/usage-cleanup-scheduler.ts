@@ -126,6 +126,9 @@ interface PRDShape {
 
 // CollectAllIdsFn is imported from shared-types.ts and re-exported above.
 
+/** Signature for PRD loaders compatible with `loadPRDSync`. */
+export type LoadPRDFn = (rexDir: string) => unknown;
+
 /**
  * Load valid task IDs from the PRD file.
  *
@@ -135,8 +138,9 @@ interface PRDShape {
 function loadValidTaskIds(
   rexDir: string,
   collectAllIds: CollectAllIdsFn,
+  loadPRD: LoadPRDFn = loadPRDSync,
 ): Set<string> | null {
-  const doc = loadPRDSync(rexDir) as PRDShape | null;
+  const doc = loadPRD(rexDir) as PRDShape | null;
   if (!doc || !Array.isArray(doc.items)) return null;
   return collectAllIds(doc.items);
 }
@@ -161,6 +165,7 @@ function loadValidTaskIds(
  * @param options.collectAllIds Injected function to extract IDs from PRD items
  * @param options.logPath Optional path for the JSONL audit log
  * @param options.broadcast Optional WebSocket broadcast function
+ * @param options.loadPRD Optional PRD loader (defaults to `loadPRDSync`; injectable for testing)
  */
 export async function runCleanupCycle(options: {
   aggregator: IncrementalTaskUsageAggregator;
@@ -168,12 +173,13 @@ export async function runCleanupCycle(options: {
   collectAllIds?: CollectAllIdsFn;
   logPath?: string;
   broadcast?: (data: unknown) => void;
+  loadPRD?: LoadPRDFn;
 }): Promise<CleanupResult> {
-  const { aggregator, rexDir, collectAllIds: collectIds, logPath, broadcast } = options;
+  const { aggregator, rexDir, collectAllIds: collectIds, logPath, broadcast, loadPRD } = options;
 
   // Ensure aggregator is populated before checking for orphans
   const taskUsage = await aggregator.getTaskUsage();
-  const validIds = collectIds ? loadValidTaskIds(rexDir, collectIds) : null;
+  const validIds = collectIds ? loadValidTaskIds(rexDir, collectIds, loadPRD) : null;
 
   const result: CleanupResult = {
     timestamp: new Date().toISOString(),

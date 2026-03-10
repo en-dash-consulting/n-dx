@@ -1,5 +1,13 @@
 {
   "llm": {
     "vendor": "claude"
+  },
+  "sourcevision": {
+    "zones": {
+      "pins": {
+        "packages/web/src/viewer/views/hench-runs.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-polling.ts": "web-dashboard"
+      }
+    }
   }
 }

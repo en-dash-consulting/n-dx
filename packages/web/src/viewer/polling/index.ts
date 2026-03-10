@@ -26,3 +26,25 @@ export {
   type PollingStateSnapshot,
   type PollingStateChangeHandler,
 } from "./polling-state.js";
+
+// ── Tab visibility ──────────────────────────────────────────────────────────
+
+export {
+  startTabVisibilityMonitor,
+  stopTabVisibilityMonitor,
+  onVisibilityChange,
+  getTabVisibility,
+  getTabVisibilitySnapshot,
+  isTabVisible,
+  getVisibilityCapabilities,
+  getTransitionHistory,
+  resetTabVisibility,
+  detectVisibilityAPI,
+  type TabVisibilityState,
+  type TabVisibilitySnapshot,
+  type VisibilityChangeHandler,
+  type TabVisibilityConfig,
+  type VisibilityDetectionMethod,
+  type VisibilityAPICapabilities,
+  type VisibilityTransition,
+} from "./tab-visibility.js";

@@ -7,18 +7,16 @@
  */
 
 import { useState, useEffect } from "preact/hooks";
-import type {
-  TabVisibilityState,
-  TabVisibilitySnapshot,
-  VisibilityAPICapabilities,
-} from "../polling/tab-visibility.js";
 import {
   startTabVisibilityMonitor,
   stopTabVisibilityMonitor,
   onVisibilityChange,
   getTabVisibilitySnapshot,
   getVisibilityCapabilities,
-} from "../polling/tab-visibility.js";
+  type TabVisibilityState,
+  type TabVisibilitySnapshot,
+  type VisibilityAPICapabilities,
+} from "../polling/index.js";
 
 export interface UseTabVisibilityResult {
   /** Current tab visibility state ("visible" or "hidden"). */

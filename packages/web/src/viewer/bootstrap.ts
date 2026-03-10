@@ -7,7 +7,7 @@
  */
 
 import { initTheme } from "./components/theme-toggle.js";
-import { startTabVisibilityMonitor } from "./polling/tab-visibility.js";
+import { startTabVisibilityMonitor } from "./polling/index.js";
 import { startPollingManager } from "./polling/polling-manager.js";
 import { startPollingRestart } from "./polling/polling-restart.js";
 import { createTickVisibilityGate } from "./polling/tick-visibility-gate.js";
