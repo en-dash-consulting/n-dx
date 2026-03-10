@@ -167,6 +167,13 @@ const COMMAND_REGISTRY = [
     keywords: ["settings", "configuration", "preferences", "edit", "view", "feature", "toggle"],
     related: [],
   },
+  {
+    name: "self-heal",
+    category: "Orchestration",
+    summary: "Iterative codebase improvement loop",
+    keywords: ["heal", "iterate", "loop", "improve", "analyze", "recommend", "accept", "agent", "autonomous"],
+    related: ["plan", "work", "refresh"],
+  },
   // ── Tool delegation commands ──
   {
     name: "rex",
@@ -748,6 +755,25 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start"],
   },
+  "self-heal": {
+    summary: "iterative codebase improvement loop",
+    description:
+      "Runs N iterations of the full improvement cycle:\n" +
+      "  1. sourcevision analyze --deep --full  (deep static analysis)\n" +
+      "  2. rex recommend                       (generate recommendations)\n" +
+      "  3. rex recommend --accept              (accept recommendations into PRD)\n" +
+      "  4. hench run --auto --loop             (execute tasks autonomously)\n\n" +
+      "Each iteration builds on the previous one — analysis improves as the\n" +
+      "codebase evolves, recommendations become more targeted, and the agent\n" +
+      "addresses progressively deeper issues.",
+    usage: "ndx self-heal [N] [dir]",
+    examples: [
+      { command: "ndx self-heal 3 .", description: "Run 3 improvement iterations" },
+      { command: "ndx self-heal .", description: "Run 1 iteration (default)" },
+      { command: "ndx self-heal 5", description: "Run 5 iterations in current directory" },
+    ],
+    related: ["plan", "work", "refresh"],
+  },
 };
 
 /**
@@ -858,6 +884,7 @@ export function formatMainHelp() {
     ["web [dir]", "Alias for start (--port=N, --background, stop, status)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
     ["config [key] [value]", "View and edit settings (--json, --help)"],
+    ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → accept → execute)"],
   ];
   const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));
   const orchPad = Math.max(maxOrchLen + 4, 24);
