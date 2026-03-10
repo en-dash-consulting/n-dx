@@ -20637,6 +20637,9 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-10T00:20:52.552Z",
+      "completedAt": "2026-03-10T00:31:53.658Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Re-pinned 4 MCP-route files (domain-gateway.ts, routes-mcp.ts, and their tests) from web-dashboard to new mcp-route-layer zone in .n-dx.json. Added zone type classification and health annotation. Removed stale sourcevision-mcp-gateway annotation.",
       "recommendationMeta": {
         "findingHashes": [
           "f0411816a57a"
@@ -20646,19 +20649,17 @@
           "warning": 1
         },
         "findingCount": 1
-      },
-      "completedAt": "2026-03-10T00:31:53.658Z",
-      "resolutionType": "config-override",
-      "resolutionDetail": "Re-pinned 4 MCP-route files (domain-gateway.ts, routes-mcp.ts, and their tests) from web-dashboard to new mcp-route-layer zone in .n-dx.json. Added zone type classification and health annotation. Removed stale sourcevision-mcp-gateway annotation."
+      }
     },
     {
       "id": "cc746139-c4ca-4b97-97bf-eb0772786707",
       "title": "Address relationship issues (3 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- The 4 cross-zone imports from web-viewer into web-shared are traceable to the shared/request-dedup.ts duplicate — resolving the duplication would collapse this cross-zone edge entirely, reducing coupling between web-viewer and web-shared to zero.\n- message zone depends on files in viewer-message-pipeline that logically belong in web-viewer; resolving the zone misclassification will redirect this import edge and may expose a latent zone-level cycle between message and web-viewer that is currently hidden by the misclassification.\n- Production file packages/web/src/landing/landing.ts co-zones with test and script files — zone health metrics conflate production and test code, masking any real production-side structural issues.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-03-10T00:32:45.761Z",
       "recommendationMeta": {
         "findingHashes": [
           "a43400446d2f",
@@ -20670,7 +20671,10 @@
           "warning": 3
         },
         "findingCount": 3
-      }
+      },
+      "completedAt": "2026-03-10T00:36:10.402Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Removed dead cross-zone re-export from shared/index.ts, pinned all 7 messaging files + 7 test files to viewer-message-pipeline zone, and separated landing.ts into dedicated web-landing zone"
     },
     {
       "id": "731ea4c3-f02c-4ffb-a2bd-b5c9fea47424",

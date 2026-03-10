@@ -33,7 +33,8 @@
         "root-gateway-contracts": "test",
         "root-concurrency-contracts": "test",
         "web-build-infrastructure": "infrastructure",
-        "mcp-route-layer": "infrastructure"
+        "mcp-route-layer": "infrastructure",
+        "web-landing": "domain"
       },
       "pins": {
         "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-viewer",
@@ -86,19 +87,26 @@
 
         "packages/web/src/viewer/messaging/call-rate-limiter.ts": "viewer-message-pipeline",
         "packages/web/src/viewer/messaging/fetch-pipeline.ts": "viewer-message-pipeline",
+        "packages/web/src/viewer/messaging/index.ts": "viewer-message-pipeline",
+        "packages/web/src/viewer/messaging/message-coalescer.ts": "viewer-message-pipeline",
+        "packages/web/src/viewer/messaging/message-throttle.ts": "viewer-message-pipeline",
         "packages/web/src/viewer/messaging/request-dedup.ts": "viewer-message-pipeline",
+        "packages/web/src/viewer/messaging/ws-pipeline.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/call-rate-limiter.test.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/fetch-pipeline.test.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/message-coalescer.test.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/message-throttle.test.ts": "viewer-message-pipeline",
         "packages/web/tests/unit/viewer/request-dedup.test.ts": "viewer-message-pipeline",
+        "packages/web/tests/unit/viewer/ws-pipeline.test.ts": "viewer-message-pipeline",
 
         "packages/web/tests/unit/viewer/sidebar.test.ts": "web-viewer",
 
         "packages/web/tests/unit/viewer/graph-interaction.test.ts": "web-viewer",
         "packages/web/tests/unit/viewer/graph-zoom.test.ts": "web-viewer",
 
-        "packages/web/src/landing/landing.ts": "web-dashboard",
-        "packages/web/tests/unit/landing/landing.test.ts": "web-dashboard",
+        "packages/web/src/landing/landing.ts": "web-landing",
+        "packages/web/tests/unit/landing/landing.test.ts": "web-landing",
         "packages/web/tests/integration/boundary-check.test.ts": "web-dashboard",
         "packages/web/tests/integration/build-output-contract.test.ts": "web-dashboard"
       },
@@ -126,7 +134,12 @@
         "web-ancillary": {
           "expectedCohesion": 0,
           "expectedCoupling": 0,
-          "reason": "Residual zone containing orphaned web package files (config, assets) that Louvain cannot cluster. Production files like landing.ts are pinned to web-dashboard; remaining files are infrastructure artifacts with no import edges. Zero cohesion and coupling are structural invariants."
+          "reason": "Residual zone containing orphaned web package files (config, assets) that Louvain cannot cluster. Production files like landing.ts are pinned to web-landing; remaining files are infrastructure artifacts with no import edges. Zero cohesion and coupling are structural invariants."
+        },
+        "web-landing": {
+          "expectedCohesion": 1.0,
+          "expectedCoupling": 0,
+          "reason": "Standalone landing page module with zero imports — landing.ts and its test file. Isolated from the main web-dashboard orchestration zone to prevent test/production metric conflation."
         },
         "viewer-message-pipeline": {
           "expectedCohesion": 0.5,

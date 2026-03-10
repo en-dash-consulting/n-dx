@@ -9,5 +9,3 @@
 export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "./data-files.js";
 export { NodeCuller } from "./node-culler.js";
 export type { NodeCullerOptions, NodeCullerState, VisibilityCallback } from "./node-culler.js";
-export { createRequestDedup } from "../viewer/messaging/request-dedup.js";
-export type { RequestDedup } from "../viewer/messaging/request-dedup.js";
