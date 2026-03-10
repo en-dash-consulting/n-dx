@@ -1,0 +1,30 @@
+{
+  "id": "packages-rex:tree-dag-primitives",
+  "name": "Tree and DAG Primitives",
+  "description": "Houses the foundational tree traversal, DAG cycle detection, and node-move algorithms that underpin all PRD hierarchy operations.",
+  "files": [
+    "packages/rex/src/core/dag.ts",
+    "packages/rex/src/core/move.ts",
+    "packages/rex/src/core/tree.ts",
+    "packages/rex/tests/unit/core/dag.test.ts",
+    "packages/rex/tests/unit/core/move.test.ts",
+    "packages/rex/tests/unit/core/tree-hardened.test.ts",
+    "packages/rex/tests/unit/core/tree.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/core/dag.ts",
+    "packages/rex/src/core/move.ts",
+    "packages/rex/src/core/tree.ts"
+  ],
+  "cohesion": 0.06,
+  "coupling": 0.94,
+  "fileCount": 7,
+  "lineCount": 1775,
+  "riskMetrics": {
+    "cohesion": 0.06,
+    "coupling": 0.94,
+    "riskScore": 0.94,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

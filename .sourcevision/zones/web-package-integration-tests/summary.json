@@ -1,0 +1,21 @@
+{
+  "id": "web-package-integration-tests",
+  "name": "Web Package Integration Tests",
+  "description": "Validates the web package's build output contract and internal architectural boundary enforcement at the integration level.",
+  "files": [
+    "packages/web/tests/integration/boundary-check.test.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 317,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,467 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": "agent-completion-validation",
+      "zoneName": "Agent Completion Validation",
+      "cohesion": 0.44,
+      "coupling": 0.56,
+      "riskScore": 0.56,
+      "fileCount": 5,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "autonomous-agent-engine",
+      "zoneName": "Autonomous Agent Engine",
+      "cohesion": 0.93,
+      "coupling": 0.07,
+      "riskScore": 0.06999999999999998,
+      "fileCount": 127,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "crash-recovery-system",
+      "zoneName": "Crash Recovery System",
+      "cohesion": 0.67,
+      "coupling": 0.33,
+      "riskScore": 0.32999999999999996,
+      "fileCount": 6,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "cross-package-integration-tests",
+      "zoneName": "Cross-Package Integration Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "dashboard-panel-components",
+      "zoneName": "Dashboard Panel Components",
+      "cohesion": 0.29,
+      "coupling": 0.71,
+      "riskScore": 0.71,
+      "fileCount": 3,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "hench-cli-commands",
+      "zoneName": "Hench CLI Commands",
+      "cohesion": 0.48,
+      "coupling": 0.52,
+      "riskScore": 0.52,
+      "fileCount": 6,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "hench-package-config",
+      "zoneName": "Hench Package Config",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 15,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "hench-run-storage",
+      "zoneName": "Hench Run Storage",
+      "cohesion": 0.33,
+      "coupling": 0.67,
+      "riskScore": 0.6699999999999999,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "landing-page-assets",
+      "zoneName": "Landing Page Assets",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 2,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "monorepo-e2e-test-suite",
+      "zoneName": "Monorepo E2E Test Suite",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 22,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-llm-client:llm-client-core",
+      "zoneName": "LLM Client Core",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 36,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-llm-client:llm-client-tests",
+      "zoneName": "LLM Client Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 5,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-llm-client:package-config",
+      "zoneName": "Package Config",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 3,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:cli-mcp-interface",
+      "zoneName": "CLI and MCP Interface",
+      "cohesion": 0.27,
+      "coupling": 0.73,
+      "riskScore": 0.73,
+      "fileCount": 23,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:integration-adapter-layer",
+      "zoneName": "Integration Adapter Layer",
+      "cohesion": 0.38,
+      "coupling": 0.63,
+      "riskScore": 0.625,
+      "fileCount": 16,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:llm-analysis-engine",
+      "zoneName": "LLM Analysis Engine",
+      "cohesion": 0.38,
+      "coupling": 0.62,
+      "riskScore": 0.62,
+      "fileCount": 28,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:notion-integration-client",
+      "zoneName": "Notion Integration Client",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:prd-domain-operations",
+      "zoneName": "PRD Domain Operations",
+      "cohesion": 0.44,
+      "coupling": 0.56,
+      "riskScore": 0.56,
+      "fileCount": 43,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:prd-proposal-pipeline",
+      "zoneName": "PRD Proposal Pipeline",
+      "cohesion": 0.37,
+      "coupling": 0.63,
+      "riskScore": 0.63,
+      "fileCount": 34,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:prd-repair-command",
+      "zoneName": "PRD Repair Command",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:prd-structural-validation",
+      "zoneName": "PRD Structural Validation",
+      "cohesion": 0.36,
+      "coupling": 0.64,
+      "riskScore": 0.64,
+      "fileCount": 11,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:project-configuration",
+      "zoneName": "Project Configuration",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 8,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:rex-cli-command-layer",
+      "zoneName": "Rex CLI Command Layer",
+      "cohesion": 0.46,
+      "coupling": 0.54,
+      "riskScore": 0.54,
+      "fileCount": 37,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:rex-e2e-test-suite",
+      "zoneName": "Rex E2E Test Suite",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 13,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:rex-runtime-state",
+      "zoneName": "Rex Runtime State",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:schema-storage-reporting",
+      "zoneName": "Schema Storage and Reporting",
+      "cohesion": 0.17,
+      "coupling": 0.83,
+      "riskScore": 0.83,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:task-selection-engine",
+      "zoneName": "Task Selection Engine",
+      "cohesion": 0.17,
+      "coupling": 0.83,
+      "riskScore": 0.83,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-rex:tree-dag-primitives",
+      "zoneName": "Tree and DAG Primitives",
+      "cohesion": 0.06,
+      "coupling": 0.94,
+      "riskScore": 0.94,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:branch-collection-pipeline",
+      "zoneName": "Branch Collection Pipeline",
+      "cohesion": 0.2,
+      "coupling": 0.8,
+      "riskScore": 0.8,
+      "fileCount": 5,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:branch-risk-domain",
+      "zoneName": "Branch Risk Domain",
+      "cohesion": 0.48,
+      "coupling": 0.52,
+      "riskScore": 0.52,
+      "fileCount": 17,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:claude-workspace-config",
+      "zoneName": "Claude Workspace Config",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 2,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:data-file-schema",
+      "zoneName": "Data File Schema",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 3,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:sourcevision-analysis-core",
+      "zoneName": "Sourcevision Analysis Core",
+      "cohesion": 0.9,
+      "coupling": 0.1,
+      "riskScore": 0.09999999999999999,
+      "fileCount": 87,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:static-analysis-services",
+      "zoneName": "Static Analysis Services",
+      "cohesion": 0.21,
+      "coupling": 0.79,
+      "riskScore": 0.79,
+      "fileCount": 8,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:test-fixture-projects",
+      "zoneName": "Test Fixture Projects",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 11,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "packages-sourcevision:workspace-root",
+      "zoneName": "Workspace Root",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 9,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "project-documentation",
+      "zoneName": "Project Documentation",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 16,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "rex-runtime-state",
+      "zoneName": "Rex Runtime State",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 6,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "task-usage-analytics",
+      "zoneName": "Task Usage Analytics",
+      "cohesion": 0.83,
+      "coupling": 0.17,
+      "riskScore": 0.17000000000000004,
+      "fileCount": 10,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "viewer-polling-infrastructure",
+      "zoneName": "Viewer Polling Infrastructure",
+      "cohesion": 0.29,
+      "coupling": 0.71,
+      "riskScore": 0.71,
+      "fileCount": 5,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "viewer-route-state",
+      "zoneName": "Viewer Route State",
+      "cohesion": 0.4,
+      "coupling": 0.6,
+      "riskScore": 0.6,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "viewer-shell-assets",
+      "zoneName": "Viewer Shell Assets",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 3,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "web-application-core",
+      "zoneName": "Web Application Core",
+      "cohesion": 0.94,
+      "coupling": 0.06,
+      "riskScore": 0.060000000000000026,
+      "fileCount": 294,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "web-dashboard",
+      "zoneName": "Web Dashboard",
+      "cohesion": 0.59,
+      "coupling": 0.41,
+      "riskScore": 0.41000000000000003,
+      "fileCount": 88,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "web-package-integration-tests",
+      "zoneName": "Web Package Integration Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    },
+    {
+      "zoneId": "workspace-root",
+      "zoneName": "Workspace Root",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 31,
+      "timestamp": "2026-03-10T11:22:09.180Z",
+      "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+    }
+  ],
+  "analyzedAt": "2026-03-10T11:22:09.180Z",
+  "gitSha": "21786d24aeb21767389090712636b7f7c224e7e2"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "schema-storage-reporting",
+  "name": "Schema Storage and Reporting",
+  "description": "Groups schema validation, the file-system PRD store adapter, and the report command — three loosely related infrastructure concerns that share no strong internal dependency.",
+  "files": [
+    "src/cli/commands/report.ts",
+    "src/schema/validate.ts",
+    "src/store/file-adapter.ts",
+    "tests/e2e/cli-init.test.ts",
+    "tests/unit/cli/commands/report.test.ts",
+    "tests/unit/schema/validate.test.ts",
+    "tests/unit/store/file-adapter.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/report.ts",
+    "src/schema/validate.ts",
+    "src/store/file-adapter.ts"
+  ],
+  "cohesion": 0.17,
+  "coupling": 0.83,
+  "fileCount": 7,
+  "lineCount": 2144,
+  "riskMetrics": {
+    "cohesion": 0.17,
+    "coupling": 0.83,
+    "riskScore": 0.83,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

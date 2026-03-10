@@ -1,0 +1,27 @@
+{
+  "id": "dashboard-panel-components",
+  "name": "Dashboard Panel Components",
+  "description": "Viewer UI components for the active-tasks, concurrency, and memory panels, co-located with the hench-runs page view that hosts them.",
+  "files": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/memory-panel.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/memory-panel.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 3,
+  "lineCount": 841,
+  "riskMetrics": {
+    "cohesion": 0.29,
+    "coupling": 0.71,
+    "riskScore": 0.71,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

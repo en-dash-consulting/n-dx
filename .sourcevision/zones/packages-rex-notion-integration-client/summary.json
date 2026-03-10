@@ -1,0 +1,25 @@
+{
+  "id": "packages-rex:notion-integration-client",
+  "name": "Notion Integration Client",
+  "description": "Encapsulates the low-level Notion API client and its associated store-contract tests, forming the isolated foundation layer of the Notion adapter.",
+  "files": [
+    "packages/rex/src/store/notion-client.ts",
+    "packages/rex/tests/unit/store/notion-adapter.test.ts",
+    "packages/rex/tests/unit/store/notion-client.test.ts",
+    "packages/rex/tests/unit/store/store-contract.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/notion-client.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 1908,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

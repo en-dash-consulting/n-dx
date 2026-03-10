@@ -1,0 +1,17 @@
+{
+  "id": "web-viewer/web-integration",
+  "name": "Web Viewer/web Integration",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/views/pr-markdown.ts",
+    "packages/web/tests/integration/pr-markdown-refresh.test.ts",
+    "packages/web/tests/unit/viewer/pr-markdown.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/pr-markdown.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 983
+}

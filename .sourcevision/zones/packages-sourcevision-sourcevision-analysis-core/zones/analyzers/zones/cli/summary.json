@@ -1,0 +1,20 @@
+{
+  "id": "unit-2/analyzers/cli",
+  "name": "Unit 2/analyzers/cli",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "src/analyzers/convergence.ts",
+    "src/cli/commands/analyze-phases.ts",
+    "src/cli/commands/analyze.ts",
+    "tests/unit/analyzers/convergence.test.ts",
+    "tests/unit/cli/analyze.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/analyze-phases.ts",
+    "src/cli/commands/analyze.ts"
+  ],
+  "cohesion": 0.17,
+  "coupling": 0.83,
+  "fileCount": 5,
+  "lineCount": 0
+}

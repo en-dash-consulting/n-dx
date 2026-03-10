@@ -1,0 +1,15 @@
+{
+  "id": "unit-2/export",
+  "name": "Unit 2/export",
+  "description": "1 files, primarily TypeScript",
+  "files": [
+    "src/export/pdf-report.ts"
+  ],
+  "entryPoints": [
+    "src/export/pdf-report.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 1,
+  "lineCount": 563
+}

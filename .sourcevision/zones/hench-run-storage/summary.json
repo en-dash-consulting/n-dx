@@ -1,0 +1,26 @@
+{
+  "id": "hench-run-storage",
+  "name": "Hench Run Storage",
+  "description": "Persistence layer for hench agent run data, providing JSON file I/O and compressed run history access as dual entrypoints.",
+  "files": [
+    "packages/hench/src/store/json.ts",
+    "packages/hench/src/store/runs.ts",
+    "packages/hench/tests/integration/codex-token-accounting.test.ts",
+    "packages/hench/tests/unit/store/run-compressed-reads.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/store/json.ts",
+    "packages/hench/src/store/runs.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 4,
+  "lineCount": 430,
+  "riskMetrics": {
+    "cohesion": 0.33,
+    "coupling": 0.67,
+    "riskScore": 0.6699999999999999,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

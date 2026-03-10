@@ -1,0 +1,21 @@
+{
+  "id": "unit-2/analyzers/analyzers-2",
+  "name": "Unit 2/analyzers/analyzers 2",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "src/analyzers/context.ts",
+    "src/analyzers/llms-txt.ts",
+    "src/analyzers/next-steps.ts",
+    "src/cli/mcp.ts"
+  ],
+  "entryPoints": [
+    "src/analyzers/context.ts",
+    "src/analyzers/llms-txt.ts",
+    "src/analyzers/next-steps.ts",
+    "src/cli/mcp.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 4,
+  "lineCount": 1379
+}

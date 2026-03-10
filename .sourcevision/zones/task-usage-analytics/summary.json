@@ -1,0 +1,32 @@
+{
+  "id": "task-usage-analytics",
+  "name": "Task Usage Analytics",
+  "description": "Server-side task usage collection, incremental aggregation, and scheduled cleanup infrastructure, including the two cross-package gateways that give the web server access to Rex and Sourcevision.",
+  "files": [
+    "packages/web/src/server/domain-gateway.ts",
+    "packages/web/src/server/incremental-task-usage.ts",
+    "packages/web/src/server/register-scheduler.ts",
+    "packages/web/src/server/rex-gateway.ts",
+    "packages/web/src/server/shared-types.ts",
+    "packages/web/src/server/task-usage.ts",
+    "packages/web/src/server/usage-cleanup-scheduler.ts",
+    "packages/web/tests/unit/server/incremental-task-usage.test.ts",
+    "packages/web/tests/unit/server/task-usage.test.ts",
+    "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/shared-types.ts",
+    "packages/web/src/server/task-usage.ts"
+  ],
+  "cohesion": 0.83,
+  "coupling": 0.17,
+  "fileCount": 10,
+  "lineCount": 2140,
+  "riskMetrics": {
+    "cohesion": 0.83,
+    "coupling": 0.17,
+    "riskScore": 0.17000000000000004,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

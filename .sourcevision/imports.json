@@ -18776,7 +18776,7 @@
     },
     {
       "from": "packages/web/src/viewer/bootstrap.ts",
-      "to": "packages/web/src/viewer/components/theme-toggle.ts",
+      "to": "packages/web/src/viewer/components/index.ts",
       "type": "static",
       "symbols": [
         "initTheme"
@@ -18784,33 +18784,12 @@
     },
     {
       "from": "packages/web/src/viewer/bootstrap.ts",
-      "to": "packages/web/src/viewer/polling/polling-manager.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "static",
       "symbols": [
-        "startPollingManager"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/bootstrap.ts",
-      "to": "packages/web/src/viewer/polling/polling-restart.ts",
-      "type": "static",
-      "symbols": [
-        "startPollingRestart"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/bootstrap.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
-      "type": "static",
-      "symbols": [
-        "startTabVisibilityMonitor"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/bootstrap.ts",
-      "to": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
-      "type": "static",
-      "symbols": [
+        "startTabVisibilityMonitor",
+        "startPollingManager",
+        "startPollingRestart",
         "createTickVisibilityGate"
       ]
     },
@@ -18965,6 +18944,251 @@
       "type": "type",
       "symbols": [
         "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/active-tasks-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "ActiveTasksPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/breadcrumb.ts",
+      "type": "reexport",
+      "symbols": [
+        "Breadcrumb",
+        "BreadcrumbProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/concurrency-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "ConcurrencyPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/config-footer.ts",
+      "type": "reexport",
+      "symbols": [
+        "ConfigFooter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/constants.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/copy-link-button.ts",
+      "type": "reexport",
+      "symbols": [
+        "CopyLinkButton",
+        "buildShareableUrl",
+        "CopyLinkButtonProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/crash-recovery-banner.ts",
+      "type": "reexport",
+      "symbols": [
+        "CrashRecoveryBanner"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/degradation-banner.ts",
+      "type": "reexport",
+      "symbols": [
+        "DegradationBanner",
+        "DegradationBannerProps"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/detail-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "DetailPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/elapsed-time.ts",
+      "type": "reexport",
+      "symbols": [
+        "ElapsedTime"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/faq.ts",
+      "type": "reexport",
+      "symbols": [
+        "GlobalFAQ",
+        "HeaderFAQ"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/favicon.ts",
+      "type": "reexport",
+      "symbols": [
+        "updateFavicon",
+        "resetFavicon",
+        "FAVICON_PNGS",
+        "VIEW_TO_PRODUCT"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/guide.ts",
+      "type": "reexport",
+      "symbols": [
+        "Guide"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/logos.ts",
+      "type": "reexport",
+      "symbols": [
+        "NdxLogoPng",
+        "ProductLogoPng",
+        "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/memory-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "MemoryPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/memory-warning.ts",
+      "type": "reexport",
+      "symbols": [
+        "MemoryWarningBanner"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/notion-schema-wizard.ts",
+      "type": "reexport",
+      "symbols": [
+        "NotionSchemaWizard"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+      "type": "reexport",
+      "symbols": [
+        "PollingSuspensionIndicator"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/refresh-queue-status.ts",
+      "type": "reexport",
+      "symbols": [
+        "RefreshQueueStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/rex-task-link.ts",
+      "type": "reexport",
+      "symbols": [
+        "RexTaskLink",
+        "RexTaskLinkProps",
+        "TaskRef"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/search-filter.ts",
+      "type": "reexport",
+      "symbols": [
+        "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/search-overlay.ts",
+      "type": "reexport",
+      "symbols": [
+        "SearchOverlay",
+        "useSearchOverlay"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/sidebar.ts",
+      "type": "reexport",
+      "symbols": [
+        "Sidebar"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/status-indicators.ts",
+      "type": "reexport",
+      "symbols": [
+        "useProjectStatus",
+        "SvFreshnessIndicator",
+        "RexCompletionIndicator",
+        "HenchActivityIndicator",
+        "ProjectStatus",
+        "SourceVisionStatus",
+        "RexStatus",
+        "HenchStatus"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/theme-toggle.ts",
+      "type": "reexport",
+      "symbols": [
+        "SidebarThemeToggle",
+        "initTheme"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/throttle-controls.ts",
+      "type": "reexport",
+      "symbols": [
+        "ThrottleControlsPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/ws-health-panel.ts",
+      "type": "reexport",
+      "symbols": [
+        "WsHealthPanel"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/index.ts",
+      "to": "packages/web/src/viewer/components/zone-slideout.ts",
+      "type": "reexport",
+      "symbols": [
+        "ZoneSlideout"
       ]
     },
     {
@@ -19826,6 +20050,31 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/crash/crash-detector.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/crash/index.ts",
+      "to": "packages/web/src/viewer/crash/crash-detector.ts",
+      "type": "reexport",
+      "symbols": [
+        "detectCrash",
+        "saveNavigationState",
+        "clearSavedNavigationState",
+        "markRecoveryShown",
+        "wasRecoveryShown",
+        "getDetectionResult",
+        "clearCrashHistory",
+        "resetCrashDetector",
+        "CrashDetectionResult",
+        "SavedNavigationState"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/external.ts",
       "to": "packages/web/src/schema/v1.ts",
       "type": "reexport",
@@ -19972,15 +20221,14 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/performance/index.ts",
       "type": "static",
       "symbols": [
         "detectCrash",
         "saveNavigationState",
         "clearSavedNavigationState",
         "markRecoveryShown",
-        "wasRecoveryShown",
-        "resetCrashDetector"
+        "wasRecoveryShown"
       ]
     },
     {
@@ -20452,7 +20700,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "static",
       "symbols": [
         "startTabVisibilityMonitor",
@@ -20464,7 +20712,7 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "type",
       "symbols": [
         "TabVisibilityState",
@@ -20557,99 +20805,22 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/breadcrumb.ts",
+      "to": "packages/web/src/viewer/components/index.ts",
       "type": "static",
       "symbols": [
-        "Breadcrumb"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/crash-recovery-banner.ts",
-      "type": "static",
-      "symbols": [
-        "CrashRecoveryBanner"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/degradation-banner.ts",
-      "type": "static",
-      "symbols": [
-        "DegradationBanner"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/detail-panel.ts",
-      "type": "static",
-      "symbols": [
-        "DetailPanel"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/faq.ts",
-      "type": "static",
-      "symbols": [
-        "HeaderFAQ"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/favicon.ts",
-      "type": "static",
-      "symbols": [
-        "updateFavicon"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/guide.ts",
-      "type": "static",
-      "symbols": [
-        "Guide"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/memory-warning.ts",
-      "type": "static",
-      "symbols": [
-        "MemoryWarningBanner"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/polling-suspension-indicator.ts",
-      "type": "static",
-      "symbols": [
-        "PollingSuspensionIndicator"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/refresh-queue-status.ts",
-      "type": "static",
-      "symbols": [
-        "RefreshQueueStatus"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/search-overlay.ts",
-      "type": "static",
-      "symbols": [
+        "Sidebar",
+        "DetailPanel",
+        "Guide",
+        "HeaderFAQ",
+        "Breadcrumb",
+        "updateFavicon",
+        "MemoryWarningBanner",
+        "CrashRecoveryBanner",
+        "DegradationBanner",
+        "RefreshQueueStatus",
+        "PollingSuspensionIndicator",
         "SearchOverlay",
         "useSearchOverlay"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/components/sidebar.ts",
-      "type": "static",
-      "symbols": [
-        "Sidebar"
       ]
     },
     {
@@ -20872,10 +21043,19 @@
     },
     {
       "from": "packages/web/src/viewer/performance/crash-detector.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "type": "type",
+      "to": "packages/web/src/viewer/crash/crash-detector.ts",
+      "type": "reexport",
       "symbols": [
-        "ViewId"
+        "detectCrash",
+        "saveNavigationState",
+        "clearSavedNavigationState",
+        "markRecoveryShown",
+        "wasRecoveryShown",
+        "getDetectionResult",
+        "clearCrashHistory",
+        "resetCrashDetector",
+        "CrashDetectionResult",
+        "SavedNavigationState"
       ]
     },
     {
@@ -20896,7 +21076,7 @@
     },
     {
       "from": "packages/web/src/viewer/performance/dom-update-gate.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "static",
       "symbols": [
         "onVisibilityChange",
@@ -20905,7 +21085,7 @@
     },
     {
       "from": "packages/web/src/viewer/performance/dom-update-gate.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "type",
       "symbols": [
         "TabVisibilitySnapshot"
@@ -20932,9 +21112,17 @@
     },
     {
       "from": "packages/web/src/viewer/performance/index.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/crash/index.ts",
       "type": "reexport",
       "symbols": [
+        "detectCrash",
+        "saveNavigationState",
+        "clearSavedNavigationState",
+        "markRecoveryShown",
+        "wasRecoveryShown",
+        "getDetectionResult",
+        "clearCrashHistory",
+        "resetCrashDetector",
         "CrashDetectionResult",
         "SavedNavigationState"
       ]
@@ -21063,7 +21251,7 @@
     },
     {
       "from": "packages/web/src/viewer/performance/response-buffer-gate.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "static",
       "symbols": [
         "onVisibilityChange",
@@ -21072,7 +21260,7 @@
     },
     {
       "from": "packages/web/src/viewer/performance/response-buffer-gate.ts",
-      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "to": "packages/web/src/viewer/polling/index.ts",
       "type": "type",
       "symbols": [
         "TabVisibilitySnapshot"
@@ -21099,8 +21287,26 @@
       "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "reexport",
       "symbols": [
+        "startPollingManager",
+        "stopPollingManager",
         "registerPoller",
-        "unregisterPoller"
+        "unregisterPoller",
+        "suspendAll",
+        "resumeAll",
+        "isSuspended",
+        "isPollerActive",
+        "getRegisteredPollers",
+        "getPollerCount",
+        "resetPollingManager"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/index.ts",
+      "to": "packages/web/src/viewer/polling/polling-restart.ts",
+      "type": "reexport",
+      "symbols": [
+        "startPollingRestart",
+        "stopPollingRestart"
       ]
     },
     {
@@ -21116,6 +21322,50 @@
         "PollingSourceConfig",
         "PollingStateSnapshot",
         "PollingStateChangeHandler"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/index.ts",
+      "to": "packages/web/src/viewer/polling/tab-visibility.ts",
+      "type": "reexport",
+      "symbols": [
+        "startTabVisibilityMonitor",
+        "stopTabVisibilityMonitor",
+        "onVisibilityChange",
+        "getTabVisibility",
+        "getTabVisibilitySnapshot",
+        "isTabVisible",
+        "getVisibilityCapabilities",
+        "getTransitionHistory",
+        "resetTabVisibility",
+        "detectVisibilityAPI",
+        "TabVisibilityState",
+        "TabVisibilitySnapshot",
+        "VisibilityChangeHandler",
+        "TabVisibilityConfig",
+        "VisibilityDetectionMethod",
+        "VisibilityAPICapabilities",
+        "VisibilityTransition"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/index.ts",
+      "to": "packages/web/src/viewer/polling/tick-timer.ts",
+      "type": "reexport",
+      "symbols": [
+        "onTick",
+        "suspendTickTimer",
+        "resumeTickTimer",
+        "getTickTimerState",
+        "resetTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/polling/index.ts",
+      "to": "packages/web/src/viewer/polling/tick-visibility-gate.ts",
+      "type": "reexport",
+      "symbols": [
+        "createTickVisibilityGate"
       ]
     },
     {
@@ -22197,26 +22447,12 @@
     },
     {
       "from": "packages/web/src/viewer/views/task-audit.ts",
-      "to": "packages/web/src/viewer/components/elapsed-time.ts",
+      "to": "packages/web/src/viewer/components/index.ts",
       "type": "static",
       "symbols": [
+        "BrandedHeader",
+        "RexTaskLink",
         "ElapsedTime"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/task-audit.ts",
-      "to": "packages/web/src/viewer/components/logos.ts",
-      "type": "static",
-      "symbols": [
-        "BrandedHeader"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/task-audit.ts",
-      "to": "packages/web/src/viewer/components/rex-task-link.ts",
-      "type": "static",
-      "symbols": [
-        "RexTaskLink"
       ]
     },
     {
@@ -23749,7 +23985,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/crash/index.ts",
       "type": "type",
       "symbols": [
         "SavedNavigationState"
@@ -23892,6 +24128,14 @@
       "symbols": [
         "onTick",
         "resetTickTimer"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
       ]
     },
     {
@@ -24412,6 +24656,24 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/polling-restart.test.ts",
+      "to": "packages/web/src/viewer/polling/polling-restart.ts",
+      "type": "static",
+      "symbols": [
+        "startPollingRestart",
+        "stopPollingRestart"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/polling-restart.test.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
+      "type": "static",
+      "symbols": [
+        "suspendAllSources",
+        "resumeAllSources"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/polling-state.test.ts",
       "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
@@ -24683,6 +24945,32 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts",
+      "to": "packages/web/src/viewer/views/enrichment-thresholds.ts",
+      "type": "static",
+      "symbols": [
+        "ENRICHMENT_THRESHOLDS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts",
+      "to": "packages/web/src/viewer/views/sourcevision-tabs.ts",
+      "type": "static",
+      "symbols": [
+        "SOURCEVISION_TABS",
+        "SOURCEVISION_TAB_IDS"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts",
+      "to": "packages/web/src/viewer/views/sourcevision-tabs.ts",
+      "type": "type",
+      "symbols": [
+        "SourceVisionTab",
+        "SourceVisionTabId"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/status-filter.test.ts",
       "to": "packages/web/src/viewer/components/prd-tree/status-filter.ts",
       "type": "static",
@@ -24777,6 +25065,22 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/suggestions-view.test.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/suggestions-view.test.ts",
+      "to": "packages/web/src/viewer/views/suggestions.ts",
+      "type": "static",
+      "symbols": [
+        "SuggestionsView"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/tab-visibility.test.ts",
       "to": "packages/web/src/viewer/polling/tab-visibility.ts",
       "type": "static",
@@ -24848,6 +25152,14 @@
       "type": "type",
       "symbols": [
         "PRDItemData"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/throttle-controls.test.ts",
+      "to": "packages/web/src/viewer/components/throttle-controls.ts",
+      "type": "static",
+      "symbols": [
+        "ThrottleControlsPanel"
       ]
     },
     {
@@ -25172,6 +25484,22 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/use-project-status.test.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "static",
+      "symbols": [
+        "usePolling"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-project-status.test.ts",
+      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "type": "static",
+      "symbols": [
+        "useProjectStatus"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/virtual-scroll.test.ts",
       "to": "packages/web/src/viewer/components/prd-tree/types.ts",
       "type": "type",
@@ -25198,6 +25526,14 @@
       "type": "type",
       "symbols": [
         "FlatNode"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/ws-health-panel.test.ts",
+      "to": "packages/web/src/viewer/components/ws-health-panel.ts",
+      "type": "static",
+      "symbols": [
+        "WsHealthPanel"
       ]
     },
     {
@@ -25780,15 +26116,19 @@
         "packages/web/tests/unit/viewer/smart-add-input.test.ts",
         "packages/web/tests/unit/viewer/status-filter.test.ts",
         "packages/web/tests/unit/viewer/status-indicators.test.ts",
+        "packages/web/tests/unit/viewer/suggestions-view.test.ts",
         "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
         "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
         "packages/web/tests/unit/viewer/task-detail-usage.test.ts",
+        "packages/web/tests/unit/viewer/throttle-controls.test.ts",
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
         "packages/web/tests/unit/viewer/tree-event-delegate.test.ts",
         "packages/web/tests/unit/viewer/tree-view.test.ts",
         "packages/web/tests/unit/viewer/use-crash-recovery.test.ts",
         "packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts",
         "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
+        "packages/web/tests/unit/viewer/use-project-status.test.ts",
+        "packages/web/tests/unit/viewer/ws-health-panel.test.ts",
         "packages/web/tests/unit/viewer/zone-drill-down.test.ts"
       ],
       "symbols": [
@@ -26273,6 +26613,7 @@
         "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
         "packages/web/tests/unit/viewer/dom-update-gate.test.ts",
         "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+        "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts",
         "packages/web/tests/unit/viewer/execution-panel-dedup.test.ts",
         "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
         "packages/web/tests/unit/viewer/favicon.test.ts",
@@ -26300,6 +26641,7 @@
         "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
         "packages/web/tests/unit/viewer/persistent-filter.test.ts",
         "packages/web/tests/unit/viewer/polling-manager.test.ts",
+        "packages/web/tests/unit/viewer/polling-restart.test.ts",
         "packages/web/tests/unit/viewer/polling-state.test.ts",
         "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
         "packages/web/tests/unit/viewer/pr-markdown.test.ts",
@@ -26316,14 +26658,17 @@
         "packages/web/tests/unit/viewer/search-overlay.test.ts",
         "packages/web/tests/unit/viewer/sidebar.test.ts",
         "packages/web/tests/unit/viewer/smart-add-input.test.ts",
+        "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts",
         "packages/web/tests/unit/viewer/status-filter.test.ts",
         "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
         "packages/web/tests/unit/viewer/status-indicators-polling.test.ts",
         "packages/web/tests/unit/viewer/status-indicators.test.ts",
+        "packages/web/tests/unit/viewer/suggestions-view.test.ts",
         "packages/web/tests/unit/viewer/tab-visibility.test.ts",
         "packages/web/tests/unit/viewer/task-detail-failure.test.ts",
         "packages/web/tests/unit/viewer/task-detail-requirements.test.ts",
         "packages/web/tests/unit/viewer/task-detail-usage.test.ts",
+        "packages/web/tests/unit/viewer/throttle-controls.test.ts",
         "packages/web/tests/unit/viewer/tick-timer.test.ts",
         "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts",
         "packages/web/tests/unit/viewer/token-usage-nav.test.ts",
@@ -26337,7 +26682,9 @@
         "packages/web/tests/unit/viewer/use-crash-recovery.test.ts",
         "packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts",
         "packages/web/tests/unit/viewer/use-polling-suspension.test.ts",
+        "packages/web/tests/unit/viewer/use-project-status.test.ts",
         "packages/web/tests/unit/viewer/virtual-scroll.test.ts",
+        "packages/web/tests/unit/viewer/ws-health-panel.test.ts",
         "packages/web/tests/unit/viewer/ws-pipeline.test.ts",
         "packages/web/tests/unit/viewer/zone-drill-down.test.ts",
         "packages/web/tests/unit/viewer/zone-inline-subzones.test.ts",
@@ -26404,10 +26751,19 @@
     }
   ],
   "summary": {
-    "totalEdges": 2732,
+    "totalEdges": 2762,
     "totalExternal": 18,
-    "circularCount": 0,
-    "circulars": [],
+    "circularCount": 1,
+    "circulars": [
+      {
+        "cycle": [
+          "packages/web/src/viewer/polling/index.ts",
+          "packages/web/src/viewer/polling/polling-restart.ts",
+          "packages/web/src/viewer/performance/graceful-degradation.ts",
+          "packages/web/src/viewer/performance/memory-monitor.ts"
+        ]
+      }
+    ],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
@@ -26450,16 +26806,16 @@
         "count": 20
       },
       {
-        "path": "packages/web/src/viewer/polling/tab-visibility.ts",
-        "count": 19
-      },
-      {
         "path": "packages/rex/src/core/canonical.ts",
         "count": 17
       },
       {
         "path": "packages/web/src/server/rex-gateway.ts",
         "count": 17
+      },
+      {
+        "path": "packages/web/src/viewer/polling/tab-visibility.ts",
+        "count": 16
       },
       {
         "path": "packages/sourcevision/src/cli/output.ts",
@@ -26478,18 +26834,18 @@
         "count": 12
       },
       {
-        "path": "packages/web/src/viewer/polling/polling-manager.ts",
-        "count": 12
-      },
-      {
         "path": "packages/web/src/viewer/visualization/index.ts",
         "count": 12
       },
       {
         "path": "packages/llm-client/src/types.ts",
         "count": 11
+      },
+      {
+        "path": "packages/sourcevision/src/analyzers/claude-client.ts",
+        "count": 11
       }
     ],
-    "avgImportsPerFile": 3.45
+    "avgImportsPerFile": 3.44
   }
 }

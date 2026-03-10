@@ -1,0 +1,24 @@
+{
+  "id": "data-file-schema",
+  "name": "Data File Schema",
+  "description": "A minimal schema module defining canonical data-file constants (DATA_FILES, SUPPLEMENTARY_FILES) with co-located unit tests for MCP and schema validation.",
+  "files": [
+    "src/schema/data-files.ts",
+    "tests/unit/cli/mcp.test.ts",
+    "tests/unit/schema/data-files.test.ts"
+  ],
+  "entryPoints": [
+    "src/schema/data-files.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 285,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

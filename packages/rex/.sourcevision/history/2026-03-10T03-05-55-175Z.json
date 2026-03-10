@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": "cli-mcp-interface",
+      "zoneName": "CLI and MCP Interface",
+      "cohesion": 0.27,
+      "coupling": 0.73,
+      "riskScore": 0.73,
+      "fileCount": 23,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "integration-adapter-layer",
+      "zoneName": "Integration Adapter Layer",
+      "cohesion": 0.38,
+      "coupling": 0.63,
+      "riskScore": 0.625,
+      "fileCount": 16,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "llm-analysis-engine",
+      "zoneName": "LLM Analysis Engine",
+      "cohesion": 0.38,
+      "coupling": 0.62,
+      "riskScore": 0.62,
+      "fileCount": 28,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "notion-integration-client",
+      "zoneName": "Notion Integration Client",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "prd-domain-operations",
+      "zoneName": "PRD Domain Operations",
+      "cohesion": 0.44,
+      "coupling": 0.56,
+      "riskScore": 0.56,
+      "fileCount": 43,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "prd-proposal-pipeline",
+      "zoneName": "PRD Proposal Pipeline",
+      "cohesion": 0.37,
+      "coupling": 0.63,
+      "riskScore": 0.63,
+      "fileCount": 34,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "prd-repair-command",
+      "zoneName": "PRD Repair Command",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "prd-structural-validation",
+      "zoneName": "PRD Structural Validation",
+      "cohesion": 0.36,
+      "coupling": 0.64,
+      "riskScore": 0.64,
+      "fileCount": 11,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "project-configuration",
+      "zoneName": "Project Configuration",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 8,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "rex-cli-command-layer",
+      "zoneName": "Rex CLI Command Layer",
+      "cohesion": 0.46,
+      "coupling": 0.54,
+      "riskScore": 0.54,
+      "fileCount": 37,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "rex-e2e-test-suite",
+      "zoneName": "Rex E2E Test Suite",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 13,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "rex-runtime-state",
+      "zoneName": "Rex Runtime State",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 4,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "schema-storage-reporting",
+      "zoneName": "Schema Storage and Reporting",
+      "cohesion": 0.17,
+      "coupling": 0.83,
+      "riskScore": 0.83,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "task-selection-engine",
+      "zoneName": "Task Selection Engine",
+      "cohesion": 0.17,
+      "coupling": 0.83,
+      "riskScore": 0.83,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    },
+    {
+      "zoneId": "tree-dag-primitives",
+      "zoneName": "Tree and DAG Primitives",
+      "cohesion": 0.06,
+      "coupling": 0.94,
+      "riskScore": 0.94,
+      "fileCount": 7,
+      "timestamp": "2026-03-10T03:05:55.175Z"
+    }
+  ],
+  "analyzedAt": "2026-03-10T03:05:55.175Z"
+}

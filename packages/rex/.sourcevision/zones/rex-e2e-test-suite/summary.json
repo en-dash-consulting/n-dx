@@ -1,0 +1,32 @@
+{
+  "id": "rex-e2e-test-suite",
+  "name": "Rex E2E Test Suite",
+  "description": "Contains all end-to-end CLI and adapter tests that exercise rex commands against real file-system fixtures, validating full-stack behavior from CLI invocation to PRD state.",
+  "files": [
+    "tests/e2e/cli-adapter.test.ts",
+    "tests/e2e/cli-analyze.test.ts",
+    "tests/e2e/cli-import.test.ts",
+    "tests/e2e/cli-prune.test.ts",
+    "tests/e2e/cli-quiet.test.ts",
+    "tests/e2e/cli-recommend.test.ts",
+    "tests/e2e/cli-smart-add.test.ts",
+    "tests/e2e/cli-sync.test.ts",
+    "tests/e2e/cli-workflow.test.ts",
+    "tests/e2e/fixtures/sample-prd/.rex/config.json",
+    "tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl",
+    "tests/e2e/fixtures/sample-prd/.rex/prd.json",
+    "tests/e2e/fixtures/sample-prd/.rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 13,
+  "lineCount": 2596,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "branch-collection-pipeline",
+  "name": "Branch Collection Pipeline",
+  "description": "Orchestrates branch-work data collection and exposes it through the PR-markdown CLI command.",
+  "files": [
+    "src/analyzers/branch-work-collector.ts",
+    "src/cli/commands/pr-markdown.ts",
+    "tests/integration/pr-markdown-reviewer-output.test.ts",
+    "tests/unit/analyzers/branch-work-collector.test.ts",
+    "tests/unit/cli/pr-markdown.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/pr-markdown.ts"
+  ],
+  "cohesion": 0.2,
+  "coupling": 0.8,
+  "fileCount": 5,
+  "lineCount": 2005,
+  "riskMetrics": {
+    "cohesion": 0.2,
+    "coupling": 0.8,
+    "riskScore": 0.8,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

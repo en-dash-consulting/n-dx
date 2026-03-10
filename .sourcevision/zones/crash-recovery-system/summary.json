@@ -1,0 +1,27 @@
+{
+  "id": "crash-recovery-system",
+  "name": "Crash Recovery System",
+  "description": "Viewer-side crash detection, recovery orchestration, and associated test infrastructure for detecting and responding to renderer failures.",
+  "files": [
+    "packages/web/src/viewer/crash/crash-detector.ts",
+    "packages/web/src/viewer/crash/index.ts",
+    "packages/web/src/viewer/performance/crash-detector.ts",
+    "packages/web/tests/helpers/crash-detector-test-support.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts",
+    "packages/web/tests/unit/viewer/use-crash-recovery.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/crash/index.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 6,
+  "lineCount": 898,
+  "riskMetrics": {
+    "cohesion": 0.67,
+    "coupling": 0.33,
+    "riskScore": 0.32999999999999996,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "hench-cli-commands",
+  "name": "Hench CLI Commands",
+  "description": "CLI command layer for inspecting hench agent runs, task status, and run history, forming the read-oriented observability surface for hench.",
+  "files": [
+    "packages/hench/src/cli/commands/constants.ts",
+    "packages/hench/src/cli/commands/show.ts",
+    "packages/hench/src/cli/commands/status.ts",
+    "packages/hench/src/cli/commands/task-lookup.ts",
+    "packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts",
+    "packages/hench/tests/unit/cli/commands/task-lookup.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/commands/constants.ts",
+    "packages/hench/src/cli/commands/show.ts",
+    "packages/hench/src/cli/commands/status.ts"
+  ],
+  "cohesion": 0.48,
+  "coupling": 0.52,
+  "fileCount": 6,
+  "lineCount": 509,
+  "riskMetrics": {
+    "cohesion": 0.48,
+    "coupling": 0.52,
+    "riskScore": 0.52,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

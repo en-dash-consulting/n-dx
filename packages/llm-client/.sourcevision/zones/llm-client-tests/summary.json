@@ -1,0 +1,24 @@
+{
+  "id": "llm-client-tests",
+  "name": "LLM Client Tests",
+  "description": "Unit tests covering the five public-API entry points: config, JSON serialization, project-config overrides, CLI typo suggestion, and shared types.",
+  "files": [
+    "tests/unit/config.test.ts",
+    "tests/unit/json.test.ts",
+    "tests/unit/project-config.test.ts",
+    "tests/unit/suggest.test.ts",
+    "tests/unit/types.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 451,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

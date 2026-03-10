@@ -1,0 +1,17 @@
+{
+  "id": "web-viewer/web-viewer/web/unit-viewer",
+  "name": "Web Viewer/web Viewer/web/unit Viewer",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
+    "packages/web/tests/integration/token-usage-route-regression.test.ts",
+    "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts",
+    "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
+    "packages/web/tests/unit/viewer/search-overlay.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 1265
+}

@@ -1,0 +1,26 @@
+{
+  "id": "agent-completion-validation",
+  "name": "Agent Completion Validation",
+  "description": "Encapsulates LLM completion response generation and validation logic shared across the hench agent execution loop.",
+  "files": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/validation/completion.ts",
+    "packages/hench/src/validation/index.ts",
+    "packages/hench/tests/unit/agent/completion.test.ts",
+    "packages/hench/tests/unit/tools/completion-validation.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/validation/completion.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 5,
+  "lineCount": 923,
+  "riskMetrics": {
+    "cohesion": 0.44,
+    "coupling": 0.56,
+    "riskScore": 0.56,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

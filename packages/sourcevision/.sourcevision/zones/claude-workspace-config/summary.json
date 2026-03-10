@@ -1,0 +1,21 @@
+{
+  "id": "claude-workspace-config",
+  "name": "Claude Workspace Config",
+  "description": "Claude Code IDE permission and local settings configuration for the workspace.",
+  "files": [
+    ".claude/settings.json",
+    ".claude/settings.local.json"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 19,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

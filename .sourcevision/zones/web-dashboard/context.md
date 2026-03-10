@@ -5,11 +5,11 @@
 <zone>
 
 Zone: Web Dashboard (`web-dashboard`)
-Files: 9, Cohesion: 0.27, Coupling: 0.73
-Risk: healthy (score: 0.73)
-Description: Build infrastructure and package-level configuration for the web package, including the esbuild runner scripts and TypeScript/Vitest configuration that produce the dashboard and MCP server bundles.
-Entry points: packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/polling/tick-timer.ts, packages/web/src/viewer/route-state.ts, packages/web/src/viewer/views/task-audit.ts
-Lines: 690
+Files: 88, Cohesion: 0.59, Coupling: 0.41
+Risk: healthy (score: 0.41)
+Description: Build infrastructure, package configuration, static assets, and loosely-connected viewer utilities that form the outer shell of the web dashboard package.
+Entry points: packages/web/src/viewer/messaging/index.ts, packages/web/src/viewer/messaging/request-dedup.ts, packages/web/src/viewer/polling/tick-timer.ts, packages/web/src/viewer/usage/constants.ts, packages/web/src/viewer/views/enrichment-thresholds.ts, packages/web/src/viewer/views/graph.ts, packages/web/src/viewer/views/sourcevision-tabs.ts, packages/web/src/viewer/views/token-usage.ts
+Lines: 31408
 
 </zone>
 
@@ -17,40 +17,203 @@ Lines: 690
 
 packages/web/SourceVision-F.png (Other, 0 lines, asset)
 packages/web/SourceVision.png (Other, 0 lines, asset)
-packages/web/build.js (JavaScript, 238 lines, source)
+packages/web/build.js (JavaScript, 243 lines, source)
 packages/web/dev.js (JavaScript, 114 lines, source)
 packages/web/package.json (JSON, 51 lines, config)
-packages/web/tests/integration/boundary-check.test.ts (TypeScript, 126 lines, test)
-packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 117 lines, test)
+packages/web/src/landing/landing.ts (TypeScript, 351 lines, source)
+packages/web/src/viewer/graph/index.ts (TypeScript, 35 lines, source)
+packages/web/src/viewer/graph/physics.ts (TypeScript, 443 lines, source)
+packages/web/src/viewer/graph/renderer.ts (TypeScript, 1636 lines, source)
+packages/web/src/viewer/hooks/use-polling.ts (TypeScript, 68 lines, source)
+packages/web/src/viewer/messaging/call-rate-limiter.ts (TypeScript, 153 lines, source)
+packages/web/src/viewer/messaging/fetch-pipeline.ts (TypeScript, 104 lines, source)
+packages/web/src/viewer/messaging/index.ts (TypeScript, 78 lines, source)
+packages/web/src/viewer/messaging/message-coalescer.ts (TypeScript, 194 lines, source)
+packages/web/src/viewer/messaging/message-throttle.ts (TypeScript, 230 lines, source)
+packages/web/src/viewer/messaging/request-dedup.ts (TypeScript, 84 lines, source)
+packages/web/src/viewer/messaging/ws-pipeline.ts (TypeScript, 130 lines, source)
+packages/web/src/viewer/polling/tick-timer.ts (TypeScript, 205 lines, source)
+packages/web/src/viewer/styles/a11y.css (CSS, 46 lines, other)
+packages/web/src/viewer/styles/analysis.css (CSS, 131 lines, other)
+packages/web/src/viewer/styles/badges.css (CSS, 110 lines, other)
+packages/web/src/viewer/styles/base.css (CSS, 34 lines, other)
+packages/web/src/viewer/styles/branding.css (CSS, 125 lines, other)
+packages/web/src/viewer/styles/breadcrumb.css (CSS, 167 lines, other)
+packages/web/src/viewer/styles/call-graph-explorer.css (CSS, 309 lines, other)
+packages/web/src/viewer/styles/cards.css (CSS, 253 lines, other)
+packages/web/src/viewer/styles/components.css (CSS, 193 lines, other)
+packages/web/src/viewer/styles/copy-link.css (CSS, 83 lines, other)
+packages/web/src/viewer/styles/crash-recovery.css (CSS, 152 lines, other)
+packages/web/src/viewer/styles/degradation-banner.css (CSS, 163 lines, other)
+packages/web/src/viewer/styles/detail.css (CSS, 134 lines, other)
+packages/web/src/viewer/styles/faq.css (CSS, 161 lines, other)
+packages/web/src/viewer/styles/feature-toggles.css (CSS, 376 lines, other)
+packages/web/src/viewer/styles/forms.css (CSS, 128 lines, other)
+packages/web/src/viewer/styles/graph.css (CSS, 356 lines, other)
+packages/web/src/viewer/styles/hench-config.css (CSS, 589 lines, other)
+packages/web/src/viewer/styles/hench-runs.css (CSS, 1701 lines, other)
+packages/web/src/viewer/styles/hench-templates.css (CSS, 382 lines, other)
+packages/web/src/viewer/styles/index.css (CSS, 42 lines, other)
+packages/web/src/viewer/styles/integration-config.css (CSS, 526 lines, other)
+packages/web/src/viewer/styles/layout.css (CSS, 467 lines, other)
+packages/web/src/viewer/styles/memory-warning.css (CSS, 115 lines, other)
+packages/web/src/viewer/styles/notion-config.css (CSS, 770 lines, other)
+packages/web/src/viewer/styles/overview.css (CSS, 219 lines, other)
+packages/web/src/viewer/styles/polling-suspension.css (CSS, 104 lines, other)
+packages/web/src/viewer/styles/pr-markdown.css (CSS, 100 lines, other)
+packages/web/src/viewer/styles/prd-tree.css (CSS, 5783 lines, other)
+packages/web/src/viewer/styles/refresh-queue.css (CSS, 105 lines, other)
+packages/web/src/viewer/styles/responsive.css (CSS, 314 lines, other)
+packages/web/src/viewer/styles/rex-dashboard.css (CSS, 1384 lines, other)
+packages/web/src/viewer/styles/routes.css (CSS, 39 lines, other)
+packages/web/src/viewer/styles/search-overlay.css (CSS, 336 lines, other)
+packages/web/src/viewer/styles/tables.css (CSS, 74 lines, other)
+packages/web/src/viewer/styles/task-audit.css (CSS, 639 lines, other)
+packages/web/src/viewer/styles/task-link.css (CSS, 185 lines, other)
+packages/web/src/viewer/styles/token-usage.css (CSS, 487 lines, other)
+packages/web/src/viewer/styles/tokens.css (CSS, 112 lines, other)
+packages/web/src/viewer/styles/utils.css (CSS, 375 lines, other)
+packages/web/src/viewer/styles/validation.css (CSS, 784 lines, other)
+packages/web/src/viewer/styles/zone-map.css (CSS, 503 lines, other)
+packages/web/src/viewer/styles/zone-slideout.css (CSS, 350 lines, other)
+packages/web/src/viewer/usage/constants.ts (TypeScript, 18 lines, source)
+packages/web/src/viewer/usage/index.ts (TypeScript, 12 lines, source)
+packages/web/src/viewer/views/enrichment-thresholds.ts (TypeScript, 11 lines, source)
+packages/web/src/viewer/views/graph.ts (TypeScript, 388 lines, source)
+packages/web/src/viewer/views/hench-runs.ts (TypeScript, 750 lines, source)
+packages/web/src/viewer/views/sourcevision-tabs.ts (TypeScript, 35 lines, source)
+packages/web/src/viewer/views/token-usage.ts (TypeScript, 760 lines, source)
+packages/web/tests/integration/messaging-stack.test.ts (TypeScript, 464 lines, test)
+packages/web/tests/integration/request-dedup.test.ts (TypeScript, 626 lines, test)
+packages/web/tests/unit/landing/landing.test.ts (TypeScript, 159 lines, test)
+packages/web/tests/unit/viewer/call-rate-limiter.test.ts (TypeScript, 408 lines, test)
+packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts (TypeScript, 282 lines, test)
+packages/web/tests/unit/viewer/enrichment-thresholds.test.ts (TypeScript, 28 lines, test)
+packages/web/tests/unit/viewer/execution-panel-dedup.test.ts (TypeScript, 280 lines, test)
+packages/web/tests/unit/viewer/fetch-pipeline.test.ts (TypeScript, 133 lines, test)
+packages/web/tests/unit/viewer/graph-destroy.test.ts (TypeScript, 132 lines, test)
+packages/web/tests/unit/viewer/graph-interaction.test.ts (TypeScript, 721 lines, test)
+packages/web/tests/unit/viewer/graph-layout.test.ts (TypeScript, 313 lines, test)
+packages/web/tests/unit/viewer/graph-zoom.test.ts (TypeScript, 299 lines, test)
+packages/web/tests/unit/viewer/message-coalescer.test.ts (TypeScript, 534 lines, test)
+packages/web/tests/unit/viewer/message-throttle.test.ts (TypeScript, 578 lines, test)
+packages/web/tests/unit/viewer/request-dedup.test.ts (TypeScript, 235 lines, test)
+packages/web/tests/unit/viewer/sourcevision-tabs.test.ts (TypeScript, 71 lines, test)
+packages/web/tests/unit/viewer/tick-timer.test.ts (TypeScript, 456 lines, test)
+packages/web/tests/unit/viewer/ws-pipeline.test.ts (TypeScript, 146 lines, test)
 packages/web/tsconfig.json (JSON, 11 lines, config)
 packages/web/vitest.config.ts (TypeScript, 33 lines, config)
 
 </files>
 
+<imports>
+
+Internal:
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, buildQuadTree, bhRepulsion, tick, PhysicsNode, PhysicsLink, QTNode, SimState, TickCallbacks}
+  packages/web/src/viewer/graph/index.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer, GraphNode, GraphLink, ZoneInfo, GraphRendererOptions}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {initZoneClusteredPositions, tick}
+  packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/src/viewer/messaging/fetch-pipeline.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {createCallRateLimiter}
+  packages/web/src/viewer/messaging/fetch-pipeline.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {CallRateLimiter, CallRateLimiterConfig}
+  packages/web/src/viewer/messaging/fetch-pipeline.ts → packages/web/src/viewer/messaging/request-dedup.ts {createRequestDedup}
+  packages/web/src/viewer/messaging/fetch-pipeline.ts → packages/web/src/viewer/messaging/request-dedup.ts {RequestDedup}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {createCallRateLimiter, CallRateLimiter, CallRateLimiterConfig}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/fetch-pipeline.ts {createFetchPipeline, FetchPipeline, FetchPipelineConfig}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/message-coalescer.ts {createMessageCoalescer, MessageCoalescer, MessageCoalescerConfig, ParsedWSMessage, CoalescedBatch}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/message-throttle.ts {createMessageThrottle, MessageThrottle, ThrottledHandlerConfig}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/request-dedup.ts {createRequestDedup, RequestDedup}
+  packages/web/src/viewer/messaging/index.ts → packages/web/src/viewer/messaging/ws-pipeline.ts {createWSPipeline, WSPipeline, WSPipelineConfig}
+  packages/web/src/viewer/messaging/message-throttle.ts → packages/web/src/viewer/messaging/message-coalescer.ts {ParsedWSMessage}
+  packages/web/src/viewer/messaging/ws-pipeline.ts → packages/web/src/viewer/messaging/message-coalescer.ts {createMessageCoalescer}
+  packages/web/src/viewer/messaging/ws-pipeline.ts → packages/web/src/viewer/messaging/message-coalescer.ts {MessageCoalescer, ParsedWSMessage, CoalescedBatch}
+  packages/web/src/viewer/messaging/ws-pipeline.ts → packages/web/src/viewer/messaging/message-throttle.ts {createMessageThrottle}
+  packages/web/src/viewer/messaging/ws-pipeline.ts → packages/web/src/viewer/messaging/message-throttle.ts {MessageThrottle}
+  packages/web/src/viewer/usage/index.ts → packages/web/src/viewer/usage/constants.ts {TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS, TOKEN_USAGE_VIEW_ID}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphRenderer}
+  packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/graph/renderer.ts {GraphNode, GraphLink, ZoneInfo}
+  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
+  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
+  packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
+  packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/usage/constants.ts {TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS}
+  packages/web/tests/integration/messaging-stack.test.ts → packages/web/src/viewer/messaging/index.ts {createWSPipeline, createFetchPipeline}
+  packages/web/tests/integration/messaging-stack.test.ts → packages/web/src/viewer/messaging/index.ts {WSPipeline, FetchPipeline, CoalescedBatch, ParsedWSMessage}
+  packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {createCallRateLimiter}
+  packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/message-coalescer.ts {createMessageCoalescer}
+  packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/message-throttle.ts {createMessageThrottle}
+  packages/web/tests/integration/request-dedup.test.ts → packages/web/src/viewer/messaging/request-dedup.ts {createRequestDedup}
+  packages/web/tests/unit/landing/landing.test.ts → packages/web/src/landing/landing.ts {*}
+  packages/web/tests/unit/viewer/call-rate-limiter.test.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {createCallRateLimiter}
+  packages/web/tests/unit/viewer/call-rate-limiter.test.ts → packages/web/src/viewer/messaging/call-rate-limiter.ts {CallRateLimiter}
+  packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts → packages/web/src/viewer/polling/tick-timer.ts {onTick, resetTickTimer}
+  packages/web/tests/unit/viewer/enrichment-thresholds.test.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
+  packages/web/tests/unit/viewer/execution-panel-dedup.test.ts → packages/web/src/viewer/messaging/fetch-pipeline.ts {createFetchPipeline}
+  packages/web/tests/unit/viewer/fetch-pipeline.test.ts → packages/web/src/viewer/messaging/index.ts {createFetchPipeline}
+  packages/web/tests/unit/viewer/fetch-pipeline.test.ts → packages/web/src/viewer/messaging/index.ts {FetchPipeline}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {tick}
+  packages/web/tests/unit/viewer/graph-destroy.test.ts → packages/web/src/viewer/graph/physics.ts {SimState, TickCallbacks}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {computeForceParams, hashPosition, initZoneClusteredPositions, computeZoneCentroids, applyZoneCentroidRepulsion, tick}
+  packages/web/tests/unit/viewer/graph-layout.test.ts → packages/web/src/viewer/graph/physics.ts {PhysicsNode, PhysicsLink, SimState, TickCallbacks}
+  packages/web/tests/unit/viewer/message-coalescer.test.ts → packages/web/src/viewer/messaging/message-coalescer.ts {createMessageCoalescer}
+  packages/web/tests/unit/viewer/message-coalescer.test.ts → packages/web/src/viewer/messaging/message-coalescer.ts {MessageCoalescer, CoalescedBatch, ParsedWSMessage}
+  packages/web/tests/unit/viewer/message-throttle.test.ts → packages/web/src/viewer/messaging/message-coalescer.ts {ParsedWSMessage}
+  packages/web/tests/unit/viewer/message-throttle.test.ts → packages/web/src/viewer/messaging/message-throttle.ts {createMessageThrottle}
+  packages/web/tests/unit/viewer/message-throttle.test.ts → packages/web/src/viewer/messaging/message-throttle.ts {MessageThrottle, ThrottledHandlerConfig}
+  packages/web/tests/unit/viewer/request-dedup.test.ts → packages/web/src/viewer/messaging/request-dedup.ts {createRequestDedup}
+  packages/web/tests/unit/viewer/request-dedup.test.ts → packages/web/src/viewer/messaging/request-dedup.ts {RequestDedup}
+  packages/web/tests/unit/viewer/sourcevision-tabs.test.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
+  packages/web/tests/unit/viewer/sourcevision-tabs.test.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SOURCEVISION_TABS, SOURCEVISION_TAB_IDS}
+  packages/web/tests/unit/viewer/sourcevision-tabs.test.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SourceVisionTab, SourceVisionTabId}
+  packages/web/tests/unit/viewer/tick-timer.test.ts → packages/web/src/viewer/polling/tick-timer.ts {onTick, getTickTimerState, resetTickTimer, suspendTickTimer, resumeTickTimer}
+  packages/web/tests/unit/viewer/tick-timer.test.ts → packages/web/src/viewer/polling/tick-timer.ts {TickListener}
+  packages/web/tests/unit/viewer/ws-pipeline.test.ts → packages/web/src/viewer/messaging/index.ts {createWSPipeline}
+  packages/web/tests/unit/viewer/ws-pipeline.test.ts → packages/web/src/viewer/messaging/index.ts {WSPipeline, CoalescedBatch, ParsedWSMessage}
+
+Outgoing (this zone → other zones):
+  → dashboard-panel-components: packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/concurrency-panel.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/memory-panel.ts
+  → viewer-polling-infrastructure: packages/web/src/viewer/polling/tick-timer.ts → packages/web/src/viewer/polling/polling-state.ts
+  → web-application-core: packages/web/src/viewer/graph/renderer.ts → packages/web/src/viewer/utils.ts; packages/web/src/viewer/hooks/use-polling.ts → packages/web/src/viewer/polling/index.ts; packages/web/src/viewer/usage/constants.ts → packages/web/src/viewer/types.ts; packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/components/logos.ts; packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/types.ts; packages/web/src/viewer/views/graph.ts → packages/web/src/viewer/visualization/index.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/copy-link-button.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/logos.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/rex-task-link.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/throttle-controls.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/ws-health-panel.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/types.ts; packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/visualization/index.ts; packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/types.ts; packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/components/logos.ts; packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/visualization/index.ts
+
+Incoming (other zones → this zone):
+  ← viewer-route-state: packages/web/tests/unit/viewer/token-usage-nav.test.ts → packages/web/src/viewer/usage/constants.ts
+  ← web-application-core: packages/web/src/viewer/components/prd-tree/execution-panel.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/src/viewer/components/prd-tree/execution-panel.ts → packages/web/src/viewer/messaging/index.ts; packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/views/sourcevision-tabs.ts; packages/web/src/viewer/external.ts → packages/web/src/viewer/messaging/request-dedup.ts; packages/web/src/viewer/external.ts → packages/web/src/viewer/messaging/request-dedup.ts; packages/web/src/viewer/hooks/use-prd-data.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/src/viewer/hooks/use-prd-data.ts → packages/web/src/viewer/messaging/index.ts; packages/web/src/viewer/hooks/use-prd-websocket.ts → packages/web/src/viewer/messaging/index.ts; packages/web/src/viewer/hooks/use-project-status.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/src/viewer/hooks/use-project-status.ts → packages/web/src/viewer/messaging/index.ts; packages/web/src/viewer/polling/batched-tick-dispatcher.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/src/viewer/polling/index.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/views/enrichment-thresholds.ts; packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-runs.ts; packages/web/src/viewer/views/domain-rex.ts → packages/web/src/viewer/views/token-usage.ts; packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/graph.ts; packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/views/enrichment-thresholds.ts; packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/hooks/use-polling.ts; packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/views/enrichment-thresholds.ts; packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/sourcevision-tabs.ts; packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/tests/unit/viewer/tick-visibility-gate.test.ts → packages/web/src/viewer/polling/tick-timer.ts; packages/web/tests/unit/viewer/usage-polling.test.ts → packages/web/src/viewer/usage/constants.ts; packages/web/tests/unit/viewer/use-project-status.test.ts → packages/web/src/viewer/hooks/use-polling.ts
+
+</imports>
+
 <findings>
 
-[observation] [warning] Low cohesion (0.27) — files are loosely related, consider splitting this zone
-[observation] [warning] Coupling of 0.73 is a misclassification artifact: viewer source files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are being grouped with build infrastructure and pulling in web-viewer import edges. These files should be pinned to web-viewer.
-[observation] [info] Low cohesion (0.27) is expected and acceptable for a build-infrastructure zone; config/script files share no import relationships by nature.
-[observation] [info] build.js and dev.js are executable orchestration scripts (esbuild runners), not passive config — they should be treated as entrypoints when evaluating dead-code or unused-export findings for this zone.
-[anti-pattern] [warning] Viewer source files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) remain grouped with build infrastructure (build.js, dev.js, package.json, tsconfig.json), producing a spurious coupling score of 0.73 that masks the true health of both the viewer and build-infrastructure concerns. Zone pins to web-viewer are the documented fix and have not yet been applied.
-[suggestion] [info] Zone 'web-dashboard' is a naming inversion: it contains build infrastructure (build.js, dev.js) while the actual dashboard UI lives in 'web-viewer'. Renaming this zone to 'web-build-infra' (or similar) would eliminate the ambiguity and make zone health reports self-documenting without any source code changes.
+[suggestion] [info] Zone "web-dashboard" has files across 12 directories — consider consolidating under a dedicated directory
+[move-file] [warning] File "packages/web/src/viewer/views/hench-runs.ts" is pinned to zone "Web Dashboard" but lives in packages/web/src/viewer/views/ — consider moving to packages/web/src/viewer/styles/ to align physical location with architectural zone
+[observation] [info] Cohesion of 0.59 is reasonable for a package-shell zone that intentionally mixes non-importing build artifacts (images, package.json) with active source files.
+[observation] [info] The bidirectional coupling between web-dashboard and web-application-core (9 outbound + 19 inbound cross-zone imports) is the primary coupling concern for this zone — the composition-root justification from developer hints should be captured in zone context documentation.
+[observation] [info] Viewer graph and messaging files (graph/physics.ts, messaging/index.ts) clustering in web-dashboard rather than web-application-core indicates these files have distinct import patterns — verify they are correctly pinned or should migrate to the core application zone.
 
 </findings>
 
 <insights>
 
-- Low cohesion (0.27) — files are loosely related, consider splitting this zone
-- Low cohesion (0.27) is structurally inherent — build.js, dev.js, package.json, and tsconfig.json do not import each other; this is not a quality defect.
-- The four viewer entry points listed (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are misclassified here by the import graph — per developer context they belong in web-viewer; the high coupling (0.73) is an artifact of this misclassification.
-- Once viewer entry points are re-pinned to web-viewer, the residual web-dashboard zone should contain only build/config files, and coupling should drop to near zero.
-- Coupling of 0.73 is a misclassification artifact: viewer source files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) are being grouped with build infrastructure and pulling in web-viewer import edges. These files should be pinned to web-viewer.
-- Low cohesion (0.27) is expected and acceptable for a build-infrastructure zone; config/script files share no import relationships by nature.
-- build.js and dev.js are executable orchestration scripts (esbuild runners), not passive config — they should be treated as entrypoints when evaluating dead-code or unused-export findings for this zone.
-- The zone pins for misclassified viewer files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) remain unapplied — the coupling metric of 0.73 and low cohesion of 0.27 are known artifacts of this misclassification, and the metrics will remain misleading until the pins are committed to the manifest.
-- Viewer source files (elapsed-time.ts, route-state.ts, tick-timer.ts, task-audit.ts) remain grouped with build infrastructure (build.js, dev.js, package.json, tsconfig.json), producing a spurious coupling score of 0.73 that masks the true health of both the viewer and build-infrastructure concerns. Zone pins to web-viewer are the documented fix and have not yet been applied.
-- The zone ID 'web-dashboard' implies it is the dashboard UI, but it contains only build infrastructure (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts, logo assets). The actual dashboard UI is in 'web-viewer'. This naming inversion means zone health reports and alerts referencing 'web-dashboard' describe build tooling health, not dashboard feature health — the opposite of what the name communicates to new contributors.
-- Zone 'web-dashboard' is a naming inversion: it contains build infrastructure (build.js, dev.js) while the actual dashboard UI lives in 'web-viewer'. Renaming this zone to 'web-build-infra' (or similar) would eliminate the ambiguity and make zone health reports self-documenting without any source code changes.
-- [call graph] 32 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- build.js and dev.js are executable build-runner entrypoints while image assets and package.json are non-importing configuration artifacts — the mixed artifact types inherently suppress cohesion scores for this zone.
+- Viewer files clustering here (graph/, views/, messaging/, polling/) likely have weaker import ties to the main application zone, forming a peripheral layer around the core web-application-core zone.
+- Bidirectional coupling with web-application-core (19 imports in, 9 out) suggests the boundary between this package shell and the application core is permeable and should be documented explicitly.
+- Zone "web-dashboard" has files across 12 directories — consider consolidating under a dedicated directory
+- File "packages/web/src/viewer/views/hench-runs.ts" is pinned to zone "Web Dashboard" but lives in packages/web/src/viewer/views/ — consider moving to packages/web/src/viewer/styles/ to align physical location with architectural zone
+- The bidirectional coupling between web-dashboard and web-application-core (9 outbound + 19 inbound cross-zone imports) is the primary coupling concern for this zone — the composition-root justification from developer hints should be captured in zone context documentation.
+- Cohesion of 0.59 is reasonable for a package-shell zone that intentionally mixes non-importing build artifacts (images, package.json) with active source files.
+- Viewer graph and messaging files (graph/physics.ts, messaging/index.ts) clustering in web-dashboard rather than web-application-core indicates these files have distinct import patterns — verify they are correctly pinned or should migrate to the core application zone.
+- [call graph] 834 internal calls, 11 outgoing, 37 incoming (cohesion: 0.99, coupling: 0.01)
 
 </insights>
+
+<sub-zones>
+
+This zone has 6 sub-zone(s):
+
+- **Web/unit** (`web/unit`): 8 files, cohesion 1, coupling 0
+- **Web/unit Viewer** (`web/unit-viewer`): 16 files, cohesion 1, coupling 0
+- **Web/viewer** (`web/viewer`): 6 files, cohesion 1, coupling 0
+- **Web/viewer Styles** (`web/viewer-styles`): 43 files, cohesion 0, coupling 0
+- **Web/viewer Usage** (`web/viewer-usage`): 6 files, cohesion 1, coupling 0
+- **Web/web** (`web/web`): 7 files, cohesion 0, coupling 0
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

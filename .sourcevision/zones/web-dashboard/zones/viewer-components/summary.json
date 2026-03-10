@@ -1,0 +1,18 @@
+{
+  "id": "web/viewer-components",
+  "name": "Web/viewer Components",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/elapsed-time.ts",
+    "packages/web/src/viewer/hooks/use-tick.ts",
+    "packages/web/src/viewer/views/task-audit.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/elapsed-time.ts",
+    "packages/web/src/viewer/views/task-audit.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 778
+}

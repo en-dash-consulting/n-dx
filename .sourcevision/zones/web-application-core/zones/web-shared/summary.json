@@ -1,0 +1,18 @@
+{
+  "id": "web-viewer/web-shared",
+  "name": "Web Viewer/web Shared",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/node-culler.ts",
+    "packages/web/tests/unit/viewer/node-culler.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/shared/data-files.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 4,
+  "lineCount": 551
+}

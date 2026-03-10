@@ -9,25 +9,22 @@ Project: llm-client
 Git: feature/integrate-codex @ 3acc839
 Files: 44, Lines: 8061
 Languages: TypeScript(42) JSON(2)
-Zones: 4, Described: 4
+Zones: 3, Described: 3
 Import edges: 114, External packages: 2
 
 </architecture>
 
 <zones>
 
-[root] Root (3 files, coh=0.00 coup=0.00)
-  3 files, primarily JSON, TypeScript
+[llm-client-core] LLM Client Core (36 files, coh=1.00 coup=0.00)
+  The complete vendor-neutral LLM client library: provider interface, registry, session management, Claude and Codex adapters, auth, config, token usage, process execution, and shared CLI utilities.
+  files: src/api-provider.ts [service], src/auth.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/config.ts [config], src/create-client.ts [service], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/llm-client.ts [service] +26
+[llm-client-tests] LLM Client Tests (5 files, coh=1.00 coup=0.00)
+  Unit tests covering the five public-API entry points: config, JSON serialization, project-config overrides, CLI typo suggestion, and shared types.
+  files: tests/unit/config.test.ts, tests/unit/json.test.ts, tests/unit/project-config.test.ts, tests/unit/suggest.test.ts, tests/unit/types.test.ts
+[package-config] Package Config (3 files, coh=0.00 coup=0.00)
+  Top-level package manifest and build tooling configuration for the llm-client package.
   files: package.json, tsconfig.json, vitest.config.ts
-[src] Src (13 files, coh=0.77 coup=0.23)
-  13 files, primarily TypeScript
-  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [service], src/provider-session.ts [service] +3
-[src-2] Src 2 (19 files, coh=0.56 coup=0.44)
-  19 files, primarily TypeScript
-  files: src/auth.ts [service], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [config], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
-[unit] Unit (9 files, coh=1.00 coup=0.00)
-  9 files, primarily TypeScript
-  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -51,32 +48,41 @@ Most imported:
 
 <findings>
 
-[warning] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting shared interface
-[warning] 12 entry points — wide API surface, consider consolidating exports [src]
-[warning] Contains 43% of project files (19/44) — may be too broad, consider splitting [src-2]
-[warning] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [src-2]
-[warning] Findings 3, 4, and 5 share a single root cause: the package's public API surface has not been rationalized after an incremental refactor. CompletionRequest still carries cliFlags, LLMClient still aliases ClaudeClient without deprecation, and createClient still coexists with createLLMClient. These three should be resolved as one coordinated change: (a) extract cliFlags into a CliCompletionOptions overlay type, (b) add @deprecated JSDoc to LLMClient and createClient referencing their replacements, (c) mark createClient as internal-only in package.json exports. No file splits required — all changes are in-place type/annotation edits.
-[warning] The vendor-neutralization refactor left three in-place annotations missing, confirmed by the classification manifest. Concrete edits required (no file splits): (1) src/create-client.ts — add @deprecated JSDoc on createClient pointing to createLLMClient in src/llm-client.ts; (2) src/llm-types.ts — add @deprecated JSDoc on the LLMClient type alias pointing to ClaudeClient; (3) src/types.ts — confirm CompletionRequest.cliFlags is CLI-adapter-only and add a @internal or cli-only JSDoc marker if not already present. These three annotation edits reduce the effective exported surface and directly address the wide entry-point heuristic without restructuring any files. [src]
+[warning] Contains 82% of project files (36/44) — may be too broad, consider splitting [llm-client-core]
+[warning] 86% of llm-client-core files (31/36) have no corresponding cross-zone import from the test zone, concentrating unit-test risk on the provider stack and execution layer — the most behaviorally complex parts of the package. [llm-client-core]
+[warning] llm-client-tests imports exclusively from utility/config modules in llm-client-core, creating a structural split: utility logic is unit-tested via cross-zone imports while provider and execution logic is not — any regression in those paths requires integration-level detection. [llm-client-tests]
+[warning] CompletionRequest (types.ts) contains CLI-provider-specific fields cliFlags and timeoutMs. This shared contract type, imported by all domain packages, is contaminated with implementation details from one provider backend. CLI-specific options should move to CliProviderOptions and be excluded from the vendor-neutral request type. [llm-client-core]
+[warning] The codex entry in createDefaultRegistry() constructs an inline LLMProvider adapter around createCodexCliClient rather than the codex provider implementing LLMProvider directly. Registry code is supposed to be a pure dispatch table with no provider logic; the shim belongs in codex-cli-provider.ts. [llm-client-core]
+[warning] Two independent vendor selection paths exist: createLLMClient() in llm-client.ts and ProviderRegistry.getActiveProvider() in provider-registry.ts. They implement the same vendor-resolution logic (config.vendor ?? 'claude') without delegating to each other, so a new vendor must be registered in both places to be fully supported. [llm-client-core]
+[warning] createLLMClient() returns ClaudeClient instead of LLMProvider. Callers of the 'vendor-neutral' factory receive a Claude-typed value, which prevents swapping vendors transparently and exposes Claude-specific interface members (e.g. mode: AuthMode) to vendor-agnostic consumers. Should return LLMProvider to honour the abstraction boundary. [llm-client-core]
+[warning] Consolidate 'llm-types.ts' and 'types.ts' into a single file or establish an explicit naming rule distinguishing them (e.g. 'types.ts' for vendor-neutral shared types, 'llm-types.ts' for provider-facing contracts); coexistence without a documented split invites accidental duplication of type definitions. [llm-client-core]
+[warning] Rename 'api-provider.ts' → 'claude-api-provider.ts' and 'cli-provider.ts' → 'claude-cli-provider.ts' to match the 'codex-cli-provider.ts' naming pattern; all three are vendor-specific and the asymmetric naming implies api-provider/cli-provider are vendor-neutral when they are not. [llm-client-core]
+[warning] Add a unit test file for 'types.ts' (CompletionRequest, CompletionResponse, LLMProvider interface shape) — this is the cross-package contract type consumed by every downstream package, and it currently has no unit-level regression guard in the test zone. [llm-client-tests]
 
 </findings>
 
 <next-steps>
 
-[medium] Contains 43% of project files (19/44) — may be too broad, consider splitting
-  files: src/auth.ts, src/config.ts, src/exec.ts
+[medium] CompletionRequest (types.ts) contains CLI-provider-specific… (+3 related)
+  files: src/api-provider.ts, src/auth.ts, src/cli-provider.ts
   category: refactor
-[medium] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…
-  files: src/auth.ts, src/config.ts, src/exec.ts
-  category: refactor
-[medium] The vendor-neutralization refactor left three in-place annotations missing, con…
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: refactor
-[medium] 12 entry points — wide API surface, consider consolidating exports
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: refactor
-[medium] Findings 3, 4, and 5 share a single root cause: the package's public API surfac…
+[medium] 86% of llm-client-core files (31/36) have no corresponding cross-zone import fr…
+  files: src/api-provider.ts, src/auth.ts, src/cli-provider.ts
   category: extract
-[medium] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting …
+[medium] llm-client-tests imports exclusively from utility/config modules in llm-client-…
+  files: tests/unit/config.test.ts, tests/unit/json.test.ts, tests/unit/project-config.test.ts
+  category: extract
+[medium] Consolidate 'llm-types.ts' and 'types.ts' into a single file or establish an ex…
+  files: src/api-provider.ts, src/auth.ts, src/cli-provider.ts
+  category: refactor
+[medium] Rename 'api-provider.ts' → 'claude-api-provider.ts' and 'cli-provider.ts' → 'cl…
+  files: src/api-provider.ts, src/auth.ts, src/cli-provider.ts
+  category: refactor
+[medium] Add a unit test file for 'types.ts' (CompletionRequest, CompletionResponse, LLM…
+  files: tests/unit/config.test.ts, tests/unit/json.test.ts, tests/unit/project-config.test.ts
+  category: refactor
+[medium] Contains 82% of project files (36/44) — may be too broad, consider splitting
+  files: src/api-provider.ts, src/auth.ts, src/cli-provider.ts
   category: refactor
 
 </next-steps>

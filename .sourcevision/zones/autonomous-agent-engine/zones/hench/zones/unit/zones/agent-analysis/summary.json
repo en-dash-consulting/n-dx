@@ -1,0 +1,27 @@
+{
+  "id": "hench-unit/hench/unit/agent-analysis",
+  "name": "Hench Unit/hench/unit/agent Analysis",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/summary.ts",
+    "packages/hench/src/agent/planning/prompt.ts",
+    "packages/hench/src/cli/commands/config.ts",
+    "packages/hench/src/schema/index.ts",
+    "packages/hench/src/schema/v1.ts",
+    "packages/hench/tests/e2e/cli-init.test.ts",
+    "packages/hench/tests/unit/agent/prompt.test.ts",
+    "packages/hench/tests/unit/agent/summary.test.ts",
+    "packages/hench/tests/unit/cli/commands/config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/summary.ts",
+    "packages/hench/src/agent/planning/prompt.ts",
+    "packages/hench/src/cli/commands/config.ts",
+    "packages/hench/src/schema/index.ts",
+    "packages/hench/src/schema/v1.ts"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.62,
+  "fileCount": 9,
+  "lineCount": 1800
+}

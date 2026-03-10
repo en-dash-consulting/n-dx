@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Project Documentation (`project-documentation`)
-Files: 20, Cohesion: 0.00, Coupling: 0.00
+Files: 16, Cohesion: 0.00, Coupling: 0.00
 Risk: at-risk (score: 0.50)
-Description: Architecture decision records, audit analyses, and developer guides that capture design rationale and system-level constraints for the n-dx toolkit.
-Lines: 6160
+Description: Architecture decision records, codebase analysis reports, and developer reference guides covering memory architecture, signal handling, viewer audits, and process lifecycle investigations.
+Lines: 4317
 
 </zone>
 
@@ -30,40 +30,27 @@ docs/process/level-refactor-and-steward-plan.md (Markdown, 407 lines, docs)
 docs/process/memory-improvements.md (Markdown, 275 lines, docs)
 docs/process/memory-os-behavior.md (Markdown, 216 lines, docs)
 docs/process/rex-smart-add-duplicate-detection.md (Markdown, 416 lines, docs)
-packages/hench/src/store/suggestions.ts (TypeScript, 98 lines, source)
-packages/hench/tests/unit/store/suggestions.test.ts (TypeScript, 119 lines, test)
-packages/web/src/landing/index.html (HTML, 309 lines, other)
-packages/web/src/landing/landing.css (CSS, 1317 lines, other)
 
 </files>
 
-<imports>
-
-Internal:
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {loadSuggestionHistory, saveSuggestionHistory, recordDecision, getDecisionStats}
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {SuggestionHistory, SuggestionRecord}
-
-</imports>
-
 <findings>
 
-[observation] [info] Isolated files — no import edges between 20 files, cohesion is unmeasurable (reported as 0)
-[observation] [info] 20 documentation files with no coupling to source confirms docs are not accidentally imported, preserving the clean tier boundary.
-[observation] [info] Analysis docs under docs/analysis/ serve as architectural memory — keeping them current as the codebase evolves prevents them from becoming misleading historical artifacts.
-[suggestion] [info] Zone "project-documentation" has files across 6 directories — consider consolidating under a dedicated directory
+[observation] [info] Isolated files — no import edges between 16 files, cohesion is unmeasurable (reported as 0)
+[observation] [info] Analysis docs under docs/analysis/ are engineering journal artifacts from specific investigations (process lifecycle, signal handling, memory risks); establishing a convention for archiving or dating these when conclusions become stale would prevent accumulation of conflicting guidance.
+[observation] [info] Architecture-level reference docs (level-system-reference.md, memory-architecture.md) partially duplicate CLAUDE.md content; a clear layering policy — CLAUDE.md as concise contract, docs/architecture/ as deep reference — would reduce the risk of the two diverging.
+[observation] [info] Zero cohesion and zero coupling are expected and correct for a pure documentation zone — Markdown files carry no import graph edges.
 [suggestion] [info] Zone "Project Documentation" (project-documentation) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
 
 </findings>
 
 <insights>
 
-- Isolated files — no import edges between 20 files, cohesion is unmeasurable (reported as 0)
-- Zero cohesion and zero coupling are expected for a documentation zone — Markdown files carry no import edges.
-- The docs/analysis/ subtree (viewer-audit, memory-risks, process-lifecycle-audit) indicates a practice of recording architectural investigations, which reduces knowledge loss across sessions.
-- docs/architecture/ captures durable design decisions (memory architecture, level system) that should stay synchronized with CLAUDE.md and PACKAGE_GUIDELINES.md when those evolve.
-- Analysis docs under docs/analysis/ serve as architectural memory — keeping them current as the codebase evolves prevents them from becoming misleading historical artifacts.
-- 20 documentation files with no coupling to source confirms docs are not accidentally imported, preserving the clean tier boundary.
-- Zone "project-documentation" has files across 6 directories — consider consolidating under a dedicated directory
-- [call graph] 14 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Isolated files — no import edges between 16 files, cohesion is unmeasurable (reported as 0)
+- The docs/analysis/ subdirectory contains point-in-time engineering investigation artifacts; without a staleness convention these will accumulate and may mislead future contributors.
+- Zero cohesion is expected for a documentation zone — Markdown files have no import relationships by definition.
+- docs/architecture/ content partially overlaps with CLAUDE.md; treating CLAUDE.md as the authoritative quick-reference and docs/ as the expanded detail layer would reduce maintenance drift.
+- Zero cohesion and zero coupling are expected and correct for a pure documentation zone — Markdown files carry no import graph edges.
+- Analysis docs under docs/analysis/ are engineering journal artifacts from specific investigations (process lifecycle, signal handling, memory risks); establishing a convention for archiving or dating these when conclusions become stale would prevent accumulation of conflicting guidance.
+- Architecture-level reference docs (level-system-reference.md, memory-architecture.md) partially duplicate CLAUDE.md content; a clear layering policy — CLAUDE.md as concise contract, docs/architecture/ as deep reference — would reduce the risk of the two diverging.
 
 </insights>

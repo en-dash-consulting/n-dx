@@ -1,0 +1,19 @@
+{
+  "id": "hench-unit/hench/unit/process-2",
+  "name": "Hench Unit/hench/unit/process 2",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts",
+    "packages/hench/tests/unit/process/exec.test.ts",
+    "packages/hench/tests/unit/process/lifecycle.test.ts",
+    "packages/hench/tests/unit/process/limiter.test.ts",
+    "packages/hench/tests/unit/process/memory-throttle.test.ts",
+    "packages/hench/tests/unit/process/pool.test.ts",
+    "packages/hench/tests/unit/process/process-memory-tracker.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 3440
+}

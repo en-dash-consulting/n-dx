@@ -1,0 +1,18 @@
+{
+  "id": "unit-2/cli-2",
+  "name": "Unit 2/cli 2",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "src/cli/commands/validate.ts",
+    "src/cli/output.ts",
+    "tests/unit/cli/output.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/validate.ts",
+    "src/cli/output.ts"
+  ],
+  "cohesion": 0.12,
+  "coupling": 0.88,
+  "fileCount": 3,
+  "lineCount": 0
+}

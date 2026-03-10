@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web-viewer/web/unit",
+  "name": "Web Viewer/web Viewer/web/unit",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/data-display/mini-charts.ts",
+    "packages/web/tests/unit/viewer/bar-chart.test.ts",
+    "packages/web/tests/unit/viewer/detail-panel.test.ts",
+    "packages/web/tests/unit/viewer/favicon.test.ts",
+    "packages/web/tests/unit/viewer/flow-data-builders.test.ts",
+    "packages/web/tests/unit/viewer/flow-diagram.test.ts",
+    "packages/web/tests/unit/viewer/label-utils.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/data-display/mini-charts.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 739
+}

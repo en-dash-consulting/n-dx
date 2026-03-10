@@ -1,0 +1,22 @@
+{
+  "id": "web/viewer-usage",
+  "name": "Web/viewer Usage",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/polling/tick-timer.ts",
+    "packages/web/src/viewer/usage/constants.ts",
+    "packages/web/src/viewer/usage/index.ts",
+    "packages/web/src/viewer/views/token-usage.ts",
+    "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+    "packages/web/tests/unit/viewer/tick-timer.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/polling/tick-timer.ts",
+    "packages/web/src/viewer/usage/constants.ts",
+    "packages/web/src/viewer/views/token-usage.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 1733
+}

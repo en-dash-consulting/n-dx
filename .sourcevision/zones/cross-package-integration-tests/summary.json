@@ -1,0 +1,21 @@
+{
+  "id": "cross-package-integration-tests",
+  "name": "Cross-Package Integration Tests",
+  "description": "Validates cross-package API contracts and server scheduler startup behavior at the monorepo integration level.",
+  "files": [
+    "tests/integration/cross-package-contracts.test.js",
+    "tests/integration/scheduler-startup.test.js"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 1474,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

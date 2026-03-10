@@ -1,0 +1,42 @@
+{
+  "id": "packages-sourcevision:branch-risk-domain",
+  "name": "Branch Risk Domain",
+  "description": "Core domain layer encompassing branch-work classification, filtering, storage, risk scoring, PR markdown templating, and the package's public API surface.",
+  "files": [
+    "packages/sourcevision/src/analyzers/branch-work-classifier.ts",
+    "packages/sourcevision/src/analyzers/branch-work-filter.ts",
+    "packages/sourcevision/src/analyzers/branch-work-store.ts",
+    "packages/sourcevision/src/analyzers/risk-scoring.ts",
+    "packages/sourcevision/src/generators/pr-markdown-template.ts",
+    "packages/sourcevision/src/public.ts",
+    "packages/sourcevision/src/schema/v1.ts",
+    "packages/sourcevision/tests/unit/analyzers/branch-work-classifier.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/branch-work-filter.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/branch-work-store.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/callgraph-findings.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/dedup-findings.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/next-steps.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/risk-scoring.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/zone-type-thresholds.test.ts",
+    "packages/sourcevision/tests/unit/export/pdf-report.test.ts",
+    "packages/sourcevision/tests/unit/generators/pr-markdown-template.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/branch-work-classifier.ts",
+    "packages/sourcevision/src/analyzers/risk-scoring.ts",
+    "packages/sourcevision/src/generators/pr-markdown-template.ts",
+    "packages/sourcevision/src/public.ts",
+    "packages/sourcevision/src/schema/v1.ts"
+  ],
+  "cohesion": 0.48,
+  "coupling": 0.52,
+  "fileCount": 17,
+  "lineCount": 7391,
+  "riskMetrics": {
+    "cohesion": 0.48,
+    "coupling": 0.52,
+    "riskScore": 0.52,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

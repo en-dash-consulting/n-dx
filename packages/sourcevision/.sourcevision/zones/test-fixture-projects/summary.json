@@ -1,0 +1,30 @@
+{
+  "id": "test-fixture-projects",
+  "name": "Test Fixture Projects",
+  "description": "Standalone sample projects (a Remix app and a small TypeScript project) used as realistic inputs for sourcevision integration and end-to-end tests.",
+  "files": [
+    "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
+    "tests/fixtures/remix-app/app/routes/_auth.tsx",
+    "tests/fixtures/remix-app/app/routes/_index.tsx",
+    "tests/fixtures/remix-app/app/routes/users.$id.tsx",
+    "tests/fixtures/small-ts-project/src/config.ts",
+    "tests/fixtures/small-ts-project/src/index.ts",
+    "tests/fixtures/small-ts-project/src/models/user.ts",
+    "tests/fixtures/small-ts-project/src/services/email-service.ts",
+    "tests/fixtures/small-ts-project/src/services/user-service.ts",
+    "tests/fixtures/small-ts-project/src/utils/format.ts",
+    "tests/fixtures/small-ts-project/src/utils/validate.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 11,
+  "lineCount": 88,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

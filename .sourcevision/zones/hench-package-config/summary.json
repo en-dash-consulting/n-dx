@@ -1,0 +1,36 @@
+{
+  "id": "hench-package-config",
+  "name": "Hench Package Config",
+  "description": "Hench package shell zone containing the CLI entrypoint wiring, error and help utilities, package metadata, and weakly-connected store files that accumulate here due to import-graph fragmentation.",
+  "files": [
+    "packages/hench/Hench-F.png",
+    "packages/hench/Hench.png",
+    "packages/hench/README.md",
+    "packages/hench/package.json",
+    "packages/hench/src/cli/errors.ts",
+    "packages/hench/src/cli/help.ts",
+    "packages/hench/src/cli/index.ts",
+    "packages/hench/src/store/suggestions.ts",
+    "packages/hench/tests/fixtures/token-usage-regression.json",
+    "packages/hench/tests/unit/cli/commands/constants.test.ts",
+    "packages/hench/tests/unit/cli/errors.test.ts",
+    "packages/hench/tests/unit/cli/help.test.ts",
+    "packages/hench/tests/unit/store/suggestions.test.ts",
+    "packages/hench/tsconfig.json",
+    "packages/hench/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/errors.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 15,
+  "lineCount": 1465,
+  "riskMetrics": {
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

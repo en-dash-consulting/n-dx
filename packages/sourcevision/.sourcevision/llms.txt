@@ -8,89 +8,80 @@
 - **Files**: 146
 - **Lines of code**: 44,803
 - **Languages**: TypeScript (134), JSON (6), Markdown (3), Other (3)
-- **Zones**: 9 (9 with descriptions)
+- **Zones**: 8 (8 with descriptions)
 - **Git**: main @ 63d150a
-- **Analyzed**: 2026-03-10T00:48:16.636Z
+- **Analyzed**: 2026-03-10T03:17:18.972Z
 
 ## Architecture Zones
 
-### .claude (`.claude`)
+### Branch Collection Pipeline (`branch-collection-pipeline`)
 
-2 files, primarily JSON
+Orchestrates branch-work data collection and exposes it through the PR-markdown CLI command.
+
+- Files: 5
+- Cohesion: 0.20, Coupling: 0.80
+- Entry points: src/cli/commands/pr-markdown.ts
+- Detail: `.sourcevision/zones/branch-collection-pipeline/context.md`
+
+### Branch Risk Domain (`branch-risk-domain`)
+
+Core domain layer encompassing branch-work classification, filtering, storage, risk scoring, PR markdown templating, and the package's public API surface.
+
+- Files: 17
+- Cohesion: 0.48, Coupling: 0.52
+- Entry points: src/analyzers/branch-work-classifier.ts, src/analyzers/risk-scoring.ts, src/generators/pr-markdown-template.ts, src/public.ts, src/schema/v1.ts
+- Detail: `.sourcevision/zones/branch-risk-domain/context.md`
+
+### Claude Workspace Config (`claude-workspace-config`)
+
+Claude Code IDE permission and local settings configuration for the workspace.
 
 - Files: 2
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/.claude/context.md`
+- Detail: `.sourcevision/zones/claude-workspace-config/context.md`
 
-### Analyzers (`analyzers`)
+### Data File Schema (`data-file-schema`)
 
-40 files, primarily TypeScript
+A minimal schema module defining canonical data-file constants (DATA_FILES, SUPPLEMENTARY_FILES) with co-located unit tests for MCP and schema validation.
 
-- Files: 40
-- Cohesion: 0.62, Coupling: 0.38
-- Entry points: src/analyzers/callgraph-findings.ts, src/analyzers/classify.ts, src/analyzers/claude-client.ts, src/analyzers/context.ts, src/analyzers/enrich-parsing.ts (+14 more)
-- Detail: `.sourcevision/zones/analyzers/context.md`
-
-### Analyzers 2 (`analyzers-2`)
-
-11 files, primarily TypeScript
-
-- Files: 11
-- Cohesion: 0.48, Coupling: 0.52
-- Entry points: src/analyzers/callgraph.ts, src/analyzers/components.ts, src/analyzers/imports.ts, src/analyzers/inventory.ts, src/util/paths.ts
-- Detail: `.sourcevision/zones/analyzers-2/context.md`
-
-### Analyzers 3 (`analyzers-3`)
-
-6 files, primarily TypeScript
-
-- Files: 6
-- Cohesion: 0.27, Coupling: 0.73
-- Entry points: src/analyzers/zone-hash.ts, src/analyzers/zones.ts
-- Detail: `.sourcevision/zones/analyzers-3/context.md`
-
-### Cli (`cli`)
-
-30 files, primarily TypeScript
-
-- Files: 30
-- Cohesion: 0.65, Coupling: 0.35
-- Entry points: src/analyzers/manifest.ts, src/cli/commands/analyze-phases.ts, src/cli/commands/analyze.ts, src/cli/errors.ts, src/cli/output.ts (+1 more)
-- Detail: `.sourcevision/zones/cli/context.md`
-
-### E2e (`e2e`)
-
-4 files, primarily TypeScript
-
-- Files: 5
+- Files: 3
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: src/schema/validate.ts
-- Detail: `.sourcevision/zones/e2e/context.md`
+- Entry points: src/schema/data-files.ts
+- Detail: `.sourcevision/zones/data-file-schema/context.md`
 
-### Fixtures (`fixtures`)
+### Sourcevision Analysis Core (`sourcevision-analysis-core`)
 
-10 files, primarily TypeScript
+The primary sourcevision package implementation spanning the full analysis pipeline, schema types, CLI interface, and report export.
+
+- Files: 87
+- Cohesion: 0.90, Coupling: 0.10
+- Entry points: src/analyzers/classify.ts, src/analyzers/enrich-parsing.ts, src/analyzers/next-steps.ts, src/cli/commands/constants.ts, src/cli/errors.ts (+6 more)
+- Detail: `.sourcevision/zones/sourcevision-analysis-core/context.md`
+
+### Static Analysis Services (`static-analysis-services`)
+
+Core analysis infrastructure providing archetype detection, call-graph finding generation, completion reading, and manifest management.
+
+- Files: 8
+- Cohesion: 0.21, Coupling: 0.79
+- Entry points: src/analyzers/archetypes.ts, src/analyzers/callgraph-findings.ts, src/analyzers/manifest.ts, src/constants.ts
+- Detail: `.sourcevision/zones/static-analysis-services/context.md`
+
+### Test Fixture Projects (`test-fixture-projects`)
+
+Standalone sample projects (a Remix app and a small TypeScript project) used as realistic inputs for sourcevision integration and end-to-end tests.
 
 - Files: 11
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/fixtures/context.md`
+- Detail: `.sourcevision/zones/test-fixture-projects/context.md`
 
-### Root (`root`)
+### Workspace Root (`workspace-root`)
 
-9 files, primarily Markdown, Other, JSON
+Root-level project documentation, workspace package manifest, TypeScript build config, and shared Vitest configuration.
 
 - Files: 9
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/root/context.md`
-
-### Unit (`unit`)
-
-29 files, primarily TypeScript
-
-- Files: 29
-- Cohesion: 0.40, Coupling: 0.60
-- Entry points: src/analyzers/branch-work-classifier.ts, src/analyzers/risk-scoring.ts, src/cli/commands/workspace.ts, src/generators/pr-markdown-template.ts, src/schema/data-files.ts (+2 more)
-- Detail: `.sourcevision/zones/unit/context.md`
+- Detail: `.sourcevision/zones/workspace-root/context.md`
 
 ## Key Dependencies
 
@@ -121,35 +112,61 @@
 
 ### Anti-patterns
 
-- God function: cmdAnalyze in src/cli/commands/analyze.ts calls 32 unique functions — consider decomposing into smaller, focused functions [warning]
+- CLI command (pr-markdown.ts) and domain service (branch-work-collector.ts) are in the same zone — split along the CLI/domain boundary so the domain service can be imported independently of CLI infrastructure [warning] (branch-collection-pipeline)
+- tests/integration/pr-markdown-reviewer-output.test.ts validates markdown rendering output but is assigned to the collection pipeline zone — misassigned test obscures which production code it guards and should be co-located with the template code in branch-risk-domain [info] (branch-collection-pipeline)
+- branch-work-store.ts co-locates stateful persistence with stateless domain logic (classifier, filter, risk-scorer) — the store abstraction belongs in a separate persistence or state zone to preserve the functional purity of the domain layer [warning] (branch-risk-domain)
+- pr-markdown-template.ts (presentation/rendering) is embedded in the domain zone alongside classifiers and risk-scorers — presentation templates should reside in a dedicated output or generators zone, not in the domain layer [warning] (branch-risk-domain)
+- schema/v1.ts (the package's canonical data contract) lives inside a zone that participates in an 8+8 bidirectional cycle with unit-2 — the schema is transitively entangled in implementation cycles, making it impossible to depend on the contract without pulling in all of branch-risk-domain's coupling baggage; extract schema/v1.ts to an isolated schema-foundation zone with zero outbound runtime dependencies [critical] (branch-risk-domain)
+- mcp.test.ts is discoverable only by import-graph proximity, not by file path or zone membership. Developers debugging CLI MCP behavior will search the CLI zone for tests and miss this file entirely, leading to duplicate test authoring or untested regression paths during CLI refactors. [warning] (data-file-schema)
+- The 'analyzers' sub-zone (8 files, cohesion 0.21) has the lowest cohesion of any named zone, indicating its 8 files do not form a natural cluster. Files grouped there likely share a directory path rather than import relationships — cohesion below 0.3 in an 8-file zone suggests artificial grouping that obscures actual dependencies. [warning] (sourcevision-analysis-core)
+- Zone encompasses 87 files at cohesion 0.9, effectively absorbing the entire package into a single unit. Zone detection has failed to partition the codebase into actionable boundaries — the 7 internal sub-zones should be elevated to top-level zones so that cross-zone import analysis reflects real architectural intent rather than a single monolithic blob vs. a few satellite micro-zones. [critical] (sourcevision-analysis-core)
+- completion-reader.ts introduces file-system I/O into a zone labeled as analysis services — I/O adapters and pure analysis logic are different abstraction levels and should reside in separate zones to allow hermetic testing [warning] (static-analysis-services)
+- constants.ts defines shared type contracts but is co-located with service implementations, forcing consumers to couple to the full service zone to access shared types — extract to a neutral schema or types zone with zero runtime dependencies [warning] (static-analysis-services)
+- ... and 3 more
+
+### Patterns
+
+- public.ts residing in a zone that participates in an 8+8 bidirectional cycle with unit-2 means the package's public API is coupled to internal implementation cycles — pin public.ts and schema/v1.ts to an isolated api-surface zone with only downward imports to stabilize the contract boundary. [critical] (branch-risk-domain)
+- data-file-schema is the only non-fixture zone with zero outbound cross-zone imports — it is the sole genuine foundation layer in this codebase and should be explicitly protected from gaining any outbound edges [info] (data-file-schema)
+- sourcevision-analysis-core is the sole mandatory intermediary for all cross-zone traffic in the package — zero zones communicate with each other without passing through it, making it a single point of architectural failure for any zone-boundary refactor [warning] (sourcevision-analysis-core)
+- Fixture coverage gap: no fixture project contains circular imports or a nested package.json, leaving two high-risk analysis paths (cycle detection, monorepo boundary detection) without e2e regression coverage [warning] (test-fixture-projects)
+- test-fixture-projects is the only zone with confirmed zero cross-zone coupling in both directions — it is the reference model for what a correctly bounded zone looks like and its pattern (path-prefixed isolation, no src/ imports) should be codified as a lint rule [info] (test-fixture-projects)
+
+### Relationships
+
+- branch-collection-pipeline connects to the rest of the codebase exclusively via unit-2 as a single coupling point — this makes unit-2 a mandatory transitive dependency for any consumer of the collection pipeline, increasing blast radius if unit-2 is refactored. [warning] (branch-collection-pipeline)
+- claude-workspace-config and workspace-root together form a cleanly isolated configuration stratum with zero cross-zone imports in either direction — this boundary is the healthiest in the codebase and should be explicitly preserved. [info] (claude-workspace-config)
+- mcp.test.ts lives in data-file-schema but tests CLI MCP behavior — its zone placement is an artifact of import-graph proximity, not architectural intent, and will silently diverge as CLI code evolves [warning] (data-file-schema)
+- unit-cli participates in a three-node cycle: unit-2 → unit-cli (7 imports) and unit-cli → unit-2 (1 import) closes a direct cycle, while unit-cli → unit (1 import) and unit → unit-2 (8 imports) closes a second indirect cycle through unit — two overlapping cycles sharing one edge [critical] (sourcevision-analysis-core)
+- The 12-inbound / 5-outbound import asymmetry with unit-2 indicates analyzers acts as a shared utility layer that has grown a back-dependency on its primary consumer — extract the shared contracts into a neutral schema zone to make the relationship strictly one-directional. [warning] (static-analysis-services)
 
 ### Observations
 
-- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0) [info] (.claude)
-- 19 entry points — wide API surface, consider consolidating exports [warning] (analyzers)
-- Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [warning] (analyzers-2)
-- High coupling (0.52) — 15 imports target "analyzers" [warning] (analyzers-2)
-- Generic zone name "Analyzers 3" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [warning] (analyzers-3)
-- High coupling (0.73) — 13 imports target "analyzers" [warning] (analyzers-3)
-- Low cohesion (0.27) — files are loosely related, consider splitting this zone [warning] (analyzers-3)
-- High cohesion (1) — files are tightly interconnected [info] (e2e)
-- High cohesion (1) — files are tightly interconnected [info] (fixtures)
-- Bidirectional coupling: "analyzers" ↔ "unit" (5+29 crossings) — consider extracting shared interface [warning]
-- ... and 5 more
+- High coupling (0.8) — 4 imports target "sourcevision-analysis-core" [warning] (branch-collection-pipeline)
+- Low cohesion (0.2) — files are loosely related, consider splitting this zone [warning] (branch-collection-pipeline)
+- Cohesion 0.20 and coupling 0.80 are at warning thresholds; as an orchestration-layer adapter this is acceptable if the zone deliberately wires collector → CLI, but document this intent to prevent accidental logic accumulation. [warning] (branch-collection-pipeline)
+- The CLI command (pr-markdown.ts) and its domain service (branch-work-collector.ts) are correctly co-located here, keeping the CLI thin and the domain logic in unit; this is a positive structural pattern. [info] (branch-collection-pipeline)
+- High coupling (0.52) — 8 imports target "sourcevision-analysis-core" [warning] (branch-risk-domain)
+- Bidirectional coupling with unit-2 (8 imports in each direction) creates a circular dependency smell at the zone level; decompose shared types into a neutral foundation zone to break the cycle. [warning] (branch-risk-domain)
+- Hosting both the public API entrypoint (public.ts) and implementation details (branch-work-store, risk-scoring) in the same zone makes the public surface hard to audit; consider pinning entrypoint and schema files to a dedicated api-surface zone. [info] (branch-risk-domain)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0) [info] (claude-workspace-config)
+- Zero cohesion and zero coupling are expected here; this zone is configuration-only and should not be evaluated against code quality thresholds. [info] (claude-workspace-config)
+- High cohesion (1) — files are tightly interconnected [info] (data-file-schema)
+- ... and 22 more
 
 ### Suggestions
 
-- Zone "analyzers" has files across 9 directories — consider consolidating under a dedicated directory [info] (analyzers)
-- Zone "cli" has files across 7 directories — consider consolidating under a dedicated directory [info] (cli)
-- Zone "fixtures" has files across 5 directories — consider consolidating under a dedicated directory [info] (fixtures)
-- src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Hub function: info in src/cli/output.ts is called from 9 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
-- Zone "unit" has files across 10 directories — consider consolidating under a dedicated directory [info] (unit)
-- Merge analyzers-2 into the main analyzers zone. The 11 files (callgraph.ts, components.ts, imports.ts, inventory.ts, route-detection.ts, index.ts, paths.ts, and 4 unit tests) all reside in src/analyzers/ and tests/unit/analyzers/ and are logically part of the same analysis engine. The zone boundary is a Louvain artifact caused by zones.ts acting as a hub — the algorithm clustered hub-adjacent files into a satellite zone. After merge: move src/util/paths.ts to src/util/ (it already lives there; remove it from this zone membership) and verify src/analyzers/index.ts is the sole public entry point for the merged zone. [warning] (analyzers-2)
-- Rename 'analyzers-2' to a semantically meaningful name by inspecting its file contents and choosing a name following the '{domain}-{role}' convention (finding 8). Numeric-suffix auto-generated names make this zone unreferenceable in architecture discussions and prevent meaningful cohesion/coupling comparisons across passes. [warning] (analyzers-2)
-- Merge analyzers-3 into the main analyzers zone rather than renaming or splitting it. The three production files (zones.ts, louvain.ts, zone-hash.ts) are the zone-detection subsystem of the same analysis engine. After merge, the zones.ts decomposition task becomes tractable: the three test files (zone-detection.test.ts, zone-size-policy.test.ts, zone-subdivision.test.ts) already map to three internal sub-concerns (detection, size constraints, subdivision) that can guide extraction of focused modules from zones.ts when the god-function metric warrants it (currently 32 calls, 2x above any reasonable threshold). Do not decompose zones.ts before the zone-public.ts re-export boundary is in place. [warning] (analyzers-3)
-- Zone "Analyzers 3" (analyzers-3) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention [critical] (analyzers-3)
-- ... and 2 more
+- Zone "branch-collection-pipeline" has files across 5 directories — consider consolidating under a dedicated directory [info] (branch-collection-pipeline)
+- 5 files across 5 distinct directories with zero directory co-location — the zone is held together only by import proximity; evaluate dissolving it entirely by pinning branch-work-collector.ts to the domain zone it couples with and pr-markdown.ts to a cli-commands zone, rather than treating the glue layer as an architectural unit [warning] (branch-collection-pipeline)
+- Zone "Branch Collection Pipeline" (branch-collection-pipeline) has catastrophic risk (score: 0.80, cohesion: 0.20, coupling: 0.80) — requires immediate architectural intervention [critical] (branch-collection-pipeline)
+- Zone "branch-risk-domain" has files across 7 directories — consider consolidating under a dedicated directory [info] (branch-risk-domain)
+- public.ts entrypoint zone assignment is algorithm-determined and not stable across re-analysis runs — pin public.ts to a manually-curated zone in the zone manifest to prevent silent entrypoint drift after future graph topology changes [warning] (branch-risk-domain)
+- src/analyzers/ contains files from 4 zones (branch-collection-pipeline, branch-risk-domain, sourcevision-analysis-core, static-analysis-services) — consider grouping into subdirectories to clarify architectural boundaries [info]
+- Evaluate dissolving both static-analysis-services (cohesion 0.21, coupling 0.79) and branch-collection-pipeline (cohesion 0.20, coupling 0.80) rather than refactoring them — both exhibit the glue-layer structural signature (near-zero cohesion, near-maximum coupling) and their files would be better assigned directly to the zones they most heavily couple with, eliminating two low-signal zone labels from the architecture map [warning]
+- Introduce a TypeScript barrel file (index.ts or public-api.ts) per zone that re-exports only the zone's intended public surface — currently all cross-zone imports reference concrete implementation paths, preventing compiler enforcement of zone contracts and making internal restructuring silently breaking [warning]
+- Rename all unit-prefixed zones (unit, unit-2, unit-cli, unit-analyzers) to names that reflect their dominant source directory or architectural role — algorithm-generated labels with no filesystem anchor make zone-to-directory mapping impossible without tooling and obscure dependency direction [warning]
+- The only two zones with zero coupling (data-file-schema via functional design, test-fixture-projects via path isolation) achieve isolation through different mechanisms. The package has no third example of an intentionally isolated zone. Documenting these two isolation patterns as canonical reference models and identifying which other zones could adopt each pattern would give contributors a concrete target for the next refactoring cycle. [info]
+- ... and 23 more
 
 ## Next Steps
 
@@ -157,219 +174,244 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **Zone "Analyzers 3" (analyzers-3) has catastrophic risk (score: 0.73, cohesion: …**
-   Files: `src/analyzers/louvain.ts`, `src/analyzers/zone-hash.ts`, `src/analyzers/zones.ts`
+1. **completion-reader.ts introduces file-system I/O into a zone… (+1 related)**
+   Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/completion-reader.ts`
 
-1. **Merge analyzers-3 into the main analyzers zone rather than renaming or splittin…**
-   Files: `src/analyzers/louvain.ts`, `src/analyzers/zone-hash.ts`, `src/analyzers/zones.ts`
-
-1. **Generic zone name "Analyzers 3" — enrichment did not assign a meaningful name r…**
-   Files: `src/analyzers/louvain.ts`, `src/analyzers/zone-hash.ts`, `src/analyzers/zones.ts`
-
-1. **High coupling (0.73) — 13 imports target "analyzers"**
-   Files: `src/analyzers/louvain.ts`, `src/analyzers/zone-hash.ts`, `src/analyzers/zones.ts`
-
-1. **Low cohesion (0.27) — files are loosely related, consider splitting this zone**
-   Files: `src/analyzers/louvain.ts`, `src/analyzers/zone-hash.ts`, `src/analyzers/zones.ts`
-
-1. **High coupling (0.6) — 29 imports target "analyzers"**
+1. **public.ts residing in a zone that participates in an 8+8 bi… (+1 related)**
    Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
+
+1. **Zone "Branch Collection Pipeline" (branch-collection-pipeline) has catastrophic…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **CLI command (pr-markdown.ts) and domain service (branch-work-collector.ts) are …**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **branch-collection-pipeline connects to the rest of the codebase exclusively via…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **5 files across 5 distinct directories with zero directory co-location — the zon…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **High coupling (0.8) — 4 imports target "sourcevision-analysis-core"**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **Low cohesion (0.2) — files are loosely related, consider splitting this zone**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **Cohesion 0.20 and coupling 0.80 are at warning thresholds; as an orchestration-…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **Zone "Static Analysis Services" (static-analysis-services) has catastrophic ris…**
+   Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/completion-reader.ts`
 
 ### Medium Priority
 
-1. **Merge analyzers-2 into the main analyzers zone. The 11 files (callgraph.ts, com…**
-   Files: `src/analyzers/callgraph.ts`, `src/analyzers/components.ts`, `src/analyzers/imports.ts`
+1. **branch-work-store.ts co-locates stateful persistence with s… (+1 related)**
+   Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
 
-1. **Rename 'analyzers-2' to a semantically meaningful name by inspecting its file c…**
-   Files: `src/analyzers/callgraph.ts`, `src/analyzers/components.ts`, `src/analyzers/imports.ts`
+1. **2 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …**
 
-1. **Generic zone name "Analyzers 2" — enrichment did not assign a meaningful name r…**
-   Files: `src/analyzers/callgraph.ts`, `src/analyzers/components.ts`, `src/analyzers/imports.ts`
+1. **public.ts entrypoint zone assignment is algorithm-determined and not stable acr…**
+   Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
 
-1. **High coupling (0.52) — 15 imports target "analyzers"**
-   Files: `src/analyzers/callgraph.ts`, `src/analyzers/components.ts`, `src/analyzers/imports.ts`
+1. **High coupling (0.52) — 8 imports target "sourcevision-analysis-core"**
+   Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
+
+1. **Bidirectional coupling with unit-2 (8 imports in each direction) creates a circ…**
+   Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
 
 1. **God function: cmdAnalyze in src/cli/commands/analyze.ts calls 32 unique functio…**
 
-1. **19 entry points — wide API surface, consider consolidating exports**
-   Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/classify.ts`
+1. **The 'analyzers' sub-zone (8 files, cohesion 0.21) has the lowest cohesion of an…**
+   Files: `src/analyzers/callgraph.ts`, `src/analyzers/classify.ts`, `src/analyzers/claude-client.ts`
 
-1. **Bidirectional coupling: "analyzers" ↔ "unit" (5+29 crossings) — consider extrac…**
+1. **sourcevision-analysis-core is the sole mandatory intermediary for all cross-zon…**
+   Files: `src/analyzers/callgraph.ts`, `src/analyzers/classify.ts`, `src/analyzers/claude-client.ts`
+
+1. **No index.ts or public barrel file exists at the zone boundary to make the exter…**
+   Files: `src/analyzers/callgraph.ts`, `src/analyzers/classify.ts`, `src/analyzers/claude-client.ts`
+
+1. **11 entry points — wide API surface, consider consolidating exports**
+   Files: `src/analyzers/callgraph.ts`, `src/analyzers/classify.ts`, `src/analyzers/claude-client.ts`
 
 ### Low Priority
 
 1. **Hub function: info in src/cli/output.ts is called from 9 files (high fan-in exp…**
 
-1. **Zone "unit" has files across 10 directories — consider consolidating under a de…**
+1. **Zone "branch-collection-pipeline" has files across 5 directories — consider con…**
+   Files: `src/analyzers/branch-work-collector.ts`, `src/cli/commands/pr-markdown.ts`, `tests/integration/pr-markdown-reviewer-output.test.ts`
+
+1. **Zone "branch-risk-domain" has files across 7 directories — consider consolidati…**
    Files: `src/analyzers/branch-work-classifier.ts`, `src/analyzers/branch-work-filter.ts`, `src/analyzers/branch-work-store.ts`
 
-1. **Zone ".claude" (.claude) has at-risk risk (score: 0.50, cohesion: 0.00, couplin…**
-   Files: `.claude/settings.json`, `.claude/settings.local.json`
-
-1. **Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.0…**
+1. **tsconfig.tsbuildinfo is a generated build artifact present in workspace-root — …**
    Files: `ARCHITECTURE.md`, `README.md`, `SourceVision-F.png`
 
-1. **Zone "analyzers" has files across 9 directories — consider consolidating under …**
-   Files: `src/analyzers/archetypes.ts`, `src/analyzers/callgraph-findings.ts`, `src/analyzers/classify.ts`
+1. **Zone "Workspace Root" (workspace-root) has at-risk risk (score: 0.50, cohesion:…**
+   Files: `ARCHITECTURE.md`, `README.md`, `SourceVision-F.png`
 
-1. **Zone "cli" has files across 7 directories — consider consolidating under a dedi…**
-   Files: `src/analyzers/branch-work-collector.ts`, `src/analyzers/convergence.ts`, `src/analyzers/manifest.ts`
+1. **Zone "Claude Workspace Config" (claude-workspace-config) has at-risk risk (scor…**
+   Files: `.claude/settings.json`, `.claude/settings.local.json`
 
-1. **Zone "fixtures" has files across 5 directories — consider consolidating under a…**
-   Files: `tests/fixtures/remix-app/app/routes/_auth.login.tsx`, `tests/fixtures/remix-app/app/routes/_auth.tsx`, `tests/fixtures/remix-app/app/routes/_index.tsx`
+1. **Zone "sourcevision-analysis-core" has files across 12 directories — consider co…**
+   Files: `src/analyzers/callgraph.ts`, `src/analyzers/classify.ts`, `src/analyzers/claude-client.ts`
 
-1. **src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3…**
+1. **src/analyzers/ contains files from 4 zones (branch-collection-pipeline, branch-…**
+
+1. **The only two zones with zero coupling (data-file-schema via functional design, …**
+
+1. **Zone naming is inconsistent: three zones use semantic names (sourcevision-analy…**
 
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
 |------|------|-----------|------|
-| `.claude/settings.json` | other |  | .claude |
-| `.claude/settings.local.json` | other |  | .claude |
-| `ARCHITECTURE.md` | docs |  | root |
-| `README.md` | docs |  | root |
-| `SourceVision-F.png` | asset |  | root |
-| `SourceVision.png` | asset |  | root |
-| `WORKSPACE_DESIGN.md` | docs |  | root |
-| `package.json` | config |  | root |
-| `src/analyzers/archetypes.ts` | source | types | analyzers |
-| `src/analyzers/branch-work-classifier.ts` | source | utility | unit |
-| `src/analyzers/branch-work-collector.ts` | source | service | cli |
-| `src/analyzers/branch-work-filter.ts` | source | utility | unit |
-| `src/analyzers/branch-work-store.ts` | source | store | unit |
-| `src/analyzers/callgraph-findings.ts` | source | service | analyzers |
-| `src/analyzers/callgraph.ts` | source | service | analyzers-2 |
-| `src/analyzers/classify.ts` | source | service | analyzers |
-| `src/analyzers/claude-client.ts` | source | service | analyzers |
-| `src/analyzers/completion-reader.ts` | source | service | analyzers |
-| `src/analyzers/components.ts` | source | service | analyzers-2 |
-| `src/analyzers/context.ts` | source | service | analyzers |
-| `src/analyzers/convergence.ts` | source | service | cli |
-| `src/analyzers/enrich-batch.ts` | source | service | analyzers |
-| `src/analyzers/enrich-config.ts` | source | config | analyzers |
-| `src/analyzers/enrich-parsing.ts` | source | utility | analyzers |
-| `src/analyzers/enrich-per-zone.ts` | source | service | analyzers |
-| `src/analyzers/enrich.ts` | source | gateway | analyzers |
-| `src/analyzers/imports.ts` | source | service | analyzers-2 |
-| `src/analyzers/index.ts` | source | entrypoint | analyzers-2 |
-| `src/analyzers/inventory.ts` | source | service | analyzers-2 |
-| `src/analyzers/llms-txt.ts` | source | service | analyzers |
-| `src/analyzers/louvain.ts` | source | utility | analyzers-3 |
-| `src/analyzers/manifest.ts` | source | service | cli |
-| `src/analyzers/move-recommendations.ts` | source | service | analyzers |
-| `src/analyzers/next-steps.ts` | source | service | analyzers |
-| `src/analyzers/risk-scoring.ts` | source | service | unit |
-| `src/analyzers/route-detection.ts` | source | route-handler | analyzers-2 |
-| `src/analyzers/server-route-detection.ts` | source | service | analyzers |
-| `src/analyzers/token-usage.ts` | source | utility | analyzers |
-| `src/analyzers/workspace-aggregate.ts` | source | service | unit |
-| `src/analyzers/workspace-crossings.ts` | source | service | analyzers |
-| `src/analyzers/workspace.ts` | source | service | analyzers |
-| `src/analyzers/zone-hash.ts` | source | utility | analyzers-3 |
-| `src/analyzers/zone-output.ts` | source | service | analyzers |
-| `src/analyzers/zones.ts` | source | service | analyzers-3 |
-| `src/cli/commands/analyze-phases.ts` | source | cli-command | cli |
-| `src/cli/commands/analyze.ts` | source | cli-command | cli |
-| `src/cli/commands/constants.ts` | source | types | cli |
-| `src/cli/commands/export-pdf.ts` | source | cli-command | cli |
-| `src/cli/commands/git-credential-helper.ts` | source | cli-command | cli |
-| `src/cli/commands/init.ts` | source | cli-command | cli |
-| `src/cli/commands/pr-markdown.ts` | source | cli-command | cli |
-| `src/cli/commands/prd-epic-resolver.ts` | source | cli-command | cli |
-| `src/cli/commands/reset.ts` | source | cli-command | cli |
-| `src/cli/commands/validate.ts` | source | cli-command | cli |
-| `src/cli/commands/workspace.ts` | source | cli-command | unit |
-| `src/cli/errors.ts` | source | utility | cli |
-| `src/cli/help.ts` | source | cli-command | cli |
-| `src/cli/index.ts` | source | entrypoint | cli |
-| `src/cli/mcp.ts` | source | cli-command | analyzers |
-| `src/cli/output.ts` | source | utility | cli |
-| `src/cli/serve.ts` | source | cli-command | cli |
-| `src/constants.ts` | source | types | cli |
-| `src/export/pdf-report.ts` | source | service | analyzers |
-| `src/generators/pr-markdown-template.ts` | source | utility | unit |
-| `src/public.ts` | source | entrypoint | unit |
-| `src/schema/data-files.ts` | source | schema | unit |
-| `src/schema/index.ts` | source | entrypoint | analyzers |
-| `src/schema/v1.ts` | source | schema | unit |
-| `src/schema/validate.ts` | source | schema | e2e |
-| `src/util/merge.ts` | source | utility | analyzers |
-| `src/util/paths.ts` | source | utility | analyzers-2 |
-| `src/util/sort.ts` | source | utility | analyzers |
-| `tests/e2e/cli-analyze.test.ts` | test |  | e2e |
-| `tests/e2e/cli-serve.test.ts` | test |  | e2e |
+| `.claude/settings.json` | other |  | claude-workspace-config |
+| `.claude/settings.local.json` | other |  | claude-workspace-config |
+| `ARCHITECTURE.md` | docs |  | workspace-root |
+| `README.md` | docs |  | workspace-root |
+| `SourceVision-F.png` | asset |  | workspace-root |
+| `SourceVision.png` | asset |  | workspace-root |
+| `WORKSPACE_DESIGN.md` | docs |  | workspace-root |
+| `package.json` | config |  | workspace-root |
+| `src/analyzers/archetypes.ts` | source | types | static-analysis-services |
+| `src/analyzers/branch-work-classifier.ts` | source | service | branch-risk-domain |
+| `src/analyzers/branch-work-collector.ts` | source | service | branch-collection-pipeline |
+| `src/analyzers/branch-work-filter.ts` | source | utility | branch-risk-domain |
+| `src/analyzers/branch-work-store.ts` | source | store | branch-risk-domain |
+| `src/analyzers/callgraph-findings.ts` | source | service | static-analysis-services |
+| `src/analyzers/callgraph.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/classify.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/claude-client.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/completion-reader.ts` | source | service | static-analysis-services |
+| `src/analyzers/components.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/context.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/convergence.ts` | source | utility | sourcevision-analysis-core |
+| `src/analyzers/enrich-batch.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/enrich-config.ts` | source | config | sourcevision-analysis-core |
+| `src/analyzers/enrich-parsing.ts` | source | utility | sourcevision-analysis-core |
+| `src/analyzers/enrich-per-zone.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/enrich.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/imports.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/index.ts` | source | entrypoint | sourcevision-analysis-core |
+| `src/analyzers/inventory.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/llms-txt.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/louvain.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/manifest.ts` | source | service | static-analysis-services |
+| `src/analyzers/move-recommendations.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/next-steps.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/risk-scoring.ts` | source | service | branch-risk-domain |
+| `src/analyzers/route-detection.ts` | source | route-handler | sourcevision-analysis-core |
+| `src/analyzers/server-route-detection.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/token-usage.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/workspace-aggregate.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/workspace-crossings.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/workspace.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/zone-hash.ts` | source | utility | sourcevision-analysis-core |
+| `src/analyzers/zone-output.ts` | source | service | sourcevision-analysis-core |
+| `src/analyzers/zones.ts` | source | service | sourcevision-analysis-core |
+| `src/cli/commands/analyze-phases.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/analyze.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/constants.ts` | source | types | sourcevision-analysis-core |
+| `src/cli/commands/export-pdf.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/git-credential-helper.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/init.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/pr-markdown.ts` | source | cli-command | branch-collection-pipeline |
+| `src/cli/commands/prd-epic-resolver.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/reset.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/validate.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/commands/workspace.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/errors.ts` | source | utility | sourcevision-analysis-core |
+| `src/cli/help.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/index.ts` | source | entrypoint | sourcevision-analysis-core |
+| `src/cli/mcp.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/cli/output.ts` | source | utility | sourcevision-analysis-core |
+| `src/cli/serve.ts` | source | cli-command | sourcevision-analysis-core |
+| `src/constants.ts` | source | types | static-analysis-services |
+| `src/export/pdf-report.ts` | source | service | sourcevision-analysis-core |
+| `src/generators/pr-markdown-template.ts` | source | utility | branch-risk-domain |
+| `src/public.ts` | source | entrypoint | branch-risk-domain |
+| `src/schema/data-files.ts` | source | schema | data-file-schema |
+| `src/schema/index.ts` | source | entrypoint | sourcevision-analysis-core |
+| `src/schema/v1.ts` | source | schema | branch-risk-domain |
+| `src/schema/validate.ts` | source | schema | sourcevision-analysis-core |
+| `src/util/merge.ts` | source | utility | sourcevision-analysis-core |
+| `src/util/paths.ts` | source | utility | sourcevision-analysis-core |
+| `src/util/sort.ts` | source | utility | sourcevision-analysis-core |
+| `tests/e2e/cli-analyze.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/e2e/cli-serve.test.ts` | test |  |  |
 | `tests/fixtures/remix-app/app/root.tsx` | test |  |  |
-| `tests/fixtures/remix-app/app/routes/_auth.login.tsx` | test |  | fixtures |
-| `tests/fixtures/remix-app/app/routes/_auth.tsx` | test |  | fixtures |
-| `tests/fixtures/remix-app/app/routes/_index.tsx` | test |  | fixtures |
-| `tests/fixtures/remix-app/app/routes/users.$id.tsx` | test |  | fixtures |
+| `tests/fixtures/remix-app/app/routes/_auth.login.tsx` | test |  | test-fixture-projects |
+| `tests/fixtures/remix-app/app/routes/_auth.tsx` | test |  | test-fixture-projects |
+| `tests/fixtures/remix-app/app/routes/_index.tsx` | test |  | test-fixture-projects |
+| `tests/fixtures/remix-app/app/routes/users.$id.tsx` | test |  | test-fixture-projects |
 | `tests/fixtures/remix-app/tsconfig.json` | test |  |  |
-| `tests/fixtures/small-ts-project/src/config.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/index.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/models/user.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/services/email-service.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/services/user-service.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/utils/format.ts` | test |  | fixtures |
-| `tests/fixtures/small-ts-project/src/utils/validate.ts` | test |  | fixtures |
+| `tests/fixtures/small-ts-project/src/config.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/index.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/models/user.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/services/email-service.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/services/user-service.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/utils/format.ts` | test |  | test-fixture-projects |
+| `tests/fixtures/small-ts-project/src/utils/validate.ts` | test |  | test-fixture-projects |
 | `tests/fixtures/small-ts-project/tsconfig.json` | test |  |  |
-| `tests/integration/claude-config.test.ts` | test |  | analyzers |
-| `tests/integration/context.test.ts` | test |  | analyzers |
-| `tests/integration/llms-txt.test.ts` | test |  | analyzers |
-| `tests/integration/pipeline.test.ts` | test |  | e2e |
-| `tests/integration/pr-markdown-reviewer-output.test.ts` | test |  | cli |
-| `tests/unit/analyzers/archetypes.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/branch-work-classifier.test.ts` | test |  | unit |
-| `tests/unit/analyzers/branch-work-collector.test.ts` | test |  | cli |
-| `tests/unit/analyzers/branch-work-filter.test.ts` | test |  | unit |
-| `tests/unit/analyzers/branch-work-store.test.ts` | test |  | unit |
-| `tests/unit/analyzers/callgraph-findings.test.ts` | test |  | unit |
-| `tests/unit/analyzers/callgraph.test.ts` | test |  | analyzers-2 |
-| `tests/unit/analyzers/classify.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/completion-reader.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/components.test.ts` | test |  | analyzers-2 |
-| `tests/unit/analyzers/convergence.test.ts` | test |  | cli |
-| `tests/unit/analyzers/dedup-findings.test.ts` | test |  | unit |
-| `tests/unit/analyzers/enrich-content-skip.test.ts` | test |  | unit |
-| `tests/unit/analyzers/enrich-per-zone.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/hints.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/imports.test.ts` | test |  | analyzers-2 |
-| `tests/unit/analyzers/inventory.test.ts` | test |  | analyzers-2 |
-| `tests/unit/analyzers/manifest.test.ts` | test |  | cli |
-| `tests/unit/analyzers/move-recommendations.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/next-steps.test.ts` | test |  | unit |
-| `tests/unit/analyzers/risk-scoring.test.ts` | test |  | unit |
-| `tests/unit/analyzers/token-usage.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/workspace-aggregate.test.ts` | test |  | unit |
-| `tests/unit/analyzers/workspace-crossings.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/workspace.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/zone-cross-package.test.ts` | test |  | unit |
-| `tests/unit/analyzers/zone-detection.test.ts` | test |  | analyzers-3 |
-| `tests/unit/analyzers/zone-enrichment.test.ts` | test |  | unit |
-| `tests/unit/analyzers/zone-insights.test.ts` | test |  | unit |
-| `tests/unit/analyzers/zone-output.test.ts` | test |  | analyzers |
-| `tests/unit/analyzers/zone-size-policy.test.ts` | test |  | analyzers-3 |
-| `tests/unit/analyzers/zone-subdivision.test.ts` | test |  | analyzers-3 |
-| `tests/unit/analyzers/zone-type-thresholds.test.ts` | test |  | unit |
-| `tests/unit/analyzers/zones-helpers.ts` | test |  | unit |
-| `tests/unit/cli/analyze.test.ts` | test |  | analyzers |
-| `tests/unit/cli/errors.test.ts` | test |  | cli |
-| `tests/unit/cli/export-pdf.test.ts` | test |  | cli |
-| `tests/unit/cli/git-credential-helper.test.ts` | test |  | cli |
-| `tests/unit/cli/help.test.ts` | test |  | cli |
-| `tests/unit/cli/mcp.test.ts` | test |  | unit |
-| `tests/unit/cli/output.test.ts` | test |  | cli |
-| `tests/unit/cli/pr-markdown.test.ts` | test |  | cli |
-| `tests/unit/cli/prd-epic-resolver.test.ts` | test |  | cli |
-| `tests/unit/cli/workspace.test.ts` | test |  | unit |
-| `tests/unit/export/pdf-report.test.ts` | test |  | unit |
-| `tests/unit/generators/pr-markdown-template.test.ts` | test |  | unit |
-| `tests/unit/schema/data-files.test.ts` | test |  | unit |
-| `tests/unit/schema/validate.test.ts` | test |  | e2e |
-| `tests/unit/util/merge.test.ts` | test |  | analyzers |
-| `tests/unit/util/sort.test.ts` | test |  | analyzers |
-| `tsconfig.json` | config |  | root |
-| `tsconfig.tsbuildinfo` | config |  | root |
-| `vitest.config.ts` | config |  | root |
+| `tests/integration/claude-config.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/integration/context.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/integration/llms-txt.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/integration/pipeline.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/integration/pr-markdown-reviewer-output.test.ts` | test |  | branch-collection-pipeline |
+| `tests/unit/analyzers/archetypes.test.ts` | test |  | static-analysis-services |
+| `tests/unit/analyzers/branch-work-classifier.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/branch-work-collector.test.ts` | test |  | branch-collection-pipeline |
+| `tests/unit/analyzers/branch-work-filter.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/branch-work-store.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/callgraph-findings.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/callgraph.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/classify.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/completion-reader.test.ts` | test |  | static-analysis-services |
+| `tests/unit/analyzers/components.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/convergence.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/dedup-findings.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/enrich-content-skip.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/enrich-per-zone.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/hints.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/imports.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/inventory.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/manifest.test.ts` | test |  | static-analysis-services |
+| `tests/unit/analyzers/move-recommendations.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/next-steps.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/risk-scoring.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/token-usage.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/workspace-aggregate.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/workspace-crossings.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/workspace.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-cross-package.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-detection.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-enrichment.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-insights.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-output.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-size-policy.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-subdivision.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/analyzers/zone-type-thresholds.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/analyzers/zones-helpers.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/analyze.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/errors.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/export-pdf.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/git-credential-helper.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/help.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/mcp.test.ts` | test |  | data-file-schema |
+| `tests/unit/cli/output.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/pr-markdown.test.ts` | test |  | branch-collection-pipeline |
+| `tests/unit/cli/prd-epic-resolver.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/cli/workspace.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/export/pdf-report.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/generators/pr-markdown-template.test.ts` | test |  | branch-risk-domain |
+| `tests/unit/schema/data-files.test.ts` | test |  | data-file-schema |
+| `tests/unit/schema/validate.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/util/merge.test.ts` | test |  | sourcevision-analysis-core |
+| `tests/unit/util/sort.test.ts` | test |  | sourcevision-analysis-core |
+| `tsconfig.json` | config |  | workspace-root |
+| `tsconfig.tsbuildinfo` | config |  | workspace-root |
+| `vitest.config.ts` | config |  | workspace-root |
 
 ## Tooling
 

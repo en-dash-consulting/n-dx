@@ -1,0 +1,21 @@
+{
+  "id": "landing-page-assets",
+  "name": "Landing Page Assets",
+  "description": "Static HTML and CSS assets for the web dashboard landing page, with no JavaScript dependencies.",
+  "files": [
+    "packages/web/src/landing/index.html",
+    "packages/web/src/landing/landing.css"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 1640,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

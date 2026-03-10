@@ -1,0 +1,27 @@
+{
+  "id": "viewer-polling-infrastructure",
+  "name": "Viewer Polling Infrastructure",
+  "description": "Implements the polling lifecycle primitives (state machine and restart logic) that drive the viewer's server-sent event refresh cycle.",
+  "files": [
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts",
+    "packages/web/tests/unit/viewer/polling-restart.test.ts",
+    "packages/web/tests/unit/viewer/polling-state.test.ts",
+    "packages/web/tests/unit/viewer/use-polling-suspension.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/polling/polling-restart.ts",
+    "packages/web/src/viewer/polling/polling-state.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 5,
+  "lineCount": 1530,
+  "riskMetrics": {
+    "cohesion": 0.29,
+    "coupling": 0.71,
+    "riskScore": 0.71,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "unit-2/analyzers/unit",
+  "name": "Unit 2/analyzers/unit",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "src/analyzers/workspace-aggregate.ts",
+    "src/cli/commands/workspace.ts",
+    "tests/unit/analyzers/callgraph.test.ts",
+    "tests/unit/analyzers/components.test.ts",
+    "tests/unit/analyzers/imports.test.ts",
+    "tests/unit/analyzers/inventory.test.ts",
+    "tests/unit/analyzers/workspace-aggregate.test.ts",
+    "tests/unit/cli/workspace.test.ts"
+  ],
+  "entryPoints": [
+    "src/cli/commands/workspace.ts"
+  ],
+  "cohesion": 0.18,
+  "coupling": 0.82,
+  "fileCount": 8,
+  "lineCount": 0
+}

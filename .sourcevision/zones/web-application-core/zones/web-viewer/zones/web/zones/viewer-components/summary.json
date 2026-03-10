@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web-viewer/web/viewer-components",
+  "name": "Web Viewer/web Viewer/web/viewer Components",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+    "packages/web/src/viewer/components/search-overlay.ts",
+    "packages/web/src/viewer/main.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+    "packages/web/src/viewer/components/search-overlay.ts",
+    "packages/web/src/viewer/main.ts"
+  ],
+  "cohesion": 0.46,
+  "coupling": 0.54,
+  "fileCount": 4,
+  "lineCount": 976
+}

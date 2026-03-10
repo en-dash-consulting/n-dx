@@ -1,0 +1,14 @@
+{
+  "id": "unit-2/integration",
+  "name": "Unit 2/integration",
+  "description": "2 files, primarily TypeScript",
+  "files": [
+    "tests/integration/context.test.ts",
+    "tests/integration/llms-txt.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 0
+}

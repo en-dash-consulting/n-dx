@@ -1,0 +1,21 @@
+{
+  "id": "web/tick",
+  "name": "Web/tick",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts",
+    "packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts",
+    "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
+    "packages/web/tests/unit/viewer/tick-timer.test.ts",
+    "packages/web/tests/unit/viewer/tick-visibility-gate.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/polling/batched-tick-dispatcher.ts",
+    "packages/web/src/viewer/polling/tick-timer.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 2447
+}

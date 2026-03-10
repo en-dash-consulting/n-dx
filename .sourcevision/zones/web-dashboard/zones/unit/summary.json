@@ -1,0 +1,23 @@
+{
+  "id": "web/unit",
+  "name": "Web/unit",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/landing/landing.ts",
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts",
+    "packages/web/tests/unit/landing/landing.test.ts",
+    "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts",
+    "packages/web/tests/unit/viewer/graph-interaction.test.ts",
+    "packages/web/tests/unit/viewer/graph-zoom.test.ts",
+    "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 1675
+}

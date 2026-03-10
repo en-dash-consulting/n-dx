@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web-viewer/web-viewer/memory",
+  "name": "Web Viewer/web Viewer/web Viewer/memory",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/hooks/use-memory-monitor.ts",
+    "packages/web/src/viewer/performance/memory-monitor.ts",
+    "packages/web/tests/unit/viewer/memory-monitor.test.ts",
+    "packages/web/tests/unit/viewer/memory-warning.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-memory-monitor.ts",
+    "packages/web/src/viewer/performance/memory-monitor.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 4,
+  "lineCount": 1050
+}

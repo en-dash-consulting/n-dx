@@ -8,49 +8,58 @@
 Project: rex
 Files: 248, Lines: 84274
 Languages: TypeScript(231) JSON(8) Other(4) Markdown(4) Text(1)
-Zones: 12, Described: 12
+Zones: 15, Described: 15
 Import edges: 920, External packages: 5
 
 </architecture>
 
 <zones>
 
-[.rex] .rex (4 files, coh=0.00 coup=0.00)
-  4 files, primarily JSON, Other, Markdown
-  files: .rex/config.json, .rex/execution-log.jsonl, .rex/prd.json, .rex/workflow.md
-[cli] Cli (11 files, coh=0.22 coup=0.78)
-  11 files, primarily TypeScript
-  files: src/cli/commands/constants.ts [types], src/cli/commands/health.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/mcp-tools.ts [route-handler], src/cli/mcp.ts [service], src/core/health.ts [utility], src/workflow/default.ts [config], tests/integration/smart-add-duplicate-outcomes.test.ts, tests/unit/cli/commands/smart-add-merge.test.ts, tests/unit/cli/mcp.test.ts +1
-[e2e] E2e (13 files, coh=1.00 coup=0.00)
-  13 files, primarily TypeScript, JSON, Other
-  files: tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts, tests/e2e/cli-import.test.ts, tests/e2e/cli-prune.test.ts, tests/e2e/cli-quiet.test.ts, tests/e2e/cli-recommend.test.ts, tests/e2e/cli-smart-add.test.ts, tests/e2e/cli-sync.test.ts, tests/e2e/cli-workflow.test.ts, tests/e2e/fixtures/sample-prd/.rex/config.json +3
-[fix] Fix (4 files, coh=0.25 coup=0.75)
-  4 files, primarily TypeScript
-  files: src/cli/commands/fix.ts [cli-command], src/core/fix.ts [utility], tests/unit/cli/commands/fix.test.ts, tests/unit/core/fix.test.ts
-[root] Root (8 files, coh=0.00 coup=0.00)
-  8 files, primarily Markdown, Other, JSON
-  files: README.md, Rex-F.png, Rex.png, context.md, llms.txt, package.json, tsconfig.json, vitest.config.ts
-[store] Store (16 files, coh=0.38 coup=0.63)
-  16 files, primarily TypeScript
+[cli-mcp-interface] CLI and MCP Interface (23 files, coh=0.27 coup=0.73)
+  Command-line entry points and MCP tool definitions for rex operations including PRD reshaping, pruning, health checks, chunked review, smart-add, and the MCP server interface.
+  files: src/analyze/reshape-reason.ts [service], src/cli/commands/chunked-review-state.ts [cli-command], src/cli/commands/chunked-review.ts [cli-command], src/cli/commands/constants.ts [types], src/cli/commands/health.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/commands/prune.ts [cli-command], src/cli/commands/reshape.ts [cli-command], src/cli/commands/smart-add-duplicates.ts [cli-command], src/cli/commands/smart-add.ts [cli-command] +13
+[integration-adapter-layer] Integration Adapter Layer (16 files, coh=0.38 coup=0.63)
+  Manages remote sync adapters, integration schemas, and the adapter registry for connecting the PRD to external tools like Jira and Notion.
   files: src/cli/commands/sync.ts [cli-command], src/store/adapter-registry.ts [store], src/store/index.ts [entrypoint], src/store/integration-schema.ts [store], src/store/integration-schemas/index.ts [entrypoint], src/store/integration-schemas/jira.ts [store], src/store/integration-schemas/notion.ts [store], src/store/notion-adapter.ts [store], src/store/notion-map.ts [store], tests/integration/project-config.test.ts +6
-[unit] Unit (26 files, coh=0.28 coup=0.72)
-  26 files, primarily TypeScript
-  files: src/analyze/acknowledge.ts [service], src/cli/commands/recommend.ts [cli-command], src/cli/commands/report.ts [cli-command], src/core/canonical.ts [utility], src/core/dag.ts [utility], src/core/move.ts [utility], src/core/tree.ts [utility], src/recommend/conflict-detection.ts [utility], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types] +16
-[unit-analyze] Unit Analyze (105 files, coh=0.68 coup=0.32)
-  105 files, primarily TypeScript
-  files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [service], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/extract.ts [service], src/analyze/file-validation.ts [utility], src/analyze/guided.ts [service], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [service] +95
-[unit-cli] Unit Cli (37 files, coh=0.46 coup=0.54)
-  37 files, primarily TypeScript
-  files: src/cli/commands/adapter.ts [cli-command], src/cli/commands/move.ts [cli-command], src/cli/commands/remove.ts [cli-command], src/cli/commands/status-sections.ts [cli-command], src/cli/commands/status-shared.ts [cli-command], src/cli/commands/status.ts [cli-command], src/cli/commands/token-format.ts [cli-command], src/cli/commands/update.ts [cli-command], src/cli/commands/usage.ts [cli-command], src/cli/commands/verify.ts [cli-command] +27
-[unit-core] Unit Core (7 files, coh=0.17 coup=0.83)
-  7 files, primarily TypeScript
-  files: src/cli/commands/next.ts [cli-command], src/core/next-task.ts [utility], tests/unit/core/feature-filtered-task.test.ts, tests/unit/core/next-task-matching.test.ts, tests/unit/core/next-task-scoring.test.ts, tests/unit/core/next-task.test.ts, tests/unit/core/requirements-prioritization.test.ts
-[unit-store] Unit Store (4 files, coh=1.00 coup=0.00)
-  4 files, primarily TypeScript
+[llm-analysis-engine] LLM Analysis Engine (28 files, coh=0.38 coup=0.62)
+  Orchestrates LLM-driven PRD analysis: bridges raw scan output to the LLM, validates and reasons about proposed modifications, and guards against unsafe consolidations.
+  files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [service], src/analyze/file-validation.ts [utility], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [service], src/analyze/modify-reason.ts [service], src/analyze/reason.ts [service], src/analyze/validate-modification.ts [utility], src/cli/commands/analyze.ts [cli-command], src/cli/commands/decomposition-review.ts [cli-command] +18
+[notion-integration-client] Notion Integration Client (4 files, coh=1.00 coup=0.00)
+  Encapsulates the low-level Notion API client and its associated store-contract tests, forming the isolated foundation layer of the Notion adapter.
   files: src/store/notion-client.ts [store], tests/unit/store/notion-adapter.test.ts, tests/unit/store/notion-client.test.ts, tests/unit/store/store-contract.test.ts
-[validate] Validate (11 files, coh=0.36 coup=0.64)
-  11 files, primarily TypeScript
+[prd-domain-operations] PRD Domain Operations (43 files, coh=0.44 coup=0.56)
+  The central domain layer for rex: schema definitions, state transitions, CRUD operations, merge/reorganize, sync engine, and the public API surface.
+  files: src/cli/commands/add.ts [cli-command], src/cli/commands/reorganize.ts [cli-command], src/core/analytics.ts [utility], src/core/cascade-reset.ts [utility], src/core/code-coverage.ts [utility], src/core/delete.ts [utility], src/core/facets.ts [utility], src/core/keywords.ts [utility], src/core/merge.ts [utility], src/core/override-escalation.ts [utility] +33
+[prd-proposal-pipeline] PRD Proposal Pipeline (34 files, coh=0.37 coup=0.63)
+  Core domain services for generating, diffing, deduplicating, decomposing, and reconciling PRD item proposals from LLM analysis output.
+  files: src/analyze/acknowledge.ts [service], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/extract.ts [service], src/analyze/guided.ts [service], src/analyze/propose.ts [types], src/analyze/reconcile.ts [service], src/analyze/scanners.ts [service], src/cli/commands/recommend.ts [cli-command] +24
+[prd-repair-command] PRD Repair Command (4 files, coh=0.25 coup=0.75)
+  Self-contained implementation of the `rex fix` command that detects and repairs structural inconsistencies in the PRD tree.
+  files: src/cli/commands/fix.ts [cli-command], src/core/fix.ts [utility], tests/unit/cli/commands/fix.test.ts, tests/unit/core/fix.test.ts
+[prd-structural-validation] PRD Structural Validation (11 files, coh=0.36 coup=0.64)
+  Implements PRD integrity checks including structural consistency, epic correlation, and interactive fix prompts surfaced through the validate CLI commands.
   files: src/cli/commands/validate-interactive.ts [cli-command], src/cli/commands/validate.ts [cli-command], src/core/epic-correlation.ts [utility], src/core/structural.ts [utility], tests/integration/smart-add-orphaned-parent.test.ts, tests/unit/cli/commands/validate-epicless.test.ts, tests/unit/cli/commands/validate-interactive.test.ts, tests/unit/cli/commands/validate.test.ts, tests/unit/core/epic-correlation.test.ts, tests/unit/core/epicless.test.ts +1
+[project-configuration] Project Configuration (8 files, coh=0.00 coup=0.00)
+  Root-level project scaffolding: package manifest, TypeScript and test configuration, documentation assets, and AI-readable context files generated by sourcevision.
+  files: README.md, Rex-F.png, Rex.png, context.md, llms.txt, package.json, tsconfig.json, vitest.config.ts
+[rex-cli-command-layer] Rex CLI Command Layer (37 files, coh=0.46 coup=0.54)
+  Implements the full suite of rex CLI commands and their supporting output, error handling, and parent-node lifecycle utilities.
+  files: src/cli/commands/adapter.ts [cli-command], src/cli/commands/move.ts [cli-command], src/cli/commands/remove.ts [cli-command], src/cli/commands/status-sections.ts [cli-command], src/cli/commands/status-shared.ts [cli-command], src/cli/commands/status.ts [cli-command], src/cli/commands/token-format.ts [cli-command], src/cli/commands/update.ts [cli-command], src/cli/commands/usage.ts [cli-command], src/cli/commands/verify.ts [cli-command] +27
+[rex-e2e-test-suite] Rex E2E Test Suite (13 files, coh=1.00 coup=0.00)
+  Contains all end-to-end CLI and adapter tests that exercise rex commands against real file-system fixtures, validating full-stack behavior from CLI invocation to PRD state.
+  files: tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts, tests/e2e/cli-import.test.ts, tests/e2e/cli-prune.test.ts, tests/e2e/cli-quiet.test.ts, tests/e2e/cli-recommend.test.ts, tests/e2e/cli-smart-add.test.ts, tests/e2e/cli-sync.test.ts, tests/e2e/cli-workflow.test.ts, tests/e2e/fixtures/sample-prd/.rex/config.json +3
+[rex-runtime-state] Rex Runtime State (4 files, coh=0.00 coup=0.00)
+  Persistent runtime data directory holding the live PRD, execution log, project configuration, and workflow state written and read by rex commands.
+  files: .rex/config.json, .rex/execution-log.jsonl, .rex/prd.json, .rex/workflow.md
+[schema-storage-reporting] Schema Storage and Reporting (7 files, coh=0.17 coup=0.83)
+  Groups schema validation, the file-system PRD store adapter, and the report command — three loosely related infrastructure concerns that share no strong internal dependency.
+  files: src/cli/commands/report.ts [cli-command], src/schema/validate.ts [schema], src/store/file-adapter.ts [store], tests/e2e/cli-init.test.ts, tests/unit/cli/commands/report.test.ts, tests/unit/schema/validate.test.ts, tests/unit/store/file-adapter.test.ts
+[task-selection-engine] Task Selection Engine (7 files, coh=0.17 coup=0.83)
+  Implements next-task selection logic including multi-criteria scoring, feature-scoped filtering, and requirements-based prioritization for the `rex next` command.
+  files: src/cli/commands/next.ts [cli-command], src/core/next-task.ts [utility], tests/unit/core/feature-filtered-task.test.ts, tests/unit/core/next-task-matching.test.ts, tests/unit/core/next-task-scoring.test.ts, tests/unit/core/next-task.test.ts, tests/unit/core/requirements-prioritization.test.ts
+[tree-dag-primitives] Tree and DAG Primitives (7 files, coh=0.06 coup=0.94)
+  Houses the foundational tree traversal, DAG cycle detection, and node-move algorithms that underpin all PRD hierarchy operations.
+  files: src/core/dag.ts [utility], src/core/move.ts [utility], src/core/tree.ts [utility], tests/unit/core/dag.test.ts, tests/unit/core/move.test.ts, tests/unit/core/tree-hardened.test.ts, tests/unit/core/tree.test.ts
 [unzoned] 2 files: .claude/settings.local.json, tests/fixtures/token-usage-regression.json
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
@@ -75,69 +84,69 @@ Most imported:
 
 <findings>
 
-[warning] High coupling (0.78) — 28 imports target "unit-analyze" [cli]
-[warning] Low cohesion (0.22) — files are loosely related, consider splitting this zone [cli]
-[warning] High coupling (0.75) — 3 imports target "unit-analyze" [fix]
-[warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone [fix]
-[warning] Bidirectional coupling: "unit" ↔ "unit-analyze" (35+39 crossings) — consider extracting shared interface
-[warning] The bidirectional coupling between unit and unit-analyze (35+39 crossings) is the single highest-priority structural issue by crossing count. However, both directions of the coupling need separate diagnosis: unit → unit-analyze crossings likely represent legitimate consumption of shared core; unit-analyze → unit crossings (39) represent the riskier direction where the dependency flows upward into a consumer zone and should be examined for what unit-analyze is importing back from unit.
+[warning] 12 entry points — wide API surface, consider consolidating exports [cli-mcp-interface]
+[warning] High coupling (0.73) — 31 imports target "prd-domain-operations" [cli-mcp-interface]
+[warning] Low cohesion (0.27) — files are loosely related, consider splitting this zone [cli-mcp-interface]
+[warning] Cohesion of 0.27 is well below the 0.4 threshold — this zone aggregates unrelated concerns (MCP server, reshape logic, pruning, chunked review) that would benefit from separation. [cli-mcp-interface]
+[warning] Coupling of 0.73 is significantly above the 0.6 warning threshold, driven by 31 outbound imports to core and 26 to unit-analyze — this zone is highly dependent and fragile to upstream changes. [cli-mcp-interface]
+[warning] The cross-zone import path core → cli (13 imports) creates a cycle with cli → core (31 imports); core-layer code should never import from the CLI layer — these imports should be inverted or extracted to a shared module. [cli-mcp-interface]
+[warning] Bidirectional coupling: "prd-domain-operations" ↔ "rex-cli-command-layer" (13+39 crossings) — consider extracting shared interface
 [warning] Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects
-[warning] High coupling (0.63) — 19 imports target "unit-analyze" [store]
-[warning] Low cohesion (0.38) — files are loosely related, consider splitting this zone [store]
-[warning] 10 entry points — wide API surface, consider consolidating exports [unit]
-[warning] High coupling (0.72) — 35 imports target "unit-analyze" [unit]
-[warning] Low cohesion (0.28) — files are loosely related, consider splitting this zone [unit]
-[warning] 33 entry points — wide API surface, consider consolidating exports [unit-analyze]
-[warning] The 39 imports flowing from unit-analyze back into unit (the upward direction of the bidirectional coupling) are the higher-risk direction. A shared-core zone importing from its consumer zones creates an inversion that prevents the core from being extracted or reused. These 39 crossings should be audited first — each one is a potential dependency inversion that needs to be resolved by either moving the dependency down into unit-analyze or breaking the edge. [unit-analyze]
-[warning] unit-analyze is the dependency sink for the entire package: cli (28 imports), unit (35), unit-cli (43), fix (3), unit-core (9), store (19), validate (20) — 157 total inbound cross-zone imports. The 33-entry-point wide API surface reflects the zone legitimately serving as shared core, not a decomposition failure. The risk is that this role is undeclared and therefore unprotected by any stability contract. [unit-analyze]
-... +33 more
+[warning] High coupling (0.63) — 18 imports target "prd-domain-operations" [integration-adapter-layer]
+[warning] Low cohesion (0.38) — files are loosely related, consider splitting this zone [integration-adapter-layer]
+[warning] Cohesion 0.38 and coupling 0.63 are both at or beyond warning thresholds; the zone bundles CLI sync dispatch, adapter registry, and multiple integration schema implementations into one community, weakening its single-responsibility profile. [integration-adapter-layer]
+[warning] src/cli/commands/sync.ts sits inside a store-dominated zone rather than the CLI zone, creating an implicit cross-tier dependency that bypasses the gateway pattern. [integration-adapter-layer]
+[warning] 12 entry points — wide API surface, consider consolidating exports [llm-analysis-engine]
+[warning] High coupling (0.62) — 27 imports target "prd-proposal-pipeline" [llm-analysis-engine]
+[warning] Low cohesion (0.38) — files are loosely related, consider splitting this zone [llm-analysis-engine]
+... +87 more
 
 </findings>
 
 <next-steps>
 
-[high] The 39 imports from unit-analyze → unit (upward direction) … (+3 related)
-  files: src/analyze/acknowledge.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts
-  category: fix
-[high] 5 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …
+[high] 8 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …
   category: refactor
+[high] tree-dag-primitives receives imports from both a production… (+3 related)
+  files: src/core/dag.ts, src/core/move.ts, src/core/tree.ts
+  category: fix
+[high] src/cli/commands/constants.ts (9-zone hub) must be relocate… (+2 related)
+  files: src/analyze/reshape-reason.ts, src/cli/commands/chunked-review-state.ts, src/cli/commands/chunked-review.ts
+  category: fix
 [high] Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact …
   category: refactor
-[high] Zone "Unit Core" (unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17…
+[high] e2e/cli-init.test.ts was pulled into this zone because it i… (+1 related)
+  files: src/cli/commands/report.ts, src/schema/validate.ts, src/store/file-adapter.ts
+  category: extract
+[high] One integration test (smart-add-orphaned-parent.test.ts) is… (+1 related)
+  files: src/cli/commands/validate-interactive.ts, src/cli/commands/validate.ts, src/core/epic-correlation.ts
+  category: refactor
+[high] The wide entry-point surface (12 exports) of prd-proposal-p… (+1 related)
+  files: src/analyze/acknowledge.ts, src/analyze/decompose.ts, src/analyze/dedupe.ts
+  category: extract
+[high] store/atomic-write.ts being assigned to llm-analysis-engine… (+1 related)
+  files: src/analyze/analyze-shared.ts, src/analyze/consolidation-guard.ts, src/analyze/file-validation.ts
+  category: fix
+[high] High coupling (0.94) — 9 imports target "prd-domain-operations"
+  files: src/core/dag.ts, src/core/move.ts, src/core/tree.ts
+  category: refactor
+[high] Low cohesion (0.06) — files are loosely related, consider splitting this zone
+  files: src/core/dag.ts, src/core/move.ts, src/core/tree.ts
+  category: refactor
+[high] Cohesion 0.06 is critically low and coupling 0.94 is critically high — this zon…
+  files: src/core/dag.ts, src/core/move.ts, src/core/tree.ts
+  category: refactor
+[high] The 20-import flow from core into this zone and 11-import flow from unit-cli in…
+  files: src/core/dag.ts, src/core/move.ts, src/core/tree.ts
+  category: refactor
+[high] Zone "Schema Storage and Reporting" (schema-storage-reporting) has catastrophic…
+  files: src/cli/commands/report.ts, src/schema/validate.ts, src/store/file-adapter.ts
+  category: fix
+[high] Zone "Task Selection Engine" (task-selection-engine) has catastrophic risk (sco…
   files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
   category: fix
-[high] Downgrade unit-core from catastrophic to warning. The 0.83 coupling to unit-ana…
+[high] MCP task-selection tool (in cli-mcp-interface) imports from task-selection-engi…
   files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
-  category: refactor
-[high] High coupling (0.83) — 9 imports target "unit-analyze"
-  files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
-  category: refactor
-[high] Low cohesion (0.17) — files are loosely related, consider splitting this zone
-  files: src/cli/commands/next.ts, src/core/next-task.ts, tests/unit/core/feature-filtered-task.test.ts
-  category: refactor
-[high] Zone "Cli" (cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: …
-  files: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts
-  category: fix
-[high] The actionable structural defect is 11 files spanning 8 directories. Consolidat…
-  files: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts
-  category: refactor
-[high] High coupling (0.78) — 28 imports target "unit-analyze"
-  files: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts
-  category: refactor
-[high] Low cohesion (0.22) — files are loosely related, consider splitting this zone
-  files: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts
-  category: refactor
-[high] Before deleting: verify reachability by running `node --input-type=module -e 'i…
-  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
-  category: refactor
-[high] Downgrade fix zone from catastrophic to informational. With 4 files below the 8…
-  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
-  category: refactor
-[high] High coupling (0.75) — 3 imports target "unit-analyze"
-  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
-  category: refactor
-[high] Low cohesion (0.25) — files are loosely related, consider splitting this zone
-  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
-  category: refactor
+  category: extract
 
 </next-steps>

@@ -1,7 +1,7 @@
 {
   "id": "project-documentation",
   "name": "Project Documentation",
-  "description": "Architecture decision records, audit analyses, and developer guides that capture design rationale and system-level constraints for the n-dx toolkit.",
+  "description": "Architecture decision records, codebase analysis reports, and developer reference guides covering memory architecture, signal handling, viewer audits, and process lifecycle investigations.",
   "files": [
     "docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md",
     "docs/analysis/memory-risks-and-flaws.md",
@@ -18,17 +18,13 @@
     "docs/process/level-refactor-and-steward-plan.md",
     "docs/process/memory-improvements.md",
     "docs/process/memory-os-behavior.md",
-    "docs/process/rex-smart-add-duplicate-detection.md",
-    "packages/hench/src/store/suggestions.ts",
-    "packages/hench/tests/unit/store/suggestions.test.ts",
-    "packages/web/src/landing/index.html",
-    "packages/web/src/landing/landing.css"
+    "docs/process/rex-smart-add-duplicate-detection.md"
   ],
   "entryPoints": [],
   "cohesion": 0,
   "coupling": 0,
-  "fileCount": 20,
-  "lineCount": 6160,
+  "fileCount": 16,
+  "lineCount": 4317,
   "riskMetrics": {
     "cohesion": 0,
     "coupling": 0,

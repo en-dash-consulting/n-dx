@@ -432,13 +432,13 @@
     },
     {
       "path": "src/analyzers/zones.ts",
-      "size": 74205,
+      "size": 74201,
       "language": "TypeScript",
       "lineCount": 2072,
-      "hash": "e9e9a868ecb4910c9438b1a970f6f2087f2d1e1f43f59f80792513c2f25681fc",
+      "hash": "5e5baf998362a837a1752b5a1d2b4386824e9cef67518fd3ece75b3bb31527aa",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1773094647440
+      "lastModified": 1773107952249
     },
     {
       "path": "src/cli/commands/analyze-phases.ts",
@@ -1212,13 +1212,13 @@
     },
     {
       "path": "tests/unit/analyzers/zone-insights.test.ts",
-      "size": 36599,
+      "size": 36623,
       "language": "TypeScript",
       "lineCount": 899,
-      "hash": "c37ac3bdaf5adda450129d92b2eef12a9de597245adeccde98d4f75951310a41",
+      "hash": "28cec76d5e1e7aa2e6032e715dd4ae1496952cc95d81d0a4626c21e8e11d7b15",
       "role": "test",
       "category": "tests",
-      "lastModified": 1773020571101
+      "lastModified": 1773108027821
     },
     {
       "path": "tests/unit/analyzers/zone-output.test.ts",
@@ -1445,10 +1445,10 @@
       "size": 84374,
       "language": "Other",
       "lineCount": 1,
-      "hash": "37c28779db6fdc93d787802ed02a35581297a3ca90d352293adb85585398243f",
+      "hash": "fab2ad65e141b968968e96a6409d7683a43d08f94c6734301ff730e388526f68",
       "role": "config",
       "category": "root",
-      "lastModified": 1773101657211
+      "lastModified": 1773107959378
     },
     {
       "path": "vitest.config.ts",

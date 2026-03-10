@@ -1,0 +1,32 @@
+{
+  "id": "packages-sourcevision:static-analysis-services",
+  "name": "Static Analysis Services",
+  "description": "Core analysis infrastructure providing archetype detection, call-graph finding generation, completion reading, and manifest management.",
+  "files": [
+    "packages/sourcevision/src/analyzers/archetypes.ts",
+    "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+    "packages/sourcevision/src/analyzers/completion-reader.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/constants.ts",
+    "packages/sourcevision/tests/unit/analyzers/archetypes.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/completion-reader.test.ts",
+    "packages/sourcevision/tests/unit/analyzers/manifest.test.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/archetypes.ts",
+    "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/constants.ts"
+  ],
+  "cohesion": 0.21,
+  "coupling": 0.79,
+  "fileCount": 8,
+  "lineCount": 2483,
+  "riskMetrics": {
+    "cohesion": 0.21,
+    "coupling": 0.79,
+    "riskScore": 0.79,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

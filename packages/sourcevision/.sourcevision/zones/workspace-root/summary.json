@@ -1,0 +1,28 @@
+{
+  "id": "workspace-root",
+  "name": "Workspace Root",
+  "description": "Root-level project documentation, workspace package manifest, TypeScript build config, and shared Vitest configuration.",
+  "files": [
+    "ARCHITECTURE.md",
+    "README.md",
+    "SourceVision-F.png",
+    "SourceVision.png",
+    "WORKSPACE_DESIGN.md",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.tsbuildinfo",
+    "vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 9,
+  "lineCount": 990,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

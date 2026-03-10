@@ -1,0 +1,19 @@
+{
+  "id": "hench-unit/hench/unit-2",
+  "name": "Hench Unit/hench/unit 2",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/store/project-config.ts",
+    "packages/hench/tests/unit/agent/api-auth.test.ts",
+    "packages/hench/tests/unit/store/claude-config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/store/project-config.ts"
+  ],
+  "cohesion": 0.12,
+  "coupling": 0.88,
+  "fileCount": 4,
+  "lineCount": 1125
+}

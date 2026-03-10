@@ -1,0 +1,22 @@
+{
+  "id": "viewer-shell-assets",
+  "name": "Viewer Shell Assets",
+  "description": "Static shell entry point for the viewer application — the root index.html and paired light/dark logo image assets loaded at startup.",
+  "files": [
+    "packages/web/src/viewer/darkmode_logo.png",
+    "packages/web/src/viewer/index.html",
+    "packages/web/src/viewer/lightmode_logo.png"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 30,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

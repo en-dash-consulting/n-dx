@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": "llm-client-core",
+      "zoneName": "LLM Client Core",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 36,
+      "timestamp": "2026-03-10T02:45:57.975Z",
+      "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad"
+    },
+    {
+      "zoneId": "llm-client-tests",
+      "zoneName": "LLM Client Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 5,
+      "timestamp": "2026-03-10T02:45:57.975Z",
+      "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad"
+    },
+    {
+      "zoneId": "package-config",
+      "zoneName": "Package Config",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 3,
+      "timestamp": "2026-03-10T02:45:57.975Z",
+      "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad"
+    }
+  ],
+  "analyzedAt": "2026-03-10T02:45:57.975Z",
+  "gitSha": "3acc83960af2346500edaebf35caafe9f7993fad"
+}
