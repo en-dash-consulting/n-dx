@@ -6,6 +6,14 @@
  *
  * Each edge in callgraph.json represents a single call site (no callCount
  * field), so we count edges rather than summing a weight.
+ *
+ * Usage:  node scripts/hench-callgraph-analysis.mjs
+ * Requires: Node >= 18 (ES module, top-level await not used but fs imports needed)
+ * Prerequisite: Run `ndx plan .` or `sourcevision analyze .` first to generate
+ *               .sourcevision/callgraph.json.
+ *
+ * Note: This script is intentionally excluded from the monorepo build and test
+ * pipelines — it is a one-off diagnostic tool, not production code.
  */
 
 import { readFileSync, existsSync } from "fs";

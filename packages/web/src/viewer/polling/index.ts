@@ -6,9 +6,35 @@
  */
 
 export {
+  startPollingManager,
+  stopPollingManager,
   registerPoller,
   unregisterPoller,
+  suspendAll,
+  resumeAll,
+  isSuspended,
+  isPollerActive,
+  getRegisteredPollers,
+  getPollerCount,
+  resetPollingManager,
 } from "./polling-manager.js";
+
+export {
+  startPollingRestart,
+  stopPollingRestart,
+} from "./polling-restart.js";
+
+export {
+  createTickVisibilityGate,
+} from "./tick-visibility-gate.js";
+
+export {
+  onTick,
+  suspendTickTimer,
+  resumeTickTimer,
+  getTickTimerState,
+  resetTickTimer,
+} from "./tick-timer.js";
 
 export {
   registerTickUpdater,

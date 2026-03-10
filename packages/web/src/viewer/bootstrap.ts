@@ -6,11 +6,13 @@
  * the first render.
  */
 
-import { initTheme } from "./components/theme-toggle.js";
-import { startTabVisibilityMonitor } from "./polling/index.js";
-import { startPollingManager } from "./polling/polling-manager.js";
-import { startPollingRestart } from "./polling/polling-restart.js";
-import { createTickVisibilityGate } from "./polling/tick-visibility-gate.js";
+import { initTheme } from "./components/index.js";
+import {
+  startTabVisibilityMonitor,
+  startPollingManager,
+  startPollingRestart,
+  createTickVisibilityGate,
+} from "./polling/index.js";
 
 /** Run all one-time setup operations. */
 export function bootstrap(): void {
