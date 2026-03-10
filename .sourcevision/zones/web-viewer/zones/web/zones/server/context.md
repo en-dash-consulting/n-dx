@@ -8,14 +8,14 @@ Zone: Web Viewer/web/server (`web-viewer/web/server`)
 Files: 81, Cohesion: 0.98, Coupling: 0.02
 Description: 81 files, primarily TypeScript
 Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/shared/data-files.ts, packages/web/src/viewer/views/pr-markdown.ts
-Lines: 29172
+Lines: 29188
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 55 lines, source)
+packages/web/src/public.ts (TypeScript, 68 lines, source)
 packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
 packages/web/src/server/index.ts (TypeScript, 40 lines, source)
@@ -23,7 +23,7 @@ packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
 packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
-packages/web/src/server/rex-gateway.ts (TypeScript, 88 lines, source)
+packages/web/src/server/rex-gateway.ts (TypeScript, 91 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
 packages/web/src/server/routes-data.ts (TypeScript, 147 lines, source)

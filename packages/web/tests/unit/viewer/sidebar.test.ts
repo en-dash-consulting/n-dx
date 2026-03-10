@@ -469,8 +469,10 @@ describe("Sidebar", () => {
       modules: {
         inventory: { status: "complete" },
         imports: { status: "complete" },
+        classifications: { status: "complete" },
         zones: { status: "running" },
         components: { status: "pending" },
+        callgraph: { status: "pending" },
       },
     } as any;
 
@@ -499,7 +501,7 @@ describe("Sidebar", () => {
     it("shows correct progress count", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const label = root.querySelector(".progress-label");
-      expect(label?.textContent).toBe("Analysis: 2/5");
+      expect(label?.textContent).toBe("Analysis: 3/6");
     });
 
     it("navigates to overview when progress indicator is clicked", () => {
@@ -520,20 +522,21 @@ describe("Sidebar", () => {
     it("renders module status icons", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const modules = root.querySelectorAll(".progress-module");
-      expect(modules.length).toBe(5);
-      // First two should be done (✓)
+      expect(modules.length).toBe(6);
+      // First three should be done (✓)
       expect(modules[0].classList.contains("done")).toBe(true);
       expect(modules[1].classList.contains("done")).toBe(true);
+      expect(modules[2].classList.contains("done")).toBe(true);
       // Last three should not be done
-      expect(modules[2].classList.contains("done")).toBe(false);
       expect(modules[3].classList.contains("done")).toBe(false);
       expect(modules[4].classList.contains("done")).toBe(false);
+      expect(modules[5].classList.contains("done")).toBe(false);
     });
 
     it("progress bar reflects completion percentage", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const fill = root.querySelector<HTMLElement>(".progress-fill");
-      expect(fill?.style.width).toBe("40%");
+      expect(fill?.style.width).toBe("50%");
     });
 
     it("progress indicator collapses with the SourceVision section", async () => {

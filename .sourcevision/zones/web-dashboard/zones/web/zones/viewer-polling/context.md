@@ -8,7 +8,7 @@ Zone: Web Viewer/web/viewer Polling (`web-viewer/web/viewer-polling`)
 Files: 9, Cohesion: 0.50, Coupling: 0.50
 Description: 9 files, primarily TypeScript
 Entry points: packages/web/src/viewer/hooks/use-polling-suspension.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/polling/batched-tick-dispatcher.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-restart.ts, packages/web/src/viewer/polling/polling-state.ts
-Lines: 2446
+Lines: 2424
 
 </zone>
 
@@ -18,7 +18,7 @@ packages/web/src/viewer/hooks/use-polling-suspension.ts (TypeScript, 61 lines, s
 packages/web/src/viewer/hooks/use-polling.ts (TypeScript, 68 lines, source)
 packages/web/src/viewer/polling/batched-tick-dispatcher.ts (TypeScript, 240 lines, source)
 packages/web/src/viewer/polling/index.ts (TypeScript, 28 lines, source)
-packages/web/src/viewer/polling/polling-restart.ts (TypeScript, 143 lines, source)
+packages/web/src/viewer/polling/polling-restart.ts (TypeScript, 121 lines, source)
 packages/web/src/viewer/polling/polling-state.ts (TypeScript, 398 lines, source)
 packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts (TypeScript, 655 lines, test)
 packages/web/tests/unit/viewer/polling-state.test.ts (TypeScript, 725 lines, test)

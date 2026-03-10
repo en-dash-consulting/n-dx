@@ -19,13 +19,14 @@
     "src/cli/commands/constants.ts",
     "src/cli/commands/health.ts",
     "src/cli/commands/init.ts",
+    "src/cli/mcp-tools.ts",
     "src/cli/mcp.ts",
     "src/core/health.ts"
   ],
   "cohesion": 0.22,
   "coupling": 0.78,
   "fileCount": 11,
-  "lineCount": 2417,
+  "lineCount": 2523,
   "riskMetrics": {
     "cohesion": 0.22,
     "coupling": 0.78,

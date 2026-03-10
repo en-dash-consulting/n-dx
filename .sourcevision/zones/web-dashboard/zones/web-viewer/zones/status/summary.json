@@ -10,8 +10,8 @@
   "entryPoints": [
     "packages/web/src/viewer/components/status-indicators.ts"
   ],
-  "cohesion": 0.4,
-  "coupling": 0.6,
+  "cohesion": 0.5,
+  "coupling": 0.5,
   "fileCount": 3,
   "lineCount": 783
 }

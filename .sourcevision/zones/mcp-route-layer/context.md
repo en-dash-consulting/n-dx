@@ -7,7 +7,7 @@
 Zone: MCP Route Layer (`mcp-route-layer`)
 Files: 4, Cohesion: 0.40, Coupling: 0.60
 Risk: healthy (score: 0.60)
-Description: The MCP server route handlers and domain gateway module that expose rex and sourcevision capabilities over HTTP to Claude Code clients.
+Description: The MCP HTTP route handler and its domain gateway, together forming the server-side boundary that exposes sourcevision data to MCP clients via Express routes.
 Entry points: packages/web/src/server/routes-mcp.ts
 Lines: 598
 
@@ -30,7 +30,7 @@ Internal:
   packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute, closeAllMcpSessions}
 
 Outgoing (this zone → other zones):
-  → packages-sourcevision:branch-workspace-reporting: packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts
+  → packages-sourcevision:unit: packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts
   → web-dashboard: packages/web/src/server/routes-mcp.ts → packages/web/src/server/rex-gateway.ts; packages/web/src/server/routes-mcp.ts → packages/web/src/server/types.ts; packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/types.ts
 
 Incoming (other zones → this zone):
@@ -41,34 +41,19 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [warning] High coupling (0.6) — 3 imports target "web-dashboard"
-[observation] [info] Coupling 0.6 sits at the warning threshold but is architecturally justified — this zone is intentionally a composition point and its coupling is bounded by the gateway pattern.
-[observation] [info] Each production file has a co-located unit test; the 1:1 pairing is a positive signal for boundary-layer test coverage.
-[observation] [info] The zone's small size (4 files) with high coupling suggests it is correctly scoped as a thin adapter layer rather than a logic-heavy service.
-[pattern] [info] Anti-corruption layer pattern: mcp-route-layer isolates the MCP protocol surface from rex and sourcevision domain internals via the gateway module. This prevents protocol-level concerns (session IDs, HTTP framing) from leaking into domain logic and vice versa. The pattern is correctly implemented and should be the reference for any future protocol adapter zones.
-[relationship] [info] mcp-route-layer → web-dashboard coupling (0.6) flows in one direction only at the zone level: routes-mcp.ts is imported by web-dashboard's start.ts composition root. The reverse edge (web-dashboard → mcp-route-layer) exists only as a type-import (erased at compile time). This asymmetry is healthy — the ACL is consumed by the composition root, not entangled with it.
-[anti-pattern] [warning] The MCP route layer's two domain gateways are split across two zones: domain-gateway.ts (sourcevision) lives in mcp-route-layer while rex-gateway.ts (rex) lives in web-dashboard. A developer auditing cross-package MCP imports must inspect both zones to see the full surface, weakening the gateway pattern's auditability guarantee.
-[suggestion] [info] Rename zone from 'mcp-route-layer' to 'web-mcp-route-layer' to match the 'web-' naming prefix convention used by web-dashboard, web-landing-scripts, and web-static-assets. Without the prefix, package-level zone filtering by name pattern silently excludes this zone.
+[observation] [info] Coupling of 0.6 sits at the warning threshold but is architecturally intentional per zone hints — the route layer must import from the rex gateway and the web-dashboard wires the route handler at composition time.
+[observation] [info] Each production file has a corresponding unit test file (domain-gateway.test.ts, routes-mcp.test.ts), indicating good test coverage discipline for a boundary-critical zone.
 
 </findings>
 
 <insights>
 
 - High coupling (0.6) — 3 imports target "web-dashboard"
-- The coupling of 0.6 is at the threshold boundary and is expected given this zone's role as a composition point bridging the web server to domain packages via gateway modules.
-- The zone correctly pairs each production file with its dedicated test (domain-gateway.test.ts, routes-mcp.test.ts), indicating good test discipline at the boundary layer.
-- The domain-gateway.ts file enforces the single-gateway-per-source-package rule for sourcevision, keeping the cross-package import surface auditable.
-- Coupling 0.6 sits at the warning threshold but is architecturally justified — this zone is intentionally a composition point and its coupling is bounded by the gateway pattern.
-- Each production file has a co-located unit test; the 1:1 pairing is a positive signal for boundary-layer test coverage.
-- The zone's small size (4 files) with high coupling suggests it is correctly scoped as a thin adapter layer rather than a logic-heavy service.
-- Serves as an anti-corruption layer (ACL) between the web server infrastructure and the rex/sourcevision domain packages — it translates MCP protocol requests into domain calls without leaking domain types into the server layer.
-- The 1:1 pairing of domain-gateway.ts↔domain-gateway.test.ts and routes-mcp.ts↔routes-mcp.test.ts makes this the most test-complete boundary layer in the web package relative to its size.
-- Anti-corruption layer pattern: mcp-route-layer isolates the MCP protocol surface from rex and sourcevision domain internals via the gateway module. This prevents protocol-level concerns (session IDs, HTTP framing) from leaking into domain logic and vice versa. The pattern is correctly implemented and should be the reference for any future protocol adapter zones.
-- mcp-route-layer → web-dashboard coupling (0.6) flows in one direction only at the zone level: routes-mcp.ts is imported by web-dashboard's start.ts composition root. The reverse edge (web-dashboard → mcp-route-layer) exists only as a type-import (erased at compile time). This asymmetry is healthy — the ACL is consumed by the composition root, not entangled with it.
-- domain-gateway.ts enforces the single-gateway-per-source-package rule for sourcevision but the corresponding rex-gateway.ts lives in web-dashboard rather than in this zone. The two gateways serving MCP routes are split across two zones, making the complete MCP cross-package import surface invisible from a single zone view
-- If a third domain package (e.g. hench) is ever exposed via MCP, its gateway file would need to be created in one of two zones (this zone or web-dashboard), and the choice is non-obvious given that one gateway already lives in each location — the split-gateway precedent makes future decisions ambiguous
-- The MCP route layer's two domain gateways are split across two zones: domain-gateway.ts (sourcevision) lives in mcp-route-layer while rex-gateway.ts (rex) lives in web-dashboard. A developer auditing cross-package MCP imports must inspect both zones to see the full surface, weakening the gateway pattern's auditability guarantee.
-- Zone name 'mcp-route-layer' does not use the 'web-' prefix that three other web-package zones use (web-dashboard, web-landing-scripts, web-static-assets). Automated tooling that identifies web-package zones by name prefix would misclassify this zone as belonging to a different package or tier.
-- Rename zone from 'mcp-route-layer' to 'web-mcp-route-layer' to match the 'web-' naming prefix convention used by web-dashboard, web-landing-scripts, and web-static-assets. Without the prefix, package-level zone filtering by name pattern silently excludes this zone.
+- Coupling of 0.6 is at the warning boundary, but the zone hints confirm this is intentional: routes-mcp.ts imports from rex-gateway.ts and types.ts as part of the composition-root wiring pattern — the coupling is structural, not accidental.
+- At only 4 files (2 production, 2 tests) this zone is at the minimum viable size; if the MCP route surface expands, splitting into route-handlers and domain-gateway sub-zones would improve navigability.
+- The bidirectional crossing with web-dashboard (3 imports web-server→web-dashboard, 2 imports web-dashboard→web-server) is inherent to the composition root: start.ts wires the route handler, which in turn imports server-side types — both directions are type-safe and architecturally justified.
+- Coupling of 0.6 sits at the warning threshold but is architecturally intentional per zone hints — the route layer must import from the rex gateway and the web-dashboard wires the route handler at composition time.
+- Each production file has a corresponding unit test file (domain-gateway.test.ts, routes-mcp.test.ts), indicating good test coverage discipline for a boundary-critical zone.
 - [call graph] 14 internal calls, 1 outgoing, 3 incoming (cohesion: 0.93, coupling: 0.07)
 
 </insights>

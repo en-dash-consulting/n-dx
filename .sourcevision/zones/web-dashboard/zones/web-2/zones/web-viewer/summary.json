@@ -1,0 +1,38 @@
+{
+  "id": "web-viewer/web-2/web-viewer",
+  "name": "Web Viewer/web 2/web Viewer",
+  "description": "17 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/degradation-banner.ts",
+    "packages/web/src/viewer/components/memory-warning.ts",
+    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+    "packages/web/src/viewer/components/refresh-queue-status.ts",
+    "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+    "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+    "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
+    "packages/web/src/viewer/performance/dom-performance-monitor.ts",
+    "packages/web/src/viewer/performance/index.ts",
+    "packages/web/src/viewer/performance/refresh-throttle.ts",
+    "packages/web/src/viewer/performance/update-batcher.ts",
+    "packages/web/tests/integration/memory-aware-polling-suspension.test.ts",
+    "packages/web/tests/unit/viewer/degradation-banner.test.ts",
+    "packages/web/tests/unit/viewer/dom-performance-monitor.test.ts",
+    "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
+    "packages/web/tests/unit/viewer/update-batcher.test.ts",
+    "packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/degradation-banner.ts",
+    "packages/web/src/viewer/components/memory-warning.ts",
+    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
+    "packages/web/src/viewer/components/refresh-queue-status.ts",
+    "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+    "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
+    "packages/web/src/viewer/performance/index.ts",
+    "packages/web/src/viewer/performance/update-batcher.ts"
+  ],
+  "cohesion": 0.71,
+  "coupling": 0.29,
+  "fileCount": 17,
+  "lineCount": 5912
+}

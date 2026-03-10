@@ -1,0 +1,24 @@
+{
+  "id": "web-viewer/web/viewer-views/viewer-components",
+  "name": "Web Viewer/web/viewer Views/viewer Components",
+  "description": "10 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/crash-recovery-banner.ts",
+    "packages/web/src/viewer/components/faq.ts",
+    "packages/web/src/viewer/components/polling-suspension-indicator.ts",
+    "packages/web/src/viewer/components/search-overlay.ts",
+    "packages/web/src/viewer/main.ts",
+    "packages/web/tests/integration/pr-markdown-tab-parity.test.ts",
+    "packages/web/tests/integration/token-usage-route-regression.test.ts",
+    "packages/web/tests/unit/viewer/crash-recovery-banner.test.ts",
+    "packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts",
+    "packages/web/tests/unit/viewer/search-overlay.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/faq.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 10,
+  "lineCount": 2562
+}

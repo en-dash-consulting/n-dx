@@ -1,0 +1,27 @@
+{
+  "id": "packages-rex:root",
+  "name": "Root",
+  "description": "8 files, primarily Markdown, Other, JSON",
+  "files": [
+    "packages/rex/README.md",
+    "packages/rex/Rex-F.png",
+    "packages/rex/Rex.png",
+    "packages/rex/context.md",
+    "packages/rex/llms.txt",
+    "packages/rex/package.json",
+    "packages/rex/tsconfig.json",
+    "packages/rex/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 535,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

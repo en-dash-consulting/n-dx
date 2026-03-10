@@ -5,26 +5,34 @@
 <zone>
 
 Zone: Hench/unit 2 (`hench/unit-2`)
-Files: 3, Cohesion: 1.00, Coupling: 0.00
-Description: 3 files, primarily TypeScript
-Entry points: packages/hench/src/agent/lifecycle/token-usage.ts
-Lines: 657
+Files: 6, Cohesion: 1.00, Coupling: 0.00
+Description: 6 files, primarily TypeScript
+Entry points: packages/hench/src/store/config.ts
+Lines: 999
 
 </zone>
 
 <files>
 
-packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 141 lines, source)
-packages/hench/tests/unit/agent/token-usage-regression.test.ts (TypeScript, 65 lines, test)
-packages/hench/tests/unit/agent/token-usage.test.ts (TypeScript, 451 lines, test)
+packages/hench/src/store/config.ts (TypeScript, 49 lines, source)
+packages/hench/tests/integration/store-roundtrip.test.ts (TypeScript, 126 lines, test)
+packages/hench/tests/unit/agent/atomic-transition.test.ts (TypeScript, 381 lines, test)
+packages/hench/tests/unit/agent/loop.test.ts (TypeScript, 109 lines, test)
+packages/hench/tests/unit/agent/task-failure.test.ts (TypeScript, 248 lines, test)
+packages/hench/tests/unit/store/project-config.test.ts (TypeScript, 86 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/tests/unit/agent/token-usage-regression.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage}
-  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
-  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
+  packages/hench/tests/integration/store-roundtrip.test.ts → packages/hench/src/store/config.ts {ensureHenchDir, loadConfig, saveConfig, configExists, initConfig}
+  packages/hench/tests/unit/agent/atomic-transition.test.ts → packages/hench/src/store/config.ts {loadConfig}
+  packages/hench/tests/unit/agent/atomic-transition.test.ts → packages/hench/src/store/config.ts {initConfig}
+  packages/hench/tests/unit/agent/loop.test.ts → packages/hench/src/store/config.ts {loadConfig}
+  packages/hench/tests/unit/agent/loop.test.ts → packages/hench/src/store/config.ts {ensureHenchDir, initConfig}
+  packages/hench/tests/unit/agent/task-failure.test.ts → packages/hench/src/store/config.ts {loadConfig}
+  packages/hench/tests/unit/agent/task-failure.test.ts → packages/hench/src/store/config.ts {initConfig}
+  packages/hench/tests/unit/store/project-config.test.ts → packages/hench/src/store/config.ts {ensureHenchDir, loadConfig, initConfig}
 
 </imports>

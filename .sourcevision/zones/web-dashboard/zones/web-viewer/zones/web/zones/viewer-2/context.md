@@ -5,16 +5,15 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer 2 (`web-viewer/web-viewer/web/viewer-2`)
-Files: 5, Cohesion: 0.32, Coupling: 0.68
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/sourcevision-tabs.ts, packages/web/src/viewer/views/suggestions.ts
-Lines: 333
+Files: 4, Cohesion: 0.32, Coupling: 0.68
+Description: 4 files, primarily TypeScript
+Entry points: packages/web/src/viewer/views/enrichment-thresholds.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/sourcevision-tabs.ts, packages/web/src/viewer/views/suggestions.ts
+Lines: 230
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/views/architecture.ts (TypeScript, 103 lines, source)
 packages/web/src/viewer/views/enrichment-thresholds.ts (TypeScript, 11 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/sourcevision-tabs.ts (TypeScript, 35 lines, source)
@@ -25,7 +24,6 @@ packages/web/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
 <imports>
 
 Internal:
-  packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}

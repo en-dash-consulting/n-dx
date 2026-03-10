@@ -5,25 +5,25 @@
 <zone>
 
 Zone: Web Viewer/web 4 (`web-viewer/web-4`)
-Files: 3, Cohesion: 0.44, Coupling: 0.56
+Files: 3, Cohesion: 0.29, Coupling: 0.71
 Description: 3 files, primarily TypeScript
-Entry points: packages/web/src/viewer/usage/constants.ts, packages/web/src/viewer/views/token-usage.ts
-Lines: 790
+Entry points: packages/web/src/viewer/views/enrichment-thresholds.ts, packages/web/src/viewer/views/sourcevision-tabs.ts, packages/web/src/viewer/views/suggestions.ts
+Lines: 128
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/usage/constants.ts (TypeScript, 18 lines, source)
-packages/web/src/viewer/usage/index.ts (TypeScript, 12 lines, source)
-packages/web/src/viewer/views/token-usage.ts (TypeScript, 760 lines, source)
+packages/web/src/viewer/views/enrichment-thresholds.ts (TypeScript, 11 lines, source)
+packages/web/src/viewer/views/sourcevision-tabs.ts (TypeScript, 35 lines, source)
+packages/web/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/usage/index.ts → packages/web/src/viewer/usage/constants.ts {TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS, TOKEN_USAGE_VIEW_ID}
-  packages/web/src/viewer/views/token-usage.ts → packages/web/src/viewer/usage/constants.ts {TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS}
+  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
+  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
 
 </imports>

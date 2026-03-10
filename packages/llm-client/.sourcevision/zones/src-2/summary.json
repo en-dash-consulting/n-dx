@@ -1,0 +1,40 @@
+{
+  "id": "src-2",
+  "name": "Src 2",
+  "description": "19 files, primarily TypeScript",
+  "files": [
+    "src/auth.ts",
+    "src/config.ts",
+    "src/exec.ts",
+    "src/help-format.ts",
+    "src/json.ts",
+    "src/output.ts",
+    "src/project-config.ts",
+    "src/project-dirs.ts",
+    "src/public.ts",
+    "src/suggest.ts",
+    "tests/unit/auth.test.ts",
+    "tests/unit/config.test.ts",
+    "tests/unit/exec.test.ts",
+    "tests/unit/help-format.test.ts",
+    "tests/unit/json.test.ts",
+    "tests/unit/output.test.ts",
+    "tests/unit/project-config.test.ts",
+    "tests/unit/public-api.test.ts",
+    "tests/unit/suggest.test.ts"
+  ],
+  "entryPoints": [
+    "src/config.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 19,
+  "lineCount": 4425,
+  "riskMetrics": {
+    "cohesion": 0.56,
+    "coupling": 0.44,
+    "riskScore": 0.43999999999999995,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

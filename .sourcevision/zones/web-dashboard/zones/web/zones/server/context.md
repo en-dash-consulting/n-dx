@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web/server (`web-viewer/web/server`)
-Files: 81, Cohesion: 0.98, Coupling: 0.02
+Files: 81, Cohesion: 0.99, Coupling: 0.01
 Description: 81 files, primarily TypeScript
 Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/shared/data-files.ts, packages/web/src/viewer/views/pr-markdown.ts
 Lines: 29188

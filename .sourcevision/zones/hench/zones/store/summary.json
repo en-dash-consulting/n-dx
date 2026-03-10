@@ -1,14 +1,19 @@
 {
   "id": "hench/store",
   "name": "Hench/store",
-  "description": "2 files, primarily TypeScript",
+  "description": "4 files, primarily TypeScript",
   "files": [
-    "packages/hench/src/store/suggestions.ts",
-    "packages/hench/tests/unit/store/suggestions.test.ts"
+    "packages/hench/src/store/json.ts",
+    "packages/hench/src/store/runs.ts",
+    "packages/hench/tests/integration/codex-token-accounting.test.ts",
+    "packages/hench/tests/unit/store/run-compressed-reads.test.ts"
   ],
-  "entryPoints": [],
-  "cohesion": 1,
-  "coupling": 0,
-  "fileCount": 2,
-  "lineCount": 217
+  "entryPoints": [
+    "packages/hench/src/store/json.ts",
+    "packages/hench/src/store/runs.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 4,
+  "lineCount": 430
 }

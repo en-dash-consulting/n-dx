@@ -3,17 +3,16 @@
   "name": "Hench/unit/agent Lifecycle",
   "description": "4 files, primarily TypeScript",
   "files": [
-    "packages/hench/src/agent/lifecycle/task-display.ts",
-    "packages/hench/src/types/index.ts",
-    "packages/hench/src/types/output.ts",
-    "packages/hench/tests/unit/agent/task-display.test.ts"
+    "packages/hench/src/agent/index.ts",
+    "packages/hench/src/agent/lifecycle/token-usage.ts",
+    "packages/hench/tests/unit/agent/token-usage-regression.test.ts",
+    "packages/hench/tests/unit/agent/token-usage.test.ts"
   ],
   "entryPoints": [
-    "packages/hench/src/agent/lifecycle/task-display.ts",
-    "packages/hench/src/types/output.ts"
+    "packages/hench/src/agent/lifecycle/token-usage.ts"
   ],
-  "cohesion": 0.36,
-  "coupling": 0.64,
+  "cohesion": 0.18,
+  "coupling": 0.82,
   "fileCount": 4,
-  "lineCount": 226
+  "lineCount": 733
 }

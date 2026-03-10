@@ -5,56 +5,45 @@
 <zone>
 
 Zone: Hench/unit/cli (`hench/unit/cli`)
-Files: 14, Cohesion: 0.67, Coupling: 0.33
-Description: 14 files, primarily TypeScript
-Entry points: packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/output.ts
-Lines: 1589
+Files: 9, Cohesion: 0.25, Coupling: 0.75
+Description: 9 files, primarily TypeScript
+Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/prd/rex-gateway.ts, packages/hench/src/tools/rex.ts
+Lines: 4507
 
 </zone>
 
 <files>
 
-packages/hench/src/cli/commands/constants.ts (TypeScript, 55 lines, source)
-packages/hench/src/cli/commands/show.ts (TypeScript, 114 lines, source)
-packages/hench/src/cli/commands/status.ts (TypeScript, 76 lines, source)
-packages/hench/src/cli/commands/task-lookup.ts (TypeScript, 83 lines, source)
-packages/hench/src/cli/errors.ts (TypeScript, 219 lines, source)
-packages/hench/src/cli/help.ts (TypeScript, 199 lines, source)
-packages/hench/src/cli/index.ts (TypeScript, 146 lines, source)
-packages/hench/src/cli/output.ts (TypeScript, 19 lines, source)
-packages/hench/tests/unit/cli/commands/constants.test.ts (TypeScript, 42 lines, test)
-packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts (TypeScript, 157 lines, test)
-packages/hench/tests/unit/cli/commands/task-lookup.test.ts (TypeScript, 24 lines, test)
-packages/hench/tests/unit/cli/errors.test.ts (TypeScript, 234 lines, test)
-packages/hench/tests/unit/cli/help.test.ts (TypeScript, 101 lines, test)
-packages/hench/tests/unit/cli/output.test.ts (TypeScript, 120 lines, test)
+packages/hench/src/agent/planning/brief.ts (TypeScript, 353 lines, source)
+packages/hench/src/cli/commands/run.ts (TypeScript, 1118 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 122 lines, source)
+packages/hench/src/tools/rex.ts (TypeScript, 253 lines, source)
+packages/hench/tests/unit/agent/brief.test.ts (TypeScript, 1531 lines, test)
+packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts (TypeScript, 248 lines, test)
+packages/hench/tests/unit/cli/commands/run-epic.test.ts (TypeScript, 529 lines, test)
+packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 105 lines, test)
+packages/hench/tests/unit/tools/rex.test.ts (TypeScript, 248 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/src/cli/commands/constants.ts → packages/hench/src/cli/errors.ts {CLIError}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/commands/task-lookup.ts {lookupTaskInRex, formatTaskLine}
-  packages/hench/src/cli/commands/show.ts → packages/hench/src/cli/output.ts {info, result}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR, safeParseInt}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/commands/task-lookup.ts {batchLookupTasksInRex, formatTaskLine}
-  packages/hench/src/cli/commands/status.ts → packages/hench/src/cli/output.ts {info, result}
-  packages/hench/src/cli/commands/task-lookup.ts → packages/hench/src/cli/commands/constants.ts {HENCH_DIR}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/constants.ts {usage}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/errors.ts {CLIError, handleCLIError, requireHenchDir}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/help.ts {showCommandHelp}
-  packages/hench/src/cli/index.ts → packages/hench/src/cli/output.ts {setQuiet}
-  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/commands/constants.ts {safeParseInt}
-  packages/hench/tests/unit/cli/commands/constants.test.ts → packages/hench/src/cli/errors.ts {CLIError}
-  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/show.ts {cmdShow}
-  packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts → packages/hench/src/cli/commands/status.ts {cmdStatus}
-  packages/hench/tests/unit/cli/commands/task-lookup.test.ts → packages/hench/src/cli/commands/task-lookup.ts {formatTaskLine}
-  packages/hench/tests/unit/cli/errors.test.ts → packages/hench/src/cli/errors.ts {CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI}
-  packages/hench/tests/unit/cli/help.test.ts → packages/hench/src/cli/help.ts {showCommandHelp}
-  packages/hench/tests/unit/cli/output.test.ts → packages/hench/src/cli/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
+  packages/hench/src/agent/planning/brief.ts → packages/hench/src/prd/rex-gateway.ts {findNextTask, findActionableTasks, collectCompletedIds, findItem, walkTree, collectRequirements, isWorkItem}
+  packages/hench/src/agent/planning/brief.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore, PRDItem, TreeEntry}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {collectEpicTaskIds}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/agent/planning/brief.ts {getActionableTasks, collectEpicTaskIds}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {walkTree}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {resolveStore, findNextTask, findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION}
+  packages/hench/src/cli/commands/run.ts → packages/hench/src/prd/rex-gateway.ts {PRDItem, PRDStore}
+  packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding}
+  packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore, PRDItem, ItemStatus, CommandExecutor}
+  packages/hench/tests/unit/agent/brief.test.ts → packages/hench/src/agent/planning/brief.ts {formatTaskBrief, assembleTaskBrief, getActionableTasks, TaskNotActionableError, collectEpicTaskIds}
+  packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {getOrderedEpics, printEpicByEpicSummary}
+  packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicRunSummary, EpicScopeInfo}
+  packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {listEpics, findEpicByIdOrTitle, resolveEpicFlag, collectEpicTaskIds, getEpicScopeInfo}
+  packages/hench/tests/unit/cli/commands/run-epic.test.ts → packages/hench/src/cli/commands/run.ts {EpicScopeInfo}
+  packages/hench/tests/unit/prd/rex-gateway.test.ts → packages/hench/src/prd/rex-gateway.ts {*}
+  packages/hench/tests/unit/tools/rex.test.ts → packages/hench/src/tools/rex.ts {toolRexUpdateStatus, toolRexAppendLog, toolRexAddSubtask}
 
 </imports>

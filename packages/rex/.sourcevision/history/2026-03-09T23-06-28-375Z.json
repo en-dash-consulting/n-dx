@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": ".rex",
+      "zoneName": ".rex",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 4,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "cli",
+      "zoneName": "Cli",
+      "cohesion": 0.22,
+      "coupling": 0.78,
+      "riskScore": 0.78,
+      "fileCount": 11,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "e2e",
+      "zoneName": "E2e",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 13,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "fix",
+      "zoneName": "Fix",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 4,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "root",
+      "zoneName": "Root",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 8,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "store",
+      "zoneName": "Store",
+      "cohesion": 0.38,
+      "coupling": 0.63,
+      "riskScore": 0.625,
+      "fileCount": 16,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "unit",
+      "zoneName": "Unit",
+      "cohesion": 0.28,
+      "coupling": 0.72,
+      "riskScore": 0.72,
+      "fileCount": 26,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "unit-analyze",
+      "zoneName": "Unit Analyze",
+      "cohesion": 0.68,
+      "coupling": 0.32,
+      "riskScore": 0.31999999999999995,
+      "fileCount": 105,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "unit-cli",
+      "zoneName": "Unit Cli",
+      "cohesion": 0.46,
+      "coupling": 0.54,
+      "riskScore": 0.54,
+      "fileCount": 37,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "unit-core",
+      "zoneName": "Unit Core",
+      "cohesion": 0.17,
+      "coupling": 0.83,
+      "riskScore": 0.83,
+      "fileCount": 7,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "unit-store",
+      "zoneName": "Unit Store",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 4,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    },
+    {
+      "zoneId": "validate",
+      "zoneName": "Validate",
+      "cohesion": 0.36,
+      "coupling": 0.64,
+      "riskScore": 0.64,
+      "fileCount": 11,
+      "timestamp": "2026-03-09T23:06:28.375Z"
+    }
+  ],
+  "analyzedAt": "2026-03-09T23:06:28.375Z"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "root",
+  "name": "Root",
+  "description": "3 files, primarily JSON, TypeScript",
+  "files": [
+    "package.json",
+    "tsconfig.json",
+    "vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 51,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

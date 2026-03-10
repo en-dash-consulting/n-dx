@@ -1,7 +1,7 @@
 {
   "id": "hench-agent",
   "name": "Hench Agent",
-  "description": "Autonomous agent execution engine that picks PRD tasks, builds briefs, drives Claude in a tool-use loop, and records run history.",
+  "description": "The complete autonomous agent package: task briefing, Claude API tool-use loop, run persistence, PRD gateway, and CLI entry points.",
   "files": [
     "packages/hench/Hench-F.png",
     "packages/hench/Hench.png",

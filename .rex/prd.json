@@ -20237,6 +20237,497 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b04b43ee-f886-4322-91e6-32ebcccb6866",
+      "title": "Address observation issues (10 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- High coupling (0.71) — 3 imports target \"web-viewer\"\n- Low cohesion (0.29) — files are loosely related, consider splitting this zone\n- The catastrophic risk score (0.71) is a small-zone artifact: 3 of 5 files importing from web-viewer mechanically yields 0.60–0.71 coupling regardless of whether the coupling is problematic. crash-0 and crash-1 already flag the same root cause at warning severity. crash-3 applying the same threshold formula to 5 files and escalating to critical adds no new information — it is severity inflation from sample size. The actionable fix is structural relocation as the zone hint prescribes (move crash files to packages/web/src/viewer/hooks/crash/), at which point the zone dissolves into web-viewer and all three crash findings resolve.\n- Bidirectional coupling: \"web\" ↔ \"web-viewer\" (13+9 crossings) — consider extracting shared interface\n- The analyzeZones function in packages/sourcevision/src/analyzers/zones.ts (32 unique outgoing calls) is the only function-level finding that approaches 2x the typical god-function detection threshold. Before scheduling decomposition, confirm whether analyzeZones is a phase dispatcher (calling into separate phase handlers — acceptable orchestration) or contains inline logic across phases (genuinely monolithic). If it dispatches across the 4-phase pipeline (inventory, imports, zones, enrich), the fan-out is expected and the finding should remain informational.\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- High coupling (0.67) — 13 imports target \"web-viewer\"\n- Low cohesion (0.33) — files are loosely related, consider splitting this zone\n- High coupling (0.6) — 3 imports target \"web-viewer\"\n- 11 entry points — wide API surface, consider consolidating exports",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T19:38:04.928Z",
+      "completedAt": "2026-03-09T19:45:35.236Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Added 7 zone pins to dissolve crash zone and collapse web zone into web-viewer. Crash zone (3 findings): pinned 3 remaining test files to web-viewer, dissolving the zone entirely. Web zone (2 findings): pinned 4 remaining test files to web-viewer, reducing web zone to pure build infrastructure. Bidirectional coupling and entry point findings resolve as side effects. analyzeZones decomposition confirmed done by sibling task. Rex schema fan-in confirmed expected barrel behavior. Web-server coupling confirmed architecturally justified.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "8ea08e97fe62",
+          "5edecec53a4c",
+          "83a6811d43d9",
+          "a44643cd460f",
+          "fe65659db6a5",
+          "3a82920140f7",
+          "ef71664e96f9",
+          "4ff6c6795022",
+          "52e6dec4844a",
+          "f1a3cd8408d2"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 10
+        },
+        "findingCount": 10
+      }
+    },
+    {
+      "id": "dc30e866-3942-47dc-96fe-d8e8a792afa8",
+      "title": "Address suggestion issues (6 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Zone \"Crash\" (crash) has catastrophic risk (score: 0.71, cohesion: 0.29, coupling: 0.71) — requires immediate architectural intervention\n- 3 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): crash, web, packages-rex:validate — mandatory refactoring recommended before further development\n- Zone \"Web\" (web) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development\n- Create packages/web/src/viewer/index.ts as the sole public surface for the viewer subpackage, re-exporting only the symbols currently consumed by the web zone (server entry), web-server zone, and crash zone. Then add an import-boundary assertion to domain-isolation.test.js that fails if any file outside packages/web/src/viewer/ imports a path inside src/viewer/ that is not re-exported by index.ts. This single change directly resolves the 11 entry-point warning, collapses the bidirectional web↔web-viewer coupling (13+9 crossings), and eliminates the high-coupling findings in web-server (0.60) and crash (0.71) by making their import targets explicit and controlled.\n- Zone \"Analyzers 3\" (packages-sourcevision:analyzers-3) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention\n- Zone \"Validate\" (packages-rex:validate) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T19:28:29.053Z",
+      "completedAt": "2026-03-09T19:34:46.443Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Applied zone pins to dissolve crash zone (5 files → web-viewer), web zone viewer files (10 files → web-viewer), and analyzers-3 zone (3 files → analyzers). Removed 7 dead exports across 4 files: 3 from polling-restart.ts, 2 from loader.ts, 1 from branch-work-filter.ts, 1 from prd-epic-resolver.ts. Validate zone acknowledged as healthy high-volume consumer per its own insights.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "7940e7f1d761",
+          "786a936c16e8",
+          "00cdc05a8ce0",
+          "ac0979e7c956",
+          "7662c342e2c4",
+          "966d8ca2fa09"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "critical": 2,
+          "warning": 4
+        },
+        "findingCount": 6
+      }
+    },
+    {
+      "id": "bcfe5bdf-685d-4be4-b581-581055424544",
+      "title": "Address pattern issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Three distinct web package zones (web at 0.67, web-server at 0.60, crash at 0.71) each independently show high coupling to web-viewer, and global-0 records 13+9=22 bidirectional crossings. All four findings share the single root cause: no barrel export or import boundary exists for packages/web/src/viewer/. Web-viewer finding 4 (LLM pass) already identifies the fix. Scheduling these as four separate refactoring items misattributes scope — they are one gap with one fix.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T19:46:05.569Z",
+      "completedAt": "2026-03-09T19:54:29.822Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Created viewer external gateway (external.ts) to funnel all cross-boundary imports through a single file. Updated 19 viewer files. Added boundary enforcement test. Pinned 5 stray viewer files to web-viewer zone.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "ff4921aaeef9"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      }
+    },
+    {
+      "id": "ef4a47f0-273c-4c99-ae0a-8902ca66802a",
+      "title": "Address anti-pattern issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- God function: analyzeZones in packages/sourcevision/src/analyzers/zones.ts calls 32 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T19:35:17.229Z",
+      "completedAt": "2026-03-09T19:37:43.886Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Extracted 4 helper functions from analyzeZones: prepareScopeAndEdges, promoteSubAnalyses, computeMoveFindings, buildAnalyzeZonesResult. Reduces the god function from ~190 lines of inline logic to a clean orchestrator that delegates each phase to a named function.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "bf0bbc5c917a"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      }
+    },
+    {
+      "id": "6cab0ad8-c7df-4ca4-b9e2-e6f6f275719d",
+      "title": "Address observation issues (10 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Bidirectional coupling: \"sourcevision-mcp-gateway\" ↔ \"web-dashboard\" (3+2 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"viewer-message-pipeline\" ↔ \"web-dashboard\" (2+4 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- High coupling (0.6) — 3 imports target \"web-dashboard\"\n- Zero cohesion is expected for a residual zone but the mix of production source (landing.ts), test files, and analysis scripts across different directories suggests several distinct file families that should be pinned to their logical home zones.\n- 11 entry points — wide API surface, consider consolidating exports\n- High coupling (0.7) — 2 imports target \"web-dashboard\"\n- Low cohesion (0.3) — files are loosely related, consider splitting this zone\n- Cohesion 0.3 and coupling 0.7 are warning-level metrics caused by zone misclassification: viewer source files and build infrastructure files have been grouped together by the Louvain algorithm but serve completely different architectural roles.\n- Files elapsed-time.ts, fetch-pipeline.ts, call-rate-limiter.ts, route-state.ts, tick-timer.ts, and task-audit.ts are viewer UI code and should be pinned to the web-viewer zone; build.js and dev.js should be pinned to web-dashboard to match the pattern documented in the developer hints.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T22:29:02.246Z",
+      "completedAt": "2026-03-09T22:38:49.447Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Pinned 4 web-ancillary files to web-dashboard to dissolve the residual zone. Added healthAnnotations for sourcevision-mcp-gateway (coupling 0.6) and web-dashboard (11 entry points). All 10 observation findings addressed through zone pins, health annotations, and acknowledgment of intentional architectural patterns.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "63226b6ea8cb",
+          "4fd9eca790e1",
+          "3a82920140f7",
+          "d51d0b9c505a",
+          "b2935e4ed8d4",
+          "606920a99dff",
+          "4f6929011170",
+          "b1d3b5191525",
+          "fe179e1b3243",
+          "04fb3637c10a"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 10
+        },
+        "findingCount": 10
+      }
+    },
+    {
+      "id": "566c29af-1fa7-41f6-bbeb-c9ed586ce2f0",
+      "title": "Address suggestion issues (19 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- The four graph visualization test files (graph-interaction, graph-zoom, graph-layout, graph-destroy) are split across two zones by Louvain classification despite testing the same production subsystem (src/viewer/visualization/). This is the highest-priority zone-pin action in the web package: pinning all four to web-dashboard restores subsystem-level test coverage observability at zero code change cost.\n- The intra-package layering KNOWN_VIOLATIONS set has 5 entries but no resolution tracking: no target dates, no assigned owners, and no staleness check. Consider converting KNOWN_VIOLATIONS from a silent allowlist to a tracked issue list (e.g. with inline TODO comments linking to PRD tasks) or adding a staleness self-check parallel to the ALLOWED list test so resolved violations are automatically detected.\n- The two lowest-cohesion zones (web: 0.3, web-server: 0.4) are both inside the web cluster SCC — establish a joint remediation order: (1) dissolve web-unit residual, (2) merge web-server into web-viewer to eliminate 5 SCC edges, (3) extract message→web shared symbols to break the cycle, (4) re-analyze to confirm SCC dissolution before addressing the remaining web residual zone\n- Zero zones outside the web cluster have coupling > 0, yet zero zones have automated zone-boundary coupling tests — the current coupling-free state of hench, root, and rex is maintained only by gateway and spawn-only rules that happen to enforce coupling-0 as a side effect; if any new package is added without these rules, coupling will accumulate with no detection mechanism until the next manual zone analysis\n- messaging/index.ts is an unenforced gateway: it acts as the sole public surface for the viewer-message-pipeline zone but is not listed in domain-isolation.test.js's re-export-only assertions. The three formally enforced gateways (rex-gateway.ts, domain-gateway.ts, and the viewer/external.ts boundary) are tested; messaging/index.ts is not. Add it to the domain-isolation test to close the enforcement gap before the messaging subsystem grows.\n- packages/web/src/schema/v1.ts is imported across multiple web zones without passing through any gateway and is modified on the current branch. Schema files that bypass gateway enforcement are the highest-probability vector for silent type-import-to-runtime-import promotion during refactoring. Adding v1.ts to an explicit schema-types zone with re-export-only enforcement would close the last ungated import surface in the web package.\n- 2 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): web-viewer-messaging, packages-rex:validate — mandatory refactoring recommended before further development\n- graph-interaction.test.ts and graph-zoom.test.ts belong to the graph visualization subsystem (packages/web/src/viewer/visualization/) and should be pinned to web-dashboard alongside graph-layout.test.ts and graph-destroy.test.ts. Leaving them in web-ancillary splits the same subsystem's test suite across two zones with no architectural justification and suppresses the subsystem's test coverage signal.\n- graph-interaction.test.ts and graph-zoom.test.ts are classified into web-ancillary while graph-layout.test.ts and graph-destroy.test.ts land in web-dashboard — all four test the same graph visualization subsystem (src/viewer/visualization/). The split is a zone classification artifact that prevents accurate coverage tracking for the graph subsystem; all four files should be pinned to web-dashboard.\n- Add a staleness self-check for KNOWN_VIOLATIONS in architecture-policy.test.js parallel to the existing ALLOWED list stale-entry test. Without it, resolved intra-package layering violations (currently 5 entries) persist invisibly and the file's 'tracked for resolution' comment carries no enforcement weight.\n- Replace the toBeGreaterThanOrEqual(12) floor in the DOCUMENTED_POLICIES coverage test with an exact count assertion or an exhaustive enumeration check. The current floor means a 13th CLAUDE.md tier boundary rule can be added without a corresponding test entry, bypassing the intent of the cross-reference registry.\n- cohesion 0.4 + coupling 0.6 meets the high-coupling/low-cohesion risk pattern from the severity guide. Even though both metrics are architectural rather than accidental, the zone has no documented threshold exception — adding an explicit zone-health annotation acknowledging that these metrics are expected and intentional would prevent future automated alerts from treating this as a degradation signal.\n- messaging/index.ts acts as a de facto gateway (sole public surface for the messaging subsystem) but is not subject to domain-isolation.test.js enforcement. If business logic is added to messaging/index.ts during a future refactor, no test will fail — unlike the formally enforced gateways. Adding messaging/index.ts to the domain-isolation test's re-export-only assertion list would close this enforcement gap.\n- web zone (cohesion 0.3) is a risk area: it is the least internally cohesive zone AND a member of the strongly connected component — both conditions must be resolved together, not sequentially; dissolving the SCC cycle first would reduce external pull and make the low-cohesion files easier to reassign to correct zones\n- web-server has both low cohesion (0.4) AND participates in the SCC — this is the specific 'high coupling + low cohesion = fragile' risk pattern; at 4 files it is below any minimum zone size threshold, and merging it into web-viewer would collapse 5 cross-zone edges into internal edges, immediately improving zone-level coupling metrics\n- Immediately pin packages/web/tests/unit/viewer/sidebar.test.ts to web-viewer. Its entire import graph points to viewer components (Sidebar, Preact), it has no relationship to messaging infrastructure, and it is currently being actively modified on feature/sv-fixes-0306 — incorrect zone attribution during active development means coverage and change-churn metrics for web-viewer are understated right now.\n- Zone \"Web Viewer Messaging\" (web-viewer-messaging) has critical risk (score: 0.70, cohesion: 0.30, coupling: 0.70) — requires refactoring before new feature development\n- Zone \"Analyzers 3\" (packages-sourcevision:analyzers-3) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention\n- Zone \"Validate\" (packages-rex:validate) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T22:20:49.444Z",
+      "completedAt": "2026-03-09T22:28:07.456Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Addressed 19 suggestion findings: (1) pinned graph-interaction.test.ts and graph-zoom.test.ts to web-dashboard, (2) added KNOWN_VIOLATIONS staleness self-check, (3) replaced DOCUMENTED_POLICIES floor assertion with exact count, (4) added messaging/index.ts as enforced internal barrel in gateway-rules.json + domain-isolation.test.js, (5) added non-web zone coupling guard test, (6) added zone health annotations for 3 high-risk zones. Larger architectural items (SCC remediation, schema zone extraction) acknowledged via health annotations.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "49824dcea1fe",
+          "8d9ad4565e5f",
+          "239482924bbc",
+          "2c3a3804d0bb",
+          "e5bb9518d382",
+          "c6be9dd24810",
+          "4bbd79bb45e7",
+          "48ea3b3630cc",
+          "b2f43592fe3a",
+          "2856c862678f",
+          "616edd5d8a62",
+          "732f0f52074b",
+          "905c396ac8bd",
+          "982599ce36eb",
+          "901d91d81f12",
+          "895e6b878da2",
+          "19c1ad1b29a7",
+          "7662c342e2c4",
+          "966d8ca2fa09"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 18,
+          "critical": 1
+        },
+        "findingCount": 19
+      }
+    },
+    {
+      "id": "57fcea74-4eb1-4867-9e7f-b4a59c743b77",
+      "title": "Address pattern issues (3 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Outbound coupling (5 edges out) exceeds inbound coupling (4 edges in) for a module named 'pipeline' — utilities that act as infrastructure typically have higher fan-in than fan-out. The reverse ratio here may indicate the messaging zone has absorbed dependencies that belong in its callers.\n- Production entrypoint (landing.ts) co-located in a zero-cohesion residual zone inflates production-file count for a zone with otherwise no production code — automated health reports cannot distinguish between 'isolated production file' and 'isolated test artifact' without the pin.\n- web-viewer sub-zone acts as an undeclared hub (4 of 6 cross-zone edges touch it) without a gateway module to make that surface explicit and auditable. CLAUDE.md documents gateways for rex and sourcevision but not for the viewer-message-pipeline↔web-viewer interface.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T22:39:32.669Z",
+      "completedAt": "2026-03-09T22:45:05.546Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Addressed 3 pattern findings: (1) added healthAnnotation for viewer-message-pipeline explaining outbound>inbound coupling is expected for a composed integration layer; (2) added healthAnnotation for web-ancillary residual zone acknowledging landing.ts pin and zero-cohesion invariant; (3) declared external.ts as intra-package viewer↔server gateway in CLAUDE.md/CODEX.md gateway table, documenting the web-viewer hub surface.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "8564f6acf3cb",
+          "ee2ca067e5f8",
+          "cd4c1157fae2"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 3
+        },
+        "findingCount": 3
+      }
+    },
+    {
+      "id": "cc28dcfc-04e3-4ff4-8868-8e6f5c910c37",
+      "title": "Address relationship issues (3 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Triangular import pattern: message → web-dashboard (3), message → web-viewer (2), web-viewer → message (4). Not a cycle today, but a single new message→web-server import would close the loop and create a critical circular dependency between three zones.\n- viewer-message-pipeline imports 3 times into web-dashboard (message → web) with no gateway enforcement, creating an ungated inbound surface. If those imports reach internals rather than public barrel exports, this is a leaky abstraction.\n- The 2 artificial cross-zone edges from web-viewer-messaging into web-dashboard are inflating the web cluster's apparent coupling density — resolving the zone pins will reduce the total counted cross-zone import edges in the web subsystem by at least 2, giving a cleaner picture of the true web-server/web-viewer boundary",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T22:45:39.523Z",
+      "completedAt": "2026-03-09T22:53:07.894Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Moved request-dedup.ts from src/shared/ to src/viewer/messaging/ to resolve the dependency inversion (utility zone importing from consumer zone). Updated all imports, external.ts gateway, and documentation. The triangular import pattern is broken, the ungated inbound surface is eliminated, and artificial cross-zone edges from web-viewer-messaging will dissolve on next analysis.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "daa9d2ec7e97",
+          "977dd029558c",
+          "8ada3da401e8"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 3
+        },
+        "findingCount": 3
+      }
+    },
+    {
+      "id": "29244904-187d-4fd7-962d-111678c2bc11",
+      "title": "Address anti-pattern issues (10 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- architecture-policy.test.js covers tier-boundary and spawn-only rules but does not cover within-package zone import cycles; the message ↔ web-viewer ↔ web 3-zone cycle is the highest-severity architectural violation in the codebase and has zero automated enforcement — adding a zone-cycle lint rule to architecture-policy.test.js is the only way to prevent new edges from closing additional cycles\n- domain-isolation.test.js (gateway enforcement) and architecture-policy.test.js (spawn-only enforcement) are not listed in CLAUDE.md's Key Files table. If these files are accidentally deleted or excluded from CI, both architectural constraints become unenforced documentation. They should be listed alongside prd.json and CONTEXT.md as critical project files.\n- A 2-file zone provides no meaningful cohesion or coupling signal — any addition or removal of a single file causes a 50-100% metric change, making trend analysis unreliable. cross-package-contracts.test.js (static boundary enforcement) and scheduler-startup.test.js (runtime concurrency contract) test orthogonal concerns; splitting them into separate explicit pins (e.g. root-gateway-contracts, root-concurrency-contracts) makes each zone's health independently observable and prevents both files from being silently absorbed into an unrelated zone on the next Louvain pass.\n- sourcevision-mcp-gateway at 4 files is below the minimum viable size for a zone to provide meaningful health metrics or boundary enforcement. The zone boundary splits routes-mcp.ts from the start.ts composition root in web-dashboard, creating an invisible gap that makes MCP route extension non-obvious. Merging into web-dashboard eliminates 2 of 6 cross-zone edges and simplifies the zone graph without any loss of architectural control, since the domain-isolation test already enforces the re-export-only constraint on domain-gateway.ts.\n- Integration tests messaging-stack.test.ts and request-dedup.test.ts validate composed pipeline behavior that spans the web-viewer and viewer-message-pipeline zone boundary; co-locating them inside viewer-message-pipeline creates a zone whose test files have a wider blast radius than its production files, making per-zone coverage metrics unreliable and hiding that these tests are cross-zone contract tests rather than intra-zone unit tests.\n- message zone imports 3 symbols from web-dashboard (message→web:3) — a utility pipeline depending on its consumer is a dependency inversion. The 3 shared symbols (likely types or constants) should be extracted to a neutral shared-types or foundation module so the dependency direction flows caller→utility rather than utility→caller. This is one of the three edges forming the zone-level cycle and is the most architecturally incorrect direction since utilities must not know about their callers.\n- scripts/hench-callgraph-analysis.mjs and scripts/parse-gateway-exports.mjs are in a web-adjacent residual zone despite having no web package relationship; their inputs are hench callgraph output and sourcevision gateway export data. Automated coupling analysis that inspects these scripts will incorrectly attribute hench/sourcevision coupling to the web-ancillary zone, producing false-positive coupling findings on every future analysis run until the scripts are pinned to the project-root zone.\n- Zone mixes build entrypoints (build.js, dev.js) with viewer source and test files, yielding cohesion 0.3. Zone pins are required: viewer source files → web-viewer, build files → web-dashboard. Until resolved, zone-level health metrics for both this zone and web-viewer are unreliable.\n- packages/web/tests/unit/viewer/sidebar.test.ts is grouped with messaging infrastructure files (call-rate-limiter.ts, fetch-pipeline.ts) despite testing sidebar UI behavior — a semantic mismatch that causes zone-level test attribution errors for the web-viewer zone.\n- God function: generateStructuralInsights in packages/sourcevision/src/analyzers/zones.ts calls 32 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T22:05:28.046Z",
+      "completedAt": "2026-03-09T22:19:45.549Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Addressed all 10 anti-pattern findings: zone-cycle enforcement test, Key Files table update, zone pin corrections (7 categories), dependency inversion fix, boundary test update, and generateStructuralInsights decomposition",
+      "recommendationMeta": {
+        "findingHashes": [
+          "2ddf9cf7267d",
+          "bc29a9d226af",
+          "d46bcd1a6b7f",
+          "e61a6bcab7c6",
+          "68c9b4022e4d",
+          "9944330e8199",
+          "5313ca556589",
+          "1746ad298183",
+          "af5bfc055ce0",
+          "c35ebb9d343a"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 9,
+          "critical": 1
+        },
+        "findingCount": 10
+      }
+    },
+    {
+      "id": "921cf630-faac-4721-8415-13c38ea8ee57",
+      "title": "Address observation issues (9 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- High coupling (0.65) — 2 imports target \"request-deduplication\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone\n- Cohesion of 0.35 and coupling of 0.65 are warning-level indicators caused by mixing viewer UI utilities with build infrastructure in a single zone — applying zone pins to migrate viewer files into web-viewer and build scripts into web-dashboard will resolve both metrics.\n- Cohesion of 0.0 indicates this zone is a Louvain residual — the landing service, viewer tests, and analysis scripts share no imports; this is a candidate for zone dissolution via pins.\n- packages/web/src/landing/landing.ts is a production service file misclassified into a residual zone; pinning it to web-dashboard would give it accurate health tracking.\n- Coupling of 0.67 exceeds the 0.6 warning threshold and is a direct artifact of the duplication; resolving to one canonical copy is expected to bring coupling back below threshold.\n- Two RequestDedup implementations exist at src/shared/request-dedup.ts and src/viewer/messaging/request-dedup.ts; per CLAUDE.md the canonical location is viewer/messaging/ — the shared/ copy should be deleted and consumers redirected through external.ts.\n- Zone imports from both 'web-shared' (2) and 'web' (Viewer Message Pipeline, 3) while being imported by 'web-viewer' (4). The bidirectional relationship between 'message' and 'web' zones warrants a review to confirm no unintended circular dependency exists at the module level.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-10T00:15:04.773Z",
+      "completedAt": "2026-03-10T00:20:15.778Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Pinned request-dedup.ts and its test to viewer-message-pipeline zone to dissolve the request-deduplication zone. Removed stale health annotation. All 9 findings addressed: 6 were already resolved by prior work (duplicate deletion, existing pins), 2 resolved by new pins, 1 acknowledged (fan-in hotspot by design).",
+      "recommendationMeta": {
+        "findingHashes": [
+          "3a82920140f7",
+          "9a2ff5b315ef",
+          "534f9b8f955f",
+          "677a1a686a64",
+          "f768ef191031",
+          "1e116e3cbbac",
+          "d7c433f472b0",
+          "e1b2a6bbc9a4",
+          "34b36fe49cbc"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 9
+        },
+        "findingCount": 9
+      }
+    },
+    {
+      "id": "e553f97e-34a5-4303-b54b-b71434306d6f",
+      "title": "Address suggestion issues (13 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Add a subsection to CLAUDE.md's Architecture section documenting the web package's internal zone layering: web-shared (foundation) → viewer-messaging-stack (messaging middleware) → web-viewer (consumer), with web-server as a parallel composition-root tier. The four-tier monorepo hierarchy is documented but the web package's own internal stack is not, leaving developers without a documented model for intended import direction within the package.\n- Three web-package zones (web-server: 4 files, web-shared: 3 files, logo: 2 files) are below a meaningful minimum zone size for health metric reliability. Cohesion and coupling calculations on fewer than 5 files produce high-variance readings that change dramatically with single-file additions. Define a minimum zone size threshold of 5 files below which health metrics are suppressed or annotated as unreliable in zone health reports.\n- 3 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): request-deduplication, viewer-message-pipeline, packages-rex:validate — mandatory refactoring recommended before further development\n- hench-agent spans 31 directories with no sub-zones, while the web package applies sub-zone decomposition at roughly 60 files per sub-zone. At 155 files, hench-agent qualifies for at least 2-3 sub-zones (e.g. agent-core, store, prd-integration, guard-policy). Without sub-zones, any zone-level coupling finding has a 155-file blast radius and directory-level architectural drift is invisible to sourcevision health metrics.\n- The deleted .sourcevision/zones/mcp-route-layer/ directory in the git status (shown as D in the diff) confirms that 'mcp-route-layer' was previously an explicit zone ID for domain-gateway.ts and routes-mcp.ts. The 4-file sub-zone should be re-pinned under 'mcp-route-layer' to restore the semantically correct zone name that was lost.\n- All existing zone insights for request-deduplication that describe 'two implementations', 'split consumer bases', and a 'causally linked atomic change' are based on the false premise that shared/request-dedup.ts contains an independent implementation. Update these insights to reflect the actual state: one implementation (viewer/messaging/), one dead shim (shared/), one correct test. The remediation complexity has been significantly overstated.\n- packages/web/src/shared/request-dedup.ts is dead code: it re-exports from viewer/messaging/request-dedup.ts, and shared/index.ts already re-exports the same symbols directly from the same canonical source. No source file imports from shared/request-dedup directly. Delete the shim file in a single commit — no consumer updates, no test changes, no import path redirects are needed.\n- Zone \"Request Deduplication\" (request-deduplication) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development\n- Add mcp-transport.test.js and integration-coverage-policy.test.js to CLAUDE.md's Key Files table alongside architecture-policy.test.js and domain-isolation.test.js. All four files form the project's architectural enforcement corpus — omitting two of them from the Key Files table creates an incomplete picture of enforcement coverage for developers consulting documentation.\n- Zone 'viewer-message-pipeline' is the sole zone with both high coupling (0.65) AND low cohesion (0.35) simultaneously — a fragile combination where changes have wide blast radius and internal structure provides no stabilizing guidance. This risk profile warrants priority resolution before adding any new files that import from this zone, as the coupling score will increase further. Resolve by zone-pinning the misclassified build scripts to web-dashboard and viewer utilities to web-viewer, then verify coupling drops below 0.3.\n- Zone \"Viewer Message Pipeline\" (viewer-message-pipeline) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development\n- Zone \"Analyzers 3\" (packages-sourcevision:analyzers-3) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention\n- Zone \"Validate\" (packages-rex:validate) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T23:49:55.557Z",
+      "completedAt": "2026-03-09T23:57:15.451Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "All 13 suggestion findings addressed via documentation, dead code deletion, min zone size threshold, and health annotations.",
+      "children": [
+        {
+          "id": "ebe23be9-0b7f-4309-b1ed-c41d9d3a3896",
+          "title": "Documentation: web zone layering and Key Files table updates in CLAUDE.md",
+          "status": "completed",
+          "level": "task",
+          "description": "Add web package internal zone layering subsection to Architecture. Add mcp-transport.test.js and integration-coverage-policy.test.js to Key Files table.",
+          "startedAt": "2026-03-09T23:57:07.756Z",
+          "completedAt": "2026-03-09T23:57:07.756Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Added web zone layering subsection to CLAUDE.md and CODEX.md Architecture section. Added mcp-transport.test.js and integration-coverage-policy.test.js to Key Files table in both files."
+        },
+        {
+          "id": "d38e9a38-f057-4b04-a6ab-d80db339705f",
+          "title": "Delete dead code shared/request-dedup.ts and update zone insights",
+          "status": "completed",
+          "level": "task",
+          "description": "Delete packages/web/src/shared/request-dedup.ts (dead shim). Update request-deduplication zone insights in .n-dx.json.",
+          "startedAt": "2026-03-09T23:57:11.275Z",
+          "completedAt": "2026-03-09T23:57:11.275Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Deleted dead code shared/request-dedup.ts (zero imports). Updated .n-dx.json health annotations for request-deduplication zone with accurate description (single implementation, not two)."
+        },
+        {
+          "id": "f5d9eb49-04e8-4dce-8069-6a01647d63eb",
+          "title": "Zone config: min size threshold, pins, health annotations for risk zones",
+          "status": "completed",
+          "level": "task",
+          "description": "Add minimum zone size threshold in risk scoring. Add zone pins for mcp-route-layer, hench sub-zones, viewer-message-pipeline. Add health annotations for small zones and at-risk zones.",
+          "startedAt": "2026-03-09T23:57:15.309Z",
+          "completedAt": "2026-03-09T23:57:15.309Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Added minZoneSize threshold (5 files) to RISK_THRESHOLDS. Small zones now get findings downgraded to info severity with 'unreliable' annotation. Excluded from global summary. Updated viewer-message-pipeline health annotation with expected metrics. Added tests for small zone behavior."
+        }
+      ],
+      "recommendationMeta": {
+        "findingHashes": [
+          "7b455a378c6c",
+          "3e9060a10415",
+          "cd6be08a2aab",
+          "6a0a561762c5",
+          "af625a121f21",
+          "96d88f4b825c",
+          "0824a2593a0a",
+          "65d315825789",
+          "0b0e8cc8022f",
+          "916d2f723a91",
+          "772ac81280ad",
+          "7662c342e2c4",
+          "966d8ca2fa09"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 12,
+          "critical": 1
+        },
+        "findingCount": 13
+      }
+    },
+    {
+      "id": "f8e698df-c2d9-462f-ba04-84e2e8395907",
+      "title": "Address move-file issues (2 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- File \"packages/web/src/viewer/messaging/call-rate-limiter.ts\" is pinned to zone \"Viewer Message Pipeline\" but lives in packages/web/src/viewer/messaging/ — consider moving to packages/web/tests/unit/viewer/ to align physical location with architectural zone\n- File \"packages/web/src/server/domain-gateway.ts\" is pinned to zone \"Web Dashboard\" but lives in packages/web/src/server/ — consider moving to packages/web/tests/unit/viewer/ to align physical location with architectural zone",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T23:58:18.892Z",
+      "completedAt": "2026-03-10T00:14:27.306Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Fixed move-file analyzer to exclude test files from majority directory computation in pin divergence detection. Both findings were false positives caused by test files outnumbering source files in pinned zones.",
+      "recommendationMeta": {
+        "findingHashes": [
+          "ce4395f3b141",
+          "382b05ecccd9"
+        ],
+        "category": "move-file",
+        "severityDistribution": {
+          "warning": 2
+        },
+        "findingCount": 2
+      }
+    },
+    {
+      "id": "cadffe40-c450-4a45-90c4-40a1c335eaf1",
+      "title": "Address pattern issues (1 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- Zone ID 'web-dashboard' is assigned to two distinct zone entries (372-file main zone and 4-file MCP route sub-zone) — deduplicate zone IDs so health metrics are not silently merged across structurally different groups.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-03-10T00:20:52.552Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "f0411816a57a"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      },
+      "completedAt": "2026-03-10T00:31:53.658Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Re-pinned 4 MCP-route files (domain-gateway.ts, routes-mcp.ts, and their tests) from web-dashboard to new mcp-route-layer zone in .n-dx.json. Added zone type classification and health annotation. Removed stale sourcevision-mcp-gateway annotation."
+    },
+    {
+      "id": "cc746139-c4ca-4b97-97bf-eb0772786707",
+      "title": "Address relationship issues (3 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- The 4 cross-zone imports from web-viewer into web-shared are traceable to the shared/request-dedup.ts duplicate — resolving the duplication would collapse this cross-zone edge entirely, reducing coupling between web-viewer and web-shared to zero.\n- message zone depends on files in viewer-message-pipeline that logically belong in web-viewer; resolving the zone misclassification will redirect this import edge and may expose a latent zone-level cycle between message and web-viewer that is currently hidden by the misclassification.\n- Production file packages/web/src/landing/landing.ts co-zones with test and script files — zone health metrics conflate production and test code, masking any real production-side structural issues.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "a43400446d2f",
+          "1ae7b18edbef",
+          "4733d641cad2"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 3
+        },
+        "findingCount": 3
+      }
+    },
+    {
+      "id": "731ea4c3-f02c-4ffb-a2bd-b5c9fea47424",
+      "title": "Address anti-pattern issues (10 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- architecture-policy.test.js packageFamily() uses colon-based splitting to identify intra-package zones and skip them from cycle detection. But zones.json uses slash-delimited IDs ('web-viewer/web-server'), not colon-delimited ones. The intra-package exemption never fires — all zone cycles including intra-package sub-zone cycles are subject to CI failure. The code comment is misleading and the function should either be updated to use slash-splitting or removed if the stricter all-cycles behavior is intentional.\n- The messaging/ exemption in boundary-check.test.ts (lines 74-80) creates an unmonitored bypass: viewer/messaging/ files can import directly from shared/ without going through external.ts. This exemption is undocumented in CLAUDE.md and may expand silently as new messaging files are added — each new bypass weakens the gateway contract without triggering the enforcement test.\n- No e2e tests cover the HTTP MCP transport layer (session creation, Mcp-Session-Id header, streaming responses, rex/sourcevision endpoint contracts). All MCP contract tests use stdio spawning. If the HTTP transport regresses, no test in this zone catches it — this is a coverage gap for the primary recommended transport.\n- Two build runner scripts (build.js, dev.js) are colocated with viewer UI utilities in the same zone. Build infrastructure and UI components have completely different change frequencies, owners, and test strategies — colocation forces unrelated coupling metrics onto both populations and should be resolved by zone pins before any health thresholds are applied to this zone.\n- Integration tests messaging-stack.test.ts and request-dedup.test.ts are co-located with the messaging zone but test cross-zone subjects (request-dedup.ts is canonically in web-shared). When these tests fail, blame is ambiguous between the two zones — move them to a root-level integration test directory or to the zone that owns the primary subject under test.\n- fetch-pipeline.test.ts has no corresponding production file in this zone — it likely tests a file from web-viewer (fetch pipeline lives in the viewer, not the messaging infrastructure). This misplaced test inflates viewer-messaging-stack's test count and leaves web-viewer's fetch-pipeline file without a co-located test, causing coverage attribution errors in both zones.\n- boundary-check.test.ts enforces the server/viewer intra-package boundary (three test cases: no server→viewer, no viewer→server, viewer cross-boundary imports through external.ts) but lives in a zero-cohesion residual zone instead of being co-located or cross-referenced with domain-isolation.test.js — the two enforcement tests are now split across two different zones with no shared discoverability path, creating a gap in architectural guardrail visibility.\n- graph-interaction.test.ts and graph-zoom.test.ts import nothing from viewer source files (import graph shows only vitest), so their zone attribution is driven purely by file path rather than import structure — these tests cannot be automatically associated with their implementation subjects by import-graph analysis, making viewer component refactors more likely to leave these tests silently orphaned.\n- The zone ID 'web-dashboard' is shared by both the 372-file main zone (cohesion 0.98) and the 4-file MCP route sub-zone (cohesion 0.40) — any tooling that aggregates zone metrics by ID will silently conflate these two structurally distinct groups, producing a blended cohesion figure that is neither representative of the gateway-enforced main zone nor the loosely coupled MCP route cluster. This is a metrics-integrity defect, not just a naming issue.\n- God function: cmdAnalyze in packages/sourcevision/src/cli/commands/analyze.ts calls 32 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-09T23:37:56.518Z",
+      "completedAt": "2026-03-09T23:48:33.276Z",
+      "children": [
+        {
+          "id": "29c2ecf7-f569-44f1-b281-e033da200d45",
+          "title": "Fix zone pins and document exemptions for anti-pattern findings",
+          "status": "completed",
+          "level": "task",
+          "description": "Address the actionable anti-pattern findings:\n1. Pin build.js/dev.js to web-build-infrastructure zone (separate from viewer UI)\n2. Pin fetch-pipeline.test.ts to viewer-message-pipeline zone\n3. Document messaging/ exemption in CLAUDE.md gateway rules\n4. Add cross-reference between boundary-check.test.ts and domain-isolation.test.js\n5. Add source imports to graph-interaction/graph-zoom tests\n6. Acknowledge already-resolved findings (packageFamily colon splitting, test relocations, cmdAnalyze decomposition, zone ID collision)",
+          "priority": "critical",
+          "startedAt": "2026-03-09T23:47:28.711Z",
+          "completedAt": "2026-03-09T23:47:28.711Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Fixed zone pins (build.js/dev.js to web-build-infrastructure, fetch-pipeline.test.ts to viewer-message-pipeline, graph tests to web-viewer), documented messaging exemption in CLAUDE.md/CODEX.md, added cross-references between all 3 architectural guardrail test files, registered boundary-check.test.ts in DOCUMENTED_POLICIES"
+        },
+        {
+          "id": "60f5953b-4958-4c94-b996-086f843501aa",
+          "title": "Add HTTP MCP transport e2e test coverage",
+          "status": "completed",
+          "level": "task",
+          "description": "Create e2e tests for HTTP MCP transport: session creation, Mcp-Session-Id header, streaming responses, rex/sourcevision endpoint contracts. Currently all MCP tests use stdio transport only.",
+          "priority": "high",
+          "startedAt": "2026-03-09T23:48:33.061Z",
+          "completedAt": "2026-03-09T23:48:33.061Z",
+          "resolutionType": "acknowledgment",
+          "resolutionDetail": "HTTP MCP transport e2e tests already exist at tests/e2e/mcp-transport.test.js. Covers session creation, Mcp-Session-Id header, session reuse, both rex/sourcevision endpoints, and error cases (400/405). The finding was outdated — tests were added previously."
+        }
+      ],
+      "recommendationMeta": {
+        "findingHashes": [
+          "e33a14aa1eed",
+          "832e4110950a",
+          "156c17bb7e5f",
+          "4271b7944403",
+          "588a159db330",
+          "450049312db7",
+          "922656338ac3",
+          "d8e8ea6c6d53",
+          "4946fabcfefc",
+          "88a1e80e7229"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 9,
+          "critical": 1
+        },
+        "findingCount": 10
+      }
     }
   ]
 }

@@ -1,0 +1,40 @@
+{
+  "id": "packages-llm-client:src-2",
+  "name": "Src 2",
+  "description": "19 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/auth.ts",
+    "packages/llm-client/src/config.ts",
+    "packages/llm-client/src/exec.ts",
+    "packages/llm-client/src/help-format.ts",
+    "packages/llm-client/src/json.ts",
+    "packages/llm-client/src/output.ts",
+    "packages/llm-client/src/project-config.ts",
+    "packages/llm-client/src/project-dirs.ts",
+    "packages/llm-client/src/public.ts",
+    "packages/llm-client/src/suggest.ts",
+    "packages/llm-client/tests/unit/auth.test.ts",
+    "packages/llm-client/tests/unit/config.test.ts",
+    "packages/llm-client/tests/unit/exec.test.ts",
+    "packages/llm-client/tests/unit/help-format.test.ts",
+    "packages/llm-client/tests/unit/json.test.ts",
+    "packages/llm-client/tests/unit/output.test.ts",
+    "packages/llm-client/tests/unit/project-config.test.ts",
+    "packages/llm-client/tests/unit/public-api.test.ts",
+    "packages/llm-client/tests/unit/suggest.test.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/config.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 19,
+  "lineCount": 4425,
+  "riskMetrics": {
+    "cohesion": 0.56,
+    "coupling": 0.44,
+    "riskScore": 0.43999999999999995,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

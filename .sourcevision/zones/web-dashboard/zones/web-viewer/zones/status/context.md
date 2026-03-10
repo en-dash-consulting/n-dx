@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/status (`web-viewer/web-viewer/status`)
-Files: 3, Cohesion: 0.40, Coupling: 0.60
+Files: 3, Cohesion: 0.50, Coupling: 0.50
 Description: 3 files, primarily TypeScript
 Entry points: packages/web/src/viewer/components/status-indicators.ts
 Lines: 783

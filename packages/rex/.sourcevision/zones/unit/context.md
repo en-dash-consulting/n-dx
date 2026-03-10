@@ -5,46 +5,40 @@
 <zone>
 
 Zone: Unit (`unit`)
-Files: 32, Cohesion: 0.31, Coupling: 0.69
-Risk: critical (score: 0.69)
-Description: 32 files, primarily TypeScript
-Entry points: src/analyze/acknowledge.ts, src/cli/commands/add.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts, src/core/cascade-reset.ts, src/core/dag.ts, src/core/move.ts, src/core/transitions.ts, src/core/tree.ts, src/recommend/create-from-recommendations.ts, src/schema/index.ts, src/schema/v1.ts, src/schema/validate.ts, src/store/file-adapter.ts
-Lines: 10833
+Files: 26, Cohesion: 0.28, Coupling: 0.72
+Risk: catastrophic (score: 0.72)
+Description: 26 files, primarily TypeScript
+Entry points: src/analyze/acknowledge.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts, src/core/canonical.ts, src/core/dag.ts, src/core/move.ts, src/core/tree.ts, src/recommend/create-from-recommendations.ts, src/schema/validate.ts, src/store/file-adapter.ts
+Lines: 7364
 
 </zone>
 
 <files>
 
 src/analyze/acknowledge.ts (TypeScript, 85 lines, source)
-src/cli/commands/add.ts (TypeScript, 150 lines, source)
 src/cli/commands/recommend.ts (TypeScript, 537 lines, source)
 src/cli/commands/report.ts (TypeScript, 278 lines, source)
-src/core/cascade-reset.ts (TypeScript, 60 lines, source)
+src/core/canonical.ts (TypeScript, 22 lines, source)
 src/core/dag.ts (TypeScript, 84 lines, source)
 src/core/move.ts (TypeScript, 205 lines, source)
-src/core/transitions.ts (TypeScript, 94 lines, source)
 src/core/tree.ts (TypeScript, 105 lines, source)
 src/recommend/conflict-detection.ts (TypeScript, 355 lines, source)
 src/recommend/create-from-recommendations.ts (TypeScript, 428 lines, source)
 src/recommend/types.ts (TypeScript, 63 lines, source)
-src/schema/index.ts (TypeScript, 81 lines, source)
-src/schema/v1.ts (TypeScript, 446 lines, source)
-src/schema/validate.ts (TypeScript, 170 lines, source)
+src/schema/validate.ts (TypeScript, 172 lines, source)
 src/store/file-adapter.ts (TypeScript, 169 lines, source)
 tests/e2e/cli-init.test.ts (TypeScript, 213 lines, test)
 tests/unit/analyze/acknowledge.test.ts (TypeScript, 112 lines, test)
 tests/unit/analyze/scanners-acknowledge.test.ts (TypeScript, 101 lines, test)
 tests/unit/cli/commands/recommend.test.ts (TypeScript, 1032 lines, test)
 tests/unit/cli/commands/report.test.ts (TypeScript, 419 lines, test)
-tests/unit/cli/commands/usage.test.ts (TypeScript, 696 lines, test)
+tests/unit/cli/edit-item.test.ts (TypeScript, 226 lines, test)
+tests/unit/core/canonical.test.ts (TypeScript, 89 lines, test)
 tests/unit/core/dag.test.ts (TypeScript, 120 lines, test)
 tests/unit/core/move.test.ts (TypeScript, 285 lines, test)
-tests/unit/core/transitions.test.ts (TypeScript, 148 lines, test)
 tests/unit/core/tree-hardened.test.ts (TypeScript, 740 lines, test)
 tests/unit/core/tree.test.ts (TypeScript, 236 lines, test)
 tests/unit/recommend/conflict-detection.test.ts (TypeScript, 395 lines, test)
-tests/unit/recommend/create-from-recommendations.test.ts (TypeScript, 2024 lines, test)
-tests/unit/schema/schema-version.test.ts (TypeScript, 109 lines, test)
 tests/unit/schema/validate.test.ts (TypeScript, 628 lines, test)
 tests/unit/store/file-adapter.test.ts (TypeScript, 265 lines, test)
 
@@ -53,135 +47,107 @@ tests/unit/store/file-adapter.test.ts (TypeScript, 265 lines, test)
 <imports>
 
 Internal:
-  src/cli/commands/add.ts → src/core/cascade-reset.ts {cascadeParentReset}
-  src/cli/commands/add.ts → src/core/dag.ts {validateDAG}
-  src/cli/commands/add.ts → src/core/tree.ts {findItem}
-  src/cli/commands/add.ts → src/schema/index.ts {LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel}
-  src/cli/commands/add.ts → src/schema/index.ts {PRDItem, ItemLevel, ItemStatus, Priority}
   src/cli/commands/recommend.ts → src/analyze/acknowledge.ts {computeFindingHash, loadAcknowledged, saveAcknowledged, acknowledgeFinding, isAcknowledged}
   src/cli/commands/recommend.ts → src/recommend/conflict-detection.ts {formatConflict, formatIntraBatchDuplicate}
   src/cli/commands/recommend.ts → src/recommend/conflict-detection.ts {RecommendationConflict, IntraBatchDuplicate}
   src/cli/commands/recommend.ts → src/recommend/create-from-recommendations.ts {createItemsFromRecommendations}
   src/cli/commands/recommend.ts → src/recommend/create-from-recommendations.ts {EnrichedRecommendation, RecommendationMeta, ConflictStrategy}
-  src/cli/commands/recommend.ts → src/schema/index.ts {ItemLevel}
   src/cli/commands/report.ts → src/core/dag.ts {validateDAG}
   src/cli/commands/report.ts → src/core/tree.ts {walkTree}
-  src/cli/commands/report.ts → src/schema/index.ts {SCHEMA_VERSION}
-  src/cli/commands/report.ts → src/schema/index.ts {PRDDocument, PRDItem, ItemLevel}
   src/cli/commands/report.ts → src/schema/validate.ts {validateDocument, validateConfig}
-  src/core/cascade-reset.ts → src/schema/index.ts {PRDItem, ItemStatus}
   src/core/dag.ts → src/core/tree.ts {walkTree, collectAllIds}
-  src/core/dag.ts → src/schema/index.ts {PRDItem}
   src/core/move.ts → src/core/tree.ts {findItem, removeFromTree, insertChild, walkTree}
-  src/core/move.ts → src/schema/index.ts {LEVEL_HIERARCHY}
-  src/core/move.ts → src/schema/index.ts {PRDItem, ItemLevel}
-  src/core/transitions.ts → src/schema/index.ts {ItemStatus}
-  src/core/tree.ts → src/schema/index.ts {LEVEL_HIERARCHY}
-  src/core/tree.ts → src/schema/index.ts {PRDItem, ItemLevel}
   src/recommend/conflict-detection.ts → src/core/tree.ts {walkTree}
   src/recommend/conflict-detection.ts → src/recommend/types.ts {EnrichedRecommendation, RecommendationMeta}
-  src/recommend/conflict-detection.ts → src/schema/index.ts {PRDItem, ItemLevel, ItemStatus}
   src/recommend/create-from-recommendations.ts → src/core/dag.ts {validateDAG}
   src/recommend/create-from-recommendations.ts → src/core/tree.ts {findItem, insertChild}
   src/recommend/create-from-recommendations.ts → src/recommend/conflict-detection.ts {detectRecommendationConflicts}
   src/recommend/create-from-recommendations.ts → src/recommend/conflict-detection.ts {ConflictReport}
   src/recommend/create-from-recommendations.ts → src/recommend/types.ts {EnrichedRecommendation, RecommendationMeta, ConflictStrategy}
-  src/recommend/create-from-recommendations.ts → src/schema/index.ts {LEVEL_HIERARCHY, CHILD_LEVEL, isLeafLevel, getLevelLabel}
-  src/recommend/create-from-recommendations.ts → src/schema/index.ts {PRDItem, ItemLevel}
-  src/recommend/types.ts → src/schema/index.ts {ItemLevel, Priority}
-  src/schema/index.ts → src/schema/v1.ts {SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion, LEVEL_HIERARCHY, PRIORITY_ORDER, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES, CHILD_LEVEL, LOE_DEFAULTS, isPriority, isItemLevel, isItemStatus, isRequirementCategory, isValidationType, DEFAULT_CONFIG}
-  src/schema/index.ts → src/schema/v1.ts {ItemLevel, ItemStatus, Priority, RequirementCategory, RequirementValidationType, Requirement, DuplicateOverrideMarker, MergedProposalRecord, PRDItem, PRDDocument, RexConfig, FacetDefinition, BudgetThresholds, LoEConfig, LogEntry, TokenUsage, AnalyzeTokenUsage}
-  src/schema/validate.ts → src/schema/v1.ts {SCHEMA_VERSION, isCompatibleSchema, VALID_STATUSES, VALID_LEVELS, VALID_PRIORITIES, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES}
+  src/store/file-adapter.ts → src/core/canonical.ts {toCanonicalJSON}
   src/store/file-adapter.ts → src/core/tree.ts {findItem, insertChild, updateInTree, removeFromTree}
-  src/store/file-adapter.ts → src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
   src/store/file-adapter.ts → src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry}
-  tests/e2e/cli-init.test.ts → src/schema/v1.ts {SCHEMA_VERSION, DEFAULT_CONFIG}
   tests/e2e/cli-init.test.ts → src/schema/validate.ts {RexConfigSchema, PRDDocumentSchema}
   tests/unit/analyze/acknowledge.test.ts → src/analyze/acknowledge.ts {computeFindingHash, loadAcknowledged, saveAcknowledged, acknowledgeFinding, isAcknowledged}
   tests/unit/analyze/scanners-acknowledge.test.ts → src/analyze/acknowledge.ts {computeFindingHash, acknowledgeFinding, saveAcknowledged}
   tests/unit/cli/commands/recommend.test.ts → src/cli/commands/recommend.ts {*}
-  tests/unit/cli/commands/recommend.test.ts → src/schema/index.ts {PRDDocument}
   tests/unit/cli/commands/report.test.ts → src/cli/commands/report.ts {cmdReport}
-  tests/unit/cli/commands/report.test.ts → src/schema/index.ts {PRDDocument}
-  tests/unit/cli/commands/usage.test.ts → src/schema/index.ts {PRDDocument, RexConfig}
+  tests/unit/cli/edit-item.test.ts → src/core/canonical.ts {toCanonicalJSON}
+  tests/unit/core/canonical.test.ts → src/core/canonical.ts {toCanonicalJSON, sortItems}
   tests/unit/core/dag.test.ts → src/core/dag.ts {validateDAG}
-  tests/unit/core/dag.test.ts → src/schema/index.ts {PRDItem}
   tests/unit/core/move.test.ts → src/core/move.ts {validateMove, moveItem}
-  tests/unit/core/move.test.ts → src/schema/index.ts {PRDItem}
-  tests/unit/core/transitions.test.ts → src/core/transitions.ts {validateTransition, allowedTargets}
-  tests/unit/core/transitions.test.ts → src/schema/index.ts {ItemStatus}
   tests/unit/core/tree-hardened.test.ts → src/core/tree.ts {walkTree, findItem, insertChild, updateInTree, removeFromTree, getParentChain, collectAllIds}
-  tests/unit/core/tree-hardened.test.ts → src/schema/index.ts {PRDItem}
   tests/unit/core/tree.test.ts → src/core/tree.ts {walkTree, findItem, insertChild, updateInTree, removeFromTree, getParentChain, collectAllIds}
-  tests/unit/core/tree.test.ts → src/schema/index.ts {PRDItem}
   tests/unit/recommend/conflict-detection.test.ts → src/recommend/conflict-detection.ts {detectRecommendationConflicts, formatConflict, formatIntraBatchDuplicate, CONFLICT_THRESHOLD}
   tests/unit/recommend/conflict-detection.test.ts → src/recommend/types.ts {EnrichedRecommendation}
-  tests/unit/recommend/conflict-detection.test.ts → src/schema/index.ts {PRDItem}
-  tests/unit/recommend/create-from-recommendations.test.ts → src/recommend/create-from-recommendations.ts {*}
-  tests/unit/recommend/create-from-recommendations.test.ts → src/schema/index.ts {PRDDocument, PRDItem}
-  tests/unit/schema/schema-version.test.ts → src/schema/v1.ts {SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion}
-  tests/unit/schema/schema-version.test.ts → src/schema/validate.ts {validateDocument}
   tests/unit/schema/validate.test.ts → src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry, formatValidationErrors}
-  tests/unit/store/file-adapter.test.ts → src/schema/index.ts {SCHEMA_VERSION}
-  tests/unit/store/file-adapter.test.ts → src/schema/index.ts {PRDDocument, PRDItem}
+  tests/unit/store/file-adapter.test.ts → src/core/canonical.ts {toCanonicalJSON}
   tests/unit/store/file-adapter.test.ts → src/store/file-adapter.ts {FileStore, ensureRexDir}
 
 Outgoing (this zone → other zones):
-  → cli: src/cli/commands/add.ts → src/cli/commands/constants.ts; src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/report.ts → src/cli/commands/constants.ts
-  → core: src/core/cascade-reset.ts → src/store/contracts.ts; src/recommend/create-from-recommendations.ts → src/store/contracts.ts; src/schema/index.ts → src/schema/levels.ts; src/schema/index.ts → src/schema/levels.ts; src/store/file-adapter.ts → src/store/contracts.ts
-  → store: src/cli/commands/add.ts → src/store/index.ts; src/cli/commands/recommend.ts → src/store/index.ts; src/store/file-adapter.ts → src/core/canonical.ts; tests/unit/recommend/create-from-recommendations.test.ts → src/store/index.ts; tests/unit/store/file-adapter.test.ts → src/core/canonical.ts
-  → unit-analyze: src/cli/commands/report.ts → src/core/structural.ts; src/recommend/conflict-detection.ts → src/analyze/dedupe.ts; src/store/file-adapter.ts → src/store/atomic-write.ts; src/store/file-adapter.ts → src/store/project-config.ts; tests/unit/analyze/scanners-acknowledge.test.ts → src/analyze/scanners.ts
-  → unit-cli: src/cli/commands/add.ts → src/cli/errors.ts; src/cli/commands/add.ts → src/cli/output.ts; src/cli/commands/recommend.ts → src/cli/output.ts; src/cli/commands/report.ts → src/cli/output.ts; src/cli/commands/report.ts → src/core/stats.ts; src/cli/commands/report.ts → src/core/stats.ts; src/core/cascade-reset.ts → src/core/parent-reset.ts; src/core/move.ts → src/cli/errors.ts; tests/unit/cli/commands/usage.test.ts → src/cli/commands/usage.ts; tests/unit/core/move.test.ts → src/cli/errors.ts; tests/unit/core/tree-hardened.test.ts → src/core/stats.ts; tests/unit/core/tree.test.ts → src/core/stats.ts
+  → cli: src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/report.ts → src/cli/commands/constants.ts; tests/unit/cli/edit-item.test.ts → src/cli/mcp-tools.ts
+  → store: src/cli/commands/recommend.ts → src/store/index.ts; tests/unit/cli/edit-item.test.ts → src/store/index.ts
+  → unit-analyze: src/cli/commands/recommend.ts → src/schema/index.ts; src/cli/commands/report.ts → src/schema/index.ts; src/cli/commands/report.ts → src/schema/index.ts; src/core/canonical.ts → src/schema/index.ts; src/core/canonical.ts → src/schema/index.ts; src/core/dag.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/move.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/core/tree.ts → src/schema/index.ts; src/recommend/conflict-detection.ts → src/analyze/dedupe.ts; src/recommend/conflict-detection.ts → src/schema/index.ts; src/recommend/create-from-recommendations.ts → src/schema/index.ts; src/recommend/create-from-recommendations.ts → src/schema/index.ts; src/recommend/create-from-recommendations.ts → src/store/contracts.ts; src/recommend/types.ts → src/schema/index.ts; src/schema/validate.ts → src/schema/v1.ts; src/store/file-adapter.ts → src/schema/index.ts; src/store/file-adapter.ts → src/store/atomic-write.ts; src/store/file-adapter.ts → src/store/contracts.ts; src/store/file-adapter.ts → src/store/project-config.ts; tests/e2e/cli-init.test.ts → src/schema/v1.ts; tests/unit/analyze/scanners-acknowledge.test.ts → src/analyze/scanners.ts; tests/unit/cli/commands/recommend.test.ts → src/schema/index.ts; tests/unit/cli/commands/report.test.ts → src/schema/index.ts; tests/unit/cli/edit-item.test.ts → src/schema/v1.ts; tests/unit/cli/edit-item.test.ts → src/schema/v1.ts; tests/unit/core/canonical.test.ts → src/schema/index.ts; tests/unit/core/dag.test.ts → src/schema/index.ts; tests/unit/core/move.test.ts → src/schema/index.ts; tests/unit/core/tree-hardened.test.ts → src/schema/index.ts; tests/unit/core/tree.test.ts → src/schema/index.ts; tests/unit/recommend/conflict-detection.test.ts → src/schema/index.ts; tests/unit/store/file-adapter.test.ts → src/schema/index.ts; tests/unit/store/file-adapter.test.ts → src/schema/index.ts
+  → unit-cli: src/cli/commands/recommend.ts → src/cli/output.ts; src/cli/commands/report.ts → src/cli/output.ts; src/cli/commands/report.ts → src/core/stats.ts; src/cli/commands/report.ts → src/core/stats.ts; src/core/move.ts → src/cli/errors.ts; tests/unit/core/move.test.ts → src/cli/errors.ts; tests/unit/core/tree-hardened.test.ts → src/core/stats.ts; tests/unit/core/tree.test.ts → src/core/stats.ts
+  → validate: src/cli/commands/report.ts → src/core/structural.ts
 
 Incoming (other zones → this zone):
-  ← cli: src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/core/cascade-reset.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/transitions.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp.ts → src/schema/index.ts; src/core/health.ts → src/core/tree.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/schema/index.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts
-  ← core: src/cli/commands/reorganize.ts → src/schema/index.ts; src/core/analytics.ts → src/schema/index.ts; src/core/analytics.ts → src/schema/index.ts; src/core/code-coverage.ts → src/core/tree.ts; src/core/code-coverage.ts → src/schema/index.ts; src/core/delete.ts → src/core/tree.ts; src/core/delete.ts → src/schema/index.ts; src/core/facets.ts → src/core/tree.ts; src/core/facets.ts → src/schema/index.ts; src/core/merge.ts → src/core/tree.ts; src/core/merge.ts → src/schema/index.ts; src/core/prune.ts → src/core/tree.ts; src/core/prune.ts → src/schema/index.ts; src/core/remove-epic.ts → src/core/tree.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-epic.ts → src/schema/index.ts; src/core/remove-feature.ts → src/core/tree.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-feature.ts → src/schema/index.ts; src/core/remove-task.ts → src/core/tree.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/remove-task.ts → src/schema/index.ts; src/core/reorganize-executor.ts → src/core/move.ts; src/core/reorganize-executor.ts → src/core/tree.ts; src/core/reorganize-executor.ts → src/schema/index.ts; src/core/reorganize.ts → src/core/tree.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/reorganize.ts → src/schema/index.ts; src/core/requirements.ts → src/core/tree.ts; src/core/requirements.ts → src/schema/index.ts; src/core/scope-creep.ts → src/core/tree.ts; src/core/scope-creep.ts → src/schema/index.ts; src/core/scope-creep.ts → src/schema/index.ts; src/core/sync-engine.ts → src/core/tree.ts; src/core/sync-engine.ts → src/schema/index.ts; src/core/sync.ts → src/core/tree.ts; src/core/sync.ts → src/schema/index.ts; src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/core/cascade-reset.ts; src/public.ts → src/core/tree.ts; src/public.ts → src/core/tree.ts; src/public.ts → src/recommend/create-from-recommendations.ts; src/public.ts → src/recommend/create-from-recommendations.ts; src/public.ts → src/schema/v1.ts; src/public.ts → src/schema/v1.ts; src/schema/levels.ts → src/schema/v1.ts; src/schema/levels.ts → src/schema/v1.ts; src/store/contracts.ts → src/schema/index.ts; tests/unit/core/facets.test.ts → src/schema/v1.ts; tests/unit/core/merge.test.ts → src/core/tree.ts; tests/unit/core/merge.test.ts → src/schema/index.ts; tests/unit/core/prune.test.ts → src/schema/v1.ts; tests/unit/core/remove-epic.test.ts → src/schema/index.ts; tests/unit/core/remove-feature.test.ts → src/schema/index.ts; tests/unit/core/remove-task.test.ts → src/schema/index.ts; tests/unit/core/reorganize-executor.test.ts → src/schema/index.ts; tests/unit/core/reorganize.test.ts → src/schema/index.ts; tests/unit/core/requirements.test.ts → src/schema/v1.ts; tests/unit/core/requirements.test.ts → src/schema/validate.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync-engine.test.ts → src/schema/index.ts; tests/unit/core/sync.test.ts → src/schema/index.ts
-  ← fix: src/core/fix.ts → src/core/tree.ts; src/core/fix.ts → src/schema/index.ts; tests/unit/cli/commands/fix.test.ts → src/schema/index.ts; tests/unit/core/fix.test.ts → src/schema/index.ts
-  ← store: src/core/canonical.ts → src/schema/index.ts; src/core/canonical.ts → src/schema/index.ts; src/store/adapter-registry.ts → src/store/file-adapter.ts; src/store/index.ts → src/store/file-adapter.ts; src/store/index.ts → src/store/file-adapter.ts; src/store/notion-adapter.ts → src/core/tree.ts; src/store/notion-adapter.ts → src/schema/index.ts; src/store/notion-adapter.ts → src/schema/validate.ts; src/store/notion-map.ts → src/core/tree.ts; src/store/notion-map.ts → src/schema/index.ts; src/store/notion-map.ts → src/schema/index.ts; tests/integration/project-config.test.ts → src/schema/index.ts; tests/integration/store-roundtrip.test.ts → src/schema/index.ts; tests/integration/store-roundtrip.test.ts → src/schema/index.ts; tests/unit/cli/commands/sync.test.ts → src/schema/index.ts; tests/unit/cli/commands/sync.test.ts → src/store/file-adapter.ts; tests/unit/core/canonical.test.ts → src/schema/index.ts; tests/unit/core/notion-map.test.ts → src/schema/index.ts; tests/unit/store/adapter-registry.test.ts → src/schema/index.ts; tests/unit/store/adapter-registry.test.ts → src/store/file-adapter.ts; tests/unit/store/resolve-store.test.ts → src/schema/index.ts; tests/unit/store/resolve-store.test.ts → src/store/file-adapter.ts
-  ← unit-analyze: src/analyze/analyze-shared.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/consolidation-guard.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/decompose.ts → src/schema/index.ts; src/analyze/dedupe.ts → src/schema/index.ts; src/analyze/diff.ts → src/core/tree.ts; src/analyze/diff.ts → src/schema/index.ts; src/analyze/extract.ts → src/schema/index.ts; src/analyze/modify-reason.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/propose.ts → src/schema/index.ts; src/analyze/reason.ts → src/core/tree.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reason.ts → src/schema/index.ts; src/analyze/reconcile.ts → src/core/tree.ts; src/analyze/reconcile.ts → src/schema/index.ts; src/analyze/reshape-reason.ts → src/core/tree.ts; src/analyze/reshape-reason.ts → src/schema/index.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/analyze/scanners.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/analyze.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/prune.ts → src/schema/index.ts; src/cli/commands/reshape.ts → src/schema/index.ts; src/cli/commands/smart-add-duplicates.ts → src/core/tree.ts; src/cli/commands/smart-add-duplicates.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/core/cascade-reset.ts; src/cli/commands/smart-add.ts → src/core/tree.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/smart-add.ts → src/schema/index.ts; src/cli/commands/validate-interactive.ts → src/core/tree.ts; src/cli/commands/validate-interactive.ts → src/schema/index.ts; src/cli/commands/validate-interactive.ts → src/schema/index.ts; src/cli/commands/validate.ts → src/core/dag.ts; src/cli/commands/validate.ts → src/schema/index.ts; src/cli/commands/validate.ts → src/schema/index.ts; src/cli/commands/validate.ts → src/schema/validate.ts; src/core/epic-correlation.ts → src/schema/index.ts; src/core/epic-correlation.ts → src/schema/index.ts; src/core/reshape.ts → src/core/move.ts; src/core/reshape.ts → src/core/tree.ts; src/core/reshape.ts → src/schema/index.ts; src/core/structural.ts → src/core/tree.ts; src/core/structural.ts → src/schema/index.ts; src/core/structural.ts → src/schema/index.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/schema/index.ts; tests/unit/analyze/consolidation-guard.test.ts → src/schema/v1.ts; tests/unit/analyze/diff.test.ts → src/schema/v1.ts; tests/unit/analyze/reconcile.test.ts → src/schema/index.ts; tests/unit/analyze/token-tracking.test.ts → src/schema/v1.ts; tests/unit/cli/commands/smart-add-duplicates.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate-epicless.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate-interactive.test.ts → src/schema/index.ts; tests/unit/cli/commands/validate.test.ts → src/schema/index.ts; tests/unit/core/epic-correlation.test.ts → src/schema/index.ts; tests/unit/core/epicless.test.ts → src/schema/index.ts; tests/unit/core/structural.test.ts → src/schema/index.ts
-  ← unit-cli: src/cli/commands/move.ts → src/core/move.ts; src/cli/commands/remove.ts → src/core/tree.ts; src/cli/commands/remove.ts → src/schema/index.ts; src/cli/commands/remove.ts → src/schema/index.ts; src/cli/commands/status-sections.ts → src/core/tree.ts; src/cli/commands/status-sections.ts → src/schema/index.ts; src/cli/commands/status-shared.ts → src/schema/index.ts; src/cli/commands/status-shared.ts → src/schema/index.ts; src/cli/commands/status.ts → src/core/tree.ts; src/cli/commands/status.ts → src/schema/index.ts; src/cli/commands/update.ts → src/core/dag.ts; src/cli/commands/update.ts → src/core/transitions.ts; src/cli/commands/update.ts → src/core/tree.ts; src/cli/commands/update.ts → src/schema/index.ts; src/cli/commands/update.ts → src/schema/index.ts; src/cli/commands/verify.ts → src/core/tree.ts; src/cli/index.ts → src/cli/commands/add.ts; src/cli/index.ts → src/cli/commands/recommend.ts; src/cli/index.ts → src/cli/commands/report.ts; src/cli/index.ts → src/schema/index.ts; src/cli/validate-input.ts → src/schema/index.ts; src/cli/validate-input.ts → src/schema/index.ts; src/core/parent-completion.ts → src/core/tree.ts; src/core/parent-completion.ts → src/schema/index.ts; src/core/parent-reset.ts → src/core/tree.ts; src/core/parent-reset.ts → src/schema/index.ts; src/core/stats.ts → src/core/tree.ts; src/core/stats.ts → src/schema/index.ts; src/core/stats.ts → src/schema/index.ts; src/core/timestamps.ts → src/schema/index.ts; src/core/token-usage.ts → src/schema/index.ts; src/core/verify.ts → src/core/tree.ts; src/core/verify.ts → src/schema/index.ts; tests/unit/cli/commands/add.test.ts → src/cli/commands/add.ts; tests/unit/cli/commands/status.test.ts → src/schema/index.ts; tests/unit/cli/commands/update.test.ts → src/schema/index.ts; tests/unit/cli/commands/verify.test.ts → src/schema/index.ts; tests/unit/cli/commands/verify.test.ts → src/schema/v1.ts; tests/unit/core/parent-completion.test.ts → src/schema/index.ts; tests/unit/core/parent-reset.test.ts → src/schema/index.ts; tests/unit/core/token-usage-regression.test.ts → src/schema/index.ts; tests/unit/core/token-usage.test.ts → src/schema/index.ts; tests/unit/core/verify.test.ts → src/schema/index.ts
-  ← unit-core: src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/schema/index.ts; src/core/next-task.ts → src/schema/index.ts; tests/unit/core/feature-filtered-task.test.ts → src/schema/index.ts; tests/unit/core/next-task-matching.test.ts → src/schema/index.ts; tests/unit/core/next-task-scoring.test.ts → src/schema/index.ts; tests/unit/core/next-task.test.ts → src/schema/index.ts; tests/unit/core/requirements-prioritization.test.ts → src/schema/index.ts
-  ← unit-store: tests/unit/store/notion-adapter.test.ts → src/schema/index.ts; tests/unit/store/notion-adapter.test.ts → src/schema/index.ts; tests/unit/store/store-contract.test.ts → src/schema/index.ts; tests/unit/store/store-contract.test.ts → src/schema/index.ts; tests/unit/store/store-contract.test.ts → src/store/file-adapter.ts
+  ← cli: src/cli/commands/init.ts → src/core/canonical.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/core/health.ts → src/core/tree.ts; tests/unit/cli/mcp.test.ts → src/core/canonical.ts
+  ← fix: src/core/fix.ts → src/core/tree.ts
+  ← store: src/store/adapter-registry.ts → src/core/canonical.ts; src/store/adapter-registry.ts → src/store/file-adapter.ts; src/store/index.ts → src/store/file-adapter.ts; src/store/index.ts → src/store/file-adapter.ts; src/store/notion-adapter.ts → src/core/canonical.ts; src/store/notion-adapter.ts → src/core/tree.ts; src/store/notion-adapter.ts → src/schema/validate.ts; src/store/notion-map.ts → src/core/tree.ts; tests/integration/project-config.test.ts → src/core/canonical.ts; tests/integration/store-roundtrip.test.ts → src/core/canonical.ts; tests/unit/cli/commands/sync.test.ts → src/core/canonical.ts; tests/unit/cli/commands/sync.test.ts → src/store/file-adapter.ts; tests/unit/store/adapter-registry.test.ts → src/core/canonical.ts; tests/unit/store/adapter-registry.test.ts → src/store/file-adapter.ts; tests/unit/store/resolve-store.test.ts → src/core/canonical.ts; tests/unit/store/resolve-store.test.ts → src/store/file-adapter.ts
+  ← unit-analyze: src/analyze/diff.ts → src/core/tree.ts; src/analyze/reason.ts → src/core/tree.ts; src/analyze/reconcile.ts → src/core/tree.ts; src/analyze/reshape-reason.ts → src/core/tree.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/analyze/scanners.ts → src/analyze/acknowledge.ts; src/cli/commands/add.ts → src/core/dag.ts; src/cli/commands/add.ts → src/core/tree.ts; src/cli/commands/prune.ts → src/core/canonical.ts; src/cli/commands/reshape.ts → src/core/canonical.ts; src/cli/commands/smart-add-duplicates.ts → src/core/tree.ts; src/cli/commands/smart-add.ts → src/core/tree.ts; src/core/code-coverage.ts → src/core/tree.ts; src/core/delete.ts → src/core/tree.ts; src/core/facets.ts → src/core/tree.ts; src/core/merge.ts → src/core/tree.ts; src/core/prune.ts → src/core/tree.ts; src/core/remove-epic.ts → src/core/tree.ts; src/core/remove-feature.ts → src/core/tree.ts; src/core/remove-task.ts → src/core/tree.ts; src/core/reorganize-executor.ts → src/core/move.ts; src/core/reorganize-executor.ts → src/core/tree.ts; src/core/reorganize.ts → src/core/tree.ts; src/core/requirements.ts → src/core/tree.ts; src/core/reshape.ts → src/core/move.ts; src/core/reshape.ts → src/core/tree.ts; src/core/scope-creep.ts → src/core/tree.ts; src/core/sync-engine.ts → src/core/tree.ts; src/core/sync.ts → src/core/tree.ts; src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/analyze/acknowledge.ts; src/public.ts → src/core/tree.ts; src/public.ts → src/core/tree.ts; src/public.ts → src/recommend/create-from-recommendations.ts; src/public.ts → src/recommend/create-from-recommendations.ts; tests/unit/core/merge.test.ts → src/core/tree.ts; tests/unit/core/requirements.test.ts → src/schema/validate.ts; tests/unit/recommend/create-from-recommendations.test.ts → src/recommend/create-from-recommendations.ts; tests/unit/schema/schema-version.test.ts → src/schema/validate.ts
+  ← unit-cli: src/cli/commands/move.ts → src/core/move.ts; src/cli/commands/remove.ts → src/core/tree.ts; src/cli/commands/status-sections.ts → src/core/tree.ts; src/cli/commands/status.ts → src/core/tree.ts; src/cli/commands/update.ts → src/core/dag.ts; src/cli/commands/update.ts → src/core/tree.ts; src/cli/commands/verify.ts → src/core/tree.ts; src/cli/index.ts → src/cli/commands/recommend.ts; src/cli/index.ts → src/cli/commands/report.ts; src/core/parent-completion.ts → src/core/tree.ts; src/core/parent-reset.ts → src/core/tree.ts; src/core/stats.ts → src/core/tree.ts; src/core/verify.ts → src/core/tree.ts
+  ← unit-core: src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/core/tree.ts
+  ← unit-store: tests/unit/store/notion-adapter.test.ts → src/core/canonical.ts; tests/unit/store/store-contract.test.ts → src/core/canonical.ts; tests/unit/store/store-contract.test.ts → src/store/file-adapter.ts
+  ← validate: src/cli/commands/validate-interactive.ts → src/core/tree.ts; src/cli/commands/validate.ts → src/core/dag.ts; src/cli/commands/validate.ts → src/schema/validate.ts; src/core/structural.ts → src/core/tree.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] 14 entry points — wide API surface, consider consolidating exports
-[observation] [warning] High coupling (0.69) — 12 imports target "unit-cli"
-[observation] [warning] Low cohesion (0.31) — files are loosely related, consider splitting this zone
-[suggestion] [info] Zone "unit" has files across 13 directories — consider consolidating under a dedicated directory
-[suggestion] [warning] Zone "Unit" (unit) has critical risk (score: 0.69, cohesion: 0.31, coupling: 0.69) — requires refactoring before new feature development
+[observation] [warning] 10 entry points — wide API surface, consider consolidating exports
+[observation] [warning] High coupling (0.72) — 35 imports target "unit-analyze"
+[observation] [warning] Low cohesion (0.28) — files are loosely related, consider splitting this zone
+[suggestion] [info] Zone "unit" has files across 14 directories — consider consolidating under a dedicated directory
+[suggestion] [critical] The 39 imports from unit-analyze → unit (upward direction) are the highest-priority cut points. Identify which files in unit are being imported by unit-analyze and move those files down into unit-analyze. This breaks the inversion without requiring a full zone reorganization. Start with the files that unit-analyze imports most frequently — these are the misplaced shared utilities.
+[suggestion] [critical] To resolve the 39 unit-analyze → unit import inversions without full zone reorganization: run grep on packages/rex/src/analyze/ for imports matching '../unit/' or relative paths reaching unit zone files. Each matching file in unit that is imported by unit-analyze belongs in unit-analyze, not unit. Move the identified files and update their import paths. This severs the inversion at its source — the files are misclassified by zone because they are consumed by the shared core, not by the consumer tier.
+[suggestion] [critical] Zone "Unit" (unit) has catastrophic risk (score: 0.72, cohesion: 0.28, coupling: 0.72) — requires immediate architectural intervention
+[pattern] [critical] The critical severity rating is fully corroborated by three independent measurement types: zone metrics (cohesion 0.28, coupling 0.72), API surface analysis (10 entry points), and structural analysis (14 directories). This is the strongest multi-signal case in the analysis.
 
 </findings>
 
 <insights>
 
-- Low cohesion (0.31) — files are loosely related, consider splitting this zone
-- High coupling (0.69) — 12 imports target "unit-cli"
-- 14 entry points — wide API surface, consider consolidating exports
-- High coupling (0.69) — 12 imports target "prd-cli-operations"
-- 14 entry points — wide API surface, consider consolidating exports
-- The zone's 14 entry points indicate it functions as a public API surface — schema/index.ts and core/tree.ts are especially high-traffic import targets for the rest of the package.
-- Mixing schema definitions, core tree operations, CLI leaf commands (add, recommend, report), and the store adapter in one zone suggests the algorithmic grouping has conflated the dependency hub with unrelated command handlers.
-- store/file-adapter.ts belongs semantically with the store zone but is grouped here due to import weight — verifying its zone assignment against actual store zone members would clarify whether a reassignment improves cohesion.
-- Cohesion of 0.31 combined with coupling of 0.69 indicates this zone is acting as a catch-all dependency hub rather than a focused domain boundary — consider splitting schema types, tree utilities, and CLI commands into separate zones.
-- 63 imports from the 'core' zone and 60 from 'unit-analyze' flow into this zone, confirming it is the structural foundation of the package and that its stability is critical to the entire dependency graph.
-- CLI command files (add.ts, recommend.ts, report.ts) appearing in a schema/core zone is an architectural smell — these files should depend on the foundation, not be part of it.
-- Zone "prd-schema-foundation" has files across 13 directories — consider consolidating under a dedicated directory
-- The 12 outbound imports from this zone into prd-cli-operations are confirmed reverse dependencies: schema/foundation layer importing from CLI-tier code violates the four-tier hierarchy in CLAUDE.md and is the direct source of the bidirectional coupling risk flagged previously.
-- src/cli/commands/constants.ts (a hub imported by 7 zones) re-exports only from @n-dx/llm-client, making it a thin pass-through — but its placement in the CLI command directory causes zones at every tier to take an implicit CLI-layer import just to access shared constants, inflating the apparent coupling of this zone.
-- prd-schema-foundation → prd-cli-operations (12 imports): the foundation tier importing from the CLI tier is a confirmed layering inversion. These 12 imports must be resolved — either the depended-on symbols belong in the foundation and should be moved down, or the imports are accidental and should be removed.
-- constants.ts is co-located in src/cli/commands/ but is imported by 7 zones across all tiers. Moving it to a shared infrastructure location (e.g. src/shared/ or src/config/) would eliminate the upward import pressure on every zone that needs project constants.
-- Three CLI command files (add.ts, recommend.ts, report.ts) are grouped in this zone by import weight but are semantically CLI-tier — moving them to prd-cli-operations would reduce this zone's entry point count from 14 to 11 and raise cohesion by removing non-foundation files.
-- The zone's 14 entry points make it the widest API surface in the rex package — a narrower, types-only public.ts barrel would force consumers to be explicit about which foundation symbols they need, reducing accidental coupling.
-- CLI command files (add.ts, recommend.ts, report.ts) are grouped in the schema/foundation zone purely due to import weight. Files whose primary purpose is command dispatch belong in the CLI tier regardless of their dependency count; their presence inflates the foundation's entry-point count and makes the zone's stated purpose ambiguous.
-- The zone splits the src/core/ directory across two zones: cascade-reset.ts, dag.ts, move.ts, and transitions.ts live here while other core/ files belong to the 'core' zone. Developers navigating src/core/ encounter files from two different architectural zones with no visual or filesystem indicator of the boundary.
-- prd-schema-foundation is the only source zone that simultaneously holds the lowest cohesion (0.31) AND highest coupling (0.69) in the package — the textbook fragile-module signature. High coupling means any change breaks many consumers; low cohesion means there is no single responsibility to preserve. This combination makes coordinated refactoring significantly harder than fixing either metric alone.
-- The 14 entry points include both src/schema/index.ts (pure types) and src/core/tree.ts (stateful tree operations) — two fundamentally different abstraction levels bundled under one zone label. Consumers importing 'the foundation' may unknowingly couple to tree mutation logic when they only need type definitions.
-- src/core/ is split across two zones (prd-schema-foundation and core) with no filesystem boundary separating them. Add a src/schema/ subdirectory and migrate type-only files there, leaving algorithmic core/ files in their own directory. This makes the zone split visible to directory navigation tools and prevents new files from being silently assigned to the wrong zone.
-- The zone combines a pure-types layer (src/schema/index.ts) with stateful tree operations (src/core/tree.ts) under one entry surface. Extract a src/schema/types.ts barrel that exports only type aliases and interfaces, distinct from src/core/tree.ts. Consumers that need only types would import from types.ts, breaking the hidden coupling between type consumers and tree-mutation consumers.
-- Zone "unit" has files across 13 directories — consider consolidating under a dedicated directory
-- [call graph] 844 internal calls, 102 outgoing, 263 incoming (cohesion: 0.89, coupling: 0.11)
+- Low cohesion (0.28) — files are loosely related, consider splitting this zone
+- High coupling (0.72) — 35 imports target "unit-analyze"
+- 10 entry points — wide API surface, consider consolidating exports
+- High coupling (0.72) — 35 imports target "analyze-engine"
+- 10 entry points — wide API surface, consider consolidating exports
+- The low cohesion (0.28) and high coupling (0.72) signal that this zone is a community-detection residual: files that import broadly but don't form a tight internal cluster
+- dag.ts and tree.ts are the gravitational center of this zone; extracting them into an explicit 'prd-graph-core' sub-namespace would improve discoverability
+- conflict-detection.ts and acknowledge.ts suggest recommendation lifecycle logic that may belong closer to the recommend/ module rather than scattered here
+- Coupling at 0.72 exceeds the 0.6 warning threshold — this zone is a high-traffic dependency hub. Consider whether dag.ts and tree.ts should be promoted to a dedicated foundational module to make the dependency surface explicit.
+- Bidirectional imports with unit-analyze (35 outbound, 39 inbound) create a circular dependency cycle that will complicate future refactoring or extraction of either zone.
+- canonical.ts and move.ts appear to be pure utilities with no UI concerns — they are good candidates for co-location with dag.ts/tree.ts in a standalone graph-utilities module.
+- Zone "prd-graph-utilities" has files across 14 directories — consider consolidating under a dedicated directory
+- prd-graph-utilities is the keystone of the three-zone coupling triangle: it is the only zone that is simultaneously in a bidirectional cycle with analyze-engine (74 edges) AND with cli-command-layer (21 edges). Removing it from either cycle requires resolving both, making it impossible to refactor incrementally.
+- All three pairs in the analyze-engine/cli-command-layer/prd-graph-utilities triangle are independently bidirectional — not just the triangle as a whole. This means there is no safe extraction seam: any zone boundary drawn inside the triangle is immediately crossed from both directions.
+- conflict-detection.ts belongs to recommendation lifecycle semantics (detecting conflicts between proposed PRD items) but lives in a graph-utilities zone — its location is determined by import proximity to dag.ts/tree.ts rather than by domain intent. This is a concrete misplaced-file instance, not just a cohesion signal.
+- The 26 files spanning 14 directories with cohesion 0.28 is evidence that this zone is the Louvain algorithm's residual bin: files that import broadly but don't cluster tightly anywhere. The practical consequence is that no single engineer owns this zone conceptually, making it a maintenance liability that grows by default.
+- conflict-detection.ts is misplaced in prd-graph-utilities — its domain (recommendation conflict resolution) belongs in the recommend/ module. Its current location creates a false dependency between graph traversal utilities and recommendation lifecycle logic.
+- The zone spans 14 directories with cohesion 0.28 and no clear owner — it is a Louvain residual bin that will accumulate files by default. Without an explicit split into prd-graph-core (dag.ts, tree.ts, canonical.ts, move.ts) and reassignment of the remaining files to their primary consumer zones, this zone will continue to grow as a catch-all.
+- The zone display name prd-graph-utilities does not match the internal zone ID unit used in the cross-zone import table. Engineers correlating import metrics (unit→unit-analyze: 35 imports) with zone health metrics (prd-graph-utilities cohesion: 0.28) must maintain a mental translation table. This dual naming creates a documentation gap where no single artifact maps zone IDs to zone names.
+- The zone spans 14 directories with no single directory home, making zone membership impossible to enforce through directory conventions or path-based lint rules. Without a physical directory boundary, the only enforcement mechanism is the import graph itself — which the zone already violates by having bidirectional cycles with two other zones.
+- The zone name uses a descriptive compound noun (prd-graph-utilities) while the cross-zone import ID uses an abbreviated prefix scheme (unit). This inconsistency extends to all three triadic zones: analyze-engine/unit-analyze, cli-command-layer/unit-cli, prd-graph-utilities/unit — suggesting the abbreviated IDs are legacy names from before the descriptive renaming was applied, and the renaming was never propagated to the import tracking layer.
+- Zone ID unit does not match display name prd-graph-utilities. Publish a canonical zone-id-to-name mapping in CONTEXT.md or a sourcevision config so engineers can cross-reference import metrics with health metrics without a mental translation step.
+- Zone has no single directory home (14 directories) — zone membership cannot be enforced by path-based lint or directory convention. Define a target directory (src/graph/) and track migration of files into it as a refactoring milestone.
+- Zone "unit" has files across 14 directories — consider consolidating under a dedicated directory
+- All four independent warning/critical signals — bidirectional coupling with unit-analyze (35+39 crossings), 10 entry points, low cohesion (0.28), and files across 14 directories — converge on the same root cause: the zone contains multiple distinct responsibility layers co-located as peers
+- The critical severity rating is fully corroborated by three independent measurement types: zone metrics (cohesion 0.28, coupling 0.72), API surface analysis (10 entry points), and structural analysis (14 directories). This is the strongest multi-signal case in the analysis.
+- The critical rating for unit is the most strongly corroborated finding in this analysis, confirmed by three independent measurement types (zone metrics, API surface count, structural directory count) plus explicit LLM corroboration. No downgrade warranted.
+- The 39 imports from unit-analyze → unit (upward direction) are the highest-priority cut points. Identify which files in unit are being imported by unit-analyze and move those files down into unit-analyze. This breaks the inversion without requiring a full zone reorganization. Start with the files that unit-analyze imports most frequently — these are the misplaced shared utilities.
+- Multi-signal critical corroboration confirmed by three independent measurement types: zone metrics (cohesion 0.28, coupling 0.72), API surface (10 entry points), structural spread (14 directories). The 39 unit-analyze → unit crossings are a dependency inversion where the shared-core zone imports back from a consumer zone. This is the highest-priority structural finding in the codebase.
+- To resolve the 39 unit-analyze → unit import inversions without full zone reorganization: run grep on packages/rex/src/analyze/ for imports matching '../unit/' or relative paths reaching unit zone files. Each matching file in unit that is imported by unit-analyze belongs in unit-analyze, not unit. Move the identified files and update their import paths. This severs the inversion at its source — the files are misclassified by zone because they are consumed by the shared core, not by the consumer tier.
+- [call graph] 655 internal calls, 74 outgoing, 192 incoming (cohesion: 0.9, coupling: 0.1)
 
 </insights>

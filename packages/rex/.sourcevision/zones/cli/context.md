@@ -8,8 +8,8 @@ Zone: Cli (`cli`)
 Files: 11, Cohesion: 0.22, Coupling: 0.78
 Risk: catastrophic (score: 0.78)
 Description: 11 files, primarily TypeScript
-Entry points: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts, src/cli/mcp.ts, src/core/health.ts
-Lines: 2417
+Entry points: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts, src/cli/mcp-tools.ts, src/cli/mcp.ts, src/core/health.ts
+Lines: 2523
 
 </zone>
 
@@ -18,13 +18,13 @@ Lines: 2417
 src/cli/commands/constants.ts (TypeScript, 51 lines, source)
 src/cli/commands/health.ts (TypeScript, 28 lines, source)
 src/cli/commands/init.ts (TypeScript, 71 lines, source)
-src/cli/mcp-tools.ts (TypeScript, 623 lines, source)
-src/cli/mcp.ts (TypeScript, 226 lines, source)
+src/cli/mcp-tools.ts (TypeScript, 709 lines, source)
+src/cli/mcp.ts (TypeScript, 245 lines, source)
 src/core/health.ts (TypeScript, 436 lines, source)
 src/workflow/default.ts (TypeScript, 20 lines, source)
 tests/integration/smart-add-duplicate-outcomes.test.ts (TypeScript, 257 lines, test)
 tests/unit/cli/commands/smart-add-merge.test.ts (TypeScript, 163 lines, test)
-tests/unit/cli/mcp.test.ts (TypeScript, 169 lines, test)
+tests/unit/cli/mcp.test.ts (TypeScript, 170 lines, test)
 tests/unit/core/health.test.ts (TypeScript, 373 lines, test)
 
 </files>
@@ -40,7 +40,7 @@ Internal:
   src/cli/mcp-tools.ts → src/cli/commands/constants.ts {TOOL_VERSION}
   src/cli/mcp-tools.ts → src/core/health.ts {computeHealthScore}
   src/cli/mcp.ts → src/cli/commands/constants.ts {REX_DIR, TOOL_VERSION}
-  src/cli/mcp.ts → src/cli/mcp-tools.ts {handleGetPrdStatus, handleGetNextTask, handleUpdateTaskStatus, handleAddItem, handleMoveItem, handleMergeItems, handleGetItem, handleAppendLog, handleSyncWithRemote, handleGetRecommendations, handleVerifyCriteria, handleGetCapabilities, handleReorganize, handleHealth, handleFacets}
+  src/cli/mcp.ts → src/cli/mcp-tools.ts {handleGetPrdStatus, handleGetNextTask, handleUpdateTaskStatus, handleAddItem, handleMoveItem, handleMergeItems, handleGetItem, handleAppendLog, handleSyncWithRemote, handleGetRecommendations, handleVerifyCriteria, handleGetCapabilities, handleReorganize, handleHealth, handleFacets, handleEditItem}
   tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/constants.ts {REX_DIR}
   tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/init.ts {cmdInit}
   tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/constants.ts {REX_DIR}
@@ -49,29 +49,30 @@ Internal:
   tests/unit/core/health.test.ts → src/core/health.ts {computeHealthScore, formatHealthScore}
 
 Outgoing (this zone → other zones):
-  → core: src/cli/mcp-tools.ts → src/core/delete.ts; src/cli/mcp-tools.ts → src/core/facets.ts; src/cli/mcp-tools.ts → src/core/merge.ts; src/cli/mcp-tools.ts → src/core/reorganize-executor.ts; src/cli/mcp-tools.ts → src/core/reorganize.ts; src/core/health.ts → src/core/prune.ts; tests/unit/cli/mcp.test.ts → src/public.ts
-  → store: src/cli/commands/health.ts → src/store/index.ts; src/cli/commands/init.ts → src/core/canonical.ts; src/cli/commands/init.ts → src/store/index.ts; src/cli/mcp-tools.ts → src/store/index.ts; src/cli/mcp.ts → src/store/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/store/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/store/index.ts; tests/unit/cli/mcp.test.ts → src/core/canonical.ts; tests/unit/cli/mcp.test.ts → src/store/index.ts
-  → unit: src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/core/cascade-reset.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/transitions.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp.ts → src/schema/index.ts; src/core/health.ts → src/core/tree.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/schema/index.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts
-  → unit-analyze: src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts
+  → store: src/cli/commands/health.ts → src/store/index.ts; src/cli/commands/init.ts → src/store/index.ts; src/cli/mcp-tools.ts → src/store/index.ts; src/cli/mcp.ts → src/store/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/store/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/store/index.ts; tests/unit/cli/mcp.test.ts → src/store/index.ts
+  → unit: src/cli/commands/init.ts → src/core/canonical.ts; src/cli/mcp-tools.ts → src/core/dag.ts; src/cli/mcp-tools.ts → src/core/move.ts; src/cli/mcp-tools.ts → src/core/tree.ts; src/core/health.ts → src/core/tree.ts; tests/unit/cli/mcp.test.ts → src/core/canonical.ts
+  → unit-analyze: src/cli/commands/init.ts → src/schema/index.ts; src/cli/commands/init.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/analyze/reason.ts; src/cli/mcp-tools.ts → src/analyze/reshape-reason.ts; src/cli/mcp-tools.ts → src/core/cascade-reset.ts; src/cli/mcp-tools.ts → src/core/delete.ts; src/cli/mcp-tools.ts → src/core/facets.ts; src/cli/mcp-tools.ts → src/core/merge.ts; src/cli/mcp-tools.ts → src/core/reorganize-executor.ts; src/cli/mcp-tools.ts → src/core/reorganize.ts; src/cli/mcp-tools.ts → src/core/transitions.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/schema/index.ts; src/cli/mcp-tools.ts → src/store/project-config.ts; src/cli/mcp.ts → src/schema/index.ts; src/core/health.ts → src/core/prune.ts; src/core/health.ts → src/schema/index.ts; src/core/health.ts → src/schema/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/analyze/index.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/cli/commands/smart-add.ts; tests/integration/smart-add-duplicate-outcomes.test.ts → src/schema/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/analyze/index.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add-duplicates.ts; tests/unit/cli/commands/smart-add-merge.test.ts → src/cli/commands/smart-add.ts; tests/unit/cli/mcp.test.ts → src/public.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/cli/mcp.test.ts → src/schema/v1.ts; tests/unit/core/health.test.ts → src/schema/index.ts
   → unit-cli: src/cli/commands/health.ts → src/cli/output.ts; src/cli/commands/init.ts → src/cli/output.ts; src/cli/mcp-tools.ts → src/core/parent-completion.ts; src/cli/mcp-tools.ts → src/core/stats.ts; src/cli/mcp-tools.ts → src/core/timestamps.ts; src/cli/mcp-tools.ts → src/core/verify.ts
   → unit-core: src/cli/mcp-tools.ts → src/core/next-task.ts
 
 Incoming (other zones → this zone):
-  ← core: src/cli/commands/reorganize.ts → src/cli/commands/constants.ts; src/public.ts → src/cli/mcp.ts; src/public.ts → src/core/health.ts; src/public.ts → src/core/health.ts
   ← fix: src/cli/commands/fix.ts → src/cli/commands/constants.ts
   ← store: src/cli/commands/sync.ts → src/cli/commands/constants.ts
-  ← unit: src/cli/commands/add.ts → src/cli/commands/constants.ts; src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/report.ts → src/cli/commands/constants.ts
-  ← unit-analyze: src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/prune.ts → src/cli/commands/constants.ts; src/cli/commands/reshape.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/cli/commands/validate.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/init.ts
+  ← unit: src/cli/commands/recommend.ts → src/cli/commands/constants.ts; src/cli/commands/report.ts → src/cli/commands/constants.ts; tests/unit/cli/edit-item.test.ts → src/cli/mcp-tools.ts
+  ← unit-analyze: src/cli/commands/add.ts → src/cli/commands/constants.ts; src/cli/commands/analyze.ts → src/cli/commands/constants.ts; src/cli/commands/prune.ts → src/cli/commands/constants.ts; src/cli/commands/reorganize.ts → src/cli/commands/constants.ts; src/cli/commands/reshape.ts → src/cli/commands/constants.ts; src/cli/commands/smart-add.ts → src/cli/commands/constants.ts; src/public.ts → src/cli/mcp-tools.ts; src/public.ts → src/cli/mcp.ts; src/public.ts → src/core/health.ts; src/public.ts → src/core/health.ts
   ← unit-cli: src/cli/commands/adapter.ts → src/cli/commands/constants.ts; src/cli/commands/move.ts → src/cli/commands/constants.ts; src/cli/commands/remove.ts → src/cli/commands/constants.ts; src/cli/commands/status.ts → src/cli/commands/constants.ts; src/cli/commands/update.ts → src/cli/commands/constants.ts; src/cli/commands/usage.ts → src/cli/commands/constants.ts; src/cli/commands/verify.ts → src/cli/commands/constants.ts; src/cli/errors.ts → src/cli/commands/constants.ts; src/cli/index.ts → src/cli/commands/constants.ts; src/cli/index.ts → src/cli/commands/health.ts; src/cli/index.ts → src/cli/commands/init.ts; src/cli/index.ts → src/cli/mcp.ts
   ← unit-core: src/cli/commands/next.ts → src/cli/commands/constants.ts
+  ← validate: src/cli/commands/validate.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/constants.ts; tests/integration/smart-add-orphaned-parent.test.ts → src/cli/commands/init.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] High coupling (0.78) — 17 imports target "unit"
+[observation] [warning] High coupling (0.78) — 28 imports target "unit-analyze"
 [observation] [warning] Low cohesion (0.22) — files are loosely related, consider splitting this zone
 [suggestion] [info] Zone "cli" has files across 8 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Downgrade cli zone from catastrophic to warning. The coupling to unit-analyze reflects consumer behavior, not bidirectional entanglement. The more actionable issue is the 8-directory spread for 11 files — consolidate into a flatter structure under src/cli/ to improve the cohesion signal and make the zone's boundary visible in the filesystem.
+[suggestion] [warning] The actionable structural defect is 11 files spanning 8 directories. Consolidate all cli zone files under src/cli/ with a flat layout: existing src/cli/commands/*.ts already provides the right grouping. Resolve the inversion in src/analyze/guided.ts by moving src/cli/output.ts to src/util/output.ts and updating the import — this is the only cross-layer dependency that needs severing. After those two steps the cohesion signal will improve without restructuring the zone.
 [suggestion] [critical] Zone "Cli" (cli) has catastrophic risk (score: 0.78, cohesion: 0.22, coupling: 0.78) — requires immediate architectural intervention
 
 </findings>
@@ -79,28 +80,36 @@ Incoming (other zones → this zone):
 <insights>
 
 - Low cohesion (0.22) — files are loosely related, consider splitting this zone
-- High coupling (0.78) — 17 imports target "unit"
-- High coupling (0.78) — 17 imports target "prd-schema-foundation"
-- Low cohesion (0.22) and high coupling (0.78) indicate this zone mixes unrelated responsibilities — MCP transport, CLI lifecycle, and health checks should ideally be separated.
-- Integration test files co-located with service entry points dilute the zone's identity; moving tests to a dedicated test zone would improve cohesion.
-- The 'mcp-tools.ts' route-handler and 'mcp.ts' service together define the MCP surface; ensure these stay in sync as new tools are added to avoid undocumented tool drift.
-- Cohesion of 0.22 is well below the 0.4 threshold — the zone bundles CLI bootstrapping, MCP transport, health monitoring, and workflow configuration into a single community, obscuring each concern's boundaries.
-- Coupling of 0.78 reflects that nearly every file here imports from adjacent zones; the 12 inbound imports from unit-cli and 9 from store suggest this zone acts as a fan-in hub rather than a focused layer.
-- 'workflow/default.ts' classified as config and 'core/health.ts' classified as utility are both pulled into a CLI-dominated zone, indicating these files have not yet found stable homes in the architecture.
-- Zone "rex-mcp-service-layer" has files across 8 directories — consider consolidating under a dedicated directory
-- prd-cli-operations directs 12 imports at rex-mcp-service-layer (unit-cli → cli), meaning CLI command files depend on MCP transport infrastructure — this inverts the expected direction where transport adapts domain commands, not the other way around.
-- The MCP service layer pulls in both remote-sync-adapters (9 imports) and receives 12 imports from prd-cli-operations simultaneously, making it a bidirectional hub between CLI and storage concerns that should instead be a pure transport leaf.
-- prd-cli-operations imports rex-mcp-service-layer 12 times, meaning CLI commands depend on MCP transport infrastructure. This inverts the expected dependency direction — transport layers should adapt domain commands, never be imported by them.
-- src/core/health.ts (utility) and src/cli/commands/health.ts (cli-command) split health monitoring across two archetypes within a single zone with no clear ownership boundary — neither file has a natural home, making it ambiguous whether health is a domain concern or a transport concern.
-- workflow/default.ts is the only config-archetyped file in a zone otherwise composed of transport infrastructure and CLI lifecycle files; it has no runtime relationship to MCP and has drifted into this zone purely by import proximity.
-- src/workflow/default.ts (config archetype) is misplaced in the MCP service layer; workflow configuration has no runtime relationship to MCP transport and should be relocated to the domain operations zone or a dedicated configuration zone.
-- Health monitoring is fragmented across src/core/health.ts (utility) and src/cli/commands/health.ts (cli-command) within an MCP-transport-dominated zone. The two-file split without a unifying interface means health check logic and CLI health reporting evolve independently with no enforced contract between them.
-- The health domain (src/core/health.ts + src/cli/commands/health.ts) is the only CLI/core paired concept whose two files were assigned to different zones — fix and next-task both maintain their CLI/core pairs within a single zone. The split is caused by import-graph proximity pulling health.ts toward MCP infrastructure rather than toward a domain pairing.
-- The three integration test files in this zone (tests/integration/smart-add-duplicate-outcomes.test.ts + 2 more) are testing prd-domain-operations concerns, not MCP transport concerns — their zone assignment reveals they import from MCP infrastructure paths that happen to be co-located, not that they logically belong here.
-- src/cli/commands/health.ts and src/core/health.ts are the only CLI/core sibling pair split across zone boundaries — the fix and task-selection zones correctly co-locate their pairs. Realigning health.ts imports to reduce affinity toward MCP infrastructure would allow the next analysis pass to reunite the pair in a dedicated health zone.
-- Integration tests co-located in this zone test duplicate-outcome and smart-add scenarios that belong to prd-domain-operations, not MCP transport. Their import paths determine their zone assignment; moving them to tests/integration/domain/ would break the false affinity and assign them to the correct zone in future analyses.
-- Three independent signals converge on this zone: lowest source-zone cohesion (0.22), bidirectional coupling with unit/unit-cli/store simultaneously, and the god-function + tight-coupling findings both targeting src/cli/commands/prune.ts. This multi-signal convergence makes the critical severity well-supported rather than a single-heuristic escalation.
+- High coupling (0.78) — 28 imports target "unit-analyze"
+- High coupling (0.78) — 28 imports target "analyze-engine"
+- Low cohesion (0.22) and high coupling (0.78) indicate this zone is a catch-all for bootstrap concerns that have not yet found a home in more focused zones.
+- Integration tests (smart-add-duplicate-outcomes) are co-located in a zone dominated by MCP and health infrastructure, suggesting test placement is opportunistic rather than intentional.
+- The presence of both src/core/health.ts and src/cli/commands/health.ts in the same zone is a positive sign that the command/core split is being respected, but the zone itself may benefit from being split into an MCP-only zone and an init/health zone.
+- Cohesion of 0.22 is well below the 0.4 threshold — the zone conflates MCP server registration, health checking, CLI init, and workflow defaults into a single community, masking distinct responsibilities.
+- Coupling of 0.78 against the Analyze Engine zone (28 imports) indicates heavy reliance on upstream domain logic; consider whether mcp-tools.ts can delegate through a gateway rather than importing directly.
+- workflow/default.ts sitting alongside MCP tooling suggests workflow configuration is not yet claimed by a dedicated zone; moving it to Package Config or Rex Runtime State would improve zone clarity.
+- Zone "mcp-cli-bootstrap" has files across 8 directories — consider consolidating under a dedicated directory
+- The 10 return imports from unit-analyze into this zone confirm a bidirectional cycle — the domain engine should not reach back into CLI bootstrap infrastructure; any shared utilities flowing this direction likely belong in a foundation module
+- unit-analyze imports 10 items from this zone, creating a domain-to-infrastructure inversion: the analyze engine should not depend on CLI bootstrap code. Any shared types or utilities should be extracted to a foundation layer.
+- mcp-tools.ts applies no gateway/facade pattern despite the monorepo's established gateway convention — it imports 20+ items directly from unit-analyze with no mediation layer, unlike hench (rex-gateway.ts) and web (rex-gateway.ts, domain-gateway.ts) which both apply gateways for the same upstream
+- mcp-tools.ts mixes static and dynamic import of the same module: TOOL_VERSION is statically imported at the top while REX_DIR is lazily loaded via await import() inside a function body — inconsistent import strategies within a single file are a reliable indicator of an underlying circular dependency that was patched with a dynamic import workaround rather than resolved structurally
+- TOOL_VERSION and REX_DIR both reside in src/cli/commands/constants.ts — a CLI command file — yet TOOL_VERSION is consumed by MCP service infrastructure (mcp.ts, mcp-tools.ts) and REX_DIR by 20+ files across all zones; these two constants serve entirely different purposes and their co-location in CLI command infrastructure creates artificial cross-layer coupling
+- mcp-tools.ts uses a dynamic await import('./commands/constants.js') for REX_DIR inside a function body while statically importing TOOL_VERSION from the same file at the module top-level. This inconsistency indicates a circular dependency that was patched with a lazy import rather than resolved by extracting shared constants to a foundation module. The static import path and dynamic import path must be reconciled.
+- mcp-tools.ts imports 20+ items directly from core domain modules (tree, stats, delete, next-task, transitions, timestamps, parent-completion, dag, cascade-reset, move, merge, verify, reorganize, reorganize-executor, health, facets) with no gateway/facade layer. Every other cross-package consumer in the monorepo uses a gateway; the absence of one here makes mcp-tools.ts the highest-risk refactoring surface in the package.
+- REX_DIR is defined in src/cli/commands/constants.ts and imported by 20+ files spanning every zone in the codebase. A path constant that is truly package-wide should live in a package-level constants module (e.g. src/constants.ts), not inside CLI command infrastructure. Every non-CLI zone that imports REX_DIR is forced to depend on CLI command internals solely to read a directory path string.
+- The dynamic imports in mcp-tools.ts serve two structurally distinct purposes that should not be conflated: (1) legitimate lazy-loading of optional LLM features (reshape-reason.js, reason.js, project-config.js — loaded only when mode !== 'fast') and (2) a cycle-break workaround for REX_DIR from constants.js. Only the second is a structural problem; the first is intentional performance optimization.
+- mcp.ts is classified with archetype 'cli-command' but it is a transport-agnostic server factory exporting createRexMcpServer() and startMcpServer(). The 'service' or 'entrypoint' archetype more accurately describes its role — the current archetype label will mislead future zone classification.
+- workflow/default.ts contains a single exported string constant (10-step agent workflow instructions for hench) with zero runtime relationship to MCP transport or CLI commands. Its placement in this zone is purely positional proximity in the file system, not semantic.
+- TOOL_VERSION is hardcoded as '0.1.0' in constants.ts independently of package.json. Version drift between the CLI help text and the published npm package version is undetectable at build time and will silently diverge as the package is released.
+- TOOL_VERSION hardcoded as '0.1.0' in src/cli/commands/constants.ts diverges from package.json 'version' at publish time. Replace with a build-time import of the package version (e.g. import { version } from '../../package.json' with resolveJsonModule) to keep them in sync.
+- mcp.ts is classified as archetype 'cli-command' but exports a transport-agnostic server factory (createRexMcpServer). Reclassify it as 'service' to accurately reflect its role and prevent future files being co-located based on a misleading archetype label.
+- workflow/default.ts (a single string constant with no imports) has no semantic relationship to MCP bootstrap infrastructure. Relocate it to src/workflow/ as a standalone constant or to a domain-config module to remove it from the CLI bootstrap zone and improve zone cohesion.
 - Zone "cli" has files across 8 directories — consider consolidating under a dedicated directory
-- [call graph] 211 internal calls, 83 outgoing, 6 incoming (cohesion: 0.72, coupling: 0.28)
+- Catastrophic risk rating is corroborated: three independent signals (coupling 0.78 to unit-analyze, cohesion 0.22, files across 8 directories) confirm this zone is architecturally incoherent
+- The catastrophic heuristic rating for cli (cohesion 0.22, coupling 0.78) is partially supported by the structural observation that cli spans 8 directories — an unusually wide spread for 11 files. However, no LLM analysis pass specifically corroborated the catastrophic severity for cli as a standalone zone. The high coupling to unit-analyze is consistent with cli being a legitimate consumer of shared core, not evidence of structural failure.
+- Downgrade cli zone from catastrophic to warning. The coupling to unit-analyze reflects consumer behavior, not bidirectional entanglement. The more actionable issue is the 8-directory spread for 11 files — consolidate into a flatter structure under src/cli/ to improve the cohesion signal and make the zone's boundary visible in the filesystem.
+- Coupling to unit-analyze reflects legitimate consumer behavior (28 inbound imports to shared core), not bidirectional entanglement. Automated heuristic catastrophic rating is not corroborated: LLM analysis in zone finding 3 explicitly recommends downgrade to warning. The structural issue is the 8-directory spread for 11 files, not the coupling ratio.
+- The actionable structural defect is 11 files spanning 8 directories. Consolidate all cli zone files under src/cli/ with a flat layout: existing src/cli/commands/*.ts already provides the right grouping. Resolve the inversion in src/analyze/guided.ts by moving src/cli/output.ts to src/util/output.ts and updating the import — this is the only cross-layer dependency that needs severing. After those two steps the cohesion signal will improve without restructuring the zone.
+- [call graph] 217 internal calls, 85 outgoing, 17 incoming (cohesion: 0.72, coupling: 0.28)
 
 </insights>

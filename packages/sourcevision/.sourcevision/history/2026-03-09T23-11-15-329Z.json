@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": ".claude",
+      "zoneName": ".claude",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 2,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "analyzers",
+      "zoneName": "Analyzers",
+      "cohesion": 0.62,
+      "coupling": 0.38,
+      "riskScore": 0.38,
+      "fileCount": 40,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "analyzers-2",
+      "zoneName": "Analyzers 2",
+      "cohesion": 0.48,
+      "coupling": 0.52,
+      "riskScore": 0.52,
+      "fileCount": 11,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "analyzers-3",
+      "zoneName": "Analyzers 3",
+      "cohesion": 0.27,
+      "coupling": 0.73,
+      "riskScore": 0.73,
+      "fileCount": 6,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "cli",
+      "zoneName": "Cli",
+      "cohesion": 0.65,
+      "coupling": 0.35,
+      "riskScore": 0.35,
+      "fileCount": 30,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "e2e",
+      "zoneName": "E2e",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 5,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "fixtures",
+      "zoneName": "Fixtures",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 11,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "root",
+      "zoneName": "Root",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 9,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    },
+    {
+      "zoneId": "unit",
+      "zoneName": "Unit",
+      "cohesion": 0.4,
+      "coupling": 0.6,
+      "riskScore": 0.6,
+      "fileCount": 29,
+      "timestamp": "2026-03-09T23:11:15.329Z",
+      "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+    }
+  ],
+  "analyzedAt": "2026-03-09T23:11:15.329Z",
+  "gitSha": "63d150ae28616003380c385586352d8a928bb9bf"
+}

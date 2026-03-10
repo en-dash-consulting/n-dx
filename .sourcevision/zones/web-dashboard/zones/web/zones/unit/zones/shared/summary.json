@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web/unit/shared",
+  "name": "Web Viewer/web/unit/shared",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/node-culler.ts",
+    "packages/web/src/shared/request-dedup.ts",
+    "packages/web/tests/unit/viewer/node-culler.test.ts",
+    "packages/web/tests/unit/viewer/request-dedup.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/request-dedup.ts"
+  ],
+  "cohesion": 0.6,
+  "coupling": 0.4,
+  "fileCount": 6,
+  "lineCount": 872
+}

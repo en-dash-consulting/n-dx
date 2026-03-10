@@ -112,13 +112,13 @@
     },
     {
       "path": "src/analyzers/branch-work-filter.ts",
-      "size": 11463,
+      "size": 11522,
       "language": "TypeScript",
-      "lineCount": 377,
-      "hash": "ffb60683da686c13b8759cd1e56d952fe2c3c87dc3b342e954586a87148b3f48",
+      "lineCount": 378,
+      "hash": "18c4212f8ca8f4c0c7d6bdbda2ab5b3255a0aab440ae60976ef62fdaf31a9e4d",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1772682844162
+      "lastModified": 1773084861649
     },
     {
       "path": "src/analyzers/branch-work-store.ts",
@@ -432,13 +432,13 @@
     },
     {
       "path": "src/analyzers/zones.ts",
-      "size": 69252,
+      "size": 74205,
       "language": "TypeScript",
-      "lineCount": 1942,
-      "hash": "3a5122c2c67d9de0cf2efa42fbbff6d85be3e0ff33a49e3e2854e7df6c8ea661",
+      "lineCount": 2072,
+      "hash": "e9e9a868ecb4910c9438b1a970f6f2087f2d1e1f43f59f80792513c2f25681fc",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1773024513314
+      "lastModified": 1773094647440
     },
     {
       "path": "src/cli/commands/analyze-phases.ts",
@@ -512,13 +512,13 @@
     },
     {
       "path": "src/cli/commands/prd-epic-resolver.ts",
-      "size": 7706,
+      "size": 7797,
       "language": "TypeScript",
-      "lineCount": 290,
-      "hash": "58fd65de27beec2ba7c4358d5ba7027519233825141aab3811c3859ef59996b4",
+      "lineCount": 291,
+      "hash": "52a642167a46fb57acadd032622d7066e68c4d0477bf123c7cf56010aec4d715",
       "role": "source",
       "category": "cli",
-      "lastModified": 1772682844167
+      "lastModified": 1773084861650
     },
     {
       "path": "src/cli/commands/reset.ts",
@@ -1445,10 +1445,10 @@
       "size": 84374,
       "language": "Other",
       "lineCount": 1,
-      "hash": "7f6fdfdde563d26afc46a8c05623e18fd5f413fbdca75068f9ba9d6fc9a9e30b",
+      "hash": "8bb433b9bbdd9fceaeae31d208f0f04a5f5471f10af215a2930255fc8d7cc0d1",
       "role": "config",
       "category": "root",
-      "lastModified": 1773022769167
+      "lastModified": 1773094287335
     },
     {
       "path": "vitest.config.ts",
@@ -1463,7 +1463,7 @@
   ],
   "summary": {
     "totalFiles": 146,
-    "totalLines": 44532,
+    "totalLines": 44664,
     "byLanguage": {
       "JSON": 6,
       "Markdown": 3,

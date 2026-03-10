@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Hench (`hench`)
-Files: 158, Cohesion: 1.00, Coupling: 0.00
+Files: 155, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: 156 files, primarily TypeScript, Other, JSON
-Lines: 37239
+Description: 153 files, primarily TypeScript, Other, JSON
+Lines: 35506
 
 </zone>
 
@@ -19,13 +19,14 @@ packages/hench/Hench.png (Other, 0 lines, asset)
 packages/hench/README.md (Markdown, 108 lines, docs)
 packages/hench/package.json (JSON, 38 lines, config)
 packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
+packages/hench/src/agent/analysis/index.ts (TypeScript, 78 lines, source)
 packages/hench/src/agent/analysis/review.ts (TypeScript, 110 lines, source)
 packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
 packages/hench/src/agent/analysis/stuck.ts (TypeScript, 70 lines, source)
 packages/hench/src/agent/analysis/summary.ts (TypeScript, 120 lines, source)
 packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
 packages/hench/src/agent/completion.ts (TypeScript, 15 lines, source)
-packages/hench/src/agent/index.ts (TypeScript, 75 lines, source)
+packages/hench/src/agent/index.ts (TypeScript, 76 lines, source)
 packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 1168 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 90 lines, source)
 packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 427 lines, source)
@@ -53,7 +54,7 @@ packages/hench/src/guard/contracts.ts (TypeScript, 33 lines, source)
 packages/hench/src/guard/index.ts (TypeScript, 166 lines, source)
 packages/hench/src/guard/paths.ts (TypeScript, 127 lines, source)
 packages/hench/src/guard/policy.ts (TypeScript, 252 lines, source)
-packages/hench/src/prd/rex-gateway.ts (TypeScript, 91 lines, source)
+packages/hench/src/prd/rex-gateway.ts (TypeScript, 122 lines, source)
 packages/hench/src/process/concurrent-execution-metrics.ts (TypeScript, 534 lines, source)
 packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
 packages/hench/src/process/exec.ts (TypeScript, 31 lines, source)
@@ -83,7 +84,6 @@ packages/hench/src/store/run-change-detector.ts (TypeScript, 237 lines, source)
 packages/hench/src/store/run-retention-scheduler.ts (TypeScript, 206 lines, source)
 packages/hench/src/store/run-retention.ts (TypeScript, 477 lines, source)
 packages/hench/src/store/runs.ts (TypeScript, 97 lines, source)
-packages/hench/src/store/suggestions.ts (TypeScript, 98 lines, source)
 packages/hench/src/store/templates.ts (TypeScript, 153 lines, source)
 packages/hench/src/tools/contracts.ts (TypeScript, 73 lines, source)
 packages/hench/src/tools/dispatch.ts (TypeScript, 262 lines, source)
@@ -159,7 +159,6 @@ packages/hench/tests/unit/store/run-change-detector.test.ts (TypeScript, 383 lin
 packages/hench/tests/unit/store/run-compressed-reads.test.ts (TypeScript, 148 lines, test)
 packages/hench/tests/unit/store/run-retention-scheduler.test.ts (TypeScript, 260 lines, test)
 packages/hench/tests/unit/store/run-retention.test.ts (TypeScript, 571 lines, test)
-packages/hench/tests/unit/store/suggestions.test.ts (TypeScript, 119 lines, test)
 packages/hench/tests/unit/store/templates.test.ts (TypeScript, 356 lines, test)
 packages/hench/tests/unit/tools/completion-validation.test.ts (TypeScript, 305 lines, test)
 packages/hench/tests/unit/tools/dispatch-memory.test.ts (TypeScript, 146 lines, test)
@@ -170,8 +169,6 @@ packages/hench/tests/unit/tools/shell.test.ts (TypeScript, 317 lines, test)
 packages/hench/tests/unit/tools/test-runner.test.ts (TypeScript, 441 lines, test)
 packages/hench/tsconfig.json (JSON, 8 lines, config)
 packages/hench/vitest.config.ts (TypeScript, 24 lines, config)
-packages/web/src/landing/index.html (HTML, 309 lines, other)
-packages/web/src/landing/landing.css (CSS, 1317 lines, other)
 
 </files>
 
@@ -179,6 +176,15 @@ packages/web/src/landing/landing.css (CSS, 1317 lines, other)
 
 Internal:
   packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/schema/v1.ts {RunRecord, HenchConfig}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adaptive.ts {analyzeAdaptive, collectMetrics, getAutoApplicable, DEFAULT_ADAPTIVE_SETTINGS}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adaptive.ts {ProjectMetrics, WorkflowAdjustment, AdjustmentNotification, AdaptiveSettings, AdaptiveAnalysis, AdjustmentCategory, AdjustmentPriority}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/review.ts {ReviewResult, ReviewDiff}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, isSpinningRun, DEFAULT_SPIN_THRESHOLD}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/workflow.ts {WorkflowAnalysis, WorkflowStats, WorkflowSuggestion, SuggestionCategory, SuggestionPriority}
   packages/hench/src/agent/analysis/review.ts → packages/hench/src/process/index.ts {execStdout}
   packages/hench/src/agent/analysis/review.ts → packages/hench/src/types/output.ts {section, subsection, info}
   packages/hench/src/agent/analysis/stuck.ts → packages/hench/src/schema/index.ts {RunRecord}
@@ -186,10 +192,8 @@ Internal:
   packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/schema/v1.ts {RunRecord, RunStatus, HenchConfig}
   packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {validateCompletion, formatValidationResult}
   packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {CompletionValidationResult, CompletionValidationOptions}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/review.ts {ReviewResult, ReviewDiff}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/index.ts {collectReviewDiff, promptReview, revertChanges, buildRunSummary, countRecentFailures, isStuckTask, getStuckTaskIds}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/index.ts {ReviewResult, ReviewDiff}
   packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
   packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliLoopOptions, CliLoopResult}
   packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
@@ -575,8 +579,6 @@ Internal:
   packages/hench/tests/unit/store/run-retention-scheduler.test.ts → packages/hench/src/store/run-retention-scheduler.ts {runRetentionCycle, startRetentionScheduler, loadRetentionIntervalMs, DEFAULT_RETENTION_INTERVAL_MS}
   packages/hench/tests/unit/store/run-retention.test.ts → packages/hench/src/store/run-retention.ts {enforceRetentionPolicy, identifyRetainableRuns, identifyWarningRuns, extractUsageStats, loadRetentionConfig, DEFAULT_RETENTION_CONFIG}
   packages/hench/tests/unit/store/run-retention.test.ts → packages/hench/src/store/run-retention.ts {RetentionConfig, RetentionResult, PreservedUsageStats}
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {loadSuggestionHistory, saveSuggestionHistory, recordDecision, getDecisionStats}
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {SuggestionHistory, SuggestionRecord}
   packages/hench/tests/unit/store/templates.test.ts → packages/hench/src/schema/templates.ts {BUILT_IN_TEMPLATES}
   packages/hench/tests/unit/store/templates.test.ts → packages/hench/src/schema/templates.ts {WorkflowTemplate}
   packages/hench/tests/unit/store/templates.test.ts → packages/hench/src/schema/v1.ts {DEFAULT_HENCH_CONFIG}
@@ -601,31 +603,49 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Zone "hench" has files across 32 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "hench" has files across 31 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Zone "hench" has files across 32 directories — consider consolidating under a dedicated directory
-- [call graph] 2723 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Perfect cohesion (1.0) and zero coupling across 155 files is an exceptional result — the hench package is fully self-contained with no leakage to sibling packages outside its gateway.
+- The single rex-gateway.ts re-exports 8 functions and is the only cross-package surface; this gateway discipline keeps the dependency graph auditable and the package independently testable.
+- 155 files with zero external coupling suggests the package has good internal modularity; verify that the agent/analysis/, store/, and prd/ subdirectories each have clear ownership boundaries to prevent internal coupling from growing silently.
+- Cohesion of 1.0 across 155 files with zero external coupling is architecturally excellent — the gateway pattern is working as intended.
+- rex-gateway.ts is the sole cross-package import surface; any new rex dependency must route through it, keeping the domain-isolation contract enforced by tests.
+- With 155 files, internal zone fragmentation risk is real; periodic review of agent/analysis vs store vs prd submodule boundaries will prevent future cohesion decay.
+- Zone "hench-agent" has files across 31 directories — consider consolidating under a dedicated directory
+- The single-gateway topology creates a deliberate star pattern for cross-package dependencies: all 155 files connect outward through one choke point, which is the inverse of the web-viewer hub pattern and represents the healthier design.
+- Star topology via rex-gateway.ts is the reference pattern for safe cross-package coupling — one explicit choke point vs the web-viewer hub's many-to-many crossing imports.
+- The zone's 155 files span agent/analysis, store, and prd subdirectories with no intra-zone boundary enforcement. While zero external coupling is excellent, there is no test or lint rule preventing agent/analysis from importing directly from prd/ or store/ in ways that violate internal ownership — internal coupling can grow silently until a full re-analysis surfaces it.
+- No intra-zone submodule boundary enforcement exists between agent/analysis/, store/, and prd/ subdirectories. The domain-isolation test only enforces cross-package gateway discipline; intra-package layering violations (e.g. agent importing directly from prd/ internals) are undetected. A zone-internal layer test or directory-level import lint rule would catch coupling decay before it affects cohesion scores.
+- rex-gateway.ts re-exports 8 rex functions, but there is no test verifying that every re-exported function is actually consumed by at least one hench file. domain-isolation.test.js covers the 'no direct imports outside gateway' direction but not the 'no unused re-exports' direction. Unused gateway entries accumulate silently as hench evolves and decouples from specific rex APIs, becoming dead-code debt invisible to standard tooling.
+- Add a gateway surface test that verifies every symbol re-exported from rex-gateway.ts is consumed by at least one hench source file. This closes the coverage gap in domain-isolation.test.js: currently it enforces 'no direct imports' but not 'no dead re-exports', allowing gateway surface to grow stale without detection.
+- Zone "hench" has files across 31 directories — consider consolidating under a dedicated directory
+- [call graph] 2709 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  hench/guard → hench/tools: 1
-  hench/guard → hench/unit: 2
-  hench/tools → hench/guard: 1
-  hench/tools → hench/unit: 6
-  hench/unit → hench/guard: 1
-  hench/unit → hench/tools: 5
+  hench/guard → hench/unit: 3
+  hench/store → hench/unit: 5
+  hench/store → hench/unit-2: 2
+  hench/types → hench/unit: 2
+  hench/unit → hench/guard: 2
+  hench/unit → hench/store: 3
+  hench/unit → hench/types: 6
+  hench/unit → hench/unit-2: 9
   hench/unit → hench/unit-agent: 5
   hench/unit → hench/unit-cli: 3
+  hench/unit-2 → hench/store: 2
+  hench/unit-2 → hench/unit: 11
   hench/unit-agent → hench/unit: 2
-  hench/unit-cli → hench/unit: 4
+  hench/unit-cli → hench/unit: 3
+  hench/unit-cli → hench/unit-2: 1
 
 </sub-crossings>
 
@@ -635,13 +655,13 @@ This zone has 8 sub-zone(s):
 
 - **Hench/guard** (`hench/guard`): 10 files, cohesion 0.86, coupling 0.14
 - **Hench/hench** (`hench/hench`): 6 files, cohesion 0, coupling 0
-- **Hench/store** (`hench/store`): 2 files, cohesion 1, coupling 0
-- **Hench/tools** (`hench/tools`): 12 files, cohesion 0.74, coupling 0.26
-- **Hench/unit** (`hench/unit`): 116 files, cohesion 0.95, coupling 0.05
-  - Has 6 nested sub-zone(s)
+- **Hench/store** (`hench/store`): 4 files, cohesion 0.33, coupling 0.67
+- **Hench/types** (`hench/types`): 4 files, cohesion 0.36, coupling 0.64
+- **Hench/unit** (`hench/unit`): 115 files, cohesion 0.94, coupling 0.06
+  - Has 7 nested sub-zone(s)
+- **Hench/unit 2** (`hench/unit-2`): 6 files, cohesion 1, coupling 0
 - **Hench/unit Agent** (`hench/unit-agent`): 5 files, cohesion 0.44, coupling 0.56
 - **Hench/unit Cli** (`hench/unit-cli`): 3 files, cohesion 1, coupling 0
-- **Hench/web** (`hench/web`): 2 files, cohesion 0, coupling 0
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

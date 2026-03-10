@@ -5,23 +5,27 @@
 <zone>
 
 Zone: Hench/store (`hench/store`)
-Files: 2, Cohesion: 1.00, Coupling: 0.00
-Description: 2 files, primarily TypeScript
-Lines: 217
+Files: 4, Cohesion: 0.33, Coupling: 0.67
+Description: 4 files, primarily TypeScript
+Entry points: packages/hench/src/store/json.ts, packages/hench/src/store/runs.ts
+Lines: 430
 
 </zone>
 
 <files>
 
-packages/hench/src/store/suggestions.ts (TypeScript, 98 lines, source)
-packages/hench/tests/unit/store/suggestions.test.ts (TypeScript, 119 lines, test)
+packages/hench/src/store/json.ts (TypeScript, 2 lines, source)
+packages/hench/src/store/runs.ts (TypeScript, 97 lines, source)
+packages/hench/tests/integration/codex-token-accounting.test.ts (TypeScript, 183 lines, test)
+packages/hench/tests/unit/store/run-compressed-reads.test.ts (TypeScript, 148 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {loadSuggestionHistory, saveSuggestionHistory, recordDecision, getDecisionStats}
-  packages/hench/tests/unit/store/suggestions.test.ts → packages/hench/src/store/suggestions.ts {SuggestionHistory, SuggestionRecord}
+  packages/hench/src/store/runs.ts → packages/hench/src/store/json.ts {toCanonicalJSON}
+  packages/hench/tests/integration/codex-token-accounting.test.ts → packages/hench/src/store/runs.ts {saveRun, listRuns}
+  packages/hench/tests/unit/store/run-compressed-reads.test.ts → packages/hench/src/store/runs.ts {saveRun, loadRun, listRuns}
 
 </imports>

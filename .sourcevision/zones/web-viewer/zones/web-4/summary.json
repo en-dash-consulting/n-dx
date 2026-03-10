@@ -3,16 +3,17 @@
   "name": "Web Viewer/web 4",
   "description": "3 files, primarily TypeScript",
   "files": [
-    "packages/web/src/viewer/usage/constants.ts",
-    "packages/web/src/viewer/usage/index.ts",
-    "packages/web/src/viewer/views/token-usage.ts"
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts",
+    "packages/web/src/viewer/views/suggestions.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/usage/constants.ts",
-    "packages/web/src/viewer/views/token-usage.ts"
+    "packages/web/src/viewer/views/enrichment-thresholds.ts",
+    "packages/web/src/viewer/views/sourcevision-tabs.ts",
+    "packages/web/src/viewer/views/suggestions.ts"
   ],
-  "cohesion": 0.44,
-  "coupling": 0.56,
+  "cohesion": 0.29,
+  "coupling": 0.71,
   "fileCount": 3,
-  "lineCount": 790
+  "lineCount": 128
 }

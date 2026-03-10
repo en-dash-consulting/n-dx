@@ -7,8 +7,8 @@
 Zone: Rex Runtime Data (`rex-runtime-data`)
 Files: 6, Cohesion: 0.00, Coupling: 0.00
 Risk: healthy (score: 0.50)
-Description: Runtime state directory holding the live PRD tree, execution logs, workflow state, and adapter configuration consumed by the rex CLI and MCP server.
-Lines: 25618
+Description: On-disk runtime state for the rex PRD engine: the live PRD tree, execution logs, workflow state, configuration, and the pruned-item archive.
+Lines: 26188
 
 </zone>
 
@@ -17,8 +17,8 @@ Lines: 25618
 .rex/archive.json (JSON, 840 lines, other)
 .rex/config.json (JSON, 6 lines, other)
 .rex/execution-log.1.jsonl (Other, 3899 lines, other)
-.rex/execution-log.jsonl (Other, 613 lines, other)
-.rex/prd.json (JSON, 20242 lines, other)
+.rex/execution-log.jsonl (Other, 695 lines, other)
+.rex/prd.json (JSON, 20730 lines, other)
 .rex/workflow.md (Markdown, 18 lines, docs)
 
 </files>
@@ -26,23 +26,20 @@ Lines: 25618
 <findings>
 
 [observation] [info] Isolated files — no import edges between 6 files, cohesion is unmeasurable (reported as 0)
-[observation] [info] Two execution log files suggest log rotation is active; CLAUDE.md notes archive.json is capped at 100 batches, but execution log rotation policy is not documented.
-[observation] [info] Zero cohesion is expected for a runtime data directory — these files are written by different subsystems and never import each other.
-[observation] [info] prd.json and archive.json are both mutation targets for rex commands; concurrent writes from plan + work remain a documented risk requiring process-level coordination.
-[anti-pattern] [warning] Execution log rotation policy is undocumented. CLAUDE.md documents that archive.json is capped at 100 batches, but execution-log.jsonl has no stated bound. Without a documented policy, operators have no signal for when to intervene and automated tooling cannot enforce limits.
+[observation] [info] Zero cohesion and coupling are expected: runtime data files have no import relationships with each other or with source code, so Louvain correctly treats them as an isolated island.
+[observation] [info] archive.json is documented as safe to delete and capped at 100 batches; verifying the auto-trim logic has a unit test guards against silent cap removal during refactors.
+[observation] [info] workflow.md is human-readable state that mirrors prd.json; if these ever diverge they become misleading — a post-write consistency check (or generating workflow.md from prd.json on read) would eliminate the drift risk.
 
 </findings>
 
 <insights>
 
 - Isolated files — no import edges between 6 files, cohesion is unmeasurable (reported as 0)
-- These are data files, not source files — zero cohesion and zero coupling are expected and correct; no action needed on those metrics.
-- The execution log files (execution-log.jsonl, execution-log.1.jsonl) are append-only audit trails; ensure log rotation policy is documented so they don't grow unbounded in long-lived projects.
-- archive.json coexists with prd.json here; both are write targets for rex commands, so concurrent writes (e.g. ndx plan + ndx work) remain a documented data-corruption risk.
-- Zero cohesion is expected for a runtime data directory — these files are written by different subsystems and never import each other.
-- Two execution log files suggest log rotation is active; CLAUDE.md notes archive.json is capped at 100 batches, but execution log rotation policy is not documented.
-- prd.json and archive.json are both mutation targets for rex commands; concurrent writes from plan + work remain a documented risk requiring process-level coordination.
-- Two execution-log files (execution-log.jsonl, execution-log.1.jsonl) indicate log rotation is active, but no rotation policy (max size, max count, retention window) is documented in CLAUDE.md or any .rex config. Unbounded growth is a latent operational risk in long-lived projects.
-- Execution log rotation policy is undocumented. CLAUDE.md documents that archive.json is capped at 100 batches, but execution-log.jsonl has no stated bound. Without a documented policy, operators have no signal for when to intervene and automated tooling cannot enforce limits.
+- These files are data artifacts written by rex commands at runtime, not source code — they should never be imported by any package and are intentionally outside the src/ tree.
+- The execution log is split across two files (.rex/execution-log.jsonl and .rex/execution-log.1.jsonl), suggesting a rotation mechanism; confirming that the rotation cap is enforced prevents unbounded disk growth.
+- prd.json is a shared mutable file: concurrent writes from ndx plan and ndx work cause data corruption (documented in CLAUDE.md); any new tooling that writes this file must coordinate through the same single-writer discipline.
+- Zero cohesion and coupling are expected: runtime data files have no import relationships with each other or with source code, so Louvain correctly treats them as an isolated island.
+- archive.json is documented as safe to delete and capped at 100 batches; verifying the auto-trim logic has a unit test guards against silent cap removal during refactors.
+- workflow.md is human-readable state that mirrors prd.json; if these ever diverge they become misleading — a post-write consistency check (or generating workflow.md from prd.json on read) would eliminate the drift risk.
 
 </insights>

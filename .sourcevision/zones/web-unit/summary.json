@@ -1,27 +1,27 @@
 {
   "id": "web-unit",
   "name": "Web Unit",
-  "description": "5 files, primarily TypeScript",
+  "description": "8 files, primarily TypeScript, JavaScript",
   "files": [
-    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-    "packages/web/src/viewer/performance/crash-detector.ts",
-    "packages/web/tests/helpers/crash-detector-test-support.ts",
-    "packages/web/tests/unit/viewer/crash-detector.test.ts",
-    "packages/web/tests/unit/viewer/use-crash-recovery.test.ts"
+    "packages/web/src/landing/landing.ts",
+    "packages/web/tests/integration/boundary-check.test.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts",
+    "packages/web/tests/unit/landing/landing.test.ts",
+    "packages/web/tests/unit/viewer/graph-interaction.test.ts",
+    "packages/web/tests/unit/viewer/graph-zoom.test.ts",
+    "scripts/hench-callgraph-analysis.mjs",
+    "scripts/parse-gateway-exports.mjs"
   ],
-  "entryPoints": [
-    "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-    "packages/web/src/viewer/performance/crash-detector.ts"
-  ],
-  "cohesion": 0.29,
-  "coupling": 0.71,
-  "fileCount": 5,
-  "lineCount": 994,
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 1928,
   "riskMetrics": {
-    "cohesion": 0.29,
-    "coupling": 0.71,
-    "riskScore": 0.71,
-    "riskLevel": "catastrophic",
-    "failsThreshold": true
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
   }
 }

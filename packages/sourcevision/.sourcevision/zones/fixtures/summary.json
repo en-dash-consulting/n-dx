@@ -1,0 +1,30 @@
+{
+  "id": "fixtures",
+  "name": "Fixtures",
+  "description": "10 files, primarily TypeScript",
+  "files": [
+    "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
+    "tests/fixtures/remix-app/app/routes/_auth.tsx",
+    "tests/fixtures/remix-app/app/routes/_index.tsx",
+    "tests/fixtures/remix-app/app/routes/users.$id.tsx",
+    "tests/fixtures/small-ts-project/src/config.ts",
+    "tests/fixtures/small-ts-project/src/index.ts",
+    "tests/fixtures/small-ts-project/src/models/user.ts",
+    "tests/fixtures/small-ts-project/src/services/email-service.ts",
+    "tests/fixtures/small-ts-project/src/services/user-service.ts",
+    "tests/fixtures/small-ts-project/src/utils/format.ts",
+    "tests/fixtures/small-ts-project/src/utils/validate.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 11,
+  "lineCount": 88,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

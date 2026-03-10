@@ -5,17 +5,17 @@
 <zone>
 
 Zone: Web Viewer/web (`web-viewer/web`)
-Files: 282, Cohesion: 0.96, Coupling: 0.04
-Description: 282 files, primarily TypeScript
-Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 87431
+Files: 279, Cohesion: 0.96, Coupling: 0.04
+Description: 279 files, primarily TypeScript
+Entry points: packages/web/src/schema/v1.ts, packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
+Lines: 87319
 
 </zone>
 
 <files>
 
 packages/web/src/cli/index.ts (TypeScript, 56 lines, source)
-packages/web/src/public.ts (TypeScript, 55 lines, source)
+packages/web/src/public.ts (TypeScript, 68 lines, source)
 packages/web/src/schema/v1.ts (TypeScript, 378 lines, source)
 packages/web/src/server/aggregation-cache.ts (TypeScript, 222 lines, source)
 packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
@@ -24,7 +24,7 @@ packages/web/src/server/port.ts (TypeScript, 195 lines, source)
 packages/web/src/server/pr-markdown-refresh-diagnostics.ts (TypeScript, 591 lines, source)
 packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
 packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
-packages/web/src/server/rex-gateway.ts (TypeScript, 88 lines, source)
+packages/web/src/server/rex-gateway.ts (TypeScript, 91 lines, source)
 packages/web/src/server/routes-adaptive.ts (TypeScript, 873 lines, source)
 packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
 packages/web/src/server/routes-data.ts (TypeScript, 147 lines, source)
@@ -164,7 +164,6 @@ packages/web/src/viewer/views/domain-hench.ts (TypeScript, 14 lines, source)
 packages/web/src/viewer/views/domain-rex.ts (TypeScript, 18 lines, source)
 packages/web/src/viewer/views/domain-settings.ts (TypeScript, 13 lines, source)
 packages/web/src/viewer/views/domain-sourcevision.ts (TypeScript, 22 lines, source)
-packages/web/src/viewer/views/enrichment-thresholds.ts (TypeScript, 11 lines, source)
 packages/web/src/viewer/views/feature-toggles.ts (TypeScript, 332 lines, source)
 packages/web/src/viewer/views/files.ts (TypeScript, 278 lines, source)
 packages/web/src/viewer/views/hench-config.ts (TypeScript, 674 lines, source)
@@ -177,8 +176,6 @@ packages/web/src/viewer/views/prd.ts (TypeScript, 353 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/rex-dashboard.ts (TypeScript, 640 lines, source)
 packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
-packages/web/src/viewer/views/sourcevision-tabs.ts (TypeScript, 35 lines, source)
-packages/web/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
 packages/web/src/viewer/views/validation.ts (TypeScript, 819 lines, source)
 packages/web/src/viewer/views/view-registry.ts (TypeScript, 177 lines, source)
 packages/web/src/viewer/views/workflow-optimization.ts (TypeScript, 598 lines, source)
@@ -554,7 +551,6 @@ Internal:
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/theme-toggle.ts {SidebarThemeToggle}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/types.ts {ViewId}
-  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SOURCEVISION_TABS}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/types.ts {NavigateTo}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/utils.ts {basename}
@@ -677,7 +673,6 @@ Internal:
   packages/web/src/viewer/views/architecture.ts → packages/web/src/schema/v1.ts {Finding}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-config.ts {HenchConfigView}
   packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-templates.ts {HenchTemplatesView}
@@ -695,7 +690,6 @@ Internal:
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/pr-markdown.ts {PRMarkdownView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/problems.ts {ProblemsView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/routes.ts {RoutesView}
-  packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/suggestions.ts {SuggestionsView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/zones.ts {ZonesView}
   packages/web/src/viewer/views/feature-toggles.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng}
   packages/web/src/viewer/views/files.ts → packages/web/src/schema/v1.ts {FileEntry}
@@ -736,7 +730,6 @@ Internal:
   packages/web/src/viewer/views/problems.ts → packages/web/src/schema/v1.ts {Finding}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/types.ts {LoadedData}
-  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/prd-tree/execution-panel.ts {ExecutionPanel}
@@ -751,13 +744,6 @@ Internal:
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeView, CollapsibleSection, BarChart}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeNode}
-  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/types.ts {ViewId}
-  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/schema/v1.ts {Finding}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/types.ts {LoadedData}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/visualization/index.ts {FindingsList}
   packages/web/src/viewer/views/validation.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/validation.ts → packages/web/src/viewer/types.ts {NavigateTo}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/performance/index.ts {DegradableFeature}
@@ -766,7 +752,6 @@ Internal:
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-rex.ts {PRDView, RexDashboard, TokenUsageView, ValidationView, TaskAuditView, WorkflowOptimizationView}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-settings.ts {NotionConfigView, IntegrationConfigView, FeatureTogglesView}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-sourcevision.ts {Overview, Graph, ZonesView, FilesView, ArchitectureView, ProblemsView, SuggestionsView, PRMarkdownView, RoutesView, AnalysisView}
-  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SOURCEVISION_TAB_IDS}
   packages/web/src/viewer/views/workflow-optimization.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/zones.ts → packages/web/src/schema/v1.ts {CallGraph, Zone, ZoneCrossing}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
@@ -1033,7 +1018,7 @@ Cross-dependencies between sub-zones:
   web-viewer/web/unit → web-viewer/web/viewer-components: 6
   web-viewer/web/unit → web-viewer/web/viewer-polling: 4
   web-viewer/web/viewer → web-viewer/web/viewer-2: 7
-  web-viewer/web/viewer → web-viewer/web/viewer-views: 11
+  web-viewer/web/viewer → web-viewer/web/viewer-views: 10
   web-viewer/web/viewer-2 → web-viewer/web/viewer: 3
   web-viewer/web/viewer-2 → web-viewer/web/viewer-components: 1
   web-viewer/web/viewer-2 → web-viewer/web/viewer-polling: 1
@@ -1044,7 +1029,7 @@ Cross-dependencies between sub-zones:
   web-viewer/web/viewer-polling → web-viewer/web/unit: 3
   web-viewer/web/viewer-views → web-viewer/web/server: 3
   web-viewer/web/viewer-views → web-viewer/web/unit: 4
-  web-viewer/web/viewer-views → web-viewer/web/viewer: 20
+  web-viewer/web/viewer-views → web-viewer/web/viewer: 18
   web-viewer/web/viewer-views → web-viewer/web/viewer-2: 4
   web-viewer/web/viewer-views → web-viewer/web/viewer-components: 8
   web-viewer/web/viewer-views → web-viewer/web/viewer-polling: 2
@@ -1058,12 +1043,12 @@ This zone has 7 sub-zone(s):
 - **Web Viewer/web/server** (`web-viewer/web/server`): 81 files, cohesion 0.98, coupling 0.02
   - Has 5 nested sub-zone(s)
 - **Web Viewer/web/unit** (`web-viewer/web/unit`): 28 files, cohesion 0.56, coupling 0.44
-- **Web Viewer/web/viewer** (`web-viewer/web/viewer`): 47 files, cohesion 0.75, coupling 0.25
+- **Web Viewer/web/viewer** (`web-viewer/web/viewer`): 47 files, cohesion 0.77, coupling 0.23
 - **Web Viewer/web/viewer 2** (`web-viewer/web/viewer-2`): 54 files, cohesion 0.87, coupling 0.13
   - Has 3 nested sub-zone(s)
 - **Web Viewer/web/viewer Components** (`web-viewer/web/viewer-components`): 15 files, cohesion 0.51, coupling 0.49
 - **Web Viewer/web/viewer Polling** (`web-viewer/web/viewer-polling`): 9 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/viewer Views** (`web-viewer/web/viewer-views`): 48 files, cohesion 0.7, coupling 0.3
+- **Web Viewer/web/viewer Views** (`web-viewer/web/viewer-views`): 45 files, cohesion 0.69, coupling 0.31
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

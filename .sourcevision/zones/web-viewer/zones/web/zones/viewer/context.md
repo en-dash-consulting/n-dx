@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web/viewer (`web-viewer/web/viewer`)
-Files: 47, Cohesion: 0.75, Coupling: 0.25
+Files: 47, Cohesion: 0.77, Coupling: 0.23
 Description: 47 files, primarily TypeScript
 Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/components/prd-tree/facet-filter.ts, packages/web/src/viewer/components/prd-tree/index.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/analysis.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/views/zones.ts, packages/web/src/viewer/visualization/index.ts
 Lines: 12271

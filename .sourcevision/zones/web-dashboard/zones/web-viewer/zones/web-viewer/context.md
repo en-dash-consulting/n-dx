@@ -5,40 +5,31 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web Viewer (`web-viewer/web-viewer/web-viewer`)
-Files: 9, Cohesion: 0.69, Coupling: 0.31
-Description: 9 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/copy-link-button.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/views/hench-runs.ts
-Lines: 2931
+Files: 6, Cohesion: 0.50, Coupling: 0.50
+Description: 6 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/faq.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/hooks/use-project-metadata.ts
+Lines: 1672
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/active-tasks-panel.ts (TypeScript, 290 lines, source)
-packages/web/src/viewer/components/concurrency-panel.ts (TypeScript, 251 lines, source)
-packages/web/src/viewer/components/copy-link-button.ts (TypeScript, 103 lines, source)
-packages/web/src/viewer/components/memory-panel.ts (TypeScript, 300 lines, source)
-packages/web/src/viewer/components/rex-task-link.ts (TypeScript, 320 lines, source)
-packages/web/src/viewer/components/throttle-controls.ts (TypeScript, 382 lines, source)
-packages/web/src/viewer/components/ws-health-panel.ts (TypeScript, 389 lines, source)
-packages/web/src/viewer/views/hench-runs.ts (TypeScript, 750 lines, source)
-packages/web/tests/unit/viewer/copy-link-button.test.ts (TypeScript, 146 lines, test)
+packages/web/src/viewer/components/config-footer.ts (TypeScript, 181 lines, source)
+packages/web/src/viewer/components/faq.ts (TypeScript, 321 lines, source)
+packages/web/src/viewer/components/sidebar.ts (TypeScript, 434 lines, source)
+packages/web/src/viewer/components/theme-toggle.ts (TypeScript, 36 lines, source)
+packages/web/src/viewer/hooks/use-project-metadata.ts (TypeScript, 79 lines, source)
+packages/web/tests/unit/viewer/sidebar.test.ts (TypeScript, 621 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/components/active-tasks-panel.ts → packages/web/src/viewer/components/rex-task-link.ts {RexTaskLink}
-  packages/web/src/viewer/components/rex-task-link.ts → packages/web/src/viewer/components/copy-link-button.ts {buildShareableUrl}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts {ActiveTasksPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts {ActiveRun}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/concurrency-panel.ts {ConcurrencyPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/copy-link-button.ts {CopyLinkButton}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/memory-panel.ts {MemoryPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/rex-task-link.ts {RexTaskLink}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/throttle-controls.ts {ThrottleControlsPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/ws-health-panel.ts {WsHealthPanel}
-  packages/web/tests/unit/viewer/copy-link-button.test.ts → packages/web/src/viewer/components/copy-link-button.ts {CopyLinkButton, buildShareableUrl}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/config-footer.ts {ConfigFooter}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/faq.ts {GlobalFAQ}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/theme-toggle.ts {SidebarThemeToggle}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
+  packages/web/tests/unit/viewer/sidebar.test.ts → packages/web/src/viewer/components/sidebar.ts {Sidebar}
 
 </imports>

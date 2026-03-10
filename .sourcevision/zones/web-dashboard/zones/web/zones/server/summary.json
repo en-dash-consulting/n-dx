@@ -92,8 +92,8 @@
     "packages/web/src/shared/data-files.ts",
     "packages/web/src/viewer/views/pr-markdown.ts"
   ],
-  "cohesion": 0.98,
-  "coupling": 0.02,
+  "cohesion": 0.99,
+  "coupling": 0.01,
   "fileCount": 81,
   "lineCount": 29188
 }

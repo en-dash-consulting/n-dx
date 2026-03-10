@@ -1,7 +1,7 @@
 {
   "id": "mcp-route-layer",
   "name": "MCP Route Layer",
-  "description": "The MCP server route handlers and domain gateway module that expose rex and sourcevision capabilities over HTTP to Claude Code clients.",
+  "description": "The MCP HTTP route handler and its domain gateway, together forming the server-side boundary that exposes sourcevision data to MCP clients via Express routes.",
   "files": [
     "packages/web/src/server/domain-gateway.ts",
     "packages/web/src/server/routes-mcp.ts",

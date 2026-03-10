@@ -18776,7 +18776,7 @@
     },
     {
       "from": "packages/web/src/shared/index.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "reexport",
       "symbols": [
         "createRequestDedup"
@@ -18784,7 +18784,7 @@
     },
     {
       "from": "packages/web/src/shared/index.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "type",
       "symbols": [
         "RequestDedup"
@@ -18889,14 +18889,6 @@
     },
     {
       "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
       "to": "packages/web/src/viewer/components/data-display/collapsible-section.ts",
       "type": "static",
       "symbols": [
@@ -18912,8 +18904,16 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/data-display/findings-list.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/data-display/zone-map.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Zone",
@@ -19698,15 +19698,6 @@
     },
     {
       "from": "packages/web/src/viewer/components/sidebar.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Manifest",
-        "Zones"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/sidebar.ts",
       "to": "packages/web/src/viewer/components/config-footer.ts",
       "type": "static",
       "symbols": [
@@ -19747,6 +19738,15 @@
       "type": "static",
       "symbols": [
         "SidebarThemeToggle"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/sidebar.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Manifest",
+        "Zones"
       ]
     },
     {
@@ -19802,7 +19802,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/zone-slideout.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Zone",
@@ -19839,6 +19839,61 @@
       "type": "static",
       "symbols": [
         "meterClass"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "Manifest",
+        "Inventory",
+        "Imports",
+        "Zones",
+        "Components",
+        "CallGraph",
+        "CallEdge",
+        "ComponentUsageEdge",
+        "ExternalImport",
+        "FileEntry",
+        "Finding",
+        "RouteExportKind",
+        "RouteTreeNode",
+        "Zone",
+        "ZoneCrossing"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/shared/data-files.ts",
+      "type": "reexport",
+      "symbols": [
+        "DATA_FILES",
+        "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "reexport",
+      "symbols": [
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "type",
+      "symbols": [
+        "RequestDedup"
       ]
     },
     {
@@ -20451,7 +20506,15 @@
     },
     {
       "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "static",
+      "symbols": [
+        "DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/loader.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Manifest",
@@ -20460,14 +20523,6 @@
         "Zones",
         "Components",
         "CallGraph"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/loader.ts",
-      "to": "packages/web/src/shared/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "DATA_FILES"
       ]
     },
     {
@@ -20506,14 +20561,6 @@
         "validateZones",
         "validateComponents",
         "validateCallGraph"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/shared/data-files.ts",
-      "type": "static",
-      "symbols": [
-        "ALL_DATA_FILES"
       ]
     },
     {
@@ -20623,6 +20670,14 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "static",
+      "symbols": [
+        "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/main.ts",
       "to": "packages/web/src/viewer/hooks/use-app-data.ts",
       "type": "static",
       "symbols": [
@@ -20697,22 +20752,6 @@
     },
     {
       "from": "packages/web/src/viewer/messaging/fetch-pipeline.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
-      "type": "static",
-      "symbols": [
-        "createRequestDedup"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/messaging/fetch-pipeline.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
-      "type": "type",
-      "symbols": [
-        "RequestDedup"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/messaging/fetch-pipeline.ts",
       "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
       "type": "static",
       "symbols": [
@@ -20729,11 +20768,18 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/messaging/index.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
-      "type": "reexport",
+      "from": "packages/web/src/viewer/messaging/fetch-pipeline.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "static",
       "symbols": [
-        "createRequestDedup",
+        "createRequestDedup"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/messaging/fetch-pipeline.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "type",
+      "symbols": [
         "RequestDedup"
       ]
     },
@@ -20777,6 +20823,15 @@
         "createMessageThrottle",
         "MessageThrottle",
         "ThrottledHandlerConfig"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/messaging/index.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "reexport",
+      "symbols": [
+        "createRequestDedup",
+        "RequestDedup"
       ]
     },
     {
@@ -21186,7 +21241,7 @@
     },
     {
       "from": "packages/web/src/viewer/types.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Manifest",
@@ -21247,10 +21302,10 @@
     },
     {
       "from": "packages/web/src/viewer/validate.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
-        "*"
+        "V1"
       ]
     },
     {
@@ -21280,18 +21335,18 @@
     },
     {
       "from": "packages/web/src/viewer/views/architecture.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/architecture.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/architecture.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
       ]
     },
     {
@@ -21507,18 +21562,18 @@
     },
     {
       "from": "packages/web/src/viewer/views/files.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "FileEntry"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/files.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/files.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "FileEntry"
       ]
     },
     {
@@ -21731,19 +21786,19 @@
     },
     {
       "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/overview.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Zone",
+        "Finding"
       ]
     },
     {
@@ -21944,18 +21999,18 @@
     },
     {
       "from": "packages/web/src/viewer/views/problems.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/problems.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/problems.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
       ]
     },
     {
@@ -22050,16 +22105,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/routes.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "RouteTreeNode",
-        "RouteExportKind",
-        "ComponentUsageEdge"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/routes.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -22072,6 +22117,16 @@
       "type": "static",
       "symbols": [
         "SearchFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/routes.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "RouteTreeNode",
+        "RouteExportKind",
+        "ComponentUsageEdge"
       ]
     },
     {
@@ -22118,18 +22173,18 @@
     },
     {
       "from": "packages/web/src/viewer/views/suggestions.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/suggestions.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
         "BrandedHeader"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/suggestions.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "Finding"
       ]
     },
     {
@@ -22325,16 +22380,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/schema/v1.ts",
-      "type": "type",
-      "symbols": [
-        "CallGraph",
-        "Zone",
-        "ZoneCrossing"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/zones.ts",
       "to": "packages/web/src/viewer/components/logos.ts",
       "type": "static",
       "symbols": [
@@ -22355,6 +22400,16 @@
       "type": "static",
       "symbols": [
         "ZoneSlideout"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/views/zones.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "CallGraph",
+        "Zone",
+        "ZoneCrossing"
       ]
     },
     {
@@ -22437,7 +22492,7 @@
     },
     {
       "from": "packages/web/src/viewer/visualization/colors.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Zones"
@@ -22445,7 +22500,7 @@
     },
     {
       "from": "packages/web/src/viewer/visualization/flow.ts",
-      "to": "packages/web/src/schema/v1.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "Zones",
@@ -22715,14 +22770,6 @@
     },
     {
       "from": "packages/web/tests/integration/request-dedup.test.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
-      "type": "static",
-      "symbols": [
-        "createRequestDedup"
-      ]
-    },
-    {
-      "from": "packages/web/tests/integration/request-dedup.test.ts",
       "to": "packages/web/src/viewer/messaging/call-rate-limiter.ts",
       "type": "static",
       "symbols": [
@@ -22743,6 +22790,14 @@
       "type": "static",
       "symbols": [
         "createMessageThrottle"
+      ]
+    },
+    {
+      "from": "packages/web/tests/integration/request-dedup.test.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
+      "type": "static",
+      "symbols": [
+        "createRequestDedup"
       ]
     },
     {
@@ -24569,7 +24624,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "static",
       "symbols": [
         "createRequestDedup"
@@ -24577,7 +24632,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/request-dedup.test.ts",
-      "to": "packages/web/src/shared/request-dedup.ts",
+      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
       "type": "type",
       "symbols": [
         "RequestDedup"
@@ -26365,7 +26420,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2729,
+    "totalEdges": 2734,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],

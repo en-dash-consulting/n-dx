@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web 4 (`web-viewer/web-viewer/web-4`)
-Files: 3, Cohesion: 0.44, Coupling: 0.56
+Files: 3, Cohesion: 0.50, Coupling: 0.50
 Description: 3 files, primarily TypeScript
 Entry points: packages/web/src/viewer/usage/constants.ts, packages/web/src/viewer/views/token-usage.ts
 Lines: 790

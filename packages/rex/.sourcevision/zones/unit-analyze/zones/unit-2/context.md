@@ -5,26 +5,30 @@
 <zone>
 
 Zone: Unit Analyze/unit 2 (`unit-analyze/unit-2`)
-Files: 3, Cohesion: 1.00, Coupling: 0.00
-Description: 3 files, primarily TypeScript
-Entry points: src/analyze/guided.ts
-Lines: 711
+Files: 5, Cohesion: 1.00, Coupling: 0.00
+Description: 5 files, primarily TypeScript
+Entry points: src/analyze/extract.ts
+Lines: 3682
 
 </zone>
 
 <files>
 
-src/analyze/guided.ts (TypeScript, 239 lines, source)
-tests/unit/analyze/guided.test.ts (TypeScript, 276 lines, test)
-tests/unit/cli/commands/analyze-guided.test.ts (TypeScript, 196 lines, test)
+src/analyze/extract.ts (TypeScript, 1688 lines, source)
+tests/unit/analyze/extract-llm-mock.test.ts (TypeScript, 382 lines, test)
+tests/unit/analyze/extract-llm.test.ts (TypeScript, 264 lines, test)
+tests/unit/analyze/extract-text.test.ts (TypeScript, 778 lines, test)
+tests/unit/analyze/extract.test.ts (TypeScript, 570 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  tests/unit/analyze/guided.test.ts → src/analyze/guided.ts {clarify, generateSpecFromContext}
-  tests/unit/analyze/guided.test.ts → src/analyze/guided.ts {GuidedContext}
-  tests/unit/cli/commands/analyze-guided.test.ts → src/analyze/guided.ts {runGuidedSpec}
+  tests/unit/analyze/extract-llm-mock.test.ts → src/analyze/extract.ts {maybeDisambiguate, extractFromText}
+  tests/unit/analyze/extract-llm.test.ts → src/analyze/extract.ts {isAmbiguousStructure, maybeDisambiguate, extractFromText, extractFromMarkdown}
+  tests/unit/analyze/extract-llm.test.ts → src/analyze/extract.ts {ExtractionResult}
+  tests/unit/analyze/extract-text.test.ts → src/analyze/extract.ts {extractFromText, classifyHeadingLevels, isAllCapsHeader, isRequirementSentence, extractRequirementSentences, parseNumberedSection, extractPriorityTag}
+  tests/unit/analyze/extract.test.ts → src/analyze/extract.ts {extractFromMarkdown, extractFromText, classifyHeadingLevels}
 
 </imports>

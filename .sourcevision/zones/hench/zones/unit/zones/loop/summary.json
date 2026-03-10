@@ -1,0 +1,31 @@
+{
+  "id": "hench/unit/loop",
+  "name": "Hench/unit/loop",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/agent/lifecycle/shared.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts",
+    "packages/hench/src/store/project-config.ts",
+    "packages/hench/tests/unit/agent/api-auth.test.ts",
+    "packages/hench/tests/unit/agent/cli-retry.test.ts",
+    "packages/hench/tests/unit/agent/codex-normalization.test.ts",
+    "packages/hench/tests/unit/agent/heartbeat.test.ts",
+    "packages/hench/tests/unit/agent/shared-lifecycle.test.ts",
+    "packages/hench/tests/unit/agent/token-budget.test.ts",
+    "packages/hench/tests/unit/agent/token-tracking.test.ts",
+    "packages/hench/tests/unit/store/claude-config.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts",
+    "packages/hench/src/store/project-config.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 14,
+  "lineCount": 4031
+}

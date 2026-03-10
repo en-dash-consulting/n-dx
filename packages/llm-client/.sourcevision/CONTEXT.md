@@ -16,18 +16,18 @@ Import edges: 114, External packages: 2
 
 <zones>
 
-[llm-provider-core] LLM Provider Core (13 files, coh=0.77 coup=0.23)
-  The central abstraction layer defining provider interfaces, client factory, token tracking, and adapters for Claude API, CLI, and Codex backends.
-  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [store], src/provider-session.ts [service] +3
-[llm-provider-tests] LLM Provider Tests (9 files, coh=1.00 coup=0.00)
-  Unit test suite with one-to-one coverage of every core provider, client, registry, session, and type module in llm-provider-core.
-  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
-[llm-runtime-support] LLM Runtime Support (19 files, coh=0.56 coup=0.44)
-  Cross-cutting utilities and configuration helpers — auth, exec, JSON handling, output formatting, project config, and directory resolution — that underpin the provider implementations.
-  files: src/auth.ts [utility], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [utility], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
-[package-config] Package Config (3 files, coh=0.00 coup=0.00)
-  Project-level configuration files that define build, type-checking, and test runner settings for the llm-client package.
+[root] Root (3 files, coh=0.00 coup=0.00)
+  3 files, primarily JSON, TypeScript
   files: package.json, tsconfig.json, vitest.config.ts
+[src] Src (13 files, coh=0.77 coup=0.23)
+  13 files, primarily TypeScript
+  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [store], src/provider-session.ts [service] +3
+[src-2] Src 2 (19 files, coh=0.56 coup=0.44)
+  19 files, primarily TypeScript
+  files: src/auth.ts [utility], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [utility], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
+[unit] Unit (9 files, coh=1.00 coup=0.00)
+  9 files, primarily TypeScript
+  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -51,70 +51,28 @@ Most imported:
 
 <findings>
 
-[warning] Bidirectional coupling: "llm-provider-core" ↔ "llm-runtime-support" (3+23 crossings) — consider extracting shared interface
-[warning] 12 entry points — wide API surface, consider consolidating exports [llm-provider-core]
-[warning] 3 imports from src into src-2 create a bidirectional dependency with the utility layer; if those utilities are truly generic, consider moving the depended-upon items into src or a shared foundation file. [llm-provider-core]
-[warning] All 25 test-to-source imports target llm-provider-core exclusively, confirming the utility layer (src-2) currently has no dedicated unit tests. [llm-provider-tests]
-[warning] Contains 43% of project files (19/44) — may be too broad, consider splitting [llm-runtime-support]
-[warning] Cohesion of 0.56 is below the strong-cohesion threshold, indicating this zone bundles heterogeneous utilities; splitting auth/exec/output into focused sub-modules would improve navigability. [llm-runtime-support]
-[warning] CompletionRequest.cliFlags leaks a CLI-only concern into the vendor-neutral request type used by LLMProvider — rename it to providerFlags or move it to a CliCompletionRequest subtype so API providers do not receive transport-specific fields they must silently discard.
-[warning] llm-provider-core acts as a hub with two independent spoke zones (support and tests); this is a sound layered pattern as long as the hub does not import from its spokes — the 3 reverse imports into support break this invariant. [llm-provider-core]
-[warning] The support zone plays two conflicting roles: foundation (23 imports into core treat it as a lower layer) and utility consumer (3 reverse imports from core treat it as a higher layer) — this dual-role is the root cause of the bidirectional coupling and should drive the refactor boundary. [llm-runtime-support]
-[warning] Test coverage is structurally biased toward llm-provider-core; no test files import from llm-runtime-support, creating a coverage boundary that coincides with the zone boundary — adding a tests/unit/support/ directory would close this gap and make the zone boundary explicit in the test layout. [llm-provider-tests]
-[warning] llm-runtime-support is entirely absent from the test import graph — all 25 test-to-source imports target llm-provider-core exclusively, leaving the largest zone in the package with zero unit test coverage. [llm-runtime-support]
-[warning] codex-cli-provider.ts and cli-provider.ts implement divergent config resolution strategies: cli-provider.ts delegates to resolveCliPath from config.ts while codex-cli-provider.ts resolves config inline via a passed codexConfig parameter. The inconsistency means the two CLI provider implementations cannot be substituted interchangeably and will diverge further as config logic evolves. [llm-provider-core]
-[warning] create-client.ts imports resolveApiKey from config.ts (support zone) rather than accepting a pre-resolved key — factory functions should receive resolved values via parameters, not perform I/O side-effects internally. This couples the factory to the filesystem and makes isolated unit testing require real config fixtures. [llm-provider-core]
-[warning] codex-cli-provider.ts is the only concrete provider implementation without a dedicated test file; api-provider.test.ts and cli-provider.test.ts exist but codex-cli-provider.test.ts does not. Since codex-cli-provider.ts uses raw spawn and inline config resolution (diverging from the shared utilities used by other providers), it has the highest behavioral complexity and the lowest test safety net. [llm-provider-tests]
-[warning] auth.ts coordinates config resolution (resolveApiKey, resolveCliPath) and process execution (exec) to authenticate providers — this is provider-level orchestration logic, not a standalone utility. Placing it in the support zone alongside pure utilities (json.ts, output.ts, project-dirs.ts) inflates the zone's apparent cohesion score and obscures the architectural role of authentication. [llm-runtime-support]
-... +5 more
+[warning] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting shared interface
+[warning] 12 entry points — wide API surface, consider consolidating exports [src]
+[warning] Contains 43% of project files (19/44) — may be too broad, consider splitting [src-2]
+[warning] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [src-2]
+[warning] Findings 3, 4, and 5 share a single root cause: the package's public API surface has not been rationalized after an incremental refactor. CompletionRequest still carries cliFlags, LLMClient still aliases ClaudeClient without deprecation, and createClient still coexists with createLLMClient. These three should be resolved as one coordinated change: (a) extract cliFlags into a CliCompletionOptions overlay type, (b) add @deprecated JSDoc to LLMClient and createClient referencing their replacements, (c) mark createClient as internal-only in package.json exports. No file splits required — all changes are in-place type/annotation edits.
 
 </findings>
 
 <next-steps>
 
-[high] config.ts is imported by 3 files in the core zone (api-provider.ts, cli-provide…
-  files: src/auth.ts, src/config.ts, src/exec.ts
-  category: fix
-[medium] The support zone plays two conflicting roles: foundation (2… (+1 related)
-  files: src/auth.ts, src/config.ts, src/exec.ts
-  category: extract
-[medium] codex-cli-provider.ts and cli-provider.ts implement diverge… (+1 related)
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: refactor
-[medium] auth.ts coordinates config resolution (resolveApiKey, resolveCliPath) and proce…
-  files: src/auth.ts, src/config.ts, src/exec.ts
-  category: refactor
-[medium] AuthMode (types.ts) and ProviderAuthMode (provider-interface.ts) are duplicate …
-  files: src/auth.ts, src/config.ts, src/exec.ts
-  category: refactor
 [medium] Contains 43% of project files (19/44) — may be too broad, consider splitting
   files: src/auth.ts, src/config.ts, src/exec.ts
   category: refactor
-[medium] Cohesion of 0.56 is below the strong-cohesion threshold, indicating this zone b…
+[medium] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…
   files: src/auth.ts, src/config.ts, src/exec.ts
-  category: refactor
-[medium] llm-provider-core acts as a hub with two independent spoke zones (support and t…
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: extract
-[medium] createLLMClient() return type is ClaudeClient instead of LLMProvider — change t…
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: refactor
-[medium] llm-client.ts hardcodes a codex branch independently of ProviderRegistry — call…
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
   category: refactor
 [medium] 12 entry points — wide API surface, consider consolidating exports
   files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
   category: refactor
-[medium] 3 imports from src into src-2 create a bidirectional dependency with the utilit…
-  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
-  category: refactor
-[medium] codex-cli-provider.ts is the only concrete provider implementation without a de…
-  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts
-  category: refactor
-[medium] Test coverage is structurally biased toward llm-provider-core; no test files im…
-  files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts
+[medium] Findings 3, 4, and 5 share a single root cause: the package's public API surfac…
   category: extract
-[medium] CompletionRequest.cliFlags leaks a CLI-only concern into the vendor-neutral req…
+[medium] Bidirectional coupling: "src" ↔ "src-2" (3+23 crossings) — consider extracting …
   category: refactor
 
 </next-steps>

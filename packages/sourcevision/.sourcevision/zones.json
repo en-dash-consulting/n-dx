@@ -1,9 +1,36 @@
 {
   "zones": [
     {
-      "id": "analysis-engine",
-      "name": "Analysis Engine",
-      "description": "The core static-analysis pipeline: file inventory, import graph traversal, zone enrichment, LLM-assisted classification, output generation, and MCP server entry.",
+      "id": ".claude",
+      "name": ".claude",
+      "description": "2 files, primarily JSON",
+      "files": [
+        ".claude/settings.json",
+        ".claude/settings.local.json"
+      ],
+      "entryPoints": [],
+      "cohesion": 0,
+      "coupling": 0,
+      "insights": [
+        "Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)",
+        "Settings files are not imported by any production code, making this zone a pure configuration island with no graph edges.",
+        "Splitting global and local settings into two files follows good practice for keeping sensitive or machine-specific config out of version control.",
+        "No action required — this zone has no architectural role beyond IDE tooling configuration.",
+        "Zero cohesion and coupling scores reflect that these JSON files have no import relationships; this is expected and correct for IDE config files.",
+        "Cohesion 0 is expected for config/skills files. These are not a module system participant. At-risk score is a false positive."
+      ],
+      "riskMetrics": {
+        "cohesion": 0,
+        "coupling": 0,
+        "riskScore": 0.5,
+        "riskLevel": "at-risk",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "analyzers",
+      "name": "Analyzers",
+      "description": "40 files, primarily TypeScript",
       "files": [
         "src/analyzers/archetypes.ts",
         "src/analyzers/callgraph-findings.ts",
@@ -89,6 +116,16 @@
         "enrich-config.ts carries a [config] archetype inside the core engine zone — configuration data structures are co-located with computation logic, preventing configuration from being independently loaded or validated without importing the full engine zone.",
         "Zone name 'analysis-engine' does not match its source directory 'src/analyzers/' — align them by either renaming the zone to 'analyzers-core' or restructuring source files under 'src/analysis-engine/' so IDE navigation, zone references in documentation, and Louvain clustering inputs are all consistent.",
         "claude-client.ts provides direct LLM API access from within the core computation zone with no interface abstraction — extract an ILLMClient interface and inject it as a dependency so unit tests can substitute a stub and the analysis engine zone no longer carries an implicit external network dependency.",
+        "src/analyzers/ is the primary architectural stress point: it is a hub zone (finding 1), contains a god function (finding 17), participates in the highest bidirectional coupling pair (finding 0), and hosts files from 5 different conceptual zones (finding 4). These four independent signals converge on the same zone, making this the highest-priority area for boundary work.",
+        "Zone \"analyzers\" has files across 9 directories — consider consolidating under a dedicated directory",
+        "Create src/analyzers/zone-public.ts that re-exports only the intended cross-zone API surface of src/analyzers/zones.ts. This is the highest-ROI single change: zones.ts is imported by 4 zones (finding 1) and all 77 cross-zone edges are concrete-to-concrete with no interface layer (finding 6). Adding one re-export boundary here validates the zone-public.ts pattern before applying it elsewhere and immediately narrows the blast radius of any zones.ts API change.",
+        "zones.ts is the gravitational center of the package: god function (32 outgoing calls), hub (4 zones import it), and primary coupling target for analyzers-2 and analyzers-3. The zone-public.ts boundary is a low-risk first step before any decomposition of analyzeZones.",
+        "Introduce src/analyzers/zone-public.ts as a re-export boundary for zones.ts before attempting to decompose analyzeZones. Three independent signals converge on this file (god function 32 calls, hub 4-zone import, primary coupling target), making any direct edit to zones.ts a high blast-radius operation. The re-export boundary is a zero-logic change that narrows the API surface and enables safe incremental decomposition later.",
+        "zones.ts is the single highest-risk file: 32 outgoing calls (god function), imported by 4 zones (hub), and primary LLM refactoring target. Three independent methods converge.",
+        "Create src/analyzers/zone-public.ts that re-exports only the symbols from zones.ts consumed by external zones. This is a zero-logic change (re-exports only, no new logic) that narrows the blast radius of any zones.ts change. Do this before any decomposition of analyzeZones. Confirm the 4 importing zones reference zone-public.ts after the change.",
+        "After absorbing analyzers-2 and analyzers-3, the unified analyzers zone will contain ~57 files across src/analyzers/ and tests/unit/analyzers/. The zone-public.ts re-export boundary for zones.ts remains the highest-priority single action — it is a zero-logic change that narrows the blast radius of zones.ts edits and is a prerequisite for any safe decomposition.",
+        "Findings 2, 3, and 4 in this zone are three independent LLM-pass suggestions that all prescribe the identical action: create src/analyzers/zone-public.ts re-exporting only the symbols from zones.ts consumed by external zones. These should be treated as one consolidated finding with triple-pass corroboration, not three separate tasks.",
+        "After merging analyzers-2 and analyzers-3, create src/analyzers/zone-public.ts as a zero-logic re-export boundary: enumerate the symbols from zones.ts that the 4 importing zones actually use, re-export only those, and update all external import sites to reference zone-public.ts instead of zones.ts directly. This is the only prerequisite before any decomposition of the generateStructuralInsights god function. Confirm via grep that no external zone retains a direct import of zones.ts after the change.",
         "[call graph] 969 internal calls, 65 outgoing, 246 incoming (cohesion: 0.94, coupling: 0.06)"
       ],
       "riskMetrics": {
@@ -100,9 +137,125 @@
       }
     },
     {
-      "id": "analyze-pipeline-cli",
-      "name": "Analyze Pipeline CLI",
-      "description": "Orchestrates the end-to-end analyze command: phase sequencing, manifest management, convergence detection, git credential handling, PDF export, and all CLI output/error formatting.",
+      "id": "analyzers-2",
+      "name": "Analyzers 2",
+      "description": "11 files, primarily TypeScript",
+      "files": [
+        "src/analyzers/callgraph.ts",
+        "src/analyzers/components.ts",
+        "src/analyzers/imports.ts",
+        "src/analyzers/index.ts",
+        "src/analyzers/inventory.ts",
+        "src/analyzers/route-detection.ts",
+        "src/util/paths.ts",
+        "tests/unit/analyzers/callgraph.test.ts",
+        "tests/unit/analyzers/components.test.ts",
+        "tests/unit/analyzers/imports.test.ts",
+        "tests/unit/analyzers/inventory.test.ts"
+      ],
+      "entryPoints": [
+        "src/analyzers/callgraph.ts",
+        "src/analyzers/components.ts",
+        "src/analyzers/imports.ts",
+        "src/analyzers/inventory.ts",
+        "src/util/paths.ts"
+      ],
+      "cohesion": 0.48,
+      "coupling": 0.52,
+      "insights": [
+        "High coupling (0.52) — 15 imports target \"analyzers\"",
+        "Generic zone name \"Analyzers 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+        "High coupling (0.52) — 15 imports target \"analysis-engine\"",
+        "The 15 imports into the 'Analysis Engine' zone signal that these analyzers share a common foundation; audit whether shared utilities could be consolidated to reduce cross-zone coupling.",
+        "route-detection.ts sitting alongside general-purpose analyzers suggests it may belong in its own focused zone once zone boundaries are tightened.",
+        "Unit tests are co-located in this zone, which is good for discoverability but inflates the coupling metric — test-only imports should not penalize production cohesion scores.",
+        "Zone cohesion (0.48) and coupling (0.52) are moderate; the zone is a natural grouping of concrete analyzer services but would benefit from extracting route-detection into its own zone given its distinct domain.",
+        "Heavy inbound imports from cli (5) and e2e (3) zones indicate these analyzers are a key dependency surface — their public APIs should be kept stable and well-documented.",
+        "route-detection.ts shares no import edges with the other analyzers in this zone — it is co-located by directory convention only, not by actual coupling, making it a false positive in zone grouping.",
+        "The zone exports 15 imports into analysis-engine but receives only 2 back — this is a clean consumer relationship, not a bidirectional entanglement; the high coupling metric is directional and not a circular dependency risk.",
+        "route-detection.ts has no import edges to sibling analyzer files in this zone; it is grouped by filesystem proximity only and should be extracted to a dedicated route-analysis zone once zone boundaries are tightened.",
+        "The 15 outbound imports to analysis-engine and 2 inbound form a clean one-directional consumer relationship — no circular dependency exists between these two zones.",
+        "src/util/paths.ts is classified as a utility and lives in src/util/ but is grouped into this zone purely by import affinity — it is a shared utility, not an analyzer implementation, and its presence inflates the zone's file count while obscuring its cross-cutting role.",
+        "The zone contains both production analyzer services and their unit tests but no dedicated test-support helpers — any test setup logic is likely duplicated across the three test files, creating a hidden maintenance surface.",
+        "src/util/paths.ts is a utility misclassified into the analyzer-implementations zone by import affinity. As a cross-cutting utility imported by multiple zones, it belongs in a dedicated foundation or utility zone alongside sort.ts and schema/index.ts — the three hub utilities should share an owner zone.",
+        "src/analyzers/index.ts is classified as an entrypoint and lives in this zone, but entrypoints normally belong to the zone that owns the public API surface — having the analyzer barrel export inside the implementations zone rather than the analysis-engine zone means the public API has no stable owner separate from the concrete implementations.",
+        "The zone name 'file-analyzer-implementations' implies corresponding interfaces or abstractions exist elsewhere, but no interface or abstract-class zone exists in the codebase — the 'implementations' suffix is misleading naming that implies a contract layer that has never been created.",
+        "src/analyzers/index.ts (entrypoint archetype) belongs in the analysis-engine zone that owns the public API, not the implementations zone — relocating it would give the public API surface a clear owner and prevent the entrypoint from being refactored as if it were a private implementation detail.",
+        "Rename the zone from 'file-analyzer-implementations' to 'file-analyzers' or 'analyzer-services' — the 'implementations' suffix implies a corresponding interface layer that does not exist, creating a misleading architectural signal for anyone onboarding to the codebase.",
+        "Rename 'analyzers-2' to a semantically meaningful name by inspecting its file contents and choosing a name following the '{domain}-{role}' convention (finding 8). Numeric-suffix auto-generated names make this zone unreferenceable in architecture discussions and prevent meaningful cohesion/coupling comparisons across passes.",
+        "High coupling (0.52) to 'analyzers' combined with a numeric auto-generated name suggests this zone may be a Louvain satellite of 'analyzers' rather than a distinct architectural boundary. Renaming is the minimum action; merging should be considered after 'analyzers-3' is resolved.",
+        "Zone is the core AST-based file analyzer implementations (callgraph.ts, components.ts, imports.ts, inventory.ts, route-detection.ts) — all in src/analyzers/, all re-exported through src/analyzers/index.ts. This is not a distinct architectural zone; it is the primary analyzer engine that Louvain partitioned away from zones.ts due to the hub's gravitational pull.",
+        "Merge analyzers-2 into the main analyzers zone. The 11 files (callgraph.ts, components.ts, imports.ts, inventory.ts, route-detection.ts, index.ts, paths.ts, and 4 unit tests) all reside in src/analyzers/ and tests/unit/analyzers/ and are logically part of the same analysis engine. The zone boundary is a Louvain artifact caused by zones.ts acting as a hub — the algorithm clustered hub-adjacent files into a satellite zone. After merge: move src/util/paths.ts to src/util/ (it already lives there; remove it from this zone membership) and verify src/analyzers/index.ts is the sole public entry point for the merged zone.",
+        "[call graph] 384 internal calls, 7 outgoing, 34 incoming (cohesion: 0.98, coupling: 0.02)"
+      ],
+      "riskMetrics": {
+        "cohesion": 0.48,
+        "coupling": 0.52,
+        "riskScore": 0.52,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "analyzers-3",
+      "name": "Analyzers 3",
+      "description": "6 files, primarily TypeScript",
+      "files": [
+        "src/analyzers/louvain.ts",
+        "src/analyzers/zone-hash.ts",
+        "src/analyzers/zones.ts",
+        "tests/unit/analyzers/zone-detection.test.ts",
+        "tests/unit/analyzers/zone-size-policy.test.ts",
+        "tests/unit/analyzers/zone-subdivision.test.ts"
+      ],
+      "entryPoints": [
+        "src/analyzers/zone-hash.ts",
+        "src/analyzers/zones.ts"
+      ],
+      "cohesion": 0.27,
+      "coupling": 0.73,
+      "insights": [
+        "Low cohesion (0.27) — files are loosely related, consider splitting this zone",
+        "High coupling (0.73) — 13 imports target \"analyzers\"",
+        "Generic zone name \"Analyzers 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+        "High coupling (0.73) — 13 imports target \"analysis-engine\"",
+        "Low cohesion (0.27) signals that louvain.ts, zone-hash.ts, and zones.ts may not be tightly coupled to each other — consider whether zone-hash.ts belongs closer to the output or schema layer.",
+        "High coupling (0.73) combined with 13 imports from the main Analysis Engine zone suggests this zone is a dependent extension rather than an independent subsystem; merging with 'Analysis Engine' may improve clarity.",
+        "The three zone-detection unit tests provide good coverage of a complex algorithmic area, but test files inflating the coupling metric may obscure the true production dependency structure.",
+        "Cohesion of 0.27 is below the 0.4 threshold — the three production files (louvain.ts, zone-hash.ts, zones.ts) may not be tightly enough related to warrant their own zone; merging with the 'Analysis Engine' zone should be evaluated.",
+        "Coupling of 0.73 exceeds the 0.6 warning threshold, indicating heavy dependency on other zones; the zone-detection logic is not self-contained and relies significantly on the broader analysis infrastructure.",
+        "zone-hash.ts has no documented consumers outside this zone, yet it contributes to the coupling metric — if it is only used internally it may be a private implementation detail incorrectly surfaced as a zone boundary file.",
+        "The three unit test files in this zone cover distinct algorithmic concerns (detection, size policy, subdivision) suggesting the production logic has already been implicitly split into three sub-domains that have not yet been reflected in source organization.",
+        "Three separate unit test files (zone-detection, zone-size-policy, zone-subdivision) map to distinct sub-domains within two production files — the test surface reveals a hidden split that should be made explicit in source organization before these concerns grow further.",
+        "zone-hash.ts has no outbound edges to zones outside zone-detection-engine; if it is only consumed within this zone it is a private module incorrectly treated as a zone boundary and should be marked internal.",
+        "zone-hash.ts has no outbound import edges to other zones and no inbound edges from zones outside zone-detection-engine — if confirmed, it is a private implementation detail that should not influence zone boundary calculations or be surfaced as a public API file.",
+        "The zone has equal numbers of production files (louvain.ts, zone-hash.ts, zones.ts) and unit test files (zone-detection, zone-size-policy, zone-subdivision) — a 1:1 ratio suggests good test coverage, but the three test files covering distinct algorithmic sub-domains (detection, size policy, subdivision) reveal that zones.ts is doing too much and should be split along those same sub-domain lines.",
+        "zones.ts is exercised by three separate unit test files each covering a distinct algorithmic concern (detection, size policy, subdivision) — this indicates zones.ts has at least three separate responsibilities. Splitting it into zones-detect.ts, zones-size-policy.ts, and zones-subdivide.ts would align source organization with the already-expressed test structure and improve zone cohesion from 0.27.",
+        "zone-detection-engine is the only zone in the codebase with BOTH low cohesion (0.27) AND high coupling (0.73) simultaneously — this combination defines a fragile zone: its files are loosely related to each other but tightly dependent on external zones, meaning a change to any neighbor can break the zone while the zone itself provides no clear encapsulation benefit.",
+        "The 'engine' suffix in the zone name implies autonomy and self-containment, but a coupling score of 0.73 directly contradicts this — a zone with 73% of its import weight crossing its own boundary is a module, not an engine. The name should reflect the zone's actual role as a dependent sub-module of the analysis pipeline.",
+        "zone-detection-engine has both low cohesion (0.27) and high coupling (0.73) — this is the highest-fragility zone in the codebase. Any refactor of the analysis-engine zone will cascade here. Prioritize merging louvain.ts and zone-hash.ts into the analysis-engine zone or extracting them into a named sub-package before any broader architectural work begins.",
+        "Rename the zone to 'zone-detection' or 'louvain-clustering' to accurately reflect its dependent sub-module role — 'engine' implies autonomy that the coupling metrics explicitly contradict, and the misleading name may cause developers to treat it as a stable boundary when it is not.",
+        "Rename 'analyzers-3' following the same '{domain}-{role}' convention as suggested for 'analyzers-2'. With cohesion 0.27 and coupling 0.73, this zone has the weakest health metrics among production zones and is the most likely candidate for being an artefact of under-specified zone detection rather than a real architectural boundary.",
+        "Three corroborating signals — cohesion 0.27, coupling 0.73, and a numeric-suffix auto-generated name — each from independent analysis methods, confirm this zone is a Louvain over-partitioning artifact rather than a real architectural boundary. Critical severity is justified by multi-signal convergence, not by any single heuristic alone.",
+        "Audit the 6 files in 'analyzers-3' to determine whether they share a coherent domain purpose. If no meaningful boundary exists, merge them into 'analyzers' or rename using the '{domain}-{role}' convention. Do not optimize this zone in place until its identity is established — all cohesion/coupling metrics are unreliable for an artifact zone. This action is the prerequisite for every other analyzers-3 suggestion.",
+        "Cohesion 0.27 + coupling 0.73 + generic name = unreliable zone identity. Audit before any metric-driven optimization.",
+        "Read the 6 files in 'analyzers-3' and determine which of three outcomes applies: (a) files belong in 'analyzers' — merge them; (b) files form a coherent sub-domain — rename using '{domain}-{role}' convention and add a zone-public.ts; (c) files span multiple unrelated concerns — split into named zones. Do not run any metric-based optimization until identity is established. The 0.73 coupling and 0.27 cohesion are unreliable while the zone boundary is an artifact.",
+        "Zone contains zones.ts (2011 lines, 32 outgoing calls), louvain.ts (808 lines, pure algorithm), zone-hash.ts (26 lines, circular-dependency shim), and 3 test files. These files are logically part of the zone-detection subsystem within the analyzers engine — not a separate architectural zone. The low cohesion (0.27) is because zone-hash.ts is a 26-line shim with almost no internal edges, dragging down the average. The high coupling (0.73) to analyzers reflects the fact that zones.ts is itself the primary driver of the main analyzers zone.",
+        "Merge analyzers-3 into the main analyzers zone rather than renaming or splitting it. The three production files (zones.ts, louvain.ts, zone-hash.ts) are the zone-detection subsystem of the same analysis engine. After merge, the zones.ts decomposition task becomes tractable: the three test files (zone-detection.test.ts, zone-size-policy.test.ts, zone-subdivision.test.ts) already map to three internal sub-concerns (detection, size constraints, subdivision) that can guide extraction of focused modules from zones.ts when the god-function metric warrants it (currently 32 calls, 2x above any reasonable threshold). Do not decompose zones.ts before the zone-public.ts re-export boundary is in place.",
+        "[call graph] 256 internal calls, 591 outgoing, 54 incoming (cohesion: 0.3, coupling: 0.7)"
+      ],
+      "riskMetrics": {
+        "cohesion": 0.27,
+        "coupling": 0.73,
+        "riskScore": 0.73,
+        "riskLevel": "catastrophic",
+        "failsThreshold": true
+      }
+    },
+    {
+      "id": "cli",
+      "name": "Cli",
+      "description": "30 files, primarily TypeScript",
       "files": [
         "src/analyzers/branch-work-collector.ts",
         "src/analyzers/convergence.ts",
@@ -163,6 +316,7 @@
         "convergence.ts computes stateless algorithmic deltas (pure function, no side effects) — pure computation functions should live at the lowest possible architectural tier rather than inside the CLI orchestration zone where they are only reachable by consuming the entire CLI layer.",
         "convergence.ts is a stateless pure-function algorithm placed inside the CLI orchestration zone — move it to the analysis-engine zone or a shared foundation module so its logic is reachable without a CLI layer dependency, and the CLI zone's semantic boundary remains limited to command orchestration.",
         "export-pdf.ts and git-credential-helper.ts have no relationship to the analyze pipeline lifecycle — their presence violates the zone's stated semantic scope; move them to an 'ancillary-cli-commands' zone or equivalent to preserve the zone's architectural focus and prevent the 'analyze-pipeline' name from becoming misleading.",
+        "Zone \"cli\" has files across 7 directories — consider consolidating under a dedicated directory",
         "[call graph] 502 internal calls, 45 outgoing, 36 incoming (cohesion: 0.92, coupling: 0.08)"
       ],
       "riskMetrics": {
@@ -174,9 +328,139 @@
       }
     },
     {
-      "id": "branch-workspace-reporting",
-      "name": "Branch Workspace Reporting",
-      "description": "Groups branch-work tracking utilities, risk scoring, workspace aggregation, PR report generation, schema definitions, and the package public API alongside co-located unit tests.",
+      "id": "e2e",
+      "name": "E2e",
+      "description": "4 files, primarily TypeScript",
+      "files": [
+        "src/schema/validate.ts",
+        "tests/e2e/cli-analyze.test.ts",
+        "tests/e2e/cli-serve.test.ts",
+        "tests/integration/pipeline.test.ts",
+        "tests/unit/schema/validate.test.ts"
+      ],
+      "entryPoints": [
+        "src/schema/validate.ts"
+      ],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "src/schema/validate.ts is the only production file here; the community detection algorithm grouped it with e2e/integration tests likely because validate.ts is only exercised in full-pipeline scenarios rather than unit tests — verify it is also called during the core analysis flow.",
+        "Perfect cohesion (1.0) and zero coupling indicate this group is internally self-consistent but isolated from the broader import graph — the production module may be underutilized if it isn't imported from the main analysis pipeline.",
+        "E2e and integration tests are co-located in this zone; consider whether separating them by test type would improve test organization and CI parallelism.",
+        "The production file src/schema/validate.ts is co-located with e2e and integration tests, suggesting it is only exercised at the pipeline level — verify it is also called during the core analysis flow to avoid silent validation gaps.",
+        "Zero coupling to other zones is architecturally clean for a validation module; this makes schema validation portable and easy to test in isolation.",
+        "Zero coupling to the analysis-engine zone means the schema validation step is never called from within the pipeline's own import graph — validation is only exercised at the e2e level, creating a silent gap where partial or malformed outputs can be written without any in-process validation.",
+        "The co-location of e2e and integration test files with the sole production file (validate.ts) in one Louvain community confirms that validate.ts is never imported from production pipeline code — this is a structural signal, not a naming coincidence.",
+        "validate.ts has zero import edges to or from any production zone; it is only exercised through e2e and integration tests. If the analysis pipeline does not call validate() at the end of each run, malformed output files can reach consumers silently.",
+        "The schema-validation zone is correctly isolated from analyzers and cli zones for portability, but the absence of any inbound import from the pipeline entrypoint means validation is opt-in rather than enforced — a single import from the pipeline finalization step would close this gap.",
+        "The zone name 'schema-validation' is misleading: 4 of 5 files are test files (e2e and integration), making this a test-grouping artifact rather than a schema domain zone — the zone label should reflect its actual composition.",
+        "The co-presence of both e2e tests (cli-analyze, cli-serve) and an integration test (pipeline.test.ts) in one Louvain community suggests these test tiers share a common import target (validate.ts) but have different execution scopes — they should not be treated as the same architectural tier for CI parallelism purposes.",
+        "Zone contains 1 production file and 4 test files (80% test) — the zone boundary is a test-grouping artifact, not a domain boundary. The single production file (validate.ts) has no identity as a 'zone' and should be absorbed into a shared schema or foundation zone where it can be imported by the pipeline.",
+        "E2e and integration test files are co-located in the same Louvain community because both import validate.ts — CI parallelism and test reporting depend on these tiers being separately categorized. Mixing them in one zone obscures which test tier caught a regression.",
+        "A cohesion score of 1.0 on a zone with only one production file is mathematically inevitable regardless of architectural quality — any single production file co-located with tests that import only it will score 1.0. The metric is not meaningful at this zone size and should not be interpreted as an architectural health signal.",
+        "The zone name 'schema-validation' describes only the single production file; 80% of the zone's files are tests. Naming a zone after one production file while 4 test files determine its Louvain membership makes the zone label actively misleading in status reports and architectural diagrams.",
+        "Cohesion=1.0 for a single-file production zone is a degenerate metric, not an architectural achievement — sourcevision should suppress or annotate cohesion scores for zones with fewer than 3 production files to prevent false confidence in zone health.",
+        "Absorb validate.ts into a shared 'schema' or 'foundation' zone alongside schema/index.ts so the production file gains a meaningful owner zone, and move the e2e/integration tests back to their respective test-tier zones — this eliminates the misleading zone name and fixes the mixed-tier test co-location in one step.",
+        "[call graph] 87 internal calls, 10 outgoing, 11 incoming (cohesion: 0.9, coupling: 0.1)"
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "fixtures",
+      "name": "Fixtures",
+      "description": "10 files, primarily TypeScript",
+      "files": [
+        "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
+        "tests/fixtures/remix-app/app/routes/_auth.tsx",
+        "tests/fixtures/remix-app/app/routes/_index.tsx",
+        "tests/fixtures/remix-app/app/routes/users.$id.tsx",
+        "tests/fixtures/small-ts-project/src/config.ts",
+        "tests/fixtures/small-ts-project/src/index.ts",
+        "tests/fixtures/small-ts-project/src/models/user.ts",
+        "tests/fixtures/small-ts-project/src/services/email-service.ts",
+        "tests/fixtures/small-ts-project/src/services/user-service.ts",
+        "tests/fixtures/small-ts-project/src/utils/format.ts",
+        "tests/fixtures/small-ts-project/src/utils/validate.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 1,
+      "coupling": 0,
+      "insights": [
+        "High cohesion (1) — files are tightly interconnected",
+        "Perfect cohesion (1.0) and zero coupling confirm this zone is completely self-contained — test fixtures correctly have no runtime dependencies on production code.",
+        "Two fixture types (Remix app for route-detection, small-ts-project for general analysis) cover the two main analysis scenarios; a third fixture with circular imports or a large-scale graph could improve edge-case coverage.",
+        "Fixture files should be kept minimal and purpose-built; avoid letting them drift into realistic project copies that become expensive to maintain over time.",
+        "All 11 files are test fixtures with no production code — the zone is cleanly isolated and serves as stable input data for the test suite.",
+        "The Remix fixture covers route-detection scenarios specifically; ensure it stays synchronized with supported Remix conventions as the route-detection analyzer evolves.",
+        "Zone \"test-fixtures\" has files across 5 directories — consider consolidating under a dedicated directory",
+        "The two fixture projects serve orthogonal test concerns (Remix route-detection vs generic TS import graph) and have no shared files — they are two independent test datasets grouped together only by filesystem nesting under tests/fixtures/.",
+        "No production zone imports from test-fixtures, confirming correct dependency direction; however, if fixture paths are hardcoded in test files rather than resolved via a shared constant, fixture relocation will require multi-file edits.",
+        "The two fixture sub-projects (remix-app, small-ts-project) are unrelated datasets with no shared imports; grouping them in one zone is a filesystem artifact. If a third fixture is added, consider a fixtures/index.ts manifest to keep fixture discovery centralized.",
+        "Zero inbound edges from any production zone confirms correct isolation; verify that fixture paths are referenced via a shared constant in test helpers rather than duplicated path strings to reduce coupling to the filesystem layout.",
+        "The two fixture sub-projects serve orthogonal concerns (Remix route-detection vs generic TS import graph analysis) but share the same zone — if either fixture grows to support new test scenarios, there is no structural mechanism to prevent cross-fixture import leakage.",
+        "No shared fixture-loader or path-constants file exists in the test-fixtures zone — fixture paths are likely hardcoded as strings in test files across multiple zones, meaning any fixture directory rename requires multi-file edits with no single point of control.",
+        "Fixture paths are consumed as string literals scattered across test files in multiple zones rather than through a centralized fixture registry or path-constants module. A single tests/fixtures/index.ts exporting named fixture paths would make relocation atomic and prevent path drift.",
+        "The fixture set covers only two scenarios (Remix route-detection and small-ts generic imports) but the analyzers under test include callgraph, components, zones, and imports analysis — fixture coverage is asymmetric, with route-detection over-represented relative to the codebase's total analyzer surface.",
+        "The two fixture sub-projects use different file extensions (.tsx for Remix, .ts for small-ts) but share the same zone; if a new component-analysis fixture is added using .tsx, it will be indistinguishable from the Remix route-detection fixture by extension alone — fixture purpose should be encoded in directory naming convention, not inferred from extension.",
+        "Add a fixture-to-analyzer coverage matrix (even as a comment in tests/fixtures/index.ts) mapping each fixture to the analyzers it exercises — currently there is no documented link between fixture files and the analyzer features they cover, making it unclear when adding a new analyzer feature whether a new fixture is needed.",
+        "Establish a naming convention that encodes fixture purpose in the directory name (e.g. tests/fixtures/route-detection-remix/, tests/fixtures/import-graph-ts/) rather than relying on implicit knowledge — the current names 'remix-app' and 'small-ts-project' describe technology stack, not the analyzer scenario being exercised.",
+        "Zone \"fixtures\" has files across 5 directories — consider consolidating under a dedicated directory",
+        "[call graph] 5 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
+      ],
+      "riskMetrics": {
+        "cohesion": 1,
+        "coupling": 0,
+        "riskScore": 0,
+        "riskLevel": "healthy",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "root",
+      "name": "Root",
+      "description": "9 files, primarily Markdown, Other, JSON",
+      "files": [
+        "ARCHITECTURE.md",
+        "README.md",
+        "SourceVision-F.png",
+        "SourceVision.png",
+        "WORKSPACE_DESIGN.md",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.tsbuildinfo",
+        "vitest.config.ts"
+      ],
+      "entryPoints": [],
+      "cohesion": 0,
+      "coupling": 0,
+      "insights": [
+        "Isolated files — no import edges between 9 files, cohesion is unmeasurable (reported as 0)",
+        "Documentation files (ARCHITECTURE.md, WORKSPACE_DESIGN.md, README.md) live alongside build tooling (tsconfig, vitest.config, package.json), indicating this zone is a documentation-plus-config layer rather than a code layer.",
+        "Having zero imports in/out is correct — root config should never be imported by source modules.",
+        "The presence of image assets (SourceVision-F.png, SourceVision.png) in the root zone suggests no dedicated assets directory; consider a docs/ or assets/ folder if the asset count grows.",
+        "Zero cohesion and coupling are expected for a root config zone; no structural changes needed.",
+        "Image assets mixed with markdown and build config files is a minor organization concern; a dedicated assets/ or docs/ directory would improve navigability.",
+        "Cohesion 0 is expected: root-level orchestration scripts (cli.js, web.js, ci.js, config.js) are intentionally non-importing by architectural contract. The at-risk score is a false positive for this zone type."
+      ],
+      "riskMetrics": {
+        "cohesion": 0,
+        "coupling": 0,
+        "riskScore": 0.5,
+        "riskLevel": "at-risk",
+        "failsThreshold": false
+      }
+    },
+    {
+      "id": "unit",
+      "name": "Unit",
+      "description": "29 files, primarily TypeScript",
       "files": [
         "src/analyzers/branch-work-classifier.ts",
         "src/analyzers/branch-work-filter.ts",
@@ -220,6 +504,7 @@
       "cohesion": 0.4,
       "coupling": 0.6,
       "insights": [
+        "High coupling (0.6) — 29 imports target \"analyzers\"",
         "High coupling (0.6) — 29 imports target \"analysis-engine\"",
         "Coupling at exactly 0.6 (the warning threshold) and borderline cohesion (0.4) indicate this zone is a catch-all for files that didn't cluster tightly elsewhere — schema types, generators, CLI commands, and tests all cohabit here.",
         "The presence of src/public.ts (the package entrypoint) in this zone alongside tests/unit/ helpers suggests the community-detection algorithm grouped files by co-import density rather than by semantic role; a deliberate split of schema, generators, and tests into separate zones would improve clarity.",
@@ -236,6 +521,10 @@
         "src/public.ts (the package public API entrypoint) living in this high-coupling zone means any downstream consumer who imports the package's public API silently acquires a transitive coupling to branch-workspace internals — there is no way to import the public API without depending on this zone's full transitive closure.",
         "This zone has BOTH high coupling (0.6) AND low cohesion (0.4) — the only zone in this batch to exhibit both simultaneously. Prioritize splitting: move src/public.ts and schema types to a dedicated zone, and move branch-work utilities to a 'branch-risk-analysis' zone, to break the fragile catch-all structure before further features are added.",
         "src/public.ts co-located with branch-workspace internals forces every package consumer to transitively couple to this high-coupling zone — extract public.ts to its own dedicated zone (e.g. 'package-public-api') so the public API surface is independent of the branch reporting internals and can be changed without affecting branch-workspace coupling metrics.",
+        "Zone \"unit\" has files across 10 directories — consider consolidating under a dedicated directory",
+        "Test zone coupling to 'analyzers' is architecturally correct — unit tests by design import from the zones they verify. The warning severity on finding 0 is a false positive per the constraint that test-to-implementation coupling must not be flagged as an anti-pattern.",
+        "Coupling of 0.6 to 'analyzers' reflects normal test-to-implementation dependency. The 29 cross-zone imports are test files consuming the public API they exercise. This is correct design; warning severity is unwarranted and should be treated as info.",
+        "Coupling 0.6 to 'analyzers' is structurally correct: test zones should import the implementation zones they exercise. This is not a defect.",
         "[call graph] 1361 internal calls, 277 outgoing, 614 incoming (cohesion: 0.83, coupling: 0.17)"
       ],
       "riskMetrics": {
@@ -245,1067 +534,812 @@
         "riskLevel": "healthy",
         "failsThreshold": false
       }
-    },
-    {
-      "id": "claude-tool-config",
-      "name": "Claude Tool Config",
-      "description": "Stores Claude Code permission settings and local overrides for the n-dx development environment.",
-      "files": [
-        ".claude/settings.json",
-        ".claude/settings.local.json"
-      ],
-      "entryPoints": [],
-      "cohesion": 0,
-      "coupling": 0,
-      "insights": [
-        "Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)",
-        "Settings files are not imported by any production code, making this zone a pure configuration island with no graph edges.",
-        "Splitting global and local settings into two files follows good practice for keeping sensitive or machine-specific config out of version control.",
-        "No action required — this zone has no architectural role beyond IDE tooling configuration.",
-        "Zero cohesion and coupling scores reflect that these JSON files have no import relationships; this is expected and correct for IDE config files."
-      ],
-      "riskMetrics": {
-        "cohesion": 0,
-        "coupling": 0,
-        "riskScore": 0.5,
-        "riskLevel": "at-risk",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "file-analyzer-implementations",
-      "name": "File Analyzer Implementations",
-      "description": "Houses the concrete analyzer service implementations — callgraph, component, import, inventory, and route-detection — along with their unit tests and the shared path utilities they depend on.",
-      "files": [
-        "src/analyzers/callgraph.ts",
-        "src/analyzers/components.ts",
-        "src/analyzers/imports.ts",
-        "src/analyzers/index.ts",
-        "src/analyzers/inventory.ts",
-        "src/analyzers/route-detection.ts",
-        "src/util/paths.ts",
-        "tests/unit/analyzers/callgraph.test.ts",
-        "tests/unit/analyzers/components.test.ts",
-        "tests/unit/analyzers/imports.test.ts",
-        "tests/unit/analyzers/inventory.test.ts"
-      ],
-      "entryPoints": [
-        "src/analyzers/callgraph.ts",
-        "src/analyzers/components.ts",
-        "src/analyzers/imports.ts",
-        "src/analyzers/inventory.ts",
-        "src/util/paths.ts"
-      ],
-      "cohesion": 0.48,
-      "coupling": 0.52,
-      "insights": [
-        "High coupling (0.52) — 15 imports target \"analysis-engine\"",
-        "The 15 imports into the 'Analysis Engine' zone signal that these analyzers share a common foundation; audit whether shared utilities could be consolidated to reduce cross-zone coupling.",
-        "route-detection.ts sitting alongside general-purpose analyzers suggests it may belong in its own focused zone once zone boundaries are tightened.",
-        "Unit tests are co-located in this zone, which is good for discoverability but inflates the coupling metric — test-only imports should not penalize production cohesion scores.",
-        "Zone cohesion (0.48) and coupling (0.52) are moderate; the zone is a natural grouping of concrete analyzer services but would benefit from extracting route-detection into its own zone given its distinct domain.",
-        "Heavy inbound imports from cli (5) and e2e (3) zones indicate these analyzers are a key dependency surface — their public APIs should be kept stable and well-documented.",
-        "route-detection.ts shares no import edges with the other analyzers in this zone — it is co-located by directory convention only, not by actual coupling, making it a false positive in zone grouping.",
-        "The zone exports 15 imports into analysis-engine but receives only 2 back — this is a clean consumer relationship, not a bidirectional entanglement; the high coupling metric is directional and not a circular dependency risk.",
-        "route-detection.ts has no import edges to sibling analyzer files in this zone; it is grouped by filesystem proximity only and should be extracted to a dedicated route-analysis zone once zone boundaries are tightened.",
-        "The 15 outbound imports to analysis-engine and 2 inbound form a clean one-directional consumer relationship — no circular dependency exists between these two zones.",
-        "src/util/paths.ts is classified as a utility and lives in src/util/ but is grouped into this zone purely by import affinity — it is a shared utility, not an analyzer implementation, and its presence inflates the zone's file count while obscuring its cross-cutting role.",
-        "The zone contains both production analyzer services and their unit tests but no dedicated test-support helpers — any test setup logic is likely duplicated across the three test files, creating a hidden maintenance surface.",
-        "src/util/paths.ts is a utility misclassified into the analyzer-implementations zone by import affinity. As a cross-cutting utility imported by multiple zones, it belongs in a dedicated foundation or utility zone alongside sort.ts and schema/index.ts — the three hub utilities should share an owner zone.",
-        "src/analyzers/index.ts is classified as an entrypoint and lives in this zone, but entrypoints normally belong to the zone that owns the public API surface — having the analyzer barrel export inside the implementations zone rather than the analysis-engine zone means the public API has no stable owner separate from the concrete implementations.",
-        "The zone name 'file-analyzer-implementations' implies corresponding interfaces or abstractions exist elsewhere, but no interface or abstract-class zone exists in the codebase — the 'implementations' suffix is misleading naming that implies a contract layer that has never been created.",
-        "src/analyzers/index.ts (entrypoint archetype) belongs in the analysis-engine zone that owns the public API, not the implementations zone — relocating it would give the public API surface a clear owner and prevent the entrypoint from being refactored as if it were a private implementation detail.",
-        "Rename the zone from 'file-analyzer-implementations' to 'file-analyzers' or 'analyzer-services' — the 'implementations' suffix implies a corresponding interface layer that does not exist, creating a misleading architectural signal for anyone onboarding to the codebase.",
-        "[call graph] 384 internal calls, 7 outgoing, 34 incoming (cohesion: 0.98, coupling: 0.02)"
-      ],
-      "riskMetrics": {
-        "cohesion": 0.48,
-        "coupling": 0.52,
-        "riskScore": 0.52,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "project-root",
-      "name": "Project Root",
-      "description": "Houses workspace-level documentation, build configuration, and project identity assets that define the monorepo structure.",
-      "files": [
-        "ARCHITECTURE.md",
-        "README.md",
-        "SourceVision-F.png",
-        "SourceVision.png",
-        "WORKSPACE_DESIGN.md",
-        "package.json",
-        "tsconfig.json",
-        "tsconfig.tsbuildinfo",
-        "vitest.config.ts"
-      ],
-      "entryPoints": [],
-      "cohesion": 0,
-      "coupling": 0,
-      "insights": [
-        "Isolated files — no import edges between 9 files, cohesion is unmeasurable (reported as 0)",
-        "Documentation files (ARCHITECTURE.md, WORKSPACE_DESIGN.md, README.md) live alongside build tooling (tsconfig, vitest.config, package.json), indicating this zone is a documentation-plus-config layer rather than a code layer.",
-        "Having zero imports in/out is correct — root config should never be imported by source modules.",
-        "The presence of image assets (SourceVision-F.png, SourceVision.png) in the root zone suggests no dedicated assets directory; consider a docs/ or assets/ folder if the asset count grows.",
-        "Zero cohesion and coupling are expected for a root config zone; no structural changes needed.",
-        "Image assets mixed with markdown and build config files is a minor organization concern; a dedicated assets/ or docs/ directory would improve navigability."
-      ],
-      "riskMetrics": {
-        "cohesion": 0,
-        "coupling": 0,
-        "riskScore": 0.5,
-        "riskLevel": "at-risk",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "schema-validation",
-      "name": "Schema Validation",
-      "description": "Contains the JSON schema validation module for sourcevision output files, alongside the end-to-end CLI tests and integration pipeline tests that exercise the full analysis workflow.",
-      "files": [
-        "src/schema/validate.ts",
-        "tests/e2e/cli-analyze.test.ts",
-        "tests/e2e/cli-serve.test.ts",
-        "tests/integration/pipeline.test.ts",
-        "tests/unit/schema/validate.test.ts"
-      ],
-      "entryPoints": [
-        "src/schema/validate.ts"
-      ],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "src/schema/validate.ts is the only production file here; the community detection algorithm grouped it with e2e/integration tests likely because validate.ts is only exercised in full-pipeline scenarios rather than unit tests — verify it is also called during the core analysis flow.",
-        "Perfect cohesion (1.0) and zero coupling indicate this group is internally self-consistent but isolated from the broader import graph — the production module may be underutilized if it isn't imported from the main analysis pipeline.",
-        "E2e and integration tests are co-located in this zone; consider whether separating them by test type would improve test organization and CI parallelism.",
-        "The production file src/schema/validate.ts is co-located with e2e and integration tests, suggesting it is only exercised at the pipeline level — verify it is also called during the core analysis flow to avoid silent validation gaps.",
-        "Zero coupling to other zones is architecturally clean for a validation module; this makes schema validation portable and easy to test in isolation.",
-        "Zero coupling to the analysis-engine zone means the schema validation step is never called from within the pipeline's own import graph — validation is only exercised at the e2e level, creating a silent gap where partial or malformed outputs can be written without any in-process validation.",
-        "The co-location of e2e and integration test files with the sole production file (validate.ts) in one Louvain community confirms that validate.ts is never imported from production pipeline code — this is a structural signal, not a naming coincidence.",
-        "validate.ts has zero import edges to or from any production zone; it is only exercised through e2e and integration tests. If the analysis pipeline does not call validate() at the end of each run, malformed output files can reach consumers silently.",
-        "The schema-validation zone is correctly isolated from analyzers and cli zones for portability, but the absence of any inbound import from the pipeline entrypoint means validation is opt-in rather than enforced — a single import from the pipeline finalization step would close this gap.",
-        "The zone name 'schema-validation' is misleading: 4 of 5 files are test files (e2e and integration), making this a test-grouping artifact rather than a schema domain zone — the zone label should reflect its actual composition.",
-        "The co-presence of both e2e tests (cli-analyze, cli-serve) and an integration test (pipeline.test.ts) in one Louvain community suggests these test tiers share a common import target (validate.ts) but have different execution scopes — they should not be treated as the same architectural tier for CI parallelism purposes.",
-        "Zone contains 1 production file and 4 test files (80% test) — the zone boundary is a test-grouping artifact, not a domain boundary. The single production file (validate.ts) has no identity as a 'zone' and should be absorbed into a shared schema or foundation zone where it can be imported by the pipeline.",
-        "E2e and integration test files are co-located in the same Louvain community because both import validate.ts — CI parallelism and test reporting depend on these tiers being separately categorized. Mixing them in one zone obscures which test tier caught a regression.",
-        "A cohesion score of 1.0 on a zone with only one production file is mathematically inevitable regardless of architectural quality — any single production file co-located with tests that import only it will score 1.0. The metric is not meaningful at this zone size and should not be interpreted as an architectural health signal.",
-        "The zone name 'schema-validation' describes only the single production file; 80% of the zone's files are tests. Naming a zone after one production file while 4 test files determine its Louvain membership makes the zone label actively misleading in status reports and architectural diagrams.",
-        "Cohesion=1.0 for a single-file production zone is a degenerate metric, not an architectural achievement — sourcevision should suppress or annotate cohesion scores for zones with fewer than 3 production files to prevent false confidence in zone health.",
-        "Absorb validate.ts into a shared 'schema' or 'foundation' zone alongside schema/index.ts so the production file gains a meaningful owner zone, and move the e2e/integration tests back to their respective test-tier zones — this eliminates the misleading zone name and fixes the mixed-tier test co-location in one step.",
-        "[call graph] 87 internal calls, 10 outgoing, 11 incoming (cohesion: 0.9, coupling: 0.1)"
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "test-fixtures",
-      "name": "Test Fixtures",
-      "description": "Provides static sample projects (a Remix app and a small TypeScript project) used as realistic inputs for end-to-end and integration tests of the analysis pipeline.",
-      "files": [
-        "tests/fixtures/remix-app/app/routes/_auth.login.tsx",
-        "tests/fixtures/remix-app/app/routes/_auth.tsx",
-        "tests/fixtures/remix-app/app/routes/_index.tsx",
-        "tests/fixtures/remix-app/app/routes/users.$id.tsx",
-        "tests/fixtures/small-ts-project/src/config.ts",
-        "tests/fixtures/small-ts-project/src/index.ts",
-        "tests/fixtures/small-ts-project/src/models/user.ts",
-        "tests/fixtures/small-ts-project/src/services/email-service.ts",
-        "tests/fixtures/small-ts-project/src/services/user-service.ts",
-        "tests/fixtures/small-ts-project/src/utils/format.ts",
-        "tests/fixtures/small-ts-project/src/utils/validate.ts"
-      ],
-      "entryPoints": [],
-      "cohesion": 1,
-      "coupling": 0,
-      "insights": [
-        "High cohesion (1) — files are tightly interconnected",
-        "Perfect cohesion (1.0) and zero coupling confirm this zone is completely self-contained — test fixtures correctly have no runtime dependencies on production code.",
-        "Two fixture types (Remix app for route-detection, small-ts-project for general analysis) cover the two main analysis scenarios; a third fixture with circular imports or a large-scale graph could improve edge-case coverage.",
-        "Fixture files should be kept minimal and purpose-built; avoid letting them drift into realistic project copies that become expensive to maintain over time.",
-        "All 11 files are test fixtures with no production code — the zone is cleanly isolated and serves as stable input data for the test suite.",
-        "The Remix fixture covers route-detection scenarios specifically; ensure it stays synchronized with supported Remix conventions as the route-detection analyzer evolves.",
-        "Zone \"test-fixtures\" has files across 5 directories — consider consolidating under a dedicated directory",
-        "The two fixture projects serve orthogonal test concerns (Remix route-detection vs generic TS import graph) and have no shared files — they are two independent test datasets grouped together only by filesystem nesting under tests/fixtures/.",
-        "No production zone imports from test-fixtures, confirming correct dependency direction; however, if fixture paths are hardcoded in test files rather than resolved via a shared constant, fixture relocation will require multi-file edits.",
-        "The two fixture sub-projects (remix-app, small-ts-project) are unrelated datasets with no shared imports; grouping them in one zone is a filesystem artifact. If a third fixture is added, consider a fixtures/index.ts manifest to keep fixture discovery centralized.",
-        "Zero inbound edges from any production zone confirms correct isolation; verify that fixture paths are referenced via a shared constant in test helpers rather than duplicated path strings to reduce coupling to the filesystem layout.",
-        "The two fixture sub-projects serve orthogonal concerns (Remix route-detection vs generic TS import graph analysis) but share the same zone — if either fixture grows to support new test scenarios, there is no structural mechanism to prevent cross-fixture import leakage.",
-        "No shared fixture-loader or path-constants file exists in the test-fixtures zone — fixture paths are likely hardcoded as strings in test files across multiple zones, meaning any fixture directory rename requires multi-file edits with no single point of control.",
-        "Fixture paths are consumed as string literals scattered across test files in multiple zones rather than through a centralized fixture registry or path-constants module. A single tests/fixtures/index.ts exporting named fixture paths would make relocation atomic and prevent path drift.",
-        "The fixture set covers only two scenarios (Remix route-detection and small-ts generic imports) but the analyzers under test include callgraph, components, zones, and imports analysis — fixture coverage is asymmetric, with route-detection over-represented relative to the codebase's total analyzer surface.",
-        "The two fixture sub-projects use different file extensions (.tsx for Remix, .ts for small-ts) but share the same zone; if a new component-analysis fixture is added using .tsx, it will be indistinguishable from the Remix route-detection fixture by extension alone — fixture purpose should be encoded in directory naming convention, not inferred from extension.",
-        "Add a fixture-to-analyzer coverage matrix (even as a comment in tests/fixtures/index.ts) mapping each fixture to the analyzers it exercises — currently there is no documented link between fixture files and the analyzer features they cover, making it unclear when adding a new analyzer feature whether a new fixture is needed.",
-        "Establish a naming convention that encodes fixture purpose in the directory name (e.g. tests/fixtures/route-detection-remix/, tests/fixtures/import-graph-ts/) rather than relying on implicit knowledge — the current names 'remix-app' and 'small-ts-project' describe technology stack, not the analyzer scenario being exercised.",
-        "[call graph] 5 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
-      ],
-      "riskMetrics": {
-        "cohesion": 1,
-        "coupling": 0,
-        "riskScore": 0,
-        "riskLevel": "healthy",
-        "failsThreshold": false
-      }
-    },
-    {
-      "id": "zone-detection-engine",
-      "name": "Zone Detection Engine",
-      "description": "Implements the Louvain community-detection algorithm, zone hashing for stability, and the zone assembly pipeline that transforms the import graph into named architectural zones.",
-      "files": [
-        "src/analyzers/louvain.ts",
-        "src/analyzers/zone-hash.ts",
-        "src/analyzers/zones.ts",
-        "tests/unit/analyzers/zone-detection.test.ts",
-        "tests/unit/analyzers/zone-size-policy.test.ts",
-        "tests/unit/analyzers/zone-subdivision.test.ts"
-      ],
-      "entryPoints": [
-        "src/analyzers/zone-hash.ts",
-        "src/analyzers/zones.ts"
-      ],
-      "cohesion": 0.27,
-      "coupling": 0.73,
-      "insights": [
-        "Low cohesion (0.27) — files are loosely related, consider splitting this zone",
-        "High coupling (0.73) — 13 imports target \"analysis-engine\"",
-        "Low cohesion (0.27) signals that louvain.ts, zone-hash.ts, and zones.ts may not be tightly coupled to each other — consider whether zone-hash.ts belongs closer to the output or schema layer.",
-        "High coupling (0.73) combined with 13 imports from the main Analysis Engine zone suggests this zone is a dependent extension rather than an independent subsystem; merging with 'Analysis Engine' may improve clarity.",
-        "The three zone-detection unit tests provide good coverage of a complex algorithmic area, but test files inflating the coupling metric may obscure the true production dependency structure.",
-        "Cohesion of 0.27 is below the 0.4 threshold — the three production files (louvain.ts, zone-hash.ts, zones.ts) may not be tightly enough related to warrant their own zone; merging with the 'Analysis Engine' zone should be evaluated.",
-        "Coupling of 0.73 exceeds the 0.6 warning threshold, indicating heavy dependency on other zones; the zone-detection logic is not self-contained and relies significantly on the broader analysis infrastructure.",
-        "zone-hash.ts has no documented consumers outside this zone, yet it contributes to the coupling metric — if it is only used internally it may be a private implementation detail incorrectly surfaced as a zone boundary file.",
-        "The three unit test files in this zone cover distinct algorithmic concerns (detection, size policy, subdivision) suggesting the production logic has already been implicitly split into three sub-domains that have not yet been reflected in source organization.",
-        "Three separate unit test files (zone-detection, zone-size-policy, zone-subdivision) map to distinct sub-domains within two production files — the test surface reveals a hidden split that should be made explicit in source organization before these concerns grow further.",
-        "zone-hash.ts has no outbound edges to zones outside zone-detection-engine; if it is only consumed within this zone it is a private module incorrectly treated as a zone boundary and should be marked internal.",
-        "zone-hash.ts has no outbound import edges to other zones and no inbound edges from zones outside zone-detection-engine — if confirmed, it is a private implementation detail that should not influence zone boundary calculations or be surfaced as a public API file.",
-        "The zone has equal numbers of production files (louvain.ts, zone-hash.ts, zones.ts) and unit test files (zone-detection, zone-size-policy, zone-subdivision) — a 1:1 ratio suggests good test coverage, but the three test files covering distinct algorithmic sub-domains (detection, size policy, subdivision) reveal that zones.ts is doing too much and should be split along those same sub-domain lines.",
-        "zones.ts is exercised by three separate unit test files each covering a distinct algorithmic concern (detection, size policy, subdivision) — this indicates zones.ts has at least three separate responsibilities. Splitting it into zones-detect.ts, zones-size-policy.ts, and zones-subdivide.ts would align source organization with the already-expressed test structure and improve zone cohesion from 0.27.",
-        "zone-detection-engine is the only zone in the codebase with BOTH low cohesion (0.27) AND high coupling (0.73) simultaneously — this combination defines a fragile zone: its files are loosely related to each other but tightly dependent on external zones, meaning a change to any neighbor can break the zone while the zone itself provides no clear encapsulation benefit.",
-        "The 'engine' suffix in the zone name implies autonomy and self-containment, but a coupling score of 0.73 directly contradicts this — a zone with 73% of its import weight crossing its own boundary is a module, not an engine. The name should reflect the zone's actual role as a dependent sub-module of the analysis pipeline.",
-        "zone-detection-engine has both low cohesion (0.27) and high coupling (0.73) — this is the highest-fragility zone in the codebase. Any refactor of the analysis-engine zone will cascade here. Prioritize merging louvain.ts and zone-hash.ts into the analysis-engine zone or extracting them into a named sub-package before any broader architectural work begins.",
-        "Rename the zone to 'zone-detection' or 'louvain-clustering' to accurately reflect its dependent sub-module role — 'engine' implies autonomy that the coupling metrics explicitly contradict, and the misleading name may cause developers to treat it as a stable boundary when it is not.",
-        "[call graph] 245 internal calls, 591 outgoing, 54 incoming (cohesion: 0.29, coupling: 0.71)"
-      ],
-      "riskMetrics": {
-        "cohesion": 0.27,
-        "coupling": 0.73,
-        "riskScore": 0.73,
-        "riskLevel": "catastrophic",
-        "failsThreshold": true
-      }
     }
   ],
   "crossings": [
     {
-      "from": "src/analyzers/classify.ts",
-      "to": "src/cli/output.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/analyzers/enrich-batch.ts",
-      "to": "src/cli/output.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/analyzers/enrich-per-zone.ts",
-      "to": "src/cli/output.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/analyzers/workspace.ts",
-      "to": "src/constants.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/cli/mcp.ts",
-      "to": "src/constants.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "tests/unit/analyzers/hints.test.ts",
-      "to": "src/cli/commands/analyze-phases.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "tests/unit/cli/analyze.test.ts",
-      "to": "src/cli/commands/analyze.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/analyzers/workspace.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/mcp.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/schema/index.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "tests/unit/analyzers/move-recommendations.test.ts",
-      "to": "tests/unit/analyzers/zones-helpers.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "tests/unit/analyzers/token-usage.test.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
       "from": "src/analyzers/workspace-crossings.ts",
       "to": "src/util/paths.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "file-analyzer-implementations"
+      "fromZone": "analyzers",
+      "toZone": "analyzers-2"
     },
     {
       "from": "src/analyzers/workspace.ts",
       "to": "src/util/paths.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/schema/index.ts",
-      "to": "src/schema/validate.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "schema-validation"
-    },
-    {
-      "from": "src/schema/index.ts",
-      "to": "src/schema/validate.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "schema-validation"
+      "fromZone": "analyzers",
+      "toZone": "analyzers-2"
     },
     {
       "from": "src/analyzers/enrich.ts",
       "to": "src/analyzers/zone-hash.ts",
-      "fromZone": "analysis-engine",
-      "toZone": "zone-detection-engine"
+      "fromZone": "analyzers",
+      "toZone": "analyzers-3"
     },
     {
-      "from": "src/analyzers/convergence.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/manifest.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/callgraph-findings.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/classify.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/enrich-parsing.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/util/sort.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/claude-client.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/context.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/enrich-parsing.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/llms-txt.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/token-usage.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/zone-output.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/util/sort.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/export-pdf.ts",
-      "to": "src/export/pdf-report.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/export-pdf.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/validate.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/index.ts",
-      "to": "src/cli/mcp.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/risk-scoring.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/analyzers/risk-scoring.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/analyze.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/export-pdf.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/init.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/pr-markdown.ts",
-      "to": "src/analyzers/branch-work-classifier.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/pr-markdown.ts",
-      "to": "src/generators/pr-markdown-template.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/pr-markdown.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/validate.ts",
-      "to": "src/schema/data-files.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/index.ts",
-      "to": "src/cli/commands/workspace.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "tests/unit/analyzers/convergence.test.ts",
-      "to": "tests/unit/analyzers/zones-helpers.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/callgraph.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/components.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/imports.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/inventory.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/inventory.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "src/cli/commands/analyze-phases.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "analyze-pipeline-cli",
-      "toZone": "zone-detection-engine"
-    },
-    {
-      "from": "src/analyzers/risk-scoring.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/analyzers/context.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/analyzers/llms-txt.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/analyzers/workspace-crossings.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/util/sort.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/cli/commands/workspace.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/public.ts",
-      "to": "src/cli/mcp.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/callgraph-findings.test.ts",
-      "to": "src/analyzers/callgraph-findings.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/dedup-findings.test.ts",
-      "to": "src/analyzers/enrich-parsing.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
-      "to": "src/analyzers/claude-client.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
-      "to": "src/analyzers/enrich.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/next-steps.test.ts",
-      "to": "src/analyzers/next-steps.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/workspace-aggregate.test.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/workspace-aggregate.test.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
-      "to": "src/analyzers/workspace-crossings.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
-      "to": "src/analyzers/workspace.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
-      "to": "src/analyzers/claude-client.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
-      "to": "src/analyzers/enrich-parsing.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
-      "to": "src/analyzers/enrich.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zone-insights.test.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/analyzers/zones-helpers.ts",
-      "to": "src/schema/index.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/cli/mcp.test.ts",
-      "to": "src/cli/mcp.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "tests/unit/export/pdf-report.test.ts",
-      "to": "src/export/pdf-report.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analysis-engine"
-    },
-    {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/constants.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/cli/commands/workspace.ts",
-      "to": "src/cli/errors.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/cli/commands/workspace.ts",
+      "from": "src/analyzers/classify.ts",
       "to": "src/cli/output.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "analyze-pipeline-cli"
+      "fromZone": "analyzers",
+      "toZone": "cli"
     },
     {
-      "from": "src/analyzers/workspace-aggregate.ts",
-      "to": "src/util/paths.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "file-analyzer-implementations"
+      "from": "src/analyzers/enrich-batch.ts",
+      "to": "src/cli/output.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
     },
     {
-      "from": "src/cli/commands/workspace.ts",
-      "to": "src/util/paths.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "file-analyzer-implementations"
+      "from": "src/analyzers/enrich-per-zone.ts",
+      "to": "src/cli/output.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
     },
     {
-      "from": "src/analyzers/branch-work-store.ts",
+      "from": "src/analyzers/workspace.ts",
+      "to": "src/constants.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
+    },
+    {
+      "from": "src/cli/mcp.ts",
+      "to": "src/constants.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
+    },
+    {
+      "from": "tests/unit/analyzers/hints.test.ts",
+      "to": "src/cli/commands/analyze-phases.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
+    },
+    {
+      "from": "tests/unit/cli/analyze.test.ts",
+      "to": "src/cli/commands/analyze.ts",
+      "fromZone": "analyzers",
+      "toZone": "cli"
+    },
+    {
+      "from": "src/schema/index.ts",
       "to": "src/schema/validate.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "schema-validation"
+      "fromZone": "analyzers",
+      "toZone": "e2e"
     },
     {
-      "from": "tests/unit/analyzers/branch-work-store.test.ts",
+      "from": "src/schema/index.ts",
       "to": "src/schema/validate.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "schema-validation"
+      "fromZone": "analyzers",
+      "toZone": "e2e"
     },
     {
-      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "zone-detection-engine"
+      "from": "src/analyzers/workspace.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "analyzers",
+      "toZone": "unit"
     },
     {
-      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "zone-detection-engine"
+      "from": "src/cli/mcp.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "analyzers",
+      "toZone": "unit"
     },
     {
-      "from": "tests/unit/analyzers/zone-insights.test.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "branch-workspace-reporting",
-      "toZone": "zone-detection-engine"
+      "from": "src/schema/index.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "analyzers",
+      "toZone": "unit"
+    },
+    {
+      "from": "tests/unit/analyzers/move-recommendations.test.ts",
+      "to": "tests/unit/analyzers/zones-helpers.ts",
+      "fromZone": "analyzers",
+      "toZone": "unit"
+    },
+    {
+      "from": "tests/unit/analyzers/token-usage.test.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "analyzers",
+      "toZone": "unit"
     },
     {
       "from": "src/analyzers/callgraph.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/callgraph.ts",
       "to": "src/util/sort.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/components.ts",
       "to": "src/analyzers/server-route-detection.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/components.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/components.ts",
       "to": "src/util/sort.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/imports.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/imports.ts",
       "to": "src/util/merge.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/imports.ts",
       "to": "src/util/sort.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/index.ts",
       "to": "src/analyzers/callgraph-findings.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/index.ts",
       "to": "src/analyzers/callgraph-findings.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/index.ts",
       "to": "src/analyzers/token-usage.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/inventory.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/inventory.ts",
       "to": "src/util/merge.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/inventory.ts",
       "to": "src/util/sort.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/route-detection.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/index.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "src/analyzers/index.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "analyzers-2",
+      "toZone": "analyzers-3"
     },
     {
       "from": "src/analyzers/index.ts",
       "to": "src/analyzers/manifest.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "analyze-pipeline-cli"
-    },
-    {
-      "from": "src/analyzers/index.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "zone-detection-engine"
-    },
-    {
-      "from": "src/analyzers/index.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "file-analyzer-implementations",
-      "toZone": "zone-detection-engine"
-    },
-    {
-      "from": "src/schema/validate.ts",
-      "to": "src/schema/v1.ts",
-      "fromZone": "schema-validation",
-      "toZone": "branch-workspace-reporting"
-    },
-    {
-      "from": "tests/integration/pipeline.test.ts",
-      "to": "src/analyzers/components.ts",
-      "fromZone": "schema-validation",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "tests/integration/pipeline.test.ts",
-      "to": "src/analyzers/imports.ts",
-      "fromZone": "schema-validation",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "tests/integration/pipeline.test.ts",
-      "to": "src/analyzers/inventory.ts",
-      "fromZone": "schema-validation",
-      "toZone": "file-analyzer-implementations"
-    },
-    {
-      "from": "tests/integration/pipeline.test.ts",
-      "to": "src/analyzers/zones.ts",
-      "fromZone": "schema-validation",
-      "toZone": "zone-detection-engine"
+      "fromZone": "analyzers-2",
+      "toZone": "cli"
     },
     {
       "from": "src/analyzers/louvain.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/enrich-parsing.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/enrich.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/enrich.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/move-recommendations.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/move-recommendations.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/workspace-crossings.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/workspace.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/analyzers/workspace.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "src/analyzers/zones.ts",
       "to": "src/util/sort.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "tests/unit/analyzers/zone-detection.test.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "tests/unit/analyzers/zone-subdivision.test.ts",
       "to": "src/schema/index.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "analysis-engine"
+      "fromZone": "analyzers-3",
+      "toZone": "analyzers"
     },
     {
       "from": "tests/unit/analyzers/zone-detection.test.ts",
       "to": "tests/unit/analyzers/zones-helpers.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "branch-workspace-reporting"
+      "fromZone": "analyzers-3",
+      "toZone": "unit"
     },
     {
       "from": "tests/unit/analyzers/zone-size-policy.test.ts",
       "to": "tests/unit/analyzers/zones-helpers.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "branch-workspace-reporting"
+      "fromZone": "analyzers-3",
+      "toZone": "unit"
     },
     {
       "from": "tests/unit/analyzers/zone-subdivision.test.ts",
       "to": "tests/unit/analyzers/zones-helpers.ts",
-      "fromZone": "zone-detection-engine",
-      "toZone": "branch-workspace-reporting"
+      "fromZone": "analyzers-3",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/analyzers/convergence.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/manifest.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/callgraph-findings.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/classify.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/enrich-parsing.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/util/sort.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/claude-client.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/context.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/enrich-parsing.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/llms-txt.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/token-usage.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/zone-output.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/util/sort.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/export-pdf.ts",
+      "to": "src/export/pdf-report.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/export-pdf.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/mcp.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/callgraph.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/components.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/imports.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/inventory.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/inventory.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "cli",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "src/cli/commands/analyze-phases.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/risk-scoring.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/analyzers/risk-scoring.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/analyze.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/export-pdf.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/init.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/pr-markdown.ts",
+      "to": "src/analyzers/branch-work-classifier.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/pr-markdown.ts",
+      "to": "src/generators/pr-markdown-template.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/pr-markdown.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/commands/validate.ts",
+      "to": "src/schema/data-files.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/cli/index.ts",
+      "to": "src/cli/commands/workspace.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "tests/unit/analyzers/convergence.test.ts",
+      "to": "tests/unit/analyzers/zones-helpers.ts",
+      "fromZone": "cli",
+      "toZone": "unit"
+    },
+    {
+      "from": "tests/integration/pipeline.test.ts",
+      "to": "src/analyzers/components.ts",
+      "fromZone": "e2e",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "tests/integration/pipeline.test.ts",
+      "to": "src/analyzers/imports.ts",
+      "fromZone": "e2e",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "tests/integration/pipeline.test.ts",
+      "to": "src/analyzers/inventory.ts",
+      "fromZone": "e2e",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "tests/integration/pipeline.test.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "e2e",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "src/schema/validate.ts",
+      "to": "src/schema/v1.ts",
+      "fromZone": "e2e",
+      "toZone": "unit"
+    },
+    {
+      "from": "src/analyzers/risk-scoring.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/analyzers/context.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/analyzers/llms-txt.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/analyzers/workspace-crossings.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/util/sort.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/cli/commands/workspace.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/public.ts",
+      "to": "src/cli/mcp.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/callgraph-findings.test.ts",
+      "to": "src/analyzers/callgraph-findings.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/dedup-findings.test.ts",
+      "to": "src/analyzers/enrich-parsing.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
+      "to": "src/analyzers/claude-client.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
+      "to": "src/analyzers/enrich.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/next-steps.test.ts",
+      "to": "src/analyzers/next-steps.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/workspace-aggregate.test.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/workspace-aggregate.test.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
+      "to": "src/analyzers/workspace-crossings.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
+      "to": "src/analyzers/workspace.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
+      "to": "src/analyzers/claude-client.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
+      "to": "src/analyzers/enrich-parsing.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
+      "to": "src/analyzers/enrich.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-enrichment.test.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-insights.test.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/analyzers/zones-helpers.ts",
+      "to": "src/schema/index.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/cli/mcp.test.ts",
+      "to": "src/cli/mcp.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "tests/unit/export/pdf-report.test.ts",
+      "to": "src/export/pdf-report.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/util/paths.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "src/cli/commands/workspace.ts",
+      "to": "src/util/paths.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers-2"
+    },
+    {
+      "from": "tests/unit/analyzers/enrich-content-skip.test.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-cross-package.test.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "tests/unit/analyzers/zone-insights.test.ts",
+      "to": "src/analyzers/zones.ts",
+      "fromZone": "unit",
+      "toZone": "analyzers-3"
+    },
+    {
+      "from": "src/analyzers/workspace-aggregate.ts",
+      "to": "src/constants.ts",
+      "fromZone": "unit",
+      "toZone": "cli"
+    },
+    {
+      "from": "src/cli/commands/workspace.ts",
+      "to": "src/cli/errors.ts",
+      "fromZone": "unit",
+      "toZone": "cli"
+    },
+    {
+      "from": "src/cli/commands/workspace.ts",
+      "to": "src/cli/output.ts",
+      "fromZone": "unit",
+      "toZone": "cli"
+    },
+    {
+      "from": "src/analyzers/branch-work-store.ts",
+      "to": "src/schema/validate.ts",
+      "fromZone": "unit",
+      "toZone": "e2e"
+    },
+    {
+      "from": "tests/unit/analyzers/branch-work-store.test.ts",
+      "to": "src/schema/validate.ts",
+      "fromZone": "unit",
+      "toZone": "e2e"
     }
   ],
   "unzoned": [
@@ -1317,6 +1351,15 @@
     "Hub: src/analyzers/zones.ts is imported by 4 zones — cross-cutting dependency",
     "Hub: src/schema/index.ts is imported by 4 zones — cross-cutting dependency",
     "Hub: src/util/sort.ts is imported by 4 zones — cross-cutting dependency",
+    "Bidirectional coupling: \"analyzers\" ↔ \"unit\" (5+29 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"analyzers\" ↔ \"cli\" (7+20 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"analyzers\" ↔ \"analyzers-2\" (2+15 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"cli\" ↔ \"unit\" (13+3 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"analyzers\" ↔ \"analyzers-3\" (1+13 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"analyzers-2\" ↔ \"cli\" (1+5 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"analyzers-3\" ↔ \"unit\" (3+3 crossings) — consider extracting shared interface",
+    "Bidirectional coupling: \"e2e\" ↔ \"unit\" (1+2 crossings) — consider extracting shared interface",
+    "Size imbalance: largest zone has 40 files vs smallest with 2 — uneven decomposition",
     "Bidirectional coupling: \"analysis-engine\" ↔ \"branch-workspace-reporting\" (5+29 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"analysis-engine\" ↔ \"analyze-pipeline-cli\" (7+20 crossings) — consider extracting shared interface",
     "Bidirectional coupling: \"analysis-engine\" ↔ \"file-analyzer-implementations\" (2+15 crossings) — consider extracting shared interface",
@@ -1393,102 +1436,116 @@
     "Establish and document a zone naming convention before the next analysis pass — proposed convention: '{domain}-{role}' where role is one of: engine (autonomous, low coupling), service (concrete impl), pipeline (orchestration), foundation (shared utilities), fixtures (test data). Applying this convention retroactively would make zone health metrics (especially coupling scores) interpretable without reading zone file contents.",
     "The codebase has no zone with coupling < 0.3 and cohesion > 0.7 among production zones (only test zones achieve clean scores) — this indicates that no production zone has yet been refactored to a stable, well-bounded state. The target architectural state should include at least one reference zone with clean metrics that other zones can emulate.",
     "All 77 cross-zone import edges connect concrete files with no interface layer — introduce at least one explicit contract boundary (a types-only or interface-only module) at the analysis-engine zone boundary to validate that the pattern is feasible before attempting to apply it to all zones. This single change would demonstrate the pattern and immediately reduce the blast radius of any analysis-engine API change.",
-    "[call graph] 574 calls: \"zone-detection-engine\" → \"branch-workspace-reporting\"",
-    "[call graph] 192 calls: \"branch-workspace-reporting\" → \"analysis-engine\"",
-    "[call graph] 49 calls: \"branch-workspace-reporting\" → \"zone-detection-engine\"",
-    "[call graph] 32 calls: \"analysis-engine\" → \"branch-workspace-reporting\"",
-    "[call graph] 30 calls: \"analyze-pipeline-cli\" → \"analysis-engine\""
+    "CONVERGENCE: Findings 0, 1, 4, 6, 17 independently point at src/analyzers/ as the single highest-risk zone. The bidirectional coupling (finding 0), hub import (finding 1), multi-zone file mixing (finding 4), absence of interface layers (finding 6), and god function (finding 17) are five orthogonal signals targeting the same location. This convergence elevates the zone's risk beyond what any single heuristic would justify.",
+    "SYSTEMIC GAP — NO ZONE BOUNDARIES: Findings 6, 9, and 0 together reveal that the codebase has never enforced intra-package zone contracts. All 77 cross-zone import edges are concrete-to-concrete (finding 6), there is no zone-public.ts convention (finding 9), and the highest-crossing zone pair has 34 crossings (finding 0). This is not a localized issue: it is a structural gap that affects every zone's cohesion/coupling measurement.",
+    "METRIC INCOMPARABILITY: Findings 7 and 11 together explain why no production zone has clean metrics (finding 11). Mixed test/production zone membership (finding 7) conflates test coupling with production coupling, making cohesion and coupling scores across zones incomparable. Establishing a consistent test co-location policy (finding 7) is a prerequisite for using zone metrics as a reliable health signal.",
+    "NAMING DEBT BLOCKS GOVERNANCE: Findings 5, 8, and 10 describe the same root problem from three angles — the naming debt is not cosmetic. Auto-generated numeric names (analyzers-2, analyzers-3) and inconsistent naming schemas prevent zone ownership, documentation, and cross-pass metric tracking. This should be resolved before the next analysis pass so that zone IDs are stable references.",
+    "REDUNDANCY: Findings 5 and 8 are substantially redundant — both call for a zone naming convention before the next pass. Finding 8 is more specific (proposes the '{domain}-{role}' schema with defined role vocabulary) and supersedes finding 5. Finding 5 can be considered resolved if finding 8 is acted on.",
+    "src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries",
+    "The combination of findings 13 and 14 (two dead exports from different zones) alongside the absence of a zone-public.ts pattern (finding 9) suggests that the public API surface of each zone is not explicitly declared anywhere. Dead exports are a predictable consequence of this: without a declared public surface, callers import what they need ad-hoc and abandoned exports accumulate silently. The fix is structural (zone-public.ts) rather than mechanical (deleting the two exports).",
+    "No contradiction found between findings 6 (77 cross-zone import edges) and the cross-zone crossing summary (134 total across 22 zone pairs). The 77 figure refers to unique directed import edges; the 134 figure counts total crossings (which may count each edge once per file crossing it). The values are consistent with each other and should not be treated as contradictory.",
+    "Finding 16 (fixture file location suggestion: tests/fixtures/small-ts-project/src/models/user.ts should move to services/) describes test fixture internals. This is not an actionable architectural concern — fixture projects intentionally model realistic directory structures. This finding should be suppressed in future passes by excluding tests/fixtures/** from move-file heuristics.",
+    "zones.ts is the highest-priority single file in the codebase: three independent analysis methods (automated call-graph, hub detection, LLM analysis) converge on it as a god module, hub dependency, and coupling target simultaneously. The zone-public.ts re-export boundary should precede any other refactoring in the analyzers zone.",
+    "Global finding 0 (bidirectional coupling analyzers ↔ unit) is a false positive. The coupling is semantically unidirectional: 'unit' tests import 'analyzers' implementation, but 'analyzers' does not import test files. The 5 crossings in the analyzers→unit direction should be verified — if they are also test utilities imported by tests, the bidirectional flag is entirely spurious.",
+    "The two numeric-suffix zones ('analyzers-2', 'analyzers-3') together import 28 times into 'analyzers' and share no domain-meaningful names. This pattern — multiple unnamed satellite zones orbiting one large hub zone — is a known Louvain artifact when resolution is too fine-grained. Both zones should be resolved (renamed or merged) before zone health metrics are used to guide further refactoring, since cohesion/coupling comparisons across passes are meaningless while zone identities are unstable.",
+    "The absence of zone-public.ts files is the systemic root cause behind three observable symptoms: 19 undifferentiated entry points in 'analyzers', two silently accumulated dead exports (detectBranchLifecycle, resolveWorkedEpicTitlesForRange), and concrete-to-concrete cross-zone imports with no interface layer. These are not independent cleanup tasks — they are predictable consequences of the same structural gap. Introducing zone-public.ts in 'analyzers' first addresses all three structurally.",
+    "Global finding 9 (move tests/fixtures/small-ts-project/src/models/user.ts to services/) is a confirmed false positive, correctly identified by global finding 10. The move-file heuristic should exclude tests/fixtures/** in future passes. No action required on the fixture file itself.",
+    "Three independent analysis methods converge on src/analyzers/zones.ts as the primary architectural risk: automated call-graph (32 outgoing calls, global finding 13), hub detection (4 zones import it, global finding 1), and LLM analysis (highest-ROI refactoring target, analyzers finding 2). This triple convergence — no single heuristic alone — justifies treating zones.ts as the package's critical path for architectural improvement. The zone-public.ts re-export boundary is the recommended entry point.",
+    "The two dead exports (detectBranchLifecycle, resolveWorkedEpicTitlesForRange) and the 19 undifferentiated entry points in 'analyzers' are symptoms of one structural gap: no zone declares an explicit public surface. Without zone-public.ts files, callers import ad-hoc and unused exports accumulate silently. These are not isolated cleanup items but predictable steady-state consequences of implicit API boundaries.",
+    "Zone detection produced two numeric-suffix satellite zones ('analyzers-2' with 11 files, 'analyzers-3' with 6 files) that orbit 'analyzers' (40 files) with high coupling (0.52 and 0.73) and no domain-meaningful names. This three-zone cluster pattern — large hub plus unnamed satellites with high inward coupling — suggests Louvain resolution is too fine for this codebase section. Consider re-running zone detection with a coarser resolution parameter for the src/analyzers/ directory, or manually assigning the 17 satellite files to named zones before treating them as stable architectural units.",
+    "All critical and warning findings converge on a single directory: src/analyzers/. The three-zone cluster (analyzers 40 files, analyzers-2 11 files, analyzers-3 6 files) plus god-function zones.ts plus 19 undifferentiated entry points are one systemic problem, not three separate problems. The root cause is that Louvain resolution is too fine for this directory.",
+    "The bidirectional coupling warning (analyzers ↔ unit) is a false positive: 'unit' is a test zone, and 29 of the 34 crossings are test files importing their implementation targets. Bidirectional coupling warnings should be suppressed when one side is a test zone.",
+    "No zone in this package declares an explicit public surface (zone-public.ts). Dead exports and wide coupling are predictable steady-state consequences of this, not isolated cleanup items. Establishing zone-public.ts files will passively surface future dead exports at zone boundaries rather than requiring call-graph scans.",
+    "The two zones with cohesion 0 (.claude and root) are orchestration/config artifacts and should be excluded from architectural risk scoring. Cohesion is unmeasurable — not zero — for files that participate in no import graph. The metric threshold system should treat 'no edges' as unscored rather than at-risk.",
+    "Finding global-10 (LLM correctly suppresses fixture move-file suggestion) and finding global-11 (LLM resolves apparent contradiction in edge counts) demonstrate that LLM pass 5 consistently provides correct calibration for false-positive heuristic findings. The heuristic system should incorporate these as suppressions in future passes.",
+    "The only confirmed actionable dead exports are detectBranchLifecycle in src/analyzers/branch-work-filter.ts and resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts. Both are isolated findings with no corroborating signals — appropriate for single-file verification and removal, not structural intervention.",
+    "The automated heuristic produced one false-positive critical (analyzers-3 zone risk score) and one false-positive warning (unit high coupling). Both were correctly identified as false positives by LLM pass 5. This indicates the heuristic thresholds are calibrated for general codebases and do not account for: (1) test zones which structurally couple to implementation, (2) orchestration zones which structurally have zero cohesion, (3) artifact zones produced by over-fine Louvain resolution. Future heuristic passes should tag zones with a type (test, orchestration, config, production) and apply type-specific thresholds.",
+    "Three independent methods (heuristic call-graph, hub detection, LLM structural analysis) all identify src/analyzers/zones.ts as the primary architectural risk point. This triple convergence — not any single signal — is the correct threshold for treating a finding as 'warning'. No other file in the package reaches this bar. Treat zones.ts as the package's single highest-priority architectural concern.",
+    "The src/util/paths.ts move-file suggestion (89% import neighbors in src/analyzers/) is an info-level signal with no corroboration. Do not act on it until analyzers-3 identity is resolved — if those 6 files merge into analyzers, the neighbor distribution for paths.ts may shift and the suggestion may become moot or strengthen.",
+    "The three numeric-suffix zones (analyzers, analyzers-2, analyzers-3) are all in src/analyzers/ and share the same filesystem root. Louvain over-segmented this directory into three clusters because zones.ts acts as a gravitational hub — files that import zones.ts were pulled into satellite clusters. This is a known failure mode of community detection on hub-topology graphs, not evidence of real architectural boundaries.",
+    "The duplicate zone-public.ts suggestion appearing three times (findings 6, 7, 8 in analyzers zone) is itself a signal: three independent LLM analysis passes converged on the same file and the same zero-logic action. Triple convergence on a concrete, low-risk action is sufficient evidence to treat it as confirmed. It does not require further validation passes.",
+    "The catastrophic-risk finding on analyzers-3 (finding 19) was already identified as a heuristic false positive by global finding 8. Zone exploration confirms the diagnosis: 0.27 cohesion is an artifact of the 26-line zone-hash.ts shim having almost no import edges, and 0.73 coupling reflects zones.ts being both the zone's primary file and an inbound dependency target of the broader engine. Neither metric reflects a genuine architectural problem.",
+    "The corrected severity order for this package is: (1) warning — zones.ts triple convergence (hub + god function + primary coupling target); (2) warning — two phantom zone boundaries (analyzers-2, analyzers-3) masking the unified analyzer engine; (3) info — wide API surface of 19 entry points in analyzers (benign while zone-public.ts does not yet exist); (4) info — all other findings.",
+    "The unit zone's 29 imports targeting analyzers (finding 9, originally warning) and the bidirectional analyzers↔unit coupling (finding 23, originally warning) are both confirmed false positives: unit is a test zone and structural coupling from tests to implementation is expected by design. Global finding 8 already recorded this heuristic calibration problem; these two severity downgrades are the concrete corrections that finding 8 prescribed.",
+    "src/util/paths.ts (finding 29: 89% import neighbors in src/analyzers/) lives in src/util/ which is the correct structural location for a cross-cutting utility. The high neighbor affinity to src/analyzers/ is an artifact of the current zone over-segmentation — once analyzers-2 and analyzers-3 merge, the neighbor distribution will shift and this move-file suggestion may become moot. Defer evaluation until after the zone merge is complete, consistent with global finding 32.",
+    "The correct remediation sequence for the analyzers zone cluster is: (1) merge analyzers-2 and analyzers-3 into analyzers in the zone config; (2) create src/analyzers/zone-public.ts re-exporting only the external-facing API of zones.ts; (3) update all 4 importing zones to reference zone-public.ts; (4) only then consider decomposing generateStructuralInsights in zones.ts, guided by the three existing test files (zone-detection, zone-size-policy, zone-subdivision) as natural sub-module boundaries. Steps 1 and 2 are zero-risk. Step 4 carries moderate refactoring risk and should not be attempted before steps 1–3 are complete.",
+    "The three findings prescribing src/analyzers/zone-public.ts (zone findings 6, 7, 8) are duplicates from three independent LLM analysis sub-passes. They should be collapsed into a single action item. Triple convergence from independent passes on the same concrete zero-logic change is strong corroboration — not a reason to escalate severity, but sufficient to treat the action as confirmed rather than speculative.",
+    "Two of the three 'analyzers' sub-zones (analyzers-2, analyzers-3) received numeric-suffix auto-generated names. Both are now confirmed Louvain over-segmentation artifacts rather than real architectural zones. The Louvain resolution parameter is calibrated too fine for this directory: all three clusters live in the same filesystem path (src/analyzers/), share the same public API surface (src/analyzers/index.ts), and are logically part of one engine. Consider reducing the Louvain resolution parameter or applying a post-processing merge step for zones where all member files share a common directory prefix and a single barrel export.",
+    "[call graph] 574 calls: \"analyzers-3\" → \"unit\"",
+    "[call graph] 192 calls: \"unit\" → \"analyzers\"",
+    "[call graph] 49 calls: \"unit\" → \"analyzers-3\"",
+    "[call graph] 32 calls: \"analyzers\" → \"unit\"",
+    "[call graph] 30 calls: \"cli\" → \"analyzers\""
   ],
   "findings": [
     {
       "type": "observation",
       "pass": 0,
-      "scope": "analysis-engine",
-      "text": "19 entry points — wide API surface, consider consolidating exports",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "analysis-engine",
-      "text": "High cohesion (0.62) and low coupling (0.38) reflect a well-bounded core engine — the majority of cross-zone traffic flows in the correct direction (inward toward this zone).",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "analysis-engine",
-      "text": "Reverse imports from analyzers into the cli and unit zones (7 + 5 edges) suggest mild layering inversions; auditing these imports and pushing shared types down to a foundation module would improve the dependency graph.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "branch-workspace-reporting",
-      "text": "High coupling (0.6) — 29 imports target \"analysis-engine\"",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "branch-workspace-reporting",
-      "text": "Branch-work utilities (classifier, filter, store) and risk-scoring form a coherent sub-cluster within this zone; they could be extracted into a dedicated 'branch-risk-analysis' zone if the codebase grows.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "branch-workspace-reporting",
-      "text": "Coupling score of 0.6 meets the warning threshold; the zone imports from analyzers (29), cli (3), analyzers-2 (2), analyzers-3 (3), and e2e (2), indicating it acts as a cross-cutting hub rather than a focused module.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "branch-workspace-reporting",
-      "text": "Mixing src/public.ts (the package's public API entrypoint), schema type files, and unit test helpers in one community suggests the Louvain graph does not yet have enough edge weight to separate these concerns; manually anchoring schema and public API into a dedicated zone would help.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "claude-tool-config",
+      "scope": ".claude",
       "text": "Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "claude-tool-config",
-      "text": "Zero cohesion and coupling scores reflect that these JSON files have no import relationships; this is expected and correct for IDE config files.",
+      "pass": 0,
+      "scope": "analyzers",
+      "text": "19 entry points — wide API surface, consider consolidating exports",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "analyzers-2",
+      "text": "Generic zone name \"Analyzers 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "analyzers-2",
+      "text": "High coupling (0.52) — 15 imports target \"analyzers\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "analyzers-3",
+      "text": "Generic zone name \"Analyzers 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "analyzers-3",
+      "text": "High coupling (0.73) — 13 imports target \"analyzers\"",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "analyzers-3",
+      "text": "Low cohesion (0.27) — files are loosely related, consider splitting this zone",
+      "severity": "warning"
+    },
+    {
+      "type": "observation",
+      "pass": 0,
+      "scope": "e2e",
+      "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
-      "scope": "file-analyzer-implementations",
-      "text": "High coupling (0.52) — 15 imports target \"analysis-engine\"",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "file-analyzer-implementations",
-      "text": "Heavy inbound imports from cli (5) and e2e (3) zones indicate these analyzers are a key dependency surface — their public APIs should be kept stable and well-documented.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "file-analyzer-implementations",
-      "text": "Zone cohesion (0.48) and coupling (0.52) are moderate; the zone is a natural grouping of concrete analyzer services but would benefit from extracting route-detection into its own zone given its distinct domain.",
+      "scope": "fixtures",
+      "text": "High cohesion (1) — files are tightly interconnected",
       "severity": "info"
     },
     {
       "type": "observation",
       "pass": 0,
       "scope": "global",
-      "text": "Bidirectional coupling: \"analysis-engine\" ↔ \"branch-workspace-reporting\" (5+29 crossings) — consider extracting shared interface",
+      "text": "Bidirectional coupling: \"analyzers\" ↔ \"unit\" (5+29 crossings) — consider extracting shared interface",
       "severity": "warning"
     },
     {
@@ -1507,6 +1564,13 @@
     },
     {
       "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "src/util/paths.ts (finding 29: 89% import neighbors in src/analyzers/) lives in src/util/ which is the correct structural location for a cross-cutting utility. The high neighbor affinity to src/analyzers/ is an artifact of the current zone over-segmentation — once analyzers-2 and analyzers-3 merge, the neighbor distribution will shift and this move-file suggestion may become moot. Defer evaluation until after the zone merge is complete, consistent with global finding 32.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
       "pass": 0,
       "scope": "global",
       "text": "Fan-in hotspot: src/cli/output.ts receives calls from 13 files (high fan-in expected for this module type) — high-impact module, changes may have wide ripple effects",
@@ -1521,211 +1585,78 @@
     {
       "type": "observation",
       "pass": 0,
-      "scope": "project-root",
+      "scope": "root",
       "text": "Isolated files — no import edges between 9 files, cohesion is unmeasurable (reported as 0)",
       "severity": "info"
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "project-root",
-      "text": "Image assets mixed with markdown and build config files is a minor organization concern; a dedicated assets/ or docs/ directory would improve navigability.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "project-root",
-      "text": "Zero cohesion and coupling are expected for a root config zone; no structural changes needed.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
       "pass": 0,
-      "scope": "schema-validation",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "schema-validation",
-      "text": "The production file src/schema/validate.ts is co-located with e2e and integration tests, suggesting it is only exercised at the pipeline level — verify it is also called during the core analysis flow to avoid silent validation gaps.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "schema-validation",
-      "text": "Zero coupling to other zones is architecturally clean for a validation module; this makes schema validation portable and easy to test in isolation.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "test-fixtures",
-      "text": "High cohesion (1) — files are tightly interconnected",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "test-fixtures",
-      "text": "All 11 files are test fixtures with no production code — the zone is cleanly isolated and serves as stable input data for the test suite.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "test-fixtures",
-      "text": "The Remix fixture covers route-detection scenarios specifically; ensure it stays synchronized with supported Remix conventions as the route-detection analyzer evolves.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "zone-detection-engine",
-      "text": "High coupling (0.73) — 13 imports target \"analysis-engine\"",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 0,
-      "scope": "zone-detection-engine",
-      "text": "Low cohesion (0.27) — files are loosely related, consider splitting this zone",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "zone-detection-engine",
-      "text": "Cohesion of 0.27 is below the 0.4 threshold — the three production files (louvain.ts, zone-hash.ts, zones.ts) may not be tightly enough related to warrant their own zone; merging with the 'Analysis Engine' zone should be evaluated.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "zone-detection-engine",
-      "text": "Coupling of 0.73 exceeds the 0.6 warning threshold, indicating heavy dependency on other zones; the zone-detection logic is not self-contained and relies significantly on the broader analysis infrastructure.",
+      "scope": "unit",
+      "text": "High coupling (0.6) — 29 imports target \"analyzers\"",
       "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "analysis-engine",
-      "text": "Zone \"analysis-engine\" has files across 9 directories — consider consolidating under a dedicated directory",
+      "scope": "analyzers",
+      "text": "Zone \"analyzers\" has files across 9 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
       "type": "suggestion",
-      "pass": 4,
-      "scope": "analysis-engine",
-      "text": "Zone name 'analysis-engine' does not match its source directory 'src/analyzers/' — align them by either renaming the zone to 'analyzers-core' or restructuring source files under 'src/analysis-engine/' so IDE navigation, zone references in documentation, and Louvain clustering inputs are all consistent.",
-      "severity": "info"
+      "pass": 5,
+      "scope": "analyzers",
+      "text": "After merging analyzers-2 and analyzers-3, create src/analyzers/zone-public.ts as a zero-logic re-export boundary: enumerate the symbols from zones.ts that the 4 importing zones actually use, re-export only those, and update all external import sites to reference zone-public.ts instead of zones.ts directly. This is the only prerequisite before any decomposition of the generateStructuralInsights god function. Confirm via grep that no external zone retains a direct import of zones.ts after the change.",
+      "severity": "warning"
     },
     {
       "type": "suggestion",
-      "pass": 4,
-      "scope": "analysis-engine",
-      "text": "claude-client.ts provides direct LLM API access from within the core computation zone with no interface abstraction — extract an ILLMClient interface and inject it as a dependency so unit tests can substitute a stub and the analysis engine zone no longer carries an implicit external network dependency.",
+      "pass": 5,
+      "scope": "analyzers",
+      "text": "Create src/analyzers/zone-public.ts that re-exports only the intended cross-zone API surface of src/analyzers/zones.ts. This is the highest-ROI single change: zones.ts is imported by 4 zones (finding 1) and all 77 cross-zone edges are concrete-to-concrete with no interface layer (finding 6). Adding one re-export boundary here validates the zone-public.ts pattern before applying it elsewhere and immediately narrows the blast radius of any zones.ts API change.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "analyzers",
+      "text": "Create src/analyzers/zone-public.ts that re-exports only the symbols from zones.ts consumed by external zones. This is a zero-logic change (re-exports only, no new logic) that narrows the blast radius of any zones.ts change. Do this before any decomposition of analyzeZones. Confirm the 4 importing zones reference zone-public.ts after the change.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "analyzers",
+      "text": "Introduce src/analyzers/zone-public.ts as a re-export boundary for zones.ts before attempting to decompose analyzeZones. Three independent signals converge on this file (god function 32 calls, hub 4-zone import, primary coupling target), making any direct edit to zones.ts a high blast-radius operation. The re-export boundary is a zero-logic change that narrows the API surface and enables safe incremental decomposition later.",
       "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "analyze-pipeline-cli",
-      "text": "Zone \"analyze-pipeline-cli\" has files across 7 directories — consider consolidating under a dedicated directory",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "analyze-pipeline-cli",
-      "text": "convergence.ts is a stateless pure-function algorithm placed inside the CLI orchestration zone — move it to the analysis-engine zone or a shared foundation module so its logic is reachable without a CLI layer dependency, and the CLI zone's semantic boundary remains limited to command orchestration.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "analyze-pipeline-cli",
-      "text": "export-pdf.ts and git-credential-helper.ts have no relationship to the analyze pipeline lifecycle — their presence violates the zone's stated semantic scope; move them to an 'ancillary-cli-commands' zone or equivalent to preserve the zone's architectural focus and prevent the 'analyze-pipeline' name from becoming misleading.",
+      "scope": "cli",
+      "text": "Zone \"cli\" has files across 7 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "branch-workspace-reporting",
-      "text": "Zone \"branch-workspace-reporting\" has files across 10 directories — consider consolidating under a dedicated directory",
+      "scope": "fixtures",
+      "text": "Zone \"fixtures\" has files across 5 directories — consider consolidating under a dedicated directory",
       "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "branch-workspace-reporting",
-      "text": "This zone has BOTH high coupling (0.6) AND low cohesion (0.4) — the only zone in this batch to exhibit both simultaneously. Prioritize splitting: move src/public.ts and schema types to a dedicated zone, and move branch-work utilities to a 'branch-risk-analysis' zone, to break the fragile catch-all structure before further features are added.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "branch-workspace-reporting",
-      "text": "src/public.ts co-located with branch-workspace internals forces every package consumer to transitively couple to this high-coupling zone — extract public.ts to its own dedicated zone (e.g. 'package-public-api') so the public API surface is independent of the branch reporting internals and can be changed without affecting branch-workspace coupling metrics.",
-      "severity": "warning"
     },
     {
       "type": "suggestion",
       "pass": 0,
       "scope": "global",
-      "text": "src/analyzers/ contains files from 5 zones (analysis-engine, analyze-pipeline-cli, branch-workspace-reporting, file-analyzer-implementations, zone-detection-engine) — consider grouping into subdirectories to clarify architectural boundaries",
+      "text": "src/analyzers/ contains files from 5 zones (analyzers, analyzers-2, analyzers-3, cli, unit) — consider grouping into subdirectories to clarify architectural boundaries",
       "severity": "info"
     },
     {
       "type": "suggestion",
-      "pass": 4,
+      "pass": 5,
       "scope": "global",
-      "text": "Adopt a consistent zone naming convention — current names mix action-noun ('analyze-pipeline-cli'), adjective-compound-noun ('branch-workspace-reporting'), and noun-noun ('analysis-engine') patterns; standardizing on a single schema (e.g. '<domain>-<architectural-role>') would make zone roles immediately readable from name alone.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "All 77 cross-zone import edges connect concrete files with no interface layer — introduce at least one explicit contract boundary (a types-only or interface-only module) at the analysis-engine zone boundary to validate that the pattern is feasible before attempting to apply it to all zones. This single change would demonstrate the pattern and immediately reduce the blast radius of any analysis-engine API change.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Define a project-wide policy for test file zone membership: either tests always co-locate with their production zone or tests always live in dedicated test zones — the current mixed state (e2e/fixtures zones isolated, branch-workspace-reporting mixed) makes cohesion and coupling scores incomparable across zones and masks production-only coupling.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Establish and document a zone naming convention before the next analysis pass — proposed convention: '{domain}-{role}' where role is one of: engine (autonomous, low coupling), service (concrete impl), pipeline (orchestration), foundation (shared utilities), fixtures (test data). Applying this convention retroactively would make zone health metrics (especially coupling scores) interpretable without reading zone file contents.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Introduce an intra-package zone interface convention analogous to the cross-package gateway pattern: each zone exposes a zone-public.ts that re-exports only its intended cross-zone API, with a lint rule or test enforcing that external zones import only from zone-public.ts rather than from internal implementation files.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "Rename auto-generated zones 'analyzers-2' and 'analyzers-3' to semantically meaningful names reflecting their domain (e.g. 'file-classifier-engine', 'zone-graph-detector') — numeric-suffix names prevent zone-based architectural communication and make it impossible to reference these zones in documentation or discussions without ambiguity.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "global",
-      "text": "The codebase has no zone with coupling < 0.3 and cohesion > 0.7 among production zones (only test zones achieve clean scores) — this indicates that no production zone has yet been refactored to a stable, well-bounded state. The target architectural state should include at least one reference zone with clean metrics that other zones can emulate.",
+      "text": "The correct remediation sequence for the analyzers zone cluster is: (1) merge analyzers-2 and analyzers-3 into analyzers in the zone config; (2) create src/analyzers/zone-public.ts re-exporting only the external-facing API of zones.ts; (3) update all 4 importing zones to reference zone-public.ts; (4) only then consider decomposing generateStructuralInsights in zones.ts, guided by the three existing test files (zone-detection, zone-size-policy, zone-subdivision) as natural sub-module boundaries. Steps 1 and 2 are zero-risk. Step 4 carries moderate refactoring risk and should not be attempted before steps 1–3 are complete.",
       "severity": "warning"
     },
     {
@@ -1744,42 +1675,8 @@
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "global",
-      "text": "Potentially unused export: detectBranchLifecycle in src/analyzers/branch-work-filter.ts has no incoming calls — verify if still needed",
-      "severity": "info",
-      "related": [
-        "src/analyzers/branch-work-filter.ts"
-      ]
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "global",
-      "text": "Potentially unused export: resolveWorkedEpicTitlesForRange in src/cli/commands/prd-epic-resolver.ts has no incoming calls — verify if still needed",
-      "severity": "info",
-      "related": [
-        "src/cli/commands/prd-epic-resolver.ts"
-      ]
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "test-fixtures",
-      "text": "Zone \"test-fixtures\" has files across 5 directories — consider consolidating under a dedicated directory",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "test-fixtures",
-      "text": "Add a fixture-to-analyzer coverage matrix (even as a comment in tests/fixtures/index.ts) mapping each fixture to the analyzers it exercises — currently there is no documented link between fixture files and the analyzer features they cover, making it unclear when adding a new analyzer feature whether a new fixture is needed.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "test-fixtures",
-      "text": "Establish a naming convention that encodes fixture purpose in the directory name (e.g. tests/fixtures/route-detection-remix/, tests/fixtures/import-graph-ts/) rather than relying on implicit knowledge — the current names 'remix-app' and 'small-ts-project' describe technology stack, not the analyzer scenario being exercised.",
+      "scope": "unit",
+      "text": "Zone \"unit\" has files across 10 directories — consider consolidating under a dedicated directory",
       "severity": "info"
     },
     {
@@ -1811,259 +1708,84 @@
       "predictedImpact": 2
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "analyze-pipeline-cli",
-      "text": "Cohesion of 0.65 is the strongest among the non-trivial zones, confirming that the CLI orchestration layer is well-organized around the analyze pipeline lifecycle.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "analyze-pipeline-cli",
-      "text": "Three reverse imports (unit → cli) create a minor cycle between the CLI and branch-workspace-reporting zones; identifying which unit-zone files import from CLI and moving any shared symbols to a lower layer would eliminate the cycle.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "analyze-pipeline-cli",
-      "text": "git-credential-helper.ts and export-pdf.ts are ancillary features within the CLI zone; if they grow in complexity they are good candidates for extraction into dedicated feature zones.",
-      "severity": "info"
-    },
-    {
       "type": "pattern",
-      "pass": 2,
-      "scope": "branch-workspace-reporting",
-      "text": "Production utilities (branch-work-*.ts, risk-scoring.ts) cohabiting with test helpers in the same zone causes the analyze-pipeline-cli zone to transitively depend on test infrastructure through its 13 inbound imports — separating production utilities from test helpers would break this unwanted coupling.",
-      "severity": "warning"
-    },
-    {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "file-analyzer-implementations",
-      "text": "The 15 outbound imports to analysis-engine and 2 inbound form a clean one-directional consumer relationship — no circular dependency exists between these two zones.",
-      "severity": "info"
-    },
-    {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "schema-validation",
-      "text": "validate.ts has zero import edges to or from any production zone; it is only exercised through e2e and integration tests. If the analysis pipeline does not call validate() at the end of each run, malformed output files can reach consumers silently.",
-      "severity": "critical"
-    },
-    {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "test-fixtures",
-      "text": "The two fixture sub-projects (remix-app, small-ts-project) are unrelated datasets with no shared imports; grouping them in one zone is a filesystem artifact. If a third fixture is added, consider a fixtures/index.ts manifest to keep fixture discovery centralized.",
-      "severity": "info"
-    },
-    {
-      "type": "pattern",
-      "pass": 2,
-      "scope": "zone-detection-engine",
-      "text": "Three separate unit test files (zone-detection, zone-size-policy, zone-subdivision) map to distinct sub-domains within two production files — the test surface reveals a hidden split that should be made explicit in source organization before these concerns grow further.",
-      "severity": "warning"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "analysis-engine",
-      "text": "analysis-engine, analyze-pipeline-cli, and branch-workspace-reporting form a triangular circular dependency: analyzers→cli (7), cli→unit (13), unit→analyzers (29), analyzers→unit (5), unit→cli (3), cli→analyzers (20). All three zones are mutually reachable — this is a system-level cycle, not just three isolated pairwise inversions, and cannot be resolved by refactoring any single zone alone.",
-      "severity": "critical"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "analyze-pipeline-cli",
-      "text": "High internal cohesion (0.65) coexists with active participation in circular dependencies — cohesion and external coupling are orthogonal properties; the CLI zone's boundary health requires coupling analysis, not cohesion metrics, to diagnose.",
-      "severity": "info"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "file-analyzer-implementations",
-      "text": "route-detection.ts has no import edges to sibling analyzer files in this zone; it is grouped by filesystem proximity only and should be extracted to a dedicated route-analysis zone once zone boundaries are tightened.",
-      "severity": "warning"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "schema-validation",
-      "text": "The schema-validation zone is correctly isolated from analyzers and cli zones for portability, but the absence of any inbound import from the pipeline entrypoint means validation is opt-in rather than enforced — a single import from the pipeline finalization step would close this gap.",
-      "severity": "warning"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "test-fixtures",
-      "text": "Zero inbound edges from any production zone confirms correct isolation; verify that fixture paths are referenced via a shared constant in test helpers rather than duplicated path strings to reduce coupling to the filesystem layout.",
-      "severity": "info"
-    },
-    {
-      "type": "relationship",
-      "pass": 2,
-      "scope": "zone-detection-engine",
-      "text": "zone-hash.ts has no outbound edges to zones outside zone-detection-engine; if it is only consumed within this zone it is a private module incorrectly treated as a zone boundary and should be marked internal.",
+      "pass": 5,
+      "scope": "global",
+      "text": "The three findings prescribing src/analyzers/zone-public.ts (zone findings 6, 7, 8) are duplicates from three independent LLM analysis sub-passes. They should be collapsed into a single action item. Triple convergence from independent passes on the same concrete zero-logic change is strong corroboration — not a reason to escalate severity, but sufficient to treat the action as confirmed rather than speculative.",
       "severity": "info"
     },
     {
       "type": "anti-pattern",
-      "pass": 3,
-      "scope": "analysis-engine",
-      "text": "Zone exposes 19 concrete implementation files as its API surface with no facade or interface module — consumer zones are forced to import internal files directly, creating maximum blast radius for any internal restructuring.",
+      "pass": 5,
+      "scope": "global",
+      "text": "Two of the three 'analyzers' sub-zones (analyzers-2, analyzers-3) received numeric-suffix auto-generated names. Both are now confirmed Louvain over-segmentation artifacts rather than real architectural zones. The Louvain resolution parameter is calibrated too fine for this directory: all three clusters live in the same filesystem path (src/analyzers/), share the same public API surface (src/analyzers/index.ts), and are logically part of one engine. Consider reducing the Louvain resolution parameter or applying a post-processing merge step for zones where all member files share a common directory prefix and a single barrel export.",
       "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "analysis-engine",
-      "text": "completion-reader.ts explicitly documents itself as a local copy of logic from branch-work-collector.ts — duplicated cross-zone logic with no enforcement mechanism to keep the two in sync; any fix to the original will silently miss the copy.",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "analyze-pipeline-cli",
-      "text": "branch-work-collector.ts and convergence.ts are domain services (not CLI commands) placed in the CLI zone — non-CLI consumers cannot reach these services without taking a transitive dependency on the CLI orchestration layer.",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "analyze-pipeline-cli",
-      "text": "pr-markdown.ts (CLI command) directly imports branch-work-collector.ts from the analyzers path while branch-work-collector lives in the analyze-pipeline-cli zone — the import path and the zone boundary are misaligned, hiding that this is a CLI-to-CLI intra-zone call rather than a CLI-to-domain cross-zone call.",
-      "severity": "info"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "branch-workspace-reporting",
-      "text": "branch-work-collector.ts is the canonical owner of parsing logic that has already been duplicated into analysis-engine/completion-reader.ts — hosting authoritative domain logic in a high-coupling catch-all zone creates pressure to fork rather than import, accelerating divergence.",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "file-analyzer-implementations",
-      "text": "src/util/paths.ts is a utility misclassified into the analyzer-implementations zone by import affinity. As a cross-cutting utility imported by multiple zones, it belongs in a dedicated foundation or utility zone alongside sort.ts and schema/index.ts — the three hub utilities should share an owner zone.",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "schema-validation",
-      "text": "E2e and integration test files are co-located in the same Louvain community because both import validate.ts — CI parallelism and test reporting depend on these tiers being separately categorized. Mixing them in one zone obscures which test tier caught a regression.",
-      "severity": "info"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "schema-validation",
-      "text": "Zone contains 1 production file and 4 test files (80% test) — the zone boundary is a test-grouping artifact, not a domain boundary. The single production file (validate.ts) has no identity as a 'zone' and should be absorbed into a shared schema or foundation zone where it can be imported by the pipeline.",
-      "severity": "warning"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "test-fixtures",
-      "text": "Fixture paths are consumed as string literals scattered across test files in multiple zones rather than through a centralized fixture registry or path-constants module. A single tests/fixtures/index.ts exporting named fixture paths would make relocation atomic and prevent path drift.",
-      "severity": "info"
-    },
-    {
-      "type": "anti-pattern",
-      "pass": 3,
-      "scope": "zone-detection-engine",
-      "text": "zones.ts is exercised by three separate unit test files each covering a distinct algorithmic concern (detection, size policy, subdivision) — this indicates zones.ts has at least three separate responsibilities. Splitting it into zones-detect.ts, zones-size-policy.ts, and zones-subdivide.ts would align source organization with the already-expressed test structure and improve zone cohesion from 0.27.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "file-analyzer-implementations",
-      "text": "Rename the zone from 'file-analyzer-implementations' to 'file-analyzers' or 'analyzer-services' — the 'implementations' suffix implies a corresponding interface layer that does not exist, creating a misleading architectural signal for anyone onboarding to the codebase.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "file-analyzer-implementations",
-      "text": "src/analyzers/index.ts (entrypoint archetype) belongs in the analysis-engine zone that owns the public API, not the implementations zone — relocating it would give the public API surface a clear owner and prevent the entrypoint from being refactored as if it were a private implementation detail.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "schema-validation",
-      "text": "Absorb validate.ts into a shared 'schema' or 'foundation' zone alongside schema/index.ts so the production file gains a meaningful owner zone, and move the e2e/integration tests back to their respective test-tier zones — this eliminates the misleading zone name and fixes the mixed-tier test co-location in one step.",
-      "severity": "warning"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "schema-validation",
-      "text": "Cohesion=1.0 for a single-file production zone is a degenerate metric, not an architectural achievement — sourcevision should suppress or annotate cohesion scores for zones with fewer than 3 production files to prevent false confidence in zone health.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "zone-detection-engine",
-      "text": "Rename the zone to 'zone-detection' or 'louvain-clustering' to accurately reflect its dependent sub-module role — 'engine' implies autonomy that the coupling metrics explicitly contradict, and the misleading name may cause developers to treat it as a stable boundary when it is not.",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 4,
-      "scope": "zone-detection-engine",
-      "text": "zone-detection-engine has both low cohesion (0.27) and high coupling (0.73) — this is the highest-fragility zone in the codebase. Any refactor of the analysis-engine zone will cascade here. Prioritize merging louvain.ts and zone-hash.ts into the analysis-engine zone or extracting them into a named sub-package before any broader architectural work begins.",
-      "severity": "critical"
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
-      "scope": "zone-detection-engine",
-      "text": "Zone \"Zone Detection Engine\" (zone-detection-engine) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention",
-      "severity": "critical"
     },
     {
       "type": "anti-pattern",
       "pass": 0,
       "scope": "global",
-      "text": "God function: analyzeZones in src/analyzers/zones.ts calls 32 unique functions — consider decomposing into smaller, focused functions",
+      "text": "God function: cmdAnalyze in src/cli/commands/analyze.ts calls 32 unique functions — consider decomposing into smaller, focused functions",
       "severity": "warning",
       "related": [
-        "src/analyzers/zones.ts"
+        "src/cli/commands/analyze.ts"
       ]
     },
     {
       "type": "suggestion",
+      "pass": 5,
+      "scope": "analyzers-2",
+      "text": "Merge analyzers-2 into the main analyzers zone. The 11 files (callgraph.ts, components.ts, imports.ts, inventory.ts, route-detection.ts, index.ts, paths.ts, and 4 unit tests) all reside in src/analyzers/ and tests/unit/analyzers/ and are logically part of the same analysis engine. The zone boundary is a Louvain artifact caused by zones.ts acting as a hub — the algorithm clustered hub-adjacent files into a satellite zone. After merge: move src/util/paths.ts to src/util/ (it already lives there; remove it from this zone membership) and verify src/analyzers/index.ts is the sole public entry point for the merged zone.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "analyzers-2",
+      "text": "Rename 'analyzers-2' to a semantically meaningful name by inspecting its file contents and choosing a name following the '{domain}-{role}' convention (finding 8). Numeric-suffix auto-generated names make this zone unreferenceable in architecture discussions and prevent meaningful cohesion/coupling comparisons across passes.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "analyzers-3",
+      "text": "Merge analyzers-3 into the main analyzers zone rather than renaming or splitting it. The three production files (zones.ts, louvain.ts, zone-hash.ts) are the zone-detection subsystem of the same analysis engine. After merge, the zones.ts decomposition task becomes tractable: the three test files (zone-detection.test.ts, zone-size-policy.test.ts, zone-subdivision.test.ts) already map to three internal sub-concerns (detection, size constraints, subdivision) that can guide extraction of focused modules from zones.ts when the god-function metric warrants it (currently 32 calls, 2x above any reasonable threshold). Do not decompose zones.ts before the zone-public.ts re-export boundary is in place.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
       "pass": 0,
-      "scope": "claude-tool-config",
-      "text": "Zone \"Claude Tool Config\" (claude-tool-config) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
+      "scope": "analyzers-3",
+      "text": "Zone \"Analyzers 3\" (analyzers-3) has catastrophic risk (score: 0.73, cohesion: 0.27, coupling: 0.73) — requires immediate architectural intervention",
+      "severity": "critical"
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": ".claude",
+      "text": "Zone \".claude\" (.claude) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
       "severity": "info"
     },
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "project-root",
-      "text": "Zone \"Project Root\" (project-root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
+      "scope": "root",
+      "text": "Zone \"Root\" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
       "severity": "info"
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 9,
+  "metaEvaluationCount": 13,
   "structureHash": "860a06fbfef4c341",
   "zoneContentHashes": {
-    "claude-tool-config": "ae7d308f88d1a243",
-    "project-root": "87975079cba21f87",
-    "analysis-engine": "825ef741e4cf134c",
-    "branch-workspace-reporting": "e3df2f9d6b3437a8",
-    "analyze-pipeline-cli": "0ae7bd43b5462fd9",
-    "file-analyzer-implementations": "da36c8f03ebb11ae",
-    "zone-detection-engine": "bc2c387d3aff9ecb",
-    "schema-validation": "8f0966c928fd9294",
-    "test-fixtures": "365918b33dddecc2"
+    ".claude": "ae7d308f88d1a243",
+    "root": "5767fa2c09001517",
+    "analyzers": "825ef741e4cf134c",
+    "unit": "d00c910991ae20e6",
+    "cli": "955b330573ea8943",
+    "analyzers-2": "da36c8f03ebb11ae",
+    "analyzers-3": "1561a2aec16c4b9e",
+    "e2e": "8f0966c928fd9294",
+    "fixtures": "365918b33dddecc2"
   }
 }

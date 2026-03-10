@@ -518,7 +518,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Creates Claude API clients with retry logic — a service layer abstraction over the Anthropic SDK.",
+          "detail": "Creates and returns a Claude API client with retry logic and error handling — a service layer wrapping an external API.",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared authentication detection, validation, and diagnostic utilities used across providers.",
+          "detail": "Authentication detection/validation utilities with no framework coupling — pure helper functions for checking auth availability.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Creates Claude clients via CLI process spawning — a service layer provider implementation.",
+          "detail": "Creates a Claude client by spawning the CLI binary — a service layer adapter over an external process.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Creates Codex clients via CLI process spawning — a service layer provider implementation.",
+          "detail": "Creates a Codex client via subprocess execution — another service adapter for an external LLM backend.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Factory that selects and instantiates the appropriate Claude provider based on available credentials.",
+          "detail": "Factory that auto-selects between API and CLI providers — orchestration/factory logic for the service layer.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Centralized process execution abstraction (fire-and-collect, spawn-and-delegate, ProcessPool) — shared infrastructure utility.",
+          "detail": "Centralized process execution abstraction with high fan-in expected across the package — shared infrastructure utility.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Reusable CLI help formatting and color utilities with NO_COLOR/FORCE_COLOR support.",
+          "detail": "Pure formatting utilities for CLI help text with no side effects — shared helper module.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Single-purpose deterministic JSON serialization utility for config and run records.",
+          "detail": "Single-function canonical JSON serializer — a pure utility with expected high fan-in.",
           "weight": 0.7
         }
       ]
@@ -644,7 +644,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Top-level vendor-neutral client factory — orchestrates provider selection across Claude and Codex vendors.",
+          "detail": "Vendor-neutral client factory dispatching to Claude/Codex backends — top-level service orchestration.",
           "weight": 0.7
         }
       ]
@@ -658,7 +658,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Loads vendor-neutral LLM configuration from .n-dx.json with legacy fallback — configuration module.",
+          "detail": "Loads vendor-neutral LLM configuration from disk with fallback handling — a config loading module.",
           "weight": 0.7
         }
       ]
@@ -672,7 +672,7 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Vendor-neutral type definitions and enums (LLMConfig, LLMVendor, CodexConfig) — pure types, no logic.",
+          "detail": "Vendor-neutral type definitions and interfaces with no implementation logic — pure types/constants companion file.",
           "weight": 0.7
         }
       ]
@@ -700,7 +700,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Loads and deep-merges project-level .n-dx.json overrides into package configs — shared config utility.",
+          "detail": "Deep-merge and config override utilities for project-level settings — shared infrastructure helpers.",
           "weight": 0.7
         }
       ]
@@ -714,7 +714,7 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Exports canonical dot-directory name constants as single source of truth — constants only, no logic.",
+          "detail": "Single constant object of canonical directory names — pure constants with no logic.",
           "weight": 0.7
         }
       ]
@@ -728,7 +728,7 @@
         {
           "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Defines the generic LLMProvider interface, ProviderInfo, and StreamChunk — pure type/interface definitions.",
+          "detail": "Generic LLM provider interface, vendor type, and capability types — pure type definitions with no implementation.",
           "weight": 0.7
         }
       ]
@@ -742,7 +742,7 @@
         {
           "archetypeId": "store",
           "signalKind": "path",
-          "detail": "Registry for dynamic vendor registration with config-driven provider selection — high fan-in store of provider instances.",
+          "detail": "Dynamic provider registration system with a singleton registry — stateful store of provider factories with high fan-in expected.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Session-based provider lifecycle management supporting vendor switching and instance reuse.",
+          "detail": "Session-based provider management with vendor switching — stateful service managing active provider lifecycle.",
           "weight": 0.7
         }
       ]
@@ -784,7 +784,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Levenshtein-distance typo correction utility for CLI command suggestions.",
+          "detail": "Levenshtein-based typo correction helpers — pure shared utility functions.",
           "weight": 0.7
         }
       ]
@@ -798,7 +798,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Parses token usage from multiple API/CLI formats into a unified TokenUsage shape — pure transformation utility.",
+          "detail": "Token usage parsing functions for different API response formats — shared utility with no side effects.",
           "weight": 0.7
         }
       ]

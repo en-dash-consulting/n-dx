@@ -5,30 +5,35 @@
 <zone>
 
 Zone: Unit Analyze/unit Analyze (`unit-analyze/unit-analyze`)
-Files: 5, Cohesion: 0.18, Coupling: 0.82
-Description: 5 files, primarily TypeScript
-Entry points: src/analyze/dedupe.ts, src/analyze/scanners.ts
-Lines: 3289
+Files: 7, Cohesion: 0.17, Coupling: 0.83
+Description: 7 files, primarily TypeScript
+Entry points: src/analyze/consolidation-guard.ts, src/analyze/decompose.ts, src/analyze/propose.ts
+Lines: 2423
 
 </zone>
 
 <files>
 
-src/analyze/dedupe.ts (TypeScript, 373 lines, source)
-src/analyze/scanners.ts (TypeScript, 958 lines, source)
-tests/unit/analyze/dedupe.test.ts (TypeScript, 404 lines, test)
-tests/unit/analyze/propose.test.ts (TypeScript, 355 lines, test)
-tests/unit/analyze/scanners.test.ts (TypeScript, 1199 lines, test)
+src/analyze/consolidation-guard.ts (TypeScript, 184 lines, source)
+src/analyze/decompose.ts (TypeScript, 335 lines, source)
+src/analyze/propose.ts (TypeScript, 360 lines, source)
+tests/unit/analyze/consolidation-guard.test.ts (TypeScript, 238 lines, test)
+tests/unit/analyze/decompose.test.ts (TypeScript, 505 lines, test)
+tests/unit/analyze/modify-reason.test.ts (TypeScript, 605 lines, test)
+tests/unit/cli/commands/analyze-guided.test.ts (TypeScript, 196 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  src/analyze/dedupe.ts → src/analyze/scanners.ts {ScanResult}
-  tests/unit/analyze/dedupe.test.ts → src/analyze/dedupe.ts {similarity, deduplicateScanResults}
-  tests/unit/analyze/dedupe.test.ts → src/analyze/scanners.ts {ScanResult}
-  tests/unit/analyze/propose.test.ts → src/analyze/scanners.ts {ScanResult}
-  tests/unit/analyze/scanners.test.ts → src/analyze/scanners.ts {scanTests, scanDocs, scanSourceVision, scanPackageJson}
+  src/analyze/consolidation-guard.ts → src/analyze/propose.ts {Proposal}
+  src/analyze/decompose.ts → src/analyze/propose.ts {Proposal, ProposalTask, ProposalFeature}
+  tests/unit/analyze/consolidation-guard.test.ts → src/analyze/consolidation-guard.ts {countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard}
+  tests/unit/analyze/consolidation-guard.test.ts → src/analyze/propose.ts {Proposal, ProposalTask}
+  tests/unit/analyze/decompose.test.ts → src/analyze/decompose.ts {buildDecompositionPrompt, parseDecompositionResponse, applyDecompositionPass}
+  tests/unit/analyze/decompose.test.ts → src/analyze/propose.ts {ProposalTask, Proposal}
+  tests/unit/analyze/modify-reason.test.ts → src/analyze/propose.ts {Proposal}
+  tests/unit/cli/commands/analyze-guided.test.ts → src/analyze/propose.ts {Proposal}
 
 </imports>

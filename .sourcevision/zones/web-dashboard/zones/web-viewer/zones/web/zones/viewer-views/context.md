@@ -5,40 +5,29 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer Views (`web-viewer/web-viewer/web/viewer-views`)
-Files: 10, Cohesion: 0.52, Coupling: 0.48
-Description: 10 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/hench-config.ts, packages/web/src/viewer/views/hench-templates.ts, packages/web/src/viewer/views/integration-config.ts, packages/web/src/viewer/views/notion-config.ts, packages/web/src/viewer/views/validation.ts, packages/web/src/viewer/views/workflow-optimization.ts
-Lines: 5202
+Files: 5, Cohesion: 0.31, Coupling: 0.69
+Description: 5 files, primarily TypeScript
+Entry points: packages/web/src/viewer/views/view-registry.ts
+Lines: 244
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/logos.ts (TypeScript, 62 lines, source)
-packages/web/src/viewer/components/notion-schema-wizard.ts (TypeScript, 435 lines, source)
-packages/web/src/viewer/views/feature-toggles.ts (TypeScript, 332 lines, source)
-packages/web/src/viewer/views/hench-config.ts (TypeScript, 674 lines, source)
-packages/web/src/viewer/views/hench-templates.ts (TypeScript, 422 lines, source)
-packages/web/src/viewer/views/integration-config.ts (TypeScript, 796 lines, source)
-packages/web/src/viewer/views/notion-config.ts (TypeScript, 567 lines, source)
-packages/web/src/viewer/views/validation.ts (TypeScript, 819 lines, source)
-packages/web/src/viewer/views/workflow-optimization.ts (TypeScript, 598 lines, source)
-packages/web/tests/unit/viewer/hench-config.test.ts (TypeScript, 497 lines, test)
+packages/web/src/viewer/views/domain-hench.ts (TypeScript, 14 lines, source)
+packages/web/src/viewer/views/domain-rex.ts (TypeScript, 18 lines, source)
+packages/web/src/viewer/views/domain-settings.ts (TypeScript, 13 lines, source)
+packages/web/src/viewer/views/domain-sourcevision.ts (TypeScript, 22 lines, source)
+packages/web/src/viewer/views/view-registry.ts (TypeScript, 177 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/views/feature-toggles.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng}
-  packages/web/src/viewer/views/hench-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/hench-templates.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/integration-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/notion-schema-wizard.ts {NotionSchemaWizard}
-  packages/web/src/viewer/views/validation.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/workflow-optimization.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/tests/unit/viewer/hench-config.test.ts → packages/web/src/viewer/views/hench-config.ts {HenchConfigView, formatDisplayValue, coerceFieldValue, validateField, getPreviewImpact}
-  packages/web/tests/unit/viewer/hench-config.test.ts → packages/web/src/viewer/views/hench-config.ts {ConfigField}
+  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-hench.ts {HenchRunsView, HenchConfigView, HenchTemplatesView}
+  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-rex.ts {PRDView, RexDashboard, TokenUsageView, ValidationView, TaskAuditView, WorkflowOptimizationView}
+  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-settings.ts {NotionConfigView, IntegrationConfigView, FeatureTogglesView}
+  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-sourcevision.ts {Overview, Graph, ZonesView, FilesView, ArchitectureView, ProblemsView, SuggestionsView, PRMarkdownView, RoutesView, AnalysisView}
 
 </imports>

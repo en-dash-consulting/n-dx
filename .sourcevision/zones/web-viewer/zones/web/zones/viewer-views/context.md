@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web/viewer Views (`web-viewer/web/viewer-views`)
-Files: 48, Cohesion: 0.70, Coupling: 0.30
-Description: 48 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/views/enrichment-thresholds.ts
-Lines: 12774
+Files: 45, Cohesion: 0.69, Coupling: 0.31
+Description: 45 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/types.ts
+Lines: 12646
 
 </zone>
 
@@ -39,7 +39,6 @@ packages/web/src/viewer/views/domain-hench.ts (TypeScript, 14 lines, source)
 packages/web/src/viewer/views/domain-rex.ts (TypeScript, 18 lines, source)
 packages/web/src/viewer/views/domain-settings.ts (TypeScript, 13 lines, source)
 packages/web/src/viewer/views/domain-sourcevision.ts (TypeScript, 22 lines, source)
-packages/web/src/viewer/views/enrichment-thresholds.ts (TypeScript, 11 lines, source)
 packages/web/src/viewer/views/feature-toggles.ts (TypeScript, 332 lines, source)
 packages/web/src/viewer/views/files.ts (TypeScript, 278 lines, source)
 packages/web/src/viewer/views/hench-config.ts (TypeScript, 674 lines, source)
@@ -47,8 +46,6 @@ packages/web/src/viewer/views/hench-templates.ts (TypeScript, 422 lines, source)
 packages/web/src/viewer/views/integration-config.ts (TypeScript, 796 lines, source)
 packages/web/src/viewer/views/notion-config.ts (TypeScript, 567 lines, source)
 packages/web/src/viewer/views/rex-dashboard.ts (TypeScript, 640 lines, source)
-packages/web/src/viewer/views/sourcevision-tabs.ts (TypeScript, 35 lines, source)
-packages/web/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
 packages/web/src/viewer/views/validation.ts (TypeScript, 819 lines, source)
 packages/web/src/viewer/views/view-registry.ts (TypeScript, 177 lines, source)
 packages/web/src/viewer/views/workflow-optimization.ts (TypeScript, 598 lines, source)
@@ -78,7 +75,6 @@ Internal:
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng, ProductLogoPng}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/types.ts {ViewId}
-  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SOURCEVISION_TABS}
   packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/loader.ts {loadModules, loadFromFiles, detectMode, onDataChange, clearOnChange, startPolling, stopPolling}
   packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/hooks/use-route-state.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
@@ -100,7 +96,6 @@ Internal:
   packages/web/src/viewer/schema-compat.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
-  packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-config.ts {HenchConfigView}
   packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-templates.ts {HenchTemplatesView}
   packages/web/src/viewer/views/domain-rex.ts → packages/web/src/viewer/views/rex-dashboard.ts {RexDashboard}
@@ -111,7 +106,6 @@ Internal:
   packages/web/src/viewer/views/domain-settings.ts → packages/web/src/viewer/views/notion-config.ts {NotionConfigView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/architecture.ts {ArchitectureView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/files.ts {FilesView}
-  packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/suggestions.ts {SuggestionsView}
   packages/web/src/viewer/views/feature-toggles.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
@@ -123,11 +117,6 @@ Internal:
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/prd-tree/reorganize-panel.ts {ReorganizePanel}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
-  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/types.ts {ViewId}
-  packages/web/src/viewer/views/sourcevision-tabs.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/types.ts {LoadedData}
-  packages/web/src/viewer/views/suggestions.ts → packages/web/src/viewer/views/enrichment-thresholds.ts {ENRICHMENT_THRESHOLDS}
   packages/web/src/viewer/views/validation.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/validation.ts → packages/web/src/viewer/types.ts {NavigateTo}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo, DetailItem, LoadedData}
@@ -135,7 +124,6 @@ Internal:
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-rex.ts {PRDView, RexDashboard, TokenUsageView, ValidationView, TaskAuditView, WorkflowOptimizationView}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-settings.ts {NotionConfigView, IntegrationConfigView, FeatureTogglesView}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-sourcevision.ts {Overview, Graph, ZonesView, FilesView, ArchitectureView, ProblemsView, SuggestionsView, PRMarkdownView, RoutesView, AnalysisView}
-  packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/sourcevision-tabs.ts {SOURCEVISION_TAB_IDS}
   packages/web/src/viewer/views/workflow-optimization.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/tests/integration/pr-markdown-tab-parity.test.ts → packages/web/src/viewer/main.ts {*}
   packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/src/viewer/main.ts {*}

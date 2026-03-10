@@ -1,7 +1,7 @@
 {
   "id": "web-viewer/web",
   "name": "Web Viewer/web",
-  "description": "279 files, primarily TypeScript",
+  "description": "280 files, primarily TypeScript",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/public.ts",
@@ -102,6 +102,7 @@
     "packages/web/src/viewer/components/sidebar.ts",
     "packages/web/src/viewer/components/theme-toggle.ts",
     "packages/web/src/viewer/components/zone-slideout.ts",
+    "packages/web/src/viewer/external.ts",
     "packages/web/src/viewer/hooks/use-app-data.ts",
     "packages/web/src/viewer/hooks/use-delete-actions.ts",
     "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
@@ -284,12 +285,12 @@
     "packages/web/tests/unit/viewer/zone-inline-subzones.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/schema/v1.ts",
     "packages/web/src/server/prd-io.ts",
     "packages/web/src/server/rex-gateway.ts",
     "packages/web/src/server/types.ts",
     "packages/web/src/viewer/components/logos.ts",
     "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/external.ts",
     "packages/web/src/viewer/hooks/use-polling.ts",
     "packages/web/src/viewer/performance/index.ts",
     "packages/web/src/viewer/polling/index.ts",
@@ -300,6 +301,6 @@
   ],
   "cohesion": 0.96,
   "coupling": 0.04,
-  "fileCount": 279,
-  "lineCount": 87319
+  "fileCount": 280,
+  "lineCount": 87347
 }

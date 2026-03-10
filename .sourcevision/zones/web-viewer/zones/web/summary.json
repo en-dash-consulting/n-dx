@@ -1,7 +1,7 @@
 {
   "id": "web-viewer/web",
   "name": "Web Viewer/web",
-  "description": "282 files, primarily TypeScript",
+  "description": "279 files, primarily TypeScript",
   "files": [
     "packages/web/src/cli/index.ts",
     "packages/web/src/public.ts",
@@ -153,7 +153,6 @@
     "packages/web/src/viewer/views/domain-rex.ts",
     "packages/web/src/viewer/views/domain-settings.ts",
     "packages/web/src/viewer/views/domain-sourcevision.ts",
-    "packages/web/src/viewer/views/enrichment-thresholds.ts",
     "packages/web/src/viewer/views/feature-toggles.ts",
     "packages/web/src/viewer/views/files.ts",
     "packages/web/src/viewer/views/hench-config.ts",
@@ -166,8 +165,6 @@
     "packages/web/src/viewer/views/problems.ts",
     "packages/web/src/viewer/views/rex-dashboard.ts",
     "packages/web/src/viewer/views/routes.ts",
-    "packages/web/src/viewer/views/sourcevision-tabs.ts",
-    "packages/web/src/viewer/views/suggestions.ts",
     "packages/web/src/viewer/views/validation.ts",
     "packages/web/src/viewer/views/view-registry.ts",
     "packages/web/src/viewer/views/workflow-optimization.ts",
@@ -287,6 +284,7 @@
     "packages/web/tests/unit/viewer/zone-inline-subzones.test.ts"
   ],
   "entryPoints": [
+    "packages/web/src/schema/v1.ts",
     "packages/web/src/server/prd-io.ts",
     "packages/web/src/server/rex-gateway.ts",
     "packages/web/src/server/types.ts",
@@ -302,6 +300,6 @@
   ],
   "cohesion": 0.96,
   "coupling": 0.04,
-  "fileCount": 282,
-  "lineCount": 87431
+  "fileCount": 279,
+  "lineCount": 87319
 }

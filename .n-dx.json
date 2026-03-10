@@ -32,7 +32,8 @@
         "rex-runtime-data": "infrastructure",
         "root-gateway-contracts": "test",
         "root-concurrency-contracts": "test",
-        "web-build-infrastructure": "infrastructure"
+        "web-build-infrastructure": "infrastructure",
+        "mcp-route-layer": "infrastructure"
       },
       "pins": {
         "packages/web/src/viewer/hooks/use-crash-recovery.ts": "web-viewer",
@@ -64,10 +65,10 @@
         "tests/integration/cross-package-contracts.test.js": "root-gateway-contracts",
         "tests/integration/scheduler-startup.test.js": "root-concurrency-contracts",
 
-        "packages/web/src/server/domain-gateway.ts": "web-dashboard",
-        "packages/web/src/server/routes-mcp.ts": "web-dashboard",
-        "packages/web/tests/unit/server/domain-gateway.test.ts": "web-dashboard",
-        "packages/web/tests/unit/server/routes-mcp.test.ts": "web-dashboard",
+        "packages/web/src/server/domain-gateway.ts": "mcp-route-layer",
+        "packages/web/src/server/routes-mcp.ts": "mcp-route-layer",
+        "packages/web/tests/unit/server/domain-gateway.test.ts": "mcp-route-layer",
+        "packages/web/tests/unit/server/routes-mcp.test.ts": "mcp-route-layer",
 
         "packages/web/tests/integration/messaging-stack.test.ts": "cross-package-integration-tests",
         "packages/web/tests/integration/request-dedup.test.ts": "cross-package-integration-tests",
@@ -117,9 +118,10 @@
           "expectedCoupling": 0.73,
           "reason": "Analyzer residual zone created by Louvain community detection. Contains files that bridge multiple analyzer phases. High coupling reflects cross-phase data flow, which is architectural rather than accidental."
         },
-        "sourcevision-mcp-gateway": {
+        "mcp-route-layer": {
+          "expectedCohesion": 0.4,
           "expectedCoupling": 0.6,
-          "reason": "Gateway zone bridging sourcevision MCP routes to web-dashboard. Coupling to web-dashboard is inherent to the gateway pattern — routes-mcp.ts imports server types and rex-gateway.ts. Files are pinned to web-dashboard and will merge on next analysis."
+          "reason": "MCP routing infrastructure — 4 files (domain-gateway.ts, routes-mcp.ts, and their tests) bridging sourcevision MCP to the web server. High coupling is inherent to the gateway pattern; low cohesion reflects the routing vs gateway split."
         },
         "web-ancillary": {
           "expectedCohesion": 0,

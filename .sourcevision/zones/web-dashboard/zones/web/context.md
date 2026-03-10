@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web (`web-viewer/web`)
-Files: 279, Cohesion: 0.96, Coupling: 0.04
-Description: 279 files, primarily TypeScript
-Entry points: packages/web/src/schema/v1.ts, packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 87319
+Files: 280, Cohesion: 0.96, Coupling: 0.04
+Description: 280 files, primarily TypeScript
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/types.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/hooks/use-polling.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
+Lines: 87347
 
 </zone>
 
@@ -113,6 +113,7 @@ packages/web/src/viewer/components/search-overlay.ts (TypeScript, 621 lines, sou
 packages/web/src/viewer/components/sidebar.ts (TypeScript, 434 lines, source)
 packages/web/src/viewer/components/theme-toggle.ts (TypeScript, 36 lines, source)
 packages/web/src/viewer/components/zone-slideout.ts (TypeScript, 303 lines, source)
+packages/web/src/viewer/external.ts (TypeScript, 39 lines, source)
 packages/web/src/viewer/hooks/use-app-data.ts (TypeScript, 186 lines, source)
 packages/web/src/viewer/hooks/use-delete-actions.ts (TypeScript, 176 lines, source)
 packages/web/src/viewer/hooks/use-dom-performance-monitor.ts (TypeScript, 175 lines, source)
@@ -137,7 +138,7 @@ packages/web/src/viewer/hooks/use-subzone-edges.ts (TypeScript, 187 lines, sourc
 packages/web/src/viewer/hooks/use-tab-visibility.ts (TypeScript, 73 lines, source)
 packages/web/src/viewer/hooks/use-toast.ts (TypeScript, 43 lines, source)
 packages/web/src/viewer/hooks/use-zone-drag.ts (TypeScript, 94 lines, source)
-packages/web/src/viewer/loader.ts (TypeScript, 248 lines, source)
+packages/web/src/viewer/loader.ts (TypeScript, 227 lines, source)
 packages/web/src/viewer/main.ts (TypeScript, 198 lines, source)
 packages/web/src/viewer/performance/dom-performance-monitor.ts (TypeScript, 505 lines, source)
 packages/web/src/viewer/performance/dom-update-gate.ts (TypeScript, 353 lines, source)
@@ -150,14 +151,14 @@ packages/web/src/viewer/performance/update-batcher.ts (TypeScript, 188 lines, so
 packages/web/src/viewer/polling/batched-tick-dispatcher.ts (TypeScript, 240 lines, source)
 packages/web/src/viewer/polling/index.ts (TypeScript, 28 lines, source)
 packages/web/src/viewer/polling/polling-manager.ts (TypeScript, 316 lines, source)
-packages/web/src/viewer/polling/polling-restart.ts (TypeScript, 143 lines, source)
+packages/web/src/viewer/polling/polling-restart.ts (TypeScript, 121 lines, source)
 packages/web/src/viewer/polling/polling-state.ts (TypeScript, 398 lines, source)
 packages/web/src/viewer/polling/tab-visibility.ts (TypeScript, 411 lines, source)
 packages/web/src/viewer/polling/tick-visibility-gate.ts (TypeScript, 218 lines, source)
 packages/web/src/viewer/schema-compat.ts (TypeScript, 70 lines, source)
 packages/web/src/viewer/types.ts (TypeScript, 64 lines, source)
 packages/web/src/viewer/utils.ts (TypeScript, 65 lines, source)
-packages/web/src/viewer/validate.ts (TypeScript, 342 lines, source)
+packages/web/src/viewer/validate.ts (TypeScript, 346 lines, source)
 packages/web/src/viewer/views/analysis.ts (TypeScript, 156 lines, source)
 packages/web/src/viewer/views/architecture.ts (TypeScript, 103 lines, source)
 packages/web/src/viewer/views/domain-hench.ts (TypeScript, 14 lines, source)
@@ -180,7 +181,7 @@ packages/web/src/viewer/views/validation.ts (TypeScript, 819 lines, source)
 packages/web/src/viewer/views/view-registry.ts (TypeScript, 177 lines, source)
 packages/web/src/viewer/views/workflow-optimization.ts (TypeScript, 598 lines, source)
 packages/web/src/viewer/views/zone-types.ts (TypeScript, 80 lines, source)
-packages/web/src/viewer/views/zones.ts (TypeScript, 1863 lines, source)
+packages/web/src/viewer/views/zones.ts (TypeScript, 1888 lines, source)
 packages/web/src/viewer/visualization/colors.ts (TypeScript, 44 lines, source)
 packages/web/src/viewer/visualization/flow.ts (TypeScript, 146 lines, source)
 packages/web/src/viewer/visualization/index.ts (TypeScript, 57 lines, source)
@@ -271,7 +272,7 @@ packages/web/tests/unit/viewer/prune-diff-tree.test.ts (TypeScript, 229 lines, t
 packages/web/tests/unit/viewer/refresh-throttle.test.ts (TypeScript, 531 lines, test)
 packages/web/tests/unit/viewer/response-buffer-gate.test.ts (TypeScript, 590 lines, test)
 packages/web/tests/unit/viewer/search-overlay.test.ts (TypeScript, 441 lines, test)
-packages/web/tests/unit/viewer/sidebar.test.ts (TypeScript, 618 lines, test)
+packages/web/tests/unit/viewer/sidebar.test.ts (TypeScript, 621 lines, test)
 packages/web/tests/unit/viewer/smart-add-input.test.ts (TypeScript, 605 lines, test)
 packages/web/tests/unit/viewer/status-filter.test.ts (TypeScript, 257 lines, test)
 packages/web/tests/unit/viewer/status-indicators-memory.test.ts (TypeScript, 297 lines, test)
@@ -456,10 +457,10 @@ Internal:
   packages/web/src/viewer/components/breadcrumb.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
   packages/web/src/viewer/components/constants.ts → packages/web/src/viewer/visualization/colors.ts {ZONE_COLORS}
   packages/web/src/viewer/components/crash-recovery-banner.ts → packages/web/src/viewer/performance/index.ts {SavedNavigationState}
-  packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/schema/v1.ts {Finding}
   packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
   packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
-  packages/web/src/viewer/components/data-display/zone-map.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
+  packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/external.ts {Finding}
+  packages/web/src/viewer/components/data-display/zone-map.ts → packages/web/src/viewer/external.ts {Zone, ZoneCrossing}
   packages/web/src/viewer/components/data-display/zone-map.ts → packages/web/src/viewer/utils.ts {getZoneColorByIndex, basename}
   packages/web/src/viewer/components/degradation-banner.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, DegradableFeature}
   packages/web/src/viewer/components/detail-panel.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail}
@@ -544,18 +545,21 @@ Internal:
   packages/web/src/viewer/components/refresh-queue-status.ts → packages/web/src/viewer/performance/index.ts {MemoryLevel, RefreshQueueState}
   packages/web/src/viewer/components/search-overlay.ts → packages/web/src/viewer/components/prd-tree/levels.ts {getLevelEmoji}
   packages/web/src/viewer/components/search-overlay.ts → packages/web/src/viewer/types.ts {NavigateTo}
-  packages/web/src/viewer/components/sidebar.ts → packages/web/src/schema/v1.ts {Manifest, Zones}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/config-footer.ts {ConfigFooter}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/faq.ts {GlobalFAQ}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng, ProductLogoPng}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/theme-toggle.ts {SidebarThemeToggle}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/external.ts {Manifest, Zones}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
   packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/types.ts {ViewId}
-  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/schema/v1.ts {Zone, ZoneCrossing}
+  packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/external.ts {Zone, ZoneCrossing}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/types.ts {NavigateTo}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/utils.ts {basename}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex}
   packages/web/src/viewer/components/zone-slideout.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
+  packages/web/src/viewer/external.ts → packages/web/src/schema/v1.ts {*}
+  packages/web/src/viewer/external.ts → packages/web/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph, CallEdge, ComponentUsageEdge, ExternalImport, FileEntry, Finding, RouteExportKind, RouteTreeNode, Zone, ZoneCrossing}
+  packages/web/src/viewer/external.ts → packages/web/src/shared/data-files.ts {DATA_FILES, ALL_DATA_FILES}
   packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/loader.ts {loadModules, loadFromFiles, detectMode, onDataChange, clearOnChange, startPolling, stopPolling}
   packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/performance/index.ts {isFeatureDisabled, onDegradationChange}
   packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/types.ts {LoadedData}
@@ -604,13 +608,12 @@ Internal:
   packages/web/src/viewer/hooks/use-tab-visibility.ts → packages/web/src/viewer/polling/tab-visibility.ts {startTabVisibilityMonitor, stopTabVisibilityMonitor, onVisibilityChange, getTabVisibilitySnapshot, getVisibilityCapabilities}
   packages/web/src/viewer/hooks/use-tab-visibility.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilityState, TabVisibilitySnapshot, VisibilityAPICapabilities}
   packages/web/src/viewer/hooks/use-zone-drag.ts → packages/web/src/viewer/hooks/use-pan-zoom.ts {ViewBox}
-  packages/web/src/viewer/loader.ts → packages/web/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph}
-  packages/web/src/viewer/loader.ts → packages/web/src/shared/data-files.ts {DATA_FILES}
+  packages/web/src/viewer/loader.ts → packages/web/src/viewer/external.ts {DATA_FILES}
+  packages/web/src/viewer/loader.ts → packages/web/src/viewer/external.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph}
   packages/web/src/viewer/loader.ts → packages/web/src/viewer/polling/polling-manager.ts {registerPoller, unregisterPoller}
   packages/web/src/viewer/loader.ts → packages/web/src/viewer/schema-compat.ts {migrateData}
   packages/web/src/viewer/loader.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/loader.ts → packages/web/src/viewer/validate.ts {validateManifest, validateInventory, validateImports, validateZones, validateComponents, validateCallGraph}
-  packages/web/src/viewer/main.ts → packages/web/src/shared/data-files.ts {ALL_DATA_FILES}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/bootstrap.ts {bootstrap}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/components/breadcrumb.ts {Breadcrumb}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/components/crash-recovery-banner.ts {CrashRecoveryBanner}
@@ -624,6 +627,7 @@ Internal:
   packages/web/src/viewer/main.ts → packages/web/src/viewer/components/refresh-queue-status.ts {RefreshQueueStatus}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/components/search-overlay.ts {SearchOverlay, useSearchOverlay}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/components/sidebar.ts {Sidebar}
+  packages/web/src/viewer/main.ts → packages/web/src/viewer/external.ts {ALL_DATA_FILES}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/hooks/use-app-data.ts {useAppData}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/hooks/use-graceful-degradation.ts {useGracefulDegradation}
   packages/web/src/viewer/main.ts → packages/web/src/viewer/hooks/use-memory-monitor.ts {useMemoryMonitor}
@@ -662,16 +666,16 @@ Internal:
   packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {onVisibilityChange, isTabVisible}
   packages/web/src/viewer/polling/tick-visibility-gate.ts → packages/web/src/viewer/polling/tab-visibility.ts {TabVisibilitySnapshot}
   packages/web/src/viewer/schema-compat.ts → packages/web/src/viewer/types.ts {LoadedData}
-  packages/web/src/viewer/types.ts → packages/web/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph}
+  packages/web/src/viewer/types.ts → packages/web/src/viewer/external.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex, getZoneColor, buildZoneColorMap}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/flow.ts {buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, buildFlowNodes}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
-  packages/web/src/viewer/validate.ts → packages/web/src/schema/v1.ts {*}
+  packages/web/src/viewer/validate.ts → packages/web/src/viewer/external.ts {V1}
   packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/analyze-panel.ts {AnalyzePanel}
   packages/web/src/viewer/views/analysis.ts → packages/web/src/viewer/components/prd-tree/index.ts {SmartAddInput, BatchImportPanel}
-  packages/web/src/viewer/views/architecture.ts → packages/web/src/schema/v1.ts {Finding}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
+  packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/external.ts {Finding}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/architecture.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/domain-hench.ts → packages/web/src/viewer/views/hench-config.ts {HenchConfigView}
@@ -692,8 +696,8 @@ Internal:
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/routes.ts {RoutesView}
   packages/web/src/viewer/views/domain-sourcevision.ts → packages/web/src/viewer/views/zones.ts {ZonesView}
   packages/web/src/viewer/views/feature-toggles.ts → packages/web/src/viewer/components/logos.ts {NdxLogoPng}
-  packages/web/src/viewer/views/files.ts → packages/web/src/schema/v1.ts {FileEntry}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
+  packages/web/src/viewer/views/files.ts → packages/web/src/viewer/external.ts {FileEntry}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/utils.ts {basename}
   packages/web/src/viewer/views/files.ts → packages/web/src/viewer/visualization/index.ts {buildFileToZoneMap, getZoneColorByIndex}
@@ -702,8 +706,8 @@ Internal:
   packages/web/src/viewer/views/integration-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/notion-schema-wizard.ts {NotionSchemaWizard}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/schema/v1.ts {Zone, Finding}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/external.ts {Zone, Finding}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
@@ -727,8 +731,8 @@ Internal:
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/use-prd-websocket.ts {usePRDWebSocket}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/use-toast.ts {useToast}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/types.ts {DetailItem, NavigateTo}
-  packages/web/src/viewer/views/problems.ts → packages/web/src/schema/v1.ts {Finding}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/external.ts {Finding}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
@@ -738,9 +742,9 @@ Internal:
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
   packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/visualization/index.ts {HealthGauge}
-  packages/web/src/viewer/views/routes.ts → packages/web/src/schema/v1.ts {RouteTreeNode, RouteExportKind, ComponentUsageEdge}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
+  packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/external.ts {RouteTreeNode, RouteExportKind, ComponentUsageEdge}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/types.ts {LoadedData}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeView, CollapsibleSection, BarChart}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/visualization/index.ts {TreeNode}
@@ -753,10 +757,10 @@ Internal:
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-settings.ts {NotionConfigView, IntegrationConfigView, FeatureTogglesView}
   packages/web/src/viewer/views/view-registry.ts → packages/web/src/viewer/views/domain-sourcevision.ts {Overview, Graph, ZonesView, FilesView, ArchitectureView, ProblemsView, SuggestionsView, PRMarkdownView, RoutesView, AnalysisView}
   packages/web/src/viewer/views/workflow-optimization.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/zones.ts → packages/web/src/schema/v1.ts {CallGraph, Zone, ZoneCrossing}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/components/zone-slideout.ts {ZoneSlideout}
+  packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/external.ts {CallGraph, Zone, ZoneCrossing}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-file-edges.ts {useFileEdges}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-pan-zoom.ts {usePanZoom}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/hooks/use-subzone-edges.ts {useSubZoneEdges}
@@ -765,8 +769,8 @@ Internal:
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/utils.ts {basename}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, FileInfo, ZoneBreadcrumb, ExpandedSubZones}
   packages/web/src/viewer/views/zones.ts → packages/web/src/viewer/visualization/index.ts {CollapsibleSection, buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, getZoneColorByIndex}
-  packages/web/src/viewer/visualization/colors.ts → packages/web/src/schema/v1.ts {Zones}
-  packages/web/src/viewer/visualization/flow.ts → packages/web/src/schema/v1.ts {Zones, CallEdge, ExternalImport}
+  packages/web/src/viewer/visualization/colors.ts → packages/web/src/viewer/external.ts {Zones}
+  packages/web/src/viewer/visualization/flow.ts → packages/web/src/viewer/external.ts {Zones, CallEdge, ExternalImport}
   packages/web/src/viewer/visualization/flow.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex}
   packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
   packages/web/src/viewer/visualization/index.ts → packages/web/src/viewer/components/data-display/findings-list.ts {FindingsList}
@@ -1014,23 +1018,20 @@ Internal:
 
 Cross-dependencies between sub-zones:
   web-viewer/web/server → web-viewer/web/viewer-views: 1
-  web-viewer/web/unit → web-viewer/web/viewer-2: 1
+  web-viewer/web/unit → web-viewer/web/viewer: 1
   web-viewer/web/unit → web-viewer/web/viewer-components: 6
   web-viewer/web/unit → web-viewer/web/viewer-polling: 4
-  web-viewer/web/viewer → web-viewer/web/viewer-2: 7
-  web-viewer/web/viewer → web-viewer/web/viewer-views: 10
-  web-viewer/web/viewer-2 → web-viewer/web/viewer: 3
-  web-viewer/web/viewer-2 → web-viewer/web/viewer-components: 1
-  web-viewer/web/viewer-2 → web-viewer/web/viewer-polling: 1
-  web-viewer/web/viewer-2 → web-viewer/web/viewer-views: 5
+  web-viewer/web/viewer → web-viewer/web/server: 1
+  web-viewer/web/viewer → web-viewer/web/viewer-components: 1
+  web-viewer/web/viewer → web-viewer/web/viewer-polling: 1
+  web-viewer/web/viewer → web-viewer/web/viewer-views: 7
   web-viewer/web/viewer-components → web-viewer/web/unit: 7
-  web-viewer/web/viewer-components → web-viewer/web/viewer-2: 3
+  web-viewer/web/viewer-components → web-viewer/web/viewer: 3
   web-viewer/web/viewer-components → web-viewer/web/viewer-polling: 2
   web-viewer/web/viewer-polling → web-viewer/web/unit: 3
-  web-viewer/web/viewer-views → web-viewer/web/server: 3
+  web-viewer/web/viewer-views → web-viewer/web/server: 1
   web-viewer/web/viewer-views → web-viewer/web/unit: 4
-  web-viewer/web/viewer-views → web-viewer/web/viewer: 18
-  web-viewer/web/viewer-views → web-viewer/web/viewer-2: 4
+  web-viewer/web/viewer-views → web-viewer/web/viewer: 30
   web-viewer/web/viewer-views → web-viewer/web/viewer-components: 8
   web-viewer/web/viewer-views → web-viewer/web/viewer-polling: 2
 
@@ -1038,17 +1039,17 @@ Cross-dependencies between sub-zones:
 
 <sub-zones>
 
-This zone has 7 sub-zone(s):
+This zone has 6 sub-zone(s):
 
-- **Web Viewer/web/server** (`web-viewer/web/server`): 81 files, cohesion 0.98, coupling 0.02
+- **Web Viewer/web/server** (`web-viewer/web/server`): 81 files, cohesion 0.99, coupling 0.01
   - Has 5 nested sub-zone(s)
 - **Web Viewer/web/unit** (`web-viewer/web/unit`): 28 files, cohesion 0.56, coupling 0.44
-- **Web Viewer/web/viewer** (`web-viewer/web/viewer`): 47 files, cohesion 0.77, coupling 0.23
-- **Web Viewer/web/viewer 2** (`web-viewer/web/viewer-2`): 54 files, cohesion 0.87, coupling 0.13
+- **Web Viewer/web/viewer** (`web-viewer/web/viewer`): 80 files, cohesion 0.84, coupling 0.16
   - Has 3 nested sub-zone(s)
 - **Web Viewer/web/viewer Components** (`web-viewer/web/viewer-components`): 15 files, cohesion 0.51, coupling 0.49
 - **Web Viewer/web/viewer Polling** (`web-viewer/web/viewer-polling`): 9 files, cohesion 0.5, coupling 0.5
-- **Web Viewer/web/viewer Views** (`web-viewer/web/viewer-views`): 45 files, cohesion 0.69, coupling 0.31
+- **Web Viewer/web/viewer Views** (`web-viewer/web/viewer-views`): 67 files, cohesion 0.8, coupling 0.2
+  - Has 4 nested sub-zone(s)
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

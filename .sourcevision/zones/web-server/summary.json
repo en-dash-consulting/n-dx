@@ -1,0 +1,25 @@
+{
+  "id": "web-server",
+  "name": "Web Server",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/server/domain-gateway.ts",
+    "packages/web/src/server/routes-mcp.ts",
+    "packages/web/tests/unit/server/domain-gateway.test.ts",
+    "packages/web/tests/unit/server/routes-mcp.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/routes-mcp.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 4,
+  "lineCount": 598,
+  "riskMetrics": {
+    "cohesion": 0.4,
+    "coupling": 0.6,
+    "riskScore": 0.6,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

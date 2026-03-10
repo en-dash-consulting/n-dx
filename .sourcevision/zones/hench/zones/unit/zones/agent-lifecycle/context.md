@@ -5,27 +5,29 @@
 <zone>
 
 Zone: Hench/unit/agent Lifecycle (`hench/unit/agent-lifecycle`)
-Files: 4, Cohesion: 0.36, Coupling: 0.64
+Files: 4, Cohesion: 0.18, Coupling: 0.82
 Description: 4 files, primarily TypeScript
-Entry points: packages/hench/src/agent/lifecycle/task-display.ts, packages/hench/src/types/output.ts
-Lines: 226
+Entry points: packages/hench/src/agent/lifecycle/token-usage.ts
+Lines: 733
 
 </zone>
 
 <files>
 
-packages/hench/src/agent/lifecycle/task-display.ts (TypeScript, 27 lines, source)
-packages/hench/src/types/index.ts (TypeScript, 15 lines, source)
-packages/hench/src/types/output.ts (TypeScript, 77 lines, source)
-packages/hench/tests/unit/agent/task-display.test.ts (TypeScript, 107 lines, test)
+packages/hench/src/agent/index.ts (TypeScript, 76 lines, source)
+packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 141 lines, source)
+packages/hench/tests/unit/agent/token-usage-regression.test.ts (TypeScript, 65 lines, test)
+packages/hench/tests/unit/agent/token-usage.test.ts (TypeScript, 451 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/src/agent/lifecycle/task-display.ts → packages/hench/src/types/output.ts {subsection, stream, detail}
-  packages/hench/src/types/index.ts → packages/hench/src/types/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
-  packages/hench/tests/unit/agent/task-display.test.ts → packages/hench/src/agent/lifecycle/task-display.ts {displayTaskInfo}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
+  packages/hench/tests/unit/agent/token-usage-regression.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage}
+  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, mapCodexUsageToTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
+  packages/hench/tests/unit/agent/token-usage.test.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
 
 </imports>

@@ -37,22 +37,23 @@ Internal:
 
 Outgoing (this zone → other zones):
   → cli: src/cli/commands/next.ts → src/cli/commands/constants.ts
-  → core: src/core/next-task.ts → src/core/keywords.ts; src/core/next-task.ts → src/core/requirements.ts
   → store: src/cli/commands/next.ts → src/store/index.ts
-  → unit: src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/schema/index.ts; src/core/next-task.ts → src/schema/index.ts; tests/unit/core/feature-filtered-task.test.ts → src/schema/index.ts; tests/unit/core/next-task-matching.test.ts → src/schema/index.ts; tests/unit/core/next-task-scoring.test.ts → src/schema/index.ts; tests/unit/core/next-task.test.ts → src/schema/index.ts; tests/unit/core/requirements-prioritization.test.ts → src/schema/index.ts
+  → unit: src/core/next-task.ts → src/core/tree.ts; src/core/next-task.ts → src/core/tree.ts
+  → unit-analyze: src/core/next-task.ts → src/core/keywords.ts; src/core/next-task.ts → src/core/requirements.ts; src/core/next-task.ts → src/schema/index.ts; src/core/next-task.ts → src/schema/index.ts; tests/unit/core/feature-filtered-task.test.ts → src/schema/index.ts; tests/unit/core/next-task-matching.test.ts → src/schema/index.ts; tests/unit/core/next-task-scoring.test.ts → src/schema/index.ts; tests/unit/core/next-task.test.ts → src/schema/index.ts; tests/unit/core/requirements-prioritization.test.ts → src/schema/index.ts
   → unit-cli: src/cli/commands/next.ts → src/cli/output.ts
 
 Incoming (other zones → this zone):
   ← cli: src/cli/mcp-tools.ts → src/core/next-task.ts
-  ← core: src/public.ts → src/core/next-task.ts; src/public.ts → src/core/next-task.ts
+  ← unit-analyze: src/public.ts → src/core/next-task.ts; src/public.ts → src/core/next-task.ts
   ← unit-cli: src/cli/index.ts → src/cli/commands/next.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] High coupling (0.83) — 9 imports target "unit"
+[observation] [warning] High coupling (0.83) — 9 imports target "unit-analyze"
 [observation] [warning] Low cohesion (0.17) — files are loosely related, consider splitting this zone
+[suggestion] [warning] Downgrade unit-core from catastrophic to warning. The 0.83 coupling to unit-analyze across only 7 files puts it in unreliable metric territory. Before treating this as mandatory refactoring, verify whether the 9 imports to unit-analyze are consuming stable shared interfaces (acceptable) or reaching into implementation internals of unit-analyze (actionable). If the former, this is expected consumer behavior, not a structural defect.
 [suggestion] [critical] Zone "Unit Core" (unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17, coupling: 0.83) — requires immediate architectural intervention
 
 </findings>
@@ -60,24 +61,22 @@ Incoming (other zones → this zone):
 <insights>
 
 - Low cohesion (0.17) — files are loosely related, consider splitting this zone
-- High coupling (0.83) — 9 imports target "unit"
-- High coupling (0.83) — 9 imports target "prd-schema-foundation"
-- Five unit test files covering scoring, matching, filtering, and requirements prioritization indicate strong test coverage for the selection algorithm — a model for other algorithmic zones.
-- Cohesion of 0.17 is the lowest in this batch; the CLI entry point and multiple orthogonal scoring concerns are grouped together, masking which scoring dimension is authoritative.
-- The 9 imports from 'unit' (Prd Schema Foundation) tie task selection tightly to the data model — any schema change to task fields will ripple directly into scoring logic.
-- Cohesion of 0.17 is critically low for an algorithmic zone; the scoring subsystem (next-task-scoring, next-task-matching, requirements-prioritization) likely forms a separable cluster from the CLI dispatch that should be extracted as its own zone.
-- Five granular test files targeting distinct scoring dimensions (matching, scoring, filtering, prioritization) demonstrate good test decomposition and serve as living documentation of the selection algorithm's contract.
-- Coupling of 0.83 reflects that task selection is a consumer of nearly every other domain layer; consider defining a stable input interface (e.g. a TaskSelectionContext type) to decouple the algorithm from direct store and schema imports.
-- 5 of 7 files in this zone are unit tests — the cohesion score of 0.17 is partly an artifact of test-heavy composition; the two production files (next-task.ts, next.ts) are tightly coupled and would score much higher if cohesion were computed on production files only.
-- The zone functions as a test-dominated satellite: a minimal two-file production core surrounded by five granular test files. This structure is healthy for coverage but misleads zone-health dashboards that count test files equally.
-- Test files constitute 71% (5/7) of this zone's file count, artificially suppressing the cohesion metric to 0.17 — excluding test files from cohesion computation would yield a more accurate signal for the production core.
-- src/core/next-task.ts is a 594-line monolith that implements at least five distinct scoring dimensions (sibling completion ratio, blocker unblocking value, keyword matching, priority scoring, requirements prioritization) in a single file — the five dedicated test files reveal the algorithm's internal complexity but that complexity is invisible at the module level.
-- src/core/next-task.ts (594 lines) implements five independently testable scoring dimensions in a single file, confirmed by five dedicated unit test files each targeting a distinct scoring concern. The monolithic implementation file against a decomposed test suite is an anti-pattern — the test decomposition should guide a matching module decomposition (e.g. next-task-scoring.ts, next-task-matching.ts) to make each concern independently navigable and modifiable.
-- task-selection-engine has the worst combined risk profile in the package: lowest cohesion (0.17) AND highest coupling (0.83) simultaneously. Individual metric violations have been flagged elsewhere, but the combination means that both internal restructuring (low cohesion makes file boundaries unclear) and external changes (high coupling means upstream changes propagate in) are simultaneously high-risk — the zone is fragile in two independent failure modes at once.
-- Zone name 'task-selection-engine' uses a different grammatical pattern (noun-participle-noun) than all other zones in the package, which use either 'prd-noun-noun', 'rex-noun-noun', or 'noun-noun-noun' patterns. The naming inconsistency makes it the hardest zone to locate by name-pattern inference.
-- task-selection-engine combines the package's lowest cohesion (0.17) with its highest coupling (0.83), making it the only zone that is simultaneously fragile to internal restructuring and external upstream changes. This dual fragility warrants treating it as higher priority than any single-metric violation — it should be addressed before prd-domain-operations despite that zone's larger file count.
-- Rename to 'prd-task-selection' or 'rex-task-selection' to align with the package-domain-noun convention used by sibling zones. 'task-selection-engine' is the only zone using a 'what-it-does' metaphor rather than a 'what-domain-it-belongs-to' identifier.
-- Before acting on the dissolution recommendation, validate whether cohesion 0.17 persists after excluding test files. If this zone follows the pattern described in global finding 13 (test files as a significant fraction of file count), the cohesion score may be a measurement artifact. Confirm with the dual cohesion metric first — premature dissolution risks scattering files whose low cohesion is instrumentation noise, not domain fragmentation.
+- High coupling (0.83) — 9 imports target "unit-analyze"
+- High coupling (0.83) — 9 imports target "analyze-engine"
+- The zone's very low cohesion (0.17) and very high coupling (0.83) are the most extreme in this batch — scoring and filtering logic imports heavily from the Analyze Engine rather than operating on a stable internal model.
+- Five distinct unit test files covering scoring, matching, filtering, requirements prioritization, and feature-scoped selection reflect thorough coverage of a strategically important algorithm.
+- The next.ts CLI command and next-task.ts core are the only two production files, meaning the zone is test-dominated — a sign the algorithm is well-exercised but the production surface is narrow.
+- Cohesion of 0.17 is the lowest in this batch and warrants attention — the scoring, matching, and prioritization concerns import from many external modules rather than a shared internal model, suggesting the task-selection domain types may need consolidation.
+- Coupling of 0.83 driven by 9 imports into unit-analyze means any refactor of the Analyze Engine directly impacts task selection; defining a stable task-scoring interface in a shared types module would decouple these layers.
+- The breadth of unit tests (5 files, multiple scoring dimensions) is exemplary for a heuristic algorithm — each dimension of the scoring function has an isolated test file, making regressions easy to pinpoint.
+- Only 2 return imports from unit-analyze into this zone versus 9 outgoing places task-selection-engine among the cleanest consumers — its near-unidirectional dependency on the analyze engine is architecturally correct even if the coupling count is high
+- Near-unidirectional flow from task-selection-engine into unit-analyze (9 out, ~2 in) confirms this zone correctly treats the analyze engine as a read-only upstream. The high coupling count is a quantity concern, not a direction concern.
+- next-task.ts imports remain entirely within src/core/ and src/schema/ with zero cross-layer dependencies at the file-content level, confirming that the zone's clean consumer pattern observed in the import graph is also structurally verified at the source level — not an artifact of import aggregation.
+- The task-selection-engine zone contains 5 specialized test suites for a single production file (next-task.ts): next-task.test.ts, next-task-scoring.test.ts, next-task-matching.test.ts, feature-filtered-task.test.ts, requirements-prioritization.test.ts. This one-module-to-five-tests asymmetry is healthy for a 7-level scoring algorithm but is undocumented. Without a stated convention, contributors may not know when creating a specialized suite is warranted versus adding cases to the primary test file.
+- Document the convention for when a core module earns dedicated specialized test suites (as next-task.ts has 5). Without a stated threshold, contributors adding to or refactoring the scoring algorithm may not realize they should add a separate suite rather than bloating next-task.test.ts.
+- Zone has 7 files — at the boundary of the 8-file reliability threshold. The catastrophic rating (cohesion 0.17, coupling 0.83) reflects 9 outbound imports to unit-analyze across 7 files, which may simply indicate that unit-core files are consumers of shared core infrastructure, not that the zone is structurally broken.
+- Downgrade unit-core from catastrophic to warning. The 0.83 coupling to unit-analyze across only 7 files puts it in unreliable metric territory. Before treating this as mandatory refactoring, verify whether the 9 imports to unit-analyze are consuming stable shared interfaces (acceptable) or reaching into implementation internals of unit-analyze (actionable). If the former, this is expected consumer behavior, not a structural defect.
+- 7 files below the 8-file calibration floor. The 0.83 coupling score to unit-analyze is unreliable at this zone size. LLM analysis recommends downgrade — the key question is whether the 9 imports consume stable public interfaces of unit-analyze (expected consumer behavior) or reach into implementation internals (actionable). That audit is a precondition for any structural decision.
 - [call graph] 444 internal calls, 24 outgoing, 4 incoming (cohesion: 0.95, coupling: 0.05)
 
 </insights>
