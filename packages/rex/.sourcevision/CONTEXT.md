@@ -20,7 +20,7 @@ Import edges: 920, External packages: 5
   files: .rex/config.json, .rex/execution-log.jsonl, .rex/prd.json, .rex/workflow.md
 [cli] Cli (11 files, coh=0.22 coup=0.78)
   11 files, primarily TypeScript
-  files: src/cli/commands/constants.ts [types], src/cli/commands/health.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/mcp-tools.ts [service], src/cli/mcp.ts [cli-command], src/core/health.ts [utility], src/workflow/default.ts [config], tests/integration/smart-add-duplicate-outcomes.test.ts, tests/unit/cli/commands/smart-add-merge.test.ts, tests/unit/cli/mcp.test.ts +1
+  files: src/cli/commands/constants.ts [types], src/cli/commands/health.ts [cli-command], src/cli/commands/init.ts [cli-command], src/cli/mcp-tools.ts [route-handler], src/cli/mcp.ts [service], src/core/health.ts [utility], src/workflow/default.ts [config], tests/integration/smart-add-duplicate-outcomes.test.ts, tests/unit/cli/commands/smart-add-merge.test.ts, tests/unit/cli/mcp.test.ts +1
 [e2e] E2e (13 files, coh=1.00 coup=0.00)
   13 files, primarily TypeScript, JSON, Other
   files: tests/e2e/cli-adapter.test.ts, tests/e2e/cli-analyze.test.ts, tests/e2e/cli-import.test.ts, tests/e2e/cli-prune.test.ts, tests/e2e/cli-quiet.test.ts, tests/e2e/cli-recommend.test.ts, tests/e2e/cli-smart-add.test.ts, tests/e2e/cli-sync.test.ts, tests/e2e/cli-workflow.test.ts, tests/e2e/fixtures/sample-prd/.rex/config.json +3
@@ -35,7 +35,7 @@ Import edges: 920, External packages: 5
   files: src/cli/commands/sync.ts [cli-command], src/store/adapter-registry.ts [store], src/store/index.ts [entrypoint], src/store/integration-schema.ts [store], src/store/integration-schemas/index.ts [entrypoint], src/store/integration-schemas/jira.ts [store], src/store/integration-schemas/notion.ts [store], src/store/notion-adapter.ts [store], src/store/notion-map.ts [store], tests/integration/project-config.test.ts +6
 [unit] Unit (26 files, coh=0.28 coup=0.72)
   26 files, primarily TypeScript
-  files: src/analyze/acknowledge.ts [service], src/cli/commands/recommend.ts [cli-command], src/cli/commands/report.ts [cli-command], src/core/canonical.ts [utility], src/core/dag.ts [utility], src/core/move.ts [utility], src/core/tree.ts [utility], src/recommend/conflict-detection.ts [service], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types] +16
+  files: src/analyze/acknowledge.ts [service], src/cli/commands/recommend.ts [cli-command], src/cli/commands/report.ts [cli-command], src/core/canonical.ts [utility], src/core/dag.ts [utility], src/core/move.ts [utility], src/core/tree.ts [utility], src/recommend/conflict-detection.ts [utility], src/recommend/create-from-recommendations.ts [service], src/recommend/types.ts [types] +16
 [unit-analyze] Unit Analyze (105 files, coh=0.68 coup=0.32)
   105 files, primarily TypeScript
   files: src/analyze/analyze-shared.ts [utility], src/analyze/consolidation-guard.ts [service], src/analyze/decompose.ts [service], src/analyze/dedupe.ts [utility], src/analyze/diff.ts [utility], src/analyze/extract.ts [service], src/analyze/file-validation.ts [utility], src/analyze/guided.ts [service], src/analyze/index.ts [entrypoint], src/analyze/llm-bridge.ts [service] +95
@@ -90,17 +90,17 @@ Most imported:
 [warning] 33 entry points — wide API surface, consider consolidating exports [unit-analyze]
 [warning] The 39 imports flowing from unit-analyze back into unit (the upward direction of the bidirectional coupling) are the higher-risk direction. A shared-core zone importing from its consumer zones creates an inversion that prevents the core from being extracted or reused. These 39 crossings should be audited first — each one is a potential dependency inversion that needs to be resolved by either moving the dependency down into unit-analyze or breaking the edge. [unit-analyze]
 [warning] unit-analyze is the dependency sink for the entire package: cli (28 imports), unit (35), unit-cli (43), fix (3), unit-core (9), store (19), validate (20) — 157 total inbound cross-zone imports. The 33-entry-point wide API surface reflects the zone legitimately serving as shared core, not a decomposition failure. The risk is that this role is undeclared and therefore unprotected by any stability contract. [unit-analyze]
-... +31 more
+... +33 more
 
 </findings>
 
 <next-steps>
 
-[high] 6 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …
-  category: refactor
 [high] The 39 imports from unit-analyze → unit (upward direction) … (+3 related)
   files: src/analyze/acknowledge.ts, src/cli/commands/recommend.ts, src/cli/commands/report.ts
   category: fix
+[high] 5 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …
+  category: refactor
 [high] Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact …
   category: refactor
 [high] Zone "Unit Core" (unit-core) has catastrophic risk (score: 0.83, cohesion: 0.17…
@@ -127,9 +127,6 @@ Most imported:
 [high] Low cohesion (0.22) — files are loosely related, consider splitting this zone
   files: src/cli/commands/constants.ts, src/cli/commands/health.ts, src/cli/commands/init.ts
   category: refactor
-[high] Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: …
-  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
-  category: fix
 [high] Before deleting: verify reachability by running `node --input-type=module -e 'i…
   files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
   category: refactor
@@ -137,6 +134,9 @@ Most imported:
   files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
   category: refactor
 [high] High coupling (0.75) — 3 imports target "unit-analyze"
+  files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
+  category: refactor
+[high] Low cohesion (0.25) — files are loosely related, consider splitting this zone
   files: src/cli/commands/fix.ts, src/core/fix.ts, tests/unit/cli/commands/fix.test.ts
   category: refactor
 

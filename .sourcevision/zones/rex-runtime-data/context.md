@@ -7,8 +7,8 @@
 Zone: Rex Runtime Data (`rex-runtime-data`)
 Files: 6, Cohesion: 0.00, Coupling: 0.00
 Risk: healthy (score: 0.50)
-Description: On-disk runtime state for the rex PRD engine: the live PRD tree, execution logs, workflow state, configuration, and the pruned-item archive.
-Lines: 26188
+Description: Mutable runtime state files written and read by the rex PRD engine, including the canonical PRD tree, execution logs, and project configuration.
+Lines: 26202
 
 </zone>
 
@@ -17,8 +17,8 @@ Lines: 26188
 .rex/archive.json (JSON, 840 lines, other)
 .rex/config.json (JSON, 6 lines, other)
 .rex/execution-log.1.jsonl (Other, 3899 lines, other)
-.rex/execution-log.jsonl (Other, 695 lines, other)
-.rex/prd.json (JSON, 20730 lines, other)
+.rex/execution-log.jsonl (Other, 702 lines, other)
+.rex/prd.json (JSON, 20737 lines, other)
 .rex/workflow.md (Markdown, 18 lines, docs)
 
 </files>
@@ -26,20 +26,21 @@ Lines: 26188
 <findings>
 
 [observation] [info] Isolated files — no import edges between 6 files, cohesion is unmeasurable (reported as 0)
-[observation] [info] Zero cohesion and coupling are expected: runtime data files have no import relationships with each other or with source code, so Louvain correctly treats them as an isolated island.
-[observation] [info] archive.json is documented as safe to delete and capped at 100 batches; verifying the auto-trim logic has a unit test guards against silent cap removal during refactors.
-[observation] [info] workflow.md is human-readable state that mirrors prd.json; if these ever diverge they become misleading — a post-write consistency check (or generating workflow.md from prd.json on read) would eliminate the drift risk.
+[observation] [info] Execution log splitting across execution-log.jsonl and execution-log.1.jsonl suggests log rotation is active; consumers should handle multi-file reads.
+[observation] [info] Zero cohesion is correct for a data-files zone — these files are consumed by source code, not by each other.
+[suggestion] [warning] The CLAUDE.md concurrency contract table lists prd.json but omits workflow.md, which is also written by rex store operations (file-adapter.ts and notion-adapter.ts). Commands that conflict on prd.json (e.g. ndx plan + ndx work) also conflict on workflow.md — the table should be updated to list workflow.md alongside prd.json for all write-conflicting command pairs.
 
 </findings>
 
 <insights>
 
 - Isolated files — no import edges between 6 files, cohesion is unmeasurable (reported as 0)
-- These files are data artifacts written by rex commands at runtime, not source code — they should never be imported by any package and are intentionally outside the src/ tree.
-- The execution log is split across two files (.rex/execution-log.jsonl and .rex/execution-log.1.jsonl), suggesting a rotation mechanism; confirming that the rotation cap is enforced prevents unbounded disk growth.
-- prd.json is a shared mutable file: concurrent writes from ndx plan and ndx work cause data corruption (documented in CLAUDE.md); any new tooling that writes this file must coordinate through the same single-writer discipline.
-- Zero cohesion and coupling are expected: runtime data files have no import relationships with each other or with source code, so Louvain correctly treats them as an isolated island.
-- archive.json is documented as safe to delete and capped at 100 batches; verifying the auto-trim logic has a unit test guards against silent cap removal during refactors.
-- workflow.md is human-readable state that mirrors prd.json; if these ever diverge they become misleading — a post-write consistency check (or generating workflow.md from prd.json on read) would eliminate the drift risk.
+- These are data files (JSON, JSONL, Markdown), not source modules — zero cohesion and zero coupling are structurally correct and expected.
+- The execution log (execution-log.jsonl) and archive (archive.json) are append-only audit trails; keeping them in a dedicated zone makes their write-contention risk (documented in CLAUDE.md) easy to reason about.
+- Having prd.json and config.json co-located in the same zone makes it easy to identify all files that must not be written concurrently with ndx work or ndx plan.
+- Zero cohesion is correct for a data-files zone — these files are consumed by source code, not by each other.
+- Execution log splitting across execution-log.jsonl and execution-log.1.jsonl suggests log rotation is active; consumers should handle multi-file reads.
+- workflow.md is mutable state written by both file-adapter.ts and notion-adapter.ts during rex work operations (confirmed via source), placing it in the same write-contention risk category as prd.json. However, the concurrency contract table in CLAUDE.md documents only prd.json write conflicts — workflow.md is omitted, creating an undocumented concurrent-write hazard for any command pair that writes to .rex/ simultaneously.
+- The CLAUDE.md concurrency contract table lists prd.json but omits workflow.md, which is also written by rex store operations (file-adapter.ts and notion-adapter.ts). Commands that conflict on prd.json (e.g. ndx plan + ndx work) also conflict on workflow.md — the table should be updated to list workflow.md alongside prd.json for all write-conflicting command pairs.
 
 </insights>

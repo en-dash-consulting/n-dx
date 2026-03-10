@@ -1,7 +1,7 @@
 {
   "id": "hench-agent",
   "name": "Hench Agent",
-  "description": "The complete autonomous agent package: task briefing, Claude API tool-use loop, run persistence, PRD gateway, and CLI entry points.",
+  "description": "The autonomous agent package responsible for task selection, LLM tool-use loops, run recording, and adaptive analysis that drives autonomous PRD execution.",
   "files": [
     "packages/hench/Hench-F.png",
     "packages/hench/Hench.png",

@@ -22,7 +22,7 @@ Lines: 19
 <findings>
 
 [observation] [info] Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
-[suggestion] [info] Zone ".claude" (.claude) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
+[suggestion] [info] Zone ".claude" (.claude) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 2 files (minimum 5 for reliable metrics)
 
 </findings>
 

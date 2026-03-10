@@ -20660,6 +20660,9 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-10T00:32:45.761Z",
+      "completedAt": "2026-03-10T00:36:10.402Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Removed dead cross-zone re-export from shared/index.ts, pinned all 7 messaging files + 7 test files to viewer-message-pipeline zone, and separated landing.ts into dedicated web-landing zone",
       "recommendationMeta": {
         "findingHashes": [
           "a43400446d2f",
@@ -20671,10 +20674,7 @@
           "warning": 3
         },
         "findingCount": 3
-      },
-      "completedAt": "2026-03-10T00:36:10.402Z",
-      "resolutionType": "config-override",
-      "resolutionDetail": "Removed dead cross-zone re-export from shared/index.ts, pinned all 7 messaging files + 7 test files to viewer-message-pipeline zone, and separated landing.ts into dedicated web-landing zone"
+      }
     },
     {
       "id": "731ea4c3-f02c-4ffb-a2bd-b5c9fea47424",

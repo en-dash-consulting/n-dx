@@ -23,7 +23,7 @@ vitest.config.ts (TypeScript, 11 lines, config)
 <findings>
 
 [observation] [info] Isolated files — no import edges between 3 files, cohesion is unmeasurable (reported as 0)
-[suggestion] [info] Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
+[suggestion] [info] Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 3 files (minimum 5 for reliable metrics)
 
 </findings>
 

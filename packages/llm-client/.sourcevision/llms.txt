@@ -10,7 +10,7 @@
 - **Languages**: TypeScript (42), JSON (2)
 - **Zones**: 4 (4 with descriptions)
 - **Git**: feature/integrate-codex @ 3acc839
-- **Analyzed**: 2026-03-09T23:02:10.861Z
+- **Analyzed**: 2026-03-10T00:41:05.475Z
 
 ## Architecture Zones
 
@@ -83,16 +83,17 @@
 - Global findings 0, 2, and zone finding src-2[0] together confirm that the primary structural risk in this package is zone granularity imbalance (3-file root vs 19-file src-2), not cyclic coupling. The bidirectional coupling label on finding 0 is misleading given the 3+23 asymmetry; the real concern is that src-2 has absorbed too many files to be meaningfully named or analyzed as a coherent zone. This is an informational concern until file count exceeds ~30 (2x the detection threshold of ~15 for 'too broad'). [info]
 - No contradictions exist among the 7 findings, but finding 6 (relocate api-provider.test.ts) conflicts with the meta-constraint that test-to-implementation coupling is expected by design. The 100% import-neighbor overlap with src/ is the normal condition for a focused unit test file, not a structural misplacement. This finding can be treated as resolved-by-design. [info]
 - The 3 reverse crossings (src exporting into src-2) are the bounded risk surface from the asymmetric coupling. Until these specific edges are inspected and confirmed as cyclic rather than convenience imports, no interface extraction should be proposed. Treat as a watch item, not an action item. [info]
+- The move-file suggestion for tests/unit/api-provider.test.ts (global finding 9) is contradicted by three independent findings (global findings 3, 5, and 8) that each mark it resolved-by-design. Unit test files having 100% import-neighbor overlap with their implementation zone is the expected and correct structural condition for a focused test file. Global finding 9 carries no actionable weight and is definitively closed by the preponderance of independent evidence. [info]
+- Zone src-2 findings 0 and 1 (both warning severity) are directly contradicted by src-2 finding 2 (LLM analysis, info), which explicitly marks both as no-action detection artifacts. The contradiction originates from multi-pass ordering: heuristic pass 0 generated warnings before LLM pass 5 provided context. Finding 2 is correct: the 19-file count is below the 2x detection threshold (~30), and the generic name 'Src 2' reflects a Louvain partitioning artifact, not a maintainability risk. Findings 0 and 1 should be treated as info severity. [info]
 - Isolated files — no import edges between 3 files, cohesion is unmeasurable (reported as 0) [info] (root)
-- 12 entry points — wide API surface, consider consolidating exports [warning] (src)
-- Contains 43% of project files (19/44) — may be too broad, consider splitting [warning] (src-2)
-- ... and 3 more
+- ... and 5 more
 
 ### Suggestions
 
 - tests/unit/ contains files from 3 zones (src, src-2, unit) — consider grouping into subdirectories to clarify architectural boundaries [info]
 - Global finding 5 (move-file: relocate api-provider.test.ts based on 100% import-neighbor overlap with src/) is directly contradicted by global finding 3, which marks it resolved-by-design. Unit test files having 100% import-neighbor overlap with their implementation zone is the expected and correct condition. Finding 5 carries no actionable weight and should be treated as closed. [info]
-- Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds [info] (root)
+- The vendor-neutralization refactor left three in-place annotations missing, confirmed by the classification manifest. Concrete edits required (no file splits): (1) src/create-client.ts — add @deprecated JSDoc on createClient pointing to createLLMClient in src/llm-client.ts; (2) src/llm-types.ts — add @deprecated JSDoc on the LLMClient type alias pointing to ClaudeClient; (3) src/types.ts — confirm CompletionRequest.cliFlags is CLI-adapter-only and add a @internal or cli-only JSDoc marker if not already present. These three annotation edits reduce the effective exported surface and directly address the wide entry-point heuristic without restructuring any files. [warning] (src)
+- Zone "Root" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 3 files (minimum 5 for reliable metrics) [info] (root)
 
 ## Next Steps
 
@@ -105,6 +106,9 @@ Prioritized work items derived from analysis:
 
 1. **Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…**
    Files: `src/auth.ts`, `src/config.ts`, `src/exec.ts`
+
+1. **The vendor-neutralization refactor left three in-place annotations missing, con…**
+   Files: `src/api-provider.ts`, `src/cli-provider.ts`, `src/codex-cli-provider.ts`
 
 1. **12 entry points — wide API surface, consider consolidating exports**
    Files: `src/api-provider.ts`, `src/cli-provider.ts`, `src/codex-cli-provider.ts`
@@ -128,7 +132,7 @@ Prioritized work items derived from analysis:
 |------|------|-----------|------|
 | `package.json` | config |  | root |
 | `src/api-provider.ts` | source | service | src |
-| `src/auth.ts` | source | utility | src-2 |
+| `src/auth.ts` | source | service | src-2 |
 | `src/cli-provider.ts` | source | service | src |
 | `src/codex-cli-provider.ts` | source | service | src |
 | `src/config.ts` | source | config | src-2 |
@@ -140,10 +144,10 @@ Prioritized work items derived from analysis:
 | `src/llm-config.ts` | source | config | src |
 | `src/llm-types.ts` | source | types | src |
 | `src/output.ts` | source | utility | src-2 |
-| `src/project-config.ts` | source | utility | src-2 |
+| `src/project-config.ts` | source | config | src-2 |
 | `src/project-dirs.ts` | source | types | src-2 |
 | `src/provider-interface.ts` | source | types | src |
-| `src/provider-registry.ts` | source | store | src |
+| `src/provider-registry.ts` | source | service | src |
 | `src/provider-session.ts` | source | service | src |
 | `src/public.ts` | source | entrypoint | src-2 |
 | `src/suggest.ts` | source | utility | src-2 |

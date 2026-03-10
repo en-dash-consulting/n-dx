@@ -95,6 +95,7 @@
         "Downgrade cli zone from catastrophic to warning. The coupling to unit-analyze reflects consumer behavior, not bidirectional entanglement. The more actionable issue is the 8-directory spread for 11 files — consolidate into a flatter structure under src/cli/ to improve the cohesion signal and make the zone's boundary visible in the filesystem.",
         "Coupling to unit-analyze reflects legitimate consumer behavior (28 inbound imports to shared core), not bidirectional entanglement. Automated heuristic catastrophic rating is not corroborated: LLM analysis in zone finding 3 explicitly recommends downgrade to warning. The structural issue is the 8-directory spread for 11 files, not the coupling ratio.",
         "The actionable structural defect is 11 files spanning 8 directories. Consolidate all cli zone files under src/cli/ with a flat layout: existing src/cli/commands/*.ts already provides the right grouping. Resolve the inversion in src/analyze/guided.ts by moving src/cli/output.ts to src/util/output.ts and updating the import — this is the only cross-layer dependency that needs severing. After those two steps the cohesion signal will improve without restructuring the zone.",
+        "The cli zone's coupling to unit-analyze (0.78, 28 imports) reflects consumer behavior toward a shared core, not bidirectional entanglement. This is structurally identical to unit-cli (0.54, 43 imports) and store (0.63, 19 imports), neither of which was flagged catastrophic. The 'catastrophic' label from automated heuristics is not corroborated by LLM analysis. The genuinely actionable defect is the 11-file zone spanning 8 directories — a cohesion signal that has filesystem evidence.",
         "[call graph] 217 internal calls, 85 outgoing, 17 incoming (cohesion: 0.72, coupling: 0.28)"
       ],
       "riskMetrics": {
@@ -188,6 +189,7 @@
         "Downgrade fix zone from catastrophic to informational. With 4 files below the 8-file calibration floor, the 0.75 coupling score reflects measurement artifact not structural failure. The real question is reachability: trace entry points to determine if these files are dead code (delete) or dynamically invoked (add inline comments documenting the invocation path). This is a two-outcome decision, not an architectural refactoring.",
         "4-file zone falls below the 8-file calibration floor where coupling/cohesion metrics produce reliable signals. The 0.75 coupling score reflects measurement artifact, not structural failure. The critical automated heuristic rating has no corroboration and should not drive refactoring decisions.",
         "Verify reachability before any action: trace the CLI entry point for the fix command through src/cli/commands/fix.ts. If no static import path from main entry points reaches src/core/fix.ts, it is dead code — delete it. If it is reached via CLI dispatch (not static import), add a comment block at the top of each file in the fix zone explaining the invocation path. This is a two-outcome decision, not an architectural refactoring.",
+        "With 4 files, fix is below the 8-file calibration floor where coupling/cohesion metrics produce meaningful signals. The 'catastrophic' automated label is a measurement artifact. The actual decision is binary: trace the CLI entry point for the fix command to determine reachability. If unreachable via any static import path, delete the 4 files. If reached via CLI dispatch rather than static import, add inline comments at each file documenting the invocation path.",
         "[call graph] 136 internal calls, 15 outgoing, 1 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
@@ -380,6 +382,7 @@
         "The 39 imports from unit-analyze → unit (upward direction) are the highest-priority cut points. Identify which files in unit are being imported by unit-analyze and move those files down into unit-analyze. This breaks the inversion without requiring a full zone reorganization. Start with the files that unit-analyze imports most frequently — these are the misplaced shared utilities.",
         "Multi-signal critical corroboration confirmed by three independent measurement types: zone metrics (cohesion 0.28, coupling 0.72), API surface (10 entry points), structural spread (14 directories). The 39 unit-analyze → unit crossings are a dependency inversion where the shared-core zone imports back from a consumer zone. This is the highest-priority structural finding in the codebase.",
         "To resolve the 39 unit-analyze → unit import inversions without full zone reorganization: run grep on packages/rex/src/analyze/ for imports matching '../unit/' or relative paths reaching unit zone files. Each matching file in unit that is imported by unit-analyze belongs in unit-analyze, not unit. Move the identified files and update their import paths. This severs the inversion at its source — the files are misclassified by zone because they are consumed by the shared core, not by the consumer tier.",
+        "Multi-signal critical corroboration is uniquely strong here: zone metrics (cohesion 0.28, coupling 0.72), API surface analysis (10 entry points across 14 directories), and bidirectional coupling (35+39 crossings) all independently converge on the same root cause. No other zone in the analysis has all three measurement types in agreement. This is the only zone where the automated 'catastrophic' label is fully justified.",
         "[call graph] 655 internal calls, 74 outgoing, 192 incoming (cohesion: 0.9, coupling: 0.1)"
       ],
       "riskMetrics": {
@@ -1773,6 +1776,8 @@
         "Declare unit-analyze's shared-core role explicitly: add a src/core/README.md or inline comment block at the top of the primary entry point stating that this zone is the dependency sink for the package and all public exports are stability-guaranteed. Then audit the 33 entry points to identify which are truly public (keep, document) vs internal implementation details that leaked into exports (restrict or move). This narrows the API surface without a structural reorganization.",
         "The 39 unit-analyze → unit crossings are the higher-risk direction of the bidirectional coupling: a shared-core zone importing from consumer zones creates an inversion that prevents the core from being extracted or reused independently.",
         "The comment-block recommendation for src/schema/index.ts (global finding 7) is already implemented — the file contains a full stability contract comment including the Zod-exclusion convention. The outstanding action for unit-analyze is to audit its 33 entry points and classify each as: (a) stable public API — keep and annotate, or (b) implementation detail that leaked into exports — restrict or move. This narrows the API surface that all 6 consumer zones depend on without restructuring the zone.",
+        "unit-analyze is the implicit shared core for the entire package — 157 total inbound cross-zone imports from 6 consumer zones — but has no formal stability contract. The absence of a declared boundary means the 33-entry-point API surface is not protected against accidental expansion. This missing contract is a higher structural risk than any individual zone's coupling score because every consumer zone's coupling metric is a direct function of unit-analyze's undeclared API breadth.",
+        "Before auditing the 33 entry points, read packages/rex/src/public.ts to identify which unit-analyze files are re-exported at the package boundary. Files re-exported from public.ts constitute the stable API (keep, annotate); files only imported internally are implementation details that leaked into exports (restrict or move). This two-bucket classification from a single file read is the prerequisite for the entry-point audit and does not require zone reorganization.",
         "[call graph] 3894 internal calls, 390 outgoing, 133 incoming (cohesion: 0.91, coupling: 0.09)"
       ],
       "riskMetrics": {
@@ -4443,6 +4448,13 @@
     "Global finding 10 ('6 zones exceed architectural risk thresholds — mandatory refactoring recommended') directly contradicts global finding 12 ('corrected count drops to 3 after excluding sub-8-file zones'). Finding 10's inflated count includes fix, .rex, and unit-core where the coupling/cohesion metrics are noise below the calibration floor. Finding 12's corrected count of 3 (unit critical, cli warning, store warning) is the authoritative set for remediation planning.",
     "Remediation sequencing based on consolidated evidence: (1) Identify and move files responsible for the 39 unit-analyze → unit import inversions — resolves the multi-signal critical finding for unit zone. (2) Move src/cli/output.ts to src/util/output.ts and update the import in src/analyze/guided.ts — resolves confirmed layering inversion. (3) Audit unit-analyze's 33 entry points and restrict implementation-detail exports — narrows the star-coupling topology without structural reorganization. (4) Consolidate cli zone's 11 files from 8 directories into src/cli/ — improves cohesion signal. (5) Trace fix zone entry points and delete dead code or document dynamic invocation path. Steps 1-2 address confirmed structural defects; steps 3-5 address maintainability risk.",
     "The single highest-priority action in the entire analysis is auditing the 39 unit-analyze → unit import inversions and moving the misplaced files into unit-analyze. This is the structural prerequisite: it resolves the bidirectional coupling (global finding 0), reduces unit's catastrophic risk score, and narrows unit-analyze's API surface — all three of the highest-severity multi-signal findings trace to this root cause.",
+    "The only zone with genuine multi-signal critical corroboration is 'unit'. All other catastrophic labels from automated heuristics apply to zones below the 8-file calibration floor (fix: 4 files, unit-core: 7 files) or to unidirectional consumer coupling toward a shared core (cli, store, validate). After severity reassignment, 'critical' applies only to the unit zone and global finding 18. The authoritative remediation set is: unit (critical), cli (warning), store (warning), validate (warning).",
+    "The root cause behind all high-severity findings reduces to a single undeclared architectural fact: unit-analyze is the package's shared core with no formal stability contract. Resolving the unit ↔ unit-analyze coupling inversion (39 crossings), narrowing the API surface (33 entry points), and improving cli zone cohesion all share the same structural prerequisite — declaring unit-analyze's stability boundary. Addressing individual zone metrics without this declaration will not break the star-coupling topology.",
+    "Three contradictory finding pairs require resolution before executing any remediation steps. (1) Global 12 vs global 14 on zone risk count: finding 14's corrected count of 3 zones is authoritative — use it. (2) Global 13 vs global 8 on the destination for src/cli/output.ts: finding 13 recommends src/cli/commands/ based on import proximity; finding 8 correctly overrides this — the destination must be src/util/output.ts to resolve the layering inversion in src/analyze/guided.ts; applying finding 13 would deepen the inversion. (3) CLI zone finding 5 (critical) vs CLI zone finding 3 (warning downgrade): finding 3 is correct — unidirectional consumer coupling to a shared core is expected behavior, not catastrophic risk.",
+    "The five-step remediation sequence in global finding 10 is correctly sequenced and prioritized, but step 1 is missing a concrete prerequisite: the 39 unit-analyze → unit import inversions must be enumerated before any files can be moved. The executable prerequisite is: grep -rn 'from.*\\.\\./unit/' packages/rex/src/analyze/ to identify which unit zone files are imported by unit-analyze. Without this file list, step 1 cannot be acted on and steps 3–5 may target the wrong files.",
+    "The single executable prerequisite for the highest-priority remediation (global finding 10 step 1, global finding 18) is enumerating the 39 unit-analyze → unit import inversions. Command: grep -rn 'from.*\\.\\./unit/' packages/rex/src/analyze/ — this identifies the specific files in the unit zone that are consumed by unit-analyze and therefore belong in unit-analyze. Without this file list the remediation cannot proceed. A secondary check — grep -rn 'from.*\\.\\./unit/' packages/rex/tests/unit/analyzers/ — distinguishes production inversions from test-tier imports, since test files importing implementation siblings are expected by design and should not be moved.",
+    "Severity calibration summary across all 73 findings: automated heuristic 'catastrophic' and 'critical' ratings are reliable only for zones with ≥8 files. The four reassigned severities (cli zone finding 5: critical→warning, fix zone finding 6: critical→info, unit-core zone finding 3: critical→warning, global finding 12: warning→info) each have explicit corroborating evidence in existing LLM-analysis findings. After reassignment, 'critical' severity appears only on unit zone findings 4–7 and global finding 18 — all with multi-signal support. Treat all other prior 'catastrophic' labels as informational noise from the calibration gap identified in global finding 16.",
+    "Contradictions resolved with authoritative verdicts: (1) Global finding 12 ('6 zones exceed risk thresholds') is superseded by global finding 14 — the corrected count is 3 zones after excluding sub-8-file zones; finding 14 is authoritative for remediation planning. (2) Global finding 13 recommends moving src/cli/output.ts to src/cli/commands/ based on 89% import-neighbor proximity; global finding 8 correctly identifies this as the wrong destination — src/util/output.ts resolves the layering inversion where src/analyze/guided.ts imports CLI infrastructure; applying finding 13 would worsen the inversion by deepening the file's CLI identity. (3) CLI zone finding 5 (critical severity) contradicts CLI zone finding 3 (warning downgrade); finding 3 is correct because unidirectional consumer coupling to a shared core is architectural expectation, not catastrophic failure.",
     "[call graph] 261 calls: \"unit-analyze\" → \"unit-cli\"",
     "[call graph] 109 calls: \"unit-analyze\" → \"unit\"",
     "[call graph] 61 calls: \"unit-cli\" → \"unit-analyze\"",
@@ -4719,8 +4731,8 @@
       "type": "suggestion",
       "pass": 0,
       "scope": "fix",
-      "text": "Zone \"Fix\" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
-      "severity": "critical"
+      "text": "Zone \"Fix\" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)",
+      "severity": "info"
     },
     {
       "type": "suggestion",
@@ -4759,6 +4771,13 @@
     },
     {
       "type": "suggestion",
+      "pass": 5,
+      "scope": "global",
+      "text": "The single executable prerequisite for the highest-priority remediation (global finding 10 step 1, global finding 18) is enumerating the 39 unit-analyze → unit import inversions. Command: grep -rn 'from.*\\.\\./unit/' packages/rex/src/analyze/ — this identifies the specific files in the unit zone that are consumed by unit-analyze and therefore belong in unit-analyze. Without this file list the remediation cannot proceed. A secondary check — grep -rn 'from.*\\.\\./unit/' packages/rex/tests/unit/analyzers/ — distinguishes production inversions from test-tier imports, since test files importing implementation siblings are expected by design and should not be moved.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
       "pass": 0,
       "scope": "global",
       "text": "Hub function: walkTree in src/core/tree.ts is called from 30 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
@@ -4774,12 +4793,11 @@
       "type": "suggestion",
       "pass": 0,
       "scope": "global",
-      "text": "6 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): unit-core, cli, fix, unit, validate, store — mandatory refactoring recommended before further development",
+      "text": "5 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): unit-core, cli, unit, validate, store — mandatory refactoring recommended before further development",
       "severity": "warning",
       "related": [
         "unit-core",
         "cli",
-        "fix",
         "unit",
         "validate",
         "store"
@@ -4833,6 +4851,13 @@
       "scope": "unit-analyze",
       "text": "Zone \"unit-analyze\" has files across 13 directories — consider consolidating under a dedicated directory",
       "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 5,
+      "scope": "unit-analyze",
+      "text": "Before auditing the 33 entry points, read packages/rex/src/public.ts to identify which unit-analyze files are re-exported at the package boundary. Files re-exported from public.ts constitute the stable API (keep, annotate); files only imported internally are implementation details that leaked into exports (restrict or move). This two-bucket classification from a single file read is the prerequisite for the entry-point audit and does not require zone reorganization.",
+      "severity": "warning"
     },
     {
       "type": "suggestion",
@@ -4901,7 +4926,21 @@
       "type": "pattern",
       "pass": 5,
       "scope": "global",
+      "text": "Contradictions resolved with authoritative verdicts: (1) Global finding 12 ('6 zones exceed risk thresholds') is superseded by global finding 14 — the corrected count is 3 zones after excluding sub-8-file zones; finding 14 is authoritative for remediation planning. (2) Global finding 13 recommends moving src/cli/output.ts to src/cli/commands/ based on 89% import-neighbor proximity; global finding 8 correctly identifies this as the wrong destination — src/util/output.ts resolves the layering inversion where src/analyze/guided.ts imports CLI infrastructure; applying finding 13 would worsen the inversion by deepening the file's CLI identity. (3) CLI zone finding 5 (critical severity) contradicts CLI zone finding 3 (warning downgrade); finding 3 is correct because unidirectional consumer coupling to a shared core is architectural expectation, not catastrophic failure.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
       "text": "Findings 7 and 8 address the same problem (zone naming convention) at different levels of specificity. Finding 7 specifies three concrete rules; finding 8 describes a three-category taxonomy. These are complementary, not redundant: finding 7 addresses IDs and display names (the naming syntax), finding 8 addresses semantic categories (the naming vocabulary). A single PACKAGE_GUIDELINES.md section can satisfy both by defining the taxonomy first, then the syntax rules that apply within each category.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 5,
+      "scope": "global",
+      "text": "Severity calibration summary across all 73 findings: automated heuristic 'catastrophic' and 'critical' ratings are reliable only for zones with ≥8 files. The four reassigned severities (cli zone finding 5: critical→warning, fix zone finding 6: critical→info, unit-core zone finding 3: critical→warning, global finding 12: warning→info) each have explicit corroborating evidence in existing LLM-analysis findings. After reassignment, 'critical' severity appears only on unit zone findings 4–7 and global finding 18 — all with multi-signal support. Treat all other prior 'catastrophic' labels as informational noise from the calibration gap identified in global finding 16.",
       "severity": "info"
     },
     {
@@ -4985,7 +5024,7 @@
       "type": "suggestion",
       "pass": 0,
       "scope": ".rex",
-      "text": "Zone \".rex\" (.rex) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
+      "text": "Zone \".rex\" (.rex) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)",
       "severity": "info"
     },
     {
@@ -4997,7 +5036,7 @@
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 10,
+  "metaEvaluationCount": 11,
   "structureHash": "042307b44e12585a",
   "zoneContentHashes": {
     ".rex": "30cd2299ea28339e",

@@ -81,7 +81,7 @@ export interface ZonePipelineOptions {
   maxZones?: number;
   /**
    * Maximum percentage of scope files a single zone may contain (1–100).
-   * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+   * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (15%).
    * Set to `100` to disable the zone size cap.
    */
   maxZonePercent?: number;
@@ -1697,9 +1697,9 @@ function backPopulateInsights(
 /**
  * Maximum percentage of project files a single zone should contain.
  * Zones exceeding this threshold are split via internal Louvain subdivision.
- * Default: 30% — prevents over-aggregation where one zone dominates the codebase.
+ * Default: 15% — prevents over-aggregation where one zone dominates the codebase.
  */
-export const DEFAULT_MAX_ZONE_PERCENT = 30;
+export const DEFAULT_MAX_ZONE_PERCENT = 15;
 
 /**
  * Run the full zone detection pipeline: graph construction, Louvain community
@@ -1715,7 +1715,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     inventory,
     imports,
     scopeFiles,
-    maxZones = 15,
+    maxZones = 30,
     maxZonePercent = DEFAULT_MAX_ZONE_PERCENT,
     parentId,
     depth = 0,
@@ -1757,12 +1757,12 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
 
   // ── Scale maxZones by file count ──
-  // Small packages shouldn't fragment into many zones. Scale from 3 (≤45 files)
-  // up to the configured cap (default 15 at 225+ files).
+  // Small packages shouldn't fragment into many zones. Scale from 3 (≤36 files)
+  // up to the configured cap (default 30 at 360+ files).
   // Also ensure we allow enough zones for the size policy to work —
   // if maxZonePercent limits zone size, we need at least ceil(n/maxSize) zones.
   const graphNodeCount = graph.size;
-  const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 15));
+  const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 12));
   const maxPct = Math.max(1, Math.min(100, maxZonePercent));
   const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
   const minForSizePolicy = maxPct < 100 ? Math.ceil(graphNodeCount / maxZoneSize) : 0;
@@ -1934,7 +1934,7 @@ function buildAnalyzeZonesResult(opts: {
       unzoned,
       insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
       findings: allFindings.length > 0 ? allFindings : undefined,
-      enrichmentPass: allFindings.length > 0 ? displayPass : undefined,
+      enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
       zoneContentHashes: remappedContentHashes,
@@ -1964,7 +1964,7 @@ export async function analyzeZones(
     /**
      * Maximum percentage of project files a single zone may contain (1–100).
      * Zones exceeding this are split via internal Louvain subdivision.
-     * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+     * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (15%).
      * Set to `100` to disable the zone size cap.
      */
     maxZonePercent?: number;

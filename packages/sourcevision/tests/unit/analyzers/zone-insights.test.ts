@@ -391,8 +391,8 @@ describe("analyzeZones structureChanged", () => {
 
     // Structure changed, so enrichmentPass should not carry over from previous
     expect(result.structureChanged).toBe(true);
-    // The enrichmentPass should be 0 (structural only, no AI enrich)
-    expect(result.zones.enrichmentPass).toBe(0);
+    // No AI enrichment ran, so enrichmentPass should be undefined
+    expect(result.zones.enrichmentPass).toBeUndefined();
   });
 
   it("calls onReset callback when structure changes and previousZones had enrichmentPass", async () => {
@@ -525,8 +525,8 @@ describe("analyzeZones findings", () => {
     expect(result.findings!.every((f) => f.pass === 0)).toBe(true);
     expect(result.findings!.every((f) => f.type === "observation")).toBe(true);
 
-    // enrichmentPass should be 0 (not undefined) to indicate structural analysis completed
-    expect(result.enrichmentPass).toBe(0);
+    // No AI enrichment ran (enrich: false), so enrichmentPass should be undefined
+    expect(result.enrichmentPass).toBeUndefined();
   });
 
   it("populates both findings and insights for backward compat", async () => {
@@ -866,8 +866,8 @@ describe("maxZones scaling", () => {
       scopeFiles: files,
     });
 
-    // Should have at most 10 zones (scaled from 150 files)
-    expect(result.zones.length).toBeLessThanOrEqual(10);
+    // Should have at most 12 zones (scaled from 150 files, floor(150/12) = 12)
+    expect(result.zones.length).toBeLessThanOrEqual(12);
   });
 
   it("respects explicit maxZones when lower than scaled value", () => {

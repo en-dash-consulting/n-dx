@@ -1,7 +1,7 @@
 {
   "id": "rex-runtime-data",
   "name": "Rex Runtime Data",
-  "description": "On-disk runtime state for the rex PRD engine: the live PRD tree, execution logs, workflow state, configuration, and the pruned-item archive.",
+  "description": "Mutable runtime state files written and read by the rex PRD engine, including the canonical PRD tree, execution logs, and project configuration.",
   "files": [
     ".rex/archive.json",
     ".rex/config.json",
@@ -14,7 +14,7 @@
   "cohesion": 0,
   "coupling": 0,
   "fileCount": 6,
-  "lineCount": 26188,
+  "lineCount": 26202,
   "riskMetrics": {
     "cohesion": 0,
     "coupling": 0,

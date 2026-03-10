@@ -7,7 +7,7 @@
 Zone: Hench Agent (`hench-agent`)
 Files: 155, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: The complete autonomous agent package: task briefing, Claude API tool-use loop, run persistence, PRD gateway, and CLI entry points.
+Description: The autonomous agent package responsible for task selection, LLM tool-use loops, run recording, and adaptive analysis that drives autonomous PRD execution.
 Lines: 35506
 
 </zone>
@@ -603,23 +603,29 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Cohesion of 1.0 and coupling of 0.0 are ideal for an execution-tier package: hench depends downward on rex (via gateway) but presents no surface that higher-tier code imports, correctly reflecting its position in the four-tier hierarchy.
-[observation] [info] Run transcripts are written to .hench/runs/ which is outside the source tree; confirming that the runs directory has a documented retention policy prevents unbounded disk growth in long-running deployments.
-[observation] [info] The adaptive.ts and review.ts analysis modules alongside spin.ts suggest a multi-phase analysis loop; if these grow further, extracting them into a named sub-zone (e.g. hench-analysis-pipeline) would improve navigability without breaking the package boundary.
+[observation] [info] At 155 files, hench is the largest single-zone package; the zone is healthy now, but sub-zone decomposition would make future coupling regressions easier to detect.
+[observation] [info] Perfect cohesion (1.0) and zero external coupling confirm hench is a well-encapsulated execution tier with clean package boundaries.
+[observation] [info] Zero coupling means hench-agent findings (dead code, unused exports) will not produce false positives from cross-package usage — linting confidence is high.
 [suggestion] [info] Zone "hench-agent" has files across 31 directories — consider consolidating under a dedicated directory
+[pattern] [info] hench-agent reports 0 coupling despite having a cross-package gateway (src/prd/rex-gateway.ts) to rex. Zone coupling metrics only capture intra-monorepo-zone edges; cross-package imports through gateways are invisible to the metric. Gateway audits are the correct signal for hench external dependency surface.
+[anti-pattern] [info] 155 files in a single zone with no sub-zone decomposition means intra-hench coupling regressions (e.g. agent logic taking a direct dependency on store internals) are invisible to zone health metrics until they cause cross-package problems. Decomposing hench into sub-zones (agent-core, prd-bridge, store) would make internal layering violations detectable at the zone-metric level.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Perfect cohesion (1.0) with zero external coupling confirms that hench is a well-bounded execution-tier package — all 155 files form a single tight community with no stray cross-package imports leaking out.
-- The rex-gateway.ts pattern (8 re-exported functions) is the only surface through which hench touches domain-tier state; auditing that no leaf file in src/agent/ or src/store/ bypasses this gateway is the key enforcement point.
-- At 155 files hench is the largest single-package zone in this batch; if Louvain begins splitting it in future runs (e.g. store vs agent sub-communities), that is a healthy signal to introduce explicit sub-zone pins rather than resisting the split.
-- Cohesion of 1.0 and coupling of 0.0 are ideal for an execution-tier package: hench depends downward on rex (via gateway) but presents no surface that higher-tier code imports, correctly reflecting its position in the four-tier hierarchy.
-- Run transcripts are written to .hench/runs/ which is outside the source tree; confirming that the runs directory has a documented retention policy prevents unbounded disk growth in long-running deployments.
-- The adaptive.ts and review.ts analysis modules alongside spin.ts suggest a multi-phase analysis loop; if these grow further, extracting them into a named sub-zone (e.g. hench-analysis-pipeline) would improve navigability without breaking the package boundary.
+- Cohesion of 1.0 with zero coupling is ideal for a self-contained package zone — hench imports rex through its gateway and has no inbound cross-package imports.
+- 155 files in a single zone is large; if zone-level health analysis becomes noisy, consider whether sub-zones (agent-core, prd-bridge, store) would improve signal quality.
+- The gateway pattern (src/prd/rex-gateway.ts) concentrates all rex imports into one auditable surface, matching the documented architecture.
+- Perfect cohesion (1.0) and zero external coupling confirm hench is a well-encapsulated execution tier with clean package boundaries.
+- At 155 files, hench is the largest single-zone package; the zone is healthy now, but sub-zone decomposition would make future coupling regressions easier to detect.
+- Zero coupling means hench-agent findings (dead code, unused exports) will not produce false positives from cross-package usage — linting confidence is high.
 - Zone "hench-agent" has files across 31 directories — consider consolidating under a dedicated directory
+- The gateway pattern (rex-gateway.ts) creates a zone-metric blind spot: hench-agents outbound imports to rex do not register as zone coupling because rex is a separate zone. The coupling metric of 0 understates hench actual dependency surface — consumers of zone health dashboards should supplement coupling scores with gateway file audits for cross-package dependency visibility.
+- hench-agent reports 0 coupling despite having a cross-package gateway (src/prd/rex-gateway.ts) to rex. Zone coupling metrics only capture intra-monorepo-zone edges; cross-package imports through gateways are invisible to the metric. Gateway audits are the correct signal for hench external dependency surface.
+- hench-agent's perfect cohesion (1.0) and zero measured coupling create a monitoring blind spot: the zone health dashboard cannot distinguish between a healthy 155-file zone and one where internal sub-concerns (agent-core, prd-bridge, store) have developed hidden coupling that only becomes visible after a refactor. The absence of sub-zones means coupling regressions within hench are undetectable until they manifest as inter-package issues.
+- 155 files in a single zone with no sub-zone decomposition means intra-hench coupling regressions (e.g. agent logic taking a direct dependency on store internals) are invisible to zone health metrics until they cause cross-package problems. Decomposing hench into sub-zones (agent-core, prd-bridge, store) would make internal layering violations detectable at the zone-metric level.
 - [call graph] 2709 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

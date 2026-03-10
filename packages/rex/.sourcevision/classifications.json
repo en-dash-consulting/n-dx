@@ -518,7 +518,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Handles acknowledgment logic in the analyze pipeline — business logic orchestration",
+          "detail": "Manages an acknowledged-findings store with hashing, loading, and persistence — data layer business logic.",
           "weight": 0.7
         }
       ]
@@ -532,7 +532,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Shared utilities and helpers used across the analyze pipeline",
+          "detail": "Centralized shared constants, prompt definitions, JSON repair helpers, and token-parsing utilities used across the analyze module.",
           "weight": 0.7
         }
       ]
@@ -546,7 +546,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Guards/validates consolidation logic in the analyze pipeline",
+          "detail": "Orchestrates post-processing safety logic — detects over-granular proposals and triggers LLM re-consolidation.",
           "weight": 0.7
         }
       ]
@@ -560,7 +560,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Decomposition logic for analyze pipeline — business logic",
+          "detail": "Recursively decomposes oversized tasks via LLM calls — business logic orchestration with structured return values.",
           "weight": 0.7
         }
       ]
@@ -574,7 +574,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Deduplication utility used in the analyze pipeline",
+          "detail": "Pure multi-signal string similarity and near-duplicate clustering engine with no side effects.",
           "weight": 0.7
         }
       ]
@@ -588,7 +588,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Diff computation utility for comparing PRD states",
+          "detail": "Formats tree-style proposal diffs against existing PRD items — pure formatting/visualization helper.",
           "weight": 0.7
         }
       ]
@@ -602,7 +602,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Extraction logic from analysis results — data transformation service",
+          "detail": "Parses documents into hierarchical PRD proposals via pattern recognition and LLM disambiguation — data extraction orchestration.",
           "weight": 0.7
         }
       ]
@@ -616,7 +616,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "File validation helpers for the analyze pipeline",
+          "detail": "Input validation pipeline checking paths, extensions, size, binary content, and syntax — shared validation helper.",
           "weight": 0.7
         }
       ]
@@ -630,7 +630,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Guided analysis flow — orchestrates analysis steps",
+          "detail": "Implements a multi-turn LLM clarification loop to build a PRD from user input — business logic orchestration.",
           "weight": 0.7
         }
       ]
@@ -658,21 +658,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Bridge to LLM calls within the analyze pipeline — API client/service",
+          "detail": "Centralized LLM client singleton and configuration — API client abstraction layer.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/modify-reason.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Utilities for handling modification reasons in analysis",
+          "detail": "Calls LLM to revise proposals per a modification request, validates quality, and handles retries — business logic orchestration.",
           "weight": 0.7
         }
       ]
@@ -686,21 +686,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Proposal generation logic — core analyze pipeline service",
+          "detail": "Builds hierarchical PRD proposals from scan results using multi-strategy feature-task matching — domain business logic.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reason.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reasoning utilities shared across analyze pipeline",
+          "detail": "Main reasoning module providing proposal parsing, project context loading, quality validation, and anti-pattern detection.",
           "weight": 0.7
         }
       ]
@@ -714,21 +714,21 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Reconciliation logic between PRD states — business logic orchestration",
+          "detail": "Compares scan results against existing PRD items using fuzzy matching and detects update candidates — domain reconciliation logic.",
           "weight": 0.7
         }
       ]
     },
     {
       "path": "src/analyze/reshape-reason.ts",
-      "archetype": "utility",
+      "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Utilities for reshape reasoning in analyze pipeline",
+          "detail": "Builds prompts and calls LLM to propose PRD restructuring actions (merge, reparent, split) — business logic orchestration.",
           "weight": 0.7
         }
       ]
@@ -742,7 +742,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Scanner implementations for codebase analysis",
+          "detail": "Scans test files, docs, and sourcevision output for requirements, returning structured ScanResult objects — data fetching and aggregation.",
           "weight": 0.7
         }
       ]
@@ -756,7 +756,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Validation utilities for modifications in the analyze pipeline",
+          "detail": "Pure validator checking modification requests for specificity and classifying intent — no side effects, shared helper.",
           "weight": 0.7
         }
       ]
@@ -1229,14 +1229,14 @@
     },
     {
       "path": "src/cli/help.ts",
-      "archetype": "utility",
+      "archetype": "types",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "utility",
+          "archetypeId": "types",
           "signalKind": "path",
-          "detail": "Help text generation for CLI commands",
+          "detail": "Command-specific help content definitions with usage patterns and examples — companion constants file, no logic.",
           "weight": 0.7
         }
       ]
@@ -1257,6 +1257,20 @@
     },
     {
       "path": "src/cli/mcp-tools.ts",
+      "archetype": "route-handler",
+      "confidence": 0.7,
+      "source": "llm",
+      "evidence": [
+        {
+          "archetypeId": "route-handler",
+          "signalKind": "path",
+          "detail": "Implements individual MCP tool handlers receiving store and arguments and returning responses — analogous to HTTP route handlers.",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "src/cli/mcp.ts",
       "archetype": "service",
       "confidence": 0.7,
       "source": "llm",
@@ -1264,21 +1278,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "MCP tool definitions and handlers for CLI",
-          "weight": 0.7
-        }
-      ]
-    },
-    {
-      "path": "src/cli/mcp.ts",
-      "archetype": "cli-command",
-      "confidence": 0.7,
-      "source": "llm",
-      "evidence": [
-        {
-          "archetypeId": "cli-command",
-          "signalKind": "path",
-          "detail": "MCP CLI command implementation",
+          "detail": "Creates a fully configured Rex MCP server with all tools registered — server factory and composition root.",
           "weight": 0.7
         }
       ]
@@ -1306,7 +1306,7 @@
         {
           "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Input validation utilities for CLI commands",
+          "detail": "Centralizes CLI flag parsing and validation helpers with user-friendly error messages — shared validation utility.",
           "weight": 0.7
         }
       ]
@@ -1817,14 +1817,14 @@
     },
     {
       "path": "src/recommend/conflict-detection.ts",
-      "archetype": "service",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "Conflict detection logic in the recommend pipeline",
+          "detail": "Detects conflicts and intra-batch duplicates using similarity scoring with configurable thresholds — pure detection logic.",
           "weight": 0.7
         }
       ]
@@ -1838,7 +1838,7 @@
         {
           "archetypeId": "service",
           "signalKind": "path",
-          "detail": "Creates PRD items from recommendations — business logic service",
+          "detail": "Atomically creates PRD items from recommendations with conflict strategy handling and reparenting — business logic orchestration.",
           "weight": 0.7
         }
       ]
@@ -2137,7 +2137,7 @@
         {
           "archetypeId": "config",
           "signalKind": "path",
-          "detail": "Default workflow configuration/settings",
+          "detail": "Defines the canonical autonomous agent workflow guide as a static text constant — configuration/settings definition.",
           "weight": 0.7
         }
       ]
@@ -2147,11 +2147,12 @@
     "totalClassified": 113,
     "totalUnclassified": 0,
     "byArchetype": {
-      "service": 12,
-      "utility": 47,
+      "service": 14,
+      "utility": 44,
       "entrypoint": 6,
-      "cli-command": 31,
-      "types": 2,
+      "cli-command": 30,
+      "types": 3,
+      "route-handler": 1,
       "schema": 3,
       "store": 11,
       "config": 1

@@ -18775,22 +18775,6 @@
       ]
     },
     {
-      "from": "packages/web/src/shared/index.ts",
-      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
-      "type": "reexport",
-      "symbols": [
-        "createRequestDedup"
-      ]
-    },
-    {
-      "from": "packages/web/src/shared/index.ts",
-      "to": "packages/web/src/viewer/messaging/request-dedup.ts",
-      "type": "type",
-      "symbols": [
-        "RequestDedup"
-      ]
-    },
-    {
       "from": "packages/web/src/viewer/bootstrap.ts",
       "to": "packages/web/src/viewer/components/theme-toggle.ts",
       "type": "static",
@@ -26420,7 +26404,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2734,
+    "totalEdges": 2732,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],

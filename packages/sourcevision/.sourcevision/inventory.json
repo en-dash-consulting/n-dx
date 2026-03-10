@@ -322,13 +322,13 @@
     },
     {
       "path": "src/analyzers/move-recommendations.ts",
-      "size": 6506,
+      "size": 7189,
       "language": "TypeScript",
-      "lineCount": 195,
-      "hash": "919bd7e4a4486b69a9f64678e6a52dad22aef359c5c056cb0e8fe5b7a11751cb",
+      "lineCount": 210,
+      "hash": "4b6f91d22bda89641e8edf377574b37d62e8bee54ddb069921e0ec58f708c849",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1773021976280
+      "lastModified": 1773101623800
     },
     {
       "path": "src/analyzers/next-steps.ts",
@@ -342,13 +342,13 @@
     },
     {
       "path": "src/analyzers/risk-scoring.ts",
-      "size": 12333,
+      "size": 13472,
       "language": "TypeScript",
-      "lineCount": 329,
-      "hash": "8065f998331b7eb0e88d5445d1e770babb5c8a36c3a56ce337ae4bd478708e9e",
+      "lineCount": 355,
+      "hash": "09ceb085cdd898704040a0729094e39fff38f5b3275451211733ae93442a4780",
       "role": "source",
       "category": "analyzers",
-      "lastModified": 1773024513313
+      "lastModified": 1773100515659
     },
     {
       "path": "src/analyzers/route-detection.ts",
@@ -1112,13 +1112,13 @@
     },
     {
       "path": "tests/unit/analyzers/move-recommendations.test.ts",
-      "size": 7541,
+      "size": 9469,
       "language": "TypeScript",
-      "lineCount": 244,
-      "hash": "f9be6414202f28fa9525c67f04c50ea5a8289edbceaeecd0a8e7f09c3988e71c",
+      "lineCount": 303,
+      "hash": "9d8c32d7a776b2a501a948ca25a62c996c64f4b417afd359f94d825bdd8df4f1",
       "role": "test",
       "category": "tests",
-      "lastModified": 1773021945524
+      "lastModified": 1773101634781
     },
     {
       "path": "tests/unit/analyzers/next-steps.test.ts",
@@ -1132,13 +1132,13 @@
     },
     {
       "path": "tests/unit/analyzers/risk-scoring.test.ts",
-      "size": 10993,
+      "size": 12410,
       "language": "TypeScript",
-      "lineCount": 311,
-      "hash": "5d91a2dfcbb2b2e78c4cf64e45b547bb04476acfd66b673b72b1898e2f5ae232",
+      "lineCount": 350,
+      "hash": "3daaeb8ec6bca926d5fecdf3a88a4ad4bc1c095311e7c87d0f4f47835edddcce",
       "role": "test",
       "category": "tests",
-      "lastModified": 1773020571100
+      "lastModified": 1773100598396
     },
     {
       "path": "tests/unit/analyzers/token-usage.test.ts",
@@ -1445,10 +1445,10 @@
       "size": 84374,
       "language": "Other",
       "lineCount": 1,
-      "hash": "8bb433b9bbdd9fceaeae31d208f0f04a5f5471f10af215a2930255fc8d7cc0d1",
+      "hash": "37c28779db6fdc93d787802ed02a35581297a3ca90d352293adb85585398243f",
       "role": "config",
       "category": "root",
-      "lastModified": 1773094287335
+      "lastModified": 1773101657211
     },
     {
       "path": "vitest.config.ts",
@@ -1463,7 +1463,7 @@
   ],
   "summary": {
     "totalFiles": 146,
-    "totalLines": 44664,
+    "totalLines": 44803,
     "byLanguage": {
       "JSON": 6,
       "Markdown": 3,

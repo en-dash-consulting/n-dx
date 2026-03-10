@@ -90,6 +90,8 @@
         "llm-client.ts hardcodes a codex branch independently of ProviderRegistry — callers adding a third vendor must update both files. Remove the manual dispatch from llm-client.ts and delegate to defaultRegistry.getActiveProvider() to make the registry the single extension point.",
         "suggest.ts and help-format.ts are CLI presentation utilities with no LLM logic — their presence in the public.ts barrel inflates the package's surface with non-LLM concerns. Consider grouping them under a documented 'CLI utilities' section in public.ts or extracting to a subpath export (e.g. @n-dx/llm-client/cli) to signal the different role.",
         "12 entry points combined with being the minor partner in a 3+23 asymmetric cross-zone coupling suggests src/ is functioning as a public API surface layer — the wide entry-point count is structurally consistent with an intentional public API zone rather than an architectural defect",
+        "The 12-entry-point surface (finding 0) is corroborated by global finding 10 as a symptom of the same root cause: a vendor-neutralization refactor that left backwards-compat symbols without @deprecated markers. The classification manifest independently confirms the structural duplication — two co-existing factory files (src/create-client.ts and src/llm-client.ts) and two co-existing type definition files (src/types.ts and src/llm-types.ts). This makes src finding 0 the only zone-level finding with cross-corroboration from a non-heuristic source.",
+        "The vendor-neutralization refactor left three in-place annotations missing, confirmed by the classification manifest. Concrete edits required (no file splits): (1) src/create-client.ts — add @deprecated JSDoc on createClient pointing to createLLMClient in src/llm-client.ts; (2) src/llm-types.ts — add @deprecated JSDoc on the LLMClient type alias pointing to ClaudeClient; (3) src/types.ts — confirm CompletionRequest.cliFlags is CLI-adapter-only and add a @internal or cli-only JSDoc marker if not already present. These three annotation edits reduce the effective exported surface and directly address the wide entry-point heuristic without restructuring any files.",
         "[call graph] 55 internal calls, 4 outgoing, 88 incoming (cohesion: 0.93, coupling: 0.07)"
       ],
       "riskMetrics": {
@@ -156,6 +158,7 @@
         "Generic zone name 'Src 2' and 43% file concentration are co-symptoms of the same root cause: this zone absorbed implementation details across multiple domains during incremental growth without a rationalizing refactor. The two findings reinforce each other but do not independently reach the 2x threshold required to prescribe a concrete split.",
         "Zone granularity concern is below actionable threshold: 19 files vs ~30 (2x detection threshold of ~15). Monitor as files are added but no split warranted now.",
         "Zone name 'Src 2' is generic but reflects detection artifact, not structural risk. No rename action warranted until zone boundaries are clarified through file growth.",
+        "Findings 0 and 1 (both warning) are directly contradicted by finding 2 (LLM pass 5, info), which explicitly closes them as detection artifacts requiring no action. The severity mismatch within the zone is a multi-pass artifact: heuristic pass 0 generated warnings before LLM pass 5 contextualized them. File count (19) has not reached the 2x detection threshold (~30 files), and zone renaming is unwarranted until zone boundaries stabilize through file growth. Both findings 0 and 1 should be treated as info severity.",
         "[call graph] 269 internal calls, 0 outgoing, 4 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -569,6 +572,11 @@
     "Findings 3, 5, 7, and 8 form a resolved contradiction cluster around api-provider.test.ts placement. Test-to-implementation 100% import-neighbor overlap is the correct and expected condition for a focused unit test file. All four findings are closed by design — no further analysis needed.",
     "The three reverse crossings (src→src-2 direction) are the only unresolved coupling risk. These specific import edges should be individually inspected in the next analysis pass to confirm whether they are cyclic dependencies or convenience imports before any interface-extraction is proposed.",
     "The 3 reverse crossings (src exporting into src-2) are the bounded risk surface from the asymmetric coupling. Until these specific edges are inspected and confirmed as cyclic rather than convenience imports, no interface extraction should be proposed. Treat as a watch item, not an action item.",
+    "The package's structural history is directly legible from the file manifest: src/create-client.ts and src/llm-client.ts coexist as factory files, and src/types.ts and src/llm-types.ts coexist as type definition files. This confirms a vendor-neutralization refactor that preserved backwards-compat names without deprecation markers. Global finding 10 and src zone finding 0 share this single root cause — they are not independent problems.",
+    "Detection artifacts outnumber genuine structural findings: approximately 10 of 18 findings address zone naming, zone sizing, or heuristic threshold warnings that LLM pass 5 subsequently downgraded to informational. The effective actionable finding set is 2: global finding 10 (API surface rationalization) and src zone finding 0 (wide entry-point surface as a corroborating symptom of the same refactor debt).",
+    "The bidirectional coupling label on global finding 0 is a systematic mislabeling for this package: a 3+23 crossing ratio is not architecturally bidirectional. The 23 crossings represent the expected direction for a runtime layer depending on its core. Downgrading global finding 0 to info is supported by three independent LLM findings (global findings 2, 4, 6) that each independently identify the label as misleading.",
+    "Zone src-2 findings 0 and 1 (both warning severity) are directly contradicted by src-2 finding 2 (LLM analysis, info), which explicitly marks both as no-action detection artifacts. The contradiction originates from multi-pass ordering: heuristic pass 0 generated warnings before LLM pass 5 provided context. Finding 2 is correct: the 19-file count is below the 2x detection threshold (~30), and the generic name 'Src 2' reflects a Louvain partitioning artifact, not a maintainability risk. Findings 0 and 1 should be treated as info severity.",
+    "The move-file suggestion for tests/unit/api-provider.test.ts (global finding 9) is contradicted by three independent findings (global findings 3, 5, and 8) that each mark it resolved-by-design. Unit test files having 100% import-neighbor overlap with their implementation zone is the expected and correct structural condition for a focused test file. Global finding 9 carries no actionable weight and is definitively closed by the preponderance of independent evidence.",
     "[call graph] 88 calls: \"unit\" → \"src\""
   ],
   "findings": [
@@ -619,6 +627,20 @@
       "pass": 5,
       "scope": "global",
       "text": "The 3 reverse crossings (src exporting into src-2) are the bounded risk surface from the asymmetric coupling. Until these specific edges are inspected and confirmed as cyclic rather than convenience imports, no interface extraction should be proposed. Treat as a watch item, not an action item.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "The move-file suggestion for tests/unit/api-provider.test.ts (global finding 9) is contradicted by three independent findings (global findings 3, 5, and 8) that each mark it resolved-by-design. Unit test files having 100% import-neighbor overlap with their implementation zone is the expected and correct structural condition for a focused test file. Global finding 9 carries no actionable weight and is definitively closed by the preponderance of independent evidence.",
+      "severity": "info"
+    },
+    {
+      "type": "observation",
+      "pass": 5,
+      "scope": "global",
+      "text": "Zone src-2 findings 0 and 1 (both warning severity) are directly contradicted by src-2 finding 2 (LLM analysis, info), which explicitly marks both as no-action detection artifacts. The contradiction originates from multi-pass ordering: heuristic pass 0 generated warnings before LLM pass 5 provided context. Finding 2 is correct: the 19-file count is below the 2x detection threshold (~30), and the generic name 'Src 2' reflects a Louvain partitioning artifact, not a maintainability risk. Findings 0 and 1 should be treated as info severity.",
       "severity": "info"
     },
     {
@@ -700,14 +722,21 @@
     },
     {
       "type": "suggestion",
+      "pass": 5,
+      "scope": "src",
+      "text": "The vendor-neutralization refactor left three in-place annotations missing, confirmed by the classification manifest. Concrete edits required (no file splits): (1) src/create-client.ts — add @deprecated JSDoc on createClient pointing to createLLMClient in src/llm-client.ts; (2) src/llm-types.ts — add @deprecated JSDoc on the LLMClient type alias pointing to ClaudeClient; (3) src/types.ts — confirm CompletionRequest.cliFlags is CLI-adapter-only and add a @internal or cli-only JSDoc marker if not already present. These three annotation edits reduce the effective exported surface and directly address the wide entry-point heuristic without restructuring any files.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
       "pass": 0,
       "scope": "root",
-      "text": "Zone \"Root\" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
+      "text": "Zone \"Root\" (root) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 3 files (minimum 5 for reliable metrics)",
       "severity": "info"
     }
   ],
   "enrichmentPass": 4,
-  "metaEvaluationCount": 15,
+  "metaEvaluationCount": 16,
   "structureHash": "d08fabc1505e905d",
   "zoneContentHashes": {
     "root": "ce845516824a764d",

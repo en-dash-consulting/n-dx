@@ -1,0 +1,24 @@
+{
+  "id": "web-shared-foundation",
+  "name": "Web Shared Foundation",
+  "description": "Framework-agnostic shared utilities for the web package, providing data-file constants and a node-culler utility that are consumed by both the viewer and server layers without introducing framework dependencies.",
+  "files": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/node-culler.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/shared/data-files.ts"
+  ],
+  "cohesion": 0.44,
+  "coupling": 0.56,
+  "fileCount": 3,
+  "lineCount": 201,
+  "riskMetrics": {
+    "cohesion": 0.44,
+    "coupling": 0.56,
+    "riskScore": 0.56,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

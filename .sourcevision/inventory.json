@@ -101,16 +101,6 @@
       "lastModified": 1772682844021
     },
     {
-      "path": ".hench/locks/8618.lock",
-      "size": 60,
-      "language": "Other",
-      "lineCount": 4,
-      "hash": "e04fe96e56bf373536f485b845b90c9ff21f62b8d8f3287a5689ca5e8f6c5b74",
-      "role": "other",
-      "category": ".hench",
-      "lastModified": 1773099476112
-    },
-    {
       "path": ".npmrc",
       "size": 60,
       "language": "Other",
@@ -152,23 +142,23 @@
     },
     {
       "path": ".rex/execution-log.jsonl",
-      "size": 169945,
+      "size": 172035,
       "language": "Other",
-      "lineCount": 695,
-      "hash": "5dfdaa7f71371ef57cd5a8debb3e1f8c9239248b99d696b31a079e275d525832",
+      "lineCount": 702,
+      "hash": "bf66db6ea52df8591ee81c2ed483f504f81c210827ebf6f3cf8092ec794f5d17",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1773102052624
+      "lastModified": 1773103011988
     },
     {
       "path": ".rex/prd.json",
-      "size": 1122328,
+      "size": 1123054,
       "language": "JSON",
-      "lineCount": 20730,
-      "hash": "c1df89506da98fbf36dbe22d613a1d444fe8ee2fa4064f47749a4716a40fe502",
+      "lineCount": 20737,
+      "hash": "a505cefc99f700bf826a35f813e32f8a5de4fcb919f04175c3ed5be4c01487c3",
       "role": "other",
       "category": ".rex",
-      "lastModified": 1773102052623
+      "lastModified": 1773103011918
     },
     {
       "path": ".rex/workflow.md",
@@ -6972,13 +6962,13 @@
     },
     {
       "path": "packages/web/src/shared/index.ts",
-      "size": 626,
+      "size": 477,
       "language": "TypeScript",
-      "lineCount": 13,
-      "hash": "574b65cc3f5093e00d158752fa6fe1c54fcbcad1fc910452d4dfc139cfd8715d",
+      "lineCount": 11,
+      "hash": "c1e526ee3b198749acd34c5ee3480fbcbe04274f06477e6bb4670e1512c8a654",
       "role": "source",
       "category": "web",
-      "lastModified": 1773096697324
+      "lastModified": 1773102888700
     },
     {
       "path": "packages/web/src/shared/node-culler.ts",
@@ -10892,10 +10882,10 @@
     }
   ],
   "summary": {
-    "totalFiles": 1089,
-    "totalLines": 350764,
+    "totalFiles": 1088,
+    "totalLines": 350772,
     "byLanguage": {
-      "Other": 19,
+      "Other": 18,
       "Markdown": 38,
       "YAML": 3,
       "JSON": 28,
@@ -10906,7 +10896,7 @@
       "CSS": 44
     },
     "byRole": {
-      "other": 62,
+      "other": 61,
       "docs": 38,
       "build": 3,
       "config": 20,
@@ -10919,7 +10909,7 @@
       "root": 27,
       ".claude": 6,
       ".github": 1,
-      ".hench": 2,
+      ".hench": 1,
       ".rex": 6,
       "docs": 16,
       "hench": 157,

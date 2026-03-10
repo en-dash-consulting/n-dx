@@ -9,7 +9,7 @@
 - **Lines of code**: 84,274
 - **Languages**: TypeScript (231), JSON (8), Other (4), Markdown (4), Text (1)
 - **Zones**: 12 (12 with descriptions)
-- **Analyzed**: 2026-03-09T23:06:28.927Z
+- **Analyzed**: 2026-03-10T00:44:21.160Z
 
 ## Architecture Zones
 
@@ -151,7 +151,9 @@
 ### Patterns
 
 - After removing the four sub-8-file zones (fix, unit-store, .rex, unit-core) from the risk count as unreliable data points per calibration analysis, the number of zones genuinely exceeding architectural risk thresholds drops from 6 to 3: unit (catastrophic, multi-signal corroboration), cli (warning, partially corroborated), and store (warning, heuristic only). The corrected count materially changes remediation priority and sequencing. [info]
+- Contradictions resolved with authoritative verdicts: (1) Global finding 12 ('6 zones exceed risk thresholds') is superseded by global finding 14 — the corrected count is 3 zones after excluding sub-8-file zones; finding 14 is authoritative for remediation planning. (2) Global finding 13 recommends moving src/cli/output.ts to src/cli/commands/ based on 89% import-neighbor proximity; global finding 8 correctly identifies this as the wrong destination — src/util/output.ts resolves the layering inversion where src/analyze/guided.ts imports CLI infrastructure; applying finding 13 would worsen the inversion by deepening the file's CLI identity. (3) CLI zone finding 5 (critical severity) contradicts CLI zone finding 3 (warning downgrade); finding 3 is correct because unidirectional consumer coupling to a shared core is architectural expectation, not catastrophic failure. [warning]
 - Findings 7 and 8 address the same problem (zone naming convention) at different levels of specificity. Finding 7 specifies three concrete rules; finding 8 describes a three-category taxonomy. These are complementary, not redundant: finding 7 addresses IDs and display names (the naming syntax), finding 8 addresses semantic categories (the naming vocabulary). A single PACKAGE_GUIDELINES.md section can satisfy both by defining the taxonomy first, then the syntax rules that apply within each category. [info]
+- Severity calibration summary across all 73 findings: automated heuristic 'catastrophic' and 'critical' ratings are reliable only for zones with ≥8 files. The four reassigned severities (cli zone finding 5: critical→warning, fix zone finding 6: critical→info, unit-core zone finding 3: critical→warning, global finding 12: warning→info) each have explicit corroborating evidence in existing LLM-analysis findings. After reassignment, 'critical' severity appears only on unit zone findings 4–7 and global finding 18 — all with multi-signal support. Treat all other prior 'catastrophic' labels as informational noise from the calibration gap identified in global finding 16. [info]
 - The automated heuristic severity ratings are internally consistent but systematically inflate risk for small zones (fix, unit-store, .rex). The catastrophic/critical thresholds were calibrated on zone populations where metric values represent meaningful structural signals. For zones under 8 files, the same threshold values represent noise. This is not a flaw in individual findings but a calibration gap that affects how the summary in global finding 8 (6 zones exceed thresholds) should be weighted: the 4-file zones should be excluded from that count as unreliable data points. [info]
 - The fan-in hotspot at src/schema/index.ts (finding 3: 24 importer files, 8 zones) combined with the undocumented Zod-exclusion convention (finding 12) creates a compound risk: the highest-impact module in the codebase has an invisible behavioral contract. A contributor adding a Zod schema export to schema/index.ts would silently violate the convention with no static check, no lint rule, and no comment to warn them. Adding a comment block to schema/index.ts itself — not just PACKAGE_GUIDELINES.md — is higher priority because the fan-in multiplier means violations spread to 24 files instantly. [warning]
 - The single highest-priority action in the entire analysis is auditing the 39 unit-analyze → unit import inversions and moving the misplaced files into unit-analyze. This is the structural prerequisite: it resolves the bidirectional coupling (global finding 0), reduces unit's catastrophic risk score, and narrows unit-analyze's API surface — all three of the highest-severity multi-signal findings trace to this root cause. [critical]
@@ -186,9 +188,9 @@
 - Before deleting: verify reachability by running `node --input-type=module -e 'import "./src/fix/..."'` or tracing CLI entry points. If unreachable, delete the 4 files and remove the zone. If reachable only via dynamic require() or CLI spawn (not static import), add a comment block at each file's top explaining the invocation path — this documents why the import graph shows zero edges without requiring structural change. [warning] (fix)
 - Downgrade fix zone from catastrophic to informational. With 4 files below the 8-file calibration floor, the 0.75 coupling score reflects measurement artifact not structural failure. The real question is reachability: trace entry points to determine if these files are dead code (delete) or dynamically invoked (add inline comments documenting the invocation path). This is a two-outcome decision, not an architectural refactoring. [warning] (fix)
 - Verify reachability before any action: trace the CLI entry point for the fix command through src/cli/commands/fix.ts. If no static import path from main entry points reaches src/core/fix.ts, it is dead code — delete it. If it is reached via CLI dispatch (not static import), add a comment block at the top of each file in the fix zone explaining the invocation path. This is a two-outcome decision, not an architectural refactoring. [info] (fix)
-- Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention [critical] (fix)
+- Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — unreliable: zone has only 4 files (minimum 5 for reliable metrics) [info] (fix)
 - src/cli/commands/ contains files from 8 zones (cli, fix, store, unit, unit-analyze, unit-cli, unit-core, validate) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- ... and 23 more
+- ... and 25 more
 
 ## Next Steps
 
@@ -196,10 +198,10 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **6 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …**
-
 1. **The 39 imports from unit-analyze → unit (upward direction) … (+3 related)**
    Files: `src/analyze/acknowledge.ts`, `src/cli/commands/recommend.ts`, `src/cli/commands/report.ts`
+
+1. **5 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): …**
 
 1. **Fan-in hotspot: src/schema/index.ts receives calls from 24 files — high-impact …**
 
@@ -234,6 +236,9 @@ Prioritized work items derived from analysis:
 
 1. **The god-function finding for buildProposals in src/analyze/… (+1 related)**
 
+1. **Before auditing the 33 entry points, read packages/rex/src/public.ts to identif…**
+   Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
+
 1. **Declare unit-analyze's shared-core role explicitly: add a src/core/README.md or…**
    Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
 
@@ -249,9 +254,7 @@ Prioritized work items derived from analysis:
 1. **unit-analyze is the dependency sink for the entire package: cli (28 imports), u…**
    Files: `src/analyze/analyze-shared.ts`, `src/analyze/consolidation-guard.ts`, `src/analyze/decompose.ts`
 
-1. **The fan-in hotspot at src/schema/index.ts (finding 3: 24 im… (+1 related)**
-
-1. **Add a comment block to src/schema/index.ts documenting the Zod-exclusion conven…**
+1. **Contradictions resolved with authoritative verdicts: (1) Gl… (+2 related)**
 
 ### Low Priority
 
@@ -269,6 +272,9 @@ Prioritized work items derived from analysis:
 1. **Verify reachability before any action: trace the CLI entry point for the fix co…**
    Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
 
+1. **Zone "Fix" (fix) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: …**
+   Files: `src/cli/commands/fix.ts`, `src/core/fix.ts`, `tests/unit/cli/commands/fix.test.ts`
+
 1. **Zone "unit" has files across 14 directories — consider consolidating under a de…**
    Files: `src/analyze/acknowledge.ts`, `src/cli/commands/recommend.ts`, `src/cli/commands/report.ts`
 
@@ -280,9 +286,6 @@ Prioritized work items derived from analysis:
 
 1. **Zone "store" has files across 7 directories — consider consolidating under a de…**
    Files: `src/cli/commands/sync.ts`, `src/store/adapter-registry.ts`, `src/store/index.ts`
-
-1. **Zone "unit-cli" has files across 6 directories — consider consolidating under a…**
-   Files: `src/cli/commands/adapter.ts`, `src/cli/commands/move.ts`, `src/cli/commands/remove.ts`
 
 ## File Inventory
 
@@ -310,11 +313,11 @@ Prioritized work items derived from analysis:
 | `src/analyze/guided.ts` | source | service | unit-analyze |
 | `src/analyze/index.ts` | source | entrypoint | unit-analyze |
 | `src/analyze/llm-bridge.ts` | source | service | unit-analyze |
-| `src/analyze/modify-reason.ts` | source | utility | unit-analyze |
+| `src/analyze/modify-reason.ts` | source | service | unit-analyze |
 | `src/analyze/propose.ts` | source | service | unit-analyze |
-| `src/analyze/reason.ts` | source | utility | unit-analyze |
+| `src/analyze/reason.ts` | source | service | unit-analyze |
 | `src/analyze/reconcile.ts` | source | service | unit-analyze |
-| `src/analyze/reshape-reason.ts` | source | utility | unit-analyze |
+| `src/analyze/reshape-reason.ts` | source | service | unit-analyze |
 | `src/analyze/scanners.ts` | source | service | unit-analyze |
 | `src/analyze/validate-modification.ts` | source | utility | unit-analyze |
 | `src/cli/commands/adapter.ts` | source | cli-command | unit-cli |
@@ -349,10 +352,10 @@ Prioritized work items derived from analysis:
 | `src/cli/commands/validate.ts` | source | cli-command | validate |
 | `src/cli/commands/verify.ts` | source | cli-command | unit-cli |
 | `src/cli/errors.ts` | source | utility | unit-cli |
-| `src/cli/help.ts` | source | utility | unit-cli |
+| `src/cli/help.ts` | source | types | unit-cli |
 | `src/cli/index.ts` | source | entrypoint | unit-cli |
-| `src/cli/mcp-tools.ts` | source | service | cli |
-| `src/cli/mcp.ts` | source | cli-command | cli |
+| `src/cli/mcp-tools.ts` | source | route-handler | cli |
+| `src/cli/mcp.ts` | source | service | cli |
 | `src/cli/output.ts` | source | utility | unit-cli |
 | `src/cli/validate-input.ts` | source | utility | unit-cli |
 | `src/core/analytics.ts` | source | utility | unit-analyze |
@@ -391,7 +394,7 @@ Prioritized work items derived from analysis:
 | `src/core/tree.ts` | source | utility | unit |
 | `src/core/verify.ts` | source | utility | unit-cli |
 | `src/public.ts` | source | entrypoint | unit-analyze |
-| `src/recommend/conflict-detection.ts` | source | service | unit |
+| `src/recommend/conflict-detection.ts` | source | utility | unit |
 | `src/recommend/create-from-recommendations.ts` | source | service | unit |
 | `src/recommend/types.ts` | source | types | unit |
 | `src/schema/index.ts` | source | entrypoint | unit-analyze |

@@ -110,6 +110,7 @@ Incoming (other zones → this zone):
 - Generic zone name 'Src 2' and 43% file concentration are co-symptoms of the same root cause: this zone absorbed implementation details across multiple domains during incremental growth without a rationalizing refactor. The two findings reinforce each other but do not independently reach the 2x threshold required to prescribe a concrete split.
 - Zone granularity concern is below actionable threshold: 19 files vs ~30 (2x detection threshold of ~15). Monitor as files are added but no split warranted now.
 - Zone name 'Src 2' is generic but reflects detection artifact, not structural risk. No rename action warranted until zone boundaries are clarified through file growth.
+- Findings 0 and 1 (both warning) are directly contradicted by finding 2 (LLM pass 5, info), which explicitly closes them as detection artifacts requiring no action. The severity mismatch within the zone is a multi-pass artifact: heuristic pass 0 generated warnings before LLM pass 5 contextualized them. File count (19) has not reached the 2x detection threshold (~30 files), and zone renaming is unwarranted until zone boundaries stabilize through file growth. Both findings 0 and 1 should be treated as info severity.
 - [call graph] 269 internal calls, 0 outgoing, 4 incoming (cohesion: 1, coupling: 0)
 
 </insights>

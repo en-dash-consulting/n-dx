@@ -9,7 +9,7 @@ Files: 29, Cohesion: 0.40, Coupling: 0.60
 Risk: healthy (score: 0.60)
 Description: 29 files, primarily TypeScript
 Entry points: src/analyzers/branch-work-classifier.ts, src/analyzers/risk-scoring.ts, src/cli/commands/workspace.ts, src/generators/pr-markdown-template.ts, src/schema/data-files.ts, src/schema/v1.ts, tests/unit/analyzers/zones-helpers.ts
-Lines: 11443
+Lines: 11508
 
 </zone>
 
@@ -18,7 +18,7 @@ Lines: 11443
 src/analyzers/branch-work-classifier.ts (TypeScript, 241 lines, source)
 src/analyzers/branch-work-filter.ts (TypeScript, 378 lines, source)
 src/analyzers/branch-work-store.ts (TypeScript, 146 lines, source)
-src/analyzers/risk-scoring.ts (TypeScript, 329 lines, source)
+src/analyzers/risk-scoring.ts (TypeScript, 355 lines, source)
 src/analyzers/workspace-aggregate.ts (TypeScript, 501 lines, source)
 src/cli/commands/workspace.ts (TypeScript, 193 lines, source)
 src/generators/pr-markdown-template.ts (TypeScript, 344 lines, source)
@@ -32,7 +32,7 @@ tests/unit/analyzers/callgraph-findings.test.ts (TypeScript, 1305 lines, test)
 tests/unit/analyzers/dedup-findings.test.ts (TypeScript, 194 lines, test)
 tests/unit/analyzers/enrich-content-skip.test.ts (TypeScript, 348 lines, test)
 tests/unit/analyzers/next-steps.test.ts (TypeScript, 650 lines, test)
-tests/unit/analyzers/risk-scoring.test.ts (TypeScript, 311 lines, test)
+tests/unit/analyzers/risk-scoring.test.ts (TypeScript, 350 lines, test)
 tests/unit/analyzers/workspace-aggregate.test.ts (TypeScript, 702 lines, test)
 tests/unit/analyzers/zone-cross-package.test.ts (TypeScript, 201 lines, test)
 tests/unit/analyzers/zone-enrichment.test.ts (TypeScript, 862 lines, test)
@@ -133,6 +133,6 @@ Incoming (other zones → this zone):
 - Test zone coupling to 'analyzers' is architecturally correct — unit tests by design import from the zones they verify. The warning severity on finding 0 is a false positive per the constraint that test-to-implementation coupling must not be flagged as an anti-pattern.
 - Coupling of 0.6 to 'analyzers' reflects normal test-to-implementation dependency. The 29 cross-zone imports are test files consuming the public API they exercise. This is correct design; warning severity is unwarranted and should be treated as info.
 - Coupling 0.6 to 'analyzers' is structurally correct: test zones should import the implementation zones they exercise. This is not a defect.
-- [call graph] 1361 internal calls, 277 outgoing, 614 incoming (cohesion: 0.83, coupling: 0.17)
+- [call graph] 1369 internal calls, 277 outgoing, 620 incoming (cohesion: 0.83, coupling: 0.17)
 
 </insights>

@@ -7,7 +7,7 @@
 Zone: Project Documentation (`project-documentation`)
 Files: 20, Cohesion: 0.00, Coupling: 0.00
 Risk: at-risk (score: 0.50)
-Description: Architecture decision records, audit analyses, and design documents that capture the reasoning behind key structural choices in the codebase.
+Description: Architecture decision records, audit analyses, and developer guides that capture design rationale and system-level constraints for the n-dx toolkit.
 Lines: 6160
 
 </zone>
@@ -48,9 +48,8 @@ Internal:
 <findings>
 
 [observation] [info] Isolated files — no import edges between 20 files, cohesion is unmeasurable (reported as 0)
-[observation] [info] Audit documents (signal-handling-audit.md, process-lifecycle-audit.md, viewer-audit.md) are valuable institutional knowledge; linking them from CLAUDE.md or a docs/README.md index would make them discoverable without a directory scan.
-[observation] [info] The refresh-orchestration-memory-analysis doc suggests a specific incident was analyzed; confirming its recommendations are reflected in ci.js or web.js would close the action loop.
-[observation] [info] Zero coupling is correct — documentation should never be imported by source code, so this zone exerts no architectural pressure on the rest of the graph.
+[observation] [info] 20 documentation files with no coupling to source confirms docs are not accidentally imported, preserving the clean tier boundary.
+[observation] [info] Analysis docs under docs/analysis/ serve as architectural memory — keeping them current as the codebase evolves prevents them from becoming misleading historical artifacts.
 [suggestion] [info] Zone "project-documentation" has files across 6 directories — consider consolidating under a dedicated directory
 [suggestion] [info] Zone "Project Documentation" (project-documentation) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
 
@@ -59,12 +58,11 @@ Internal:
 <insights>
 
 - Isolated files — no import edges between 20 files, cohesion is unmeasurable (reported as 0)
-- Zero cohesion is structural, not a quality problem: markdown documents do not import each other, so community detection has no signal to cluster them on beyond co-location.
-- The docs/analysis/ subtree contains several process-lifecycle and memory-risk audits suggesting a history of reliability incidents; confirming that each identified risk has a corresponding code fix or accepted-risk annotation closes the loop.
-- docs/architecture/ references a level-system, memory architecture, and zone-management spec — keeping these synchronized with actual sourcevision zone output (especially after zone renames) prevents stale documentation from misleading future contributors.
-- Audit documents (signal-handling-audit.md, process-lifecycle-audit.md, viewer-audit.md) are valuable institutional knowledge; linking them from CLAUDE.md or a docs/README.md index would make them discoverable without a directory scan.
-- Zero coupling is correct — documentation should never be imported by source code, so this zone exerts no architectural pressure on the rest of the graph.
-- The refresh-orchestration-memory-analysis doc suggests a specific incident was analyzed; confirming its recommendations are reflected in ci.js or web.js would close the action loop.
+- Zero cohesion and zero coupling are expected for a documentation zone — Markdown files carry no import edges.
+- The docs/analysis/ subtree (viewer-audit, memory-risks, process-lifecycle-audit) indicates a practice of recording architectural investigations, which reduces knowledge loss across sessions.
+- docs/architecture/ captures durable design decisions (memory architecture, level system) that should stay synchronized with CLAUDE.md and PACKAGE_GUIDELINES.md when those evolve.
+- Analysis docs under docs/analysis/ serve as architectural memory — keeping them current as the codebase evolves prevents them from becoming misleading historical artifacts.
+- 20 documentation files with no coupling to source confirms docs are not accidentally imported, preserving the clean tier boundary.
 - Zone "project-documentation" has files across 6 directories — consider consolidating under a dedicated directory
 - [call graph] 14 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 

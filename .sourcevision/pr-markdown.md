@@ -2,7 +2,7 @@
 
 **Branch:** `feature/sv-fixes-0306`
 **Base:** `main`
-**Completed items:** 104
+**Completed items:** 106
 
 | Epic | Completed |
 |------|-----------|
@@ -855,4 +855,10 @@
 - Address move-file issues (2 findings) *(feature)*
   - File "packages/web/src/viewer/messaging/call-rate-limiter.ts" is pinned to zone "Viewer Message Pipeline" but lives in packages/web/src/viewer/messaging/ — consider moving to packages/web/tests/unit/viewer/ to align physical location with architectural zone
 - File "packages/web/src/server/domain-gateway.ts" is pinned to zone "Web Dashboard" but lives in packages/web/src/server/ — consider moving to packages/web/tests/unit/viewer/ to align physical location with architectural zone
+- Address pattern issues (1 findings) *(feature)*
+  - Zone ID 'web-dashboard' is assigned to two distinct zone entries (372-file main zone and 4-file MCP route sub-zone) — deduplicate zone IDs so health metrics are not silently merged across structurally different groups.
+- Address relationship issues (3 findings) *(feature)*
+  - The 4 cross-zone imports from web-viewer into web-shared are traceable to the shared/request-dedup.ts duplicate — resolving the duplication would collapse this cross-zone edge entirely, reducing coupling between web-viewer and web-shared to zero.
+- message zone depends on files in viewer-message-pipeline that logically belong in web-viewer; resolving the zone misclassification will redirect this import edge and may expose a latent zone-level cycle between message and web-viewer that is currently hidden by the misclassification.
+- Production file packages/web/src/landing/landing.ts co-zones with test and script files — zone health metrics conflate production and test code, masking any real production-side structural issues.
 

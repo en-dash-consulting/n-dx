@@ -9,7 +9,7 @@ Files: 40, Cohesion: 0.62, Coupling: 0.38
 Risk: healthy (score: 0.38)
 Description: 40 files, primarily TypeScript
 Entry points: src/analyzers/callgraph-findings.ts, src/analyzers/classify.ts, src/analyzers/claude-client.ts, src/analyzers/context.ts, src/analyzers/enrich-parsing.ts, src/analyzers/enrich.ts, src/analyzers/llms-txt.ts, src/analyzers/move-recommendations.ts, src/analyzers/next-steps.ts, src/analyzers/server-route-detection.ts, src/analyzers/token-usage.ts, src/analyzers/workspace-crossings.ts, src/analyzers/workspace.ts, src/analyzers/zone-output.ts, src/cli/mcp.ts, src/export/pdf-report.ts, src/schema/index.ts, src/util/merge.ts, src/util/sort.ts
-Lines: 12817
+Lines: 12891
 
 </zone>
 
@@ -27,7 +27,7 @@ src/analyzers/enrich-parsing.ts (TypeScript, 456 lines, source)
 src/analyzers/enrich-per-zone.ts (TypeScript, 384 lines, source)
 src/analyzers/enrich.ts (TypeScript, 350 lines, source)
 src/analyzers/llms-txt.ts (TypeScript, 326 lines, source)
-src/analyzers/move-recommendations.ts (TypeScript, 195 lines, source)
+src/analyzers/move-recommendations.ts (TypeScript, 210 lines, source)
 src/analyzers/next-steps.ts (TypeScript, 246 lines, source)
 src/analyzers/server-route-detection.ts (TypeScript, 255 lines, source)
 src/analyzers/token-usage.ts (TypeScript, 50 lines, source)
@@ -47,7 +47,7 @@ tests/unit/analyzers/classify.test.ts (TypeScript, 635 lines, test)
 tests/unit/analyzers/completion-reader.test.ts (TypeScript, 667 lines, test)
 tests/unit/analyzers/enrich-per-zone.test.ts (TypeScript, 400 lines, test)
 tests/unit/analyzers/hints.test.ts (TypeScript, 110 lines, test)
-tests/unit/analyzers/move-recommendations.test.ts (TypeScript, 244 lines, test)
+tests/unit/analyzers/move-recommendations.test.ts (TypeScript, 303 lines, test)
 tests/unit/analyzers/token-usage.test.ts (TypeScript, 142 lines, test)
 tests/unit/analyzers/workspace-crossings.test.ts (TypeScript, 545 lines, test)
 tests/unit/analyzers/workspace.test.ts (TypeScript, 430 lines, test)
@@ -177,10 +177,6 @@ Incoming (other zones → this zone):
 
 [observation] [warning] 19 entry points — wide API surface, consider consolidating exports
 [suggestion] [info] Zone "analyzers" has files across 9 directories — consider consolidating under a dedicated directory
-[suggestion] [warning] After merging analyzers-2 and analyzers-3, create src/analyzers/zone-public.ts as a zero-logic re-export boundary: enumerate the symbols from zones.ts that the 4 importing zones actually use, re-export only those, and update all external import sites to reference zone-public.ts instead of zones.ts directly. This is the only prerequisite before any decomposition of the generateStructuralInsights god function. Confirm via grep that no external zone retains a direct import of zones.ts after the change.
-[suggestion] [warning] Create src/analyzers/zone-public.ts that re-exports only the intended cross-zone API surface of src/analyzers/zones.ts. This is the highest-ROI single change: zones.ts is imported by 4 zones (finding 1) and all 77 cross-zone edges are concrete-to-concrete with no interface layer (finding 6). Adding one re-export boundary here validates the zone-public.ts pattern before applying it elsewhere and immediately narrows the blast radius of any zones.ts API change.
-[suggestion] [warning] Create src/analyzers/zone-public.ts that re-exports only the symbols from zones.ts consumed by external zones. This is a zero-logic change (re-exports only, no new logic) that narrows the blast radius of any zones.ts change. Do this before any decomposition of analyzeZones. Confirm the 4 importing zones reference zone-public.ts after the change.
-[suggestion] [warning] Introduce src/analyzers/zone-public.ts as a re-export boundary for zones.ts before attempting to decompose analyzeZones. Three independent signals converge on this file (god function 32 calls, hub 4-zone import, primary coupling target), making any direct edit to zones.ts a high blast-radius operation. The re-export boundary is a zero-logic change that narrows the API surface and enables safe incremental decomposition later.
 
 </findings>
 
@@ -215,6 +211,6 @@ Incoming (other zones → this zone):
 - After absorbing analyzers-2 and analyzers-3, the unified analyzers zone will contain ~57 files across src/analyzers/ and tests/unit/analyzers/. The zone-public.ts re-export boundary for zones.ts remains the highest-priority single action — it is a zero-logic change that narrows the blast radius of zones.ts edits and is a prerequisite for any safe decomposition.
 - Findings 2, 3, and 4 in this zone are three independent LLM-pass suggestions that all prescribe the identical action: create src/analyzers/zone-public.ts re-exporting only the symbols from zones.ts consumed by external zones. These should be treated as one consolidated finding with triple-pass corroboration, not three separate tasks.
 - After merging analyzers-2 and analyzers-3, create src/analyzers/zone-public.ts as a zero-logic re-export boundary: enumerate the symbols from zones.ts that the 4 importing zones actually use, re-export only those, and update all external import sites to reference zone-public.ts instead of zones.ts directly. This is the only prerequisite before any decomposition of the generateStructuralInsights god function. Confirm via grep that no external zone retains a direct import of zones.ts after the change.
-- [call graph] 969 internal calls, 65 outgoing, 246 incoming (cohesion: 0.94, coupling: 0.06)
+- [call graph] 975 internal calls, 71 outgoing, 246 incoming (cohesion: 0.93, coupling: 0.07)
 
 </insights>

@@ -1,7 +1,7 @@
 {
   "id": "mcp-route-layer",
   "name": "MCP Route Layer",
-  "description": "The MCP HTTP route handler and its domain gateway, together forming the server-side boundary that exposes sourcevision data to MCP clients via Express routes.",
+  "description": "The MCP HTTP route handler and its domain gateway, forming the thin composition layer that wires sourcevision MCP tool calls into the unified web server.",
   "files": [
     "packages/web/src/server/domain-gateway.ts",
     "packages/web/src/server/routes-mcp.ts",

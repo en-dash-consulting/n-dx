@@ -21,10 +21,10 @@ Import edges: 114, External packages: 2
   files: package.json, tsconfig.json, vitest.config.ts
 [src] Src (13 files, coh=0.77 coup=0.23)
   13 files, primarily TypeScript
-  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [store], src/provider-session.ts [service] +3
+  files: src/api-provider.ts [service], src/cli-provider.ts [service], src/codex-cli-provider.ts [service], src/create-client.ts [service], src/llm-client.ts [service], src/llm-config.ts [config], src/llm-types.ts [types], src/provider-interface.ts [types], src/provider-registry.ts [service], src/provider-session.ts [service] +3
 [src-2] Src 2 (19 files, coh=0.56 coup=0.44)
   19 files, primarily TypeScript
-  files: src/auth.ts [utility], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [utility], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
+  files: src/auth.ts [service], src/config.ts [config], src/exec.ts [utility], src/help-format.ts [utility], src/json.ts [utility], src/output.ts [utility], src/project-config.ts [config], src/project-dirs.ts [types], src/public.ts [entrypoint], src/suggest.ts [utility] +9
 [unit] Unit (9 files, coh=1.00 coup=0.00)
   9 files, primarily TypeScript
   files: tests/unit/api-provider.test.ts, tests/unit/cli-provider.test.ts, tests/unit/create-client.test.ts, tests/unit/llm-client.test.ts, tests/unit/provider-interface.test.ts, tests/unit/provider-registry.test.ts, tests/unit/provider-session.test.ts, tests/unit/token-usage.test.ts, tests/unit/types.test.ts
@@ -56,6 +56,7 @@ Most imported:
 [warning] Contains 43% of project files (19/44) — may be too broad, consider splitting [src-2]
 [warning] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [src-2]
 [warning] Findings 3, 4, and 5 share a single root cause: the package's public API surface has not been rationalized after an incremental refactor. CompletionRequest still carries cliFlags, LLMClient still aliases ClaudeClient without deprecation, and createClient still coexists with createLLMClient. These three should be resolved as one coordinated change: (a) extract cliFlags into a CliCompletionOptions overlay type, (b) add @deprecated JSDoc to LLMClient and createClient referencing their replacements, (c) mark createClient as internal-only in package.json exports. No file splits required — all changes are in-place type/annotation edits.
+[warning] The vendor-neutralization refactor left three in-place annotations missing, confirmed by the classification manifest. Concrete edits required (no file splits): (1) src/create-client.ts — add @deprecated JSDoc on createClient pointing to createLLMClient in src/llm-client.ts; (2) src/llm-types.ts — add @deprecated JSDoc on the LLMClient type alias pointing to ClaudeClient; (3) src/types.ts — confirm CompletionRequest.cliFlags is CLI-adapter-only and add a @internal or cli-only JSDoc marker if not already present. These three annotation edits reduce the effective exported surface and directly address the wide entry-point heuristic without restructuring any files. [src]
 
 </findings>
 
@@ -66,6 +67,9 @@ Most imported:
   category: refactor
 [medium] Generic zone name "Src 2" — enrichment did not assign a meaningful name reflect…
   files: src/auth.ts, src/config.ts, src/exec.ts
+  category: refactor
+[medium] The vendor-neutralization refactor left three in-place annotations missing, con…
+  files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts
   category: refactor
 [medium] 12 entry points — wide API surface, consider consolidating exports
   files: src/api-provider.ts, src/cli-provider.ts, src/codex-cli-provider.ts

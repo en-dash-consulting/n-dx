@@ -1,7 +1,7 @@
 {
   "id": "project-documentation",
   "name": "Project Documentation",
-  "description": "Architecture decision records, audit analyses, and design documents that capture the reasoning behind key structural choices in the codebase.",
+  "description": "Architecture decision records, audit analyses, and developer guides that capture design rationale and system-level constraints for the n-dx toolkit.",
   "files": [
     "docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md",
     "docs/analysis/memory-risks-and-flaws.md",

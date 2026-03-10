@@ -24,7 +24,7 @@ Lines: 66
 <findings>
 
 [observation] [info] Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)
-[suggestion] [info] Zone ".rex" (.rex) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
+[suggestion] [info] Zone ".rex" (.rex) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)
 
 </findings>
 
