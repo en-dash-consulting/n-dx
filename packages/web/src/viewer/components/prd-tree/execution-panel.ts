@@ -8,7 +8,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { usePolling } from "../../hooks/use-polling.js";
+import { usePolling } from "../../hooks/index.js";
 import { createFetchPipeline } from "../../messaging/index.js";
 import { isFeatureDisabled, onDegradationChange } from "../../performance/index.js";
 

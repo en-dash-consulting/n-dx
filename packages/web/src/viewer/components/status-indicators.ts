@@ -13,16 +13,16 @@ import type { ViewId } from "../types.js";
 // Re-export hook and types from the canonical hooks location.
 // This preserves backward-compatibility for any consumer that imported
 // from this module before the extraction.
-export { useProjectStatus } from "../hooks/use-project-status.js";
+export { useProjectStatus } from "../hooks/index.js";
 export type {
   ProjectStatus,
   SourceVisionStatus,
   RexStatus,
   HenchStatus,
-} from "../hooks/use-project-status.js";
+} from "../hooks/index.js";
 
 // Import types for use in component props
-import type { SourceVisionStatus, RexStatus, HenchStatus } from "../hooks/use-project-status.js";
+import type { SourceVisionStatus, RexStatus, HenchStatus } from "../hooks/index.js";
 
 // ---------------------------------------------------------------------------
 // Formatting helpers

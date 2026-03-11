@@ -79,7 +79,8 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 | `web-shared` | web | 0.36 | 0.64 | Foundation layer; 3 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
 | `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
 | `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
-| `crash` | web | 0.50 | bidirectional | At threshold boundary — one addition away from dual-fragility |
+| `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
+| `web-dashboard-platform` | web | 0.53 | — | Watch designation; 33 files (metrics reliable); 0.03 above dual-fragility threshold — baseline documented for regression tracking |
 
 **Universal governance rules** (apply to all dual-fragility zones):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
@@ -103,7 +104,7 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 
 ##### crash zone proactive governance
 
-`crash` (cohesion 0.5, bidirectional coupling with `web-viewer`) sits at the dual-fragility threshold boundary. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
+`crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
 
 ##### hench-agent internal governance
 
@@ -146,6 +147,19 @@ Rules:
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
+
+### Injection seam registry
+
+Some cross-zone dependencies use callback injection rather than gateway imports. These seams are invisible to static analysis tools (boundary-check.test.ts, domain-isolation.test.js) and must be listed explicitly to prevent future contributors from replacing injection with direct imports.
+
+| Injection site | Target module | Injected callbacks | Interface type |
+|----------------|---------------|--------------------|----------------|
+| `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+
+Rules:
+- **Prefer injection over import** when the target module would otherwise need to import from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
+- **Document the interface type** — every injection seam must have a named TypeScript interface (not inline parameter types) so that refactoring either side triggers a type error.
+- **New seams** require an entry in this table and a named interface type in the target module.
 
 ### Tier boundary crossing: spawn vs gateway
 
@@ -345,5 +359,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
 | `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
-| `tests/e2e/cli-dev.test.js` | **Required test** — sole dev-mode startup coverage (do not skip) |
-| `tests/integration/scheduler-startup.test.js` | **Required test** — sole scheduler boot coverage (do not skip) |
+| `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
+| `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |

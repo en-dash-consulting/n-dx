@@ -93,6 +93,11 @@ would create silent coverage gaps.
 These tests must remain in the test suite. If refactoring changes their targets,
 update the tests — do not delete them.
 
+Required test files must contain the annotation `REQUIRED TEST` (case-insensitive) in
+a comment near the top of the file. This annotation is machine-verified by
+`tests/e2e/architecture-policy.test.js` to prevent silent removal of required test
+coverage.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package

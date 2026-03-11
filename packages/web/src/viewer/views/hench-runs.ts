@@ -23,7 +23,7 @@ import {
   ThrottleControlsPanel,
 } from "../components/index.js";
 import type { ActiveRun } from "../components/index.js";
-import { usePolling } from "../hooks/use-polling.js";
+import { usePolling } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────

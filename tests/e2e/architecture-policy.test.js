@@ -1247,4 +1247,156 @@ describe("architecture policy: dynamic import audit", () => {
       );
     }
   });
+
+  /**
+   * Dynamic import target declaration — dynamic imports in analyze.ts
+   * create runtime coupling to chunked-review, decomposition-review,
+   * and analyze/index that is invisible to static boundary enforcement.
+   * This test makes the dependencies explicit and verifiable.
+   */
+  it("rex analyze.ts dynamic import targets are declared and exist", () => {
+    const analyzeFile = join(ROOT, "packages/rex/src/cli/commands/analyze.ts");
+    if (!existsSync(analyzeFile)) return;
+
+    const content = readFileSync(analyzeFile, "utf-8");
+
+    // Extract dynamic import paths (handles both single and double quotes)
+    const dynamicImportRe = /import\(\s*["']([^"']+)["']\s*\)/g;
+    const targets = [];
+    let m;
+    while ((m = dynamicImportRe.exec(content)) !== null) {
+      targets.push(m[1]);
+    }
+
+    // Known declared dependencies — update this list if adding new dynamic imports
+    const DECLARED_DYNAMIC_DEPS = [
+      "./chunked-review.js",
+      "./decomposition-review.js",
+      "../../analyze/guided.js",
+      "../../analyze/index.js",
+      "node:fs/promises",
+    ];
+
+    // Every dynamic import must be declared
+    const undeclared = targets.filter((t) => !DECLARED_DYNAMIC_DEPS.includes(t));
+    if (undeclared.length > 0) {
+      expect.fail(
+        `Undeclared dynamic imports in analyze.ts:\n${undeclared.map((t) => `  - ${t}`).join("\n")}\n\nAdd them to DECLARED_DYNAMIC_DEPS in architecture-policy.test.js`,
+      );
+    }
+
+    // Declared deps should actually be imported (no stale entries)
+    const stale = DECLARED_DYNAMIC_DEPS.filter((t) => !targets.includes(t));
+    if (stale.length > 0) {
+      expect.fail(
+        `Stale declared dynamic deps:\n${stale.map((t) => `  - ${t}`).join("\n")}\n\nRemove them from DECLARED_DYNAMIC_DEPS`,
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Required test annotation enforcement
+// ---------------------------------------------------------------------------
+
+/**
+ * Required test annotation enforcement.
+ *
+ * Tests listed in TESTING.md as "required" must contain the annotation
+ * string "REQUIRED TEST" in a comment. This makes the required-test
+ * contract machine-verifiable — removing the annotation or the test
+ * file triggers a CI failure.
+ */
+describe("architecture policy: required test annotations", () => {
+  it("required test files contain REQUIRED TEST annotation", () => {
+    const REQUIRED_TEST_FILES = [
+      "tests/e2e/cli-dev.test.js",
+      "tests/integration/scheduler-startup.test.js",
+    ];
+
+    const violations = [];
+
+    for (const relPath of REQUIRED_TEST_FILES) {
+      const absPath = join(ROOT, relPath);
+      if (!existsSync(absPath)) {
+        violations.push(`${relPath} — file does not exist (required test deleted?)`);
+        continue;
+      }
+
+      const content = readFileSync(absPath, "utf-8");
+      if (!/REQUIRED TEST/i.test(content)) {
+        violations.push(`${relPath} — missing "REQUIRED TEST" annotation`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Intra-package one-way dependency direction
+// ---------------------------------------------------------------------------
+
+describe("intra-package dependency direction", () => {
+  /**
+   * Rex package: core/ is a lower tier that should not import from cli/.
+   * Core files contain domain logic (fix, verify, keywords, transitions, etc.)
+   * that cli command handlers depend on — not the reverse.
+   */
+  it("rex core/ does not import from cli/", () => {
+    const rexSrc = join(ROOT, "packages/rex/src");
+    const coreDir = join(rexSrc, "core");
+    const violations = [];
+
+    if (!existsSync(coreDir)) return;
+
+    const coreFiles = walk(coreDir);
+    for (const file of coreFiles) {
+      const content = readFileSync(file, "utf-8");
+      const rel = relative(rexSrc, file);
+      const importRe =
+        /(?:import|export)\s+(?:type\s+)?(?:\{[^}]*\}\s+from\s+|[\w*]+\s+from\s+)?["']([^"']+)["']/g;
+      let m;
+      while ((m = importRe.exec(content)) !== null) {
+        if (m[1].includes("/cli/") || m[1].match(/\.\.\/cli\b/)) {
+          violations.push(
+            `${rel} imports "${m[1]}" — core/ must not depend on cli/`,
+          );
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  /**
+   * Hench package: prd/ (gateway layer) should not import from agent/.
+   * The prd/ directory contains gateway re-exports (rex-gateway, llm-gateway)
+   * that agent code depends on — not the reverse.
+   */
+  it("hench prd/ does not import from agent/", () => {
+    const henchSrc = join(ROOT, "packages/hench/src");
+    const prdDir = join(henchSrc, "prd");
+    const violations = [];
+
+    if (!existsSync(prdDir)) return;
+
+    const prdFiles = walk(prdDir);
+    for (const file of prdFiles) {
+      const content = readFileSync(file, "utf-8");
+      const rel = relative(henchSrc, file);
+      const importRe =
+        /(?:import|export)\s+(?:type\s+)?(?:\{[^}]*\}\s+from\s+|[\w*]+\s+from\s+)?["']([^"']+)["']/g;
+      let m;
+      while ((m = importRe.exec(content)) !== null) {
+        if (m[1].includes("/agent/") || m[1].match(/\.\.\/agent\b/)) {
+          violations.push(
+            `${rel} imports "${m[1]}" — prd/ must not depend on agent/`,
+          );
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
 });

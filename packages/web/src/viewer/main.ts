@@ -18,13 +18,15 @@ import {
   SearchOverlay,
   useSearchOverlay,
 } from "./components/index.js";
-import { useRouteState } from "./hooks/use-route-state.js";
-import { useAppData } from "./hooks/use-app-data.js";
-import { useMemoryMonitor } from "./hooks/use-memory-monitor.js";
-import { useCrashRecovery } from "./hooks/use-crash-recovery.js";
-import { useGracefulDegradation } from "./hooks/use-graceful-degradation.js";
-import { useRefreshThrottle } from "./hooks/use-refresh-throttle.js";
-import { usePollingSuspension } from "./hooks/use-polling-suspension.js";
+import {
+  useRouteState,
+  useAppData,
+  useMemoryMonitor,
+  useCrashRecovery,
+  useGracefulDegradation,
+  useRefreshThrottle,
+  usePollingSuspension,
+} from "./hooks/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 

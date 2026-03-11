@@ -18,7 +18,7 @@
  */
 
 import { h } from "preact";
-import { useTick } from "../hooks/use-tick.js";
+import { useTick } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

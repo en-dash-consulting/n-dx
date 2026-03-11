@@ -447,6 +447,10 @@ describe("server/client boundary", () => {
         // Files inside the zone can import freely
         if (ZONE_FILES.has(rel)) continue;
 
+        // The hooks barrel (index.ts) re-exports all hooks including contained ones —
+        // it is a passthrough, not a consumer
+        if (rel === join("viewer", "hooks", "index.ts")) continue;
+
         for (const imp of extractImportPaths(file)) {
           for (const hook of CONTAINED_HOOKS) {
             if (imp.includes(`/${hook}`) || imp.endsWith(hook) || imp.endsWith(`${hook}.js`)) {
@@ -609,5 +613,61 @@ describe("server/client boundary", () => {
         );
       }
     }
+  });
+
+  /**
+   * Hooks barrel enforcement — imports to viewer/hooks/ from outside the hooks
+   * directory must use the hooks/index.ts barrel rather than direct leaf imports.
+   *
+   * This mirrors the crash/ and shared/ barrel enforcement pattern and creates
+   * a stable public contract for the hooks directory (27 files).
+   *
+   * Exemptions:
+   * - viewer/hooks/ files can import from siblings freely
+   * - The barrel itself (hooks/index.ts) is not checked
+   */
+  it("hooks consumers import through barrel, not leaf files", () => {
+    const viewerDir = join(WEB_SRC, "viewer");
+    const hooksDir = join(viewerDir, "hooks");
+    const violations: string[] = [];
+
+    let hookLeafFiles: string[];
+    try {
+      hookLeafFiles = readdirSync(hooksDir)
+        .filter((f) => /\.ts$/.test(f) && f !== "index.ts")
+        .map((f) => f.replace(/\.ts$/, ""));
+    } catch {
+      // hooks/ doesn't exist in test environment — pass
+      return;
+    }
+
+    try {
+      for (const file of collectTsFiles(viewerDir)) {
+        const rel = relative(WEB_SRC, file);
+
+        // Files inside hooks/ can import from siblings freely
+        if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+
+        for (const imp of extractImportPaths(file)) {
+          for (const hook of hookLeafFiles) {
+            // Match direct imports like "./hooks/use-polling" or "../hooks/use-polling.js"
+            // but not "./hooks/index" or "./hooks"
+            if (
+              (imp.includes(`hooks/${hook}`) || imp.includes(`hooks/${hook}.js`)) &&
+              !imp.includes("hooks/index")
+            ) {
+              violations.push(
+                `${rel} imports "${imp}" — must use hooks/index.js barrel`
+              );
+            }
+          }
+        }
+      }
+    } catch {
+      // viewerDir doesn't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
   });
 });

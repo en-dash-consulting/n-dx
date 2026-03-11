@@ -12,7 +12,7 @@
 import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
-import { useProjectMetadata } from "../hooks/use-project-metadata.js";
+import { useProjectMetadata } from "../hooks/index.js";
 
 // ---------------------------------------------------------------------------
 // Types

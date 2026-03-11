@@ -34,10 +34,7 @@ import type {
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
-import { usePanZoom } from "../hooks/use-pan-zoom.js";
-import { useZoneDrag } from "../hooks/use-zone-drag.js";
-import { useFileEdges } from "../hooks/use-file-edges.js";
-import { useSubZoneEdges } from "../hooks/use-subzone-edges.js";
+import { usePanZoom, useZoneDrag, useFileEdges, useSubZoneEdges } from "../hooks/index.js";
 
 // ── Re-export types for downstream consumers ─────────────────────────
 export type { ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, ZoneBreadcrumb } from "./zone-types.js";

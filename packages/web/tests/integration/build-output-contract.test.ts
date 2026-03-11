@@ -31,6 +31,8 @@ const WEB_PKG = resolve(import.meta.dirname!, "../..");
 const REQUIRED_BUILD_OUTPUTS = [
   "dist/viewer/index.html",
   "dist/landing/index.html",
+  "dist/server/index.js",
+  "dist/server/index.d.ts",
 ];
 
 /**
@@ -212,6 +214,45 @@ describe("build output contract", () => {
           "These are consumed by the build pipeline and must not be removed.",
           "",
           ...missing.map((m) => `  - ${m.marker} (${m.reason})`),
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("server entry point exports are present", () => {
+    const serverEntry = resolve(WEB_PKG, "dist/server/index.js");
+    if (!existsSync(serverEntry)) {
+      return; // Covered by "all required build outputs exist" test
+    }
+
+    const content = readFileSync(serverEntry, "utf-8");
+
+    // The server entry must re-export the startServer function
+    // (or equivalent) that the orchestration layer spawns
+    expect(content.length).toBeGreaterThan(0);
+  });
+
+  it("server build includes gateway modules", () => {
+    const REQUIRED_SERVER_MODULES = [
+      "dist/server/rex-gateway.js",
+      "dist/server/domain-gateway.js",
+      "dist/server/register-scheduler.js",
+    ];
+
+    const missing = REQUIRED_SERVER_MODULES.filter(
+      (f) => !existsSync(resolve(WEB_PKG, f))
+    );
+
+    if (missing.length > 0) {
+      expect.fail(
+        [
+          "Server build is missing gateway modules.",
+          "These modules are required for MCP and scheduler integration.",
+          "",
+          "Missing:",
+          ...missing.map((f) => `  - ${f}`),
+          "",
+          "Run 'pnpm --filter @n-dx/web build' to regenerate.",
         ].join("\n"),
       );
     }

@@ -27,16 +27,18 @@ import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.j
 import { BrandedHeader } from "../components/logos.js";
 import type { PRDDocumentData } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
-import { useToast } from "../hooks/use-toast.js";
-import { usePRDData } from "../hooks/use-prd-data.js";
-import { usePRDWebSocket } from "../hooks/use-prd-websocket.js";
-import { usePRDActions } from "../hooks/use-prd-actions.js";
-import { usePRDDeepLink } from "../hooks/use-prd-deep-link.js";
-import { usePersistentFilter } from "../hooks/use-persistent-filter.js";
-import { useFeatureToggle } from "../hooks/use-feature-toggle.js";
+import {
+  useToast,
+  usePRDData,
+  usePRDWebSocket,
+  usePRDActions,
+  usePRDDeepLink,
+  usePersistentFilter,
+  useFeatureToggle,
+  useFacetState,
+} from "../hooks/index.js";
 import { searchTree, collectAllTags } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
-import { useFacetState } from "../hooks/use-facet-state.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
