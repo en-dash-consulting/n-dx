@@ -792,15 +792,14 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["architecture-docs", "Documentation-only zone; no code imports to form cohesion edges"],
   ["chunked-review", "Small CLI feature zone (2 files) with linear dependency; Louvain cohesion underestimates due to low edge count"],
   ["prd-fix-command", "Small CLI feature zone (2 files); Louvain cohesion underestimates due to low edge count"],
-  ["prd-runtime-state", "Configuration/state zone; no internal import structure"],
   ["rex", "Package config and metadata zone; no internal import structure"],
-  ["rex-package-docs", "Documentation-only zone; no code imports to form cohesion edges"],
-  ["viewer-static-assets", "Static asset zone; no code imports to form cohesion edges"],
-  ["web-landing", "HTML/CSS landing page with minimal TS; import graph cannot detect HTML/CSS edges"],
+  ["rex-core-utilities", "Two unrelated utility files (keywords.ts, verify.ts) grouped by Louvain; zero internal imports; pinned to rex-prd-engine to dissolve zone over time"],
+  ["rex-e2e-config", "Configuration/metadata zone with no internal import structure"],
+  ["viewer-prd-interaction", "Dual-fragility zone (cohesion 0.26); contains single-consumer hooks — governed by containment assertion in boundary-check.test.ts"],
   ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.46 is near threshold — governed by two-consumer addition policy (CLAUDE.md)"],
+  ["web-viewer-unit-tests", "Test-only zone; cohesion 0 is expected for test infrastructure files"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

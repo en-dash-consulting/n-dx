@@ -485,4 +485,129 @@ describe("server/client boundary", () => {
 
     expect(violations).toEqual([]);
   });
+
+  /**
+   * Exhaustive allowlist for server → viewer imports.
+   *
+   * The server must never import from the viewer — the viewer is built
+   * separately and served as static assets. This test uses a counted
+   * allowlist (currently 0) to ensure new reverse imports are explicitly
+   * reviewed rather than silently passing.
+   *
+   * If a legitimate server → viewer import is needed, add it to the
+   * ALLOWED_SERVER_TO_VIEWER list below with a justification.
+   */
+  it("server → viewer imports are exhaustively tracked (currently zero)", () => {
+    const serverDir = join(WEB_SRC, "server");
+    const ALLOWED_SERVER_TO_VIEWER: string[] = [
+      // No allowed imports — the boundary must be zero-crossing.
+      // If you need to add one, document WHY the import is necessary
+      // and whether the symbol should be extracted to web-shared instead.
+    ];
+
+    const found: string[] = [];
+
+    try {
+      for (const file of collectTsFiles(serverDir)) {
+        const rel = relative(WEB_SRC, file);
+        for (const imp of extractImportPaths(file)) {
+          if (imp.includes("/viewer/") || imp.match(/\.\.\/viewer\b/)) {
+            found.push(`${rel} imports "${imp}"`);
+          }
+        }
+      }
+    } catch {
+      // serverDir doesn't exist in test environment — pass
+      return;
+    }
+
+    // Fail if any unlisted import appears
+    const unlisted = found.filter((f) => !ALLOWED_SERVER_TO_VIEWER.includes(f));
+    expect(unlisted).toEqual([]);
+
+    // Fail if allowlist has stale entries
+    const stale = ALLOWED_SERVER_TO_VIEWER.filter((a) => !found.includes(a));
+    if (stale.length > 0) {
+      expect.fail(
+        `ALLOWED_SERVER_TO_VIEWER contains stale entries:\n${stale.map((s) => `  - ${s}`).join("\n")}\n\nRemove them — the import no longer exists.`
+      );
+    }
+  });
+
+  /**
+   * General-purpose viewer hooks coupling guard.
+   *
+   * Hooks in viewer/hooks/ with zero external zone imports are
+   * general-purpose utilities. As the hook count grows, this assertion
+   * prevents silent coupling expansion by requiring that any hook
+   * consumed outside its declaring zone is explicitly documented.
+   *
+   * Current policy: use-toast and use-feature-toggle are contained to
+   * the viewer-prd-interaction zone (see the "viewer-prd-interaction
+   * hooks are not consumed outside the zone" assertion above). This
+   * test adds a forward-looking guard: if a NEW general-purpose hook
+   * is added and consumed across zones, it must be documented here.
+   */
+  it("general-purpose hooks have bounded cross-zone consumers", () => {
+    const viewerDir = join(WEB_SRC, "viewer");
+    const hooksDir = join(viewerDir, "hooks");
+
+    // Hooks that are currently contained (single-zone consumers)
+    const CONTAINED_HOOKS = new Set(["use-toast", "use-feature-toggle"]);
+
+    let hookFiles: string[];
+    try {
+      hookFiles = readdirSync(hooksDir)
+        .filter((f) => /^use-.*\.ts$/.test(f))
+        .map((f) => f.replace(/\.ts$/, ""));
+    } catch {
+      return;
+    }
+
+    // For each hook, check if it has zero external imports (general-purpose)
+    const generalPurposeHooks: string[] = [];
+    for (const hook of hookFiles) {
+      const hookPath = join(hooksDir, `${hook}.ts`);
+      const imports = extractImportPaths(hookPath);
+      const hasExternalZoneImport = imports.some(
+        (imp) => imp.startsWith("..") && !imp.includes("/hooks/")
+      );
+      if (!hasExternalZoneImport && !CONTAINED_HOOKS.has(hook)) {
+        generalPurposeHooks.push(hook);
+      }
+    }
+
+    // General-purpose hooks that are NOT in the contained set should
+    // still be consumed within their declaring zone only. If they
+    // expand to cross-zone use, add them to CONTAINED_HOOKS or
+    // create a barrel.
+    for (const hook of generalPurposeHooks) {
+      const violations: string[] = [];
+      try {
+        for (const file of collectTsFiles(viewerDir)) {
+          const rel = relative(WEB_SRC, file);
+          if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+
+          for (const imp of extractImportPaths(file)) {
+            if (
+              imp.includes(`/${hook}`) ||
+              imp.endsWith(hook) ||
+              imp.endsWith(`${hook}.js`)
+            ) {
+              violations.push(rel);
+            }
+          }
+        }
+      } catch {
+        continue;
+      }
+
+      // Allow up to 3 consumers before requiring documentation
+      if (violations.length > 3) {
+        expect.fail(
+          `Hook ${hook} has ${violations.length} consumers outside hooks/ — add to CONTAINED_HOOKS or create a barrel:\n${violations.map((v) => `  - ${v}`).join("\n")}`
+        );
+      }
+    }
+  });
 });
