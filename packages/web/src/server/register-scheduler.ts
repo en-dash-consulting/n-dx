@@ -13,6 +13,7 @@
 
 import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 import { startUsageCleanupScheduler } from "./usage-cleanup-scheduler.js";
+import type { LoadPRDFn } from "./usage-cleanup-scheduler.js";
 import type { CollectAllIdsFn } from "./shared-types.js";
 
 /** Options for registering the usage cleanup scheduler. */
@@ -31,6 +32,9 @@ export interface RegisterSchedulerOptions {
 
   /** Override interval in ms (for testing; takes precedence over config). */
   overrideIntervalMs?: number;
+
+  /** PRD loader function (injected to avoid cross-zone coupling). */
+  loadPRD?: LoadPRDFn;
 }
 
 /**
@@ -61,5 +65,6 @@ export function registerUsageScheduler(
     options.broadcast,
     options.overrideIntervalMs,
     options.collectAllIds,
+    options.loadPRD,
   );
 }

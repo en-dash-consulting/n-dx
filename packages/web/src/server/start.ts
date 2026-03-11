@@ -15,6 +15,7 @@ import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn } from "./task-usage.js";
+import { loadPRDSync } from "./prd-io.js";
 import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
@@ -623,6 +624,7 @@ export async function startServer(
       getAggregator: () => getAggregator(watcherHandles.henchRunsDir),
       broadcast: ws.broadcast,
       collectAllIds: collectAllIds as CollectAllIdsFn,
+      loadPRD: loadPRDSync,
     });
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }

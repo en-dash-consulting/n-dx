@@ -34,7 +34,6 @@ import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 import type { TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "./shared-types.js";
-import { loadPRDSync } from "./prd-io.js";
 
 export type { CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "./shared-types.js";
 
@@ -138,7 +137,7 @@ export type LoadPRDFn = (rexDir: string) => unknown;
 function loadValidTaskIds(
   rexDir: string,
   collectAllIds: CollectAllIdsFn,
-  loadPRD: LoadPRDFn = loadPRDSync,
+  loadPRD: LoadPRDFn,
 ): Set<string> | null {
   const doc = loadPRD(rexDir) as PRDShape | null;
   if (!doc || !Array.isArray(doc.items)) return null;
@@ -165,7 +164,7 @@ function loadValidTaskIds(
  * @param options.collectAllIds Injected function to extract IDs from PRD items
  * @param options.logPath Optional path for the JSONL audit log
  * @param options.broadcast Optional WebSocket broadcast function
- * @param options.loadPRD Optional PRD loader (defaults to `loadPRDSync`; injectable for testing)
+ * @param options.loadPRD PRD loader function (injected to avoid cross-zone coupling; required when collectAllIds is provided)
  */
 export async function runCleanupCycle(options: {
   aggregator: IncrementalTaskUsageAggregator;
@@ -179,7 +178,7 @@ export async function runCleanupCycle(options: {
 
   // Ensure aggregator is populated before checking for orphans
   const taskUsage = await aggregator.getTaskUsage();
-  const validIds = collectIds ? loadValidTaskIds(rexDir, collectIds, loadPRD) : null;
+  const validIds = collectIds && loadPRD ? loadValidTaskIds(rexDir, collectIds, loadPRD) : null;
 
   const result: CleanupResult = {
     timestamp: new Date().toISOString(),
@@ -253,6 +252,7 @@ export function startUsageCleanupScheduler(
   broadcast?: (data: unknown) => void,
   overrideIntervalMs?: number,
   collectAllIds?: CollectAllIdsFn,
+  loadPRD?: LoadPRDFn,
 ): ReturnType<typeof setInterval> {
   const logPath = join(ctx.projectDir, ".hench", "usage-cleanup.jsonl");
 
@@ -268,6 +268,7 @@ export function startUsageCleanupScheduler(
         collectAllIds,
         logPath,
         broadcast,
+        loadPRD,
       });
 
       if (result.totalOrphaned > 0) {

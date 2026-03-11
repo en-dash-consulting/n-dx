@@ -38,6 +38,7 @@ export {
   loadCleanupConfig,
   writeCleanupLog,
   DEFAULT_CLEANUP_INTERVAL_MS,
+  type LoadPRDFn,
 } from "./usage-cleanup-scheduler.js";
 
 // ── Scheduler registration ───────────────────────────────────────────
