@@ -1,0 +1,17 @@
+{
+  "id": "web-viewer/web/server-2",
+  "name": "Web Viewer/web/server 2",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/server/concurrent-execution-metrics.ts",
+    "packages/web/src/server/process-memory-tracker.ts",
+    "packages/web/src/server/routes-hench.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/routes-hench.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 3181
+}

@@ -19289,7 +19289,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/breadcrumb.ts",
-      "to": "packages/web/src/viewer/hooks/use-project-metadata.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "useProjectMetadata"
@@ -19402,7 +19402,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/elapsed-time.ts",
-      "to": "packages/web/src/viewer/hooks/use-tick.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "useTick"
@@ -19774,7 +19774,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "usePolling"
@@ -20095,23 +20095,6 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
-      "type": "static",
-      "symbols": [
-        "itemMatchesFilter"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "ItemStatus"
-      ]
-    },
-    {
       "from": "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
       "to": "packages/web/src/viewer/components/prd-tree/levels.ts",
       "type": "static",
@@ -20342,6 +20325,23 @@
       ]
     },
     {
+      "from": "packages/web/src/viewer/components/progressive-loader.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/compute.ts",
+      "type": "static",
+      "symbols": [
+        "itemMatchesFilter"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/components/progressive-loader.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus"
+      ]
+    },
+    {
       "from": "packages/web/src/viewer/components/refresh-queue-status.ts",
       "to": "packages/web/src/viewer/performance/index.ts",
       "type": "type",
@@ -20437,7 +20437,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/sidebar.ts",
-      "to": "packages/web/src/viewer/hooks/use-project-metadata.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "useProjectMetadata"
@@ -20461,7 +20461,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "reexport",
       "symbols": [
         "useProjectStatus"
@@ -20469,7 +20469,7 @@
     },
     {
       "from": "packages/web/src/viewer/components/status-indicators.ts",
-      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "type",
       "symbols": [
         "ProjectStatus",
@@ -20682,6 +20682,222 @@
       "symbols": [
         "basename",
         "truncateFilename"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-app-data.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-delete-actions.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-facet-state.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-file-edges.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-item-selection.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-memory-monitor.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-pan-zoom.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-persistent-filter.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-actions.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-data.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-project-metadata.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-project-status.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-route-state.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-subzone-edges.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-tab-visibility.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-tick.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-toast.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/index.ts",
+      "to": "packages/web/src/viewer/hooks/use-zone-drag.ts",
+      "type": "reexport",
+      "symbols": [
+        "*"
       ]
     },
     {
@@ -21329,58 +21545,16 @@
     },
     {
       "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-app-data.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
-        "useAppData"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-      "type": "static",
-      "symbols": [
-        "useCrashRecovery"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
-      "type": "static",
-      "symbols": [
-        "useGracefulDegradation"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-memory-monitor.ts",
-      "type": "static",
-      "symbols": [
-        "useMemoryMonitor"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling-suspension.ts",
-      "type": "static",
-      "symbols": [
+        "useRouteState",
+        "useAppData",
+        "useMemoryMonitor",
+        "useCrashRecovery",
+        "useGracefulDegradation",
+        "useRefreshThrottle",
         "usePollingSuspension"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-refresh-throttle.ts",
-      "type": "static",
-      "symbols": [
-        "useRefreshThrottle"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/main.ts",
-      "to": "packages/web/src/viewer/hooks/use-route-state.ts",
-      "type": "static",
-      "symbols": [
-        "useRouteState"
       ]
     },
     {
@@ -22387,7 +22561,7 @@
     },
     {
       "from": "packages/web/src/viewer/views/hench-runs.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "usePolling"
@@ -22583,66 +22757,17 @@
     },
     {
       "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-facet-state.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
+        "useToast",
+        "usePRDData",
+        "usePRDWebSocket",
+        "usePRDActions",
+        "usePRDDeepLink",
+        "usePersistentFilter",
+        "useFeatureToggle",
         "useFacetState"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-feature-toggle.ts",
-      "type": "static",
-      "symbols": [
-        "useFeatureToggle"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-persistent-filter.ts",
-      "type": "static",
-      "symbols": [
-        "usePersistentFilter"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-prd-actions.ts",
-      "type": "static",
-      "symbols": [
-        "usePRDActions"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-prd-data.ts",
-      "type": "static",
-      "symbols": [
-        "usePRDData"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
-      "type": "static",
-      "symbols": [
-        "usePRDDeepLink"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-prd-websocket.ts",
-      "type": "static",
-      "symbols": [
-        "usePRDWebSocket"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/prd.ts",
-      "to": "packages/web/src/viewer/hooks/use-toast.ts",
-      "type": "static",
-      "symbols": [
-        "useToast"
       ]
     },
     {
@@ -22737,7 +22862,7 @@
     },
     {
       "from": "packages/web/src/viewer/views/rex-dashboard.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "usePolling"
@@ -22896,7 +23021,7 @@
     },
     {
       "from": "packages/web/src/viewer/views/token-usage.ts",
-      "to": "packages/web/src/viewer/hooks/use-polling.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
         "usePolling"
@@ -23057,34 +23182,13 @@
     },
     {
       "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/viewer/hooks/use-file-edges.ts",
+      "to": "packages/web/src/viewer/hooks/index.ts",
       "type": "static",
       "symbols": [
-        "useFileEdges"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/viewer/hooks/use-pan-zoom.ts",
-      "type": "static",
-      "symbols": [
-        "usePanZoom"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/viewer/hooks/use-subzone-edges.ts",
-      "type": "static",
-      "symbols": [
+        "usePanZoom",
+        "useZoneDrag",
+        "useFileEdges",
         "useSubZoneEdges"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/zones.ts",
-      "to": "packages/web/src/viewer/hooks/use-zone-drag.ts",
-      "type": "static",
-      "symbols": [
-        "useZoneDrag"
       ]
     },
     {
@@ -24797,16 +24901,6 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "type": "static",
-      "symbols": [
-        "countVisibleNodes",
-        "sliceVisibleTree",
-        "PROGRESSIVE_THRESHOLD"
-      ]
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
       "to": "packages/web/src/viewer/components/prd-tree/tree-differ.ts",
       "type": "static",
       "symbols": [
@@ -24835,6 +24929,16 @@
         "PRDDocumentData",
         "ItemStatus",
         "Priority"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
+      "to": "packages/web/src/viewer/components/progressive-loader.ts",
+      "type": "static",
+      "symbols": [
+        "countVisibleNodes",
+        "sliceVisibleTree",
+        "PROGRESSIVE_THRESHOLD"
       ]
     },
     {
@@ -25197,7 +25301,16 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/progressive-loader.test.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
+      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItemData",
+        "ItemStatus"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/progressive-loader.test.ts",
+      "to": "packages/web/src/viewer/components/progressive-loader.ts",
       "type": "static",
       "symbols": [
         "countVisibleNodes",
@@ -25205,15 +25318,6 @@
         "DEFAULT_CHUNK_SIZE",
         "PROGRESSIVE_THRESHOLD",
         "LoadMoreIndicator"
-      ]
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/progressive-loader.test.ts",
-      "to": "packages/web/src/viewer/components/prd-tree/types.ts",
-      "type": "type",
-      "symbols": [
-        "PRDItemData",
-        "ItemStatus"
       ]
     },
     {
@@ -26438,7 +26542,6 @@
         "packages/web/src/viewer/components/prd-tree/listener-lifecycle.ts",
         "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
         "packages/web/src/viewer/components/prd-tree/prd-tree.ts",
-        "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
         "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
         "packages/web/src/viewer/components/prd-tree/prune-confirmation.ts",
         "packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts",
@@ -26449,6 +26552,7 @@
         "packages/web/src/viewer/components/prd-tree/tree-event-delegate.ts",
         "packages/web/src/viewer/components/prd-tree/tree-search.ts",
         "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
+        "packages/web/src/viewer/components/progressive-loader.ts",
         "packages/web/src/viewer/components/refresh-queue-status.ts",
         "packages/web/src/viewer/components/rex-task-link.ts",
         "packages/web/src/viewer/components/search-filter.ts",
@@ -26796,6 +26900,7 @@
         "packages/llm-client/vitest.config.ts",
         "packages/rex/tests/e2e/cli-adapter.test.ts",
         "packages/rex/tests/e2e/cli-analyze.test.ts",
+        "packages/rex/tests/e2e/cli-fix.test.ts",
         "packages/rex/tests/e2e/cli-import.test.ts",
         "packages/rex/tests/e2e/cli-init.test.ts",
         "packages/rex/tests/e2e/cli-prune.test.ts",
@@ -26807,6 +26912,7 @@
         "packages/rex/tests/integration/claude-config.test.ts",
         "packages/rex/tests/integration/cli/commands/prune-cache.test.ts",
         "packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts",
+        "packages/rex/tests/integration/domain-layer-boundary.test.ts",
         "packages/rex/tests/integration/project-config.test.ts",
         "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
         "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
@@ -27186,7 +27292,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2808,
+    "totalEdges": 2819,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],
@@ -27272,6 +27378,6 @@
         "count": 11
       }
     ],
-    "avgImportsPerFile": 3.43
+    "avgImportsPerFile": 3.44
   }
 }

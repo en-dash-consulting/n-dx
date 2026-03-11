@@ -7,7 +7,7 @@
 Zone: Monorepo Orchestration (`monorepo-orchestration`)
 Files: 18, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Top-level entry points and configuration scripts that wire together all packages via spawn — the orchestration tier of the four-tier hierarchy.
+Description: Top-level entry point scripts and project-wide configuration that wire together all packages via spawned child processes.
 Lines: 6070
 
 </zone>
@@ -56,27 +56,21 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Non-source artifacts (.DS_Store, .gitignore, .npmrc) are included in the file count; excluding them from zone detection would give a cleaner signal on the 10 actual source files.
-[observation] [info] Perfect cohesion (1.0) and zero coupling reflect the spawn-only architecture: orchestration scripts have no runtime import surface to other packages, making this zone structurally correct by design.
-[observation] [info] claude-integration.js appears alongside the standard orchestration entry points — verify it follows the spawn-only rule and does not directly import package internals.
-[pattern] [info] Orchestration tier achieves (cohesion 1.0, coupling 0.0) via spawn-only; hench-agent achieves (0.99, 0.01) via gateway pattern; web zones average (~0.7, ~0.4) with convention-only enforcement — the health gradient directly tracks enforcement mechanism strength: spawn > gateway > convention.
-[suggestion] [info] config.js reads package config files directly (cross-package file I/O) but is recorded as zero coupling because file reads are not tracked as import edges. Documenting this distinction explicitly in CLAUDE.md would prevent future contributors from misreading the zero-coupling metric as evidence that config.js has no cross-package dependencies.
+[observation] [info] Non-source artifacts like .DS_Store should be excluded from zone analysis via .sourcevisionignore to keep inventory metrics accurate and prevent noise in cohesion calculations.
+[observation] [info] Perfect cohesion (1.0) and zero coupling are misleading for this zone — these files have no import edges, so the metrics reflect isolation rather than internal coherence. The zone is more a catch-all for root-level artifacts than a structurally unified module.
+[observation] [info] The orchestration entry points (cli.js, web.js, ci.js, config.js) correctly implement the spawn-only tier contract, making the boundary between orchestration and execution tiers explicit and auditable.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- All runtime cross-package coordination happens through child-process spawns here, enforcing the strongest possible isolation between packages
-- config.js is the intentional spawn-exempt exception that reads/writes all package config files directly for atomic cross-package config merges
-- Non-source artifacts (.DS_Store, .gitignore, .npmrc) are co-located here; tooling should exclude them from zone metrics to avoid skewing cohesion calculations
-- Perfect cohesion (1.0) and zero coupling reflect the spawn-only architecture: orchestration scripts have no runtime import surface to other packages, making this zone structurally correct by design.
-- Non-source artifacts (.DS_Store, .gitignore, .npmrc) are included in the file count; excluding them from zone detection would give a cleaner signal on the 10 actual source files.
-- claude-integration.js appears alongside the standard orchestration entry points — verify it follows the spawn-only rule and does not directly import package internals.
-- monorepo-orchestration is the only zone containing executable entry points that achieves both perfect cohesion (1.0) and zero coupling (0.0) simultaneously — this combination is the empirical proof that the spawn-only pattern eliminates cross-zone coupling without sacrificing internal structure, making it the reference data point for evaluating tier-boundary enforcement strength.
-- Orchestration tier achieves (cohesion 1.0, coupling 0.0) via spawn-only; hench-agent achieves (0.99, 0.01) via gateway pattern; web zones average (~0.7, ~0.4) with convention-only enforcement — the health gradient directly tracks enforcement mechanism strength: spawn > gateway > convention.
-- The monorepo-orchestration zone achieves (cohesion 1.0, coupling 0.0) via spawn-only isolation, but this metric is partially misleading: config.js (the spawn-exempt exception) would introduce outbound coupling if zone analysis counted its direct file reads as import edges. The zone's perfect metrics are contingent on sourcevision treating file reads and JSON.parse calls as non-imports — a distinction that is not explicit in the zone governance documentation.
-- config.js reads package config files directly (cross-package file I/O) but is recorded as zero coupling because file reads are not tracked as import edges. Documenting this distinction explicitly in CLAUDE.md would prevent future contributors from misreading the zero-coupling metric as evidence that config.js has no cross-package dependencies.
+- The spawn-only architecture at this tier enforces strong package isolation — orchestration scripts never import package internals directly, keeping the dependency graph clean.
+- config.js is the documented exception to spawn-only: it reads and writes cross-package config files directly, which is the correct trade-off for atomic cross-package config merges.
+- The mix of source files (.gitignore, .DS_Store, llms.txt) with entry points (cli.js, web.js, ci.js) in a single zone is expected for a monorepo root — these files have no import relationships and the zone detector groups them by proximity.
+- Perfect cohesion (1.0) and zero coupling are misleading for this zone — these files have no import edges, so the metrics reflect isolation rather than internal coherence. The zone is more a catch-all for root-level artifacts than a structurally unified module.
+- The orchestration entry points (cli.js, web.js, ci.js, config.js) correctly implement the spawn-only tier contract, making the boundary between orchestration and execution tiers explicit and auditable.
+- Non-source artifacts like .DS_Store should be excluded from zone analysis via .sourcevisionignore to keep inventory metrics accurate and prevent noise in cohesion calculations.
 - [call graph] 479 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

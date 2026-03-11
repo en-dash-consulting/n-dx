@@ -1,0 +1,32 @@
+{
+  "id": "hench-safety-guard",
+  "name": "Hench Safety Guard",
+  "description": "Command and path policy enforcement layer that intercepts agent tool calls to validate safety constraints before execution.",
+  "files": [
+    "packages/hench/src/guard/commands.ts",
+    "packages/hench/src/guard/contracts.ts",
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts",
+    "packages/hench/src/guard/policy.ts",
+    "packages/hench/tests/unit/guard/commands.test.ts",
+    "packages/hench/tests/unit/guard/guard-integration.test.ts",
+    "packages/hench/tests/unit/guard/paths.test.ts",
+    "packages/hench/tests/unit/guard/policy.test.ts",
+    "packages/hench/tests/unit/tools/shell.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/guard/index.ts",
+    "packages/hench/src/guard/paths.ts"
+  ],
+  "cohesion": 0.8,
+  "coupling": 0.2,
+  "fileCount": 10,
+  "lineCount": 1802,
+  "riskMetrics": {
+    "cohesion": 0.8,
+    "coupling": 0.2,
+    "riskScore": 0.19999999999999998,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

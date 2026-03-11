@@ -1,7 +1,7 @@
 {
   "id": "sourcevision-analysis-engine",
   "name": "Sourcevision Analysis Engine",
-  "description": "The complete static analysis package implementing inventory, import graph, zone detection, component catalog, and findings pipelines for AI-readable codebase output.",
+  "description": "The self-contained static analysis package responsible for file inventory, import graph construction, zone detection via Louvain community detection, and React component cataloging.",
   "files": [
     "packages/sourcevision/src/analyzers/archetypes.ts",
     "packages/sourcevision/src/analyzers/branch-work-classifier.ts",

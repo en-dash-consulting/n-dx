@@ -1,7 +1,7 @@
 {
   "id": "monorepo-orchestration",
   "name": "Monorepo Orchestration",
-  "description": "Top-level entry points and configuration scripts that wire together all packages via spawn — the orchestration tier of the four-tier hierarchy.",
+  "description": "Top-level entry point scripts and project-wide configuration that wire together all packages via spawned child processes.",
   "files": [
     ".DS_Store",
     ".gitignore",

@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web/unit-2",
+  "name": "Web Viewer/web/unit 2",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/web/tests/unit/server/routes-hench-audit.test.ts",
+    "packages/web/tests/unit/server/routes-hench-concurrency.test.ts",
+    "packages/web/tests/unit/server/routes-hench-config.test.ts",
+    "packages/web/tests/unit/server/routes-hench-execute.test.ts",
+    "packages/web/tests/unit/server/routes-hench-health.test.ts",
+    "packages/web/tests/unit/server/routes-hench-heartbeat.test.ts",
+    "packages/web/tests/unit/server/routes-hench-memory.test.ts",
+    "packages/web/tests/unit/server/routes-hench-shutdown.test.ts",
+    "packages/web/tests/unit/server/routes-hench-templates.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 9,
+  "lineCount": 2531
+}

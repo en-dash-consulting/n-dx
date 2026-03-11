@@ -6034,20 +6034,6 @@
       ]
     },
     {
-      "path": "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
-      "archetype": "component",
-      "confidence": 0.6,
-      "source": "algorithmic",
-      "evidence": [
-        {
-          "archetypeId": "component",
-          "signalKind": "directory",
-          "detail": "path contains \"/components/\"",
-          "weight": 0.6
-        }
-      ]
-    },
-    {
       "path": "packages/web/src/viewer/components/prd-tree/proposal-editor.ts",
       "archetype": "component",
       "confidence": 0.6,
@@ -6240,6 +6226,20 @@
     },
     {
       "path": "packages/web/src/viewer/components/prd-tree/virtual-scroll.ts",
+      "archetype": "component",
+      "confidence": 0.6,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "component",
+          "signalKind": "directory",
+          "detail": "path contains \"/components/\"",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "path": "packages/web/src/viewer/components/progressive-loader.ts",
       "archetype": "component",
       "confidence": 0.6,
       "source": "algorithmic",
@@ -6473,6 +6473,29 @@
           "signalKind": "path",
           "detail": "Graph rendering service — canvas/WebGL draw loop orchestration",
           "weight": 0.7
+        }
+      ]
+    },
+    {
+      "path": "packages/web/src/viewer/hooks/index.ts",
+      "archetype": "entrypoint",
+      "secondaryArchetypes": [
+        "hook"
+      ],
+      "confidence": 0.8,
+      "source": "algorithmic",
+      "evidence": [
+        {
+          "archetypeId": "entrypoint",
+          "signalKind": "filename",
+          "detail": "filename \"index.ts\" matches ^index\\.[tj]sx?$",
+          "weight": 0.8
+        },
+        {
+          "archetypeId": "hook",
+          "signalKind": "directory",
+          "detail": "path contains \"/hooks/\"",
+          "weight": 0.8
         }
       ]
     },
@@ -6982,14 +7005,14 @@
     },
     {
       "path": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
-      "archetype": "service",
+      "archetype": "utility",
       "confidence": 0.7,
       "source": "llm",
       "evidence": [
         {
-          "archetypeId": "service",
+          "archetypeId": "utility",
           "signalKind": "path",
-          "detail": "DOM performance monitoring service — measures and reports render metrics",
+          "detail": "Standalone module with zero framework dependencies that provides shared DOM performance monitoring utilities (counting, timing, memory tracking) consumed by other viewer modules like hooks and components.",
           "weight": 0.7
         }
       ]
@@ -7868,13 +7891,13 @@
     }
   ],
   "summary": {
-    "totalClassified": 512,
+    "totalClassified": 513,
     "totalUnclassified": 0,
     "byArchetype": {
-      "entrypoint": 46,
+      "entrypoint": 47,
       "config": 6,
-      "service": 96,
-      "utility": 93,
+      "service": 95,
+      "utility": 94,
       "cli-command": 51,
       "types": 24,
       "gateway": 7,
@@ -7888,7 +7911,7 @@
     },
     "bySource": {
       "llm": 199,
-      "algorithmic": 313
+      "algorithmic": 314
     }
   }
 }

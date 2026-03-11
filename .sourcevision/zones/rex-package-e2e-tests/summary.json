@@ -1,0 +1,23 @@
+{
+  "id": "rex-package-e2e-tests",
+  "name": "Rex Package E2E Tests",
+  "description": "A pure end-to-end test zone covering the Rex CLI's adapter, analyze, fix, and import commands via black-box process invocations.",
+  "files": [
+    "packages/rex/tests/e2e/cli-adapter.test.ts",
+    "packages/rex/tests/e2e/cli-analyze.test.ts",
+    "packages/rex/tests/e2e/cli-fix.test.ts",
+    "packages/rex/tests/e2e/cli-import.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 1242,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

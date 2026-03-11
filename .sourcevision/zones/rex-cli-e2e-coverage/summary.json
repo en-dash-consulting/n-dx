@@ -1,0 +1,28 @@
+{
+  "id": "rex-cli-e2e-coverage",
+  "name": "Rex CLI E2E Coverage",
+  "description": "End-to-end and integration test suite for Rex CLI commands, alongside test infrastructure (vitest config, fixtures, generated llms.txt).",
+  "files": [
+    "packages/rex/llms.txt",
+    "packages/rex/tests/e2e/cli-prune.test.ts",
+    "packages/rex/tests/e2e/cli-quiet.test.ts",
+    "packages/rex/tests/e2e/cli-recommend.test.ts",
+    "packages/rex/tests/e2e/cli-smart-add.test.ts",
+    "packages/rex/tests/e2e/cli-sync.test.ts",
+    "packages/rex/tests/e2e/cli-workflow.test.ts",
+    "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl",
+    "packages/rex/tests/integration/domain-layer-boundary.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 9,
+  "lineCount": 1599,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

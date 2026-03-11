@@ -1,0 +1,21 @@
+{
+  "id": "web-landing-page",
+  "name": "Web Landing Page",
+  "description": "An isolated two-file module providing the landing page service for the web package, fully self-contained with its own co-located unit test.",
+  "files": [
+    "packages/web/src/landing/landing.ts",
+    "packages/web/tests/unit/landing/landing.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 510,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

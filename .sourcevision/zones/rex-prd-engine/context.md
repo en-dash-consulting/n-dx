@@ -5,11 +5,11 @@
 <zone>
 
 Zone: Rex PRD Engine (`rex-prd-engine`)
-Files: 217, Cohesion: 0.98, Coupling: 0.02
+Files: 224, Cohesion: 0.98, Coupling: 0.02
 Risk: healthy (score: 0.02)
-Description: Core domain layer for Rex containing the PRD store, schema, tree operations, analyze pipeline, and CLI output formatting.
+Description: The primary implementation zone for the Rex package, encompassing the analyze pipeline, PRD store, schema definitions, CLI output utilities, and core tree operations.
 Entry points: packages/rex/src/analyze/index.ts, packages/rex/src/analyze/validate-modification.ts, packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/format-loe.ts, packages/rex/src/cli/output.ts, packages/rex/src/core/tree.ts, packages/rex/src/schema/index.ts, packages/rex/src/store/index.ts
-Lines: 76985
+Lines: 78403
 
 </zone>
 
@@ -17,6 +17,7 @@ Lines: 76985
 
 packages/rex/src/analyze/acknowledge.ts (TypeScript, 85 lines, source)
 packages/rex/src/analyze/analyze-shared.ts (TypeScript, 377 lines, source)
+packages/rex/src/analyze/batch-types.ts (TypeScript, 50 lines, source)
 packages/rex/src/analyze/consolidation-guard.ts (TypeScript, 184 lines, source)
 packages/rex/src/analyze/decompose.ts (TypeScript, 335 lines, source)
 packages/rex/src/analyze/dedupe.ts (TypeScript, 373 lines, source)
@@ -38,6 +39,7 @@ packages/rex/src/cli/commands/add.ts (TypeScript, 150 lines, source)
 packages/rex/src/cli/commands/analyze.ts (TypeScript, 838 lines, source)
 packages/rex/src/cli/commands/constants.ts (TypeScript, 51 lines, source)
 packages/rex/src/cli/commands/decomposition-review.ts (TypeScript, 323 lines, source)
+packages/rex/src/cli/commands/fix.ts (TypeScript, 139 lines, source)
 packages/rex/src/cli/commands/format-loe.ts (TypeScript, 45 lines, source)
 packages/rex/src/cli/commands/health.ts (TypeScript, 28 lines, source)
 packages/rex/src/cli/commands/init.ts (TypeScript, 71 lines, source)
@@ -78,6 +80,7 @@ packages/rex/src/core/epic-correlation.ts (TypeScript, 279 lines, source)
 packages/rex/src/core/facets.ts (TypeScript, 214 lines, source)
 packages/rex/src/core/fix.ts (TypeScript, 258 lines, source)
 packages/rex/src/core/health.ts (TypeScript, 436 lines, source)
+packages/rex/src/core/keywords.ts (TypeScript, 50 lines, source)
 packages/rex/src/core/merge.ts (TypeScript, 382 lines, source)
 packages/rex/src/core/move.ts (TypeScript, 202 lines, source)
 packages/rex/src/core/next-task.ts (TypeScript, 594 lines, source)
@@ -102,6 +105,7 @@ packages/rex/src/core/timestamps.ts (TypeScript, 65 lines, source)
 packages/rex/src/core/token-usage.ts (TypeScript, 739 lines, source)
 packages/rex/src/core/transitions.ts (TypeScript, 94 lines, source)
 packages/rex/src/core/tree.ts (TypeScript, 105 lines, source)
+packages/rex/src/core/verify.ts (TypeScript, 327 lines, source)
 packages/rex/src/public.ts (TypeScript, 369 lines, source)
 packages/rex/src/recommend/conflict-detection.ts (TypeScript, 355 lines, source)
 packages/rex/src/recommend/create-from-recommendations.ts (TypeScript, 428 lines, source)
@@ -162,6 +166,7 @@ packages/rex/tests/unit/analyze/validate-modification.test.ts (TypeScript, 172 l
 packages/rex/tests/unit/cli/commands/add.test.ts (TypeScript, 376 lines, test)
 packages/rex/tests/unit/cli/commands/analyze-guided.test.ts (TypeScript, 196 lines, test)
 packages/rex/tests/unit/cli/commands/decomposition-review.test.ts (TypeScript, 441 lines, test)
+packages/rex/tests/unit/cli/commands/fix.test.ts (TypeScript, 420 lines, test)
 packages/rex/tests/unit/cli/commands/format-loe.test.ts (TypeScript, 94 lines, test)
 packages/rex/tests/unit/cli/commands/loe-display-proposal-tree.test.ts (TypeScript, 133 lines, test)
 packages/rex/tests/unit/cli/commands/move.test.ts (TypeScript, 210 lines, test)
@@ -191,6 +196,7 @@ packages/rex/tests/unit/core/epic-correlation.test.ts (TypeScript, 531 lines, te
 packages/rex/tests/unit/core/epicless.test.ts (TypeScript, 196 lines, test)
 packages/rex/tests/unit/core/facets.test.ts (TypeScript, 221 lines, test)
 packages/rex/tests/unit/core/feature-filtered-task.test.ts (TypeScript, 211 lines, test)
+packages/rex/tests/unit/core/fix.test.ts (TypeScript, 413 lines, test)
 packages/rex/tests/unit/core/health.test.ts (TypeScript, 373 lines, test)
 packages/rex/tests/unit/core/merge.test.ts (TypeScript, 327 lines, test)
 packages/rex/tests/unit/core/move.test.ts (TypeScript, 284 lines, test)
@@ -231,6 +237,7 @@ packages/rex/tests/unit/store/notion-adapter.test.ts (TypeScript, 775 lines, tes
 packages/rex/tests/unit/store/notion-client.test.ts (TypeScript, 325 lines, test)
 packages/rex/tests/unit/store/resolve-store.test.ts (TypeScript, 239 lines, test)
 packages/rex/tests/unit/store/store-contract.test.ts (TypeScript, 647 lines, test)
+packages/rex/vitest.config.ts (TypeScript, 19 lines, config)
 packages/web/tests/unit/server/type-consistency.test.ts (TypeScript, 225 lines, test)
 
 </files>
@@ -264,6 +271,7 @@ Internal:
   packages/rex/src/analyze/guided.ts → packages/rex/src/analyze/reason.ts {spawnClaude, readProjectContext, parseProposalResponse, FEW_SHOT_EXAMPLE, PRD_SCHEMA, TASK_QUALITY_RULES, OUTPUT_INSTRUCTION, DEFAULT_MODEL, emptyAnalyzeTokenUsage, accumulateTokenUsage}
   packages/rex/src/analyze/guided.ts → packages/rex/src/analyze/reason.ts {ReasonResult}
   packages/rex/src/analyze/guided.ts → packages/rex/src/cli/output.ts {info}
+  packages/rex/src/analyze/index.ts → packages/rex/src/analyze/batch-types.ts {BatchAcceptanceRecord, GranularityAdjustmentRecord}
   packages/rex/src/analyze/index.ts → packages/rex/src/analyze/consolidation-guard.ts {countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard}
   packages/rex/src/analyze/index.ts → packages/rex/src/analyze/consolidation-guard.ts {ConsolidationGuardResult}
   packages/rex/src/analyze/index.ts → packages/rex/src/analyze/decompose.ts {buildDecompositionPrompt, parseDecompositionResponse, decomposeTask, applyDecompositionPass}
@@ -356,6 +364,11 @@ Internal:
   packages/rex/src/cli/commands/analyze.ts → packages/rex/src/store/project-config.ts {loadClaudeConfig, loadLLMConfig}
   packages/rex/src/cli/commands/decomposition-review.ts → packages/rex/src/analyze/index.ts {Proposal, ProposalTask, ProposalFeature}
   packages/rex/src/cli/commands/decomposition-review.ts → packages/rex/src/cli/output.ts {info}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/output.ts {info, result}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/core/fix.ts {detectIssues, applyFixes}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/core/fix.ts {FixAction, FixKind}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/store/index.ts {resolveStore}
   packages/rex/src/cli/commands/format-loe.ts → packages/rex/src/analyze/index.ts {ProposalTask}
   packages/rex/src/cli/commands/health.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
   packages/rex/src/cli/commands/health.ts → packages/rex/src/cli/output.ts {result}
@@ -478,6 +491,7 @@ Internal:
   packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/token-usage.ts {aggregateTokenUsage, checkBudget}
   packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/token-usage.ts {TokenUsageFilter}
   packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/tree.ts {walkTree}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/verify.ts {VerifyResult}
   packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/schema/index.ts {PRDItem, ItemStatus}
   packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/store/index.ts {PRDStore}
   packages/rex/src/cli/commands/status-shared.ts → packages/rex/src/core/prune.ts {isFullyCompleted}
@@ -495,6 +509,8 @@ Internal:
   packages/rex/src/cli/commands/status.ts → packages/rex/src/core/stats.ts {computeStats}
   packages/rex/src/cli/commands/status.ts → packages/rex/src/core/token-usage.ts {TokenUsageFilter}
   packages/rex/src/cli/commands/status.ts → packages/rex/src/core/tree.ts {walkTree}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {verify}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {VerifyResult}
   packages/rex/src/cli/commands/status.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/src/cli/commands/status.ts → packages/rex/src/store/index.ts {resolveStore}
   packages/rex/src/cli/commands/sync.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
@@ -546,12 +562,14 @@ Internal:
   packages/rex/src/cli/commands/verify.ts → packages/rex/src/cli/errors.ts {CLIError}
   packages/rex/src/cli/commands/verify.ts → packages/rex/src/cli/output.ts {info, result}
   packages/rex/src/cli/commands/verify.ts → packages/rex/src/core/tree.ts {findItem}
+  packages/rex/src/cli/commands/verify.ts → packages/rex/src/core/verify.ts {verify}
   packages/rex/src/cli/commands/verify.ts → packages/rex/src/store/index.ts {resolveStore}
   packages/rex/src/cli/errors.ts → packages/rex/src/cli/commands/constants.ts {REX_DIR}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/adapter.ts {cmdAdapter}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/add.ts {cmdAdd}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/analyze.ts {cmdAnalyze}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/constants.ts {usage}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/fix.ts {cmdFix}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/health.ts {cmdHealth}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/init.ts {cmdInit}
   packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/move.ts {cmdMove}
@@ -593,6 +611,7 @@ Internal:
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/core/timestamps.ts {computeTimestampUpdates}
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/core/transitions.ts {validateTransition}
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/core/tree.ts {findItem}
+  packages/rex/src/cli/mcp-tools.ts → packages/rex/src/core/verify.ts {verify}
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel, ItemStatus, Priority}
   packages/rex/src/cli/mcp-tools.ts → packages/rex/src/store/index.ts {PRDStore}
@@ -620,6 +639,7 @@ Internal:
   packages/rex/src/core/delete.ts → packages/rex/src/core/tree.ts {findItem, removeFromTree, walkTree}
   packages/rex/src/core/delete.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/src/core/epic-correlation.ts → packages/rex/src/analyze/dedupe.ts {similarity}
+  packages/rex/src/core/epic-correlation.ts → packages/rex/src/core/keywords.ts {extractKeywords}
   packages/rex/src/core/epic-correlation.ts → packages/rex/src/core/structural.ts {EpiclessFeature}
   packages/rex/src/core/epic-correlation.ts → packages/rex/src/schema/index.ts {isRootLevel}
   packages/rex/src/core/epic-correlation.ts → packages/rex/src/schema/index.ts {PRDItem}
@@ -636,6 +656,7 @@ Internal:
   packages/rex/src/core/move.ts → packages/rex/src/core/tree.ts {findItem, removeFromTree, insertChild, walkTree}
   packages/rex/src/core/move.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY}
   packages/rex/src/core/move.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel}
+  packages/rex/src/core/next-task.ts → packages/rex/src/core/keywords.ts {extractKeywords, scoreMatch}
   packages/rex/src/core/next-task.ts → packages/rex/src/core/requirements.ts {collectRequirements}
   packages/rex/src/core/next-task.ts → packages/rex/src/core/tree.ts {walkTree, findItem}
   packages/rex/src/core/next-task.ts → packages/rex/src/core/tree.ts {TreeEntry}
@@ -701,6 +722,9 @@ Internal:
   packages/rex/src/core/transitions.ts → packages/rex/src/schema/index.ts {ItemStatus}
   packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY}
   packages/rex/src/core/tree.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel}
+  packages/rex/src/core/verify.ts → packages/rex/src/core/keywords.ts {extractKeywords, scoreMatch, STOP_WORDS}
+  packages/rex/src/core/verify.ts → packages/rex/src/core/tree.ts {walkTree}
+  packages/rex/src/core/verify.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/src/public.ts → packages/rex/src/analyze/acknowledge.ts {computeFindingHash, loadAcknowledged, saveAcknowledged, acknowledgeFinding, isAcknowledged}
   packages/rex/src/public.ts → packages/rex/src/analyze/acknowledge.ts {AcknowledgedFinding, AcknowledgedStore}
   packages/rex/src/public.ts → packages/rex/src/analyze/consolidation-guard.ts {countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard}
@@ -726,6 +750,7 @@ Internal:
   packages/rex/src/public.ts → packages/rex/src/core/facets.ts {FacetConfig, FacetSuggestion}
   packages/rex/src/public.ts → packages/rex/src/core/health.ts {computeHealthScore, formatHealthScore}
   packages/rex/src/public.ts → packages/rex/src/core/health.ts {StructureHealthScore, HealthDimensions, HealthOptions}
+  packages/rex/src/public.ts → packages/rex/src/core/keywords.ts {extractKeywords, scoreMatch}
   packages/rex/src/public.ts → packages/rex/src/core/merge.ts {validateMerge, previewMerge, mergeItems}
   packages/rex/src/public.ts → packages/rex/src/core/merge.ts {MergeOptions, MergeValidation, MergePreview, MergeResult}
   packages/rex/src/public.ts → packages/rex/src/core/next-task.ts {findNextTask, findActionableTasks, collectCompletedIds, extractTaskKeywords, matchTasksByKeywords, requirementsScore}
@@ -947,6 +972,8 @@ Internal:
   packages/rex/tests/unit/cli/commands/analyze-guided.test.ts → packages/rex/src/cli/commands/analyze.ts {cmdAnalyze}
   packages/rex/tests/unit/cli/commands/decomposition-review.test.ts → packages/rex/src/analyze/index.ts {Proposal, ProposalTask, TaskDecomposition}
   packages/rex/tests/unit/cli/commands/decomposition-review.test.ts → packages/rex/src/cli/commands/decomposition-review.ts {formatDecomposedTask, formatProposalsWithDecomposition, countDecomposedTasks, applyDecompositionChoice, resolveDecompositions, autoResolveDecompositions, parseDecompositionInput, formatDecompositionSummary}
+  packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/src/cli/commands/fix.ts {cmdFix}
+  packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/src/schema/index.ts {PRDDocument}
   packages/rex/tests/unit/cli/commands/format-loe.test.ts → packages/rex/src/analyze/propose.ts {ProposalTask}
   packages/rex/tests/unit/cli/commands/format-loe.test.ts → packages/rex/src/cli/commands/format-loe.ts {formatTaskLoE, formatTaskLoERationale}
   packages/rex/tests/unit/cli/commands/loe-display-proposal-tree.test.ts → packages/rex/src/analyze/index.ts {Proposal, ProposalTask}
@@ -1027,6 +1054,8 @@ Internal:
   packages/rex/tests/unit/core/facets.test.ts → packages/rex/src/schema/v1.ts {PRDItem}
   packages/rex/tests/unit/core/feature-filtered-task.test.ts → packages/rex/src/core/next-task.ts {findNextTask, findActionableTasks}
   packages/rex/tests/unit/core/feature-filtered-task.test.ts → packages/rex/src/schema/index.ts {PRDItem}
+  packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/core/fix.ts {detectTimestampIssues, detectOrphanBlockedBy, detectParentChildMisalignment, detectIssues, applyFixes}
+  packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/tests/unit/core/health.test.ts → packages/rex/src/core/health.ts {computeHealthScore, formatHealthScore}
   packages/rex/tests/unit/core/health.test.ts → packages/rex/src/schema/index.ts {PRDItem}
   packages/rex/tests/unit/core/merge.test.ts → packages/rex/src/core/merge.ts {validateMerge, previewMerge, mergeItems}
@@ -1147,58 +1176,38 @@ Internal:
   packages/web/tests/unit/server/type-consistency.test.ts → packages/rex/src/schema/v1.ts {Priority, ItemLevel, ItemStatus, RequirementCategory, RequirementValidationType}
 
 Outgoing (this zone → other zones):
-  → chunked-review: packages/rex/src/analyze/index.ts → packages/rex/src/analyze/batch-types.ts; packages/rex/src/cli/commands/analyze.ts → packages/rex/src/cli/commands/chunked-review.ts
-  → prd-fix-command: packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/fix.ts
-  → rex-core-utilities: packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/verify.ts; packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts; packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts; packages/rex/src/cli/commands/verify.ts → packages/rex/src/core/verify.ts; packages/rex/src/cli/mcp-tools.ts → packages/rex/src/core/verify.ts; packages/rex/src/core/epic-correlation.ts → packages/rex/src/core/keywords.ts; packages/rex/src/core/next-task.ts → packages/rex/src/core/keywords.ts; packages/rex/src/public.ts → packages/rex/src/core/keywords.ts
-  → server-usage-scheduler: packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts
+  → chunked-review-pipeline: packages/rex/src/cli/commands/analyze.ts → packages/rex/src/cli/commands/chunked-review.ts
+  → web-server-api: packages/web/tests/unit/server/type-consistency.test.ts → packages/web/src/server/rex-gateway.ts
 
 Incoming (other zones → this zone):
-  ← chunked-review: packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/index.ts; packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/validate-modification.ts; packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/cli/commands/format-loe.ts; packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/analyze/index.ts; packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/output.ts; packages/rex/tests/unit/cli/commands/chunked-review.test.ts → packages/rex/src/analyze/index.ts; packages/rex/tests/unit/cli/commands/loe-display-chunked-review.test.ts → packages/rex/src/analyze/index.ts
-  ← prd-fix-command: packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/commands/constants.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/output.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/core/fix.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/core/fix.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/store/index.ts; packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/core/fix.ts; packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/schema/index.ts
-  ← rex-core-utilities: packages/rex/src/core/verify.ts → packages/rex/src/core/tree.ts; packages/rex/src/core/verify.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/core/verify.test.ts → packages/rex/src/schema/index.ts
+  ← chunked-review-pipeline: packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/batch-types.ts; packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/index.ts; packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/validate-modification.ts; packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/cli/commands/format-loe.ts; packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/analyze/index.ts; packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/output.ts; packages/rex/tests/unit/cli/commands/chunked-review.test.ts → packages/rex/src/analyze/index.ts; packages/rex/tests/unit/cli/commands/loe-display-chunked-review.test.ts → packages/rex/src/analyze/index.ts
+  ← prd-verification-utilities: packages/rex/tests/unit/core/keywords.test.ts → packages/rex/src/core/keywords.ts; packages/rex/tests/unit/core/verify.test.ts → packages/rex/src/core/verify.ts; packages/rex/tests/unit/core/verify.test.ts → packages/rex/src/schema/index.ts
 
 </imports>
 
 <findings>
 
 [observation] [info] High cohesion (0.98) — files are tightly interconnected
-[observation] [warning] Bidirectional dependency with rex-core (rex-unit→rex-core: 8, rex-core→rex-unit: 3) introduces a latent cycle; if keywords.ts or verify.ts import from core tree or schema modules, a true circular dependency exists and should be resolved.
-[observation] [info] Cohesion 0.98 and coupling 0.02 across 216 files makes this one of the healthiest large zones in the monorepo — strong evidence the domain boundaries are well-enforced.
-[observation] [info] Eight distinct entry points span analyze, store, schema, and CLI layers — consider whether a single public.ts barrel would reduce the surface consumers must track.
-[suggestion] [info] Zone "rex-prd-engine" has files across 21 directories — consider consolidating under a dedicated directory
-[suggestion] [info] CLAUDE.md documents hench-agent's internal sub-zones (agent/, prd/, brief/, tools/, process/) with barrel re-export rules but provides no equivalent sub-zone map for rex-prd-engine's 21 directories — add a matching sub-zone governance section for rex-prd-engine to close the documentation gap between the two largest zones in the monorepo.
-[suggestion] [info] The rex CLI has 30+ command files but the zone map only surfaces 3 as participants in bidirectional cycles (chunked-review, fix, core utilities) — run a targeted import trace on the remaining 27 command files to confirm they are strictly one-directional consumers of rex-prd-engine and are not silently contributing additional return edges outside the detected zones.
-[pattern] [critical] Three of the four zones that depend on rex-prd-engine (chunked-review, prd-fix-command, rex-core-utilities) each produce a return edge back into the engine, forming a systemic multi-cycle pattern rather than isolated incidents — a single structural fix (strictly enforcing one-way dependency into the engine) would resolve all three cycles simultaneously.
-[relationship] [warning] batch-types.ts is physically located in packages/rex/src/analyze/ (within the rex-prd-engine directory tree) but is classified under the chunked-review zone — this file-location/zone-membership mismatch is a leaky abstraction: callers of the analyze/ directory implicitly cross a zone boundary without any import path signal.
-[relationship] [critical] rex-prd-engine imports back into chunked-review (rex-unit → rex-cli: 2 imports) — the main domain layer has an upward dependency on a CLI satellite zone, inverting the expected CLI-over-domain layering and creating a critical architecture violation.
-[anti-pattern] [critical] Domain engine (rex-prd-engine) imports from CLI satellite zone (chunked-review) at rex-unit → rex-cli: 2 — this is the most critical layering violation in the rex package because it means a CLI handler change can break domain engine behavior at load time in ESM/bundled contexts.
+[observation] [info] Exemplary cohesion (0.98) and coupling (0.02) for a 216-file zone — this is the healthy baseline other Rex zones should target.
+[observation] [info] With 8 distinct entry points across analyze, store, schema, and CLI layers, the zone acts as the canonical Rex domain boundary; ensure new Rex features land here rather than in satellite zones.
+[observation] [info] rex-unit → rex-core (8 imports) and rex-unit → rex-cli (2 imports) represent the only outward couplings; both target small utility satellites that may be candidates for absorption if they remain below 5 files.
+[suggestion] [info] Zone "rex-prd-engine" has files across 22 directories — consider consolidating under a dedicated directory
+[move-file] [warning] File "packages/rex/src/analyze/batch-types.ts" is pinned to zone "Rex PRD Engine" but lives in packages/rex/src/analyze/ — consider moving to packages/rex/src/core/ to align physical location with architectural zone
 
 </findings>
 
 <insights>
 
 - High cohesion (0.98) — files are tightly interconnected
-- Exemplary zone hygiene: 0.98 cohesion and 0.02 coupling across 216 files indicates a well-bounded domain with minimal external dependencies.
-- Entry points cover all major public surfaces (analyze, store, schema, CLI output) — the zone acts as the canonical domain layer for the rex package.
-- Bidirectional imports with rex-core (8 outbound, 3 inbound) create a latent cycle risk; keywords and verify utilities should be evaluated for absorption into this zone or strict one-way dependency.
-- Cohesion 0.98 and coupling 0.02 across 216 files makes this one of the healthiest large zones in the monorepo — strong evidence the domain boundaries are well-enforced.
-- Bidirectional dependency with rex-core (rex-unit→rex-core: 8, rex-core→rex-unit: 3) introduces a latent cycle; if keywords.ts or verify.ts import from core tree or schema modules, a true circular dependency exists and should be resolved.
-- Eight distinct entry points span analyze, store, schema, and CLI layers — consider whether a single public.ts barrel would reduce the surface consumers must track.
-- Zone "rex-prd-engine" has files across 21 directories — consider consolidating under a dedicated directory
-- The domain engine is the sole hub of the rex package — all four satellite zones (chunked-review, prd-fix-command, rex-core-utilities, rex-cli-e2e) connect to it, but three of the four create return edges back into the engine, making the hub a participant in three simultaneous bidirectional cycles rather than a clean dependency target.
-- batch-types.ts lives in packages/rex/src/analyze/ (inside rex-prd-engine's directory) but is classified as a chunked-review zone member — the file's physical location and zone membership are misaligned, creating an ownership ambiguity that will cause confusion during refactoring.
-- rex-prd-engine imports back into chunked-review (rex-unit → rex-cli: 2 imports) — the main domain layer has an upward dependency on a CLI satellite zone, inverting the expected CLI-over-domain layering and creating a critical architecture violation.
-- batch-types.ts is physically located in packages/rex/src/analyze/ (within the rex-prd-engine directory tree) but is classified under the chunked-review zone — this file-location/zone-membership mismatch is a leaky abstraction: callers of the analyze/ directory implicitly cross a zone boundary without any import path signal.
-- Three of the four zones that depend on rex-prd-engine (chunked-review, prd-fix-command, rex-core-utilities) each produce a return edge back into the engine, forming a systemic multi-cycle pattern rather than isolated incidents — a single structural fix (strictly enforcing one-way dependency into the engine) would resolve all three cycles simultaneously.
-- The 2 upward imports (rex-unit → rex-cli) are likely targeting batch-types.ts, which is physically in analyze/ but zone-classified under chunked-review — reclassifying batch-types.ts into rex-prd-engine would simultaneously fix the zone misclassification and eliminate the apparent upward dependency without any code changes.
-- Of the three bidirectional cycles involving rex-prd-engine, two (chunked-review and rex-core-utilities) can be resolved purely through reclassification or file relocation rather than code refactoring — the cycles are partially artifacts of inaccurate zone assignment rather than actual circular imports.
-- rex-prd-engine's 0.02 coupling score does not reflect that the zone spans cli/ and core/ subdirectories shared with satellite zones — the low external coupling is partially an artifact of the Louvain algorithm including satellite files inside the engine's community boundary, making the metric misleadingly optimistic.
-- Domain engine (rex-prd-engine) imports from CLI satellite zone (chunked-review) at rex-unit → rex-cli: 2 — this is the most critical layering violation in the rex package because it means a CLI handler change can break domain engine behavior at load time in ESM/bundled contexts.
-- rex-prd-engine spans 21 directories but has no documented internal sub-zone map in CLAUDE.md, unlike hench-agent which has explicit sub-zone boundaries (agent/, prd/, brief/, tools/, process/) with barrel and import-direction rules — for a 216-file zone this omission leaves internal navigation as opaque as an undocumented monolith, and the hench-agent governance section is the ready-made template.
-- The rex CLI has 30+ command files in packages/rex/src/cli/commands/ (next, init, verify, move, fix, add, update, sync, chunked-review, decomposition-review, format-loe, health, remove, report, validate-interactive, smart-add-duplicates, token-format, usage, recommend, reorganize, reshape, status, validate, prune, smart-add, analyze, plus shared helpers) — none of these 30 files appear as entry points for rex-prd-engine, yet the domain engine participates in 3 bidirectional cycles with only 3 of the 30 CLI files. The other 27 command files are ungoverned satellite code that is invisible to the current zone map.
-- CLAUDE.md documents hench-agent's internal sub-zones (agent/, prd/, brief/, tools/, process/) with barrel re-export rules but provides no equivalent sub-zone map for rex-prd-engine's 21 directories — add a matching sub-zone governance section for rex-prd-engine to close the documentation gap between the two largest zones in the monorepo.
-- The rex CLI has 30+ command files but the zone map only surfaces 3 as participants in bidirectional cycles (chunked-review, fix, core utilities) — run a targeted import trace on the remaining 27 command files to confirm they are strictly one-directional consumers of rex-prd-engine and are not silently contributing additional return edges outside the detected zones.
-- [call graph] 7311 internal calls, 12 outgoing, 70 incoming (cohesion: 1, coupling: 0)
+- High cohesion (0.98) with minimal coupling (0.02) across 216 files signals a well-bounded domain — the zone owns its full vertical slice with few external dependencies
+- Entry points span analyze, store, schema, and CLI layers, confirming this is the authoritative hub for all Rex domain logic
+- The zone's low coupling means changes here are unlikely to cause cascading breakage in peer zones, reducing regression risk for PRD engine modifications
+- Exemplary cohesion (0.98) and coupling (0.02) for a 216-file zone — this is the healthy baseline other Rex zones should target.
+- With 8 distinct entry points across analyze, store, schema, and CLI layers, the zone acts as the canonical Rex domain boundary; ensure new Rex features land here rather than in satellite zones.
+- rex-unit → rex-core (8 imports) and rex-unit → rex-cli (2 imports) represent the only outward couplings; both target small utility satellites that may be candidates for absorption if they remain below 5 files.
+- Zone "rex-prd-engine" has files across 22 directories — consider consolidating under a dedicated directory
+- File "packages/rex/src/analyze/batch-types.ts" is pinned to zone "Rex PRD Engine" but lives in packages/rex/src/analyze/ — consider moving to packages/rex/src/core/ to align physical location with architectural zone
+- [call graph] 7464 internal calls, 6 outgoing, 88 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 

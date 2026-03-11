@@ -7,45 +7,36 @@
 Zone: Web Integration Tests (`web-integration-tests`)
 Files: 2, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Contains the web package's integration-level boundary and build-output contract tests that enforce architectural governance rules automatically.
-Lines: 685
+Description: Enforces architectural boundaries and build-output contracts for the web package through integration-level assertions.
+Lines: 962
 
 </zone>
 
 <files>
 
-packages/web/tests/integration/boundary-check.test.ts (TypeScript, 437 lines, test)
-packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 248 lines, test)
+packages/web/tests/integration/boundary-check.test.ts (TypeScript, 673 lines, test)
+packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 289 lines, test)
 
 </files>
 
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Cohesion 1.0 and coupling 0.0 are ideal for a test-only zone — no production code is at risk of being misclassified.
-[observation] [info] Consider extending build-output-contract.test.ts assertions as the viewer build evolves (e.g. CSS chunks, asset hashing) to maintain a stable contract surface.
-[observation] [info] boundary-check.test.ts is listed in CLAUDE.md as a critical governance enforcer for web-shared; ensure it runs in CI and is never marked skip.
-[pattern] [warning] boundary-check.test.ts is the sole automated enforcer for web-shared and crash/ sub-zone boundaries, but viewer-prd-interaction — the only other dual-fragility zone in the web package (cohesion 0.26, coupling 0.74) — has zero boundary assertions in this file. Extending boundary-check.test.ts to assert barrel access for viewer-prd-interaction hooks would bring governance parity with the crash zone.
-[anti-pattern] [warning] boundary-check.test.ts provides barrel and two-consumer assertions for crash/ and shared/ but has zero corresponding assertions for viewer-prd-interaction (cohesion 0.26, coupling 0.74) — the only other dual-fragility production zone in the web package. Governance automation is inversely correlated with zone fragility: the healthiest zones have the most protection while the highest-risk zone has none. This gap should be closed before any new files are added to viewer-prd-interaction.
-[suggestion] [warning] Extend build-output-contract.test.ts to assert existence of key server bundle artifacts (e.g., dist/server/index.js or equivalent entry point). The current test covers both viewer and landing bundles but has a blind spot for server build output, meaning server build regressions are undetected until runtime.
+[observation] [info] These two integration tests cover structurally distinct concerns (boundary policy vs. build artifacts); keeping them separate files within the same zone is intentional and should not be merged.
+[observation] [info] Zero coupling is expected and correct — integration tests must not be imported by production code, and this zone correctly has no outward edges.
+[observation] [info] boundary-check.test.ts is the enforcement mechanism for several CLAUDE.md governance rules; any relaxation of those rules must be mirrored in this file to keep policy and tests in sync.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Perfect cohesion (1.0) and zero coupling confirm this zone is a clean, self-contained test suite with no production code mixed in.
-- boundary-check.test.ts is the automated enforcer for web-shared addition policy, barrel-import rules, and the two-consumer rule documented in CLAUDE.md.
-- build-output-contract.test.ts provides a regression net for the viewer build artifact shape — any build pipeline change that silently drops files will be caught here.
-- Cohesion 1.0 and coupling 0.0 are ideal for a test-only zone — no production code is at risk of being misclassified.
-- boundary-check.test.ts is listed in CLAUDE.md as a critical governance enforcer for web-shared; ensure it runs in CI and is never marked skip.
-- Consider extending build-output-contract.test.ts assertions as the viewer build evolves (e.g. CSS chunks, asset hashing) to maintain a stable contract surface.
-- boundary-check.test.ts enforces governance for crash/ barrel consumption and shared/ isolation, but has no analogous assertions for viewer-prd-interaction (the only other dual-fragility production zone in the web package). Adding viewer-prd-interaction hook-barrel enforcement to this file would close the asymmetric coverage gap.
-- boundary-check.test.ts is the sole automated enforcer for web-shared and crash/ sub-zone boundaries, but viewer-prd-interaction — the only other dual-fragility zone in the web package (cohesion 0.26, coupling 0.74) — has zero boundary assertions in this file. Extending boundary-check.test.ts to assert barrel access for viewer-prd-interaction hooks would bring governance parity with the crash zone.
-- boundary-check.test.ts has no assertions preventing direct leaf-file imports of prd.ts or bulk-actions.ts from outside viewer-prd-interaction. Unlike crash/ (barrel enforcement via test assertion) and shared/ (two-consumer enforcement via test assertion), the page and component files in the only other dual-fragility production zone can be imported from any path by any consumer without triggering a test failure — the governance enforcement surface has a structural blind spot precisely where fragility is highest.
-- boundary-check.test.ts provides barrel and two-consumer assertions for crash/ and shared/ but has zero corresponding assertions for viewer-prd-interaction (cohesion 0.26, coupling 0.74) — the only other dual-fragility production zone in the web package. Governance automation is inversely correlated with zone fragility: the healthiest zones have the most protection while the highest-risk zone has none. This gap should be closed before any new files are added to viewer-prd-interaction.
-- build-output-contract.test.ts validates viewer bundle (dist/viewer/index.html) and landing bundle (dist/landing/index.html) but has zero assertions on server bundle artifacts. The web package produces a Node.js server bundle alongside the browser bundles; if server build artifacts change shape (e.g., entry point renamed, dist path restructured), no test will catch it — creating an asymmetric build contract where only browser-side outputs are protected.
-- Extend build-output-contract.test.ts to assert existence of key server bundle artifacts (e.g., dist/server/index.js or equivalent entry point). The current test covers both viewer and landing bundles but has a blind spot for server build output, meaning server build regressions are undetected until runtime.
-- [call graph] 18 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- boundary-check.test.ts is a key governance artifact — it enforces the two-consumer rule for web-shared, the messaging exemption, and barrel import requirements; treat it as a living spec for zone policy changes.
+- build-output-contract.test.ts acts as a regression gate for the web build pipeline; any change to chunk naming, output paths, or asset hashing must be reflected here before merging.
+- Perfect cohesion (1.0) and zero coupling accurately reflect a test-only zone whose sole job is validating the package it lives in.
+- These two integration tests cover structurally distinct concerns (boundary policy vs. build artifacts); keeping them separate files within the same zone is intentional and should not be merged.
+- boundary-check.test.ts is the enforcement mechanism for several CLAUDE.md governance rules; any relaxation of those rules must be mirrored in this file to keep policy and tests in sync.
+- Zero coupling is expected and correct — integration tests must not be imported by production code, and this zone correctly has no outward edges.
+- [call graph] 27 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

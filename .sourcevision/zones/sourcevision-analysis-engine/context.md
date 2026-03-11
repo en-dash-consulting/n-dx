@@ -7,7 +7,7 @@
 Zone: Sourcevision Analysis Engine (`sourcevision-analysis-engine`)
 Files: 133, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: The complete static analysis package implementing inventory, import graph, zone detection, component catalog, and findings pipelines for AI-readable codebase output.
+Description: The self-contained static analysis package responsible for file inventory, import graph construction, zone detection via Louvain community detection, and React component cataloging.
 Entry points: packages/web/src/server/domain-gateway.ts
 Lines: 43972
 
@@ -529,37 +529,30 @@ Internal:
   packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts {*}
 
 Outgoing (this zone → other zones):
-  → server-usage-scheduler: packages/web/tests/unit/server/domain-gateway.test.ts → packages/web/src/server/domain-gateway.ts
+  → web-server-api: packages/web/tests/unit/server/domain-gateway.test.ts → packages/web/src/server/domain-gateway.ts
 
 </imports>
 
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Single entry point via web's domain-gateway.ts correctly enforces the gateway pattern; any new consumers must route through this gateway rather than importing leaf files directly.
-[observation] [info] The zone's large file count (133) is offset by its high internal cohesion — the community detection algorithm found strong import clustering, validating the zone boundaries.
-[observation] [info] Zero external coupling combined with perfect cohesion across 133 files is an architectural achievement — this zone has no cross-zone dependency risk.
+[observation] [info] Cohesion of 1.0 with zero outbound coupling is an ideal signature for a domain-layer package — this zone is architecturally clean and should be preserved as a reference model.
+[observation] [info] Single entry point via web's domain-gateway.ts enforces the gateway pattern correctly — no leaf-file imports from consumers are detectable at this boundary.
+[observation] [info] The analyzers directory contains at least 8 visible service-archetyed files covering distinct concerns (classify, callgraph, branch-work, archetypes). As the package grows, consider sub-directory grouping to keep the flat directory manageable.
 [suggestion] [info] Zone "sourcevision-analysis-engine" has files across 22 directories — consider consolidating under a dedicated directory
-[suggestion] [info] Suppress 'consider consolidating under a dedicated directory' suggestions for zones with cohesion ≥ 0.9 — the metric is misleading for zones where high import-graph cohesion already proves that directory spread is not causing structural fragmentation.
-[pattern] [info] sourcevision-analysis-engine achieves zero bidirectional coupling across 133 files — it is the only large zone in the codebase that is both perfectly cohesive and perfectly isolated, and should serve as the reference model for future zone design
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Perfect cohesion (1.0) and zero coupling make this the most structurally sound large zone in the monorepo — a model for self-contained domain packages.
-- The 133-file zone is entered exclusively through web's domain-gateway.ts, enforcing the gateway pattern and keeping the public surface minimal.
-- Branch work classification, callgraph analysis, and zone enrichment are all co-located, reflecting natural domain cohesion rather than forced grouping.
-- Zero external coupling combined with perfect cohesion across 133 files is an architectural achievement — this zone has no cross-zone dependency risk.
-- Single entry point via web's domain-gateway.ts correctly enforces the gateway pattern; any new consumers must route through this gateway rather than importing leaf files directly.
-- The zone's large file count (133) is offset by its high internal cohesion — the community detection algorithm found strong import clustering, validating the zone boundaries.
+- Perfect cohesion (1.0) and zero coupling indicate a well-bounded domain package with no external runtime dependencies leaking into its core.
+- The 133-file surface with a single entry point (domain-gateway.ts in web) means all cross-package consumption is properly gated through the gateway pattern.
+- Branch-work analysis, callgraph computation, and archetype classification coexist in the analyzers directory — verify each sub-concern has a clear boundary to prevent cohesion decay as the package grows.
+- Cohesion of 1.0 with zero outbound coupling is an ideal signature for a domain-layer package — this zone is architecturally clean and should be preserved as a reference model.
+- The analyzers directory contains at least 8 visible service-archetyed files covering distinct concerns (classify, callgraph, branch-work, archetypes). As the package grows, consider sub-directory grouping to keep the flat directory manageable.
+- Single entry point via web's domain-gateway.ts enforces the gateway pattern correctly — no leaf-file imports from consumers are detectable at this boundary.
 - Zone "sourcevision-analysis-engine" has files across 22 directories — consider consolidating under a dedicated directory
-- sourcevision-analysis-engine is the only large zone (133 files) in the monorepo with zero cross-zone coupling in either direction — this is the only zone that fully satisfies the gateway pattern from both sides (single entry point in, zero leakage out)
-- sourcevision-analysis-engine achieves zero bidirectional coupling across 133 files — it is the only large zone in the codebase that is both perfectly cohesive and perfectly isolated, and should serve as the reference model for future zone design
-- The zone's 22-directory spread with perfect cohesion (1.0) is definitive evidence that directory count is not a useful predictor of zone cohesion — import-graph clustering alone determines zone health. The conventional 'consider consolidating under a dedicated directory' heuristic is a false signal for this zone and should be suppressed in future analysis passes.
-- sourcevision-analysis-engine is the only zone in the monorepo where the physical file count (133) exceeds the directory count (22) by a factor less than 7 — meaning files are spread thin across directories. The fact that cohesion remains at 1.0 under these conditions proves that co-location is neither necessary nor sufficient for zone cohesion; only import topology matters.
-- Suppress 'consider consolidating under a dedicated directory' suggestions for zones with cohesion ≥ 0.9 — the metric is misleading for zones where high import-graph cohesion already proves that directory spread is not causing structural fragmentation.
 - [call graph] 4596 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

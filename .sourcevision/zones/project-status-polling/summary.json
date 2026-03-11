@@ -1,0 +1,25 @@
+{
+  "id": "project-status-polling",
+  "name": "Project Status Polling Hooks",
+  "description": "Provides React hooks for polling-based project status retrieval, bridging the web viewer's data-fetch layer to the server API.",
+  "files": [
+    "packages/web/src/viewer/hooks/use-polling.ts",
+    "packages/web/src/viewer/hooks/use-project-status.ts",
+    "packages/web/tests/unit/viewer/use-project-status.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-polling.ts",
+    "packages/web/src/viewer/hooks/use-project-status.ts"
+  ],
+  "cohesion": 0.25,
+  "coupling": 0.75,
+  "fileCount": 3,
+  "lineCount": 389,
+  "riskMetrics": {
+    "cohesion": 0.25,
+    "coupling": 0.75,
+    "riskScore": 0.75,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

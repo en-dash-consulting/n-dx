@@ -1,7 +1,7 @@
 {
   "id": "web-integration-tests",
   "name": "Web Integration Tests",
-  "description": "Contains the web package's integration-level boundary and build-output contract tests that enforce architectural governance rules automatically.",
+  "description": "Enforces architectural boundaries and build-output contracts for the web package through integration-level assertions.",
   "files": [
     "packages/web/tests/integration/boundary-check.test.ts",
     "packages/web/tests/integration/build-output-contract.test.ts"
@@ -10,7 +10,7 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 2,
-  "lineCount": 685,
+  "lineCount": 962,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

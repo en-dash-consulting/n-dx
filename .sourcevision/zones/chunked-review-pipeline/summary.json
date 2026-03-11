@@ -1,0 +1,26 @@
+{
+  "id": "chunked-review-pipeline",
+  "name": "Chunked Review Pipeline",
+  "description": "A satellite CLI zone containing the chunked-review command and its batch-types contract, responsible for streaming large review payloads through a stateful multi-step UI flow.",
+  "files": [
+    "packages/rex/src/cli/commands/chunked-review-state.ts",
+    "packages/rex/src/cli/commands/chunked-review.ts",
+    "packages/rex/tests/unit/cli/commands/chunked-review.test.ts",
+    "packages/rex/tests/unit/cli/commands/loe-display-chunked-review.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/analyze/batch-types.ts",
+    "packages/rex/src/cli/commands/chunked-review.ts"
+  ],
+  "cohesion": 0.36,
+  "coupling": 0.64,
+  "fileCount": 4,
+  "lineCount": 3351,
+  "riskMetrics": {
+    "cohesion": 0.36,
+    "coupling": 0.64,
+    "riskScore": 0.64,
+    "riskLevel": "critical",
+    "failsThreshold": true
+  }
+}

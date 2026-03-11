@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web-viewer/web-4",
+  "name": "Web Viewer/web Viewer/web 4",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/hooks/use-app-data.ts",
+    "packages/web/src/viewer/loader.ts",
+    "packages/web/src/viewer/schema-compat.ts",
+    "packages/web/src/viewer/validate.ts",
+    "packages/web/tests/unit/viewer/loader-onchange.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/hooks/use-app-data.ts"
+  ],
+  "cohesion": 0.43,
+  "coupling": 0.57,
+  "fileCount": 5,
+  "lineCount": 871
+}

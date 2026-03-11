@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web-viewer/domain",
+  "name": "Web Viewer/web Viewer/domain",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/views/domain-hench.ts",
+    "packages/web/src/viewer/views/domain-rex.ts",
+    "packages/web/src/viewer/views/domain-settings.ts",
+    "packages/web/src/viewer/views/domain-sourcevision.ts",
+    "packages/web/src/viewer/views/view-registry.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/view-registry.ts"
+  ],
+  "cohesion": 0.28,
+  "coupling": 0.72,
+  "fileCount": 5,
+  "lineCount": 244
+}

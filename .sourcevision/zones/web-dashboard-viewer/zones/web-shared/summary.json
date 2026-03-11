@@ -1,0 +1,19 @@
+{
+  "id": "web-viewer/web-shared",
+  "name": "Web Viewer/web Shared",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/view-id.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/shared/data-files.ts",
+    "packages/web/src/shared/index.ts",
+    "packages/web/src/shared/view-id.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 61
+}

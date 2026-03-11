@@ -1,7 +1,7 @@
 {
   "id": "crash",
-  "name": "Viewer Crash Recovery",
-  "description": "Encapsulates crash detection, recovery state management, and recovery UI within the web viewer.",
+  "name": "Crash Recovery UI",
+  "description": "Encapsulates crash detection, recovery state management, and the recovery banner component for the web viewer.",
   "files": [
     "packages/web/src/viewer/components/crash-recovery-banner.ts",
     "packages/web/src/viewer/crash/crash-detector.ts",

@@ -7,7 +7,7 @@
 Zone: Monorepo Integration Tests (`monorepo-integration-tests`)
 Files: 5, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Cross-package integration test suite verifying gateway contracts, scheduler startup, and server-viewer boundaries at the monorepo level.
+Description: Integration tests validating cross-package contracts, gateway pipelines, scheduler startup, and the web server–viewer boundary at the monorepo level.
 Lines: 2176
 
 </zone>
@@ -25,42 +25,21 @@ tests/integration/web-server-viewer-boundary.test.js (JavaScript, 112 lines, tes
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Coverage spans all four architectural tiers (hench, rex, web-server, web-viewer) and gateway contracts, making this zone the primary safety net for monorepo-wide regressions — keep it running in CI without conditional skipping.
-[observation] [info] Perfect cohesion (1.0) and zero outbound coupling to other zones confirms this is a clean, well-bounded test zone with no production code leakage.
-[observation] [warning] Two files in this zone (scheduler-startup.test.js, web-server-viewer-boundary.test.js) are flagged in CLAUDE.md as sole-coverage required tests; they lack any in-file annotation marking them as such, which is a skip-risk during refactoring.
-[pattern] [info] Zero coupling from test zone to production zones is a strong positive signal: all five tests exercise the system through spawned processes, making the test zone immune to the circular-dependency risks present in production zones.
-[relationship] [warning] Integration test zone has no test targeting the rex-core ↔ rex-unit bidirectional import cycle — the only structural cycle flagged as critical in the codebase has no dedicated regression test at the integration layer.
-[relationship] [warning] web-server-viewer-boundary test should assert an exhaustive allowlist of permitted web-server→web-viewer imports (currently 3), not just the absence of a known bad import — without an allowlist, new reverse imports silently pass.
-[suggestion] [info] Add 'REQUIRED TEST — do not skip or delete' annotation to web-server-viewer-boundary.test.js header (matching the pattern established in scheduler-startup.test.js line 2) so both tests are consistently machine-searchable and annotated to match their documentation status.
-[suggestion] [warning] Add a build-freshness precondition note to tests/integration/README.md and to the root vitest config or package.json test script — e.g., a pretest or check-build step — to prevent integration tests from silently validating stale dist/ artifacts after source changes.
-[suggestion] [info] Document the scope boundary between gateway-pipeline.test.js (individual symbol + function call verification) and hench-rex-gateway-pipeline.test.js (composed multi-step workflows) in tests/integration/README.md to give engineers a canonical decision rule for where to add new hench→rex gateway tests.
-[suggestion] [warning] Rename web-server-viewer-boundary.test.js to web-scheduler-gateway-boundary.test.js (or similar) to accurately reflect its coverage: scheduler boot wiring, gateway re-exports, and cleanup data flow. The current name implies import-direction enforcement for the 3 web-server→web-viewer reverse imports, which this file does not provide — a separate test or an addition to architecture-policy.test.js is needed to actually enforce that boundary.
+[observation] [info] As new cross-package contracts are introduced (e.g. new gateway exports), a corresponding integration test should be added here to prevent silent contract breakage.
+[observation] [info] Perfect cohesion and zero coupling are correct for an integration test zone; these tests exercise production seams without becoming part of them.
+[observation] [info] hench-rex-gateway-pipeline.test.js and gateway-pipeline.test.js may have overlapping coverage of the rex gateway; periodically audit for duplication to keep the suite maintainable.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- All five tests target different cross-package seams (contracts, gateways, hench-rex pipeline, scheduler boot, web boundary), giving broad coverage of the most failure-prone integration points.
-- Cohesion of 1 and coupling of 0 confirm this zone is self-contained and correctly isolated from production code — a healthy test zone topology.
-- The scheduler-startup and web-server-viewer-boundary tests are called out in CLAUDE.md as required tests (sole coverage for their scenarios); document this explicitly in the test files with a comment to prevent accidental skips during refactoring.
-- Perfect cohesion (1.0) and zero outbound coupling to other zones confirms this is a clean, well-bounded test zone with no production code leakage.
-- Two files in this zone (scheduler-startup.test.js, web-server-viewer-boundary.test.js) are flagged in CLAUDE.md as sole-coverage required tests; they lack any in-file annotation marking them as such, which is a skip-risk during refactoring.
-- Coverage spans all four architectural tiers (hench, rex, web-server, web-viewer) and gateway contracts, making this zone the primary safety net for monorepo-wide regressions — keep it running in CI without conditional skipping.
-- Zero outbound coupling to production zones confirms these tests operate exclusively through spawned CLI processes, validating the spawn-only orchestration architecture at the test layer — the test zone itself models the same boundary discipline it verifies.
-- The integration zone covers hench-rex-gateway-pipeline and web-server-viewer-boundary but has no dedicated test for the rex-core ↔ rex-unit bidirectional dependency cycle, leaving the highest-priority structural cycle in the codebase without integration-level regression coverage.
-- The web-server-viewer-boundary test is the sole automated check for the 3 reverse web-server→web-viewer runtime imports; if it only asserts on absence of a specific import pattern rather than an exhaustive allowlist, silent regressions (new reverse imports) would not be caught.
-- Integration test zone has no test targeting the rex-core ↔ rex-unit bidirectional import cycle — the only structural cycle flagged as critical in the codebase has no dedicated regression test at the integration layer.
-- web-server-viewer-boundary test should assert an exhaustive allowlist of permitted web-server→web-viewer imports (currently 3), not just the absence of a known bad import — without an allowlist, new reverse imports silently pass.
-- Zero coupling from test zone to production zones is a strong positive signal: all five tests exercise the system through spawned processes, making the test zone immune to the circular-dependency risks present in production zones.
-- web-server-viewer-boundary.test.js tests scheduler lifecycle, gateway re-exports, and cleanup contracts — not the web-server→web-viewer import direction. The file name implies it enforces the 3 reverse imports flagged in architecture insights, but the actual assertions contain zero import-direction checks; engineers treating it as boundary protection for the server/viewer rule would have false confidence.
-- scheduler-startup.test.js carries the explicit 'REQUIRED TEST — do not skip or delete' annotation at line 2; web-server-viewer-boundary.test.js lacks this annotation despite both files being described as required in some zone insights. The annotation inconsistency means only one of the two is machine-searchable as a required test.
-- gateway-pipeline.test.js and hench-rex-gateway-pipeline.test.js both cover the hench→rex seam at different granularities; their scope distinction (individual function calls vs composed multi-step workflows) is documented only in JSDoc file headers, not in README.md or TESTING.md. Engineers adding new hench→rex gateway tests have no canonical guidance on which file to extend.
-- All 5 tests import from built dist/ artifacts. If CI runs integration tests before a fresh build, tests silently validate stale compiled code. README.md documents why dist/ is required but does not specify a build-freshness guard as a precondition.
-- Rename web-server-viewer-boundary.test.js to web-scheduler-gateway-boundary.test.js (or similar) to accurately reflect its coverage: scheduler boot wiring, gateway re-exports, and cleanup data flow. The current name implies import-direction enforcement for the 3 web-server→web-viewer reverse imports, which this file does not provide — a separate test or an addition to architecture-policy.test.js is needed to actually enforce that boundary.
-- Add 'REQUIRED TEST — do not skip or delete' annotation to web-server-viewer-boundary.test.js header (matching the pattern established in scheduler-startup.test.js line 2) so both tests are consistently machine-searchable and annotated to match their documentation status.
-- Document the scope boundary between gateway-pipeline.test.js (individual symbol + function call verification) and hench-rex-gateway-pipeline.test.js (composed multi-step workflows) in tests/integration/README.md to give engineers a canonical decision rule for where to add new hench→rex gateway tests.
-- Add a build-freshness precondition note to tests/integration/README.md and to the root vitest config or package.json test script — e.g., a pretest or check-build step — to prevent integration tests from silently validating stale dist/ artifacts after source changes.
+- The 5 test files map directly to the monorepo's critical seams: cross-package contracts, gateway pipelines (hench↔rex), scheduler wiring, and the server↔viewer boundary — a well-scoped coverage strategy.
+- scheduler-startup.test.js is a required test per CLAUDE.md; it must remain in place as a guard against regressions in the injection seam between start.ts and register-scheduler.ts.
+- web-server-viewer-boundary.test.js complements the web package's own boundary-check.test.ts by validating the seam from outside the package — two-layer boundary enforcement for the monorepo's highest-traffic import edge.
+- Perfect cohesion and zero coupling are correct for an integration test zone; these tests exercise production seams without becoming part of them.
+- hench-rex-gateway-pipeline.test.js and gateway-pipeline.test.js may have overlapping coverage of the rex gateway; periodically audit for duplication to keep the suite maintainable.
+- As new cross-package contracts are introduced (e.g. new gateway exports), a corresponding integration test should be added here to prevent silent contract breakage.
 - [call graph] 30 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
