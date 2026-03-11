@@ -77,7 +77,23 @@
         "packages/rex/src/core/fix.ts": "rex-prd-engine",
         "packages/rex/src/analyze/batch-types.ts": "rex-prd-engine",
         "packages/rex/src/core/keywords.ts": "rex-prd-engine",
-        "packages/rex/src/core/verify.ts": "rex-prd-engine"
+        "packages/rex/src/core/verify.ts": "rex-prd-engine",
+        "packages/web/src/viewer/components/prd-tree/bulk-actions.ts": "web-viewer",
+        "packages/web/src/viewer/hooks/use-feature-toggle.ts": "web-viewer",
+        "packages/web/src/viewer/hooks/use-toast.ts": "web-viewer",
+        "packages/web/src/viewer/views/prd.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/accessibility.test.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/status-filter.test.ts": "web-viewer",
+        "packages/rex/tests/unit/core/fix.test.ts": "rex-prd-engine",
+        "packages/rex/tests/unit/cli/commands/fix.test.ts": "rex-prd-engine",
+        "packages/rex/src/cli/commands/fix.ts": "rex-prd-engine",
+        "packages/rex/tests/e2e/cli-quiet.test.ts": "rex-cli-e2e",
+        "packages/rex/tests/e2e/cli-recommend.test.ts": "rex-cli-e2e",
+        "packages/rex/tests/e2e/cli-smart-add.test.ts": "rex-cli-e2e",
+        "packages/rex/tests/e2e/cli-sync.test.ts": "rex-cli-e2e",
+        "packages/rex/tests/e2e/cli-workflow.test.ts": "rex-cli-e2e",
+        "packages/rex/vitest.config.ts": "rex-prd-engine",
+        "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e"
       }
     }
   }
