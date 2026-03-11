@@ -70,13 +70,54 @@ Within the web package, four internal zones form a hub topology with `web-viewer
   web-shared          (framework-agnostic utilities — data-files, node-culler, view-id)
 ```
 
+##### Monorepo-wide zone fragility governance
+
+Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance. The following zones currently meet both thresholds:
+
+| Zone | Package | Cohesion | Coupling | Notes |
+|------|---------|----------|----------|-------|
+| `web-shared` | web | 0.46 | 0.54 | Foundation layer; wide blast radius across 3 consumer zones |
+| `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
+| `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
+| `crash` | web | 0.50 | bidirectional | At threshold boundary — one addition away from dual-fragility |
+
+**Universal governance rules** (apply to all dual-fragility zones):
+- **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
+- **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
+- **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
+
 ##### web-shared addition policy
 
-`web-shared` has low cohesion (0.46) and moderate coupling (0.54), making it the only production zone meeting both fragility thresholds simultaneously. To prevent further degradation:
+`web-shared` has low cohesion (0.46) and moderate coupling (0.54). In addition to the universal governance rules above:
 
-- **Two-consumer rule:** A new module should have at least two distinct consumer zones before being added to `web-shared`. Single-consumer utilities belong closer to their dominant use site (e.g., in `viewer/` or `server/`).
 - **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
-- **Governance:** Treat `web-shared` as a risk zone requiring active review on additions. Changes have a wide blast radius across three consumer zones.
+- **Barrel import enforcement:** Consumers should import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Direct imports erode measurable cohesion and prevent per-module consumer counting.
+
+##### rex-satellite zone policy
+
+Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` with cohesion 0.25 and coupling 0.75. In addition to the universal governance rules:
+
+- **CLI-only content:** These zones must contain only CLI command handlers and their direct support modules. Domain logic belongs in `rex-prd-engine` (e.g., `src/core/`).
+- **Subdirectory convention:** Satellite zone files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make zone boundaries visible in the file tree.
+
+##### crash zone proactive governance
+
+`crash` (cohesion 0.5, bidirectional coupling with `web-viewer`) sits at the dual-fragility threshold boundary. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
+
+##### hench-agent internal governance
+
+`hench-agent` (160+ files, 31 directories) is the second-largest zone in the monorepo. Internal sub-zone boundaries:
+
+- **`agent/`** — Agent loop, tool dispatch, conversation management
+- **`prd/`** — PRD integration via `rex-gateway.ts` and `llm-gateway.ts`
+- **`brief/`** — Task brief construction and context gathering
+- **`tools/`** — Tool implementations (file ops, shell, search)
+- **`process/`** — Process lifecycle, concurrency management
+
+Rules:
+- Each sub-zone directory should maintain a barrel `index.ts` re-exporting its public API.
+- Cross-sub-zone imports should flow through barrels, not reach into internal modules.
+- Boundary assertions should be added to hench's test suite before the zone reaches web-viewer's scale.
 
 `web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `web-shared`, while also receiving imports from sub-zones like `crash/` and `hench-agent-monitor`. The actual import graph has 11+ distinct cross-zone edges radiating from `web-viewer`, making it a hub rather than a linear stack. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `web-shared` is the foundation layer with zero upward dependencies (enforced by `boundary-check.test.ts`).
 

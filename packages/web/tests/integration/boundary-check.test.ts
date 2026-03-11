@@ -10,6 +10,23 @@
  *
  * These three test files together enforce the full architectural guardrail suite.
  * Changes to one should be reviewed against the others for consistency.
+ *
+ * ## Known limitations of regex-based import extraction
+ *
+ * The `extractImportPaths()` function uses a regex to match static import/export
+ * statements. This approach is intentionally lightweight (no AST parse) but has
+ * blind spots:
+ *
+ *   1. **Dynamic imports** — `await import("./path")` and `import("./path")` are
+ *      not detected. Two critical dynamic import paths exist in the monorepo:
+ *      `rex/src/cli/commands/analyze.ts` and `rex/src/cli/index.ts`. A separate
+ *      dynamic-import-audit test in architecture-policy.test.js covers these.
+ *   2. **Template-literal paths** — ``import(`./locales/${lang}`)`` is invisible.
+ *   3. **Multiline import statements** — Imports split across lines may be missed
+ *      if the `from "..."` portion is on a different line than the `import` keyword.
+ *
+ * Any new enforcement assertion added to this file inherits these blind spots.
+ * For boundary-critical dynamic imports, consider a separate grep-based check.
  */
 
 import { describe, it, expect } from "vitest";
@@ -284,6 +301,55 @@ describe("server/client boundary", () => {
    * This test is the ground-truth enforcement — zero violations means
    * the boundary is clean regardless of zone-level analysis.
    */
+  /**
+   * web-shared barrel import enforcement — consumers of src/shared/ must import
+   * through shared/index.ts rather than directly from leaf files (data-files.ts,
+   * view-id.ts). Direct imports erode measurable cohesion and prevent per-module
+   * consumer counting required by the two-consumer governance rule.
+   *
+   * Exemptions:
+   * - viewer/external.ts — gateway whose purpose is to re-export from shared/
+   * - viewer/crash/ — documented exemption for ViewId (cycle avoidance)
+   * - viewer/messaging/ — documented exemption for shared/ direct access
+   */
+  it("shared/ consumers import through barrel, not leaf files", () => {
+    const violations: string[] = [];
+    const SHARED_LEAF_FILES = ["data-files", "view-id"];
+
+    try {
+      for (const dir of ["server", "viewer"]) {
+        const base = join(WEB_SRC, dir);
+        for (const file of collectTsFiles(base)) {
+          const rel = relative(WEB_SRC, file);
+
+          // Gateway files are allowed to import from leaf files
+          if (rel === join("viewer", "external.ts")) continue;
+
+          // Crash zone exemption (documented cycle avoidance)
+          if (rel.startsWith(join("viewer", "crash") + "/")) continue;
+
+          // Messaging exemption (documented shared/ direct access)
+          if (rel.startsWith(join("viewer", "messaging") + "/")) continue;
+
+          for (const imp of extractImportPaths(file)) {
+            for (const leaf of SHARED_LEAF_FILES) {
+              if (imp.includes(`shared/${leaf}`)) {
+                violations.push(
+                  `${rel} imports "${imp}" — must use shared/index.js barrel`
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Directories don't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("no viewer file imports from server", () => {
     const viewerDir = join(WEB_SRC, "viewer");
     const violations: string[] = [];

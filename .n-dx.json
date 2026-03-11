@@ -40,7 +40,8 @@
         "packages/web/src/viewer/usage/index.ts": "web-viewer",
         "packages/web/src/viewer/graph/index.ts": "web-viewer",
         "packages/web/src/viewer/graph/physics.ts": "web-viewer",
-        "packages/web/src/viewer/graph/renderer.ts": "web-viewer"
+        "packages/web/src/viewer/graph/renderer.ts": "web-viewer",
+        "packages/rex/src/core/fix.ts": "rex-prd-engine"
       }
     }
   }

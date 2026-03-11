@@ -253,7 +253,7 @@ describe("analyzeZones insights", () => {
     expect(result.structureHash).toBeDefined();
   });
 
-  it("assigns proximity files to reduce unzoned count", async () => {
+  it("excludes non-importable files from zone detection and unzoned list", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/m/a.ts"),
       makeFileEntry("src/m/b.ts"),
@@ -269,9 +269,11 @@ describe("analyzeZones insights", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // README.md and styles.css should be assigned to the zone by proximity
-    expect(result.zones[0].files).toContain("src/m/README.md");
-    expect(result.zones[0].files).toContain("src/m/styles.css");
+    // Non-importable files (.md, .css) should be excluded from both zone files
+    // and the unzoned list — they cannot form import edges, so including them
+    // in zone detection produces noise zones with distorted metrics.
+    expect(result.zones[0].files).not.toContain("src/m/README.md");
+    expect(result.zones[0].files).not.toContain("src/m/styles.css");
     expect(result.unzoned).not.toContain("src/m/README.md");
     expect(result.unzoned).not.toContain("src/m/styles.css");
   });

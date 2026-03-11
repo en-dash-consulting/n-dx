@@ -7,7 +7,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
-import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/data-files.js";
+import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
 import { prdExists, prdPath } from "./prd-io.js";
 
 const MIME_TYPES: Record<string, string> = {

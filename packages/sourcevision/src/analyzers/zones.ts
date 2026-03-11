@@ -18,7 +18,7 @@
  * @see {@link generateStructuralInsights} for automated metric interpretation
  */
 
-import { basename, dirname } from "node:path";
+import { basename, dirname, extname } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   Inventory,
@@ -1283,30 +1283,6 @@ function buildZonesFromCommunities(
   return { zones, filenameBasedZoneIds };
 }
 
-// ── Helper: collect unzoned files ────────────────────────────────────────────
-
-/** Gather inventory files not assigned to any zone or sub-analysis. */
-function collectUnzonedFiles(
-  zones: Zone[],
-  inventory: Inventory,
-  subAnalyzedPrefixes: string[]
-): string[] {
-  const zonedFiles = new Set<string>();
-  for (const zone of zones) {
-    for (const f of zone.files) zonedFiles.add(f);
-  }
-  const unzoned: string[] = [];
-  for (const entry of inventory.files) {
-    if (
-      !zonedFiles.has(entry.path) &&
-      !isSubAnalyzedFile(entry.path, subAnalyzedPrefixes)
-    ) {
-      unzoned.push(entry.path);
-    }
-  }
-  return unzoned;
-}
-
 // ── Helper: compute content hashes ───────────────────────────────────────────
 
 /** Compute per-zone and global content hashes for stale-finding detection. */
@@ -1824,6 +1800,28 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   return { zones: pinnedZones, crossings, unzoned, filenameBasedZoneIds };
 }
 
+// ── Non-importable file extensions ────────────────────────────────────────────
+
+/**
+ * File extensions that cannot form import edges in any JS/TS module system.
+ * Including these in zone detection produces noise zones (e.g. logo, web-landing)
+ * with false-positive 'at-risk' labels and distorted cohesion scores of 0.
+ */
+const NON_IMPORTABLE_EXTENSIONS = new Set([
+  // Binary image assets
+  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".avif", ".bmp", ".tiff",
+  // Vector and font assets
+  ".svg", ".woff", ".woff2", ".ttf", ".otf", ".eot",
+  // Media assets
+  ".mp3", ".mp4", ".wav", ".ogg", ".webm", ".pdf",
+  // Markup and style (not importable as modules)
+  ".html", ".htm", ".css", ".scss", ".less", ".sass",
+  // Data and documentation
+  ".md", ".mdx", ".json", ".yaml", ".yml", ".toml",
+  // Lock files
+  ".lock",
+]);
+
 // ── Helper: prepare scope and edges ──────────────────────────────────────────
 
 /** Filter sub-analyzed files from edges/inventory and build the test file set. */
@@ -1848,6 +1846,7 @@ function prepareScopeAndEdges(
 
   const scopeFiles = inventory.files
     .filter(f => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes))
+    .filter(f => !NON_IMPORTABLE_EXTENSIONS.has(extname(f.path).toLowerCase()))
     .map(f => f.path);
 
   const testFiles = new Set<string>();

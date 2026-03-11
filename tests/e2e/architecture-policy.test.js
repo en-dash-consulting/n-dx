@@ -329,6 +329,18 @@ const DOCUMENTED_POLICIES = [
     rule: "Boundary gateway files must not exceed export caps",
     enforcedBy: "architecture-policy.test.js → architecture policy: boundary file export caps",
   },
+  {
+    rule: "Web package internal zones must not form import cycles",
+    enforcedBy: "architecture-policy.test.js → architecture policy: web package intra-zone cycle detection",
+  },
+  {
+    rule: "Dynamic imports must not cross zone boundaries without documentation",
+    enforcedBy: "architecture-policy.test.js → architecture policy: dynamic import audit",
+  },
+  {
+    rule: "web-shared consumers must import through barrel index, not leaf files",
+    enforcedBy: "boundary-check.test.ts → server/client boundary",
+  },
 ];
 
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
@@ -338,7 +350,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(16);
+    expect(DOCUMENTED_POLICIES.length).toBe(19);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -1010,6 +1022,228 @@ describe("architecture policy: analyzer test coverage pairing", () => {
           ...missing.map((m) => `  - src/analyzers/${m}.ts → tests/unit/analyzers/${m}.test.ts`),
           "",
           "Either add a test file or add the analyzer name to EXEMPT_ANALYZERS with justification.",
+        ].join("\n"),
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Web package intra-zone cycle detection
+// ---------------------------------------------------------------------------
+
+/**
+ * The web package's internal zone layering (web-shared → viewer-message-pipeline
+ * → web-viewer → web-server) has no mechanical enforcement beyond the
+ * cross-package cycle detection above (which skips intra-package edges).
+ *
+ * This test validates the web-internal load order by asserting no reverse
+ * import edges exist between the four declared web zones.
+ */
+const WEB_ZONE_LOAD_ORDER = [
+  "web-shared",
+  "viewer-message-pipeline",
+  "web-viewer",
+  "web-server",
+];
+
+describe("architecture policy: web package intra-zone cycle detection", () => {
+  it("web internal zones respect the declared load order", () => {
+    const zonesPath = join(ROOT, ".sourcevision/zones.json");
+    if (!existsSync(zonesPath)) return;
+
+    const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
+    const crossings = data.crossings || [];
+
+    // Load zone pins from .n-dx.json
+    const configPath = join(ROOT, ".n-dx.json");
+    const zonePins = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.pins ?? {}
+      : {};
+
+    // Build file-to-zone lookup with pins applied
+    const fileToZone = new Map();
+    for (const zone of data.zones || []) {
+      for (const file of zone.files || []) {
+        fileToZone.set(file, zone.id);
+      }
+    }
+    for (const [file, zoneId] of Object.entries(zonePins)) {
+      fileToZone.set(file, zoneId);
+    }
+
+    // Build zone rank from load order (lower = earlier in load order)
+    const zoneRank = new Map();
+    WEB_ZONE_LOAD_ORDER.forEach((z, i) => zoneRank.set(z, i));
+
+    // Load zone types to identify test zones
+    const zoneTypes = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      : {};
+
+    // Check for reverse edges (lower-rank zone importing from higher-rank zone
+    // is fine; higher-rank importing from lower-rank would be a violation if it
+    // goes against the load order). Skip test files — they naturally cross zone
+    // boundaries by importing production code from multiple zones.
+    const violations = [];
+    for (const c of crossings) {
+      const fromZone = fileToZone.get(c.from) ?? c.fromZone;
+      const toZone = fileToZone.get(c.to) ?? c.toZone;
+
+      if (fromZone === toZone) continue;
+      if (!zoneRank.has(fromZone) || !zoneRank.has(toZone)) continue;
+
+      // Skip edges originating from test zones or test files
+      const fromZoneType = zoneTypes[fromZone];
+      if (fromZoneType === "test") continue;
+      if (c.from.includes("/tests/") || c.from.includes(".test.")) continue;
+
+      // A reverse edge: importing from a zone lower in the load order
+      // is expected. But importing from a zone HIGHER in the load order
+      // violates the layering (foundation importing from consumer).
+      if (zoneRank.get(fromZone) < zoneRank.get(toZone)) {
+        // Verify the import still exists
+        const srcPath = join(ROOT, c.from);
+        if (existsSync(srcPath)) {
+          const srcContent = readFileSync(srcPath, "utf-8");
+          const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
+          if (!srcContent.includes(targetBase)) continue;
+        }
+        violations.push(`${fromZone} → ${toZone} (${c.from} imports ${c.to})`);
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "Web package internal zone layering violations detected:",
+          "",
+          `Expected load order: ${WEB_ZONE_LOAD_ORDER.join(" → ")}`,
+          "",
+          "Reverse imports (lower-layer zone importing from higher-layer zone):",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "Fix by moving the imported symbol to a lower layer or extracting to web-shared.",
+        ].join("\n"),
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dynamic import audit
+// ---------------------------------------------------------------------------
+
+/**
+ * boundary-check.test.ts uses regex-based import extraction that is blind to
+ * dynamic imports (await import()). This test enumerates all dynamic import
+ * call sites across package source directories and asserts none cross zone
+ * boundaries without documentation.
+ *
+ * Dynamic imports that are known to cross zone boundaries must be listed in
+ * DOCUMENTED_DYNAMIC_IMPORTS below with a justification.
+ */
+const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
+  // Hench CLI — lazy-loads command handlers to reduce startup time
+  ["packages/hench/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
+  ["packages/hench/src/cli/commands/config.ts", "Lazy-loads LLM config helpers on demand"],
+  ["packages/hench/src/cli/commands/run.ts", "Lazy-loads agent runner on demand"],
+  ["packages/hench/src/cli/commands/task-lookup.ts", "Lazy-loads rex gateway for task resolution"],
+  // Rex CLI — lazy-loads command handlers and heavy dependencies
+  ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
+  ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
+  ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
+  ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
+  ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],
+  ["packages/rex/src/cli/commands/reshape.ts", "Lazy-loads LLM client for reshape analysis"],
+  ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
+  ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
+  ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
+  ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
+  // Sourcevision — lazy-loads analyzers and heavy dependencies
+  ["packages/sourcevision/src/cli/index.ts", "CLI command dispatch — lazy-loads analyzers"],
+  ["packages/sourcevision/src/analyzers/callgraph-findings.ts", "Lazy-loads callgraph analysis on demand"],
+  ["packages/sourcevision/src/analyzers/convergence.ts", "Lazy-loads convergence analyzer on demand"],
+  ["packages/sourcevision/src/analyzers/imports.ts", "Lazy-loads import graph analysis on demand"],
+  // Web server — lazy-loads route handlers
+  ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
+  ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
+  ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
+]);
+
+describe("architecture policy: dynamic import audit", () => {
+  it("all dynamic imports in package sources are documented", () => {
+    const packagesDir = join(ROOT, "packages");
+    if (!existsSync(packagesDir)) return;
+
+    const undocumented = [];
+    const dynamicImportRe = /await\s+import\s*\(/g;
+
+    function scanDir(dir) {
+      try {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            // Skip node_modules, dist, tests
+            if (["node_modules", "dist", "tests", ".git"].includes(entry.name)) continue;
+            scanDir(full);
+          } else if (entry.isFile() && /\.[tj]sx?$/.test(entry.name)) {
+            const content = readFileSync(full, "utf-8");
+            if (dynamicImportRe.test(content)) {
+              const rel = relative(ROOT, full).replace(/\\/g, "/");
+              if (!DOCUMENTED_DYNAMIC_IMPORTS.has(rel)) {
+                undocumented.push(rel);
+              }
+              // Reset regex lastIndex for next file
+              dynamicImportRe.lastIndex = 0;
+            }
+          }
+        }
+      } catch {
+        // Directory doesn't exist — skip
+      }
+    }
+
+    scanDir(packagesDir);
+
+    if (undocumented.length > 0) {
+      expect.fail(
+        [
+          "Undocumented dynamic imports found in package sources:",
+          "",
+          ...undocumented.map((f) => `  - ${f}`),
+          "",
+          "Dynamic imports bypass static import analysis (boundary-check.test.ts, zone-cycle",
+          "detection). Each dynamic import must be added to DOCUMENTED_DYNAMIC_IMPORTS in",
+          "architecture-policy.test.js with a justification.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("DOCUMENTED_DYNAMIC_IMPORTS contains no stale entries", () => {
+    const stale = [];
+    for (const [filePath] of DOCUMENTED_DYNAMIC_IMPORTS) {
+      const full = join(ROOT, filePath);
+      if (!existsSync(full)) {
+        stale.push(filePath);
+        continue;
+      }
+      const content = readFileSync(full, "utf-8");
+      if (!/await\s+import\s*\(/.test(content)) {
+        stale.push(filePath);
+      }
+    }
+
+    if (stale.length > 0) {
+      expect.fail(
+        [
+          "DOCUMENTED_DYNAMIC_IMPORTS contains stale entries (file missing or no dynamic import):",
+          "",
+          ...stale.map((f) => `  - ${f}`),
+          "",
+          "Remove these entries — the dynamic import has been removed or the file was deleted.",
         ].join("\n"),
       );
     }
