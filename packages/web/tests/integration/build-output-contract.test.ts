@@ -45,6 +45,19 @@ const VIEWER_CONTENT_MARKERS = [
   "<style>",                   // inlined CSS
 ];
 
+/**
+ * Structural markers for the viewer HTML shell.
+ *
+ * The Preact app mounts onto `<div id="app">`. This element is defined
+ * in the source HTML and must survive the build pipeline. If it's
+ * removed or renamed, the viewer renders nothing — a failure invisible
+ * to TypeScript or the module graph. build-output-contract.test.ts is
+ * the sole enforcement point for this contract.
+ */
+const VIEWER_STRUCTURAL_MARKERS = [
+  '<div id="app">',  // Preact mount point — main.ts renders into this element
+];
+
 describe("build output contract", () => {
   it("all required build outputs exist", () => {
     const missing: string[] = [];
@@ -104,6 +117,37 @@ describe("build output contract", () => {
     }
   });
 
+  it("viewer HTML contains the Preact mount point", () => {
+    const viewerPath = resolve(WEB_PKG, "dist/viewer/index.html");
+    if (!existsSync(viewerPath)) {
+      return;
+    }
+
+    const html = readFileSync(viewerPath, "utf-8");
+    const missingMarkers: string[] = [];
+
+    for (const marker of VIEWER_STRUCTURAL_MARKERS) {
+      if (!html.includes(marker)) {
+        missingMarkers.push(marker);
+      }
+    }
+
+    if (missingMarkers.length > 0) {
+      expect.fail(
+        [
+          "Viewer HTML is missing the Preact mount point.",
+          "The Preact app renders into <div id=\"app\"> — without it the viewer is blank.",
+          "",
+          "Missing structural markers:",
+          ...missingMarkers.map((m) => `  - ${m}`),
+          "",
+          "Check that src/viewer/index.html still defines the mount element",
+          "and that the build pipeline preserves it in the output.",
+        ].join("\n"),
+      );
+    }
+  });
+
   it("landing HTML contains inlined JS and CSS", () => {
     const landingPath = resolve(WEB_PKG, "dist/landing/index.html");
     if (!existsSync(landingPath)) {
@@ -141,6 +185,33 @@ describe("build output contract", () => {
           ...found.map((f) => `  - ${f}`),
           "",
           "Verify build.js correctly processes the landing page.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("source viewer HTML defines required entry points", () => {
+    const sourcePath = resolve(WEB_PKG, "src/viewer/index.html");
+    if (!existsSync(sourcePath)) {
+      return;
+    }
+
+    const html = readFileSync(sourcePath, "utf-8");
+
+    // The source HTML must define the mount point and the module entry
+    const required = [
+      { marker: '<div id="app">', reason: "Preact mount point" },
+      { marker: 'src="./main.ts"', reason: "module graph entry point" },
+    ];
+
+    const missing = required.filter((r) => !html.includes(r.marker));
+    if (missing.length > 0) {
+      expect.fail(
+        [
+          "Source viewer HTML is missing required entry points.",
+          "These are consumed by the build pipeline and must not be removed.",
+          "",
+          ...missing.map((m) => `  - ${m.marker} (${m.reason})`),
         ].join("\n"),
       );
     }

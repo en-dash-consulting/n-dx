@@ -76,7 +76,7 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 
 | Zone | Package | Cohesion | Coupling | Notes |
 |------|---------|----------|----------|-------|
-| `web-shared` | web | 0.46 | 0.54 | Foundation layer; wide blast radius across 3 consumer zones |
+| `web-shared` | web | 0.36 | 0.64 | Foundation layer; 3 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
 | `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
 | `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
 | `crash` | web | 0.50 | bidirectional | At threshold boundary — one addition away from dual-fragility |
@@ -88,10 +88,11 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 
 ##### web-shared addition policy
 
-`web-shared` has low cohesion (0.46) and moderate coupling (0.54). In addition to the universal governance rules above:
+`web-shared` has low cohesion (0.36) and high coupling (0.64). The zone contains only 3 files (below the 5-file threshold for reliable metrics), so the measured values reflect the inherent low internal relationship between its two modules (data-file constants vs view identifiers) rather than structural decay. In addition to the universal governance rules above:
 
 - **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
-- **Barrel import enforcement:** Consumers should import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Direct imports erode measurable cohesion and prevent per-module consumer counting.
+- **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
+- **Two-consumer rule (automated):** Every module in `shared/` must have at least two distinct consumer zones. Enforced by the "shared/ modules have at least two consumer zones" assertion in `boundary-check.test.ts`.
 
 ##### rex-satellite zone policy
 
