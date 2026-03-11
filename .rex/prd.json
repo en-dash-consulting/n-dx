@@ -20925,6 +20925,397 @@
         },
         "findingCount": 16
       }
+    },
+    {
+      "id": "ff24d31d-6bfc-4ed8-979e-2bc790ed8549",
+      "title": "Smart Prune Proposal Caching Enhancement",
+      "status": "in_progress",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-06T05:59:33.851Z",
+      "completedAt": "2026-03-06T05:59:33.851Z",
+      "children": [
+        {
+          "id": "3691e747-c898-4d76-b2ab-bae1d34b5656",
+          "title": "LLM Proposal Caching for Prune Operations",
+          "status": "completed",
+          "level": "feature",
+          "description": "Implement caching system for smart prune proposals to enable reuse between dry-run and accept operations without redundant LLM calls",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T05:59:33.646Z",
+          "completedAt": "2026-03-06T05:59:33.646Z",
+          "children": [
+            {
+              "id": "3b13ba93-c5f1-4f48-a0ba-c1e19436b62e",
+              "title": "Implement pending smart prune cache infrastructure",
+              "status": "completed",
+              "level": "task",
+              "description": "Create cache file structure, interfaces, and utility functions for smart prune proposals following the reshape.ts pattern with PendingSmartPruneCache interface and file operations",
+              "acceptanceCriteria": [
+                "PENDING_SMART_PRUNE_FILE constant defined as 'pending-smart-prune.json'",
+                "PendingSmartPruneCache interface includes generatedAt, prdHash, and proposals fields",
+                "savePendingSmartPrune, loadPendingSmartPrune, and clearPendingSmartPrune functions implemented",
+                "hashPRD function implemented using SHA256 hash of canonical JSON"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "caching",
+                "backend"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:44:55.116Z",
+              "completedAt": "2026-03-06T05:49:44.946Z",
+              "children": []
+            },
+            {
+              "id": "f6e8b37f-0ad4-41a2-abc2-79af26d5bc79",
+              "title": "Integrate cache with smart prune workflow",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire cache operations into the existing smartPrune function to check cache before LLM calls, save proposals after generation, and clear cache after successful application",
+              "acceptanceCriteria": [
+                "Cache checked before LLM call in smartPrune function with hash validation",
+                "Cached proposals used when valid with 'Using cached proposals' log message",
+                "Proposals saved to cache after LLM generation with current PRD hash",
+                "Cache cleared after successful prune application",
+                "Required imports added for crypto and filesystem operations"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "integration",
+                "workflow"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:55:06.130Z",
+              "completedAt": "2026-03-06T05:59:33.382Z",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "c79dec6c-2402-4a63-a9dd-aa81f4270f83",
+          "title": "Integration tests for smart prune caching workflow",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add integration tests to verify the smart prune caching workflow end-to-end. Tests go in packages/rex/tests/integration/cli/commands/prune-cache.test.ts.\n\nThe smart prune caching feature (packages/rex/src/cli/commands/prune.ts lines 467-502) caches LLM-generated reshape proposals so that a dry-run followed by --accept reuses proposals without a second LLM call. The cache module is packages/rex/src/core/pending-cache.ts (hashPRD, savePendingSmartPrune, loadPendingSmartPrune, clearPendingSmartPrune).\n\nUnit tests exist in packages/rex/tests/unit/core/pending-cache.test.ts covering the cache module in isolation. These new integration tests must cover the actual smartPrune function's caching behavior.",
+          "acceptanceCriteria": [
+            "Test: cache file (.rex/pending-smart-prune.json) is written after LLM generation with correct prdHash",
+            "Test: second smartPrune call with unchanged PRD uses cache (reasonForReshape not called again, 'Using cached proposals' message emitted)",
+            "Test: cache is invalidated when PRD changes between runs (hash mismatch triggers fresh LLM call)",
+            "Test: cache is cleared after successful apply (accept=true)",
+            "All tests mock the LLM layer (vi.mock on reasonForReshape from ../../core/reshape.js) — no real LLM calls",
+            "Tests use temp directory with valid .rex/prd.json setup per test case"
+          ],
+          "priority": "high",
+          "source": "manual",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "6772d41b-37bf-44ea-9cf9-e7dc25c15c79",
+      "title": "Smart Add Cache Validation Enhancement",
+      "status": "in_progress",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-06T06:05:30.434Z",
+      "completedAt": "2026-03-06T06:05:30.434Z",
+      "children": [
+        {
+          "id": "e8159df5-c695-4c99-b0c0-852f340bf809",
+          "title": "PRD Hash Validation for Smart Add Cache",
+          "status": "completed",
+          "level": "feature",
+          "description": "Add PRD hash validation to smart-add pending proposal cache to prevent applying stale proposals when PRD changes between generation and acceptance",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T06:05:30.268Z",
+          "completedAt": "2026-03-06T06:05:30.268Z",
+          "children": [
+            {
+              "id": "5bdab225-50f0-4d3b-b58f-5e6b884e1ac6",
+              "title": "Add staleness detection for cached proposals",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement validation logic in tryAcceptCachedProposals to detect when PRD has changed since cached proposals were generated and handle stale cache appropriately",
+              "acceptanceCriteria": [
+                "Current PRD hash computed and compared with cached prdHash in tryAcceptCachedProposals",
+                "Warning message displayed when PRD changes detected: 'PRD has changed since proposals were generated'",
+                "Stale cache automatically cleared when hash mismatch found",
+                "Backwards compatibility maintained for cache entries without hash",
+                "Function returns false when stale cache detected to trigger regeneration"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "validation",
+                "staleness-detection"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:37:14.315Z",
+              "completedAt": "2026-03-06T06:05:29.949Z",
+              "children": []
+            },
+            {
+              "id": "d96ec242-803d-40ff-a008-609baa3d3366",
+              "title": "Implement PRD hash validation in smart-add cache structure",
+              "status": "completed",
+              "level": "task",
+              "description": "Update pending proposal cache to include PRD hash metadata and implement hash calculation function for PRD change detection",
+              "acceptanceCriteria": [
+                "hashPRD function implemented using SHA256 of canonical JSON",
+                "savePending function updated to accept and store prdHash parameter",
+                "loadPending function return type updated to include optional prdHash field",
+                "Required crypto and canonical JSON imports added"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "caching",
+                "validation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:49:45.412Z",
+              "completedAt": "2026-03-06T05:55:05.622Z",
+              "children": []
+            },
+            {
+              "id": "f254899a-6ef9-4ff8-8380-59752d29b5aa",
+              "title": "Update cache save operations with hash metadata",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify all savePending call sites to compute and pass PRD hash, ensuring cache entries include hash metadata for validation",
+              "acceptanceCriteria": [
+                "Both savePending call sites (around lines 1140 and 1326) updated to compute and pass PRD hash",
+                "PRD items accessible at call sites for hash computation",
+                "Cache structure consistently includes prdHash field across all save operations",
+                "Hash computation uses current PRD state at time of caching"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "caching",
+                "integration"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:59:34.169Z",
+              "completedAt": "2026-03-06T06:03:07.165Z",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "3ac045d9-23d2-442e-8be6-28d13edea664",
+          "title": "Integration tests for smart-add cache staleness detection",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add integration tests to verify the smart-add PRD hash validation and staleness detection. Tests go in packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts.\n\nThe smart-add caching feature (packages/rex/src/cli/commands/smart-add.ts) saves a prdHash alongside cached proposals via savePending(). When --accept is used, replayCachedIfRequested() (line ~1129) loads cached proposals, computes current PRD hash, and compares. If hashes differ, it warns and clears stale cache.\n\nThe prdHash is passed through maybeCacheSmartAddProposals() at three call sites (lines ~1376, ~1496, ~1532) using hashPRD(existing) where existing is the current PRD items array.\n\nKey functions to test:\n- savePending (line 706): should include prdHash in JSON\n- loadPending (line 714): should return prdHash from JSON  \n- replayCachedIfRequested (line ~1127): staleness check logic\n- maybeCacheSmartAddProposals (line ~1303): hash passthrough",
+          "acceptanceCriteria": [
+            "Test: savePending writes prdHash to pending-proposals.json when provided",
+            "Test: loadPending returns prdHash from cached file",
+            "Test: --accept (replayCachedIfRequested) succeeds when PRD hash matches cached hash",
+            "Test: --accept rejects stale cache when PRD has changed (warns and clears cache, returns false)",
+            "Test: --accept works with backward-compatible cache files that have no prdHash field (proceeds without validation)",
+            "Test: maybeCacheSmartAddProposals passes hash through to savePending",
+            "All tests mock the LLM layer — no real LLM calls",
+            "Tests use temp directory with valid .rex/ setup per test case"
+          ],
+          "priority": "high",
+          "source": "manual",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "5316ae8d-023d-4a69-b724-57f82a7e780f",
+      "title": "Address observation issues (16 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- 1 circular dependency chain detected — see imports.json for details\n- Bidirectional coupling: \"prd-fix-command\" ↔ \"rex-prd-management-core\" (7+1 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"task-usage-analytics-gateway\" ↔ \"web-application-core\" (1+33 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- High coupling (0.75) — 7 imports target \"rex-prd-management-core\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone\n- Coupling of 0.75 combined with cohesion of 0.25 indicates this zone is more of a thin adapter over rex-unit than a cohesive domain — the core fix logic in src/core/fix.ts should likely be absorbed into rex-prd-management-core to eliminate the reverse import dependency.\n- The bidirectional import cycle (fix depends on rex-unit for 7 symbols; rex-unit imports 1 symbol from fix) is an architectural inversion — CLI-layer modules should never be imported by the domain core; the shared symbol should be moved to a neutral location within rex-unit.\n- The bidirectional import relationship with the fix zone (rex-unit imports from fix: 1 import) is worth auditing — a core domain module importing from a CLI command zone suggests a possible layering inversion where fix logic should live in core rather than in the CLI command file.\n- High coupling (0.6) — 5 imports target \"web-application-core\"\n- Cohesion of 0.4 is at the warning threshold; the inclusion of token-usage-nav.test.ts (likely testing a component in web-viewer) slightly dilutes the zone's focus — consider whether that test belongs here or closer to its component.\n- Coupling of 0.6 is at the warning threshold due to 5 outbound imports into web-viewer; verify these are one-directional type imports (e.g. for shared state shapes) rather than runtime component dependencies that invert the viewer layering.\n- 16 entry points — wide API surface, consider consolidating exports\n- High coupling (0.6) — 14 imports target \"web-application-core\"\n- Bidirectional cross-zone imports with web-viewer (14 each direction) indicate a circular dependency between this zone and the core application zone; one direction should be eliminated.\n- Cohesion of 0.4 and coupling of 0.6 are both at threshold; the zone combines static assets, build config, and viewer components with no shared import backbone — consider splitting package config from viewer code.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "ddc831d1e606",
+          "af76cd90374b",
+          "d0f7b7fa1bfd",
+          "3a82920140f7",
+          "66fc30260a75",
+          "c19f228a98e7",
+          "33e6cff0b60f",
+          "5c76957af521",
+          "cd27c02503d0",
+          "4c879c71052f",
+          "03adacaf6465",
+          "e4cf6f218737",
+          "444269ac1838",
+          "f56727f7e15f",
+          "b66e402c9320",
+          "f1ed3521ea13"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 16
+        },
+        "findingCount": 16
+      }
+    },
+    {
+      "id": "aed7fb61-1693-4166-84b6-7b70af7302c6",
+      "title": "Address suggestion issues (36 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Create a packages/hench/src/prd/llm-gateway.ts (alongside rex-gateway.ts) to concentrate all @n-dx/llm-client imports into a single file. This mirrors the existing rex-gateway.ts pattern and completes the gateway discipline for both upstream dependencies hench has. Without it, llm-client imports are unconstrained and may drift across the 159-file zone as agent capabilities expand.\n- Add an explicit assertion to architecture-policy.test.js that enforces zero inbound imports into any file in packages/rex/src/ and packages/sourcevision/src/ from the @n-dx/web package. The current domain-isolation.test.js guards gateway imports but does not exhaustively guard against web-to-domain import direction inversions. The two confirmed violations (sourcevision→web-server, rex-unit→web-server) passed CI, indicating the current test does not cover these paths.\n- Both domain packages lack a tests/integration/ directory tier. Establish a shared convention (e.g., a TESTING.md in the monorepo root) that mandates an integration test tier for each package and specifies what in-process contract scenarios it must cover — particularly gateway re-exports and store mutation correctness — before the integration gap widens further.\n- CLAUDE.md prohibits backwards-compatibility re-export shims, but packages/web/src/viewer/performance/crash-detector.ts is exactly such a shim — created when crash-detector moved to crash/ and never cleaned up. Audit all re-export-only files across the codebase for the same pattern: any file whose entire content is re-exports pointing to a new canonical location is a shim candidate for deletion after updating its importers.\n- Create packages/web/tests/unit/shared/ and relocate tests for web-shared utilities (node-culler.test.ts) from tests/unit/viewer/ into it. Enforce the convention in boundary-check.test.ts: a test file whose primary production import target is classified in zone X must reside under a directory corresponding to X, not a sibling zone's directory.\n- Establish a documented admission criterion for the cross-package integration tier: any new gateway module (rex-gateway, domain-gateway, external.ts) must have a corresponding integration test added to tests/integration/contracts/ within the same PR that introduces the gateway. This prevents the current situation where 8-function gateways exist with zero integration-tier coverage.\n- Introduce a cohesion CI gate at threshold 0.5: the current bimodal distribution (all healthy zones ≥0.95, all problem zones ≤0.44) means this threshold would catch all current structural outliers (fix, web, route, web-shared) without flagging any currently healthy zone, making it a zero-false-positive enforcement rule.\n- The '\"./dist/*\": \"./dist/*\"' wildcard subpath export present in all package.json files (as documented in CLAUDE.md's conventions table) creates a package-wide bypass of the public.ts API contract. Adding a lint rule or CI check that flags direct dist/ imports in consumer files (e.g., import from 'rex/dist/internal/foo') would convert this undocumented escape hatch from an implicit footgun into an explicit, tracked exception.\n- The CLAUDE.md gateway table entry for hench lists '8 functions (store, tree, task selection)' — verify hench/src/prd/rex-gateway.ts export count matches this number. If it has grown beyond 8 without a documentation update, the 'explicit, auditable surface' guarantee for the gateway pattern is broken and the table should be updated to reflect the current count.\n- The cross-zone import map shows 'rex-unit → web-server' and 'sourcevision → web-server' as the two domain-tier violations, but neither 'rex-unit' nor 'sourcevision' matches the canonical zone IDs 'rex-prd-management-core' and 'sourcevision-analysis-engine' — zone alias resolution in the import map may be silently masking which actual zone owns the violating file, making targeted remediation unreliable. Audit the alias mapping to confirm which files are responsible.\n- The e2e test file cli-dev.test.js is a single point of failure for dev-mode coverage analogous to scheduler-startup.test.js for server boot. Both files should be annotated in CI configuration as required tests (not skippable) to prevent silent coverage gaps when refactoring dev-server startup paths.\n- The intra-domain isolation rule ('rex and sourcevision never import each other') is stated in CLAUDE.md but has no corresponding test assertion. Add a single test in domain-isolation.test.js that scans packages/rex/src/ for any import matching 'sourcevision' and packages/sourcevision/src/ for any import matching 'rex|@n-dx/rex'. This closes the one remaining enforcement gap in the four-tier hierarchy: horizontal domain-tier isolation is currently trust-based rather than test-enforced.\n- The three single-edge cycle-completing imports (web-server → web-viewer, web-viewer → route, web-viewer → web-unit) have persisted across multiple analysis passes with no remediation. Create discrete tracked tasks for each edge with the specific file and symbol to relocate — open-ended observations about bidirectional cycles do not drive resolution; named tasks with specific targets do.\n- The viewer-message-pipeline zone (src/viewer/messaging/, 7 files) is prescribed as an independent architectural tier in CLAUDE.md but has no corresponding detected zone and no independent health metrics. Add archetype annotations to messaging files so zone tooling can surface their coupling independently from the broader web-application-core zone.\n- Add subdirectory-level barrel files (analyze/index.ts, store/index.ts, schema/index.ts) that explicitly whitelist the symbols each sub-directory exposes internally; this converts the currently convention-based intra-zone layering into a mechanically enforceable boundary that would have prevented the reverse import from the fix zone.\n- Split the sourcevision test tiers into a separate 'sourcevision-tests' zone analogous to rex-cli-e2e-tests — bundling all production source and all test tiers into one 144-file zone prevents per-tier cohesion metrics from being computed and hides test coverage distribution from zone-level health tooling.\n- Cohesion of 0.96 across 355 files is statistically insensitive: any individual file change moves the metric by ≤0.003. Do not rely on cohesion thresholds in CI to detect early structural regressions in this zone — supplement with direct import-graph edge count assertions on the specific boundary files (external.ts, rex-gateway.ts, domain-gateway.ts) instead.\n- The viewer-message-pipeline internal layer (src/viewer/messaging/, 7 files) is subsumed into this zone with no independent health metrics. Assigning archetype annotations to the messaging files would allow zone tooling to surface its coupling independently without requiring a full re-analysis.\n- Zone name 'peripheral' contradicts quantitative coupling (0.6): a zone with 14 bidirectional imports to core is not peripheral by any structural measure. Rename to reflect its actual role (e.g., 'viewer-supplemental-components') to avoid misguiding contributors who use the name as a priority signal during triage.\n- Audit crash zone's 3 imports from web-viewer to determine if the internal cohesion (1.0) is achieved by coupling all four files to the same web-viewer type or hook. If so, the zone's high cohesion score is misleading — it reflects shared viewer-layer coupling rather than independent crash-recovery design. The goal should be cohesion around crash semantics, not cohesion around a shared viewer dependency.\n- Zone name 'crash-recovery-system' implies ownership of both crash detection and recovery, but the production recovery hook (use-crash-recovery.ts) lives in packages/web/src/viewer/hooks/ — outside this zone. The zone actually owns only a re-export shim and tests. Rename the zone to reflect its actual scope, or consolidate the canonical crash/crash-detector.ts and use-crash-recovery.ts into a single dedicated crash/ zone separate from web-viewer.\n- packages/web/src/viewer/performance/crash-detector.ts is a re-export shim pointing to ../crash/crash-detector.ts and violates CLAUDE.md's explicit prohibition on backwards-compat re-export shims. Identify all importers of the performance/ path and update them to import from src/viewer/crash/ directly, then delete the shim. The shim is also the reason the zone analysis misidentifies this zone's canonical production file.\n- Add an integration test for the hench→rex-gateway pipeline: instantiate a PRDStore, have the gateway select a task, and verify status update propagates correctly. This is the highest-value missing contract test given hench's rex-gateway.ts imports 8 functions from rex.\n- The fix zone has cohesion 0.25 AND bidirectional coupling with rex-unit — both the fragile-zone risk indicators simultaneously. This combination (low cohesion + bidirectional coupling) means changes to either zone require understanding both, with no stable interface between them. This is the highest-risk intra-domain structural combination in the codebase and warrants immediate remediation over web-package cycles, which are better documented.\n- The 2-file integration tier should grow proportionally with the number of cross-zone import edges, not the number of packages. With 15 cross-zone edges currently tracked, a minimum of 5-7 integration test files (one per architectural boundary: web-server↔web-viewer, viewer↔web-shared, hench↔rex-gateway, web↔domain, etc.) would provide boundary-specific failure messages rather than a single omnibus failure.\n- The './dist/*' wildcard subpath export in package.json creates a bypass path around public.ts for all packages including llm-client. For the foundation tier, this is particularly risky: hench or a future consumer could import llm-client internals directly, then have those imports break silently when internal files are renamed. Consider restricting the llm-client package.json to only the '.' export pointing to public.ts and removing the dist wildcard, or documenting the wildcard as an intentional escape hatch with a stability disclaimer.\n- Add a test in tests/e2e/architecture-policy.test.js that parses each root orchestration script (cli.js, web.js, ci.js) for static import/require statements and fails if any are found. The spawn-only boundary is the most important architectural rule in the codebase but is currently enforced only by convention — making it machine-checkable would catch accidental violations before they reach main.\n- Update integration-coverage-policy.test.js to enforce a minimum ratio (e.g., integration tests >= 15% of e2e test count) rather than a static floor, so the policy stays proportional as the suite grows.\n- Add a cli-mcp.test.ts to this zone that validates the 'rex mcp' command startup and basic tool invocation through the stdio transport; the current nine test files cover all CLI commands except MCP, leaving an untested entry point in the rex command surface.\n- Create a dedicated tests/integration/ directory within the rex package with at least one test covering the store→tree→task-selection pipeline in-process; the current direct jump from unit to E2E means store mutation regressions require a full CLI spawn to detect.\n- A 4-file zone with coupling 0.6 means the majority of its import edges are external — this zone has more cross-zone connections than internal ones. Zones with coupling > cohesion are structural liabilities: they import more than they encapsulate. Either absorb route into web-shared (for primitives) or web-viewer (for components) based on which host better reflects each file's actual purpose.\n- register-scheduler.ts and shared-types.ts lack unit test counterparts despite the zone establishing an implicit 1:1 pairing convention. Add tests/unit/server/register-scheduler.test.ts and tests/unit/server/shared-types.test.ts (or a shared types validation test) to restore consistent coverage.\n- viewer-route-state is the only zone with both cohesion (0.4) and coupling (0.6) simultaneously at warning thresholds — the fragile zone anti-pattern. As a merger candidate: move route-state.ts (pure routing logic) into web-shared and use-route-state.ts (Preact hook) into web-viewer proper. This eliminates the zone, resolves both metrics, and removes the bidirectional cycle with web-viewer in a single redistribution.\n- The 'web' zone (28 files, cohesion 0.40) participates in a confirmed 14+14 bidirectional cycle with web-viewer, has low internal cohesion, and carries a misleading name. This combination of three independent risk indicators (low cohesion, confirmed cycle, naming collision) makes it the highest-priority zone rename and structural audit target outside the direct-violation fixes.\n- Introduce an explicit admission criterion for web-shared: 'a file belongs in web-shared only if it (1) has zero framework imports (no Preact, no Express), (2) is consumed by at least two distinct layers above it, and (3) exposes a cohesive abstraction'. Without this criterion, web-shared functions as a residual zone — the place files go when they don't fit anywhere else — which explains both its low cohesion and its role as a target for cycle-breaking relocations.\n- Create a src/viewer/api.ts (or src/viewer/index.ts) barrel that explicitly re-exports the symbols consumed by crash, route, web-unit, and web zones. This single file would serve as the inbound API contract for web-viewer, making its external-facing surface visible, auditable, and decoupled from internal module organization. The existence of external.ts for outbound imports but no equivalent for inbound imports is an asymmetry in the current gateway discipline.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "573e02ce8d74",
+          "4aa2bbf70298",
+          "a866e1024bba",
+          "4ea75d4d1a1f",
+          "52575192c32b",
+          "108fb775dc88",
+          "98f2a108c8eb",
+          "56e55a97e55c",
+          "61d2a8ae9fd0",
+          "3c1162a16b3d",
+          "148dea0ee139",
+          "98e7d2f31b4e",
+          "16667c02fec6",
+          "ed1c1ce36dd2",
+          "8c17bb21ef0e",
+          "989a211c1f61",
+          "40be238e3f6d",
+          "b1b611028e3f",
+          "b524885149da",
+          "b075e7d17252",
+          "12b5e695b791",
+          "be18d0664c32",
+          "ebc55a463e0c",
+          "8f6a5ec4ccd6",
+          "f11e7cf215a4",
+          "014203ea40bc",
+          "d72a107188d2",
+          "ba1134919776",
+          "33bb2fe0ee11",
+          "147f544de9cb",
+          "320036fcc534",
+          "8904a099dcf3",
+          "5c8437500f35",
+          "fd85ce3d6de6",
+          "86cdb165544e",
+          "4da01a6fa27a"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 34,
+          "critical": 2
+        },
+        "findingCount": 36
+      }
+    },
+    {
+      "id": "26791374-dca3-4403-973f-262a06d53fc2",
+      "title": "Address move-file issues (1 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- File \"packages/hench/src/shared/glob.ts\" is pinned to zone \"Autonomous Agent Engine\" but lives in packages/hench/src/shared/ — consider moving to packages/hench/src/store/ to align physical location with architectural zone",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "eb9de8a7b18a"
+        ],
+        "category": "move-file",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      }
+    },
+    {
+      "id": "68220e26-1cc6-4d14-91e4-b3d621ad0d4f",
+      "title": "Address pattern issues (1 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- The zone contains both build-tool artifacts (build.js, dev.js, package.json) and runtime Preact components — two categories that should never share a zone boundary because build config changes and component changes have entirely different risk profiles.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "83aca7ce72d5"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      }
+    },
+    {
+      "id": "510283d6-0316-4555-a175-582e4d7f3541",
+      "title": "Address relationship issues (11 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- crash-recovery-system imports 3 symbols from web-viewer, creating a dependency on the layer it guards. If those imports are Preact hooks or component utilities, a renderer-level failure could silently break the recovery path. Prefer importing only framework-agnostic primitives (e.g., from web-shared) within crash recovery logic to keep the safety net independent of the failing layer.\n- With only 2 files guarding the cross-package contract surface while 33 web-viewer→web-server imports exist at runtime, the integration tier is significantly under-invested relative to the coupling it is supposed to guard — each heavy cross-zone edge should have a corresponding contract test here.\n- The landing page feature is structurally split: static assets (HTML/CSS) here, landing.ts in web-dashboard-peripheral-views. Consolidating landing.ts into this zone (or into a dedicated 'landing' directory) would give the marketing surface a single, self-contained home.\n- rex-prd-management-core imports 1 symbol from the web-server zone, creating an upward dependency from the Domain tier into the web composition root. Domain packages must not import from the web layer — the shared symbol should be relocated to the Foundation tier or a neutral shared module.\n- sourcevision-analysis-engine imports 1 symbol from the web-server zone — a Domain-tier package importing upward into the web composition root violates the four-tier hierarchy and the gateway-ownership rule that makes domain-gateway.ts the exclusive consumer of sourcevision APIs.\n- rex-unit → web-server (1 import) and sourcevision → web-server (1 import) both terminate in this zone; if either import targets an analytics service file rather than the gateway files, it bypasses the enforced gateway boundary. Auditing the exact import targets is warranted.\n- The single back-edge from web-viewer into viewer-route-state inverts the expected dependency direction: route state should be a pure input to the viewer, not a consumer of it. If the reverse import is a runtime value (not a type-only import), this constitutes a soft cycle that could cause initialization ordering issues in the Preact component tree.\n- web-server → web-viewer: 1 import closes the cycle with the 33-import reverse flow, producing a full bidirectional dependency between the two heaviest internal sub-zones. Even a single runtime import from server into viewer defeats the 'viewer is built separately and served as static assets' contract.\n- web-viewer → web-server: 33 imports violate the stated internal layering contract (CLAUDE.md: web-server is composition root, viewer must not import upward into server). If any of these are runtime imports they represent a critical layer inversion.\n- web-viewer ↔ web-unit bidirectional (7+1 imports) creates a secondary internal cycle; the single return import from web-viewer into web-unit should be traced to confirm it is a type-only import flowing through external.ts rather than a runtime dependency.\n- landing.ts is co-located in this zone (by import graph) while the static landing assets (HTML/CSS) form a separate landing-page-static-assets zone; the feature is split across two zones with no shared import backbone, making the landing surface harder to maintain.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "c3c09d9b374e",
+          "9bfc4ae43a89",
+          "3c1982f876b6",
+          "e31c2826694b",
+          "93bf236eb32a",
+          "7afb6025a71e",
+          "0dd901285f35",
+          "db75a187fabc",
+          "0c9cc06433a8",
+          "b46ac02dd933",
+          "c9140f2f0077"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "warning": 7,
+          "critical": 4
+        },
+        "findingCount": 11
+      }
+    },
+    {
+      "id": "a00b3658-59c6-4397-870d-5f3d5e97ba29",
+      "title": "Address anti-pattern issues (13 findings)",
+      "status": "deferred",
+      "level": "feature",
+      "description": "- use-crash-recovery.test.ts lives in crash-recovery-system but its production subject (use-crash-recovery.ts) lives in web-viewer. Tests should reside in the same zone as the code they exercise; relocate use-crash-recovery.test.ts to web-viewer or move the production hook into crash-recovery-system to restore accurate zone cohesion.\n- The integration tier (2 files) has not grown proportionally with the number of confirmed boundary violations (6+) and bidirectional cycles (3). Each new boundary violation currently has no fast integration-tier regression test; regressions are only caught by the slower 22-file e2e suite. Add one integration test per confirmed violation to restore a bottom-heavy test pyramid.\n- scheduler-startup.test.js is a single point of failure for in-process web server boot coverage — if this file is removed or skipped there is no test at any tier that validates the server's startup sequencing. Its unique role should be documented and it should be marked as a CI-required test analogous to the architectural gate tests.\n- domain-isolation.test.js likely exempts test-zone source paths from gateway enforcement, allowing rex-unit → web-server (1 import) to pass CI silently. Test files that cross tier boundaries are as harmful as production files doing the same — the isolation test should validate all source trees, not only src/ directories.\n- src/core/fix.ts is domain logic co-located with a CLI command in a satellite zone rather than residing in rex-prd-management-core where domain core logic belongs by convention. This misplacement is the direct cause of the reverse import (rex-unit → fix) that creates the bidirectional cycle. Moving core/fix.ts into the core domain zone would simultaneously eliminate the reverse edge, dissolve the cycle, and raise prd-fix-command to a clean single-purpose CLI adapter zone.\n- shared-types.ts defines analytics-domain types (TaskUsageAccumulator, CleanupResult, OrphanedEntry, CleanupLogEntry) in a zone that is also the gateway seam between the web package and its upstream dependencies. These analytics types are unrestricted — any server consumer can import them without crossing a recognized boundary — creating a path for analytics-specific concerns to spread into unrelated server modules.\n- The 1-import back-edge from web-viewer into viewer-route-state indicates a shared type or constant is defined in the viewer layer but consumed by the routing layer, inverting the expected dependency direction. The shared symbol should be extracted to web-shared so both zones import downward rather than maintaining a mutual dependency at the viewer layer boundary.\n- The 33 web-viewer → web-server import edges reported by zone analysis are not reproducible through direct static file inspection (zero ../server/ imports exist in src/viewer/). The zone metric likely aggregates type-re-export chains or import aliases, producing a high-severity coupling number that cannot be traced to specific import statements. Without knowing which files contribute these edges, the boundary cannot be enforced or tested.\n- build.js and dev.js are Node.js build-time scripts colocated with browser-runtime Preact components in the same zone. Bundlers, linters, and import analyzers that operate zone-uniformly will apply incorrect resolution rules to one category or the other. The two artifact classes should be separated so tooling can target each with appropriate configuration.\n- boundary-check.test.ts appears to not assert against the confirmed cross-boundary imports (sourcevision→web-server, rex-unit→web-server, web-server→web-viewer), since those violations pass CI. Any known violation that is exempted rather than fixed should be an explicit, documented allowlist entry in the test — currently these are invisible omissions that future contributors cannot distinguish from uncovered cases.\n- The foundation layer has cohesion 0.44 with no documented admission criterion beyond 'framework-agnostic utilities'. This vague boundary makes web-shared a de facto catch-all: files land here when no other zone claims them, not because they belong to a coherent foundation abstraction. As the layer grows, its zero-coupling property becomes harder to maintain because more zones depend on an increasingly heterogeneous set of utilities.\n- node-culler.test.ts is placed under tests/unit/viewer/ despite node-culler.ts being a zero-framework shared utility. The test should live under tests/unit/shared/ to accurately reflect the utility's layer and prevent future contributors from assuming it belongs to the viewer.\n- God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 36 unique functions — consider decomposing into smaller, focused functions",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-11T00:50:40.255Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "00394f5a6db9",
+          "9fc44a35f31d",
+          "e5d361ea3891",
+          "6b17a5115d80",
+          "4b639b1fe48f",
+          "136aadbba6ca",
+          "7a58ea9333c1",
+          "0b82052a343f",
+          "bc333465a759",
+          "a491a9fbc97f",
+          "992d0eb38c88",
+          "dcf622b6ab60",
+          "486aefc7b2f8"
+        ],
+        "category": "anti-pattern",
+        "severityDistribution": {
+          "warning": 12,
+          "critical": 1
+        },
+        "findingCount": 13
+      }
     }
   ]
 }

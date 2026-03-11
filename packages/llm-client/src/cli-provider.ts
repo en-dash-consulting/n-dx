@@ -38,6 +38,9 @@ import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 
+/** Regex patterns for stderr content indicating a missing binary (Windows shell). */
+const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
+
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
 
@@ -102,7 +105,7 @@ function spawnOnce(
   return new Promise((resolve, reject) => {
     const format = request.outputFormat ?? "json";
     const args = [
-      "-p", request.prompt,
+      "-p", "-",
       "--output-format", format,
       "--model", request.model,
       ...(request.cliFlags ?? []),
@@ -113,9 +116,13 @@ function spawnOnce(
     // server is launched from within Claude Code).
     const { CLAUDECODE: _, ...cleanEnv } = process.env;
     const proc = spawn(cliBinary, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: process.platform === "win32",
       env: cleanEnv,
     });
+    proc.stdin.on("error", () => {/* handled by proc error/close */});
+    proc.stdin.write(request.prompt);
+    proc.stdin.end();
 
     let stdout = "";
     let stderr = "";
@@ -149,6 +156,17 @@ function spawnOnce(
       }
 
       const detail = stderr.trim() || `claude exited with code ${code}`;
+
+      // On Windows with shell: true, a missing binary doesn't trigger ENOENT —
+      // cmd.exe spawns fine but exits non-zero with a "not recognized" message.
+      if (NOT_FOUND_PATTERNS.test(detail)) {
+        const pathNote = cliBinary !== "claude"
+          ? `Claude CLI not found at configured path: ${cliBinary}. Check 'n-dx config claude.cli_path'.`
+          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code, or set a custom path: n-dx config claude.cli_path /path/to/claude";
+        reject(new ClaudeClientError(pathNote, "not-found", false));
+        return;
+      }
+
       const classified = classifyStderr(detail);
       reject(new ClaudeClientError(detail, classified.reason, classified.retryable));
     });

@@ -4,6 +4,38 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
+const isWin = process.platform === "win32";
+
+/**
+ * Create a platform-appropriate fake CLI binary.
+ * On Unix: shell script with chmod 755.
+ * On Windows: .cmd batch file (the path returned includes .cmd).
+ *
+ * @param {string} filePath - Base path (without .cmd extension)
+ * @param {{ stdout?: string, stderrLine?: string, exitCode?: number, captureArgs?: boolean }} opts
+ * @returns {Promise<string>} The actual file path created (may have .cmd appended on Windows)
+ */
+async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCode = 0, captureArgs = false } = {}) {
+  if (isWin) {
+    const cmdPath = filePath + ".cmd";
+    const lines = ["@echo off"];
+    if (captureArgs) lines.push("echo %* > \"%~f0.args\"");
+    if (stderrLine) lines.push(`echo ${stderrLine} 1>&2`);
+    if (stdout) lines.push(`echo ${stdout}`);
+    if (exitCode !== 0) lines.push(`exit /b ${exitCode}`);
+    await writeFile(cmdPath, lines.join("\r\n") + "\r\n");
+    return cmdPath;
+  }
+  const lines = ["#!/bin/sh"];
+  if (captureArgs) lines.push('echo "$@" > "$0.args"');
+  if (stderrLine) lines.push(`echo '${stderrLine}' 1>&2`);
+  if (stdout) lines.push(`echo '${stdout}'`);
+  if (exitCode !== 0) lines.push(`exit ${exitCode}`);
+  await writeFile(filePath, lines.join("\n") + "\n");
+  await chmod(filePath, 0o755);
+  return filePath;
+}
+
 const CLI_PATH = join(import.meta.dirname, "../../cli.js");
 
 function run(args, opts = {}) {
@@ -944,54 +976,47 @@ describe("n-dx config", () => {
 
   describe("llm.vendor auth preflight", () => {
     it("runs claude auth preflight command when selecting claude", async () => {
-      const fakeClaude = join(tmpDir, "fake-claude-preflight");
-      await writeFile(
-        fakeClaude,
-        "#!/bin/sh\n" +
-          "echo \"$@\" > \"$0.args\"\n" +
-          "echo '{\"result\":\"ok\"}'\n",
-      );
-      await chmod(fakeClaude, 0o755);
+      const basePath = join(tmpDir, "fake-claude-preflight");
+      const fakeClaude = await writeFakeBinary(basePath, {
+        stdout: '{"result":"ok"}',
+        captureArgs: true,
+      });
 
       run(["llm.claude.cli_path", fakeClaude, tmpDir]);
       const output = run(["llm.vendor", "claude", tmpDir]);
       expect(output).toContain("llm.vendor = claude");
 
-      const args = await readFile(`${fakeClaude}.args`, "utf-8");
+      const argsFile = isWin ? `${fakeClaude}.args` : `${basePath}.args`;
+      const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("-p");
       expect(args).toContain("--output-format");
       expect(args).toContain("json");
     });
 
     it("runs codex auth preflight command when selecting codex", async () => {
-      const fakeCodex = join(tmpDir, "fake-codex-preflight");
-      await writeFile(
-        fakeCodex,
-        "#!/bin/sh\n" +
-          "echo \"$@\" > \"$0.args\"\n" +
-          "echo ok\n",
-      );
-      await chmod(fakeCodex, 0o755);
+      const basePath = join(tmpDir, "fake-codex-preflight");
+      const fakeCodex = await writeFakeBinary(basePath, {
+        stdout: "ok",
+        captureArgs: true,
+      });
 
       run(["llm.codex.cli_path", fakeCodex, tmpDir]);
       const output = run(["llm.vendor", "codex", tmpDir]);
       expect(output).toContain("llm.vendor = codex");
 
-      const args = await readFile(`${fakeCodex}.args`, "utf-8");
+      const argsFile = isWin ? `${fakeCodex}.args` : `${basePath}.args`;
+      const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("exec");
       expect(args).toContain("--skip-git-repo-check");
     });
 
     it("handles auth preflight failure with deterministic error path", async () => {
-      const fakeCodex = join(tmpDir, "fake-codex-preflight-fail");
-      await writeFile(
-        fakeCodex,
-        "#!/bin/sh\n" +
-          "echo \"$@\" > \"$0.args\"\n" +
-          "echo 'not logged in' 1>&2\n" +
-          "exit 7\n",
-      );
-      await chmod(fakeCodex, 0o755);
+      const basePath = join(tmpDir, "fake-codex-preflight-fail");
+      const fakeCodex = await writeFakeBinary(basePath, {
+        stderrLine: "not logged in",
+        exitCode: 7,
+        captureArgs: true,
+      });
 
       run(["llm.codex.cli_path", fakeCodex, tmpDir]);
       const stderr = runFail(["llm.vendor", "codex", tmpDir]);
@@ -1006,15 +1031,12 @@ describe("n-dx config", () => {
     });
 
     it("prints claude login guidance on claude auth preflight failure", async () => {
-      const fakeClaude = join(tmpDir, "fake-claude-preflight-fail");
-      await writeFile(
-        fakeClaude,
-        "#!/bin/sh\n" +
-          "echo \"$@\" > \"$0.args\"\n" +
-          "echo 'please login' 1>&2\n" +
-          "exit 9\n",
-      );
-      await chmod(fakeClaude, 0o755);
+      const basePath = join(tmpDir, "fake-claude-preflight-fail");
+      const fakeClaude = await writeFakeBinary(basePath, {
+        stderrLine: "please login",
+        exitCode: 9,
+        captureArgs: true,
+      });
 
       run(["llm.claude.cli_path", fakeClaude, tmpDir]);
       const stderr = runFail(["llm.vendor", "claude", tmpDir]);

@@ -4,6 +4,34 @@ import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const isWin = process.platform === "win32";
+const PATH_SEP = isWin ? ";" : ":";
+
+/**
+ * Create a platform-appropriate fake CLI binary on PATH.
+ * On Unix: shell script. On Windows: .cmd batch file.
+ */
+async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCode = 0, captureArgs = false } = {}) {
+  if (isWin) {
+    const cmdPath = filePath + ".cmd";
+    const lines = ["@echo off"];
+    if (captureArgs) lines.push("echo %* > \"%~f0.args\"");
+    if (stderrLine) lines.push(`echo ${stderrLine} 1>&2`);
+    if (stdout) lines.push(`echo ${stdout}`);
+    if (exitCode !== 0) lines.push(`exit /b ${exitCode}`);
+    await writeFile(cmdPath, lines.join("\r\n") + "\r\n");
+    return cmdPath;
+  }
+  const lines = ["#!/bin/sh"];
+  if (captureArgs) lines.push('echo "$@" > "$0.args"');
+  if (stderrLine) lines.push(`echo '${stderrLine}' 1>&2`);
+  if (stdout) lines.push(`echo '${stdout}'`);
+  if (exitCode !== 0) lines.push(`exit ${exitCode}`);
+  await writeFile(filePath, lines.join("\n") + "\n");
+  await chmod(filePath, 0o755);
+  return filePath;
+}
+
 const CLI_PATH = join(import.meta.dirname, "../../cli.js");
 
 function run(args, opts = {}) {
@@ -43,18 +71,13 @@ describe("n-dx init provider selection", () => {
   it("prompts with codex and claude options only", async () => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-prompt-"));
     try {
-      await writeFile(
-        join(binDir, "codex"),
-        "#!/bin/sh\n" +
-          "echo ok\n",
-      );
-      await chmod(join(binDir, "codex"), 0o755);
+      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
       const output = run(["init", tmpDir], {
         input: "1\n",
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH ?? ""}`,
+          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
         },
       });
       expect(output).toContain("n-dx init");
@@ -71,18 +94,13 @@ describe("n-dx init provider selection", () => {
   it("persists selected provider to project settings", async () => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-persist-"));
     try {
-      await writeFile(
-        join(binDir, "claude"),
-        "#!/bin/sh\n" +
-          "echo '{\"result\":\"ok\"}'\n",
-      );
-      await chmod(join(binDir, "claude"), 0o755);
+      await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
 
       run(["init", tmpDir], {
         input: "2\n",
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH ?? ""}`,
+          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
         },
       });
     } finally {
@@ -94,29 +112,20 @@ describe("n-dx init provider selection", () => {
 
   it("persists both providers through config get pathway", async () => {
     const cases = [
-      {
-        provider: "codex",
-        script: "#!/bin/sh\n" +
-          "echo ok\n",
-      },
-      {
-        provider: "claude",
-        script: "#!/bin/sh\n" +
-          "echo '{\"result\":\"ok\"}'\n",
-      },
+      { provider: "codex", stdout: "ok" },
+      { provider: "claude", stdout: '{"result":"ok"}' },
     ];
 
-    for (const { provider, script } of cases) {
+    for (const { provider, stdout } of cases) {
       const projectDir = await mkdtemp(join(tmpdir(), `ndx-init-${provider}-`));
       const binDir = await mkdtemp(join(tmpdir(), `ndx-init-bin-${provider}-`));
       try {
-        await writeFile(join(binDir, provider), script);
-        await chmod(join(binDir, provider), 0o755);
+        await writeFakeBinary(join(binDir, provider), { stdout });
 
         run(["init", `--provider=${provider}`, projectDir], {
           env: {
             ...process.env,
-            PATH: `${binDir}:${process.env.PATH ?? ""}`,
+            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
           },
         });
 
@@ -138,17 +147,12 @@ describe("n-dx init provider selection", () => {
   it("suppresses init banner in non-interactive mode", async () => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-noninteractive-"));
     try {
-      await writeFile(
-        join(binDir, "codex"),
-        "#!/bin/sh\n" +
-          "echo ok\n",
-      );
-      await chmod(join(binDir, "codex"), 0o755);
+      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
       const output = run(["init", "--provider=codex", tmpDir], {
         env: {
           ...process.env,
-          PATH: `${binDir}:${process.env.PATH ?? ""}`,
+          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
         },
       });
 
@@ -163,20 +167,14 @@ describe("n-dx init provider selection", () => {
     function pathEnvWith(...dirs) {
       return {
         ...process.env,
-        PATH: `${dirs.join(":")}:${process.env.PATH ?? ""}`,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
       };
     }
 
     it("completes codex init when authenticated and does not show login prompt", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-ok-"));
       try {
-        await writeFile(
-          join(binDir, "codex"),
-          "#!/bin/sh\n" +
-            "echo \"$@\" > \"$0.args\"\n" +
-            "echo ok\n",
-        );
-        await chmod(join(binDir, "codex"), 0o755);
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok", captureArgs: true });
 
         const output = run(
           ["init", "--provider=codex", tmpDir],
@@ -193,13 +191,7 @@ describe("n-dx init provider selection", () => {
     it("prompts codex login command when codex auth is missing", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-fail-"));
       try {
-        await writeFile(
-          join(binDir, "codex"),
-          "#!/bin/sh\n" +
-            "echo 'not logged in' 1>&2\n" +
-            "exit 7\n",
-        );
-        await chmod(join(binDir, "codex"), 0o755);
+        await writeFakeBinary(join(binDir, "codex"), { stderrLine: "not logged in", exitCode: 7 });
 
         const result = runFail(
           ["init", "--provider=codex", tmpDir],
@@ -217,13 +209,7 @@ describe("n-dx init provider selection", () => {
     it("completes claude init when authenticated and does not show login prompt", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-ok-"));
       try {
-        await writeFile(
-          join(binDir, "claude"),
-          "#!/bin/sh\n" +
-            "echo \"$@\" > \"$0.args\"\n" +
-            "echo '{\"result\":\"ok\"}'\n",
-        );
-        await chmod(join(binDir, "claude"), 0o755);
+        await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}', captureArgs: true });
 
         const output = run(
           ["init", "--provider=claude", tmpDir],
@@ -240,13 +226,7 @@ describe("n-dx init provider selection", () => {
     it("prompts claude login command when claude auth is missing", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-fail-"));
       try {
-        await writeFile(
-          join(binDir, "claude"),
-          "#!/bin/sh\n" +
-            "echo 'please login' 1>&2\n" +
-            "exit 9\n",
-        );
-        await chmod(join(binDir, "claude"), 0o755);
+        await writeFakeBinary(join(binDir, "claude"), { stderrLine: "please login", exitCode: 9 });
 
         const result = runFail(
           ["init", "--provider=claude", tmpDir],

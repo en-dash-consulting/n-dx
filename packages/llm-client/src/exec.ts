@@ -170,7 +170,8 @@ export function getCurrentBranch(cwd: string): string | undefined {
  */
 export function isExecutableOnPath(name: string): boolean {
   try {
-    execFileSync("which", [name], { stdio: "pipe" });
+    const cmd = process.platform === "win32" ? "where" : "which";
+    execFileSync(cmd, [name], { stdio: "pipe" });
     return true;
   } catch {
     return false;

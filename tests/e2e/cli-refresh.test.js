@@ -3,6 +3,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 
 const CLI_PATH = join(import.meta.dirname, "../../cli.js");
@@ -132,7 +133,7 @@ describe("n-dx refresh", () => {
     await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
     const stdout = execFileSync(
       "node",
-      ["--import", mockPath, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
+      ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
       { encoding: "utf-8", timeout: 60000 },
     );
     expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded (2 WebSocket clients notified).`);
@@ -150,7 +151,7 @@ describe("n-dx refresh", () => {
     await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
     const stdout = execFileSync(
       "node",
-      ["--import", mockPath, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
+      ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
       { encoding: "utf-8", timeout: 60000 },
     );
 

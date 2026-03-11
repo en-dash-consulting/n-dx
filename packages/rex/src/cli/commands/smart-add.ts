@@ -24,6 +24,7 @@ import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import { CHILD_LEVEL, PRIORITY_ORDER, LOE_DEFAULTS } from "../../schema/index.js";
 import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import { hashPRD } from "../../core/pending-cache.js";
 import {
   matchProposalNodesToPRD,
   attachDuplicateReasonsToProposals,
@@ -706,18 +707,19 @@ async function savePending(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
-  await atomicWriteJSON(filePath, { proposals, parentId });
+  await atomicWriteJSON(filePath, { proposals, parentId, prdHash });
 }
 
 async function loadPending(
   dir: string,
-): Promise<{ proposals: Proposal[]; parentId?: string } | null> {
+): Promise<{ proposals: Proposal[]; parentId?: string; prdHash?: string } | null> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
   try {
     const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string };
+    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string; prdHash?: string };
   } catch {
     return null;
   }
@@ -1128,6 +1130,20 @@ async function replayCachedIfRequested(
   }
   const cached = await loadPending(dir);
   if (!cached || cached.proposals.length === 0) return false;
+
+  // Staleness detection: compare current PRD hash with cached hash
+  if (cached.prdHash) {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    const currentHash = hashPRD(doc.items);
+    if (currentHash !== cached.prdHash) {
+      warn("PRD has changed since proposals were generated");
+      await clearPending(dir);
+      return false;
+    }
+  }
+
   info(`Accepting ${cached.proposals.length} cached proposal(s)...`);
   const added = await acceptProposals(dir, cached.proposals, { parentId: cached.parentId });
   result(`Added ${added} items to PRD.`);
@@ -1288,9 +1304,10 @@ async function maybeCacheSmartAddProposals(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   if (await hasRexDir(dir)) {
-    await savePending(dir, proposals, parentId);
+    await savePending(dir, proposals, parentId, prdHash);
   }
 }
 
@@ -1360,7 +1377,7 @@ async function runInteractiveSmartAddApproval(params: {
             matchProposalNodesToPRD(currentProposals, existing),
             currentProposals,
           );
-          await maybeCacheSmartAddProposals(dir, currentProposals, parentId);
+          await maybeCacheSmartAddProposals(dir, currentProposals, parentId, hashPRD(existing));
         } else {
           adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
         }
@@ -1480,7 +1497,7 @@ async function runInteractiveSmartAddApproval(params: {
 
     const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
     if (rejected.length > 0 && !usedMergeDecision) {
-      await savePending(dir, rejected, parentId);
+      await savePending(dir, rejected, parentId, hashPRD(existing));
       info(`${rejected.length} proposal(s) saved. Run \`rex add --accept\` to accept later.`);
     } else if (rejected.length > 0 && usedMergeDecision) {
       info(`${rejected.length} unselected proposal(s) were cancelled and not written.`);
@@ -1516,7 +1533,7 @@ async function finalizeSmartAdd(params: {
     thresholdWeeks,
   } = params;
 
-  await maybeCacheSmartAddProposals(dir, proposals, parentId);
+  await maybeCacheSmartAddProposals(dir, proposals, parentId, hashPRD(existing));
 
   if (accept) {
     if (hasDuplicateMatches(duplicateMatches)) {

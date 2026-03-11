@@ -194,7 +194,7 @@ async function validateCodexCliPath(value) {
     throw new Error("CLI path must be a non-empty string.");
   }
 
-  if (!value.includes("/")) {
+  if (!value.includes("/") && !value.includes("\\")) {
     const probe = testCliPath(value);
     if (!probe.ok) {
       throw new Error(
@@ -335,6 +335,7 @@ function testCliPath(cliPath) {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
+      shell: process.platform === "win32",
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -423,6 +424,7 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
+      shell: process.platform === "win32",
     });
     return { ok: true, binary, args };
   } catch (err) {
