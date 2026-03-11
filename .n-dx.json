@@ -26,7 +26,7 @@
         "packages/web/SourceVision-F.png": "web-package-assets",
         "packages/web/SourceVision.png": "web-package-assets",
         "packages/web/src/server/routes-mcp.ts": "web-server",
-        "packages/web/src/viewer/components/prd-tree/progressive-loader.ts": "web-viewer",
+        "packages/web/src/viewer/components/progressive-loader.ts": "web-viewer",
         "packages/web/src/server/routes-token-usage.ts": "web-server",
         "packages/web/src/server/aggregation-cache.ts": "web-server",
         "packages/web/src/landing/landing.ts": "web-landing",

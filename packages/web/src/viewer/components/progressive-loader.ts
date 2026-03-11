@@ -15,15 +15,15 @@
  * Search and filter operations always work on the **full** item tree —
  * progressive loading only limits the **rendering** pass, not the data.
  *
- * @see ./prd-tree.ts   — integrating component
- * @see ./compute.ts    — itemMatchesFilter used for visibility checks
+ * @see ./prd-tree/prd-tree.ts   — integrating component
+ * @see ./prd-tree/compute.ts    — itemMatchesFilter used for visibility checks
  */
 
 import { h } from "preact";
 import type { VNode } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import type { PRDItemData, ItemStatus } from "./types.js";
-import { itemMatchesFilter } from "./compute.js";
+import type { PRDItemData, ItemStatus } from "./prd-tree/types.js";
+import { itemMatchesFilter } from "./prd-tree/compute.js";
 
 /** Default number of nodes to render per chunk. */
 export const DEFAULT_CHUNK_SIZE = 50;
