@@ -662,6 +662,8 @@ describe("architecture policy: gateway enforcement", () => {
 
         if (/^export\s+(type\s+)?{/.test(trimmed)) continue;
         if (/^export\s+{/.test(trimmed)) continue;
+        // Allow: namespace re-exports  export * as Name from "..."
+        if (/^export\s+\*\s+as\s+\w+\s+from\s+["']/.test(trimmed)) continue;
         if (/^[A-Za-z_$][\w$]*\s*,?\s*$/.test(trimmed)) continue;
         if (/^}\s*from\s+["']/.test(trimmed)) continue;
         if (/^type\s+[A-Za-z_$][\w$]*\s*,?\s*$/.test(trimmed)) continue;

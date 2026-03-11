@@ -16,31 +16,11 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — canonical definitions in src/schema/features.ts
 // ---------------------------------------------------------------------------
 
-export interface FeatureToggle {
-  /** Dot-notation key (e.g., "sourcevision.showCallGraph"). */
-  key: string;
-  /** Human-readable label. */
-  label: string;
-  /** Description of what the feature does. */
-  description: string;
-  /** Impact warning — shown to explain consequences. */
-  impact: string;
-  /** Which package owns this toggle. */
-  package: "sourcevision" | "rex" | "hench";
-  /** Whether this is experimental, stable, or deprecated. */
-  stability: "experimental" | "stable" | "deprecated";
-  /** Current value (true = enabled). */
-  enabled: boolean;
-  /** Default value if not set in config. */
-  defaultValue: boolean;
-}
-
-export interface FeaturesResponse {
-  toggles: FeatureToggle[];
-}
+export type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
+import type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
 
 // ---------------------------------------------------------------------------
 // Feature registry — defines all known feature flags

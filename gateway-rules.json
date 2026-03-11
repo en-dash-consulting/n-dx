@@ -30,6 +30,14 @@
     {
       "file": "packages/web/src/viewer/crash/index.ts",
       "description": "Sole public surface for the crash recovery sub-zone — cross-zone consumers must import from this barrel, not crash internals"
+    },
+    {
+      "file": "packages/web/src/viewer/external.ts",
+      "description": "Viewer outbound gateway — concentrates all viewer-side imports from schema/, shared/, and messaging/"
+    },
+    {
+      "file": "packages/web/src/viewer/api.ts",
+      "description": "Viewer inbound API barrel — sanctioned import surface for sibling zones (crash, route, performance, usage)"
     }
   ],
   "boundaries": [

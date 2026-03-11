@@ -780,13 +780,13 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["rex-fix-command", "4-file zone with bidirectional coupling to rex-domain-core; tracked for merger"],
-  ["prd-runtime-state", "Runtime state files with no internal import structure"],
-  ["architecture-docs", "Documentation-only zone; no code imports"],
-  ["rex-package-root", "Package config and metadata files; no internal import structure"],
-  ["viewer-static-assets", "Static asset files (images, fonts); no code imports"],
+  [".rex", "Data directory zone (4 config/state files); no internal import structure"],
+  ["docs", "Documentation-only zone (16 files); no code imports"],
+  ["fix", "4-file zone with bidirectional coupling to rex domain core; tracked for merger"],
+  ["logo", "Static asset zone (3 files); no code imports"],
+  ["rex", "Package config and metadata zone (13 files); no internal import structure"],
   ["web-landing", "HTML/CSS landing page with minimal TS; import graph cannot detect HTML/CSS edges"],
-  ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.46 is near threshold"],
+  ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.46 is near threshold — governed by two-consumer addition policy (CLAUDE.md)"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

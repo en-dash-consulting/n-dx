@@ -70,6 +70,14 @@ Within the web package, four internal zones form a hub topology with `web-viewer
   web-shared          (framework-agnostic utilities — data-files, node-culler, view-id)
 ```
 
+##### web-shared addition policy
+
+`web-shared` has low cohesion (0.46) and moderate coupling (0.54), making it the only production zone meeting both fragility thresholds simultaneously. To prevent further degradation:
+
+- **Two-consumer rule:** A new module should have at least two distinct consumer zones before being added to `web-shared`. Single-consumer utilities belong closer to their dominant use site (e.g., in `viewer/` or `server/`).
+- **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
+- **Governance:** Treat `web-shared` as a risk zone requiring active review on additions. Changes have a wide blast radius across three consumer zones.
+
 `web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `web-shared`, while also receiving imports from sub-zones like `crash/` and `hench-agent-monitor`. The actual import graph has 11+ distinct cross-zone edges radiating from `web-viewer`, making it a hub rather than a linear stack. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `web-shared` is the foundation layer with zero upward dependencies (enforced by `boundary-check.test.ts`).
 
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
