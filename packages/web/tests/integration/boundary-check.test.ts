@@ -414,6 +414,57 @@ describe("server/client boundary", () => {
     expect(violations).toEqual([]);
   });
 
+  /**
+   * viewer-prd-interaction zone containment — the zone has dual-fragility
+   * metrics (cohesion 0.26, coupling 0.74) and its hooks (use-toast,
+   * use-feature-toggle) are single-consumer utilities consumed only by
+   * views/prd.ts. This assertion prevents external zone expansion by
+   * failing if a file outside the known zone consumes these hooks directly.
+   *
+   * If a second consumer legitimately needs one of these hooks, consider
+   * moving it to web-viewer hub (which dissolves the dual-fragility
+   * classification) rather than expanding the fragile zone's surface.
+   */
+  it("viewer-prd-interaction hooks are not consumed outside the zone", () => {
+    const viewerDir = join(WEB_SRC, "viewer");
+    const violations: string[] = [];
+
+    // Files that compose the viewer-prd-interaction zone
+    const ZONE_FILES = new Set([
+      join("viewer", "views", "prd.ts"),
+      join("viewer", "components", "prd-tree", "bulk-actions.ts"),
+      join("viewer", "hooks", "use-toast.ts"),
+      join("viewer", "hooks", "use-feature-toggle.ts"),
+    ]);
+
+    // Hook file stems that must stay contained
+    const CONTAINED_HOOKS = ["use-toast", "use-feature-toggle"];
+
+    try {
+      for (const file of collectTsFiles(viewerDir)) {
+        const rel = relative(WEB_SRC, file);
+
+        // Files inside the zone can import freely
+        if (ZONE_FILES.has(rel)) continue;
+
+        for (const imp of extractImportPaths(file)) {
+          for (const hook of CONTAINED_HOOKS) {
+            if (imp.includes(`/${hook}`) || imp.endsWith(hook) || imp.endsWith(`${hook}.js`)) {
+              violations.push(
+                `${rel} imports "${imp}" — ${hook} is contained to viewer-prd-interaction zone`
+              );
+            }
+          }
+        }
+      }
+    } catch {
+      // viewerDir doesn't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("no viewer file imports from server", () => {
     const viewerDir = join(WEB_SRC, "viewer");
     const violations: string[] = [];

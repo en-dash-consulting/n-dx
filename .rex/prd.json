@@ -21750,6 +21750,9 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-11T14:10:39.289Z",
+      "completedAt": "2026-03-11T14:15:54.820Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Split loe-display.test.ts to fix zone misclassification, added two-consumer rule enforcement test for web-shared, verified server-usage-scheduler upward imports are type-only. Remaining findings acknowledged as deliberate architectural choices (satellite zones, composition root entry points).",
       "recommendationMeta": {
         "findingHashes": [
           "d7fb7435f660",
@@ -21772,10 +21775,7 @@
           "warning": 14
         },
         "findingCount": 14
-      },
-      "completedAt": "2026-03-11T14:15:54.820Z",
-      "resolutionType": "code-change",
-      "resolutionDetail": "Split loe-display.test.ts to fix zone misclassification, added two-consumer rule enforcement test for web-shared, verified server-usage-scheduler upward imports are type-only. Remaining findings acknowledged as deliberate architectural choices (satellite zones, composition root entry points)."
+      }
     },
     {
       "id": "ad1e620e-9a22-4c46-9c5a-35357b607b48",
@@ -21846,11 +21846,15 @@
     {
       "id": "c04e8444-ae95-4f45-9979-9c8cd219caa8",
       "title": "Address pattern issues (5 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- index.html references the Preact bundle via a path that is outside the module graph — build-output-contract.test.ts is the sole enforcement point for this contract, but if that test is skipped or scoped incorrectly, the viewer mount point is entirely unguarded.\n- boundary-check.test.ts enforces import directions and the messaging exemption but leaves the two-consumer rule for web-shared unenforced by automation — this is the most actively degrading policy in the codebase and warrants a dedicated count-based assertion.\n- 37 imports flowing from web-dashboard-platform into web-server (vs 3 reverse) establish this zone as the true composition root at runtime, inverting the documented layering where web-server should sit above the viewer hub.\n- The cohesion degradation from the CLAUDE.md baseline (0.46 → 0.36) is measurable and ongoing; the two-consumer rule is documented but not machine-enforced by boundary-check.test.ts, leaving the primary governance at PR review discretion only.\n- web-shared cohesion has degraded from 0.46 (documented in CLAUDE.md) to 0.36 while coupling increased from 0.54 to 0.64. The zone has 5 files now vs the 3 mentioned in the overview context — the discrepancy suggests recent file additions violated the two-consumer rule or added framework-specific utilities. Audit data-files.ts, view-id.ts, and node-culler.ts for single-consumer additions.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-03-11T14:16:40.053Z",
+      "completedAt": "2026-03-11T14:21:41.843Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Strengthened build-output-contract.test.ts with mount-point and source-HTML structural assertions. Updated CLAUDE.md web-shared baseline metrics (0.46→0.36 cohesion, 0.54→0.64 coupling) and documented that two-consumer rule and barrel import enforcement are now automated in boundary-check.test.ts. Three of five findings were stale (two-consumer rule already enforced, node-culler.ts doesn't exist, zone classification artifact).",
       "recommendationMeta": {
         "findingHashes": [
           "8c26f561dd3c",
@@ -21894,6 +21898,178 @@
           "critical": 1
         },
         "findingCount": 7
+      }
+    },
+    {
+      "id": "de890e4f-84bf-4eb8-8b5c-4c8b84156509",
+      "title": "Address observation issues (26 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- High coupling (0.64) — 7 imports target \"rex-prd-engine\"\n- Low cohesion (0.36) — files are loosely related, consider splitting this zone\n- Cohesion 0.36 and coupling 0.64 confirm dual-fragility status — additions must satisfy the two-consumer rule and CLI-only content policy per CLAUDE.md satellite zone governance.\n- Bidirectional coupling: \"server-usage-scheduler\" ↔ \"web-viewer\" (3+39 crossings) — consider extracting shared interface\n- Two files in this zone (scheduler-startup.test.js, web-server-viewer-boundary.test.js) are flagged in CLAUDE.md as sole-coverage required tests; they lack any in-file annotation marking them as such, which is a skip-risk during refactoring.\n- High coupling (0.75) — 8 imports target \"rex-prd-engine\"\n- Cohesion 0.25 and coupling 0.75 are the worst metrics in this batch — active governance required; evaluate whether core/fix.ts deserves its own module or should be inlined into the command handler.\n- core/fix.ts living outside the cli/ subdirectory blurs the satellite zone boundary defined in CLAUDE.md; if it has a single consumer (fix.ts), it violates the two-consumer rule and should be co-located or promoted.\n- High coupling (0.82) — 3 imports target \"rex-prd-engine\"\n- Low cohesion (0.18) — files are loosely related, consider splitting this zone\n- Bidirectional imports between rex-core-utilities and rex-prd-engine (3 outbound, 8 inbound) suggest verify.ts or keywords.ts depend on types defined in the main engine — this circular shape should be resolved by moving shared types to schema or making the dependency strictly one-directional.\n- Cohesion 0.18 and coupling 0.82 indicate two unrelated utilities grouped together; splitting them into their dominant consumer zones or absorbing them into rex-prd-engine would eliminate the bidirectional dependency.\n- Cohesion 0 is a warning signal: these 8 files share no import edges with each other, meaning community detection has grouped package-root artifacts by proximity rather than relationship. This zone likely should not exist as a standalone zone — its contents belong in rex-e2e (test files) or be excluded from zone analysis (generated files, config).\n- Bidirectional dependency with rex-core (rex-unit→rex-core: 8, rex-core→rex-unit: 3) introduces a latent cycle; if keywords.ts or verify.ts import from core tree or schema modules, a true circular dependency exists and should be resolved.\n- 3 outbound imports into web-viewer from this server-side zone invert the expected dependency direction; trace these imports to determine whether a shared type or web-shared abstraction would eliminate the upward dependency.\n- High coupling (0.74) — 12 imports target \"web-viewer\"\n- Low cohesion (0.26) — files are loosely related, consider splitting this zone\n- Cohesion (0.26) is well below the 0.4 warning threshold and coupling (0.74) exceeds 0.6 — this zone meets the dual-fragility criteria requiring active governance on additions.\n- The prd.ts view is the sole declared entry point, but use-toast and use-feature-toggle are likely consumed outside this zone too — verify via import graph to determine whether they should be promoted to the viewer hub.\n- 12 entry points — wide API surface, consider consolidating exports\n- Bidirectional imports with web-viewer (web imports web-viewer × 23, web-viewer imports web × 7) create a cycle risk — verify these do not form a runtime circular dependency in the bundled output.\n- 24 entry points — wide API surface, consider consolidating exports\n- web-server → web-viewer (3 imports) is an inverted dependency: the server composition root should not import from the viewer layer. These 3 imports should be traced and relocated or abstracted behind shared types.\n- High coupling (1) — 7 imports target \"web-viewer\"\n- Both test files target components that live in the Web Viewer Hub zone; moving them into packages/web/tests/unit/viewer alongside peer viewer tests would improve discoverability and eliminate the orphan zone.\n- Cohesion of 0 and coupling of 1 means the community-detection algorithm grouped these files by elimination rather than affinity — they have no shared internal imports.",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "d7fb7435f660",
+          "5ece6cadcc98",
+          "36dbcb87adc3",
+          "78f23cc32d00",
+          "972d5710805d",
+          "e3b652132a17",
+          "47040f6cbaf8",
+          "f1732cc6ca0a",
+          "5a27eb933e5e",
+          "922a3049e4ee",
+          "cff19ffa1f91",
+          "9c53b303684b",
+          "f80cc9de0855",
+          "6da45042b2a0",
+          "56b274d415b6",
+          "bd97157d32a5",
+          "8675644fce1f",
+          "e5abd4928476",
+          "dc799be06402",
+          "d6348f899565",
+          "4bd69f32f988",
+          "f1a3cd8408d2",
+          "91d0d314584e",
+          "a1e1774aec7e",
+          "5bb99d3645db",
+          "b0dd9b6dd827"
+        ],
+        "category": "observation",
+        "severityDistribution": {
+          "warning": 26
+        },
+        "findingCount": 26
+      }
+    },
+    {
+      "id": "c730c0c7-4546-4440-8eb9-0fc9c22e59cb",
+      "title": "Address suggestion issues (25 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- Add a build-file exclusion list to sourcevision configuration: packages/web/build.js, packages/web/dev.js, and any future *.config.js or build-tooling files should be excluded from zone membership analysis. These files share directory proximity with runtime components but have no runtime import relationships with them — their inclusion corrupts cohesion and coupling metrics for any zone they land in.\n- Add a hooks/index.ts barrel to packages/web/src/viewer/hooks/ and a boundary-check.test.ts assertion requiring consumers to import through the barrel. The hooks directory is the largest leaf-import surface in the web viewer (29 files) with no enforcement — analogous to the pre-barrel state of crash/ and shared/ before their boundary assertions were added.\n- CLAUDE.md describes crash as having 'bidirectional coupling with web-viewer' but current imports show only web-viewer → crash (viewer imports crash's recovery utilities) with crash importing web-shared directly (documented bypass) rather than web-viewer — update the governance table to accurately describe the actual dependency direction to prevent engineers from applying the wrong mitigation strategy.\n- Consolidate the 'Required Tests' table into TESTING.md as the single source of truth. Replace the corresponding CLAUDE.md table entry with a reference link to TESTING.md. Add an architecture-policy test assertion that scans required test file paths for the 'REQUIRED TEST' annotation string, making the required-test contract machine-verifiable in CI rather than documentation-only.\n- Create a monorepo-level 'injection seam registry' alongside the gateway module table in CLAUDE.md. Seams that use callback injection (start.ts → register-scheduler.ts) rather than gateway imports are invisible to static analysis — listing them explicitly with their injected interface types prevents future contributors from inadvertently replacing injection with direct imports to 'simplify' the code.\n- Extend build-output-contract.test.ts to cover server bundle artifacts (dist/server/ or equivalent). The current contract is browser-only (viewer + landing), leaving server build regressions undetected in CI until a deployment failure.\n- Neither the rex package nor the hench package has an intra-package one-way dependency direction test despite having 4 active bidirectional cycles between them (rex: 3, hench: 1) — adding a single assertion per package that no file in src/ imports from a higher-tier directory unless it is itself in that tier would provide the same CI regression protection that web's boundary-check.test.ts provides for the web package.\n- The current zone analysis data contains at least one confirmed phantom edge (web-viewer → web-server: 39) that has been driving architectural governance discussions for multiple analysis passes. Before the next governance pass, re-run sourcevision analysis to produce a fresh zone map. All architectural priorities derived from stale cross-zone edge counts should be treated as provisional until confirmed by fresh analysis.\n- The llm-foundation './dist/*' wildcard export and the absence of sourcevision entry point declarations together mean any file in the foundation tier can be imported directly by any intra-monorepo consumer without triggering a lint, type, or boundary test warning. The foundation tier is the most critical boundary in the four-tier hierarchy — closing this gap requires either removing the wildcard export (breaking change) or adding zone-level entry point assertions to sourcevision configuration (non-breaking).\n- The rex CLI flat directory (src/cli/commands/) contains 30+ command files but only 3 are captured in named satellite zones — the other 27+ command files are zone-invisible, making the rex package's zone map unreliable as a structural navigation tool. Zone detection should be re-run with the full rex CLI directory in scope, or a catch-all 'rex-cli-commands' zone should be explicitly defined to surface the ungoverned CLI surface.\n- sourcevision's static import graph analysis cannot detect dynamic imports (await import(), require() with variable paths, or import() in conditional branches). The confirmed 4 dynamic import sites in analyze.ts→chunked-review are invisible to zone coupling metrics. A supplementary CI check scanning for cross-zone dynamic imports would close this systematic enforcement blind spot before it grows.\n- Audit the 12 entry points to determine which are prd-tree exports (which would move with reclassification) vs. genuine platform-level exports. If fewer than 4 entry points remain after prd-tree moves, the residual zone is a dissolution candidate rather than a consolidation target.\n- Audit all 39 web-viewer → web-server imports to verify each passes through rex-gateway.ts or domain-gateway.ts. A single direct leaf import at this seam would be the highest-risk gateway violation in the monorepo given the 39-import volume. Add a CI assertion that no file outside src/viewer/rex-gateway.ts or src/viewer/domain-gateway.ts imports directly from src/server/.\n- The web-viewer → web-server: 39 imports cross-zone edge is confirmed zero in the current codebase (web-viewer is a browser SPA that cannot import server modules at runtime). All governance priorities built around this being the highest-volume coupling edge are based on stale zone analysis data. Re-running sourcevision analysis to recalibrate the actual cross-zone edge map should be treated as a prerequisite for the next round of architectural governance decisions.\n- Zone \"Chunked Review\" (chunked-review) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — requires refactoring before new feature development\n- Add a build-freshness precondition note to tests/integration/README.md and to the root vitest config or package.json test script — e.g., a pretest or check-build step — to prevent integration tests from silently validating stale dist/ artifacts after source changes.\n- Rename web-server-viewer-boundary.test.js to web-scheduler-gateway-boundary.test.js (or similar) to accurately reflect its coverage: scheduler boot wiring, gateway re-exports, and cleanup data flow. The current name implies import-direction enforcement for the 3 web-server→web-viewer reverse imports, which this file does not provide — a separate test or an addition to architecture-policy.test.js is needed to actually enforce that boundary.\n- packages/rex/src/core/ hosts files from both prd-fix-command (core/fix.ts) and rex-core-utilities (keywords.ts, verify.ts) — two satellite zones sharing a physical directory is an ownership collision; inlining core/fix.ts into fix.ts (already the recommended structural fix) would also resolve the directory ambiguity and leave src/core/ exclusively owned by rex-core-utilities.\n- rex-cli-e2e covers approximately 10% of the 30+ CLI commands (analyze, import, prune plus 1 adapter structural test) — the zone's perfect cohesion metrics give no indication of this coverage gap; add an explicit coverage inventory comment or README in the e2e directory listing which commands are intentionally deferred vs unintentionally uncovered.\n- rex-core has zero internal imports between its 2 production files (keywords.ts, verify.ts) — these files form a zone only because community detection assigned them as cluster outliers, not because they share domain responsibility. Absorbing both files into rex-prd-engine would eliminate the zone, remove all 11 cross-zone edges associated with it, and resolve the bidirectional cycle without any logic changes.\n- analyze.ts uses 4 dynamic `await import('./chunked-review.js')` call sites that create runtime coupling to the chunked-review satellite zone that is invisible to static import graph analysis. Static boundary enforcement tools (boundary-check.test.ts, domain-isolation.test.js) cannot detect dynamic imports. A test asserting that analyze.ts's dynamic import targets are declared dependencies rather than implicit runtime loads would close this enforcement blind spot.\n- Define a named TypeScript interface (e.g., SchedulerCallbacks) for the injected broadcast, loadPRD, and collectAllIds parameters. Without an explicit interface, the callback contract is distributed across call sites in start.ts and parameter declarations in register-scheduler.ts — a refactor of either side can silently break the injection seam without triggering a type error.\n- Add a hooks/index.ts barrel to packages/web/src/viewer/hooks/ re-exporting all 29 hooks. Then add a boundary-check.test.ts assertion requiring consumers to import hooks through the barrel rather than by direct leaf path. This mirrors the crash/ and shared/ barrel enforcement pattern and creates a stable public contract for the hooks directory.\n- Add web-dashboard-platform (33 files, cohesion 0.53) to the CLAUDE.md dual-fragility governance table with a 'watch' designation — it is 0.03 above the threshold, metrics are reliable at 33 files, and it has no named governance policy despite being larger than all three currently-listed dual-fragility zones. Documenting the current baseline cohesion (0.53) creates a reference point for evaluating future additions.\n- Extend build-output-contract.test.ts to assert existence of key server bundle artifacts (e.g., dist/server/index.js or equivalent entry point). The current test covers both viewer and landing bundles but has a blind spot for server build output, meaning server build regressions are undetected until runtime.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "a691a46438c8",
+          "336ba02588fc",
+          "7659d55ec09c",
+          "316a86586785",
+          "da9339e237b3",
+          "46055b68ba6a",
+          "8fbf9555ac8c",
+          "366cd3df33cd",
+          "03ebf68e6ee8",
+          "b2bfe0430d46",
+          "2c9f01b7b6eb",
+          "c71d10e31d0f",
+          "d87542d60472",
+          "a82a3dc283e4",
+          "fc366bd9685c",
+          "b2fef826474c",
+          "07f649dec0d3",
+          "4a9be2ac56f7",
+          "efdf0d1033eb",
+          "0d01cb9b9bcc",
+          "caadbf349d51",
+          "9fe82e7eada4",
+          "ed1b619ab7d7",
+          "81dc77116f61",
+          "83fce42aa736"
+        ],
+        "category": "suggestion",
+        "severityDistribution": {
+          "warning": 23,
+          "critical": 2
+        },
+        "findingCount": 25
+      }
+    },
+    {
+      "id": "1bd85bb8-db2a-46a2-ba7c-1f0048aeb359",
+      "title": "Address move-file issues (1 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- File \"packages/web/src/viewer/components/prd-tree/progressive-loader.ts\" is pinned to zone \"Web Viewer Hub\" but lives in packages/web/src/viewer/components/prd-tree/ — consider moving to packages/web/src/viewer/components/ to align physical location with architectural zone",
+      "priority": "high",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "51444978b392"
+        ],
+        "category": "move-file",
+        "severityDistribution": {
+          "warning": 1
+        },
+        "findingCount": 1
+      }
+    },
+    {
+      "id": "5f81ff21-a931-49e0-8e76-2189bd06210f",
+      "title": "Address pattern issues (11 findings)",
+      "status": "completed",
+      "level": "feature",
+      "description": "- batch-types.ts is physically in packages/rex/src/analyze/ but zone-classified under chunked-review — moving the file to packages/rex/src/cli/commands/ would align physical location with zone ownership and eliminate the masked boundary crossing.\n- cli-dev.test.js is listed in CLAUDE.md as a required test and is the sole gate for dev-mode startup coverage. If this file is skipped, flaked, or times out in CI, dev-mode regressions become undetectable. It should have an explicit timeout budget and a CI status check that alerts on skip (not just failure) to prevent silent coverage gaps.\n- The fix satellite zone is the smallest zone (4 files) producing a return edge into the domain engine — the structural remedy is simpler here than in chunked-review: inlining core/fix.ts into fix.ts would close the cycle and collapse the zone to 3 files without losing any behavior.\n- chunked-review and prd-fix-command are the two highest-risk CLI commands (dual-fragility governance, active bidirectional cycles with the domain engine) but neither has a corresponding e2e test file in rex-cli-e2e — adding e2e coverage for these commands would surface cycle-induced initialization failures that unit tests cannot detect.\n- keywords.ts and verify.ts share no internal imports and exist as a zone solely because they both import from and are imported by rex-prd-engine — absorbing both files directly into rex-prd-engine would eliminate the zone, break the bidirectional cycle, and improve the engine's self-contained cohesion without adding external coupling.\n- rex-e2e-config (cohesion 0) and rex-e2e (cohesion 1, 4 files) represent a split e2e test zone that should be a single cohesive zone — the two zones together cover the same CLI surface but are separated by community detection grouping package-root artifacts with unrelated test files; consolidation would produce one high-cohesion e2e zone and eliminate the cohesion-0 artifact.\n- Three of the four zones that depend on rex-prd-engine (chunked-review, prd-fix-command, rex-core-utilities) each produce a return edge back into the engine, forming a systemic multi-cycle pattern rather than isolated incidents — a single structural fix (strictly enforcing one-way dependency into the engine) would resolve all three cycles simultaneously.\n- Build infrastructure files (build.js, dev.js) are grouped into this zone alongside runtime components purely by directory proximity — their presence corrupts cohesion and coupling metrics for this zone and should be excluded from zone analysis via sourcevision config\n- boundary-check.test.ts is the sole automated enforcer for web-shared and crash/ sub-zone boundaries, but viewer-prd-interaction — the only other dual-fragility zone in the web package (cohesion 0.26, coupling 0.74) — has zero boundary assertions in this file. Extending boundary-check.test.ts to assert barrel access for viewer-prd-interaction hooks would bring governance parity with the crash zone.\n- All inbound consumers of web-viewer (web-server, web-dashboard-platform, use, web-unit) reach it from different architectural layers (server, UI platform, interaction, test) — this multi-layer fan-in confirms web-viewer has absorbed responsibilities that belong in more focused zones\n- web-viewer is the sole zone in the monorepo that functions as both a heavy consumer hub (39 imports from web-server) and a heavy provider hub (23+12+7+3 inbound from 4 zones) — dual-hub topology means a single API change can cascade in both directions simultaneously; no other zone has this exposure profile.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "startedAt": "2026-03-11T15:16:01.379Z",
+      "recommendationMeta": {
+        "findingHashes": [
+          "8e7585ea7fe3",
+          "1fc6497eb9e8",
+          "b4deeffda2c1",
+          "da7e52535bac",
+          "b97e0c99872f",
+          "87f2f18142ae",
+          "c643f71b20da",
+          "a48989183a44",
+          "3e326173fd00",
+          "52689fc47585",
+          "1f955586e227"
+        ],
+        "category": "pattern",
+        "severityDistribution": {
+          "warning": 10,
+          "critical": 1
+        },
+        "findingCount": 11
+      },
+      "completedAt": "2026-03-11T15:24:12.646Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Zone pins for batch-types.ts/keywords.ts/verify.ts, cli-dev.test.js timeout, boundary-check viewer-prd-interaction assertion, fix command e2e tests; remaining findings acknowledged as structural observations"
+    },
+    {
+      "id": "ab158626-5487-4370-936e-d00e0ff5425b",
+      "title": "Address relationship issues (12 findings)",
+      "status": "pending",
+      "level": "feature",
+      "description": "- rex-prd-engine imports from chunked-review (2 crossings), meaning the CLI satellite zone is not a pure leaf node — it introduces a load-order dependency from the domain layer onto a CLI command handler, which can cause initialization failures in bundled or ESM contexts.\n- hench-guard ↔ hench-agent is the only bidirectional cycle outside the web package — it is also the only cycle where the smaller zone (10 files) imports into the larger (141 files) rather than the reverse, confirming this is a policy-layer inversion rather than organic coupling growth.\n- Integration test zone has no test targeting the rex-core ↔ rex-unit bidirectional import cycle — the only structural cycle flagged as critical in the codebase has no dedicated regression test at the integration layer.\n- web-server-viewer-boundary test should assert an exhaustive allowlist of permitted web-server→web-viewer imports (currently 3), not just the absence of a known bad import — without an allowlist, new reverse imports silently pass.\n- core/fix.ts sits outside cli/ but inside the prd-fix-command zone boundary and likely supplies the 1 return import that rex-prd-engine emits back — if core/fix.ts has only one consumer (fix.ts), it should be absorbed into the command handler, which would also sever the return edge and eliminate the cycle.\n- The 3 outbound imports from rex-core-utilities into rex-prd-engine (likely schema/type imports) combined with 8 inbound imports from the engine create a type-dependency loop — verify.ts or keywords.ts depend on types defined in the very zone that consumes them, which is structurally identical to a circular import even if the build currently resolves it.\n- batch-types.ts is physically located in packages/rex/src/analyze/ (within the rex-prd-engine directory tree) but is classified under the chunked-review zone — this file-location/zone-membership mismatch is a leaky abstraction: callers of the analyze/ directory implicitly cross a zone boundary without any import path signal.\n- rex-prd-engine imports back into chunked-review (rex-unit → rex-cli: 2 imports) — the main domain layer has an upward dependency on a CLI satellite zone, inverting the expected CLI-over-domain layering and creating a critical architecture violation.\n- server-usage-scheduler imports from web-viewer (3 imports) despite web-viewer being a higher-layer UI hub — server-side services must not depend on viewer code; these imports likely pull in types that should live in web-shared or a dedicated server-types module\n- use-toast and use-feature-toggle have zero external imports and are general-purpose hooks that could be consumed by any viewer zone. Currently there is no boundary-check assertion requiring consumers to access them through a barrel. As the hook count grows, add a barrel enforcement assertion analogous to the crash/ sub-zone check to prevent silent coupling growth.\n- web-dashboard-platform → web-viewer (7 imports) combined with web-viewer → web-dashboard-platform (23 imports) forms a runtime circular dependency in the Preact bundle; Preact/Vite cannot resolve initialization order across circular imports, making this a potential runtime crash vector\n- web-viewer participates in four simultaneous bidirectional coupling pairs (web-server ×39+3, web-dashboard-platform ×23+7, use ×12+1, crash ×2+2) — no other zone has more than one bidirectional pair, making web-viewer a unique structural liability",
+      "priority": "critical",
+      "source": "sourcevision",
+      "recommendationMeta": {
+        "findingHashes": [
+          "4c24b2b79d01",
+          "77f344cbe30c",
+          "17bf38e16dd8",
+          "e2bfed1ac431",
+          "773d26d2559c",
+          "7ee7e64ea9b5",
+          "cdc65ef51cfe",
+          "333f80f01905",
+          "90e1840f4fd0",
+          "510b1b93a28b",
+          "e4e1e8afdcc5",
+          "3ccadeec7659"
+        ],
+        "category": "relationship",
+        "severityDistribution": {
+          "critical": 6,
+          "warning": 6
+        },
+        "findingCount": 12
       }
     }
   ]

@@ -8,6 +8,10 @@
  * If refactoring changes the dev-server startup path, update this test
  * to match — do not remove it.
  *
+ * CI governance: this file must not be skipped or timed out silently.
+ * The explicit timeout budget below (30 s) ensures CI kills the test
+ * deterministically rather than hanging until the global timeout.
+ *
  * @see TESTING.md "Required Tests" section
  * @see tests/integration/scheduler-startup.test.js — analogous required test for server boot
  */
@@ -15,7 +19,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { run, runResult, createTmpDir, removeTmpDir } from "./e2e-helpers.js";
 
-describe("n-dx dev", () => {
+describe("n-dx dev", { timeout: 30_000 }, () => {
   let tmpDir;
 
   beforeEach(async () => {
