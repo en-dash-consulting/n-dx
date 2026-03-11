@@ -1,4 +1,6 @@
 /**
+ * REQUIRED TEST — do not skip or delete.
+ *
  * Scheduler startup integration test.
  *
  * Verifies that the usage cleanup scheduler can be wired up and fires
@@ -9,8 +11,14 @@
  * Tests use real module imports from built dist/ artifacts to exercise
  * the actual compiled code path.
  *
+ * This is the single point of failure for server scheduler wiring
+ * coverage. Without it, regressions in the scheduler boot path would
+ * require a full manual server startup to detect.
+ *
  * @see packages/web/src/server/register-scheduler.ts
  * @see packages/web/src/server/usage-cleanup-scheduler.ts
+ * @see TESTING.md "Required Tests" section
+ * @see tests/e2e/cli-dev.test.js — analogous required test for dev-mode
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";

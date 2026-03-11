@@ -148,7 +148,7 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 | Public API | `src/public.ts` → `exports["."]` in `package.json` | All 5 packages follow this |
 | Test structure | `tests/{unit,integration,e2e}/**/*.test.ts` | Standardized across all packages |
 | Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
-| Subpath exports | `"./dist/*": "./dist/*"` | Allows direct imports from `dist/` for advanced consumers |
+| Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
 Build and test:
 
@@ -294,3 +294,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
 | `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
+| `tests/e2e/cli-dev.test.js` | **Required test** — sole dev-mode startup coverage (do not skip) |
+| `tests/integration/scheduler-startup.test.js` | **Required test** — sole scheduler boot coverage (do not skip) |

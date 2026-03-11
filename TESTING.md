@@ -53,6 +53,46 @@ Examples:
 - Tests for `src/server/routes/` belong in `tests/unit/server/`, not `tests/unit/viewer/`
 - Tests for `src/viewer/messaging/` belong in `tests/unit/viewer/` (messaging is a viewer sub-zone)
 
+### Web-Shared Admission Criteria
+
+A file belongs in `web-shared` (`packages/web/src/shared/`) only if it meets
+**all three** of the following criteria:
+
+1. **Zero framework imports** — no Preact, no Express, no jsdom. The file must
+   be framework-agnostic and runnable in any JavaScript environment.
+2. **Multi-layer consumption** — the file is consumed by at least two distinct
+   layers above it (e.g., both `web-server` and `web-viewer`, or both
+   `web-viewer` and `viewer-message-pipeline`).
+3. **Cohesive abstraction** — the file exposes a single, well-defined
+   abstraction (e.g., data-file constants, node-culler utility), not a grab-bag
+   of unrelated helpers.
+
+Without these criteria, `web-shared` functions as a residual zone — the place
+files go when they don't fit anywhere else — which degrades cohesion and invites
+cycle-breaking relocations that don't improve the architecture.
+
+**Decision tree for new shared files:**
+
+- Does it import `preact`, `express`, or other framework? → **Not shared.** Place
+  in the appropriate framework-specific zone.
+- Is it only used by one layer? → **Not shared.** Place it in the consuming zone.
+- Is it a collection of unrelated helpers? → **Split it** into cohesive modules
+  first, then evaluate each independently.
+
+### Required Tests
+
+Certain test files are **required** (not skippable) because they are the sole
+coverage point for critical startup paths. Removing or skipping these tests
+would create silent coverage gaps.
+
+| Test file | Covers | Why required |
+|-----------|--------|-------------|
+| `tests/e2e/cli-dev.test.js` | `ndx dev` command startup | Single point of failure for dev-mode coverage |
+| `tests/integration/scheduler-startup.test.js` | Usage cleanup scheduler boot | Single point of failure for server scheduler wiring |
+
+These tests must remain in the test suite. If refactoring changes their targets,
+update the tests — do not delete them.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package

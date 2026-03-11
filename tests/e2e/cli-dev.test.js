@@ -1,3 +1,17 @@
+/**
+ * REQUIRED TEST — do not skip or delete.
+ *
+ * This is the single point of failure for dev-mode startup coverage.
+ * Without it, regressions in the `ndx dev` command path (prerequisite
+ * checks, help text, dev-server boot) would go undetected.
+ *
+ * If refactoring changes the dev-server startup path, update this test
+ * to match — do not remove it.
+ *
+ * @see TESTING.md "Required Tests" section
+ * @see tests/integration/scheduler-startup.test.js — analogous required test for server boot
+ */
+
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { run, runResult, createTmpDir, removeTmpDir } from "./e2e-helpers.js";
 

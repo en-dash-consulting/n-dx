@@ -149,6 +149,34 @@ All packages must include the subpath export for advanced consumers:
 }
 ```
 
+### The `dist/*` wildcard export (intentional escape hatch)
+
+Every package includes `"./dist/*": "./dist/*"` in its `exports` field. This is
+an **intentional escape hatch** for advanced consumers and cross-package
+integration tests that need access to internal modules not exposed through
+`public.ts`.
+
+**Stability disclaimer:** Files imported through `dist/*` are **not part of the
+public API**. They may be renamed, moved, or deleted without notice. Consumers
+that bypass `public.ts` accept the risk of breakage on any update.
+
+**Acceptable uses:**
+
+| Use case | Example |
+|----------|---------|
+| Integration tests importing built artifacts | `import { collectAllIds } from "rex/dist/core/tree.js"` |
+| CI scripts validating internal structure | `import { GATEWAY_RULES } from "web/dist/server/constants.js"` |
+| Temporary access during gateway migration | Importing a symbol before it's added to the gateway |
+
+**Prohibited uses:**
+
+- Production runtime imports that bypass the gateway (use the gateway instead)
+- Importing internal types when a `public.ts` type export exists
+- Treating `dist/*` imports as stable API — they are not
+
+If a `dist/*` import persists beyond a single PR, it should be promoted to the
+gateway or `public.ts`, or the import should be removed.
+
 ### Naming
 
 | Pattern | When | Examples |
