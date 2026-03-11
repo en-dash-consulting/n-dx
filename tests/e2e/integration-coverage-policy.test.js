@@ -41,7 +41,7 @@ const REQUIRED_CONTRACTS = [
 ];
 
 /** Minimum number of integration test files at the monorepo boundary. */
-const MIN_INTEGRATION_FILES = 2;
+const MIN_INTEGRATION_FILES = 5;
 
 describe("integration test coverage policy", () => {
   const integrationDir = join(ROOT, "tests", "integration");

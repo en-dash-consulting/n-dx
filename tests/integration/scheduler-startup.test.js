@@ -22,7 +22,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -45,6 +45,21 @@ const { registerUsageScheduler } = await import(
 const { collectAllIds } = await import(
   "../../packages/rex/dist/core/tree.js"
 );
+
+/**
+ * Simple PRD loader that reads prd.json from the .rex directory.
+ * Injected into runCleanupCycle alongside collectAllIds to satisfy
+ * the loadPRD requirement added when the two-callback contract was introduced.
+ */
+function loadPRDSync(rexDir) {
+  const prdPath = join(rexDir, "prd.json");
+  if (!existsSync(prdPath)) return null;
+  try {
+    return JSON.parse(readFileSync(prdPath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,6 +152,7 @@ describe("scheduler startup integration", () => {
           undefined, // no broadcast
           50, // 50ms interval
           collectAllIds,
+          loadPRDSync,
         );
 
         activeTimers.push(handle);
@@ -184,6 +200,7 @@ describe("scheduler startup integration", () => {
           broadcast: (data) => broadcastCalls.push(data),
           collectAllIds,
           overrideIntervalMs: 50,
+          loadPRD: loadPRDSync,
         });
 
         activeTimers.push(handle);
@@ -226,6 +243,7 @@ describe("scheduler startup integration", () => {
           broadcast,
           50, // 50ms interval
           collectAllIds,
+          loadPRDSync,
         );
 
         activeTimers.push(handle);
@@ -270,6 +288,7 @@ describe("scheduler startup integration", () => {
           aggregator,
           rexDir,
           collectAllIds,
+          loadPRD: loadPRDSync,
         });
 
         expect(result.prdAvailable).toBe(true);
@@ -302,6 +321,7 @@ describe("scheduler startup integration", () => {
           aggregator,
           rexDir,
           collectAllIds,
+          loadPRD: loadPRDSync,
         });
 
         expect(result.prdAvailable).toBe(false);

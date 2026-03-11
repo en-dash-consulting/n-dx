@@ -21144,6 +21144,9 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-03-11T02:25:57.416Z",
+      "completedAt": "2026-03-11T02:38:47.604Z",
+      "resolutionType": "code-change",
+      "resolutionDetail": "Fixed 3 concrete architectural issues: (1) eliminated rex core/move.ts → cli/errors.ts layering violation by replacing CLIError with plain Error, (2) broke circular dependency chain polling→polling-restart→graceful-degradation→memory-monitor→polling by importing registerPollingSource directly from polling-state.ts instead of the barrel, (3) removed cross-zone coupling in usage-cleanup-scheduler.ts → prd-io.ts by making loadPRD an injected dependency. Remaining findings are informational zone-metric observations (cohesion/coupling scores, entry point counts, fan-in hotspots) that reflect expected architectural patterns.",
       "recommendationMeta": {
         "findingHashes": [
           "ddc831d1e606",
@@ -21168,10 +21171,7 @@
           "warning": 16
         },
         "findingCount": 16
-      },
-      "completedAt": "2026-03-11T02:38:47.604Z",
-      "resolutionType": "code-change",
-      "resolutionDetail": "Fixed 3 concrete architectural issues: (1) eliminated rex core/move.ts → cli/errors.ts layering violation by replacing CLIError with plain Error, (2) broke circular dependency chain polling→polling-restart→graceful-degradation→memory-monitor→polling by importing registerPollingSource directly from polling-state.ts instead of the barrel, (3) removed cross-zone coupling in usage-cleanup-scheduler.ts → prd-io.ts by making loadPRD an injected dependency. Remaining findings are informational zone-metric observations (cohesion/coupling scores, entry point counts, fan-in hotspots) that reflect expected architectural patterns."
+      }
     },
     {
       "id": "aed7fb61-1693-4166-84b6-7b70af7302c6",
@@ -21279,10 +21279,14 @@
         {
           "id": "ab0c44d6-c808-4c13-8d50-f76ac2b96938",
           "title": "Integration and unit test additions",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "1. Add hench→rex-gateway integration test\n2. Add rex store→tree→task-selection integration test\n3. Add cli-mcp.test.ts for rex MCP command\n4. Add register-scheduler.test.ts and shared-types.test.ts\n5. Add subdirectory barrel files (analyze/index.ts, store/index.ts, schema/index.ts)\n6. Grow integration tier proportionally (5-7 test files)",
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-03-11T02:45:43.407Z",
+          "completedAt": "2026-03-11T03:01:40.771Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Added 6 new test files (hench rex-gateway integration, rex store-tree-selection integration, web register-scheduler unit, web shared-types unit, 2 monorepo integration tests). Fixed pre-existing scheduler-startup test failure (missing loadPRD parameter). Raised MIN_INTEGRATION_FILES from 2 to 5. Barrel files already existed."
         }
       ],
       "recommendationMeta": {
@@ -21358,11 +21362,15 @@
     {
       "id": "68220e26-1cc6-4d14-91e4-b3d621ad0d4f",
       "title": "Address pattern issues (1 findings)",
-      "status": "pending",
+      "status": "completed",
       "level": "feature",
       "description": "- The zone contains both build-tool artifacts (build.js, dev.js, package.json) and runtime Preact components — two categories that should never share a zone boundary because build config changes and component changes have entirely different risk profiles.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-03-11T02:39:44.888Z",
+      "completedAt": "2026-03-11T02:45:13.132Z",
+      "resolutionType": "config-override",
+      "resolutionDetail": "Pinned 7 build-tool and static asset files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts, SourceVision-F.png, SourceVision.png) from viewer-shell-assets zone to a new web-package-assets zone via .n-dx.json zone pins. Also cleaned up stale pin for deleted packages/hench/src/shared/glob.ts and removed resolved KNOWN_VIOLATIONS entry for packages/rex/src/core/move.ts.",
       "recommendationMeta": {
         "findingHashes": [
           "83aca7ce72d5"
