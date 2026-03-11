@@ -1,0 +1,20 @@
+{
+  "id": "rex-unit/rex/unit-store",
+  "name": "Rex Unit/rex/unit Store",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/adapter.ts",
+    "packages/rex/src/store/adapter-registry.ts",
+    "packages/rex/tests/unit/cli/commands/sync.test.ts",
+    "packages/rex/tests/unit/store/adapter-registry.test.ts",
+    "packages/rex/tests/unit/store/resolve-store.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/adapter.ts",
+    "packages/rex/src/store/adapter-registry.ts"
+  ],
+  "cohesion": 0.15,
+  "coupling": 0.85,
+  "fileCount": 5,
+  "lineCount": 1867
+}

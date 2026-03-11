@@ -5,25 +5,25 @@
 <zone>
 
 Zone: Web Viewer/web/server 2 (`web-viewer/web/server-2`)
-Files: 3, Cohesion: 0.22, Coupling: 0.78
+Files: 3, Cohesion: 0.40, Coupling: 0.60
 Description: 3 files, primarily TypeScript
-Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/search-index.ts
-Lines: 1075
+Entry points: packages/web/src/server/routes-hench.ts
+Lines: 3181
 
 </zone>
 
 <files>
 
-packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
-packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
+packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
+packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
+packages/web/src/server/routes-hench.ts (TypeScript, 2492 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/server/search-index.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
-  packages/web/tests/unit/server/search-index.test.ts → packages/web/src/server/search-index.ts {SearchIndex, parseQuery}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
+  packages/web/src/server/routes-hench.ts → packages/web/src/server/process-memory-tracker.ts {ProcessMemoryTracker}
 
 </imports>

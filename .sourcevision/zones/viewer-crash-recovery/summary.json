@@ -1,0 +1,26 @@
+{
+  "id": "viewer-crash-recovery",
+  "name": "Viewer Crash Recovery",
+  "description": "Self-contained crash detection and recovery service for the Preact viewer, encapsulating the detector logic, its public index entry point, and dedicated unit tests including a reusable test-support helper.",
+  "files": [
+    "packages/web/src/viewer/crash/crash-detector.ts",
+    "packages/web/src/viewer/crash/index.ts",
+    "packages/web/tests/helpers/crash-detector-test-support.ts",
+    "packages/web/tests/unit/viewer/crash-detector.test.ts",
+    "packages/web/tests/unit/viewer/use-crash-recovery.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/crash/index.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 5,
+  "lineCount": 879,
+  "riskMetrics": {
+    "cohesion": 0.5,
+    "coupling": 0.5,
+    "riskScore": 0.5,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

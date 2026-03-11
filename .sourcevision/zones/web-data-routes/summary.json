@@ -1,0 +1,24 @@
+{
+  "id": "web-data-routes",
+  "name": "Web Data Routes",
+  "description": "HTTP route handler for pre-computed analysis data-file endpoints, co-located with unit and performance tests, responsible for serving sourcevision and rex artifacts to the dashboard viewer.",
+  "files": [
+    "packages/web/src/server/routes-data.ts",
+    "packages/web/tests/unit/server/data-loading-efficiency.test.ts",
+    "packages/web/tests/unit/server/routes-data.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/server/routes-data.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 628,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

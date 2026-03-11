@@ -1,7 +1,7 @@
 {
   "id": "sourcevision-analysis-engine",
   "name": "Sourcevision Analysis Engine",
-  "description": "The complete sourcevision static analysis package, covering the four-phase analyze pipeline (inventory, imports, zone detection, components), CLI layer, schema, and all tests, consumed externally only through the web server gateway.",
+  "description": "Complete static analysis engine responsible for building file inventories, resolving the import graph, detecting architectural zones via Louvain community detection, and cataloging React components.",
   "files": [
     "packages/sourcevision/ARCHITECTURE.md",
     "packages/sourcevision/README.md",

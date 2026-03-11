@@ -1,13 +1,10 @@
 {
   "id": "web-viewer/web-viewer/web/viewer-performance",
   "name": "Web Viewer/web Viewer/web/viewer Performance",
-  "description": "58 files, primarily TypeScript",
+  "description": "53 files, primarily TypeScript",
   "files": [
     "packages/web/src/viewer/bootstrap.ts",
-    "packages/web/src/viewer/components/degradation-banner.ts",
     "packages/web/src/viewer/components/memory-warning.ts",
-    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
-    "packages/web/src/viewer/components/prd-tree/progressive-loader.ts",
     "packages/web/src/viewer/components/refresh-queue-status.ts",
     "packages/web/src/viewer/hooks/use-crash-recovery.ts",
     "packages/web/src/viewer/hooks/use-dom-performance-monitor.ts",
@@ -41,7 +38,6 @@
     "packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts",
     "packages/web/tests/unit/viewer/execution-panel-polling.test.ts",
     "packages/web/tests/unit/viewer/graceful-degradation.test.ts",
-    "packages/web/tests/unit/viewer/large-tree-performance.test.ts",
     "packages/web/tests/unit/viewer/loader-memory.test.ts",
     "packages/web/tests/unit/viewer/loader-polling.test.ts",
     "packages/web/tests/unit/viewer/memory-monitor.test.ts",
@@ -49,7 +45,6 @@
     "packages/web/tests/unit/viewer/polling-manager.test.ts",
     "packages/web/tests/unit/viewer/polling-restart.test.ts",
     "packages/web/tests/unit/viewer/polling-state.test.ts",
-    "packages/web/tests/unit/viewer/progressive-loader.test.ts",
     "packages/web/tests/unit/viewer/refresh-throttle.test.ts",
     "packages/web/tests/unit/viewer/response-buffer-gate.test.ts",
     "packages/web/tests/unit/viewer/status-indicators-memory.test.ts",
@@ -64,9 +59,7 @@
   ],
   "entryPoints": [
     "packages/web/src/viewer/bootstrap.ts",
-    "packages/web/src/viewer/components/degradation-banner.ts",
     "packages/web/src/viewer/components/memory-warning.ts",
-    "packages/web/src/viewer/components/prd-tree/execution-panel.ts",
     "packages/web/src/viewer/components/refresh-queue-status.ts",
     "packages/web/src/viewer/hooks/use-crash-recovery.ts",
     "packages/web/src/viewer/hooks/use-graceful-degradation.ts",
@@ -77,8 +70,8 @@
     "packages/web/src/viewer/polling/index.ts",
     "packages/web/src/viewer/polling/polling-manager.ts"
   ],
-  "cohesion": 0.83,
-  "coupling": 0.17,
-  "fileCount": 58,
-  "lineCount": 20530
+  "cohesion": 0.84,
+  "coupling": 0.16,
+  "fileCount": 53,
+  "lineCount": 18141
 }

@@ -1,0 +1,21 @@
+{
+  "id": "web-boundary-tests",
+  "name": "Web Boundary Tests",
+  "description": "Integration test suite enforcing the web package's architectural contracts: zone import boundaries and build output shape.",
+  "files": [
+    "packages/web/tests/integration/boundary-check.test.ts",
+    "packages/web/tests/integration/build-output-contract.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 317,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

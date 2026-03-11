@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/domain (`web-viewer/web-viewer/web/domain`)
-Files: 5, Cohesion: 0.27, Coupling: 0.73
+Files: 5, Cohesion: 0.31, Coupling: 0.69
 Description: 5 files, primarily TypeScript
 Entry points: packages/web/src/viewer/views/view-registry.ts
 Lines: 244

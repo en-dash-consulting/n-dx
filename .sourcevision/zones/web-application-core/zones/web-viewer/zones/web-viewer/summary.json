@@ -1,23 +1,20 @@
 {
   "id": "web-viewer/web-viewer/web-viewer",
   "name": "Web Viewer/web Viewer/web Viewer",
-  "description": "5 files, primarily TypeScript",
+  "description": "4 files, primarily TypeScript",
   "files": [
-    "packages/web/src/viewer/components/active-tasks-panel.ts",
-    "packages/web/src/viewer/components/concurrency-panel.ts",
-    "packages/web/src/viewer/components/memory-panel.ts",
-    "packages/web/src/viewer/components/rex-task-link.ts",
-    "packages/web/src/viewer/views/hench-runs.ts"
+    "packages/web/src/viewer/components/config-footer.ts",
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts",
+    "packages/web/tests/unit/viewer/sidebar.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/components/active-tasks-panel.ts",
-    "packages/web/src/viewer/components/concurrency-panel.ts",
-    "packages/web/src/viewer/components/memory-panel.ts",
-    "packages/web/src/viewer/components/rex-task-link.ts",
-    "packages/web/src/viewer/views/hench-runs.ts"
+    "packages/web/src/viewer/components/config-footer.ts",
+    "packages/web/src/viewer/components/sidebar.ts",
+    "packages/web/src/viewer/hooks/use-project-metadata.ts"
   ],
-  "cohesion": 0.37,
-  "coupling": 0.63,
-  "fileCount": 5,
-  "lineCount": 1911
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 4,
+  "lineCount": 1315
 }

@@ -1,21 +1,20 @@
 {
   "id": "web-viewer/web-viewer/use",
   "name": "Web Viewer/web Viewer/use",
-  "description": "5 files, primarily TypeScript",
+  "description": "6 files, primarily TypeScript",
   "files": [
-    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-    "packages/web/src/viewer/hooks/use-delete-actions.ts",
-    "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
-    "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
-    "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts"
+    "packages/web/src/viewer/components/prd-tree/bulk-actions.ts",
+    "packages/web/src/viewer/components/prd-tree/delete-confirmation.ts",
+    "packages/web/src/viewer/components/prd-tree/merge-preview.ts",
+    "packages/web/src/viewer/hooks/use-feature-toggle.ts",
+    "packages/web/src/viewer/hooks/use-toast.ts",
+    "packages/web/src/viewer/views/prd.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-    "packages/web/src/viewer/hooks/use-delete-actions.ts",
-    "packages/web/src/viewer/hooks/use-prd-deep-link.ts"
+    "packages/web/src/viewer/views/prd.ts"
   ],
-  "cohesion": 0.27,
-  "coupling": 0.73,
-  "fileCount": 5,
-  "lineCount": 802
+  "cohesion": 0.36,
+  "coupling": 0.64,
+  "fileCount": 6,
+  "lineCount": 1056
 }

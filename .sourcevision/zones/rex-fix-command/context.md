@@ -7,7 +7,7 @@
 Zone: Rex Fix Command (`rex-fix-command`)
 Files: 4, Cohesion: 0.25, Coupling: 0.75
 Risk: catastrophic (score: 0.75)
-Description: A narrow feature zone encapsulating the rex 'fix' CLI command and its backing core logic, detected as a separate community due to its import cross-traffic with the main rex domain.
+Description: The rex fix CLI command and its underlying core logic for detecting and correcting PRD structural integrity violations.
 Entry points: packages/rex/src/cli/commands/fix.ts
 Lines: 1230
 
@@ -31,20 +31,24 @@ Internal:
   packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/core/fix.ts {detectTimestampIssues, detectOrphanBlockedBy, detectParentChildMisalignment, detectIssues, applyFixes}
 
 Outgoing (this zone → other zones):
-  → rex-domain-core: packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/commands/constants.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/output.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/store/index.ts; packages/rex/src/core/fix.ts → packages/rex/src/core/tree.ts; packages/rex/src/core/fix.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/schema/index.ts
+  → rex-prd-engine: packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/commands/constants.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/cli/output.ts; packages/rex/src/cli/commands/fix.ts → packages/rex/src/store/index.ts; packages/rex/src/core/fix.ts → packages/rex/src/core/tree.ts; packages/rex/src/core/fix.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/unit/core/fix.test.ts → packages/rex/src/schema/index.ts
 
 Incoming (other zones → this zone):
-  ← rex-domain-core: packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/fix.ts
+  ← rex-prd-engine: packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/fix.ts
 
 </imports>
 
 <findings>
 
-[observation] [warning] High coupling (0.75) — 7 imports target "rex-domain-core"
+[observation] [warning] High coupling (0.75) — 7 imports target "rex-prd-engine"
 [observation] [warning] Low cohesion (0.25) — files are loosely related, consider splitting this zone
-[observation] [warning] Low cohesion (0.25) and high coupling (0.75) are artifacts of the zone's tiny size — 4-file zones cannot meaningfully satisfy cohesion thresholds, so these scores should not be interpreted as quality signals.
-[observation] [info] Separating CLI command dispatch (fix.ts in cli/commands/) from core logic (fix.ts in core/) correctly applies the CLI-layer pattern used throughout the rex package.
-[observation] [warning] The bidirectional dependency between fix and rex-domain-core (fix imports 7 symbols from rex-unit; rex-unit imports 1 from fix) suggests the fix module could be folded back into the main rex source tree to eliminate the artificial boundary.
+[observation] [info] Both unit test files are present (cli/commands/fix.test.ts and core/fix.test.ts), giving good symmetric coverage of the command and its core implementation.
+[observation] [warning] Coupling 0.75 reflects a thin command layer that delegates heavily to rex-unit — acceptable for a CLI shim, but the reverse edge (rex-unit → fix: 1 import) creates a bidirectional dependency that should be audited for circular risk.
+[observation] [info] With only 2 production files, the fix command is appropriately minimal; if fix logic grows, consider whether it should be absorbed into the rex-prd-engine zone rather than kept as a separate low-cohesion satellite.
+[relationship] [warning] The fix command zone has net zero structural contribution beyond delegation — with 7 imports from rex-prd-engine and only 1 reverse edge, it is closer to a pass-through adapter than a domain zone; if its only role is translating CLI args to rex-prd-engine calls, it could be inlined into the CLI command layer without architectural loss.
+[anti-pattern] [warning] With only 2 production files and no independent domain weight, the fix command zone cannot stand alone as a bounded subsystem. Inlining fix.ts into the rex-prd-engine zone would eliminate the 7+1 bidirectional import relationship without any loss of architectural clarity.
+[suggestion] [info] Zone ID 'rex-fix-command' is abbreviated to 'fix' in cross-zone edge labels, creating a label/ID mismatch that breaks any tooling joining edge data with zone metadata by canonical ID. Standardize the edge label to match the zone ID.
+[suggestion] [warning] rex-fix-command is the only rex zone with BOTH low cohesion (0.25) AND high coupling (0.75) — the canonical fragile-zone signature. Its 2 production files carry no independent domain weight, meaning any interface change in rex-prd-engine forces a corresponding change here. Inlining fix.ts into rex-prd-engine's CLI command layer eliminates the fragile satellite without loss of functionality.
 [suggestion] [info] Zone "Rex Fix Command" (rex-fix-command) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)
 
 </findings>
@@ -52,13 +56,20 @@ Incoming (other zones → this zone):
 <insights>
 
 - Low cohesion (0.25) — files are loosely related, consider splitting this zone
-- High coupling (0.75) — 7 imports target "rex-domain-core"
-- Four-file zone (CLI command, core function, and two test files) is the smallest meaningful unit — its isolation from rex-domain-core is a Louvain artifact caused by the bidirectional import edge, not a deliberate design boundary
-- High coupling (0.75) relative to its tiny size is expected: with only 4 files and 7 outbound imports to rex-unit, almost every file touches the zone boundary — the metric is structurally misleading at this scale
-- The fix command pattern (CLI layer + core logic + co-located tests) follows the correct two-layer decomposition used elsewhere in the rex package
-- Low cohesion (0.25) and high coupling (0.75) are artifacts of the zone's tiny size — 4-file zones cannot meaningfully satisfy cohesion thresholds, so these scores should not be interpreted as quality signals.
-- The bidirectional dependency between fix and rex-domain-core (fix imports 7 symbols from rex-unit; rex-unit imports 1 from fix) suggests the fix module could be folded back into the main rex source tree to eliminate the artificial boundary.
-- Separating CLI command dispatch (fix.ts in cli/commands/) from core logic (fix.ts in core/) correctly applies the CLI-layer pattern used throughout the rex package.
+- High coupling (0.75) — 7 imports target "rex-prd-engine"
+- Cohesion 0.25 and coupling 0.75 are in warning territory — the zone is largely defined by its dependence on rex-unit rather than internal imports, which is expected for a thin command module but suggests the fix logic may not have enough domain weight to stand alone.
+- The zone contains exactly 4 files (2 production, 2 test) with 7 inbound imports from rex-unit and 1 outbound import back; this bidirectional coupling (rex-unit → fix → rex-unit) should be examined to ensure there is no hidden cycle.
+- The fix command's test files are co-located in the same zone as the production files, which is correct per the naming convention (zone contains production files so it is not a '-tests' zone).
+- Coupling 0.75 reflects a thin command layer that delegates heavily to rex-unit — acceptable for a CLI shim, but the reverse edge (rex-unit → fix: 1 import) creates a bidirectional dependency that should be audited for circular risk.
+- With only 2 production files, the fix command is appropriately minimal; if fix logic grows, consider whether it should be absorbed into the rex-prd-engine zone rather than kept as a separate low-cohesion satellite.
+- Both unit test files are present (cli/commands/fix.test.ts and core/fix.test.ts), giving good symmetric coverage of the command and its core implementation.
+- The 7 inbound + 1 outbound import relationship with rex-prd-engine creates a dependency moat where fix command is almost entirely defined by its consumers' types — it has no independent domain weight.
+- The fix command zone has net zero structural contribution beyond delegation — with 7 imports from rex-prd-engine and only 1 reverse edge, it is closer to a pass-through adapter than a domain zone; if its only role is translating CLI args to rex-prd-engine calls, it could be inlined into the CLI command layer without architectural loss.
+- With only 2 production files and no independent domain weight, the fix command zone cannot stand alone as a bounded subsystem. Inlining fix.ts into the rex-prd-engine zone would eliminate the 7+1 bidirectional import relationship without any loss of architectural clarity.
+- The zone ID 'rex-fix-command' is abbreviated to 'fix' in all cross-zone import edge labels — this naming divergence between the canonical zone ID and the label used in import graph data makes any tooling that joins edge data with zone metadata by ID silently miss matches for this zone.
+- The fix command has both LOW cohesion (0.25) AND HIGH coupling (0.75) simultaneously — this is the canonical fragile-zone signature. It is the only rex zone that meets both thresholds, making it the highest structural risk in the rex package despite its small size.
+- Zone ID 'rex-fix-command' is abbreviated to 'fix' in cross-zone edge labels, creating a label/ID mismatch that breaks any tooling joining edge data with zone metadata by canonical ID. Standardize the edge label to match the zone ID.
+- rex-fix-command is the only rex zone with BOTH low cohesion (0.25) AND high coupling (0.75) — the canonical fragile-zone signature. Its 2 production files carry no independent domain weight, meaning any interface change in rex-prd-engine forces a corresponding change here. Inlining fix.ts into rex-prd-engine's CLI command layer eliminates the fragile satellite without loss of functionality.
 - [call graph] 136 internal calls, 15 outgoing, 1 incoming (cohesion: 0.9, coupling: 0.1)
 
 </insights>

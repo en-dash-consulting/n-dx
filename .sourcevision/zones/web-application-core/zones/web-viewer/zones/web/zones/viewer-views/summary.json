@@ -21,8 +21,8 @@
     "packages/web/src/viewer/views/validation.ts",
     "packages/web/src/viewer/views/workflow-optimization.ts"
   ],
-  "cohesion": 0.38,
-  "coupling": 0.63,
+  "cohesion": 0.43,
+  "coupling": 0.57,
   "fileCount": 8,
   "lineCount": 4200
 }

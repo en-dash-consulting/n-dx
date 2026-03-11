@@ -593,6 +593,14 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/loop.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "resolveModel"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/loop.ts",
       "to": "packages/hench/src/prd/rex-gateway.ts",
       "type": "type",
       "symbols": [
@@ -831,10 +839,27 @@
     },
     {
       "from": "packages/hench/src/agent/lifecycle/token-usage.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "parseTokenUsage",
+        "parseStreamTokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/lifecycle/token-usage.ts",
       "to": "packages/hench/src/schema/index.ts",
       "type": "type",
       "symbols": [
         "TokenUsage"
+      ]
+    },
+    {
+      "from": "packages/hench/src/agent/planning/brief.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "CLIError"
       ]
     },
     {
@@ -961,6 +986,15 @@
       "type": "static",
       "symbols": [
         "CLIError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/commands/constants.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "PROJECT_DIRS",
+        "formatUsage"
       ]
     },
     {
@@ -1286,6 +1320,32 @@
       ]
     },
     {
+      "from": "packages/hench/src/cli/errors.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "BaseCLIError",
+        "PROJECT_DIRS",
+        "isExecutableOnPath"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/help.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "formatHelp"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/help.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "HelpDefinition"
+      ]
+    },
+    {
       "from": "packages/hench/src/cli/index.ts",
       "to": "packages/hench/src/cli/commands/config.ts",
       "type": "dynamic",
@@ -1365,6 +1425,14 @@
       "type": "static",
       "symbols": [
         "setQuiet"
+      ]
+    },
+    {
+      "from": "packages/hench/src/cli/index.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "formatTypoSuggestion"
       ]
     },
     {
@@ -1464,6 +1532,14 @@
       ]
     },
     {
+      "from": "packages/hench/src/guard/paths.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "ClaudeClientError"
+      ]
+    },
+    {
       "from": "packages/hench/src/guard/policy.ts",
       "to": "packages/hench/src/guard/paths.ts",
       "type": "static",
@@ -1485,6 +1561,35 @@
       "type": "type",
       "symbols": [
         "ExecShellOptions"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/exec.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "reexport",
+      "symbols": [
+        "exec",
+        "execStdout",
+        "execShellCmd",
+        "getCurrentHead",
+        "getCurrentBranch",
+        "isExecutableOnPath",
+        "spawnTool",
+        "spawnManaged",
+        "ProcessPool",
+        "ProcessLimitError"
+      ]
+    },
+    {
+      "from": "packages/hench/src/process/exec.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "ExecResult",
+        "ExecOptions",
+        "SpawnToolOptions",
+        "SpawnToolResult",
+        "ManagedChild"
       ]
     },
     {
@@ -2184,6 +2289,14 @@
     },
     {
       "from": "packages/hench/src/schema/v1.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "PROJECT_DIRS"
+      ]
+    },
+    {
+      "from": "packages/hench/src/schema/v1.ts",
       "to": "packages/hench/src/process/memory-monitor.ts",
       "type": "type",
       "symbols": [
@@ -2312,6 +2425,44 @@
         "saveRun",
         "loadRun",
         "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/json.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "reexport",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/project-config.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "reexport",
+      "symbols": [
+        "loadProjectOverrides",
+        "mergeWithOverrides"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/project-config.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "loadClaudeConfigFromDir",
+        "loadLLMConfigFromDir",
+        "sharedResolveApiKey",
+        "sharedResolveCliPath"
+      ]
+    },
+    {
+      "from": "packages/hench/src/store/project-config.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "type",
+      "symbols": [
+        "ClaudeConfig",
+        "LLMConfig",
+        "LLMVendor"
       ]
     },
     {
@@ -2544,6 +2695,14 @@
     },
     {
       "from": "packages/hench/src/tools/rex.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "PROJECT_DIRS"
+      ]
+    },
+    {
+      "from": "packages/hench/src/tools/rex.ts",
       "to": "packages/hench/src/prd/rex-gateway.ts",
       "type": "static",
       "symbols": [
@@ -2636,6 +2795,25 @@
       ]
     },
     {
+      "from": "packages/hench/src/types/output.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "reexport",
+      "symbols": [
+        "setQuiet",
+        "isQuiet",
+        "info",
+        "result"
+      ]
+    },
+    {
+      "from": "packages/hench/src/types/output.ts",
+      "to": "packages/hench/src/prd/llm-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "isQuiet"
+      ]
+    },
+    {
       "from": "packages/hench/src/validation/completion.ts",
       "to": "packages/hench/src/process/index.ts",
       "type": "static",
@@ -2718,6 +2896,26 @@
       "symbols": [
         "saveRun",
         "listRuns"
+      ]
+    },
+    {
+      "from": "packages/hench/tests/integration/rex-gateway-pipeline.test.ts",
+      "to": "packages/hench/src/prd/rex-gateway.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore",
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "computeTimestampUpdates",
+        "findAutoCompletions",
+        "walkTree",
+        "findItem",
+        "isWorkItem",
+        "isRootLevel",
+        "SCHEMA_VERSION",
+        "isCompatibleSchema",
+        "assertSchemaVersion"
       ]
     },
     {
@@ -8985,14 +9183,6 @@
     },
     {
       "from": "packages/rex/src/core/move.ts",
-      "to": "packages/rex/src/cli/errors.ts",
-      "type": "static",
-      "symbols": [
-        "CLIError"
-      ]
-    },
-    {
-      "from": "packages/rex/src/core/move.ts",
       "to": "packages/rex/src/core/tree.ts",
       "type": "static",
       "symbols": [
@@ -11374,6 +11564,49 @@
       ]
     },
     {
+      "from": "packages/rex/tests/integration/store-tree-selection.test.ts",
+      "to": "packages/rex/src/core/canonical.ts",
+      "type": "static",
+      "symbols": [
+        "toCanonicalJSON"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/store-tree-selection.test.ts",
+      "to": "packages/rex/src/public.ts",
+      "type": "static",
+      "symbols": [
+        "resolveStore",
+        "findItem",
+        "walkTree",
+        "collectAllIds",
+        "findNextTask",
+        "findActionableTasks",
+        "collectCompletedIds",
+        "computeTimestampUpdates",
+        "findAutoCompletions",
+        "computeStats",
+        "SCHEMA_VERSION"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/store-tree-selection.test.ts",
+      "to": "packages/rex/src/schema/v1.ts",
+      "type": "type",
+      "symbols": [
+        "PRDDocument",
+        "PRDItem"
+      ]
+    },
+    {
+      "from": "packages/rex/tests/integration/store-tree-selection.test.ts",
+      "to": "packages/rex/src/store/index.ts",
+      "type": "static",
+      "symbols": [
+        "ensureRexDir"
+      ]
+    },
+    {
       "from": "packages/rex/tests/unit/analyze/acknowledge.test.ts",
       "to": "packages/rex/src/analyze/acknowledge.ts",
       "type": "static",
@@ -12786,14 +13019,6 @@
       "type": "type",
       "symbols": [
         "PRDItem"
-      ]
-    },
-    {
-      "from": "packages/rex/tests/unit/core/move.test.ts",
-      "to": "packages/rex/src/cli/errors.ts",
-      "type": "static",
-      "symbols": [
-        "CLIError"
       ]
     },
     {
@@ -17660,6 +17885,14 @@
       ]
     },
     {
+      "from": "packages/web/src/server/register-scheduler.ts",
+      "to": "packages/web/src/server/usage-cleanup-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "LoadPRDFn"
+      ]
+    },
+    {
       "from": "packages/web/src/server/routes-adaptive.ts",
       "to": "packages/web/src/server/types.ts",
       "type": "static",
@@ -18664,6 +18897,14 @@
     },
     {
       "from": "packages/web/src/server/start.ts",
+      "to": "packages/web/src/server/prd-io.ts",
+      "type": "static",
+      "symbols": [
+        "loadPRDSync"
+      ]
+    },
+    {
+      "from": "packages/web/src/server/start.ts",
       "to": "packages/web/src/server/rex-gateway.ts",
       "type": "static",
       "symbols": [
@@ -18898,7 +19139,8 @@
         "identifyOrphanedEntries",
         "loadCleanupConfig",
         "writeCleanupLog",
-        "DEFAULT_CLEANUP_INTERVAL_MS"
+        "DEFAULT_CLEANUP_INTERVAL_MS",
+        "LoadPRDFn"
       ]
     },
     {
@@ -18907,14 +19149,6 @@
       "type": "type",
       "symbols": [
         "IncrementalTaskUsageAggregator"
-      ]
-    },
-    {
-      "from": "packages/web/src/server/usage-cleanup-scheduler.ts",
-      "to": "packages/web/src/server/prd-io.ts",
-      "type": "static",
-      "symbols": [
-        "loadPRDSync"
       ]
     },
     {
@@ -18956,6 +19190,47 @@
         "NodeCullerOptions",
         "NodeCullerState",
         "VisibilityCallback"
+      ]
+    },
+    {
+      "from": "packages/web/src/shared/index.ts",
+      "to": "packages/web/src/shared/view-id.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/api.ts",
+      "to": "packages/web/src/viewer/route-state.ts",
+      "type": "reexport",
+      "symbols": [
+        "parseLegacyHashRoute",
+        "parsePathnameRoute",
+        "resolveLocationRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/api.ts",
+      "to": "packages/web/src/viewer/route-state.ts",
+      "type": "type",
+      "symbols": [
+        "ParsedRoute"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/api.ts",
+      "to": "packages/web/src/viewer/types.ts",
+      "type": "type",
+      "symbols": [
+        "LoadedData",
+        "NavigateTo",
+        "FileDetail",
+        "ZoneDetail",
+        "GenericDetail",
+        "PRDDetail",
+        "DetailItem",
+        "ViewId"
       ]
     },
     {
@@ -20235,7 +20510,7 @@
     },
     {
       "from": "packages/web/src/viewer/crash/crash-detector.ts",
-      "to": "packages/web/src/viewer/types.ts",
+      "to": "packages/web/src/viewer/external.ts",
       "type": "type",
       "symbols": [
         "ViewId"
@@ -20295,6 +20570,14 @@
       "symbols": [
         "DATA_FILES",
         "ALL_DATA_FILES"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/external.ts",
+      "to": "packages/web/src/shared/view-id.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
       ]
     },
     {
@@ -20405,6 +20688,14 @@
     },
     {
       "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
+      "to": "packages/web/src/viewer/external.ts",
+      "type": "type",
+      "symbols": [
+        "ViewId"
+      ]
+    },
+    {
+      "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
       "to": "packages/web/src/viewer/performance/index.ts",
       "type": "static",
       "symbols": [
@@ -20422,14 +20713,6 @@
       "symbols": [
         "CrashDetectionResult",
         "SavedNavigationState"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
-      "to": "packages/web/src/viewer/types.ts",
-      "type": "type",
-      "symbols": [
-        "ViewId"
       ]
     },
     {
@@ -21226,23 +21509,6 @@
       ]
     },
     {
-      "from": "packages/web/src/viewer/performance/crash-detector.ts",
-      "to": "packages/web/src/viewer/crash/crash-detector.ts",
-      "type": "reexport",
-      "symbols": [
-        "detectCrash",
-        "saveNavigationState",
-        "clearSavedNavigationState",
-        "markRecoveryShown",
-        "wasRecoveryShown",
-        "getDetectionResult",
-        "clearCrashHistory",
-        "resetCrashDetector",
-        "CrashDetectionResult",
-        "SavedNavigationState"
-      ]
-    },
-    {
       "from": "packages/web/src/viewer/performance/dom-performance-monitor.ts",
       "to": "packages/web/src/viewer/polling/index.ts",
       "type": "static",
@@ -21408,7 +21674,7 @@
     },
     {
       "from": "packages/web/src/viewer/performance/memory-monitor.ts",
-      "to": "packages/web/src/viewer/polling/index.ts",
+      "to": "packages/web/src/viewer/polling/polling-state.ts",
       "type": "static",
       "symbols": [
         "registerPollingSource"
@@ -21667,7 +21933,8 @@
         "Imports",
         "Zones",
         "Components",
-        "CallGraph"
+        "CallGraph",
+        "ViewId"
       ]
     },
     {
@@ -23346,16 +23613,6 @@
       ]
     },
     {
-      "from": "packages/web/tests/unit/server/memory-leak-fixes.test.ts",
-      "to": "packages/web/src/viewer/loader.ts",
-      "type": "dynamic",
-      "symbols": [
-        "onDataChange",
-        "clearOnChange",
-        "getData"
-      ]
-    },
-    {
       "from": "packages/web/tests/unit/server/port.test.ts",
       "to": "packages/web/src/server/port.ts",
       "type": "static",
@@ -23391,6 +23648,22 @@
         "shouldUsePRMarkdownFallback",
         "shouldUsePRMarkdownFallbackForCode",
         "validatePRMarkdownRefreshPreflightErrorContract"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/register-scheduler.test.ts",
+      "to": "packages/web/src/server/register-scheduler.ts",
+      "type": "static",
+      "symbols": [
+        "registerUsageScheduler"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/server/register-scheduler.test.ts",
+      "to": "packages/web/src/server/register-scheduler.ts",
+      "type": "type",
+      "symbols": [
+        "RegisterSchedulerOptions"
       ]
     },
     {
@@ -23830,6 +24103,19 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/server/shared-types.test.ts",
+      "to": "packages/web/src/server/shared-types.ts",
+      "type": "type",
+      "symbols": [
+        "TaskUsageAccumulator",
+        "CollectAllIdsFn",
+        "OrphanedEntry",
+        "CleanupResult",
+        "CleanupLogEntry",
+        "CleanupConfig"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/server/shutdown-handler.test.ts",
       "to": "packages/web/src/server/routes-hench.ts",
       "type": "static",
@@ -23959,7 +24245,8 @@
       "symbols": [
         "OrphanedEntry",
         "CleanupResult",
-        "CollectAllIdsFn"
+        "CollectAllIdsFn",
+        "LoadPRDFn"
       ]
     },
     {
@@ -23977,6 +24264,22 @@
       "type": "static",
       "symbols": [
         "WsHealthTracker"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/shared/node-culler.test.ts",
+      "to": "packages/web/src/shared/node-culler.ts",
+      "type": "static",
+      "symbols": [
+        "NodeCuller"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/shared/node-culler.test.ts",
+      "to": "packages/web/src/shared/node-culler.ts",
+      "type": "type",
+      "symbols": [
+        "VisibilityCallback"
       ]
     },
     {
@@ -24123,7 +24426,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-detector.test.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/crash/crash-detector.ts",
       "type": "static",
       "symbols": [
         "detectCrash",
@@ -24138,7 +24441,7 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/crash-detector.test.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
+      "to": "packages/web/src/viewer/crash/crash-detector.ts",
       "type": "type",
       "symbols": [
         "CrashDetectionResult",
@@ -24638,6 +24941,16 @@
       ]
     },
     {
+      "from": "packages/web/tests/unit/viewer/loader-onchange.test.ts",
+      "to": "packages/web/src/viewer/loader.ts",
+      "type": "dynamic",
+      "symbols": [
+        "onDataChange",
+        "clearOnChange",
+        "getData"
+      ]
+    },
+    {
       "from": "packages/web/tests/unit/viewer/loader-polling.test.ts",
       "to": "packages/web/src/viewer/polling/polling-manager.ts",
       "type": "static",
@@ -24754,22 +25067,6 @@
       "type": "type",
       "symbols": [
         "PRDItemData"
-      ]
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/node-culler.test.ts",
-      "to": "packages/web/src/shared/node-culler.ts",
-      "type": "static",
-      "symbols": [
-        "NodeCuller"
-      ]
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/node-culler.test.ts",
-      "to": "packages/web/src/shared/node-culler.ts",
-      "type": "type",
-      "symbols": [
-        "VisibilityCallback"
       ]
     },
     {
@@ -25588,6 +25885,15 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/use-crash-recovery.test.ts",
+      "to": "packages/web/src/viewer/crash/crash-detector.ts",
+      "type": "type",
+      "symbols": [
+        "CrashDetectionResult",
+        "SavedNavigationState"
+      ]
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-crash-recovery.test.ts",
       "to": "packages/web/src/viewer/hooks/use-crash-recovery.ts",
       "type": "static",
       "symbols": [
@@ -25600,15 +25906,6 @@
       "type": "type",
       "symbols": [
         "UseCrashRecoveryResult"
-      ]
-    },
-    {
-      "from": "packages/web/tests/unit/viewer/use-crash-recovery.test.ts",
-      "to": "packages/web/src/viewer/performance/crash-detector.ts",
-      "type": "type",
-      "symbols": [
-        "CrashDetectionResult",
-        "SavedNavigationState"
       ]
     },
     {
@@ -25953,20 +26250,7 @@
     {
       "package": "@n-dx/llm-client",
       "importedBy": [
-        "packages/hench/src/agent/lifecycle/loop.ts",
-        "packages/hench/src/agent/lifecycle/token-usage.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/cli/commands/constants.ts",
-        "packages/hench/src/cli/errors.ts",
-        "packages/hench/src/cli/help.ts",
-        "packages/hench/src/cli/index.ts",
-        "packages/hench/src/guard/paths.ts",
-        "packages/hench/src/process/exec.ts",
-        "packages/hench/src/schema/v1.ts",
-        "packages/hench/src/store/json.ts",
-        "packages/hench/src/store/project-config.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/types/output.ts",
+        "packages/hench/src/prd/llm-gateway.ts",
         "packages/rex/src/analyze/llm-bridge.ts",
         "packages/rex/src/analyze/scanners.ts",
         "packages/rex/src/cli/commands/constants.ts",
@@ -26050,8 +26334,8 @@
         "loadLLMConfigFromDir",
         "loadProjectOverrides",
         "mergeWithOverrides",
+        "parseApiTokenUsage",
         "parseStreamTokenUsage",
-        "parseTokenUsage",
         "resolveApiKey",
         "resolveCliPath",
         "resolveModel",
@@ -26465,6 +26749,7 @@
       "importedBy": [
         "packages/hench/tests/e2e/cli-init.test.ts",
         "packages/hench/tests/integration/codex-token-accounting.test.ts",
+        "packages/hench/tests/integration/rex-gateway-pipeline.test.ts",
         "packages/hench/tests/integration/store-roundtrip.test.ts",
         "packages/hench/tests/unit/agent/adaptive.test.ts",
         "packages/hench/tests/unit/agent/api-auth.test.ts",
@@ -26570,6 +26855,7 @@
         "packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts",
         "packages/rex/tests/integration/smart-add-orphaned-parent.test.ts",
         "packages/rex/tests/integration/store-roundtrip.test.ts",
+        "packages/rex/tests/integration/store-tree-selection.test.ts",
         "packages/rex/tests/unit/analyze/acknowledge.test.ts",
         "packages/rex/tests/unit/analyze/consolidation-guard.test.ts",
         "packages/rex/tests/unit/analyze/decompose.test.ts",
@@ -26751,6 +27037,7 @@
         "packages/web/tests/unit/server/memory-leak-fixes.test.ts",
         "packages/web/tests/unit/server/port.test.ts",
         "packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts",
+        "packages/web/tests/unit/server/register-scheduler.test.ts",
         "packages/web/tests/unit/server/routes-adaptive.test.ts",
         "packages/web/tests/unit/server/routes-config.test.ts",
         "packages/web/tests/unit/server/routes-data.test.ts",
@@ -26777,12 +27064,14 @@
         "packages/web/tests/unit/server/routes-workflow.test.ts",
         "packages/web/tests/unit/server/scope.test.ts",
         "packages/web/tests/unit/server/search-index.test.ts",
+        "packages/web/tests/unit/server/shared-types.test.ts",
         "packages/web/tests/unit/server/shutdown-handler.test.ts",
         "packages/web/tests/unit/server/task-usage.test.ts",
         "packages/web/tests/unit/server/type-consistency.test.ts",
         "packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts",
         "packages/web/tests/unit/server/websocket.test.ts",
         "packages/web/tests/unit/server/ws-health-tracker.test.ts",
+        "packages/web/tests/unit/shared/node-culler.test.ts",
         "packages/web/tests/unit/viewer/accessibility.test.ts",
         "packages/web/tests/unit/viewer/add-item-form.test.ts",
         "packages/web/tests/unit/viewer/analyze-panel.test.ts",
@@ -26818,13 +27107,13 @@
         "packages/web/tests/unit/viewer/lazy-children.test.ts",
         "packages/web/tests/unit/viewer/listener-lifecycle.test.ts",
         "packages/web/tests/unit/viewer/loader-memory.test.ts",
+        "packages/web/tests/unit/viewer/loader-onchange.test.ts",
         "packages/web/tests/unit/viewer/loader-polling.test.ts",
         "packages/web/tests/unit/viewer/memory-monitor.test.ts",
         "packages/web/tests/unit/viewer/memory-warning.test.ts",
         "packages/web/tests/unit/viewer/message-coalescer.test.ts",
         "packages/web/tests/unit/viewer/message-throttle.test.ts",
         "packages/web/tests/unit/viewer/multi-select.test.ts",
-        "packages/web/tests/unit/viewer/node-culler.test.ts",
         "packages/web/tests/unit/viewer/node-culling-integration.test.ts",
         "packages/web/tests/unit/viewer/persistent-filter.test.ts",
         "packages/web/tests/unit/viewer/polling-manager.test.ts",
@@ -26897,7 +27186,10 @@
         "tests/e2e/integration-coverage-policy.test.js",
         "tests/e2e/mcp-transport.test.js",
         "tests/integration/cross-package-contracts.test.js",
+        "tests/integration/gateway-pipeline.test.js",
+        "tests/integration/hench-rex-gateway-pipeline.test.js",
         "tests/integration/scheduler-startup.test.js",
+        "tests/integration/web-server-viewer-boundary.test.js",
         "tests/unit/help.test.js",
         "tests/unit/refresh-artifacts.test.js",
         "tests/unit/refresh-plan.test.js",
@@ -26938,19 +27230,10 @@
     }
   ],
   "summary": {
-    "totalEdges": 2784,
+    "totalEdges": 2814,
     "totalExternal": 18,
-    "circularCount": 1,
-    "circulars": [
-      {
-        "cycle": [
-          "packages/web/src/viewer/polling/index.ts",
-          "packages/web/src/viewer/polling/polling-restart.ts",
-          "packages/web/src/viewer/performance/graceful-degradation.ts",
-          "packages/web/src/viewer/performance/memory-monitor.ts"
-        ]
-      }
-    ],
+    "circularCount": 0,
+    "circulars": [],
     "mostImported": [
       {
         "path": "packages/rex/src/core/tree.ts",
@@ -26962,7 +27245,7 @@
       },
       {
         "path": "packages/rex/src/store/index.ts",
-        "count": 34
+        "count": 35
       },
       {
         "path": "packages/rex/src/cli/commands/constants.ts",
@@ -26974,7 +27257,7 @@
       },
       {
         "path": "packages/rex/src/cli/errors.ts",
-        "count": 26
+        "count": 24
       },
       {
         "path": "packages/rex/src/analyze/reason.ts",
@@ -26994,11 +27277,15 @@
       },
       {
         "path": "packages/rex/src/core/canonical.ts",
-        "count": 18
+        "count": 19
       },
       {
         "path": "packages/web/src/server/rex-gateway.ts",
         "count": 17
+      },
+      {
+        "path": "packages/hench/src/prd/llm-gateway.ts",
+        "count": 16
       },
       {
         "path": "packages/web/src/viewer/polling/tab-visibility.ts",
@@ -27027,12 +27314,8 @@
       {
         "path": "packages/llm-client/src/types.ts",
         "count": 11
-      },
-      {
-        "path": "packages/sourcevision/src/analyzers/claude-client.ts",
-        "count": 11
       }
     ],
-    "avgImportsPerFile": 3.45
+    "avgImportsPerFile": 3.44
   }
 }

@@ -5,29 +5,29 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer Hooks (`web-viewer/web-viewer/web/viewer-hooks`)
-Files: 5, Cohesion: 0.27, Coupling: 0.73
+Files: 5, Cohesion: 0.43, Coupling: 0.57
 Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/prd-tree/tree-utils.ts, packages/web/src/viewer/hooks/use-delete-actions.ts, packages/web/src/viewer/hooks/use-prd-deep-link.ts
-Lines: 802
+Entry points: packages/web/src/viewer/hooks/use-app-data.ts
+Lines: 871
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/prd-tree/tree-utils.ts (TypeScript, 114 lines, source)
-packages/web/src/viewer/hooks/use-delete-actions.ts (TypeScript, 176 lines, source)
-packages/web/src/viewer/hooks/use-prd-deep-link.ts (TypeScript, 100 lines, source)
-packages/web/tests/unit/viewer/deletion-state-updates.test.ts (TypeScript, 284 lines, test)
-packages/web/tests/unit/viewer/tree-utils-deletion.test.ts (TypeScript, 128 lines, test)
+packages/web/src/viewer/hooks/use-app-data.ts (TypeScript, 186 lines, source)
+packages/web/src/viewer/loader.ts (TypeScript, 227 lines, source)
+packages/web/src/viewer/schema-compat.ts (TypeScript, 70 lines, source)
+packages/web/src/viewer/validate.ts (TypeScript, 346 lines, source)
+packages/web/tests/unit/viewer/loader-onchange.test.ts (TypeScript, 42 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/hooks/use-delete-actions.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, collectSubtreeIds, removeItemById}
-  packages/web/src/viewer/hooks/use-prd-deep-link.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, getAncestorIds}
-  packages/web/tests/unit/viewer/deletion-state-updates.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {removeItemById, collectSubtreeIds, findItemById}
-  packages/web/tests/unit/viewer/tree-utils-deletion.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {collectSubtreeIds, removeItemById}
+  packages/web/src/viewer/hooks/use-app-data.ts → packages/web/src/viewer/loader.ts {loadModules, loadFromFiles, detectMode, onDataChange, clearOnChange, startPolling, stopPolling}
+  packages/web/src/viewer/loader.ts → packages/web/src/viewer/schema-compat.ts {migrateData}
+  packages/web/src/viewer/loader.ts → packages/web/src/viewer/validate.ts {validateManifest, validateInventory, validateImports, validateZones, validateComponents, validateCallGraph}
+  packages/web/tests/unit/viewer/loader-onchange.test.ts → packages/web/src/viewer/loader.ts {onDataChange, clearOnChange, getData}
 
 </imports>

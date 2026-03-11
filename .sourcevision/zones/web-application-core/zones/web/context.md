@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web (`web-viewer/web`)
-Files: 105, Cohesion: 0.98, Coupling: 0.02
-Description: 105 files, primarily TypeScript, CSS
-Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-mcp.ts, packages/web/src/server/routes-rex/index.ts, packages/web/src/server/types.ts
-Lines: 42413
+Files: 60, Cohesion: 0.98, Coupling: 0.02
+Description: 60 files, primarily TypeScript
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-rex/index.ts, packages/web/src/server/types.ts
+Lines: 22458
 
 </zone>
 
@@ -27,7 +27,6 @@ packages/web/src/server/routes-config.ts (TypeScript, 309 lines, source)
 packages/web/src/server/routes-features.ts (TypeScript, 302 lines, source)
 packages/web/src/server/routes-hench.ts (TypeScript, 2492 lines, source)
 packages/web/src/server/routes-integrations.ts (TypeScript, 377 lines, source)
-packages/web/src/server/routes-mcp.ts (TypeScript, 226 lines, source)
 packages/web/src/server/routes-notion.ts (TypeScript, 843 lines, source)
 packages/web/src/server/routes-project.ts (TypeScript, 192 lines, source)
 packages/web/src/server/routes-rex/analysis.ts (TypeScript, 710 lines, source)
@@ -45,52 +44,9 @@ packages/web/src/server/routes-status.ts (TypeScript, 284 lines, source)
 packages/web/src/server/routes-validation.ts (TypeScript, 501 lines, source)
 packages/web/src/server/routes-workflow.ts (TypeScript, 660 lines, source)
 packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
-packages/web/src/server/start.ts (TypeScript, 683 lines, source)
+packages/web/src/server/start.ts (TypeScript, 685 lines, source)
 packages/web/src/server/types.ts (TypeScript, 62 lines, source)
 packages/web/src/server/websocket.ts (TypeScript, 651 lines, source)
-packages/web/src/viewer/styles/a11y.css (CSS, 46 lines, other)
-packages/web/src/viewer/styles/analysis.css (CSS, 131 lines, other)
-packages/web/src/viewer/styles/badges.css (CSS, 110 lines, other)
-packages/web/src/viewer/styles/base.css (CSS, 34 lines, other)
-packages/web/src/viewer/styles/branding.css (CSS, 125 lines, other)
-packages/web/src/viewer/styles/breadcrumb.css (CSS, 167 lines, other)
-packages/web/src/viewer/styles/call-graph-explorer.css (CSS, 309 lines, other)
-packages/web/src/viewer/styles/cards.css (CSS, 253 lines, other)
-packages/web/src/viewer/styles/components.css (CSS, 193 lines, other)
-packages/web/src/viewer/styles/copy-link.css (CSS, 83 lines, other)
-packages/web/src/viewer/styles/crash-recovery.css (CSS, 152 lines, other)
-packages/web/src/viewer/styles/degradation-banner.css (CSS, 163 lines, other)
-packages/web/src/viewer/styles/detail.css (CSS, 134 lines, other)
-packages/web/src/viewer/styles/faq.css (CSS, 161 lines, other)
-packages/web/src/viewer/styles/feature-toggles.css (CSS, 376 lines, other)
-packages/web/src/viewer/styles/forms.css (CSS, 128 lines, other)
-packages/web/src/viewer/styles/graph.css (CSS, 356 lines, other)
-packages/web/src/viewer/styles/hench-config.css (CSS, 589 lines, other)
-packages/web/src/viewer/styles/hench-runs.css (CSS, 1701 lines, other)
-packages/web/src/viewer/styles/hench-templates.css (CSS, 382 lines, other)
-packages/web/src/viewer/styles/index.css (CSS, 42 lines, other)
-packages/web/src/viewer/styles/integration-config.css (CSS, 526 lines, other)
-packages/web/src/viewer/styles/layout.css (CSS, 467 lines, other)
-packages/web/src/viewer/styles/memory-warning.css (CSS, 115 lines, other)
-packages/web/src/viewer/styles/notion-config.css (CSS, 770 lines, other)
-packages/web/src/viewer/styles/overview.css (CSS, 219 lines, other)
-packages/web/src/viewer/styles/polling-suspension.css (CSS, 104 lines, other)
-packages/web/src/viewer/styles/pr-markdown.css (CSS, 100 lines, other)
-packages/web/src/viewer/styles/prd-tree.css (CSS, 5783 lines, other)
-packages/web/src/viewer/styles/refresh-queue.css (CSS, 105 lines, other)
-packages/web/src/viewer/styles/responsive.css (CSS, 314 lines, other)
-packages/web/src/viewer/styles/rex-dashboard.css (CSS, 1384 lines, other)
-packages/web/src/viewer/styles/routes.css (CSS, 39 lines, other)
-packages/web/src/viewer/styles/search-overlay.css (CSS, 336 lines, other)
-packages/web/src/viewer/styles/tables.css (CSS, 74 lines, other)
-packages/web/src/viewer/styles/task-audit.css (CSS, 639 lines, other)
-packages/web/src/viewer/styles/task-link.css (CSS, 185 lines, other)
-packages/web/src/viewer/styles/token-usage.css (CSS, 487 lines, other)
-packages/web/src/viewer/styles/tokens.css (CSS, 112 lines, other)
-packages/web/src/viewer/styles/utils.css (CSS, 375 lines, other)
-packages/web/src/viewer/styles/validation.css (CSS, 784 lines, other)
-packages/web/src/viewer/styles/zone-map.css (CSS, 503 lines, other)
-packages/web/src/viewer/styles/zone-slideout.css (CSS, 350 lines, other)
 packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
 packages/web/tests/integration/ws-health-integration.test.ts (TypeScript, 153 lines, test)
 packages/web/tests/unit/server/dev-reload.test.ts (TypeScript, 118 lines, test)
@@ -106,7 +62,6 @@ packages/web/tests/unit/server/routes-hench-heartbeat.test.ts (TypeScript, 218 l
 packages/web/tests/unit/server/routes-hench-memory.test.ts (TypeScript, 120 lines, test)
 packages/web/tests/unit/server/routes-hench-shutdown.test.ts (TypeScript, 425 lines, test)
 packages/web/tests/unit/server/routes-hench-templates.test.ts (TypeScript, 332 lines, test)
-packages/web/tests/unit/server/routes-mcp.test.ts (TypeScript, 325 lines, test)
 packages/web/tests/unit/server/routes-notion.test.ts (TypeScript, 255 lines, test)
 packages/web/tests/unit/server/routes-project.test.ts (TypeScript, 249 lines, test)
 packages/web/tests/unit/server/routes-requirements.test.ts (TypeScript, 333 lines, test)
@@ -158,8 +113,6 @@ Internal:
   packages/web/src/server/routes-hench.ts → packages/web/src/server/websocket.ts {WebSocketBroadcaster}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-integrations.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/rex-gateway.ts {createRexMcpServer}
-  packages/web/src/server/routes-mcp.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {jsonResponse, errorResponse, readBody}
   packages/web/src/server/routes-notion.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/src/server/routes-project.ts → packages/web/src/server/types.ts {jsonResponse}
@@ -240,13 +193,13 @@ Internal:
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {walkTree}
   packages/web/src/server/search-index.ts → packages/web/src/server/rex-gateway.ts {PRDItem, PRDDocument}
   packages/web/src/server/start.ts → packages/web/src/server/port.ts {findAvailablePort}
+  packages/web/src/server/start.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
   packages/web/src/server/start.ts → packages/web/src/server/rex-gateway.ts {collectAllIds}
   packages/web/src/server/start.ts → packages/web/src/server/routes-adaptive.ts {handleAdaptiveRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-config.ts {handleConfigRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-features.ts {handleFeaturesRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator}
   packages/web/src/server/start.ts → packages/web/src/server/routes-integrations.ts {handleIntegrationRoute}
-  packages/web/src/server/start.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-project.ts {handleProjectRoute}
   packages/web/src/server/start.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute, shutdownRexExecution}
@@ -286,8 +239,6 @@ Internal:
   packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
   packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/types.ts {ServerContext}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/routes-mcp.ts {handleMcpRoute, closeAllMcpSessions}
-  packages/web/tests/unit/server/routes-mcp.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/routes-notion.ts {handleNotionRoute}
   packages/web/tests/unit/server/routes-notion.test.ts → packages/web/src/server/types.ts {ServerContext}
   packages/web/tests/unit/server/routes-project.test.ts → packages/web/src/server/routes-project.ts {handleProjectRoute, extractProjectMetadata, extractRepoName, clearProjectMetadataCache}
@@ -316,33 +267,30 @@ Internal:
 <sub-crossings>
 
 Cross-dependencies between sub-zones:
-  web-viewer/web/server → web-viewer/web/server-2: 4
-  web-viewer/web/server → web-viewer/web/server-3: 2
-  web-viewer/web/server → web-viewer/web/server-routes-rex: 7
-  web-viewer/web/server → web-viewer/web/unit: 2
-  web-viewer/web/server-2 → web-viewer/web/server: 4
-  web-viewer/web/server-3 → web-viewer/web/server: 14
-  web-viewer/web/server-3 → web-viewer/web/server-routes-rex: 3
+  web-viewer/web/server → web-viewer/web/server-2: 2
+  web-viewer/web/server → web-viewer/web/server-3: 5
+  web-viewer/web/server → web-viewer/web/server-routes-rex: 10
+  web-viewer/web/server-2 → web-viewer/web/server: 5
+  web-viewer/web/server-2 → web-viewer/web/server-3: 1
+  web-viewer/web/server-2 → web-viewer/web/server-routes-rex: 1
+  web-viewer/web/server-3 → web-viewer/web/server: 4
   web-viewer/web/server-routes-rex → web-viewer/web/server: 5
-  web-viewer/web/unit → web-viewer/web/server: 14
-  web-viewer/web/unit → web-viewer/web/server-2: 1
-  web-viewer/web/unit → web-viewer/web/server-routes-rex: 1
-  web-viewer/web/unit-server → web-viewer/web/server: 14
+  web-viewer/web/unit → web-viewer/web/server: 16
+  web-viewer/web/unit-server → web-viewer/web/server: 9
+  web-viewer/web/unit-server → web-viewer/web/server-2: 9
 
 </sub-crossings>
 
 <sub-zones>
 
-This zone has 8 sub-zone(s):
+This zone has 6 sub-zone(s):
 
-- **Web Viewer/web/server** (`web-viewer/web/server`): 30 files, cohesion 0.79, coupling 0.21
-- **Web Viewer/web/server 2** (`web-viewer/web/server-2`): 3 files, cohesion 0.22, coupling 0.78
-- **Web Viewer/web/server 3** (`web-viewer/web/server-3`): 5 files, cohesion 0.13, coupling 0.87
+- **Web Viewer/web/server** (`web-viewer/web/server`): 32 files, cohesion 0.84, coupling 0.16
+- **Web Viewer/web/server 2** (`web-viewer/web/server-2`): 3 files, cohesion 0.4, coupling 0.6
+- **Web Viewer/web/server 3** (`web-viewer/web/server-3`): 3 files, cohesion 0.2, coupling 0.8
 - **Web Viewer/web/server Routes Rex** (`web-viewer/web/server-routes-rex`): 5 files, cohesion 0.13, coupling 0.88
-- **Web Viewer/web/unit** (`web-viewer/web/unit`): 12 files, cohesion 0.4, coupling 0.6
-- **Web Viewer/web/unit Server** (`web-viewer/web/unit-server`): 7 files, cohesion 1, coupling 0
-- **Web Viewer/web/viewer** (`web-viewer/web/viewer`): 40 files, cohesion 0, coupling 0
-- **Web Viewer/web/viewer Styles** (`web-viewer/web/viewer-styles`): 3 files, cohesion 0, coupling 0
+- **Web Viewer/web/unit** (`web-viewer/web/unit`): 8 files, cohesion 1, coupling 0
+- **Web Viewer/web/unit Server** (`web-viewer/web/unit-server`): 9 files, cohesion 1, coupling 0
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

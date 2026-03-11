@@ -5,31 +5,25 @@
 <zone>
 
 Zone: Web Viewer/web/server 3 (`web-viewer/web/server-3`)
-Files: 5, Cohesion: 0.13, Coupling: 0.87
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/server/routes-rex/index.ts
-Lines: 2141
+Files: 3, Cohesion: 0.20, Coupling: 0.80
+Description: 3 files, primarily TypeScript
+Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/search-index.ts
+Lines: 1075
 
 </zone>
 
 <files>
 
-packages/web/src/server/routes-rex/execution.ts (TypeScript, 478 lines, source)
-packages/web/src/server/routes-rex/index.ts (TypeScript, 87 lines, source)
-packages/web/tests/integration/smart-add-dispatch.test.ts (TypeScript, 274 lines, test)
-packages/web/tests/unit/server/routes-requirements.test.ts (TypeScript, 333 lines, test)
-packages/web/tests/unit/server/routes-rex.test.ts (TypeScript, 969 lines, test)
+packages/web/src/server/prd-io.ts (TypeScript, 71 lines, source)
+packages/web/src/server/search-index.ts (TypeScript, 452 lines, source)
+packages/web/tests/unit/server/search-index.test.ts (TypeScript, 552 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {shutdownRexExecution}
-  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {routeExecution}
-  packages/web/src/server/routes-rex/index.ts → packages/web/src/server/routes-rex/execution.ts {ShutdownRexResult}
-  packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
-  packages/web/tests/unit/server/routes-requirements.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
-  packages/web/tests/unit/server/routes-rex.test.ts → packages/web/src/server/routes-rex/index.ts {handleRexRoute}
+  packages/web/src/server/search-index.ts → packages/web/src/server/prd-io.ts {loadPRDSync}
+  packages/web/tests/unit/server/search-index.test.ts → packages/web/src/server/search-index.ts {SearchIndex, parseQuery}
 
 </imports>

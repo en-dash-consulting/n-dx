@@ -1,20 +1,18 @@
 {
   "id": "web-viewer/web-viewer/status",
   "name": "Web Viewer/web Viewer/status",
-  "description": "5 files, primarily TypeScript",
+  "description": "3 files, primarily TypeScript",
   "files": [
     "packages/web/src/viewer/components/status-indicators.ts",
-    "packages/web/src/viewer/hooks/use-polling.ts",
     "packages/web/src/viewer/hooks/use-project-status.ts",
-    "packages/web/tests/unit/viewer/status-indicators.test.ts",
-    "packages/web/tests/unit/viewer/use-project-status.test.ts"
+    "packages/web/tests/unit/viewer/status-indicators.test.ts"
   ],
   "entryPoints": [
     "packages/web/src/viewer/components/status-indicators.ts",
-    "packages/web/src/viewer/hooks/use-polling.ts"
+    "packages/web/src/viewer/hooks/use-project-status.ts"
   ],
-  "cohesion": 0.31,
-  "coupling": 0.69,
-  "fileCount": 5,
-  "lineCount": 987
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 3,
+  "lineCount": 783
 }

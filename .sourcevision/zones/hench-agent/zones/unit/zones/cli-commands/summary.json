@@ -1,0 +1,18 @@
+{
+  "id": "hench/unit/cli-commands",
+  "name": "Hench/unit/cli Commands",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/cli/errors.ts",
+    "packages/hench/src/cli/index.ts",
+    "packages/hench/tests/unit/cli/commands/constants.test.ts",
+    "packages/hench/tests/unit/cli/errors.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/errors.ts"
+  ],
+  "cohesion": 0.12,
+  "coupling": 0.88,
+  "fileCount": 4,
+  "lineCount": 641
+}

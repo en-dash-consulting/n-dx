@@ -1,0 +1,21 @@
+{
+  "id": "web-landing-page",
+  "name": "Web Landing Page",
+  "description": "Fully isolated landing page implementation with its co-located unit test, serving as the public-facing entry point to the dashboard with no runtime dependencies on the application core.",
+  "files": [
+    "packages/web/src/landing/landing.ts",
+    "packages/web/tests/unit/landing/landing.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 2,
+  "lineCount": 510,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

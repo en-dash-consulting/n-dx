@@ -1,0 +1,227 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": "e2e-tests",
+      "zoneName": "E2E Policy Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 22,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "hench-agent",
+      "zoneName": "Hench Agent",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 160,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "hench-agent-monitor",
+      "zoneName": "Hench Agent Monitor",
+      "cohesion": 0.29,
+      "coupling": 0.71,
+      "riskScore": 0.71,
+      "fileCount": 4,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "integration-tests",
+      "zoneName": "Cross-Package Integration Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 5,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "llm-client-foundation",
+      "zoneName": "LLM Client Foundation",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 44,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "monorepo-root",
+      "zoneName": "Monorepo Root",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 32,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "prd-runtime-state",
+      "zoneName": "PRD Runtime State",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 6,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "project-documentation",
+      "zoneName": "Project Documentation",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 16,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-e2e-fixtures",
+      "zoneName": "Rex E2E Test Fixtures",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 4,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-fix-command",
+      "zoneName": "Rex Fix Command",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 4,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-package-metadata",
+      "zoneName": "Rex Package Metadata",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 14,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-prd-engine",
+      "zoneName": "Rex PRD Engine",
+      "cohesion": 0.99,
+      "coupling": 0.01,
+      "riskScore": 0.010000000000000005,
+      "fileCount": 232,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "sourcevision-analysis-engine",
+      "zoneName": "Sourcevision Analysis Engine",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 144,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "viewer-crash-recovery",
+      "zoneName": "Viewer Crash Recovery",
+      "cohesion": 0.5,
+      "coupling": 0.5,
+      "riskScore": 0.5,
+      "fileCount": 5,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "viewer-entry-assets",
+      "zoneName": "Viewer Entry Assets",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 3,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-application-core",
+      "zoneName": "Web Application Core",
+      "cohesion": 0.94,
+      "coupling": 0.06,
+      "riskScore": 0.060000000000000026,
+      "fileCount": 338,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-boundary-tests",
+      "zoneName": "Web Boundary Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-data-routes",
+      "zoneName": "Web Data Routes",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 3,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-landing-page",
+      "zoneName": "Web Landing Page",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-shared",
+      "zoneName": "Web Shared Utilities",
+      "cohesion": 0.5,
+      "coupling": 0.5,
+      "riskScore": 0.5,
+      "fileCount": 5,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-task-usage-scheduler",
+      "zoneName": "Web Task Usage Scheduler",
+      "cohesion": 0.87,
+      "coupling": 0.13,
+      "riskScore": 0.13,
+      "fileCount": 12,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-viewer-messaging-pipeline",
+      "zoneName": "Web Viewer Messaging Pipeline",
+      "cohesion": 0.55,
+      "coupling": 0.45,
+      "riskScore": 0.44999999999999996,
+      "fileCount": 45,
+      "timestamp": "2026-03-11T04:02:17.679Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    }
+  ],
+  "analyzedAt": "2026-03-11T04:02:17.679Z",
+  "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+}

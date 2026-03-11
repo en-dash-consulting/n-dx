@@ -5,7 +5,7 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer Views (`web-viewer/web-viewer/web/viewer-views`)
-Files: 8, Cohesion: 0.38, Coupling: 0.63
+Files: 8, Cohesion: 0.43, Coupling: 0.57
 Description: 8 files, primarily TypeScript
 Entry points: packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/hench-config.ts, packages/web/src/viewer/views/hench-templates.ts, packages/web/src/viewer/views/integration-config.ts, packages/web/src/viewer/views/validation.ts, packages/web/src/viewer/views/workflow-optimization.ts
 Lines: 4200

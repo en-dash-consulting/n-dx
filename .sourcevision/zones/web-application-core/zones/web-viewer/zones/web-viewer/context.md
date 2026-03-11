@@ -5,31 +5,27 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web Viewer (`web-viewer/web-viewer/web-viewer`)
-Files: 5, Cohesion: 0.37, Coupling: 0.63
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/concurrency-panel.ts, packages/web/src/viewer/components/memory-panel.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/views/hench-runs.ts
-Lines: 1911
+Files: 4, Cohesion: 0.31, Coupling: 0.69
+Description: 4 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/config-footer.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/hooks/use-project-metadata.ts
+Lines: 1315
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/active-tasks-panel.ts (TypeScript, 290 lines, source)
-packages/web/src/viewer/components/concurrency-panel.ts (TypeScript, 251 lines, source)
-packages/web/src/viewer/components/memory-panel.ts (TypeScript, 300 lines, source)
-packages/web/src/viewer/components/rex-task-link.ts (TypeScript, 320 lines, source)
-packages/web/src/viewer/views/hench-runs.ts (TypeScript, 750 lines, source)
+packages/web/src/viewer/components/config-footer.ts (TypeScript, 181 lines, source)
+packages/web/src/viewer/components/sidebar.ts (TypeScript, 434 lines, source)
+packages/web/src/viewer/hooks/use-project-metadata.ts (TypeScript, 79 lines, source)
+packages/web/tests/unit/viewer/sidebar.test.ts (TypeScript, 621 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/components/active-tasks-panel.ts → packages/web/src/viewer/components/rex-task-link.ts {RexTaskLink}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts {ActiveTasksPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/active-tasks-panel.ts {ActiveRun}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/concurrency-panel.ts {ConcurrencyPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/memory-panel.ts {MemoryPanel}
-  packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/components/rex-task-link.ts {RexTaskLink}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/components/config-footer.ts {ConfigFooter}
+  packages/web/src/viewer/components/sidebar.ts → packages/web/src/viewer/hooks/use-project-metadata.ts {useProjectMetadata}
+  packages/web/tests/unit/viewer/sidebar.test.ts → packages/web/src/viewer/components/sidebar.ts {Sidebar}
 
 </imports>

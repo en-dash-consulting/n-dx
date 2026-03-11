@@ -7,7 +7,7 @@
 Zone: Sourcevision Analysis Engine (`sourcevision-analysis-engine`)
 Files: 144, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: The complete sourcevision static analysis package, covering the four-phase analyze pipeline (inventory, imports, zone detection, components), CLI layer, schema, and all tests, consumed externally only through the web server gateway.
+Description: Complete static analysis engine responsible for building file inventories, resolving the import graph, detecting architectural zones via Louvain community detection, and cataloging React components.
 Entry points: packages/web/src/server/domain-gateway.ts
 Lines: 44870
 
@@ -540,30 +540,37 @@ Internal:
   packages/web/tests/unit/server/domain-gateway.test.ts → packages/sourcevision/src/public.ts {*}
 
 Outgoing (this zone → other zones):
-  → task-usage-analytics: packages/web/tests/unit/server/domain-gateway.test.ts → packages/web/src/server/domain-gateway.ts
+  → web-task-usage-scheduler: packages/web/tests/unit/server/domain-gateway.test.ts → packages/web/src/server/domain-gateway.ts
 
 </imports>
 
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[observation] [info] Perfect cohesion across 144 files demonstrates that the Louvain algorithm found genuine structural unity — all analyzers, schema types, CLI commands, and tests form one coherent import community with no internal fragmentation.
-[observation] [info] The package contains its own documentation (ARCHITECTURE.md, WORKSPACE_DESIGN.md, README.md) and assets alongside source code; these non-source files inflate the file count but do not affect architectural quality.
-[observation] [info] The single cross-zone edge (sourcevision → web-server) is the sourcevision MCP server factory being re-exported through web/src/server/domain-gateway.ts — this is architecturally correct and validates the gateway pattern is working as intended.
+[observation] [info] Cohesion 1.0 / coupling 0 on a 144-file zone is an outstanding signal — sourcevision is architecturally self-contained, with all external access gated through a single domain-gateway entry point in the web package.
+[observation] [info] The outbound cross-zone edge (sourcevision → web-server: 1 import) traverses the domain-gateway correctly; verify the gateway re-exports the MCP server factory and all required domain types so no leaf file in web-server imports directly from sourcevision internals.
+[observation] [info] The presence of both ARCHITECTURE.md and WORKSPACE_DESIGN.md inside the package reflects strong documentation discipline; keeping these updated as the analyzer evolves will help onboard contributors without requiring codebase spelunking.
 [suggestion] [info] Zone "sourcevision-analysis-engine" has files across 26 directories — consider consolidating under a dedicated directory
+[suggestion] [info] ARCHITECTURE.md and WORKSPACE_DESIGN.md coexist at the package root without a documented scope boundary. Add a one-line ownership declaration at the top of each file (e.g., 'This document covers module structure' vs 'This document covers workspace layout and zone conventions') to prevent documentation drift as the analyzer evolves.
+[pattern] [info] Domain package with 144 files and a single outbound import edge is the cleanest tier isolation in the monorepo — the single-gateway access pattern is working as designed and should be used as the reference model for future domain packages.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Perfect cohesion (1.0) with zero internal coupling leakage confirms sourcevision is a self-contained domain package — it imports nothing from rex or hench, enforcing the domain-layer independence rule
-- The single external import edge (sourcevision → web-server: 1 import) represents the gateway export consumed by the web package's domain-gateway.ts — this is the correct and intended cross-tier dependency direction
-- 144 files across analyzers, CLI, schema, tests, and documentation form a dense but well-structured cluster; the high file count is justified by the complexity of the four-phase analysis pipeline
-- The single cross-zone edge (sourcevision → web-server) is the sourcevision MCP server factory being re-exported through web/src/server/domain-gateway.ts — this is architecturally correct and validates the gateway pattern is working as intended.
-- Perfect cohesion across 144 files demonstrates that the Louvain algorithm found genuine structural unity — all analyzers, schema types, CLI commands, and tests form one coherent import community with no internal fragmentation.
-- The package contains its own documentation (ARCHITECTURE.md, WORKSPACE_DESIGN.md, README.md) and assets alongside source code; these non-source files inflate the file count but do not affect architectural quality.
+- Cohesion 1.0 with coupling 0 means the entire sourcevision package is self-contained with no unexpected outbound imports — the one noted import direction (sourcevision → web-server: 1 import) flows through the domain-gateway.ts entry point, which is the correct pattern.
+- The single entry point (web/src/server/domain-gateway.ts) confirms that all external consumers access sourcevision exclusively through the gateway — the import surface is correctly constrained.
+- At 144 files with perfect cohesion this is the cleanest large zone in the codebase; the ARCHITECTURE.md and WORKSPACE_DESIGN.md documents suggest intentional design discipline.
+- Cohesion 1.0 / coupling 0 on a 144-file zone is an outstanding signal — sourcevision is architecturally self-contained, with all external access gated through a single domain-gateway entry point in the web package.
+- The presence of both ARCHITECTURE.md and WORKSPACE_DESIGN.md inside the package reflects strong documentation discipline; keeping these updated as the analyzer evolves will help onboard contributors without requiring codebase spelunking.
+- The outbound cross-zone edge (sourcevision → web-server: 1 import) traverses the domain-gateway correctly; verify the gateway re-exports the MCP server factory and all required domain types so no leaf file in web-server imports directly from sourcevision internals.
 - Zone "sourcevision-analysis-engine" has files across 26 directories — consider consolidating under a dedicated directory
+- Sourcevision's single outbound edge (to web-server's domain-gateway.ts) means the domain-gateway.ts file is the sole choke point controlling all external access to a 144-file codebase — any change to the gateway's re-export surface has outsized blast radius.
+- Domain package with 144 files and a single outbound import edge is the cleanest tier isolation in the monorepo — the single-gateway access pattern is working as designed and should be used as the reference model for future domain packages.
+- The package contains both ARCHITECTURE.md and WORKSPACE_DESIGN.md at its root with no documented division of responsibility between them. Contributors unable to determine which file governs a given decision will either duplicate content across both or update the wrong file, causing documentation divergence over time.
+- The web/src/server/domain-gateway.ts file is the sole access point for all 144 sourcevision files. Because there is only one gateway and no sub-gateway for subsets of the API, any deprecation or refactor of a re-exported symbol requires auditing all consumers of the gateway simultaneously — there is no safe partial migration path.
+- ARCHITECTURE.md and WORKSPACE_DESIGN.md coexist at the package root without a documented scope boundary. Add a one-line ownership declaration at the top of each file (e.g., 'This document covers module structure' vs 'This document covers workspace layout and zone conventions') to prevent documentation drift as the analyzer evolves.
 - [call graph] 4586 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

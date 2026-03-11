@@ -1,0 +1,21 @@
+{
+  "id": "web-viewer/web-viewer/web-2/use",
+  "name": "Web Viewer/web Viewer/web 2/use",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+    "packages/web/src/viewer/hooks/use-delete-actions.ts",
+    "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
+    "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
+    "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
+    "packages/web/src/viewer/hooks/use-delete-actions.ts",
+    "packages/web/src/viewer/hooks/use-prd-deep-link.ts"
+  ],
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 5,
+  "lineCount": 802
+}

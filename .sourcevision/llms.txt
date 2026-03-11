@@ -5,191 +5,200 @@
 
 ## Project Overview
 
-- **Files**: 1101
-- **Lines of code**: 353,626
-- **Languages**: TypeScript (925), CSS (44), JavaScript (42), Markdown (38), JSON (28)
-- **Zones**: 21 (21 with descriptions)
+- **Files**: 1111
+- **Lines of code**: 355,937
+- **Languages**: TypeScript (931), JavaScript (45), CSS (44), Markdown (39), JSON (28)
+- **Zones**: 22 (22 with descriptions)
 - **Git**: feature/sv-fixes-0306 @ 8c2a2e8
-- **Analyzed**: 2026-03-11T01:00:32.232Z
+- **Analyzed**: 2026-03-11T04:02:20.606Z
 
 ## Architecture Zones
 
-### Autonomous Agent Engine (`autonomous-agent-engine`)
+### E2E Policy Tests (`e2e-tests`)
 
-The hench autonomous agent package that picks PRD tasks, builds execution briefs, runs Claude in a tool-use loop, and records run history.
-
-- Files: 159
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/autonomous-agent-engine/context.md`
-
-### Cross-Package Integration Tests (`cross-package-integration-tests`)
-
-Monorepo-level integration tests that verify cross-package contracts and scheduler startup behavior without going through the full E2E suite.
-
-- Files: 2
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/cross-package-integration-tests/context.md`
-
-### Data Loading Routes (`data-loading-routes`)
-
-Server route handler for data-file endpoints (routes-data.ts) together with its unit and efficiency tests, isolated as a self-contained request-handling slice.
-
-- Files: 3
-- Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/web/src/server/routes-data.ts
-- Detail: `.sourcevision/zones/data-loading-routes/context.md`
-
-### Landing Page Assets (`landing-page-assets`)
-
-Isolated static assets (HTML template and CSS) for the product landing page, with no runtime imports or exports.
-
-- Files: 2
-- Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/landing-page-assets/context.md`
-
-### LLM Vendor Foundation (`llm-vendor-foundation`)
-
-The vendor-neutral LLM client foundation package that provides a unified API surface, authentication, and provider adapters for Claude and Codex CLI backends.
-
-- Files: 44
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/llm-vendor-foundation/context.md`
-
-### Monorepo Configuration (`monorepo-config`)
-
-Root-level project configuration, governance documents, and orchestration entry points that define the monorepo's structure and CI pipeline.
-
-- Files: 31
-- Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/monorepo-config/context.md`
-
-### Monorepo E2E Test Suite (`monorepo-e2e-test-suite`)
-
-Top-level end-to-end test suite covering CLI contracts, architecture policy enforcement, cross-package delegation, MCP transport, and integration coverage policy across the entire monorepo.
+End-to-end test suite that validates CLI contracts, architectural policies, MCP transport, and spawn-only enforcement across the full monorepo.
 
 - Files: 22
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/monorepo-e2e-test-suite/context.md`
+- Detail: `.sourcevision/zones/e2e-tests/context.md`
+
+### Hench Agent (`hench-agent`)
+
+Autonomous agent execution layer — picks PRD tasks, constructs briefs, drives Claude API tool-use loops, and records run transcripts.
+
+- Files: 160
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/hench-agent/context.md`
+
+### Hench Agent Monitor (`hench-agent-monitor`)
+
+Viewer-side UI panels and page view dedicated to surfacing live hench agent telemetry: active tasks, concurrency state, memory usage, and run history.
+
+- Files: 4
+- Cohesion: 0.29, Coupling: 0.71
+- Entry points: packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/concurrency-panel.ts, packages/web/src/viewer/components/memory-panel.ts, packages/web/src/viewer/views/hench-runs.ts
+- Detail: `.sourcevision/zones/hench-agent-monitor/context.md`
+
+### Cross-Package Integration Tests (`integration-tests`)
+
+Integration test suite verifying gateway pipelines, cross-package contracts, and the scheduler startup path at the boundary between domain and execution tiers.
+
+- Files: 5
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/integration-tests/context.md`
+
+### LLM Client Foundation (`llm-client-foundation`)
+
+Vendor-neutral LLM abstraction layer providing API, CLI, and Codex provider implementations with shared config, token parsing, and error types consumed by the execution tier.
+
+- Files: 44
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/llm-client-foundation/context.md`
+
+### Monorepo Root (`monorepo-root`)
+
+Project-level configuration, orchestration entry points, and cross-package scripts that wire the full n-dx toolkit together.
+
+- Files: 32
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/monorepo-root/context.md`
+
+### PRD Runtime State (`prd-runtime-state`)
+
+Mutable runtime data files managed by the rex package — PRD tree, execution logs, configuration, and workflow state persisted to disk between sessions.
+
+- Files: 6
+- Cohesion: 0.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/prd-runtime-state/context.md`
 
 ### Project Documentation (`project-documentation`)
 
-Architecture decision records, analysis reports, and design documents that capture the project's evolving architectural reasoning and audit trail.
+Architecture decision records, audit reports, and analysis documents that capture the rationale, risks, and structural constraints governing the n-dx codebase.
 
 - Files: 16
 - Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/project-documentation/context.md`
 
-### Rex CLI End-to-End Tests (`rex-cli-e2e-tests`)
+### Rex E2E Test Fixtures (`rex-e2e-fixtures`)
 
-End-to-end test suite for rex CLI commands, exercising the full command pipeline from adapter and analyze through prune, sync, and workflow operations against a real file system.
+Static fixture data files providing a sample PRD environment for rex end-to-end tests.
 
-- Files: 9
+- Files: 4
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/rex-cli-e2e-tests/context.md`
-
-### Rex Domain Core (`rex-domain-core`)
-
-The primary implementation zone for the rex PRD management engine, encompassing all analysis, CLI commands, store, schema, tree operations, and unit/integration tests in a tightly self-contained cluster.
-
-- Files: 222
-- Cohesion: 0.99, Coupling: 0.01
-- Entry points: packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/output.ts, packages/rex/src/core/tree.ts, packages/rex/src/schema/index.ts, packages/rex/src/store/index.ts
-- Detail: `.sourcevision/zones/rex-domain-core/context.md`
+- Detail: `.sourcevision/zones/rex-e2e-fixtures/context.md`
 
 ### Rex Fix Command (`rex-fix-command`)
 
-A narrow feature zone encapsulating the rex 'fix' CLI command and its backing core logic, detected as a separate community due to its import cross-traffic with the main rex domain.
+The rex fix CLI command and its underlying core logic for detecting and correcting PRD structural integrity violations.
 
 - Files: 4
 - Cohesion: 0.25, Coupling: 0.75
 - Entry points: packages/rex/src/cli/commands/fix.ts
 - Detail: `.sourcevision/zones/rex-fix-command/context.md`
 
-### Rex Package Assets (`rex-package-assets`)
+### Rex Package Metadata (`rex-package-metadata`)
 
-Static documentation, configuration data files, and image assets that ship with the rex package but contain no executable source code.
+Self-hosted PRD runtime state, documentation, and visual assets belonging to the rex package's own dogfooding environment.
 
-- Files: 18
+- Files: 14
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/rex-package-assets/context.md`
+- Detail: `.sourcevision/zones/rex-package-metadata/context.md`
 
-### Rex Runtime State (`rex-runtime-state`)
+### Rex PRD Engine (`rex-prd-engine`)
 
-Persistent data files that store the live PRD tree, execution logs, workflow state, and project configuration for the rex task tracker.
+Complete implementation of rex's PRD management system, spanning schema definitions, the PRD store, tree operations, the analyze pipeline, and all CLI commands.
 
-- Files: 6
-- Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/rex-runtime-state/context.md`
+- Files: 232
+- Cohesion: 0.99, Coupling: 0.01
+- Entry points: packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/output.ts, packages/rex/src/core/tree.ts, packages/rex/src/schema/index.ts, packages/rex/src/store/index.ts
+- Detail: `.sourcevision/zones/rex-prd-engine/context.md`
 
 ### Sourcevision Analysis Engine (`sourcevision-analysis-engine`)
 
-The complete sourcevision static analysis package, covering the four-phase analyze pipeline (inventory, imports, zone detection, components), CLI layer, schema, and all tests, consumed externally only through the web server gateway.
+Complete static analysis engine responsible for building file inventories, resolving the import graph, detecting architectural zones via Louvain community detection, and cataloging React components.
 
 - Files: 144
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/web/src/server/domain-gateway.ts
 - Detail: `.sourcevision/zones/sourcevision-analysis-engine/context.md`
 
-### Task Usage Analytics (`task-usage-analytics`)
+### Viewer Crash Recovery (`viewer-crash-recovery`)
 
-Server-side task usage tracking subsystem: incremental accumulation, scheduled cleanup, shared type contracts, and the cross-package gateway modules that connect the server to rex and sourcevision.
+Self-contained crash detection and recovery service for the Preact viewer, encapsulating the detector logic, its public index entry point, and dedicated unit tests including a reusable test-support helper.
 
-- Files: 10
-- Cohesion: 0.83, Coupling: 0.17
-- Entry points: packages/web/src/server/shared-types.ts, packages/web/src/server/task-usage.ts
-- Detail: `.sourcevision/zones/task-usage-analytics/context.md`
+- Files: 5
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/viewer/crash/index.ts
+- Detail: `.sourcevision/zones/viewer-crash-recovery/context.md`
 
-### Viewer App Shell (`viewer-app-shell`)
+### Viewer Entry Assets (`viewer-entry-assets`)
 
-Static entry-point assets for the Preact viewer application: the HTML document shell and light/dark-mode logo images bundled at build time.
+Static viewer entry point bundling the HTML shell and themed logo images that Vite serves as the root of the Preact SPA.
 
 - Files: 3
 - Cohesion: 0.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/viewer-app-shell/context.md`
-
-### Viewer Route State (`viewer-route-state`)
-
-Client-side URL routing state for the viewer: a vanilla route-state module and a React hook wrapper that expose the current route to Preact components.
-
-- Files: 4
-- Cohesion: 0.40, Coupling: 0.60
-- Entry points: packages/web/src/viewer/hooks/use-route-state.ts
-- Detail: `.sourcevision/zones/viewer-route-state/context.md`
-
-### Viewer Shell Assets (`viewer-shell-assets`)
-
-Outermost UI shell layer containing build tooling, static assets, landing page entry, and top-level viewer entry components (graphs, tabs, guides, messaging primitives).
-
-- Files: 44
-- Cohesion: 0.58, Coupling: 0.42
-- Entry points: packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/prd-tree/status-filter.ts, packages/web/src/viewer/messaging/index.ts, packages/web/src/viewer/messaging/request-dedup.ts, packages/web/src/viewer/usage/constants.ts (+4 more)
-- Detail: `.sourcevision/zones/viewer-shell-assets/context.md`
+- Detail: `.sourcevision/zones/viewer-entry-assets/context.md`
 
 ### Web Application Core (`web-application-core`)
 
-The primary 343-file body of the web package, encompassing the Express server (routes, gateways, caches), Preact viewer (components, hooks, views, visualization), schema definitions, and CLI entry point.
+The primary web package zone containing the Express server infrastructure, Preact viewer components, gateway modules, schema definitions, hooks, and utility layers that together compose the dashboard and its API surface.
 
-- Files: 343
-- Cohesion: 0.96, Coupling: 0.04
-- Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts (+9 more)
+- Files: 338
+- Cohesion: 0.94, Coupling: 0.06
+- Entry points: packages/web/src/server/prd-io.ts, packages/web/src/server/rex-gateway.ts, packages/web/src/server/routes-hench.ts, packages/web/src/server/routes-sourcevision.ts, packages/web/src/server/types.ts (+15 more)
 - Detail: `.sourcevision/zones/web-application-core/context.md`
 
-### Web Package Integration Tests (`web-integration-tests`)
+### Web Boundary Tests (`web-boundary-tests`)
 
-Integration-level test suite for the web package that enforces architectural boundaries: the viewer/server import boundary and the build-output contract.
+Integration test suite enforcing the web package's architectural contracts: zone import boundaries and build output shape.
 
 - Files: 2
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/web-integration-tests/context.md`
+- Detail: `.sourcevision/zones/web-boundary-tests/context.md`
 
-### Web Shared Utilities (`web-shared-utilities`)
+### Web Data Routes (`web-data-routes`)
 
-Foundation layer of the web package providing framework-agnostic utilities: data-file path constants and PRD-node culling logic consumed by both server and viewer zones.
+HTTP route handler for pre-computed analysis data-file endpoints, co-located with unit and performance tests, responsible for serving sourcevision and rex artifacts to the dashboard viewer.
 
-- Files: 4
-- Cohesion: 0.44, Coupling: 0.56
-- Entry points: packages/web/src/shared/data-files.ts
-- Detail: `.sourcevision/zones/web-shared-utilities/context.md`
+- Files: 3
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: packages/web/src/server/routes-data.ts
+- Detail: `.sourcevision/zones/web-data-routes/context.md`
+
+### Web Landing Page (`web-landing-page`)
+
+Fully isolated landing page implementation with its co-located unit test, serving as the public-facing entry point to the dashboard with no runtime dependencies on the application core.
+
+- Files: 2
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/web-landing-page/context.md`
+
+### Web Shared Utilities (`web-shared`)
+
+Framework-agnostic foundation layer for the web package, providing data-file constants, view ID types, and the node-culler tree utility consumed by both viewer and server zones.
+
+- Files: 5
+- Cohesion: 0.50, Coupling: 0.50
+- Entry points: packages/web/src/shared/data-files.ts, packages/web/src/shared/view-id.ts
+- Detail: `.sourcevision/zones/web-shared/context.md`
+
+### Web Task Usage Scheduler (`web-task-usage-scheduler`)
+
+Task usage tracking, incremental aggregation, and cleanup scheduling subsystem responsible for recording, persisting, and expiring per-run token usage metrics within the web server.
+
+- Files: 12
+- Cohesion: 0.87, Coupling: 0.13
+- Entry points: packages/web/src/server/shared-types.ts, packages/web/src/server/task-usage.ts
+- Detail: `.sourcevision/zones/web-task-usage-scheduler/context.md`
+
+### Web Viewer Messaging Pipeline (`web-viewer-messaging-pipeline`)
+
+Build configuration, static assets, viewer messaging infrastructure (coalescer, request-dedup, throttle), MCP route handler, and peripheral viewer components that form the web package's configuration and messaging periphery.
+
+- Files: 45
+- Cohesion: 0.55, Coupling: 0.45
+- Entry points: packages/web/src/server/routes-mcp.ts, packages/web/src/viewer/components/guide.ts, packages/web/src/viewer/components/prd-tree/status-filter.ts, packages/web/src/viewer/messaging/index.ts, packages/web/src/viewer/messaging/request-dedup.ts (+5 more)
+- Detail: `.sourcevision/zones/web-viewer-messaging-pipeline/context.md`
 
 ## Key Dependencies
 
@@ -197,10 +206,10 @@ Foundation layer of the web package providing framework-agnostic utilities: data
 
 - `packages/rex/src/core/tree.ts` (49 imports)
 - `packages/rex/src/schema/index.ts` (44 imports)
-- `packages/rex/src/store/index.ts` (34 imports)
+- `packages/rex/src/store/index.ts` (35 imports)
 - `packages/rex/src/cli/commands/constants.ts` (31 imports)
 - `packages/rex/src/cli/output.ts` (28 imports)
-- `packages/rex/src/cli/errors.ts` (26 imports)
+- `packages/rex/src/cli/errors.ts` (24 imports)
 - `packages/rex/src/analyze/reason.ts` (23 imports)
 - `packages/web/src/viewer/components/logos.ts` (23 imports)
 - `packages/web/src/server/types.ts` (22 imports)
@@ -208,9 +217,9 @@ Foundation layer of the web package providing framework-agnostic utilities: data
 
 ### External Packages
 
-- `vitest` (used by 440 files)
+- `vitest` (used by 448 files)
 - `preact` (used by 151 files)
-- `@n-dx/llm-client` (used by 55 files)
+- `@n-dx/llm-client` (used by 42 files)
 - `rex` (used by 15 files)
 - `zod` (used by 11 files)
 - `fs` (used by 8 files)
@@ -218,12 +227,6 @@ Foundation layer of the web package providing framework-agnostic utilities: data
 - `path` (used by 7 files)
 - `@modelcontextprotocol/sdk` (used by 6 files)
 - `child_process` (used by 5 files)
-
-### Circular Dependencies
-
-Found 1 circular dependency chain(s):
-
-- `packages/web/src/viewer/polling/index.ts` → `packages/web/src/viewer/polling/polling-restart.ts` → `packages/web/src/viewer/performance/graceful-degradation.ts` → `packages/web/src/viewer/performance/memory-monitor.ts`
 
 ## Route Structure
 
@@ -377,39 +380,73 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Anti-patterns
 
-- God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 36 unique functions — consider decomposing into smaller, focused functions [warning]
+- architecture-policy.test.js should contain an explicit named allowlist entry for config.js's spawn-exempt exception; without it, the policy test cannot distinguish between the intentional exception and accidental spawn-only violations that happen to access config files. [warning] (e2e-tests)
+- hench-runs.ts (751 lines) imports ActiveTasksPanel, ConcurrencyPanel, and MemoryPanel directly by file path rather than through a zone barrel — if the panel components ever need to be reorganized, hench-runs.ts must be updated alongside them; a barrel index.ts for the panel components would decouple the page view from panel file structure [warning] (hench-agent-monitor)
+- hench-runs.ts at 751 lines exceeds the threshold where a page view is likely handling concerns beyond routing and composition — at this size it likely contains polling logic, state management, and layout decisions that could be extracted into the panel components it orchestrates, reducing the page to a thin composition shell [warning] (hench-agent-monitor)
+- With only 2 production files and no independent domain weight, the fix command zone cannot stand alone as a bounded subsystem. Inlining fix.ts into the rex-prd-engine zone would eliminate the 7+1 bidirectional import relationship without any loss of architectural clarity. [warning] (rex-fix-command)
+- rex package bundles .rex/ operational state (prd.json, execution-log.jsonl) in its directory with no confirmed .npmignore exclusion — publishing to npm would leak project-specific PRD data and execution history into the package artifact. [warning] (rex-package-metadata)
+- crash-detector-test-support.ts is placed in tests/helpers/ implying shared utility status but is imported by exactly one test file — single-consumer helpers in a shared directory create false discoverability expectations and should either be co-located with their sole consumer or promoted to true shared status with a second consumer [info] (viewer-crash-recovery)
+- crash-detector-test-support.ts re-declares constants (storage keys, loop thresholds) that exist in production crash-detector.ts rather than importing and re-exporting them — this creates a synchronization gap where production threshold changes do not automatically propagate to test assertions, making tests silently stale after constant updates [warning] (viewer-crash-recovery)
+- No boundary-check test asserts that crash-detector.ts imports ViewId from src/shared/view-id.ts rather than the viewer gateway. The extraction of ViewId to the shared layer was motivated by crash-detector's zero-framework-dependency requirement, but without an enforcement test, the constraint can silently regress during refactoring. [warning] (web-application-core)
+- The two test files in web-boundary-tests do not assert on import paths within viewer sub-zones (crash, panel) — specifically, whether web-viewer's 2 inbound imports to crash target only crash/index.ts barrel and whether hench-runs.ts imports panels through a barrel; these gaps mean sub-zone encapsulation regressions are invisible to the entire enforcement suite [warning] (web-boundary-tests)
+- web-shared exposes a complete barrel (index.ts) but the existing boundary-check.test.ts does not assert that web-viewer's 5 imports enter through index.ts rather than directly into data-files.ts, node-culler.ts, or view-id.ts — direct sub-file imports from consumers would erode the foundation layer's interface contract in the same way that sub-zone barrel bypass erodes crash/index.ts encapsulation [warning] (web-shared)
+- ... and 2 more
+
+### Patterns
+
+- The domain-isolation.test.js in the E2E zone is the only automated guard against the web-viewer → web-unit boundary violation identified above — verify it explicitly asserts that no production viewer file imports from a test zone, as this class of violation may not be caught by the current gateway-only checks. [warning] (e2e-tests)
+- Dual-gateway architecture (rex-gateway.ts + llm-gateway.ts) partitions upstream dependencies by tier: domain layer (rex) and foundation layer (llm-client). This is a stricter application of the gateway pattern than documented and provides better import-surface auditability per tier. [info] (hench-agent)
+- Asymmetric bidirectional coupling (11 outbound, 4 inbound) compared to viewer-crash-recovery (3 outbound, 2 inbound) suggests this zone has a weaker interface contract — the crash zone's near-symmetric ratio indicates a more deliberate boundary design [info] (hench-agent-monitor)
+- Five distinct entry points covering storage, tree operations, schema types, CLI constants, and output formatting form a clean facade-per-domain pattern; each consumer gateway (hench/rex-gateway.ts, web/rex-gateway.ts) selectively imports from the relevant entry point rather than the whole zone. [info] (rex-prd-engine)
+- Domain package with 144 files and a single outbound import edge is the cleanest tier isolation in the monorepo — the single-gateway access pattern is working as designed and should be used as the reference model for future domain packages. [info] (sourcevision-analysis-engine)
+- No policy test currently verifies that web-viewer's 2 inbound imports to crash target only crash/index.ts — direct imports into crash/crash-detector.ts or crash internals would erode encapsulation without failing any existing test [warning] (viewer-crash-recovery)
+- Binary asset zone (PNG logos + HTML entry) is invisible to import-graph policy tests — the boundary-check suite cannot detect if a non-asset file is accidentally placed here, making asset zone integrity enforcement build-config-only [info] (viewer-entry-assets)
+- web-application-core is the sole convergence point for all other web satellite zones; no satellite zone has import edges that bypass it — this hub-and-spoke topology is consistent with the composition-root role of web-server but means a breaking change to any public type in this zone has monorepo-wide blast radius within the web package. [info] (web-application-core)
+- web-viewer is the highest-degree node in the web package: it imports from 5 zones (web-server, web, web-shared, panel, crash, web-unit) and is imported by 4 zones (web, panel, crash, web-unit), making it a de-facto architectural hub whose health directly determines the stability of the entire web package. [info] (web-application-core)
+- Neither boundary-check nor build-output-contract validates that web-viewer's inbound imports to viewer sub-zones (crash, panel) enter only through declared barrel files — internal encapsulation of viewer sub-zones is outside the current test scope [warning] (web-boundary-tests)
+- ... and 2 more
 
 ### Relationships
 
-- Tightly coupled modules: packages/rex/src/cli/commands/prune.ts and packages/rex/src/cli/output.ts — 117 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
+- hench-agent-monitor bypasses the web-shared foundation layer entirely (0 imports) and depends exclusively on web-viewer (11 imports) — any future need for shared utilities will route through the viewer abstraction rather than the designated foundation layer [warning] (hench-agent-monitor)
+- The fix command zone has net zero structural contribution beyond delegation — with 7 imports from rex-prd-engine and only 1 reverse edge, it is closer to a pass-through adapter than a domain zone; if its only role is translating CLI args to rex-prd-engine calls, it could be inlined into the CLI command layer without architectural loss. [warning] (rex-fix-command)
+- crash ↔ web-viewer (3+2 crossings) and panel ↔ web-viewer (11+4 crossings) both create bidirectional satellite relationships with the same hub zone; the pattern of multiple low-cohesion satellite zones bidirectionally coupled to one high-cohesion core zone is a hub-and-spoke anti-pattern that makes web-viewer changes high-risk. [warning] (viewer-crash-recovery)
+- viewer-crash-recovery's bidirectional relationship with web-viewer (3:2 ratio) is architecturally healthier than hench-agent-monitor's (11:4 ratio) — the crash zone demonstrates that viewer sub-zones can maintain near-symmetric coupling when they expose a deliberate barrel interface [info] (viewer-crash-recovery)
+- packages/web/src/viewer/crash/crash-detector.ts imports ViewId from external.ts (viewer zone) while packages/web/src/viewer/performance/index.ts imports from crash/index.js — bidirectional dependency between the 'crash' detected zone and 'web-application-core' forms a cycle; crash should depend on viewer types through a one-way edge only. [critical] (web-application-core)
+- web-viewer imports 1 symbol from web-unit (a test zone) — production code acquiring a runtime dependency on a test zone is a structural boundary violation that could accidentally pull test-only utilities into the production bundle; identify the import and relocate the shared symbol to web-shared or a dedicated viewer utility module. [critical] (web-application-core)
+- routes-data.ts (server route handler, 3-file zone) imports 7 symbols from the 338-file web-application-core zone which contains viewer components; the asymmetric edge count (7 in from the small zone, 1 out from the large zone) indicates routes-data.ts is consuming viewer-side abstractions — these must be verified as type-only imports to prevent server code from acquiring a Preact runtime dependency. [warning] (web-data-routes)
+- web-shared is imported by both web-viewer (5x) and web-unit (1x) with clean unidirectional flow — zero upward imports confirm the foundation contract is holding under actual consumer load [info] (web-shared)
+- sourcevision (domain tier) has 1 import targeting the web-server zone that likely resolves to web-task-usage-scheduler/shared-types.ts; this inverts the four-tier dependency hierarchy at a concrete file level — the referenced type must be relocated to a foundation-tier package (@n-dx/llm-client or a new shared package) to restore tier integrity. [critical] (web-task-usage-scheduler)
+- routes-mcp.ts has exactly one consumer (server/start.ts) inside the server composition root but landed in the messaging-pipeline zone; this placement splits the MCP request lifecycle across two zones and obscures the full server routing surface during audits. [warning] (web-viewer-messaging-pipeline)
+- ... and 1 more
 
 ### Observations
 
-- High cohesion (1) — files are tightly interconnected [info] (autonomous-agent-engine)
-- Cohesion of 1.0 across 159 files demonstrates that the hench package has strong internal cohesion — all files are tightly related and serve the autonomous agent's core mission. [info] (autonomous-agent-engine)
-- The presence of adaptive.ts and review.ts alongside the main agent loop suggests self-evaluation capabilities — these are high-value but high-risk components that deserve dedicated integration tests covering feedback loop termination conditions. [info] (autonomous-agent-engine)
-- With 159 files in a single zone, hench is the largest single-package zone in this batch; verifying that internal sub-zones (agent, prd, cli, store) have clear directional dependencies prevents internal coupling from growing unchecked. [info] (autonomous-agent-engine)
-- High cohesion (1) — files are tightly interconnected [info] (cross-package-integration-tests)
-- Coupling of 0 is ideal for a test zone — tests consume production packages as black boxes and are not imported by anything else, preventing test infrastructure from leaking into the production dependency graph. [info] (cross-package-integration-tests)
-- With only 2 files covering cross-package contracts and scheduler startup, coverage may be thin; consider whether other inter-package boundaries (e.g. hench↔rex, web↔sourcevision) have dedicated contract tests or rely solely on E2E. [info] (cross-package-integration-tests)
-- Zone contains only test files with no production sources, correctly earning the '-tests' suffix per naming convention. [info] (cross-package-integration-tests)
-- High cohesion (1) — files are tightly interconnected [info] (data-loading-routes)
-- Cohesion of 1.0 and coupling of 0.0 indicate a perfectly self-contained zone — this is an architectural positive demonstrating clean separation of the data-loading route slice from the rest of the server. [info] (data-loading-routes)
-- ... and 95 more
+- High cohesion (1) — files are tightly interconnected [info] (e2e-tests)
+- Cohesion of 1.0 and coupling of 0.0 confirm this zone is hermetically isolated — E2E tests spawn processes rather than importing production modules, which correctly mirrors the orchestration-tier spawn pattern. [info] (e2e-tests)
+- The breadth of CLI contract tests (arg-contracts, delegation, errors, config, ci, dev) provides strong regression coverage for the orchestration tier, which has no unit tests of its own by design. [info] (e2e-tests)
+- architecture-policy.test.js enforces zone-cycle detection and intra-package layering as a hard gate — this is the correct place for these checks, but any growth in the monorepo should be accompanied by corresponding policy updates in this file. [info] (e2e-tests)
+- Bidirectional coupling: "rex-fix-command" ↔ "rex-prd-engine" (7+1 crossings) — consider extracting shared interface [warning]
+- Bidirectional coupling: "web-application-core" ↔ "web-viewer-messaging-pipeline" (22+16 crossings) — consider extracting shared interface [warning]
+- Hub: packages/web/src/server/rex-gateway.ts is imported by 3 zones — cross-cutting dependency [info]
+- Size imbalance: largest zone has 338 files vs smallest with 2 — uneven decomposition [info]
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects [warning]
+- High cohesion (1) — files are tightly interconnected [info] (hench-agent)
+- ... and 84 more
 
 ### Suggestions
 
-- Zone "autonomous-agent-engine" has files across 32 directories — consider consolidating under a dedicated directory [info] (autonomous-agent-engine)
-- packages/web/tests/unit/server/ contains files from 5 zones (data-loading-routes, rex-domain-core, sourcevision-analysis-engine, task-usage-analytics, web-application-core) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 30 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
-- Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts has no incoming calls — verify if still needed [info]
-- Zone "rex-domain-core" has files across 21 directories — consider consolidating under a dedicated directory [info] (rex-domain-core)
-- Zone "rex-package-assets" has files across 5 directories — consider consolidating under a dedicated directory [info] (rex-package-assets)
-- Zone "Rex Package Assets" (rex-package-assets) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds [info] (rex-package-assets)
-- Zone "sourcevision-analysis-engine" has files across 26 directories — consider consolidating under a dedicated directory [info] (sourcevision-analysis-engine)
-- Zone "viewer-shell-assets" has files across 11 directories — consider consolidating under a dedicated directory [info] (viewer-shell-assets)
-- Zone "web-application-core" has files across 20 directories — consider consolidating under a dedicated directory [info] (web-application-core)
-- ... and 5 more
+- packages/web/tests/unit/server/ contains files from 6 zones (rex-prd-engine, sourcevision-analysis-engine, web-application-core, web-data-routes, web-task-usage-scheduler, web-viewer-messaging-pipeline) — consider grouping into subdirectories to clarify architectural boundaries [info]
+- Add a monorepo-wide invariant test asserting that every zone with cohesion below 0.4 is either a data zone (no source files), a test fixture zone, or has an explicit waiver comment in architecture-policy.test.js. Zones currently below threshold without waivers: fix (0.25), panel (0.29). The test would prevent low-cohesion zones from silently accumulating as new files are added. [warning]
+- CLAUDE.md documents the web package's internal zone layering as a linear stack (web-server → web-viewer → messaging → web-shared), but the actual import graph forms a hub topology with web-viewer at the center (11 distinct cross-zone edges). The linear model cannot be topologically sorted given current imports. Update CLAUDE.md to document the hub topology and web-viewer's role as the shared-state hub, so contributors do not introduce new imports based on an incorrect mental model of the dependency direction. [warning]
+- Change the REQUIRED_CONTRACTS coverage check in integration-coverage-policy.test.js from package-directory-name matching to gateway-file-path or gateway-exported-symbol matching so each entry in the list is independently verified; the current strategy silently conflates multiple gateways sharing the same package name (hench rex-gateway + llm-gateway both match on 'hench') [warning]
+- Cross-zone edge labels systematically use abbreviated zone names ('fix', 'rex-unit') that do not match canonical zone IDs. Standardize the community detection output to use canonical zone IDs as edge labels, or maintain an explicit alias map, so that import graph queries and zone metadata queries can be joined without silent data loss. [info]
+- Establish a convention that component barrels (e.g., components/index.ts) must export both the component function and all associated public interfaces (prop types, data types). Apply this to components/index.ts by adding ActiveRun and ActiveTasksPanelProps exports, then enforce it as a review checklist item or a lint rule checking that exported components have their prop interfaces co-exported. [info]
+- Establish a policy that every critical or warning finding produced by sourcevision zone enrichment must be accompanied by a corresponding policy-test assertion within the same PR that resolves the finding. The current workflow (analyze → insight → eventual fix) allows findings to age indefinitely; a 'findings must be enforced or explicitly waived' policy would create a mechanical link between detection and resolution. [warning]
+- File name accuracy has drifted in two web zone files: data-loading-efficiency.test.ts tests pagination correctness (not efficiency) and shared-types.ts is a stability-marked cross-zone contract (not an incidental types alias file). A convention of requiring file names to reflect actual content rather than original intent — enforced via a checklist in PR templates or a linter rule for test file names — would prevent this class of naming drift from accumulating. [info]
+- Non-executable assets (PNG images, HTML, CSS, build scripts) are assigned to import-graph zones by directory proximity rather than semantic affinity, inflating file counts and suppressing cohesion scores for the zones that contain them. Excluding these file types from zone membership calculation would give more representative cohesion and coupling metrics across web-viewer-messaging-pipeline and web-application-core without requiring any source code changes. [info]
+- Raise MIN_INTEGRATION_FILES in integration-coverage-policy.test.js from 5 to 6 to restore the proportional-ratio clause as an independent enforcement mechanism; at current E2E suite size (20 test files) the ratio floor equals the minimum, making the ratio check redundant until the E2E suite grows by 14 more files [info]
+- ... and 50 more
 
 ## Next Steps
 
@@ -419,89 +456,99 @@ Prioritized work items derived from analysis:
 
 1. **Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files —…**
 
-1. **High coupling (0.75) — 7 imports target "rex-domain-core"**
+1. **hench-runs.ts (751 lines) imports ActiveTasksPanel, Concurr… (+1 related)**
+   Files: `packages/web/src/viewer/components/active-tasks-panel.ts`, `packages/web/src/viewer/components/concurrency-panel.ts`, `packages/web/src/viewer/components/memory-panel.ts`
+
+1. **With only 2 production files and no independent domain weight, the fix command …**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
+
+1. **The fix command zone has net zero structural contribution beyond delegation — w…**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
+
+1. **rex-fix-command is the only rex zone with BOTH low cohesion (0.25) AND high cou…**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
+
+1. **High coupling (0.75) — 7 imports target "rex-prd-engine"**
    Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
 
 1. **Low cohesion (0.25) — files are loosely related, consider splitting this zone**
    Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
 
-1. **Low cohesion (0.25) and high coupling (0.75) are artifacts of the zone's tiny s…**
+1. **Coupling 0.75 reflects a thin command layer that delegates heavily to rex-unit …**
    Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
 
-1. **The bidirectional dependency between fix and rex-domain-core (fix imports 7 sym…**
-   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
+1. **hench-agent-monitor bypasses the web-shared foundation layer entirely (0 import…**
+   Files: `packages/web/src/viewer/components/active-tasks-panel.ts`, `packages/web/src/viewer/components/concurrency-panel.ts`, `packages/web/src/viewer/components/memory-panel.ts`
 
-1. **High coupling (0.6) — 5 imports target "web-application-core"**
-   Files: `packages/web/src/viewer/hooks/use-route-state.ts`, `packages/web/src/viewer/route-state.ts`, `packages/web/tests/unit/viewer/route-state.test.ts`
-
-1. **Coupling of 0.6 is at the warning threshold: route → web-viewer (5 imports) and…**
-   Files: `packages/web/src/viewer/hooks/use-route-state.ts`, `packages/web/src/viewer/route-state.ts`, `packages/web/tests/unit/viewer/route-state.test.ts`
+1. **Add ActiveRun (and ActiveTasksPanelProps if consumed externally) to components/…**
+   Files: `packages/web/src/viewer/components/active-tasks-panel.ts`, `packages/web/src/viewer/components/concurrency-panel.ts`, `packages/web/src/viewer/components/memory-panel.ts`
 
 ### Medium Priority
 
-1. **Cohesion of 0.44 is borderline; data-files.ts and node-culler.ts serve differen…**
+1. **No policy test currently verifies that web-viewer's 2 inbou… (+1 related)**
+   Files: `packages/web/src/viewer/crash/crash-detector.ts`, `packages/web/src/viewer/crash/index.ts`, `packages/web/tests/helpers/crash-detector-test-support.ts`
+
+1. **rex package bundles .rex/ operational state (prd.json, execution-log.jsonl) in …**
+   Files: `packages/rex/.claude/settings.local.json`, `packages/rex/.rex/config.json`, `packages/rex/.rex/execution-log.jsonl`
+
+1. **crash-detector-test-support.ts re-declares constants (storage keys, loop thresh…**
+   Files: `packages/web/src/viewer/crash/crash-detector.ts`, `packages/web/src/viewer/crash/index.ts`, `packages/web/tests/helpers/crash-detector-test-support.ts`
+
+1. **web-shared exposes a complete barrel (index.ts) but the existing boundary-check…**
    Files: `packages/web/src/shared/data-files.ts`, `packages/web/src/shared/index.ts`, `packages/web/src/shared/node-culler.ts`
 
-1. **God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 36 uniqu…**
+1. **God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 33 uniqu…**
 
-1. **Concurrent writes to prd.json from ndx plan and ndx work risk data corruption; …**
-   Files: `.rex/archive.json`, `.rex/config.json`, `.rex/execution-log.1.jsonl`
+1. **.rex/execution-log.jsonl is tracked by git and modified on every hench run, gen…**
+   Files: `packages/rex/.claude/settings.local.json`, `packages/rex/.rex/config.json`, `packages/rex/.rex/execution-log.jsonl`
 
-1. **File "packages/hench/src/shared/glob.ts" is pinned to zone "Autonomous Agent En…**
-   Files: `packages/hench/Hench-F.png`, `packages/hench/Hench.png`, `packages/hench/README.md`
+1. **boundary-check.test.ts should add an assertion that crash/crash-detector.ts doe…**
+   Files: `packages/web/src/viewer/crash/crash-detector.ts`, `packages/web/src/viewer/crash/index.ts`, `packages/web/tests/helpers/crash-detector-test-support.ts`
 
-1. **9 entry points — wide API surface, consider consolidating exports**
-   Files: `packages/web/SourceVision-F.png`, `packages/web/SourceVision.png`, `packages/web/build.js`
+1. **Add a boundary-check.test.ts assertion that no file in src/shared/ imports from…**
+   Files: `packages/web/src/shared/data-files.ts`, `packages/web/src/shared/index.ts`, `packages/web/src/shared/node-culler.ts`
 
-1. **Bidirectional imports between this zone and web-viewer (14 out, 20 in) indicate…**
-   Files: `packages/web/SourceVision-F.png`, `packages/web/SourceVision.png`, `packages/web/build.js`
+1. **The fix for crash-detector.ts importing ViewId is one line: change '../external…**
+   Files: `packages/web/src/shared/data-files.ts`, `packages/web/src/shared/index.ts`, `packages/web/src/shared/node-culler.ts`
 
-1. **14 entry points — wide API surface, consider consolidating exports**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/v1.ts`
-
-1. **web-server imports 1 file from this zone while this zone imports 33 from web-se…**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/v1.ts`
-
-1. **Both rex-unit → fix (1 import) and fix → rex-unit (7 imports) create a bidirect…**
-   Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/consolidation-guard.ts`
-
-1. **1 circular dependency chain detected — see imports.json for details**
+1. **Rex dogfoods its own PRD tooling by storing .rex/ state inside the package dire…**
+   Files: `packages/rex/.claude/settings.local.json`, `packages/rex/.rex/config.json`, `packages/rex/.rex/execution-log.jsonl`
 
 ### Low Priority
 
 1. **Hub function: walkTree in packages/rex/src/core/tree.ts is called from 30 files…**
 
+1. **Zone ID 'rex-fix-command' is abbreviated to 'fix' in cross-zone edge labels, cr…**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
+
 1. **Zone "Rex Fix Command" (rex-fix-command) has catastrophic risk (score: 0.75, co…**
    Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/core/fix.ts`, `packages/rex/tests/unit/cli/commands/fix.test.ts`
 
-1. **Potentially unused export: simpleGlobMatch in packages/hench/src/shared/glob.ts…**
+1. **Zone "Hench Agent Monitor" (hench-agent-monitor) has catastrophic risk (score: …**
+   Files: `packages/web/src/viewer/components/active-tasks-panel.ts`, `packages/web/src/viewer/components/concurrency-panel.ts`, `packages/web/src/viewer/components/memory-panel.ts`
 
-1. **Zone "rex-package-assets" has files across 5 directories — consider consolidati…**
+1. **Potentially unused export: getAggregationCacheInstance in packages/web/src/serv…**
+
+1. **Zone "Rex Package Metadata" (rex-package-metadata) has at-risk risk (score: 0.5…**
    Files: `packages/rex/.claude/settings.local.json`, `packages/rex/.rex/config.json`, `packages/rex/.rex/execution-log.jsonl`
 
-1. **Zone "Rex Package Assets" (rex-package-assets) has at-risk risk (score: 0.50, c…**
-   Files: `packages/rex/.claude/settings.local.json`, `packages/rex/.rex/config.json`, `packages/rex/.rex/execution-log.jsonl`
-
-1. **Zone "Landing Page Assets" (landing-page-assets) has at-risk risk (score: 0.50,…**
-   Files: `packages/web/src/landing/index.html`, `packages/web/src/landing/landing.css`
+1. **Zone "PRD Runtime State" (prd-runtime-state) has at-risk risk (score: 0.50, coh…**
+   Files: `.rex/archive.json`, `.rex/config.json`, `.rex/execution-log.1.jsonl`
 
 1. **Zone "Project Documentation" (project-documentation) has at-risk risk (score: 0…**
    Files: `docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md`, `docs/analysis/memory-risks-and-flaws.md`, `docs/analysis/process-lifecycle-audit.md`
 
-1. **Zone "Rex Runtime State" (rex-runtime-state) has at-risk risk (score: 0.50, coh…**
-   Files: `.rex/archive.json`, `.rex/config.json`, `.rex/execution-log.1.jsonl`
-
-1. **Zone "Viewer App Shell" (viewer-app-shell) has at-risk risk (score: 0.50, cohes…**
+1. **Zone "Viewer Entry Assets" (viewer-entry-assets) has at-risk risk (score: 0.50,…**
    Files: `packages/web/src/viewer/darkmode_logo.png`, `packages/web/src/viewer/index.html`, `packages/web/src/viewer/lightmode_logo.png`
 
-1. **Zone "viewer-shell-assets" has files across 11 directories — consider consolida…**
+1. **Zone "web-viewer-messaging-pipeline" has files across 11 directories — consider…**
    Files: `packages/web/SourceVision-F.png`, `packages/web/SourceVision.png`, `packages/web/build.js`
 
 ## File Inventory
 
 | Path | Role | Archetype | Zone |
 |------|------|-----------|------|
-| `.DS_Store` | other |  | monorepo-config |
+| `.DS_Store` | other |  | monorepo-root |
 | `.claude/skills/capture/SKILL.md` | docs |  |  |
 | `.claude/skills/configure/SKILL.md` | docs |  |  |
 | `.claude/skills/plan/SKILL.md` | docs |  |  |
@@ -509,25 +556,26 @@ Prioritized work items derived from analysis:
 | `.claude/skills/work/SKILL.md` | docs |  |  |
 | `.claude/skills/zone/SKILL.md` | docs |  |  |
 | `.github/workflows/ci.yml` | build |  |  |
-| `.gitignore` | config |  | monorepo-config |
+| `.gitignore` | config |  | monorepo-root |
 | `.hench/config.json` | other |  |  |
-| `.npmrc` | config |  | monorepo-config |
-| `.rex/archive.json` | other |  | rex-runtime-state |
-| `.rex/config.json` | other |  | rex-runtime-state |
-| `.rex/execution-log.1.jsonl` | other |  | rex-runtime-state |
-| `.rex/execution-log.jsonl` | other |  | rex-runtime-state |
-| `.rex/prd.json` | other |  | rex-runtime-state |
-| `.rex/workflow.md` | docs |  | rex-runtime-state |
-| `CLAUDE.md` | docs |  | monorepo-config |
-| `CODEX.md` | docs |  | monorepo-config |
-| `CODE_OF_CONDUCT.md` | docs |  | monorepo-config |
-| `ENFORCEMENT.md` | docs |  | monorepo-config |
-| `PACKAGE_GUIDELINES.md` | docs |  | monorepo-config |
-| `README.md` | docs |  | monorepo-config |
-| `ci.js` | source | entrypoint | monorepo-config |
-| `claude-integration.js` | source | service | monorepo-config |
-| `cli.js` | source | entrypoint | monorepo-config |
-| `config.js` | source | config | monorepo-config |
+| `.npmrc` | config |  | monorepo-root |
+| `.rex/archive.json` | other |  | prd-runtime-state |
+| `.rex/config.json` | other |  | prd-runtime-state |
+| `.rex/execution-log.1.jsonl` | other |  | prd-runtime-state |
+| `.rex/execution-log.jsonl` | other |  | prd-runtime-state |
+| `.rex/prd.json` | other |  | prd-runtime-state |
+| `.rex/workflow.md` | docs |  | prd-runtime-state |
+| `CLAUDE.md` | docs |  | monorepo-root |
+| `CODEX.md` | docs |  | monorepo-root |
+| `CODE_OF_CONDUCT.md` | docs |  | monorepo-root |
+| `ENFORCEMENT.md` | docs |  | monorepo-root |
+| `PACKAGE_GUIDELINES.md` | docs |  | monorepo-root |
+| `README.md` | docs |  | monorepo-root |
+| `TESTING.md` | docs |  | monorepo-root |
+| `ci.js` | source | entrypoint | monorepo-root |
+| `claude-integration.js` | source | service | monorepo-root |
+| `cli.js` | source | entrypoint | monorepo-root |
+| `config.js` | source | config | monorepo-root |
 | `docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md` | docs |  | project-documentation |
 | `docs/analysis/memory-risks-and-flaws.md` | docs |  | project-documentation |
 | `docs/analysis/process-lifecycle-audit.md` | docs |  | project-documentation |
@@ -544,465 +592,467 @@ Prioritized work items derived from analysis:
 | `docs/process/memory-improvements.md` | docs |  | project-documentation |
 | `docs/process/memory-os-behavior.md` | docs |  | project-documentation |
 | `docs/process/rex-smart-add-duplicate-detection.md` | docs |  | project-documentation |
-| `gateway-rules.json` | other |  | monorepo-config |
-| `help.js` | source | utility | monorepo-config |
-| `n-dx.png` | asset |  | monorepo-config |
-| `package.json` | config |  | monorepo-config |
-| `packages/hench/Hench-F.png` | asset |  | autonomous-agent-engine |
-| `packages/hench/Hench.png` | asset |  | autonomous-agent-engine |
-| `packages/hench/README.md` | docs |  | autonomous-agent-engine |
-| `packages/hench/package.json` | config |  | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/review.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/spin.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/stuck.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/summary.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/analysis/workflow.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/completion.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/agent/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/shared.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/agent/planning/brief.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/planning/prompt.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/agent/tools.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/config.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/constants.ts` | source | types | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/init.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/run.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/show.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/status.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/commands/template.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/errors.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/cli/help.ts` | source | cli-command | autonomous-agent-engine |
-| `packages/hench/src/cli/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/cli/output.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/guard/commands.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/guard/contracts.ts` | source | types | autonomous-agent-engine |
-| `packages/hench/src/guard/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/guard/paths.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/guard/policy.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | autonomous-agent-engine |
-| `packages/hench/src/process/concurrent-execution-metrics.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/process/exec-shell.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/process/exec.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/process/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/process/lifecycle.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/process/limiter.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/process/memory-monitor.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/process/memory-throttle.ts` | source | middleware | autonomous-agent-engine |
-| `packages/hench/src/process/pool.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/process/process-memory-tracker.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/public.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/queue/execution-queue.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/queue/format.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/queue/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/queue/priority-scheduler.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/schema/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/schema/templates.ts` | source | schema | autonomous-agent-engine |
-| `packages/hench/src/schema/v1.ts` | source | schema | autonomous-agent-engine |
-| `packages/hench/src/schema/validate.ts` | source | schema | autonomous-agent-engine |
-| `packages/hench/src/shared/glob.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/store/config.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/store/json.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/project-config.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/run-archiver.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/run-change-detector.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/run-retention-scheduler.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/run-retention.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/runs.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/suggestions.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/store/templates.ts` | source | store | autonomous-agent-engine |
-| `packages/hench/src/tools/contracts.ts` | source | types | autonomous-agent-engine |
-| `packages/hench/src/tools/dispatch.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/tools/exec-shell.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/tools/files.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/tools/git.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/tools/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/tools/rex.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/tools/shell.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/tools/test-runner.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/types/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/src/types/output.ts` | source | utility | autonomous-agent-engine |
-| `packages/hench/src/validation/completion.ts` | source | service | autonomous-agent-engine |
-| `packages/hench/src/validation/index.ts` | source | entrypoint | autonomous-agent-engine |
-| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/fixtures/token-usage-regression.json` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/review.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/spin-detection.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/help.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/cli/output.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/prd/rex-gateway.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/exec.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/pool.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/queue/format.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/store/templates.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/dispatch-memory.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/files.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/git.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | autonomous-agent-engine |
-| `packages/hench/tsconfig.json` | config |  | autonomous-agent-engine |
-| `packages/hench/vitest.config.ts` | config |  | autonomous-agent-engine |
-| `packages/llm-client/package.json` | config |  | llm-vendor-foundation |
-| `packages/llm-client/src/api-provider.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/auth.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/cli-provider.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/codex-cli-provider.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/config.ts` | source | config | llm-vendor-foundation |
-| `packages/llm-client/src/create-client.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/exec.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/help-format.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/json.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/llm-client.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/llm-config.ts` | source | config | llm-vendor-foundation |
-| `packages/llm-client/src/llm-types.ts` | source | types | llm-vendor-foundation |
-| `packages/llm-client/src/output.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/project-config.ts` | source | config | llm-vendor-foundation |
-| `packages/llm-client/src/project-dirs.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/provider-interface.ts` | source | types | llm-vendor-foundation |
-| `packages/llm-client/src/provider-registry.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/provider-session.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/public.ts` | source | entrypoint | llm-vendor-foundation |
-| `packages/llm-client/src/suggest.ts` | source | service | llm-vendor-foundation |
-| `packages/llm-client/src/token-usage.ts` | source | utility | llm-vendor-foundation |
-| `packages/llm-client/src/types.ts` | source | types | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/api-provider.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/auth.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/cli-provider.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/config.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/create-client.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/exec.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/help-format.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/json.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/llm-client.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/llm-config.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/output.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/project-config.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/provider-interface.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/provider-registry.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/provider-session.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/public-api.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/suggest.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/token-usage.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tests/unit/types.test.ts` | test |  | llm-vendor-foundation |
-| `packages/llm-client/tsconfig.json` | config |  | llm-vendor-foundation |
-| `packages/llm-client/vitest.config.ts` | config |  | llm-vendor-foundation |
-| `packages/rex/.claude/settings.local.json` | other |  | rex-package-assets |
-| `packages/rex/.rex/config.json` | other |  | rex-package-assets |
-| `packages/rex/.rex/execution-log.jsonl` | other |  | rex-package-assets |
-| `packages/rex/.rex/prd.json` | other |  | rex-package-assets |
-| `packages/rex/.rex/workflow.md` | docs |  | rex-package-assets |
-| `packages/rex/README.md` | docs |  | rex-package-assets |
-| `packages/rex/Rex-F.png` | asset |  | rex-package-assets |
-| `packages/rex/Rex.png` | asset |  | rex-package-assets |
-| `packages/rex/context.md` | docs |  | rex-package-assets |
-| `packages/rex/llms.txt` | docs |  | rex-package-assets |
-| `packages/rex/package.json` | config |  | rex-package-assets |
-| `packages/rex/src/analyze/acknowledge.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/analyze-shared.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/analyze/consolidation-guard.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/decompose.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/dedupe.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/analyze/diff.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/analyze/extract.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/file-validation.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/analyze/guided.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/index.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/analyze/llm-bridge.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/modify-reason.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/propose.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/reason.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/reconcile.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/reshape-reason.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/scanners.ts` | source | service | rex-domain-core |
-| `packages/rex/src/analyze/validate-modification.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/cli/commands/adapter.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/add.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/analyze.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/chunked-review-state.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/chunked-review.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/constants.ts` | source | types | rex-domain-core |
-| `packages/rex/src/cli/commands/decomposition-review.ts` | source | cli-command | rex-domain-core |
+| `gateway-rules.json` | other |  | monorepo-root |
+| `help.js` | source | utility | monorepo-root |
+| `n-dx.png` | asset |  | monorepo-root |
+| `package.json` | config |  | monorepo-root |
+| `packages/hench/Hench-F.png` | asset |  | hench-agent |
+| `packages/hench/Hench.png` | asset |  | hench-agent |
+| `packages/hench/README.md` | docs |  | hench-agent |
+| `packages/hench/package.json` | config |  | hench-agent |
+| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/analysis/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/agent/analysis/review.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/analysis/spin.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/analysis/stuck.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/analysis/summary.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/analysis/workflow.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/completion.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/lifecycle/shared.ts` | source | types | hench-agent |
+| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/lifecycle/token-budget.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/lifecycle/token-usage.ts` | source | utility | hench-agent |
+| `packages/hench/src/agent/planning/brief.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/planning/prompt.ts` | source | service | hench-agent |
+| `packages/hench/src/agent/tools.ts` | source | utility | hench-agent |
+| `packages/hench/src/cli/commands/config.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/constants.ts` | source | types | hench-agent |
+| `packages/hench/src/cli/commands/init.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/run.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/show.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/status.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/commands/template.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/errors.ts` | source | utility | hench-agent |
+| `packages/hench/src/cli/help.ts` | source | cli-command | hench-agent |
+| `packages/hench/src/cli/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/cli/output.ts` | source | utility | hench-agent |
+| `packages/hench/src/guard/commands.ts` | source | utility | hench-agent |
+| `packages/hench/src/guard/contracts.ts` | source | types | hench-agent |
+| `packages/hench/src/guard/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/guard/paths.ts` | source | utility | hench-agent |
+| `packages/hench/src/guard/policy.ts` | source | utility | hench-agent |
+| `packages/hench/src/prd/llm-gateway.ts` | source | gateway | hench-agent |
+| `packages/hench/src/prd/rex-gateway.ts` | source | gateway | hench-agent |
+| `packages/hench/src/process/concurrent-execution-metrics.ts` | source | utility | hench-agent |
+| `packages/hench/src/process/exec-shell.ts` | source | utility | hench-agent |
+| `packages/hench/src/process/exec.ts` | source | utility | hench-agent |
+| `packages/hench/src/process/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/process/lifecycle.ts` | source | service | hench-agent |
+| `packages/hench/src/process/limiter.ts` | source | utility | hench-agent |
+| `packages/hench/src/process/memory-monitor.ts` | source | service | hench-agent |
+| `packages/hench/src/process/memory-throttle.ts` | source | utility | hench-agent |
+| `packages/hench/src/process/pool.ts` | source | service | hench-agent |
+| `packages/hench/src/process/process-memory-tracker.ts` | source | service | hench-agent |
+| `packages/hench/src/public.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/queue/execution-queue.ts` | source | service | hench-agent |
+| `packages/hench/src/queue/format.ts` | source | utility | hench-agent |
+| `packages/hench/src/queue/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | service | hench-agent |
+| `packages/hench/src/schema/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/schema/templates.ts` | source | schema | hench-agent |
+| `packages/hench/src/schema/v1.ts` | source | schema | hench-agent |
+| `packages/hench/src/schema/validate.ts` | source | schema | hench-agent |
+| `packages/hench/src/store/config.ts` | source | store | hench-agent |
+| `packages/hench/src/store/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/store/json.ts` | source | store | hench-agent |
+| `packages/hench/src/store/project-config.ts` | source | store | hench-agent |
+| `packages/hench/src/store/run-archiver.ts` | source | store | hench-agent |
+| `packages/hench/src/store/run-change-detector.ts` | source | store | hench-agent |
+| `packages/hench/src/store/run-retention-scheduler.ts` | source | store | hench-agent |
+| `packages/hench/src/store/run-retention.ts` | source | store | hench-agent |
+| `packages/hench/src/store/runs.ts` | source | store | hench-agent |
+| `packages/hench/src/store/suggestions.ts` | source | store | hench-agent |
+| `packages/hench/src/store/templates.ts` | source | store | hench-agent |
+| `packages/hench/src/tools/contracts.ts` | source | types | hench-agent |
+| `packages/hench/src/tools/dispatch.ts` | source | service | hench-agent |
+| `packages/hench/src/tools/exec-shell.ts` | source | utility | hench-agent |
+| `packages/hench/src/tools/files.ts` | source | utility | hench-agent |
+| `packages/hench/src/tools/git.ts` | source | utility | hench-agent |
+| `packages/hench/src/tools/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/tools/rex.ts` | source | utility | hench-agent |
+| `packages/hench/src/tools/shell.ts` | source | utility | hench-agent |
+| `packages/hench/src/tools/test-runner.ts` | source | utility | hench-agent |
+| `packages/hench/src/types/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/src/types/output.ts` | source | utility | hench-agent |
+| `packages/hench/src/validation/completion.ts` | source | service | hench-agent |
+| `packages/hench/src/validation/index.ts` | source | entrypoint | hench-agent |
+| `packages/hench/tests/e2e/cli-init.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/fixtures/token-usage-regression.json` | test |  | hench-agent |
+| `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/integration/rex-gateway-pipeline.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/adaptive.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/api-auth.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/atomic-transition.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/brief.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/cli-retry.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/review.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/spin-detection.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/help.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/cli/output.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/prd/rex-gateway.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/exec.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/pool.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/queue/format.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/store/templates.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/completion-validation.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/dispatch-memory.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/files.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/git.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/rex.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/shell.test.ts` | test |  | hench-agent |
+| `packages/hench/tests/unit/tools/test-runner.test.ts` | test |  | hench-agent |
+| `packages/hench/tsconfig.json` | config |  | hench-agent |
+| `packages/hench/vitest.config.ts` | config |  | hench-agent |
+| `packages/llm-client/package.json` | config |  | llm-client-foundation |
+| `packages/llm-client/src/api-provider.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/auth.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/cli-provider.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/codex-cli-provider.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/config.ts` | source | config | llm-client-foundation |
+| `packages/llm-client/src/create-client.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/exec.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/help-format.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/json.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/llm-client.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/llm-config.ts` | source | config | llm-client-foundation |
+| `packages/llm-client/src/llm-types.ts` | source | types | llm-client-foundation |
+| `packages/llm-client/src/output.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/project-config.ts` | source | config | llm-client-foundation |
+| `packages/llm-client/src/project-dirs.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/provider-interface.ts` | source | types | llm-client-foundation |
+| `packages/llm-client/src/provider-registry.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/provider-session.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/public.ts` | source | entrypoint | llm-client-foundation |
+| `packages/llm-client/src/suggest.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/token-usage.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/types.ts` | source | types | llm-client-foundation |
+| `packages/llm-client/tests/unit/api-provider.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/auth.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/cli-provider.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/config.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/create-client.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/exec.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/help-format.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/json.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/llm-client.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/llm-config.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/output.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/project-config.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/provider-interface.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/provider-registry.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/provider-session.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/public-api.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/suggest.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/token-usage.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tests/unit/types.test.ts` | test |  | llm-client-foundation |
+| `packages/llm-client/tsconfig.json` | config |  | llm-client-foundation |
+| `packages/llm-client/vitest.config.ts` | config |  | llm-client-foundation |
+| `packages/rex/.claude/settings.local.json` | other |  | rex-package-metadata |
+| `packages/rex/.rex/config.json` | other |  | rex-package-metadata |
+| `packages/rex/.rex/execution-log.jsonl` | other |  | rex-package-metadata |
+| `packages/rex/.rex/prd.json` | other |  | rex-package-metadata |
+| `packages/rex/.rex/workflow.md` | docs |  | rex-package-metadata |
+| `packages/rex/README.md` | docs |  | rex-package-metadata |
+| `packages/rex/Rex-F.png` | asset |  | rex-package-metadata |
+| `packages/rex/Rex.png` | asset |  | rex-package-metadata |
+| `packages/rex/context.md` | docs |  | rex-package-metadata |
+| `packages/rex/llms.txt` | docs |  | rex-package-metadata |
+| `packages/rex/package.json` | config |  | rex-package-metadata |
+| `packages/rex/src/analyze/acknowledge.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/analyze-shared.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/analyze/consolidation-guard.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/decompose.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/dedupe.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/analyze/diff.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/analyze/extract.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/file-validation.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/analyze/guided.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/index.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/analyze/llm-bridge.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/modify-reason.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/propose.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/reason.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/reconcile.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/reshape-reason.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/scanners.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/validate-modification.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/cli/commands/adapter.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/add.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/analyze.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/chunked-review-state.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/chunked-review.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/constants.ts` | source | types | rex-prd-engine |
+| `packages/rex/src/cli/commands/decomposition-review.ts` | source | cli-command | rex-prd-engine |
 | `packages/rex/src/cli/commands/fix.ts` | source | cli-command | rex-fix-command |
-| `packages/rex/src/cli/commands/format-loe.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/health.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/init.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/move.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/next.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/prune.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/recommend.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/remove.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/reorganize.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/report.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/reshape.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/smart-add-duplicates.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/smart-add.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/status-sections.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/status-shared.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/status.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/sync.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/token-format.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/update.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/usage.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/validate-interactive.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/validate.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/commands/verify.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/errors.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/cli/help.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/cli/index.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/cli/mcp-tools.ts` | source | service | rex-domain-core |
-| `packages/rex/src/cli/mcp.ts` | source | cli-command | rex-domain-core |
-| `packages/rex/src/cli/output.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/cli/validate-input.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/analytics.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/canonical.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/cascade-reset.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/code-coverage.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/dag.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/delete.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/epic-correlation.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/facets.ts` | source | utility | rex-domain-core |
+| `packages/rex/src/cli/commands/format-loe.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/health.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/init.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/move.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/next.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/prune.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/recommend.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/remove.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/reorganize.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/report.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/reshape.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/smart-add-duplicates.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/smart-add.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/status-sections.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/status-shared.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/status.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/sync.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/token-format.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/update.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/usage.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/validate-interactive.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/validate.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/commands/verify.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/errors.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/cli/help.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/cli/index.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/cli/mcp-tools.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/cli/mcp.ts` | source | cli-command | rex-prd-engine |
+| `packages/rex/src/cli/output.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/cli/validate-input.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/analytics.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/canonical.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/cascade-reset.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/code-coverage.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/dag.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/delete.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/epic-correlation.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/facets.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/core/fix.ts` | source | utility | rex-fix-command |
-| `packages/rex/src/core/health.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/keywords.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/merge.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/move.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/next-task.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/override-escalation.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/parent-completion.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/parent-reset.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/pending-cache.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/prune.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/remove-epic.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/remove-feature.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/remove-task.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/reorganize-executor.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/reorganize.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/requirements.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/reshape.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/scope-creep.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/stats.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/structural.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/sync-engine.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/sync.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/timestamps.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/token-usage.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/transitions.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/tree.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/core/verify.ts` | source | utility | rex-domain-core |
-| `packages/rex/src/public.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/recommend/conflict-detection.ts` | source | service | rex-domain-core |
-| `packages/rex/src/recommend/create-from-recommendations.ts` | source | service | rex-domain-core |
-| `packages/rex/src/recommend/types.ts` | source | types | rex-domain-core |
-| `packages/rex/src/schema/index.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/schema/levels.ts` | source | schema | rex-domain-core |
-| `packages/rex/src/schema/v1.ts` | source | schema | rex-domain-core |
-| `packages/rex/src/schema/validate.ts` | source | schema | rex-domain-core |
-| `packages/rex/src/store/adapter-registry.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/atomic-write.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/contracts.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/file-adapter.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/index.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/store/integration-schema.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/integration-schemas/index.ts` | source | entrypoint | rex-domain-core |
-| `packages/rex/src/store/integration-schemas/jira.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/integration-schemas/notion.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/notion-adapter.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/notion-client.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/notion-map.ts` | source | store | rex-domain-core |
-| `packages/rex/src/store/project-config.ts` | source | store | rex-domain-core |
-| `packages/rex/src/workflow/default.ts` | source | config | rex-domain-core |
-| `packages/rex/tests/e2e/cli-adapter.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-analyze.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-import.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-init.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/e2e/cli-prune.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-quiet.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-recommend.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-smart-add.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-sync.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/cli-workflow.test.ts` | test |  | rex-cli-e2e-tests |
-| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/config.json` | test |  | rex-package-assets |
-| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl` | test |  | rex-package-assets |
-| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/prd.json` | test |  | rex-package-assets |
-| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/workflow.md` | test |  | rex-package-assets |
-| `packages/rex/tests/fixtures/token-usage-regression.json` | test |  | rex-package-assets |
-| `packages/rex/tests/integration/claude-config.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/cli/commands/prune-cache.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/project-config.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/smart-add-orphaned-parent.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/integration/store-roundtrip.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/acknowledge.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/consolidation-guard.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/decompose.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/dedupe.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/diff.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/extract-llm-mock.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/extract-llm.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/extract-text.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/extract.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/file-validation.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/guided.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/loe-proposal-schema.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/modify-reason.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/propose.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-assessment.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-batch.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-description.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-granularity.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-ideas.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason-multi-description.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reason.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/reconcile.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/scanners-acknowledge.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/scanners.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/token-tracking.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/analyze/validate-modification.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/add.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/analyze-guided.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/chunked-review.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/decomposition-review.test.ts` | test |  | rex-domain-core |
+| `packages/rex/src/core/health.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/keywords.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/merge.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/move.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/next-task.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/override-escalation.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/parent-completion.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/parent-reset.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/pending-cache.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/prune.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/remove-epic.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/remove-feature.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/remove-task.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/reorganize-executor.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/reorganize.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/requirements.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/reshape.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/scope-creep.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/stats.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/structural.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/sync-engine.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/sync.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/timestamps.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/token-usage.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/transitions.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/tree.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/core/verify.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/public.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/recommend/conflict-detection.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/recommend/create-from-recommendations.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/recommend/types.ts` | source | types | rex-prd-engine |
+| `packages/rex/src/schema/index.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/schema/levels.ts` | source | schema | rex-prd-engine |
+| `packages/rex/src/schema/v1.ts` | source | schema | rex-prd-engine |
+| `packages/rex/src/schema/validate.ts` | source | schema | rex-prd-engine |
+| `packages/rex/src/store/adapter-registry.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/atomic-write.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/contracts.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/file-adapter.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/index.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/store/integration-schema.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/integration-schemas/index.ts` | source | entrypoint | rex-prd-engine |
+| `packages/rex/src/store/integration-schemas/jira.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/integration-schemas/notion.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/notion-adapter.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/notion-client.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/notion-map.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/store/project-config.ts` | source | store | rex-prd-engine |
+| `packages/rex/src/workflow/default.ts` | source | config | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-adapter.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-analyze.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-import.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-init.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-prune.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-quiet.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-recommend.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-smart-add.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-sync.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/cli-workflow.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/config.json` | test |  | rex-e2e-fixtures |
+| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl` | test |  | rex-e2e-fixtures |
+| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/prd.json` | test |  | rex-e2e-fixtures |
+| `packages/rex/tests/e2e/fixtures/sample-prd/.rex/workflow.md` | test |  | rex-e2e-fixtures |
+| `packages/rex/tests/fixtures/token-usage-regression.json` | test |  | rex-package-metadata |
+| `packages/rex/tests/integration/claude-config.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/cli/commands/prune-cache.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/project-config.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/smart-add-duplicate-outcomes.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/smart-add-orphaned-parent.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/store-roundtrip.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/integration/store-tree-selection.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/acknowledge.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/consolidation-guard.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/decompose.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/dedupe.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/diff.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/extract-llm-mock.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/extract-llm.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/extract-text.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/extract.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/file-validation.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/guided.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/loe-proposal-schema.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/modify-reason.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/propose.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-assessment.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-batch.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-description.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-granularity.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-ideas.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason-multi-description.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reason.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/reconcile.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/scanners-acknowledge.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/scanners.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/token-tracking.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/analyze/validate-modification.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/add.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/analyze-guided.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/chunked-review.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/decomposition-review.test.ts` | test |  | rex-prd-engine |
 | `packages/rex/tests/unit/cli/commands/fix.test.ts` | test |  | rex-fix-command |
-| `packages/rex/tests/unit/cli/commands/format-loe.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/loe-display.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/move.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/recommend.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/remove.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/report.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/smart-add-duplicates.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/smart-add-merge.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/smart-add.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/status.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/sync.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/update.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/usage.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/validate-epicless.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/validate-interactive.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/validate.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/commands/verify.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/edit-item.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/errors.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/help.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/mcp.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/output.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/cli/validate-input.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/canonical.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/dag.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/epic-correlation.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/epicless.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/facets.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/feature-filtered-task.test.ts` | test |  | rex-domain-core |
+| `packages/rex/tests/unit/cli/commands/format-loe.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/loe-display.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/move.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/recommend.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/remove.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/report.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/smart-add-duplicates.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/smart-add-merge.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/smart-add.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/status.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/sync.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/update.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/usage.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/validate-epicless.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/validate-interactive.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/validate.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/commands/verify.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/edit-item.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/errors.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/help.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/mcp.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/output.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/cli/validate-input.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/canonical.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/dag.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/epic-correlation.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/epicless.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/facets.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/feature-filtered-task.test.ts` | test |  | rex-prd-engine |
 | `packages/rex/tests/unit/core/fix.test.ts` | test |  | rex-fix-command |
-| `packages/rex/tests/unit/core/health.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/keywords.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/merge.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/move.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/next-task-matching.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/next-task-scoring.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/next-task.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/notion-map.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/override-escalation.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/parent-completion.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/parent-reset.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/pending-cache.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/prune.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/remove-epic.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/remove-feature.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/remove-task.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/reorganize-executor.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/reorganize.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/requirements-prioritization.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/requirements.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/structural.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/sync-engine.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/sync.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/timestamps.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/token-usage-regression.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/token-usage.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/transitions.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/tree-hardened.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/tree.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/core/verify.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/recommend/conflict-detection.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/recommend/create-from-recommendations.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/schema/schema-version.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/schema/validate.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/adapter-registry.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/atomic-write.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/file-adapter.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/integration-schema.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/notion-adapter.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/notion-client.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/resolve-store.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tests/unit/store/store-contract.test.ts` | test |  | rex-domain-core |
-| `packages/rex/tsconfig.json` | config |  | rex-package-assets |
-| `packages/rex/vitest.config.ts` | config |  | rex-package-assets |
-| `packages/sourcevision/.claude/settings.json` | other |  | autonomous-agent-engine |
-| `packages/sourcevision/.claude/settings.local.json` | other |  | autonomous-agent-engine |
+| `packages/rex/tests/unit/core/health.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/keywords.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/merge.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/move.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/next-task-matching.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/next-task-scoring.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/next-task.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/notion-map.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/override-escalation.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/parent-completion.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/parent-reset.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/pending-cache.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/prune.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/remove-epic.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/remove-feature.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/remove-task.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/reorganize-executor.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/reorganize.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/requirements-prioritization.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/requirements.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/structural.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/sync-engine.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/sync.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/timestamps.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/token-usage-regression.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/token-usage.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/transitions.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/tree-hardened.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/tree.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/core/verify.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/recommend/conflict-detection.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/recommend/create-from-recommendations.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/schema/schema-version.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/schema/validate.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/adapter-registry.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/atomic-write.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/file-adapter.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/integration-schema.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/notion-adapter.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/notion-client.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/resolve-store.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tests/unit/store/store-contract.test.ts` | test |  | rex-prd-engine |
+| `packages/rex/tsconfig.json` | config |  | rex-package-metadata |
+| `packages/rex/vitest.config.ts` | config |  | rex-package-metadata |
+| `packages/sourcevision/.claude/settings.json` | other |  | hench-agent |
+| `packages/sourcevision/.claude/settings.local.json` | other |  | hench-agent |
 | `packages/sourcevision/ARCHITECTURE.md` | docs |  | sourcevision-analysis-engine |
 | `packages/sourcevision/README.md` | docs |  | sourcevision-analysis-engine |
 | `packages/sourcevision/SourceVision-F.png` | asset |  | sourcevision-analysis-engine |
@@ -1013,17 +1063,17 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/branch-work-classifier.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/branch-work-collector.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/branch-work-filter.ts` | source | utility | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/branch-work-store.ts` | source | store | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/callgraph-findings.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/branch-work-store.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/callgraph-findings.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/callgraph.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/classify.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/claude-client.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/components.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/context.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/convergence.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-batch.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/enrich-config.ts` | source | types | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/enrich-config.ts` | source | config | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-parsing.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich.ts` | source | service | sourcevision-analysis-engine |
@@ -1032,9 +1082,9 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/inventory.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/llms-txt.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/louvain.ts` | source | utility | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/manifest.ts` | source | store | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/move-recommendations.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/next-steps.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/manifest.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/move-recommendations.ts` | source | utility | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/next-steps.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/risk-scoring.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/route-detection.ts` | source | route-handler | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | utility | sourcevision-analysis-engine |
@@ -1057,7 +1107,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/cli/commands/validate.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/commands/workspace.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/errors.ts` | source | utility | sourcevision-analysis-engine |
-| `packages/sourcevision/src/cli/help.ts` | source | utility | sourcevision-analysis-engine |
+| `packages/sourcevision/src/cli/help.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/index.ts` | source | entrypoint | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/mcp.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/output.ts` | source | utility | sourcevision-analysis-engine |
@@ -1146,35 +1196,35 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/tests/unit/util/sort.test.ts` | test |  | sourcevision-analysis-engine |
 | `packages/sourcevision/tsconfig.json` | config |  | sourcevision-analysis-engine |
 | `packages/sourcevision/vitest.config.ts` | config |  | sourcevision-analysis-engine |
-| `packages/web/SourceVision-F.png` | asset |  | viewer-shell-assets |
-| `packages/web/SourceVision.png` | asset |  | viewer-shell-assets |
-| `packages/web/build.js` | source | config | viewer-shell-assets |
-| `packages/web/dev.js` | source | config | viewer-shell-assets |
-| `packages/web/package.json` | config |  | viewer-shell-assets |
+| `packages/web/SourceVision-F.png` | asset |  | web-viewer-messaging-pipeline |
+| `packages/web/SourceVision.png` | asset |  | web-viewer-messaging-pipeline |
+| `packages/web/build.js` | source | config | web-viewer-messaging-pipeline |
+| `packages/web/dev.js` | source | config | web-viewer-messaging-pipeline |
+| `packages/web/package.json` | config |  | web-viewer-messaging-pipeline |
 | `packages/web/src/cli/index.ts` | source | entrypoint | web-application-core |
-| `packages/web/src/landing/index.html` | other |  | landing-page-assets |
-| `packages/web/src/landing/landing.css` | other |  | landing-page-assets |
-| `packages/web/src/landing/landing.ts` | source | page | viewer-shell-assets |
+| `packages/web/src/landing/index.html` | other |  | web-application-core |
+| `packages/web/src/landing/landing.css` | other |  | web-application-core |
+| `packages/web/src/landing/landing.ts` | source | service | web-landing-page |
 | `packages/web/src/public.ts` | source | entrypoint | web-application-core |
 | `packages/web/src/schema/v1.ts` | source | schema | web-application-core |
 | `packages/web/src/server/aggregation-cache.ts` | source | service | web-application-core |
 | `packages/web/src/server/concurrent-execution-metrics.ts` | source | service | web-application-core |
-| `packages/web/src/server/domain-gateway.ts` | source | gateway | task-usage-analytics |
-| `packages/web/src/server/incremental-task-usage.ts` | source | service | task-usage-analytics |
+| `packages/web/src/server/domain-gateway.ts` | source | gateway | web-task-usage-scheduler |
+| `packages/web/src/server/incremental-task-usage.ts` | source | service | web-task-usage-scheduler |
 | `packages/web/src/server/index.ts` | source | entrypoint | web-application-core |
 | `packages/web/src/server/port.ts` | source | utility | web-application-core |
 | `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | service | web-application-core |
 | `packages/web/src/server/prd-io.ts` | source | service | web-application-core |
 | `packages/web/src/server/process-memory-tracker.ts` | source | service | web-application-core |
-| `packages/web/src/server/register-scheduler.ts` | source | service | task-usage-analytics |
-| `packages/web/src/server/rex-gateway.ts` | source | gateway | task-usage-analytics |
+| `packages/web/src/server/register-scheduler.ts` | source | service | web-task-usage-scheduler |
+| `packages/web/src/server/rex-gateway.ts` | source | gateway | web-task-usage-scheduler |
 | `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-config.ts` | source | route-handler | web-application-core |
-| `packages/web/src/server/routes-data.ts` | source | route-handler | data-loading-routes |
+| `packages/web/src/server/routes-data.ts` | source | route-handler | web-data-routes |
 | `packages/web/src/server/routes-features.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-hench.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-integrations.ts` | source | route-handler | web-application-core |
-| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-application-core |
+| `packages/web/src/server/routes-mcp.ts` | source | route-handler | web-viewer-messaging-pipeline |
 | `packages/web/src/server/routes-notion.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-project.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-rex/analysis.ts` | source | route-handler | web-application-core |
@@ -1194,19 +1244,21 @@ Prioritized work items derived from analysis:
 | `packages/web/src/server/routes-validation.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/routes-workflow.ts` | source | route-handler | web-application-core |
 | `packages/web/src/server/search-index.ts` | source | service | web-application-core |
-| `packages/web/src/server/shared-types.ts` | source | types | task-usage-analytics |
-| `packages/web/src/server/start.ts` | source | service | web-application-core |
-| `packages/web/src/server/task-usage.ts` | source | service | task-usage-analytics |
+| `packages/web/src/server/shared-types.ts` | source | types | web-task-usage-scheduler |
+| `packages/web/src/server/start.ts` | source | entrypoint | web-application-core |
+| `packages/web/src/server/task-usage.ts` | source | gateway | web-task-usage-scheduler |
 | `packages/web/src/server/types.ts` | source | types | web-application-core |
-| `packages/web/src/server/usage-cleanup-scheduler.ts` | source | service | task-usage-analytics |
+| `packages/web/src/server/usage-cleanup-scheduler.ts` | source | service | web-task-usage-scheduler |
 | `packages/web/src/server/websocket.ts` | source | service | web-application-core |
-| `packages/web/src/shared/data-files.ts` | source | utility | web-shared-utilities |
-| `packages/web/src/shared/index.ts` | source | entrypoint | web-shared-utilities |
-| `packages/web/src/shared/node-culler.ts` | source | utility | web-shared-utilities |
+| `packages/web/src/shared/data-files.ts` | source | types | web-shared |
+| `packages/web/src/shared/index.ts` | source | entrypoint | web-shared |
+| `packages/web/src/shared/node-culler.ts` | source | utility | web-shared |
+| `packages/web/src/shared/view-id.ts` | source | types | web-shared |
+| `packages/web/src/viewer/api.ts` | source | gateway | web-application-core |
 | `packages/web/src/viewer/bootstrap.ts` | source | entrypoint | web-application-core |
-| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | web-application-core |
+| `packages/web/src/viewer/components/active-tasks-panel.ts` | source | component | hench-agent-monitor |
 | `packages/web/src/viewer/components/breadcrumb.ts` | source | component | web-application-core |
-| `packages/web/src/viewer/components/concurrency-panel.ts` | source | component | web-application-core |
+| `packages/web/src/viewer/components/concurrency-panel.ts` | source | component | hench-agent-monitor |
 | `packages/web/src/viewer/components/config-footer.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/constants.ts` | source | types | web-application-core |
 | `packages/web/src/viewer/components/copy-link-button.ts` | source | component | web-application-core |
@@ -1222,10 +1274,10 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/components/elapsed-time.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/faq.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/favicon.ts` | source | component | web-application-core |
-| `packages/web/src/viewer/components/guide.ts` | source | component | viewer-shell-assets |
+| `packages/web/src/viewer/components/guide.ts` | source | component | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/components/index.ts` | source | entrypoint | web-application-core |
 | `packages/web/src/viewer/components/logos.ts` | source | component | web-application-core |
-| `packages/web/src/viewer/components/memory-panel.ts` | source | component | web-application-core |
+| `packages/web/src/viewer/components/memory-panel.ts` | source | component | hench-agent-monitor |
 | `packages/web/src/viewer/components/memory-warning.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/notion-schema-wizard.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/polling-suspension-indicator.ts` | source | component | web-application-core |
@@ -1251,7 +1303,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/components/prd-tree/prune-diff-tree.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/prd-tree/reorganize-panel.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/prd-tree/smart-add-input.ts` | source | component | web-application-core |
-| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | viewer-shell-assets |
+| `packages/web/src/viewer/components/prd-tree/status-filter.ts` | source | component | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/components/prd-tree/task-detail.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/prd-tree/task-utilization.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/prd-tree/tree-differ.ts` | source | component | web-application-core |
@@ -1270,13 +1322,13 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/components/throttle-controls.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/ws-health-panel.ts` | source | component | web-application-core |
 | `packages/web/src/viewer/components/zone-slideout.ts` | source | component | web-application-core |
-| `packages/web/src/viewer/crash/crash-detector.ts` | source | utility | web-application-core |
-| `packages/web/src/viewer/crash/index.ts` | source | entrypoint | web-application-core |
-| `packages/web/src/viewer/darkmode_logo.png` | asset |  | viewer-app-shell |
+| `packages/web/src/viewer/crash/crash-detector.ts` | source | service | viewer-crash-recovery |
+| `packages/web/src/viewer/crash/index.ts` | source | entrypoint | viewer-crash-recovery |
+| `packages/web/src/viewer/darkmode_logo.png` | asset |  | viewer-entry-assets |
 | `packages/web/src/viewer/external.ts` | source | gateway | web-application-core |
-| `packages/web/src/viewer/graph/index.ts` | source | entrypoint | viewer-shell-assets |
-| `packages/web/src/viewer/graph/physics.ts` | source | utility | viewer-shell-assets |
-| `packages/web/src/viewer/graph/renderer.ts` | source | service | viewer-shell-assets |
+| `packages/web/src/viewer/graph/index.ts` | source | entrypoint | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/graph/physics.ts` | source | utility | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/graph/renderer.ts` | source | utility | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/hooks/use-app-data.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-crash-recovery.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-delete-actions.ts` | source | hook | web-application-core |
@@ -1298,41 +1350,40 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/hooks/use-project-metadata.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-project-status.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-refresh-throttle.ts` | source | hook | web-application-core |
-| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | viewer-route-state |
+| `packages/web/src/viewer/hooks/use-route-state.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-subzone-edges.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-tab-visibility.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-tick.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-toast.ts` | source | hook | web-application-core |
 | `packages/web/src/viewer/hooks/use-zone-drag.ts` | source | hook | web-application-core |
-| `packages/web/src/viewer/index.html` | other |  | viewer-app-shell |
-| `packages/web/src/viewer/lightmode_logo.png` | asset |  | viewer-app-shell |
+| `packages/web/src/viewer/index.html` | other |  | viewer-entry-assets |
+| `packages/web/src/viewer/lightmode_logo.png` | asset |  | viewer-entry-assets |
 | `packages/web/src/viewer/loader.ts` | source | service | web-application-core |
 | `packages/web/src/viewer/main.ts` | source | entrypoint | web-application-core |
-| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | middleware | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | service | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/index.ts` | source | entrypoint | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | middleware | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/message-throttle.ts` | source | middleware | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/request-dedup.ts` | source | utility | viewer-shell-assets |
-| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | service | viewer-shell-assets |
-| `packages/web/src/viewer/performance/crash-detector.ts` | source | utility | web-application-core |
-| `packages/web/src/viewer/performance/dom-performance-monitor.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/index.ts` | source | entrypoint | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/message-throttle.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/request-dedup.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | middleware | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/performance/dom-performance-monitor.ts` | source | service | web-application-core |
 | `packages/web/src/viewer/performance/dom-update-gate.ts` | source | utility | web-application-core |
-| `packages/web/src/viewer/performance/graceful-degradation.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/performance/graceful-degradation.ts` | source | service | web-application-core |
 | `packages/web/src/viewer/performance/index.ts` | source | entrypoint | web-application-core |
-| `packages/web/src/viewer/performance/memory-monitor.ts` | source | utility | web-application-core |
-| `packages/web/src/viewer/performance/refresh-throttle.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/performance/memory-monitor.ts` | source | service | web-application-core |
+| `packages/web/src/viewer/performance/refresh-throttle.ts` | source | service | web-application-core |
 | `packages/web/src/viewer/performance/response-buffer-gate.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/performance/update-batcher.ts` | source | utility | web-application-core |
-| `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | service | web-application-core |
+| `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/polling/index.ts` | source | entrypoint | web-application-core |
 | `packages/web/src/viewer/polling/polling-manager.ts` | source | service | web-application-core |
-| `packages/web/src/viewer/polling/polling-restart.ts` | source | service | web-application-core |
+| `packages/web/src/viewer/polling/polling-restart.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/polling/polling-state.ts` | source | store | web-application-core |
-| `packages/web/src/viewer/polling/tab-visibility.ts` | source | service | web-application-core |
-| `packages/web/src/viewer/polling/tick-timer.ts` | source | service | web-application-core |
-| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | service | web-application-core |
-| `packages/web/src/viewer/route-state.ts` | source | route-handler | viewer-route-state |
+| `packages/web/src/viewer/polling/tab-visibility.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/polling/tick-timer.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | utility | web-application-core |
+| `packages/web/src/viewer/route-state.ts` | source | route-handler | web-application-core |
 | `packages/web/src/viewer/schema-compat.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/styles/a11y.css` | other |  | web-application-core |
 | `packages/web/src/viewer/styles/analysis.css` | other |  | web-application-core |
@@ -1378,8 +1429,8 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/styles/zone-map.css` | other |  | web-application-core |
 | `packages/web/src/viewer/styles/zone-slideout.css` | other |  | web-application-core |
 | `packages/web/src/viewer/types.ts` | source | types | web-application-core |
-| `packages/web/src/viewer/usage/constants.ts` | source | types | viewer-shell-assets |
-| `packages/web/src/viewer/usage/index.ts` | source | entrypoint | viewer-shell-assets |
+| `packages/web/src/viewer/usage/constants.ts` | source | types | web-viewer-messaging-pipeline |
+| `packages/web/src/viewer/usage/index.ts` | source | entrypoint | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/utils.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/validate.ts` | source | schema | web-application-core |
 | `packages/web/src/viewer/views/analysis.ts` | source | page | web-application-core |
@@ -1388,12 +1439,12 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/views/domain-rex.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/domain-settings.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/domain-sourcevision.ts` | source | page | web-application-core |
-| `packages/web/src/viewer/views/enrichment-thresholds.ts` | source | page | viewer-shell-assets |
+| `packages/web/src/viewer/views/enrichment-thresholds.ts` | source | page | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/views/feature-toggles.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/files.ts` | source | page | web-application-core |
-| `packages/web/src/viewer/views/graph.ts` | source | page | viewer-shell-assets |
+| `packages/web/src/viewer/views/graph.ts` | source | page | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/views/hench-config.ts` | source | page | web-application-core |
-| `packages/web/src/viewer/views/hench-runs.ts` | source | page | web-application-core |
+| `packages/web/src/viewer/views/hench-runs.ts` | source | page | hench-agent-monitor |
 | `packages/web/src/viewer/views/hench-templates.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/integration-config.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/notion-config.ts` | source | page | web-application-core |
@@ -1403,10 +1454,10 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/views/problems.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/rex-dashboard.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/routes.ts` | source | route-handler | web-application-core |
-| `packages/web/src/viewer/views/sourcevision-tabs.ts` | source | page | viewer-shell-assets |
+| `packages/web/src/viewer/views/sourcevision-tabs.ts` | source | page | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/views/suggestions.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/task-audit.ts` | source | page | web-application-core |
-| `packages/web/src/viewer/views/token-usage.ts` | source | page | viewer-shell-assets |
+| `packages/web/src/viewer/views/token-usage.ts` | source | page | web-viewer-messaging-pipeline |
 | `packages/web/src/viewer/views/validation.ts` | source | schema | web-application-core |
 | `packages/web/src/viewer/views/view-registry.ts` | source | page | web-application-core |
 | `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-application-core |
@@ -1416,30 +1467,31 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/visualization/flow.ts` | source | utility | web-application-core |
 | `packages/web/src/viewer/visualization/index.ts` | source | entrypoint | web-application-core |
 | `packages/web/src/viewer/visualization/metrics.ts` | source | utility | web-application-core |
-| `packages/web/tests/helpers/crash-detector-test-support.ts` | test |  | web-application-core |
+| `packages/web/tests/helpers/crash-detector-test-support.ts` | test |  | viewer-crash-recovery |
 | `packages/web/tests/integration/background-suspension-recovery.test.ts` | test |  | web-application-core |
-| `packages/web/tests/integration/boundary-check.test.ts` | test |  | web-integration-tests |
-| `packages/web/tests/integration/build-output-contract.test.ts` | test |  | web-integration-tests |
+| `packages/web/tests/integration/boundary-check.test.ts` | test |  | web-boundary-tests |
+| `packages/web/tests/integration/build-output-contract.test.ts` | test |  | web-boundary-tests |
 | `packages/web/tests/integration/memory-aware-polling-suspension.test.ts` | test |  | web-application-core |
-| `packages/web/tests/integration/messaging-stack.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/integration/messaging-stack.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/integration/pr-markdown-refresh.test.ts` | test |  | web-application-core |
 | `packages/web/tests/integration/pr-markdown-tab-parity.test.ts` | test |  | web-application-core |
-| `packages/web/tests/integration/request-dedup.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/integration/request-dedup.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/integration/smart-add-dispatch.test.ts` | test |  | web-application-core |
 | `packages/web/tests/integration/token-usage-route-regression.test.ts` | test |  | web-application-core |
 | `packages/web/tests/integration/ws-health-integration.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/landing/landing.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/landing/landing.test.ts` | test |  | web-landing-page |
 | `packages/web/tests/unit/server/aggregation-cache.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | data-loading-routes |
+| `packages/web/tests/unit/server/data-loading-efficiency.test.ts` | test |  | web-data-routes |
 | `packages/web/tests/unit/server/dev-reload.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/domain-gateway.test.ts` | test |  | sourcevision-analysis-engine |
-| `packages/web/tests/unit/server/incremental-task-usage.test.ts` | test |  | task-usage-analytics |
-| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/server/incremental-task-usage.test.ts` | test |  | web-task-usage-scheduler |
+| `packages/web/tests/unit/server/memory-leak-fixes.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/server/port.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/pr-markdown-refresh-diagnostics.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/server/register-scheduler.test.ts` | test |  | web-task-usage-scheduler |
 | `packages/web/tests/unit/server/routes-adaptive.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-config.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | data-loading-routes |
+| `packages/web/tests/unit/server/routes-data.test.ts` | test |  | web-data-routes |
 | `packages/web/tests/unit/server/routes-hench-audit.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-hench-concurrency.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-hench-config.test.ts` | test |  | web-application-core |
@@ -1449,7 +1501,7 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/server/routes-hench-memory.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-hench-shutdown.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-hench-templates.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/server/routes-mcp.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/server/routes-notion.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-project.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/routes-requirements.test.ts` | test |  | web-application-core |
@@ -1463,22 +1515,24 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/server/routes-workflow.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/scope.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/search-index.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/server/shared-types.test.ts` | test |  | web-task-usage-scheduler |
 | `packages/web/tests/unit/server/shutdown-handler.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/server/task-usage.test.ts` | test |  | task-usage-analytics |
-| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | rex-domain-core |
-| `packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts` | test |  | task-usage-analytics |
+| `packages/web/tests/unit/server/task-usage.test.ts` | test |  | web-task-usage-scheduler |
+| `packages/web/tests/unit/server/type-consistency.test.ts` | test |  | rex-prd-engine |
+| `packages/web/tests/unit/server/usage-cleanup-scheduler.test.ts` | test |  | web-task-usage-scheduler |
 | `packages/web/tests/unit/server/websocket.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/server/ws-health-tracker.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/shared/node-culler.test.ts` | test |  | web-shared |
+| `packages/web/tests/unit/viewer/accessibility.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/add-item-form.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/analyze-panel.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/bar-chart.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/batch-import-panel.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/batched-tick-dispatcher.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/call-rate-limiter.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/call-rate-limiter.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/collapsible-section.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/copy-link-button.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/viewer/crash-detector.test.ts` | test |  | viewer-crash-recovery |
 | `packages/web/tests/unit/viewer/crash-recovery-banner.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/degradation-banner.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/deletion-state-updates.test.ts` | test |  | web-application-core |
@@ -1486,31 +1540,31 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/viewer/dom-performance-monitor.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/dom-update-gate.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/elapsed-time-memoization.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/enrichment-thresholds.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/enrichment-thresholds.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/execution-panel-dedup.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/execution-panel-polling.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/favicon.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/fetch-pipeline.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/fetch-pipeline.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/flow-data-builders.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/flow-diagram.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/graceful-degradation.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/graph-destroy.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/graph-interaction.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/graph-layout.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/graph-zoom.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/hench-config.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/label-utils.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/large-tree-performance.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/lazy-children.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/listener-lifecycle.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/loader-memory.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/viewer/loader-onchange.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/loader-polling.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/memory-monitor.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/memory-warning.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/message-coalescer.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/message-throttle.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/message-coalescer.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/message-throttle.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/multi-select.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/node-culler.test.ts` | test |  | web-shared-utilities |
 | `packages/web/tests/unit/viewer/node-culling-integration.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/persistent-filter.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/polling-manager.test.ts` | test |  | web-application-core |
@@ -1525,14 +1579,14 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/viewer/proposal-editor.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/prune-diff-tree.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/refresh-throttle.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/request-dedup.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/request-dedup.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/response-buffer-gate.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | viewer-route-state |
+| `packages/web/tests/unit/viewer/route-state.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/search-overlay.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/sidebar.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/smart-add-input.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/sourcevision-tabs.test.ts` | test |  | viewer-shell-assets |
-| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/sourcevision-tabs.test.ts` | test |  | web-viewer-messaging-pipeline |
+| `packages/web/tests/unit/viewer/status-filter.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/status-indicators-memory.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/status-indicators-polling.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/status-indicators.test.ts` | test |  | web-application-core |
@@ -1544,7 +1598,7 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/viewer/throttle-controls.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/tick-timer.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/tick-visibility-gate.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | viewer-route-state |
+| `packages/web/tests/unit/viewer/token-usage-nav.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/tree-differ.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/tree-event-delegate.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/tree-search.test.ts` | test |  | web-application-core |
@@ -1552,56 +1606,59 @@ Prioritized work items derived from analysis:
 | `packages/web/tests/unit/viewer/tree-view.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/update-batcher.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/usage-polling.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/use-crash-recovery.test.ts` | test |  | web-application-core |
+| `packages/web/tests/unit/viewer/use-crash-recovery.test.ts` | test |  | viewer-crash-recovery |
 | `packages/web/tests/unit/viewer/use-dom-performance-monitor.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/use-polling-suspension.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/use-project-status.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/virtual-scroll.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/ws-health-panel.test.ts` | test |  | web-application-core |
-| `packages/web/tests/unit/viewer/ws-pipeline.test.ts` | test |  | viewer-shell-assets |
+| `packages/web/tests/unit/viewer/ws-pipeline.test.ts` | test |  | web-viewer-messaging-pipeline |
 | `packages/web/tests/unit/viewer/zone-drill-down.test.ts` | test |  | web-application-core |
 | `packages/web/tests/unit/viewer/zone-inline-subzones.test.ts` | test |  | web-application-core |
-| `packages/web/tsconfig.json` | config |  | viewer-shell-assets |
-| `packages/web/vitest.config.ts` | config |  | viewer-shell-assets |
-| `pnpm-lock.yaml` | generated |  | monorepo-config |
-| `pnpm-workspace.yaml` | other |  | monorepo-config |
-| `pr-check.js` | source | service | monorepo-config |
-| `prd.md` | docs |  | monorepo-config |
-| `refresh-artifacts.js` | source | service | monorepo-config |
-| `refresh-plan.js` | source | service | monorepo-config |
-| `refresh-validate.js` | source | service | monorepo-config |
+| `packages/web/tsconfig.json` | config |  | web-viewer-messaging-pipeline |
+| `packages/web/vitest.config.ts` | config |  | web-viewer-messaging-pipeline |
+| `pnpm-lock.yaml` | generated |  | monorepo-root |
+| `pnpm-workspace.yaml` | other |  | monorepo-root |
+| `pr-check.js` | source | service | monorepo-root |
+| `prd.md` | docs |  | monorepo-root |
+| `refresh-artifacts.js` | source | utility | monorepo-root |
+| `refresh-plan.js` | source | utility | monorepo-root |
+| `refresh-validate.js` | source | utility | monorepo-root |
 | `scripts/hench-callgraph-analysis.mjs` | build |  |  |
-| `tests/e2e/architecture-policy.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-arg-contracts.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-ci.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-config.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-contract.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-delegation.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-dev.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-errors.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-init.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-orchestration.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-output-contracts.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-pr-check.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-refresh.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-spawn-boundary.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-start.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-tool-resolution.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/cli-web.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/domain-isolation.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/e2e-helpers.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/integration-coverage-policy.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/mcp-transport.test.js` | test |  | monorepo-e2e-test-suite |
-| `tests/e2e/verify-build.js` | test |  | monorepo-e2e-test-suite |
-| `tests/integration/cross-package-contracts.test.js` | test |  | cross-package-integration-tests |
-| `tests/integration/scheduler-startup.test.js` | test |  | cross-package-integration-tests |
-| `tests/unit/help.test.js` | test |  | monorepo-config |
-| `tests/unit/refresh-artifacts.test.js` | test |  | monorepo-config |
-| `tests/unit/refresh-plan.test.js` | test |  | monorepo-config |
-| `tests/unit/refresh-validate.test.js` | test |  | monorepo-config |
-| `tsconfig.base.json` | config |  | monorepo-config |
-| `vitest.config.js` | config |  | monorepo-config |
-| `web.js` | source | entrypoint | monorepo-config |
+| `tests/e2e/architecture-policy.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-arg-contracts.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-ci.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-config.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-contract.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-delegation.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-dev.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-errors.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-init.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-orchestration.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-output-contracts.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-pr-check.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-refresh.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-spawn-boundary.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-start.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-tool-resolution.test.js` | test |  | e2e-tests |
+| `tests/e2e/cli-web.test.js` | test |  | e2e-tests |
+| `tests/e2e/domain-isolation.test.js` | test |  | e2e-tests |
+| `tests/e2e/e2e-helpers.js` | test |  | e2e-tests |
+| `tests/e2e/integration-coverage-policy.test.js` | test |  | e2e-tests |
+| `tests/e2e/mcp-transport.test.js` | test |  | e2e-tests |
+| `tests/e2e/verify-build.js` | test |  | e2e-tests |
+| `tests/integration/cross-package-contracts.test.js` | test |  | integration-tests |
+| `tests/integration/gateway-pipeline.test.js` | test |  | integration-tests |
+| `tests/integration/hench-rex-gateway-pipeline.test.js` | test |  | integration-tests |
+| `tests/integration/scheduler-startup.test.js` | test |  | integration-tests |
+| `tests/integration/web-server-viewer-boundary.test.js` | test |  | integration-tests |
+| `tests/unit/help.test.js` | test |  | monorepo-root |
+| `tests/unit/refresh-artifacts.test.js` | test |  | monorepo-root |
+| `tests/unit/refresh-plan.test.js` | test |  | monorepo-root |
+| `tests/unit/refresh-validate.test.js` | test |  | monorepo-root |
+| `tsconfig.base.json` | config |  | monorepo-root |
+| `vitest.config.js` | config |  | monorepo-root |
+| `web.js` | source | entrypoint | monorepo-root |
 
 ## Tooling
 

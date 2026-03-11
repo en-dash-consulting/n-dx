@@ -3,19 +3,17 @@
   "name": "Web Viewer/web Viewer/web/viewer Hooks",
   "description": "5 files, primarily TypeScript",
   "files": [
-    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-    "packages/web/src/viewer/hooks/use-delete-actions.ts",
-    "packages/web/src/viewer/hooks/use-prd-deep-link.ts",
-    "packages/web/tests/unit/viewer/deletion-state-updates.test.ts",
-    "packages/web/tests/unit/viewer/tree-utils-deletion.test.ts"
+    "packages/web/src/viewer/hooks/use-app-data.ts",
+    "packages/web/src/viewer/loader.ts",
+    "packages/web/src/viewer/schema-compat.ts",
+    "packages/web/src/viewer/validate.ts",
+    "packages/web/tests/unit/viewer/loader-onchange.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/viewer/components/prd-tree/tree-utils.ts",
-    "packages/web/src/viewer/hooks/use-delete-actions.ts",
-    "packages/web/src/viewer/hooks/use-prd-deep-link.ts"
+    "packages/web/src/viewer/hooks/use-app-data.ts"
   ],
-  "cohesion": 0.27,
-  "coupling": 0.73,
+  "cohesion": 0.43,
+  "coupling": 0.57,
   "fileCount": 5,
-  "lineCount": 802
+  "lineCount": 871
 }

@@ -12,8 +12,8 @@
   "entryPoints": [
     "packages/web/src/viewer/views/view-registry.ts"
   ],
-  "cohesion": 0.27,
-  "coupling": 0.73,
+  "cohesion": 0.31,
+  "coupling": 0.69,
   "fileCount": 5,
   "lineCount": 244
 }

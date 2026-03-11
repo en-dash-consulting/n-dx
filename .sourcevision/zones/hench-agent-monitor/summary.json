@@ -1,0 +1,28 @@
+{
+  "id": "hench-agent-monitor",
+  "name": "Hench Agent Monitor",
+  "description": "Viewer-side UI panels and page view dedicated to surfacing live hench agent telemetry: active tasks, concurrency state, memory usage, and run history.",
+  "files": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/memory-panel.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/components/active-tasks-panel.ts",
+    "packages/web/src/viewer/components/concurrency-panel.ts",
+    "packages/web/src/viewer/components/memory-panel.ts",
+    "packages/web/src/viewer/views/hench-runs.ts"
+  ],
+  "cohesion": 0.29,
+  "coupling": 0.71,
+  "fileCount": 4,
+  "lineCount": 1591,
+  "riskMetrics": {
+    "cohesion": 0.29,
+    "coupling": 0.71,
+    "riskScore": 0.71,
+    "riskLevel": "catastrophic",
+    "failsThreshold": true
+  }
+}

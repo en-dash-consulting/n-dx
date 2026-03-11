@@ -1,0 +1,30 @@
+{
+  "id": "rex-unit/rex/unit/analyze",
+  "name": "Rex Unit/rex/unit/analyze",
+  "description": "12 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/analyze/modify-reason.ts",
+    "packages/rex/src/analyze/reconcile.ts",
+    "packages/rex/src/analyze/scanners.ts",
+    "packages/rex/src/analyze/validate-modification.ts",
+    "packages/rex/tests/unit/analyze/acknowledge.test.ts",
+    "packages/rex/tests/unit/analyze/modify-reason.test.ts",
+    "packages/rex/tests/unit/analyze/propose.test.ts",
+    "packages/rex/tests/unit/analyze/reconcile.test.ts",
+    "packages/rex/tests/unit/analyze/scanners-acknowledge.test.ts",
+    "packages/rex/tests/unit/analyze/scanners.test.ts",
+    "packages/rex/tests/unit/analyze/validate-modification.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/analyze/modify-reason.ts",
+    "packages/rex/src/analyze/reconcile.ts",
+    "packages/rex/src/analyze/scanners.ts",
+    "packages/rex/src/analyze/validate-modification.ts"
+  ],
+  "cohesion": 0.26,
+  "coupling": 0.74,
+  "fileCount": 12,
+  "lineCount": 4388
+}

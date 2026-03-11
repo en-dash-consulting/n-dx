@@ -7,7 +7,7 @@
 Zone: Project Documentation (`project-documentation`)
 Files: 16, Cohesion: 0.00, Coupling: 0.00
 Risk: at-risk (score: 0.50)
-Description: Architecture decision records, analysis reports, and design documents that capture the project's evolving architectural reasoning and audit trail.
+Description: Architecture decision records, audit reports, and analysis documents that capture the rationale, risks, and structural constraints governing the n-dx codebase.
 Lines: 4317
 
 </zone>
@@ -36,9 +36,9 @@ docs/process/rex-smart-add-duplicate-detection.md (Markdown, 416 lines, docs)
 <findings>
 
 [observation] [info] Isolated files — no import edges between 16 files, cohesion is unmeasurable (reported as 0)
-[observation] [info] Maintaining architecture decision records (ADRs) and technical audits alongside source code is a strong practice — it preserves the 'why' behind design choices that are otherwise lost over time.
-[observation] [info] The viewer-audit.md and process-lifecycle-audit.md documents suggest past investigations into complex subsystems; ensuring these remain current as the codebase evolves prevents stale guidance from misleading future contributors.
-[observation] [info] With 16 documentation files and zero coupling to source, this zone is purely informational — no risk of documentation imports accidentally becoming runtime dependencies.
+[observation] [info] Architecture docs (level-system-reference.md, memory-architecture.md) are co-located with time-stamped analysis reports — separating evergreen references from dated analyses in subdirectories (docs/architecture/ vs docs/analysis/) improves discoverability as the doc set grows.
+[observation] [info] Docs zone has no coupling to source files, which is correct; any tooling that generates doc fragments from source (e.g. CONTEXT.md) should output to .sourcevision/, not docs/, to keep the authorship boundary clear.
+[observation] [info] Given the concurrency risks documented in CLAUDE.md, a dedicated docs/concurrency-contract.md that consolidates the hazard table and HTTP-request concurrency notes would make this critical constraint easier to locate.
 [suggestion] [info] Zone "Project Documentation" (project-documentation) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds
 
 </findings>
@@ -46,11 +46,11 @@ docs/process/rex-smart-add-duplicate-detection.md (Markdown, 416 lines, docs)
 <insights>
 
 - Isolated files — no import edges between 16 files, cohesion is unmeasurable (reported as 0)
-- The analysis/ subdirectory contains deep technical audits (memory risks, process lifecycle, signal handling) that serve as institutional knowledge — these should be reviewed when making changes to the areas they cover.
-- Cohesion of 0 is expected since documentation files don't import each other; the zone's value is organizational rather than structural.
-- The architecture/ subdirectory with level-system and memory-architecture references suggests a deliberate effort to document complex subsystems, which aids onboarding and long-term maintenance.
-- Maintaining architecture decision records (ADRs) and technical audits alongside source code is a strong practice — it preserves the 'why' behind design choices that are otherwise lost over time.
-- The viewer-audit.md and process-lifecycle-audit.md documents suggest past investigations into complex subsystems; ensuring these remain current as the codebase evolves prevents stale guidance from misleading future contributors.
-- With 16 documentation files and zero coupling to source, this zone is purely informational — no risk of documentation imports accidentally becoming runtime dependencies.
+- Sixteen documentation files covering memory architecture, process lifecycle, signal handling, and viewer audits indicate a mature practice of recording decisions alongside code.
+- Zero cohesion and coupling is correct for a documentation zone — these are markdown artifacts with no import relationships.
+- The presence of multiple audit documents (viewer-audit.md, signal-handling-audit.md, process-lifecycle-audit.md) reflects a healthy culture of structured self-review; keeping these current as the codebase evolves will amplify their value.
+- Architecture docs (level-system-reference.md, memory-architecture.md) are co-located with time-stamped analysis reports — separating evergreen references from dated analyses in subdirectories (docs/architecture/ vs docs/analysis/) improves discoverability as the doc set grows.
+- Docs zone has no coupling to source files, which is correct; any tooling that generates doc fragments from source (e.g. CONTEXT.md) should output to .sourcevision/, not docs/, to keep the authorship boundary clear.
+- Given the concurrency risks documented in CLAUDE.md, a dedicated docs/concurrency-contract.md that consolidates the hazard table and HTTP-request concurrency notes would make this critical constraint easier to locate.
 
 </insights>

@@ -1,0 +1,17 @@
+{
+  "id": "rex-unit/rex-2",
+  "name": "Rex Unit/rex 2",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/tests/e2e/cli-quiet.test.ts",
+    "packages/rex/tests/e2e/cli-recommend.test.ts",
+    "packages/rex/tests/e2e/cli-smart-add.test.ts",
+    "packages/rex/tests/e2e/cli-sync.test.ts",
+    "packages/rex/tests/e2e/cli-workflow.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 1179
+}

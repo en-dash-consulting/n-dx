@@ -1,0 +1,17 @@
+{
+  "id": "rex-unit/rex/store",
+  "name": "Rex Unit/rex/store",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/store/notion-adapter.ts",
+    "packages/rex/src/store/notion-map.ts",
+    "packages/rex/tests/unit/core/notion-map.test.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/notion-adapter.ts"
+  ],
+  "cohesion": 0.14,
+  "coupling": 0.86,
+  "fileCount": 3,
+  "lineCount": 2706
+}

@@ -1,0 +1,23 @@
+{
+  "id": "hench/unit/agent/store",
+  "name": "Hench/unit/agent/store",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/cli/commands/init.ts",
+    "packages/hench/src/store/index.ts",
+    "packages/hench/src/store/run-retention-scheduler.ts",
+    "packages/hench/src/store/run-retention.ts",
+    "packages/hench/tests/unit/store/run-retention-scheduler.test.ts",
+    "packages/hench/tests/unit/store/run-retention.test.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/cli/commands/init.ts",
+    "packages/hench/src/store/index.ts",
+    "packages/hench/src/store/run-retention-scheduler.ts",
+    "packages/hench/src/store/run-retention.ts"
+  ],
+  "cohesion": 0.53,
+  "coupling": 0.47,
+  "fileCount": 6,
+  "lineCount": 1581
+}

@@ -5,43 +5,21 @@
 <zone>
 
 Zone: Web Viewer/web/unit (`web-viewer/web/unit`)
-Files: 12, Cohesion: 0.40, Coupling: 0.60
-Description: 12 files, primarily TypeScript
-Entry points: packages/web/src/server/routes-hench.ts
-Lines: 5712
+Files: 8, Cohesion: 1.00, Coupling: 0.00
+Description: 8 files, primarily TypeScript
+Lines: 2627
 
 </zone>
 
 <files>
 
-packages/web/src/server/concurrent-execution-metrics.ts (TypeScript, 382 lines, source)
-packages/web/src/server/process-memory-tracker.ts (TypeScript, 307 lines, source)
-packages/web/src/server/routes-hench.ts (TypeScript, 2492 lines, source)
-packages/web/tests/unit/server/routes-hench-audit.test.ts (TypeScript, 249 lines, test)
-packages/web/tests/unit/server/routes-hench-concurrency.test.ts (TypeScript, 254 lines, test)
-packages/web/tests/unit/server/routes-hench-config.test.ts (TypeScript, 305 lines, test)
-packages/web/tests/unit/server/routes-hench-execute.test.ts (TypeScript, 398 lines, test)
-packages/web/tests/unit/server/routes-hench-health.test.ts (TypeScript, 230 lines, test)
-packages/web/tests/unit/server/routes-hench-heartbeat.test.ts (TypeScript, 218 lines, test)
-packages/web/tests/unit/server/routes-hench-memory.test.ts (TypeScript, 120 lines, test)
-packages/web/tests/unit/server/routes-hench-shutdown.test.ts (TypeScript, 425 lines, test)
-packages/web/tests/unit/server/routes-hench-templates.test.ts (TypeScript, 332 lines, test)
+packages/web/tests/unit/server/routes-adaptive.test.ts (TypeScript, 446 lines, test)
+packages/web/tests/unit/server/routes-config.test.ts (TypeScript, 234 lines, test)
+packages/web/tests/unit/server/routes-notion.test.ts (TypeScript, 255 lines, test)
+packages/web/tests/unit/server/routes-project.test.ts (TypeScript, 249 lines, test)
+packages/web/tests/unit/server/routes-search.test.ts (TypeScript, 277 lines, test)
+packages/web/tests/unit/server/routes-status.test.ts (TypeScript, 394 lines, test)
+packages/web/tests/unit/server/routes-validation.test.ts (TypeScript, 416 lines, test)
+packages/web/tests/unit/server/routes-workflow.test.ts (TypeScript, 356 lines, test)
 
 </files>
-
-<imports>
-
-Internal:
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/concurrent-execution-metrics.ts {ConcurrentExecutionMetrics}
-  packages/web/src/server/routes-hench.ts → packages/web/src/server/process-memory-tracker.ts {ProcessMemoryTracker}
-  packages/web/tests/unit/server/routes-hench-audit.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-concurrency.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-config.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-execute.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-health.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-heartbeat.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-memory.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-shutdown.test.ts → packages/web/src/server/routes-hench.ts {shutdownActiveExecutions, handleHenchRoute}
-  packages/web/tests/unit/server/routes-hench-templates.test.ts → packages/web/src/server/routes-hench.ts {handleHenchRoute}
-
-</imports>

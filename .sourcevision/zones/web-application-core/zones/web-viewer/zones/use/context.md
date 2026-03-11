@@ -5,29 +5,31 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/use (`web-viewer/web-viewer/use`)
-Files: 5, Cohesion: 0.27, Coupling: 0.73
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/prd-tree/tree-utils.ts, packages/web/src/viewer/hooks/use-delete-actions.ts, packages/web/src/viewer/hooks/use-prd-deep-link.ts
-Lines: 802
+Files: 6, Cohesion: 0.36, Coupling: 0.64
+Description: 6 files, primarily TypeScript
+Entry points: packages/web/src/viewer/views/prd.ts
+Lines: 1056
 
 </zone>
 
 <files>
 
-packages/web/src/viewer/components/prd-tree/tree-utils.ts (TypeScript, 114 lines, source)
-packages/web/src/viewer/hooks/use-delete-actions.ts (TypeScript, 176 lines, source)
-packages/web/src/viewer/hooks/use-prd-deep-link.ts (TypeScript, 100 lines, source)
-packages/web/tests/unit/viewer/deletion-state-updates.test.ts (TypeScript, 284 lines, test)
-packages/web/tests/unit/viewer/tree-utils-deletion.test.ts (TypeScript, 128 lines, test)
+packages/web/src/viewer/components/prd-tree/bulk-actions.ts (TypeScript, 136 lines, source)
+packages/web/src/viewer/components/prd-tree/delete-confirmation.ts (TypeScript, 151 lines, source)
+packages/web/src/viewer/components/prd-tree/merge-preview.ts (TypeScript, 312 lines, source)
+packages/web/src/viewer/hooks/use-feature-toggle.ts (TypeScript, 61 lines, source)
+packages/web/src/viewer/hooks/use-toast.ts (TypeScript, 43 lines, source)
+packages/web/src/viewer/views/prd.ts (TypeScript, 353 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/hooks/use-delete-actions.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, collectSubtreeIds, removeItemById}
-  packages/web/src/viewer/hooks/use-prd-deep-link.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {findItemById, getAncestorIds}
-  packages/web/tests/unit/viewer/deletion-state-updates.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {removeItemById, collectSubtreeIds, findItemById}
-  packages/web/tests/unit/viewer/tree-utils-deletion.test.ts → packages/web/src/viewer/components/prd-tree/tree-utils.ts {collectSubtreeIds, removeItemById}
+  packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/bulk-actions.ts {BulkActions}
+  packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/delete-confirmation.ts {DeleteConfirmation}
+  packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/merge-preview.ts {MergePreview}
+  packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/use-feature-toggle.ts {useFeatureToggle}
+  packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/use-toast.ts {useToast}
 
 </imports>

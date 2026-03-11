@@ -5,16 +5,17 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer (`web-viewer/web-viewer/web/viewer`)
-Files: 42, Cohesion: 0.89, Coupling: 0.11
+Files: 42, Cohesion: 0.81, Coupling: 0.19
 Description: 42 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/breadcrumb.ts, packages/web/src/viewer/components/constants.ts, packages/web/src/viewer/components/detail-panel.ts, packages/web/src/viewer/components/search-filter.ts, packages/web/src/viewer/components/zone-slideout.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/rex-dashboard.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/views/suggestions.ts, packages/web/src/viewer/views/zones.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 9105
+Entry points: packages/web/src/viewer/components/breadcrumb.ts, packages/web/src/viewer/components/constants.ts, packages/web/src/viewer/components/detail-panel.ts, packages/web/src/viewer/components/search-filter.ts, packages/web/src/viewer/components/zone-slideout.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/views/suggestions.ts, packages/web/src/viewer/views/zones.ts, packages/web/src/viewer/visualization/index.ts
+Lines: 8317
 
 </zone>
 
 <files>
 
 packages/web/src/schema/v1.ts (TypeScript, 378 lines, source)
+packages/web/src/viewer/api.ts (TypeScript, 37 lines, source)
 packages/web/src/viewer/components/breadcrumb.ts (TypeScript, 168 lines, source)
 packages/web/src/viewer/components/constants.ts (TypeScript, 10 lines, source)
 packages/web/src/viewer/components/data-display/collapsible-section.ts (TypeScript, 95 lines, source)
@@ -24,20 +25,19 @@ packages/web/src/viewer/components/data-display/mini-charts.ts (TypeScript, 183 
 packages/web/src/viewer/components/data-display/tree-view.ts (TypeScript, 135 lines, source)
 packages/web/src/viewer/components/data-display/zone-map.ts (TypeScript, 387 lines, source)
 packages/web/src/viewer/components/detail-panel.ts (TypeScript, 309 lines, source)
-packages/web/src/viewer/components/prd-tree/reorganize-panel.ts (TypeScript, 292 lines, source)
 packages/web/src/viewer/components/search-filter.ts (TypeScript, 68 lines, source)
 packages/web/src/viewer/components/zone-slideout.ts (TypeScript, 303 lines, source)
-packages/web/src/viewer/external.ts (TypeScript, 39 lines, source)
+packages/web/src/viewer/external.ts (TypeScript, 42 lines, source)
 packages/web/src/viewer/hooks/use-file-edges.ts (TypeScript, 286 lines, source)
 packages/web/src/viewer/hooks/use-pan-zoom.ts (TypeScript, 146 lines, source)
 packages/web/src/viewer/hooks/use-subzone-edges.ts (TypeScript, 187 lines, source)
 packages/web/src/viewer/hooks/use-zone-drag.ts (TypeScript, 94 lines, source)
-packages/web/src/viewer/types.ts (TypeScript, 64 lines, source)
+packages/web/src/viewer/types.ts (TypeScript, 66 lines, source)
 packages/web/src/viewer/utils.ts (TypeScript, 65 lines, source)
 packages/web/src/viewer/views/architecture.ts (TypeScript, 103 lines, source)
 packages/web/src/viewer/views/files.ts (TypeScript, 278 lines, source)
 packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
-packages/web/src/viewer/views/rex-dashboard.ts (TypeScript, 640 lines, source)
+packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
 packages/web/src/viewer/views/suggestions.ts (TypeScript, 82 lines, source)
 packages/web/src/viewer/views/zone-types.ts (TypeScript, 80 lines, source)
@@ -62,6 +62,7 @@ packages/web/tests/unit/viewer/zone-inline-subzones.test.ts (TypeScript, 257 lin
 <imports>
 
 Internal:
+  packages/web/src/viewer/api.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, FileDetail, ZoneDetail, GenericDetail, PRDDetail, DetailItem, ViewId}
   packages/web/src/viewer/components/breadcrumb.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
   packages/web/src/viewer/components/constants.ts → packages/web/src/viewer/visualization/colors.ts {ZONE_COLORS}
   packages/web/src/viewer/components/data-display/findings-list.ts → packages/web/src/viewer/components/data-display/collapsible-section.ts {CollapsibleSection}
@@ -82,7 +83,7 @@ Internal:
   packages/web/src/viewer/hooks/use-file-edges.ts → packages/web/src/viewer/views/zone-types.ts {FileConnectionMap, FileToFileMap, ZoneData, FlowEdge, BoxRect}
   packages/web/src/viewer/hooks/use-subzone-edges.ts → packages/web/src/viewer/views/zone-types.ts {ZoneData, FlowEdge, BoxRect, FileConnectionMap, ExpandedSubZones}
   packages/web/src/viewer/hooks/use-zone-drag.ts → packages/web/src/viewer/hooks/use-pan-zoom.ts {ViewBox}
-  packages/web/src/viewer/types.ts → packages/web/src/viewer/external.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph}
+  packages/web/src/viewer/types.ts → packages/web/src/viewer/external.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph, ViewId}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/colors.ts {getZoneColorByIndex, getZoneColor, buildZoneColorMap}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/flow.ts {buildFileToZoneMap, buildFlowEdges, buildCallFlowEdges, buildExternalImportEdges, buildFlowNodes}
   packages/web/src/viewer/utils.ts → packages/web/src/viewer/visualization/metrics.ts {meterClass}
@@ -97,9 +98,9 @@ Internal:
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
-  packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/components/prd-tree/reorganize-panel.ts {ReorganizePanel}
-  packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/types.ts {ViewId, NavigateTo}
-  packages/web/src/viewer/views/rex-dashboard.ts → packages/web/src/viewer/visualization/index.ts {HealthGauge}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/external.ts {Finding}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/types.ts {LoadedData}
+  packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/external.ts {RouteTreeNode, RouteExportKind, ComponentUsageEdge}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/types.ts {LoadedData}

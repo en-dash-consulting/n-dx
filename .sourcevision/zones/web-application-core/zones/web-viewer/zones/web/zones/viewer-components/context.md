@@ -5,61 +5,25 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer Components (`web-viewer/web-viewer/web/viewer-components`)
-Files: 21, Cohesion: 0.51, Coupling: 0.49
-Description: 21 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/copy-link-button.ts, packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/components/faq.ts, packages/web/src/viewer/components/index.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/components/throttle-controls.ts, packages/web/src/viewer/components/ws-health-panel.ts, packages/web/src/viewer/views/task-audit.ts
-Lines: 4253
+Files: 3, Cohesion: 0.40, Coupling: 0.60
+Description: 3 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/copy-link-button.ts, packages/web/src/viewer/components/rex-task-link.ts
+Lines: 569
 
 </zone>
 
 <files>
 
 packages/web/src/viewer/components/copy-link-button.ts (TypeScript, 103 lines, source)
-packages/web/src/viewer/components/crash-recovery-banner.ts (TypeScript, 92 lines, source)
-packages/web/src/viewer/components/elapsed-time.ts (TypeScript, 51 lines, source)
-packages/web/src/viewer/components/faq.ts (TypeScript, 321 lines, source)
-packages/web/src/viewer/components/favicon.ts (TypeScript, 107 lines, source)
-packages/web/src/viewer/components/index.ts (TypeScript, 86 lines, source)
-packages/web/src/viewer/components/polling-suspension-indicator.ts (TypeScript, 65 lines, source)
-packages/web/src/viewer/components/theme-toggle.ts (TypeScript, 36 lines, source)
-packages/web/src/viewer/components/throttle-controls.ts (TypeScript, 382 lines, source)
-packages/web/src/viewer/components/ws-health-panel.ts (TypeScript, 389 lines, source)
-packages/web/src/viewer/hooks/use-tick.ts (TypeScript, 90 lines, source)
-packages/web/src/viewer/main.ts (TypeScript, 201 lines, source)
-packages/web/src/viewer/views/task-audit.ts (TypeScript, 635 lines, source)
-packages/web/tests/integration/pr-markdown-tab-parity.test.ts (TypeScript, 236 lines, test)
-packages/web/tests/integration/token-usage-route-regression.test.ts (TypeScript, 200 lines, test)
+packages/web/src/viewer/components/rex-task-link.ts (TypeScript, 320 lines, source)
 packages/web/tests/unit/viewer/copy-link-button.test.ts (TypeScript, 146 lines, test)
-packages/web/tests/unit/viewer/crash-recovery-banner.test.ts (TypeScript, 274 lines, test)
-packages/web/tests/unit/viewer/favicon.test.ts (TypeScript, 157 lines, test)
-packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts (TypeScript, 114 lines, test)
-packages/web/tests/unit/viewer/throttle-controls.test.ts (TypeScript, 269 lines, test)
-packages/web/tests/unit/viewer/ws-health-panel.test.ts (TypeScript, 299 lines, test)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/web/src/viewer/components/elapsed-time.ts → packages/web/src/viewer/hooks/use-tick.ts {useTick}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/copy-link-button.ts {CopyLinkButton, buildShareableUrl, CopyLinkButtonProps}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/crash-recovery-banner.ts {CrashRecoveryBanner}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/elapsed-time.ts {ElapsedTime}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/faq.ts {GlobalFAQ, HeaderFAQ}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/favicon.ts {updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/polling-suspension-indicator.ts {PollingSuspensionIndicator}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/theme-toggle.ts {SidebarThemeToggle, initTheme}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/throttle-controls.ts {ThrottleControlsPanel}
-  packages/web/src/viewer/components/index.ts → packages/web/src/viewer/components/ws-health-panel.ts {WsHealthPanel}
-  packages/web/src/viewer/main.ts → packages/web/src/viewer/components/index.ts {Sidebar, DetailPanel, Guide, HeaderFAQ, Breadcrumb, updateFavicon, MemoryWarningBanner, CrashRecoveryBanner, DegradationBanner, RefreshQueueStatus, PollingSuspensionIndicator, SearchOverlay, useSearchOverlay}
-  packages/web/src/viewer/views/task-audit.ts → packages/web/src/viewer/components/index.ts {BrandedHeader, RexTaskLink, ElapsedTime}
-  packages/web/tests/integration/pr-markdown-tab-parity.test.ts → packages/web/src/viewer/main.ts {*}
-  packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/src/viewer/main.ts {*}
+  packages/web/src/viewer/components/rex-task-link.ts → packages/web/src/viewer/components/copy-link-button.ts {buildShareableUrl}
   packages/web/tests/unit/viewer/copy-link-button.test.ts → packages/web/src/viewer/components/copy-link-button.ts {CopyLinkButton, buildShareableUrl}
-  packages/web/tests/unit/viewer/crash-recovery-banner.test.ts → packages/web/src/viewer/components/crash-recovery-banner.ts {CrashRecoveryBanner}
-  packages/web/tests/unit/viewer/favicon.test.ts → packages/web/src/viewer/components/favicon.ts {updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT}
-  packages/web/tests/unit/viewer/polling-suspension-indicator.test.ts → packages/web/src/viewer/components/polling-suspension-indicator.ts {PollingSuspensionIndicator}
-  packages/web/tests/unit/viewer/throttle-controls.test.ts → packages/web/src/viewer/components/throttle-controls.ts {ThrottleControlsPanel}
-  packages/web/tests/unit/viewer/ws-health-panel.test.ts → packages/web/src/viewer/components/ws-health-panel.ts {WsHealthPanel}
 
 </imports>

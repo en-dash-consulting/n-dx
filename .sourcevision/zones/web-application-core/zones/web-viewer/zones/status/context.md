@@ -5,20 +5,18 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/status (`web-viewer/web-viewer/status`)
-Files: 5, Cohesion: 0.31, Coupling: 0.69
-Description: 5 files, primarily TypeScript
-Entry points: packages/web/src/viewer/components/status-indicators.ts, packages/web/src/viewer/hooks/use-polling.ts
-Lines: 987
+Files: 3, Cohesion: 0.29, Coupling: 0.71
+Description: 3 files, primarily TypeScript
+Entry points: packages/web/src/viewer/components/status-indicators.ts, packages/web/src/viewer/hooks/use-project-status.ts
+Lines: 783
 
 </zone>
 
 <files>
 
 packages/web/src/viewer/components/status-indicators.ts (TypeScript, 219 lines, source)
-packages/web/src/viewer/hooks/use-polling.ts (TypeScript, 68 lines, source)
 packages/web/src/viewer/hooks/use-project-status.ts (TypeScript, 185 lines, source)
 packages/web/tests/unit/viewer/status-indicators.test.ts (TypeScript, 379 lines, test)
-packages/web/tests/unit/viewer/use-project-status.test.ts (TypeScript, 136 lines, test)
 
 </files>
 
@@ -27,9 +25,6 @@ packages/web/tests/unit/viewer/use-project-status.test.ts (TypeScript, 136 lines
 Internal:
   packages/web/src/viewer/components/status-indicators.ts → packages/web/src/viewer/hooks/use-project-status.ts {useProjectStatus}
   packages/web/src/viewer/components/status-indicators.ts → packages/web/src/viewer/hooks/use-project-status.ts {ProjectStatus, SourceVisionStatus, RexStatus, HenchStatus}
-  packages/web/src/viewer/hooks/use-project-status.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
   packages/web/tests/unit/viewer/status-indicators.test.ts → packages/web/src/viewer/components/status-indicators.ts {SvFreshnessIndicator, RexCompletionIndicator, HenchActivityIndicator}
-  packages/web/tests/unit/viewer/use-project-status.test.ts → packages/web/src/viewer/hooks/use-polling.ts {usePolling}
-  packages/web/tests/unit/viewer/use-project-status.test.ts → packages/web/src/viewer/hooks/use-project-status.ts {useProjectStatus}
 
 </imports>

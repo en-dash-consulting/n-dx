@@ -1,19 +1,18 @@
 {
   "id": "web-viewer/web/server-3",
   "name": "Web Viewer/web/server 3",
-  "description": "5 files, primarily TypeScript",
+  "description": "3 files, primarily TypeScript",
   "files": [
-    "packages/web/src/server/routes-rex/execution.ts",
-    "packages/web/src/server/routes-rex/index.ts",
-    "packages/web/tests/integration/smart-add-dispatch.test.ts",
-    "packages/web/tests/unit/server/routes-requirements.test.ts",
-    "packages/web/tests/unit/server/routes-rex.test.ts"
+    "packages/web/src/server/prd-io.ts",
+    "packages/web/src/server/search-index.ts",
+    "packages/web/tests/unit/server/search-index.test.ts"
   ],
   "entryPoints": [
-    "packages/web/src/server/routes-rex/index.ts"
+    "packages/web/src/server/prd-io.ts",
+    "packages/web/src/server/search-index.ts"
   ],
-  "cohesion": 0.13,
-  "coupling": 0.87,
-  "fileCount": 5,
-  "lineCount": 2141
+  "cohesion": 0.2,
+  "coupling": 0.8,
+  "fileCount": 3,
+  "lineCount": 1075
 }

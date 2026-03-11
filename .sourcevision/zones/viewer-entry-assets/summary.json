@@ -1,0 +1,22 @@
+{
+  "id": "viewer-entry-assets",
+  "name": "Viewer Entry Assets",
+  "description": "Static viewer entry point bundling the HTML shell and themed logo images that Vite serves as the root of the Preact SPA.",
+  "files": [
+    "packages/web/src/viewer/darkmode_logo.png",
+    "packages/web/src/viewer/index.html",
+    "packages/web/src/viewer/lightmode_logo.png"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 30,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

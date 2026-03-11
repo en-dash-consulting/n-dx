@@ -1,7 +1,7 @@
 {
   "id": "rex-fix-command",
   "name": "Rex Fix Command",
-  "description": "A narrow feature zone encapsulating the rex 'fix' CLI command and its backing core logic, detected as a separate community due to its import cross-traffic with the main rex domain.",
+  "description": "The rex fix CLI command and its underlying core logic for detecting and correcting PRD structural integrity violations.",
   "files": [
     "packages/rex/src/cli/commands/fix.ts",
     "packages/rex/src/core/fix.ts",

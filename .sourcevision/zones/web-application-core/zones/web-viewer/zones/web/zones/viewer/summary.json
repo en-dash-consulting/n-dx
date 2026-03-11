@@ -4,6 +4,7 @@
   "description": "42 files, primarily TypeScript",
   "files": [
     "packages/web/src/schema/v1.ts",
+    "packages/web/src/viewer/api.ts",
     "packages/web/src/viewer/components/breadcrumb.ts",
     "packages/web/src/viewer/components/constants.ts",
     "packages/web/src/viewer/components/data-display/collapsible-section.ts",
@@ -13,7 +14,6 @@
     "packages/web/src/viewer/components/data-display/tree-view.ts",
     "packages/web/src/viewer/components/data-display/zone-map.ts",
     "packages/web/src/viewer/components/detail-panel.ts",
-    "packages/web/src/viewer/components/prd-tree/reorganize-panel.ts",
     "packages/web/src/viewer/components/search-filter.ts",
     "packages/web/src/viewer/components/zone-slideout.ts",
     "packages/web/src/viewer/external.ts",
@@ -26,7 +26,7 @@
     "packages/web/src/viewer/views/architecture.ts",
     "packages/web/src/viewer/views/files.ts",
     "packages/web/src/viewer/views/overview.ts",
-    "packages/web/src/viewer/views/rex-dashboard.ts",
+    "packages/web/src/viewer/views/problems.ts",
     "packages/web/src/viewer/views/routes.ts",
     "packages/web/src/viewer/views/suggestions.ts",
     "packages/web/src/viewer/views/zone-types.ts",
@@ -58,14 +58,14 @@
     "packages/web/src/viewer/views/architecture.ts",
     "packages/web/src/viewer/views/files.ts",
     "packages/web/src/viewer/views/overview.ts",
-    "packages/web/src/viewer/views/rex-dashboard.ts",
+    "packages/web/src/viewer/views/problems.ts",
     "packages/web/src/viewer/views/routes.ts",
     "packages/web/src/viewer/views/suggestions.ts",
     "packages/web/src/viewer/views/zones.ts",
     "packages/web/src/viewer/visualization/index.ts"
   ],
-  "cohesion": 0.89,
-  "coupling": 0.11,
+  "cohesion": 0.81,
+  "coupling": 0.19,
   "fileCount": 42,
-  "lineCount": 9105
+  "lineCount": 8317
 }

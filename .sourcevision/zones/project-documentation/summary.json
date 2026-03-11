@@ -1,7 +1,7 @@
 {
   "id": "project-documentation",
   "name": "Project Documentation",
-  "description": "Architecture decision records, analysis reports, and design documents that capture the project's evolving architectural reasoning and audit trail.",
+  "description": "Architecture decision records, audit reports, and analysis documents that capture the rationale, risks, and structural constraints governing the n-dx codebase.",
   "files": [
     "docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md",
     "docs/analysis/memory-risks-and-flaws.md",

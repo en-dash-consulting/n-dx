@@ -1,0 +1,33 @@
+{
+  "id": "rex-package-metadata",
+  "name": "Rex Package Metadata",
+  "description": "Self-hosted PRD runtime state, documentation, and visual assets belonging to the rex package's own dogfooding environment.",
+  "files": [
+    "packages/rex/.claude/settings.local.json",
+    "packages/rex/.rex/config.json",
+    "packages/rex/.rex/execution-log.jsonl",
+    "packages/rex/.rex/prd.json",
+    "packages/rex/.rex/workflow.md",
+    "packages/rex/README.md",
+    "packages/rex/Rex-F.png",
+    "packages/rex/Rex.png",
+    "packages/rex/context.md",
+    "packages/rex/llms.txt",
+    "packages/rex/package.json",
+    "packages/rex/tests/fixtures/token-usage-regression.json",
+    "packages/rex/tsconfig.json",
+    "packages/rex/vitest.config.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 0,
+  "coupling": 0,
+  "fileCount": 14,
+  "lineCount": 722,
+  "riskMetrics": {
+    "cohesion": 0,
+    "coupling": 0,
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
+    "failsThreshold": false
+  }
+}

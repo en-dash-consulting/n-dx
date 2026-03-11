@@ -1,0 +1,17 @@
+{
+  "id": "web-viewer/web-viewer/web-2/web-viewer",
+  "name": "Web Viewer/web Viewer/web 2/web Viewer",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/web/src/viewer/components/prd-tree/analyze-panel.ts",
+    "packages/web/src/viewer/views/analysis.ts",
+    "packages/web/tests/unit/viewer/analyze-panel.test.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/viewer/views/analysis.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 3,
+  "lineCount": 732
+}

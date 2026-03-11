@@ -1,0 +1,23 @@
+{
+  "id": "rex-e2e-fixtures",
+  "name": "Rex E2E Test Fixtures",
+  "description": "Static fixture data files providing a sample PRD environment for rex end-to-end tests.",
+  "files": [
+    "packages/rex/tests/e2e/fixtures/sample-prd/.rex/config.json",
+    "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl",
+    "packages/rex/tests/e2e/fixtures/sample-prd/.rex/prd.json",
+    "packages/rex/tests/e2e/fixtures/sample-prd/.rex/workflow.md"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 4,
+  "lineCount": 122,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}
