@@ -5,6 +5,12 @@ import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
+import {
+  hashPRD,
+  savePendingSmartPrune,
+  loadPendingSmartPrune,
+  clearPendingSmartPrune,
+} from "../../core/pending-cache.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -461,16 +467,36 @@ async function smartPrune(
   const accept = flags.accept === "true";
   const model = flags.model;
 
-  info("Analyzing PRD for pruning opportunities...");
-  const { proposals, tokenUsage } = await reasonForReshape(doc.items, {
-    dir,
-    model,
-    pruneMode: true,
-  });
+  // Check cache before LLM call
+  const currentHash = hashPRD(doc.items);
+  const cached = await loadPendingSmartPrune(rexDir);
 
-  const usageLine = formatTokenUsage(tokenUsage);
-  if (usageLine) {
-    info(`Token usage: ${usageLine}`);
+  let proposals: ReshapeProposal[];
+  let tokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
+
+  if (cached && cached.proposals.length > 0 && cached.prdHash === currentHash) {
+    info("Using cached proposals");
+    proposals = cached.proposals;
+    tokenUsage = undefined;
+  } else {
+    info("Analyzing PRD for pruning opportunities...");
+    const reshapeResult = await reasonForReshape(doc.items, {
+      dir,
+      model,
+      pruneMode: true,
+    });
+    proposals = reshapeResult.proposals;
+    tokenUsage = reshapeResult.tokenUsage;
+
+    const usageLine = formatTokenUsage(tokenUsage);
+    if (usageLine) {
+      info(`Token usage: ${usageLine}`);
+    }
+
+    // Save proposals to cache after LLM generation
+    if (proposals.length > 0) {
+      await savePendingSmartPrune(rexDir, proposals, currentHash);
+    }
   }
 
   if (proposals.length === 0) {
@@ -539,6 +565,9 @@ async function smartPrune(
 
   info("Saving document...");
   await store.saveDocument(doc);
+
+  // Clear cache after successful application
+  await clearPendingSmartPrune(rexDir);
 
   await store.appendLog({
     timestamp: new Date().toISOString(),

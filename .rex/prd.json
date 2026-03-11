@@ -18522,6 +18522,207 @@
           ]
         }
       ]
+    },
+    {
+      "id": "ff24d31d-6bfc-4ed8-979e-2bc790ed8549",
+      "title": "Smart Prune Proposal Caching Enhancement",
+      "status": "in_progress",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-06T05:59:33.851Z",
+      "completedAt": "2026-03-06T05:59:33.851Z",
+      "children": [
+        {
+          "id": "3691e747-c898-4d76-b2ab-bae1d34b5656",
+          "title": "LLM Proposal Caching for Prune Operations",
+          "status": "completed",
+          "level": "feature",
+          "description": "Implement caching system for smart prune proposals to enable reuse between dry-run and accept operations without redundant LLM calls",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T05:59:33.646Z",
+          "completedAt": "2026-03-06T05:59:33.646Z",
+          "children": [
+            {
+              "id": "3b13ba93-c5f1-4f48-a0ba-c1e19436b62e",
+              "title": "Implement pending smart prune cache infrastructure",
+              "status": "completed",
+              "level": "task",
+              "description": "Create cache file structure, interfaces, and utility functions for smart prune proposals following the reshape.ts pattern with PendingSmartPruneCache interface and file operations",
+              "acceptanceCriteria": [
+                "PENDING_SMART_PRUNE_FILE constant defined as 'pending-smart-prune.json'",
+                "PendingSmartPruneCache interface includes generatedAt, prdHash, and proposals fields",
+                "savePendingSmartPrune, loadPendingSmartPrune, and clearPendingSmartPrune functions implemented",
+                "hashPRD function implemented using SHA256 hash of canonical JSON"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "caching",
+                "backend"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:44:55.116Z",
+              "completedAt": "2026-03-06T05:49:44.946Z",
+              "children": []
+            },
+            {
+              "id": "f6e8b37f-0ad4-41a2-abc2-79af26d5bc79",
+              "title": "Integrate cache with smart prune workflow",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire cache operations into the existing smartPrune function to check cache before LLM calls, save proposals after generation, and clear cache after successful application",
+              "acceptanceCriteria": [
+                "Cache checked before LLM call in smartPrune function with hash validation",
+                "Cached proposals used when valid with 'Using cached proposals' log message",
+                "Proposals saved to cache after LLM generation with current PRD hash",
+                "Cache cleared after successful prune application",
+                "Required imports added for crypto and filesystem operations"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "integration",
+                "workflow"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:55:06.130Z",
+              "completedAt": "2026-03-06T05:59:33.382Z",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "c79dec6c-2402-4a63-a9dd-aa81f4270f83",
+          "title": "Integration tests for smart prune caching workflow",
+          "status": "pending",
+          "level": "feature",
+          "source": "manual",
+          "priority": "high",
+          "description": "Add integration tests to verify the smart prune caching workflow end-to-end. Tests go in packages/rex/tests/integration/cli/commands/prune-cache.test.ts.\n\nThe smart prune caching feature (packages/rex/src/cli/commands/prune.ts lines 467-502) caches LLM-generated reshape proposals so that a dry-run followed by --accept reuses proposals without a second LLM call. The cache module is packages/rex/src/core/pending-cache.ts (hashPRD, savePendingSmartPrune, loadPendingSmartPrune, clearPendingSmartPrune).\n\nUnit tests exist in packages/rex/tests/unit/core/pending-cache.test.ts covering the cache module in isolation. These new integration tests must cover the actual smartPrune function's caching behavior.",
+          "acceptanceCriteria": [
+            "Test: cache file (.rex/pending-smart-prune.json) is written after LLM generation with correct prdHash",
+            "Test: second smartPrune call with unchanged PRD uses cache (reasonForReshape not called again, 'Using cached proposals' message emitted)",
+            "Test: cache is invalidated when PRD changes between runs (hash mismatch triggers fresh LLM call)",
+            "Test: cache is cleared after successful apply (accept=true)",
+            "All tests mock the LLM layer (vi.mock on reasonForReshape from ../../core/reshape.js) — no real LLM calls",
+            "Tests use temp directory with valid .rex/prd.json setup per test case"
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "6772d41b-37bf-44ea-9cf9-e7dc25c15c79",
+      "title": "Smart Add Cache Validation Enhancement",
+      "status": "in_progress",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-06T06:05:30.434Z",
+      "completedAt": "2026-03-06T06:05:30.434Z",
+      "children": [
+        {
+          "id": "e8159df5-c695-4c99-b0c0-852f340bf809",
+          "title": "PRD Hash Validation for Smart Add Cache",
+          "status": "completed",
+          "level": "feature",
+          "description": "Add PRD hash validation to smart-add pending proposal cache to prevent applying stale proposals when PRD changes between generation and acceptance",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T06:05:30.268Z",
+          "completedAt": "2026-03-06T06:05:30.268Z",
+          "children": [
+            {
+              "id": "5bdab225-50f0-4d3b-b58f-5e6b884e1ac6",
+              "title": "Add staleness detection for cached proposals",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement validation logic in tryAcceptCachedProposals to detect when PRD has changed since cached proposals were generated and handle stale cache appropriately",
+              "acceptanceCriteria": [
+                "Current PRD hash computed and compared with cached prdHash in tryAcceptCachedProposals",
+                "Warning message displayed when PRD changes detected: 'PRD has changed since proposals were generated'",
+                "Stale cache automatically cleared when hash mismatch found",
+                "Backwards compatibility maintained for cache entries without hash",
+                "Function returns false when stale cache detected to trigger regeneration"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "validation",
+                "staleness-detection"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:37:14.315Z",
+              "completedAt": "2026-03-06T06:05:29.949Z",
+              "children": []
+            },
+            {
+              "id": "d96ec242-803d-40ff-a008-609baa3d3366",
+              "title": "Implement PRD hash validation in smart-add cache structure",
+              "status": "completed",
+              "level": "task",
+              "description": "Update pending proposal cache to include PRD hash metadata and implement hash calculation function for PRD change detection",
+              "acceptanceCriteria": [
+                "hashPRD function implemented using SHA256 of canonical JSON",
+                "savePending function updated to accept and store prdHash parameter",
+                "loadPending function return type updated to include optional prdHash field",
+                "Required crypto and canonical JSON imports added"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "caching",
+                "validation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:49:45.412Z",
+              "completedAt": "2026-03-06T05:55:05.622Z",
+              "children": []
+            },
+            {
+              "id": "f254899a-6ef9-4ff8-8380-59752d29b5aa",
+              "title": "Update cache save operations with hash metadata",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify all savePending call sites to compute and pass PRD hash, ensuring cache entries include hash metadata for validation",
+              "acceptanceCriteria": [
+                "Both savePending call sites (around lines 1140 and 1326) updated to compute and pass PRD hash",
+                "PRD items accessible at call sites for hash computation",
+                "Cache structure consistently includes prdHash field across all save operations",
+                "Hash computation uses current PRD state at time of caching"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "caching",
+                "integration"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T05:59:34.169Z",
+              "completedAt": "2026-03-06T06:03:07.165Z",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "3ac045d9-23d2-442e-8be6-28d13edea664",
+          "title": "Integration tests for smart-add cache staleness detection",
+          "status": "pending",
+          "level": "feature",
+          "source": "manual",
+          "priority": "high",
+          "description": "Add integration tests to verify the smart-add PRD hash validation and staleness detection. Tests go in packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts.\n\nThe smart-add caching feature (packages/rex/src/cli/commands/smart-add.ts) saves a prdHash alongside cached proposals via savePending(). When --accept is used, replayCachedIfRequested() (line ~1129) loads cached proposals, computes current PRD hash, and compares. If hashes differ, it warns and clears stale cache.\n\nThe prdHash is passed through maybeCacheSmartAddProposals() at three call sites (lines ~1376, ~1496, ~1532) using hashPRD(existing) where existing is the current PRD items array.\n\nKey functions to test:\n- savePending (line 706): should include prdHash in JSON\n- loadPending (line 714): should return prdHash from JSON  \n- replayCachedIfRequested (line ~1127): staleness check logic\n- maybeCacheSmartAddProposals (line ~1303): hash passthrough",
+          "acceptanceCriteria": [
+            "Test: savePending writes prdHash to pending-proposals.json when provided",
+            "Test: loadPending returns prdHash from cached file",
+            "Test: --accept (replayCachedIfRequested) succeeds when PRD hash matches cached hash",
+            "Test: --accept rejects stale cache when PRD has changed (warns and clears cache, returns false)",
+            "Test: --accept works with backward-compatible cache files that have no prdHash field (proceeds without validation)",
+            "Test: maybeCacheSmartAddProposals passes hash through to savePending",
+            "All tests mock the LLM layer — no real LLM calls",
+            "Tests use temp directory with valid .rex/ setup per test case"
+          ],
+          "children": []
+        }
+      ]
     }
   ]
 }
