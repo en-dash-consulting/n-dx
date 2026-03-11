@@ -121,7 +121,6 @@ const INTRA_PACKAGE_RULES = [
 const KNOWN_VIOLATIONS = new Set([
   // rex domain → cli imports (tracked for resolution)
   "packages/rex/src/analyze/guided.ts",
-  "packages/rex/src/core/move.ts",
   // sourcevision domain → cli imports (tracked for resolution)
   "packages/sourcevision/src/analyzers/classify.ts",
   "packages/sourcevision/src/analyzers/enrich-batch.ts",

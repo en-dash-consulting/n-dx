@@ -8,7 +8,6 @@
         "packages/web/src/viewer/views/hench-runs.ts": "web-dashboard",
         "packages/web/src/viewer/hooks/use-polling.ts": "web-dashboard",
         "packages/hench/src/prd/rex-gateway.ts": "hench-gateway",
-        "packages/hench/src/shared/glob.ts": "autonomous-agent-engine",
         "packages/web/src/server/rex-gateway.ts": "web-server",
         "packages/web/src/server/domain-gateway.ts": "web-server",
         "packages/web/src/viewer/external.ts": "web-viewer",
@@ -18,7 +17,14 @@
         "packages/web/src/viewer/messaging/message-coalescer.ts": "viewer-message-pipeline",
         "packages/web/src/viewer/messaging/message-throttle.ts": "viewer-message-pipeline",
         "packages/web/src/viewer/messaging/request-dedup.ts": "viewer-message-pipeline",
-        "packages/web/src/viewer/messaging/ws-pipeline.ts": "viewer-message-pipeline"
+        "packages/web/src/viewer/messaging/ws-pipeline.ts": "viewer-message-pipeline",
+        "packages/web/build.js": "web-package-assets",
+        "packages/web/dev.js": "web-package-assets",
+        "packages/web/package.json": "web-package-assets",
+        "packages/web/tsconfig.json": "web-package-assets",
+        "packages/web/vitest.config.ts": "web-package-assets",
+        "packages/web/SourceVision-F.png": "web-package-assets",
+        "packages/web/SourceVision.png": "web-package-assets"
       }
     }
   }
